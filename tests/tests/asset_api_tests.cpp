@@ -52,7 +52,7 @@ BOOST_AUTO_TEST_CASE( asset_holders )
 
    // make call
    vector<account_asset_balance> holders = asset_api.get_asset_holders(asset_id_type(), 0, 100);
-   BOOST_CHECK_EQUAL(holders.size(), 4);
+   BOOST_CHECK_EQUAL(holders.size(), 4u);
 
    // by now we can guarantee the order
    BOOST_CHECK(holders[0].name == "committee-account");

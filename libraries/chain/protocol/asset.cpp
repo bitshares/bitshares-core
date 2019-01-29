@@ -115,17 +115,20 @@ namespace graphene { namespace chain {
          auto ocp = cp;
 
          bool shrinked = false;
+         bool using_max = false;
          static const int128_t max( GRAPHENE_MAX_SHARE_SUPPLY );
          while( cp.numerator() > max || cp.denominator() > max )
          {
             if( cp.numerator() == 1 )
             {
                cp = boost::rational<int128_t>( 1, max );
+               using_max = true;
                break;
             }
             else if( cp.denominator() == 1 )
             {
                cp = boost::rational<int128_t>( max, 1 );
+               using_max = true;
                break;
             }
             else
@@ -168,10 +171,13 @@ namespace graphene { namespace chain {
          price np = asset( cp.numerator().convert_to<int64_t>(), p.base.asset_id )
                   / asset( cp.denominator().convert_to<int64_t>(), p.quote.asset_id );
 
-         if( ( r.numerator() > r.denominator() && np < p )
-               || ( r.numerator() < r.denominator() && np > p ) )
-            // even with an accurate result, if p is out of valid range, return it
-            np = p;
+         if( shrinked || using_max )
+         {
+            if( ( r.numerator() > r.denominator() && np < p )
+                  || ( r.numerator() < r.denominator() && np > p ) )
+               // even with an accurate result, if p is out of valid range, return it
+               np = p;
+         }
 
          np.validate();
          return np;
@@ -201,7 +207,6 @@ namespace graphene { namespace chain {
       price price::call_price( const asset& debt, const asset& collateral, uint16_t collateral_ratio)
       { try {
          // TODO replace the calculation with new operator*() and/or operator/(), could be a hardfork change due to edge cases
-         //wdump((debt)(collateral)(collateral_ratio));
          boost::rational<int128_t> swan(debt.amount.value,collateral.amount.value);
          boost::rational<int128_t> ratio( collateral_ratio, GRAPHENE_COLLATERAL_RATIO_DENOM );
          auto cp = swan * ratio;
@@ -209,7 +214,8 @@ namespace graphene { namespace chain {
          while( cp.numerator() > GRAPHENE_MAX_SHARE_SUPPLY || cp.denominator() > GRAPHENE_MAX_SHARE_SUPPLY )
             cp = boost::rational<int128_t>( (cp.numerator() >> 1)+1, (cp.denominator() >> 1)+1 );
 
-         return ~(asset( cp.numerator().convert_to<int64_t>(), debt.asset_id ) / asset( cp.denominator().convert_to<int64_t>(), collateral.asset_id ));
+         return  (  asset( cp.denominator().convert_to<int64_t>(), collateral.asset_id )
+                  / asset( cp.numerator().convert_to<int64_t>(), debt.asset_id ) );
       } FC_CAPTURE_AND_RETHROW( (debt)(collateral)(collateral_ratio) ) }
 
       bool price::is_null() const

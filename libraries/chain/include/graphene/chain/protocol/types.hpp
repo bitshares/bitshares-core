@@ -74,7 +74,6 @@ namespace graphene { namespace chain {
    using                               fc::enum_type;
    using                               fc::optional;
    using                               fc::unsigned_int;
-   using                               fc::signed_int;
    using                               fc::time_point_sec;
    using                               fc::time_point;
    using                               fc::safe;
@@ -265,6 +264,14 @@ namespace graphene { namespace chain {
        friend bool operator == ( const public_key_type& p1, const fc::ecc::public_key& p2);
        friend bool operator == ( const public_key_type& p1, const public_key_type& p2);
        friend bool operator != ( const public_key_type& p1, const public_key_type& p2);
+   };
+
+   class pubkey_comparator {
+   public:
+      inline bool operator()( const public_key_type& a, const public_key_type& b )const
+      {
+         return a.key_data < b.key_data;
+      }
    };
 
    struct extended_public_key_type

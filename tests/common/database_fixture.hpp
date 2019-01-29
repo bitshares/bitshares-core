@@ -170,6 +170,12 @@ extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;
 
 namespace graphene { namespace chain {
 
+class clearable_block : public signed_block {
+public:
+   /** @brief Clears internal cached values like ID, signing key, Merkle root etc. */
+   void clear();
+};
+
 struct database_fixture {
    // the reason we use an app is to exercise the indexes of built-in
    //   plugins
@@ -193,7 +199,6 @@ struct database_fixture {
    static fc::ecc::private_key generate_private_key(string seed);
    string generate_anon_acct_name();
    static void verify_asset_supplies( const database& db );
-   void verify_account_history_plugin_index( )const;
    void open_database();
    signed_block generate_block(uint32_t skip = ~0,
                                const fc::ecc::private_key& key = generate_private_key("null_key"),
@@ -312,9 +317,11 @@ struct database_fixture {
 
    const committee_member_object& create_committee_member( const account_object& owner );
    const witness_object& create_witness(account_id_type owner,
-                                        const fc::ecc::private_key& signing_private_key = generate_private_key("null_key"));
+                                        const fc::ecc::private_key& signing_private_key = generate_private_key("null_key"),
+                                        uint32_t skip_flags = ~0);
    const witness_object& create_witness(const account_object& owner,
-                                        const fc::ecc::private_key& signing_private_key = generate_private_key("null_key"));
+                                        const fc::ecc::private_key& signing_private_key = generate_private_key("null_key"),
+                                        uint32_t skip_flags = ~0);
    const worker_object& create_worker(account_id_type owner, const share_type daily_pay = 1000, const fc::microseconds& duration = fc::days(2));
    uint64_t fund( const account_object& account, const asset& amount = asset(500000) );
    digest_type digest( const transaction& tx );

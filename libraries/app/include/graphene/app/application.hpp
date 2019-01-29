@@ -38,8 +38,7 @@ namespace graphene { namespace app {
    class application_options
    {
       public:
-         // TODO change default to false when GUI is ready
-         bool enable_subscribe_to_all = true;
+         bool enable_subscribe_to_all = false;
          bool has_market_history_plugin = false;
    };
 
@@ -49,18 +48,17 @@ namespace graphene { namespace app {
          application();
          ~application();
 
-         void set_program_options( boost::program_options::options_description& command_line_options,
-                                   boost::program_options::options_description& configuration_file_options )const;
-         void initialize(const fc::path& data_dir, const boost::program_options::variables_map&options);
-         void initialize_plugins( const boost::program_options::variables_map& options );
+         void set_program_options(boost::program_options::options_description& command_line_options,
+                                  boost::program_options::options_description& configuration_file_options)const;
+         void initialize(const fc::path& data_dir, const boost::program_options::variables_map& options);
+         void initialize_plugins(const boost::program_options::variables_map& options);
          void startup();
          void shutdown();
          void startup_plugins();
          void shutdown_plugins();
 
          template<typename PluginType>
-         std::shared_ptr<PluginType> register_plugin()
-         {
+         std::shared_ptr<PluginType> register_plugin(bool auto_load = false) {
             auto plug = std::make_shared<PluginType>();
             plug->plugin_set_app(this);
 
@@ -73,6 +71,10 @@ namespace graphene { namespace app {
                _cfg_options.add(plugin_cfg_options);
 
             add_available_plugin( plug );
+
+            if (auto_load)
+                enable_plugin(plug->plugin_name());
+
             return plug;
          }
          std::shared_ptr<abstract_plugin> get_plugin( const string& name )const;
@@ -99,8 +101,9 @@ namespace graphene { namespace app {
 
          const application_options& get_options();
 
-      private:
          void enable_plugin( const string& name );
+
+      private:
          void add_available_plugin( std::shared_ptr<abstract_plugin> p );
          std::shared_ptr<detail::application_impl> my;
 

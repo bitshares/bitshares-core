@@ -87,8 +87,7 @@ BOOST_AUTO_TEST_CASE( get_potential_signatures_owner_and_active ) {
          trx.operations.push_back(op);
          sign(trx, nathan_key1);
          PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-         trx.operations.clear();
-         trx.signatures.clear();
+         trx.clear();
       } FC_CAPTURE_AND_RETHROW ((nathan.active))
 
       // this op requires active
@@ -155,8 +154,7 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_owner_or_active ) {
          trx.operations.push_back(op);
          sign(trx, nathan_key1);
          PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-         trx.operations.clear();
-         trx.signatures.clear();
+         trx.clear();
       } FC_CAPTURE_AND_RETHROW ((nathan.active))
 
       graphene::app::database_api db_api(db);
@@ -310,7 +308,7 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not ) {
       BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
 
       // sign with m, should be enough
-      trx.signatures.clear();
+      trx.clear_signatures();
       sign(trx, morgan_key);
 
       // provides [], should return []
@@ -365,7 +363,7 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not ) {
       BOOST_CHECK( pub_keys.size() == 0 );
 
       // make a transaction that require 2 signatures (m+n)
-      trx.signatures.clear();
+      trx.clear_signatures();
       op.from = nathan.id;
       trx.operations.push_back(op);
 
@@ -492,7 +490,7 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not ) {
       BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
 
       // sign with m, but actually need m+n
-      trx.signatures.clear();
+      trx.clear_signatures();
       sign(trx, morgan_key);
 
       // provides [], should return []
@@ -832,5 +830,115 @@ BOOST_AUTO_TEST_CASE( get_transaction_hex )
                    fc::to_hex( fc::raw::pack( trx.signatures ) ) == hex_str );
 
 } FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(verify_account_authority) 
+{
+      try {
+         
+         ACTORS( (nathan) );
+         graphene::app::database_api db_api(db);
+
+         // good keys
+         flat_set<public_key_type> public_keys;
+         public_keys.emplace(nathan_public_key);
+         BOOST_CHECK(db_api.verify_account_authority( "nathan", public_keys));
+
+         // bad keys
+         flat_set<public_key_type> bad_public_keys;
+         bad_public_keys.emplace(public_key_type("BTS6MkMxwBjFWmcDjXRoJ4mW9Hd4LCSPwtv9tKG1qYW5Kgu4AhoZy"));
+         BOOST_CHECK(!db_api.verify_account_authority( "nathan", bad_public_keys));
+
+      } FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE( any_two_of_three )
+{
+   try {
+      fc::ecc::private_key nathan_key1 = fc::ecc::private_key::regenerate(fc::digest("key1"));
+      fc::ecc::private_key nathan_key2 = fc::ecc::private_key::regenerate(fc::digest("key2"));
+      fc::ecc::private_key nathan_key3 = fc::ecc::private_key::regenerate(fc::digest("key3"));
+      const account_object& nathan = create_account("nathan", nathan_key1.get_public_key() );
+      fund(nathan);
+      graphene::app::database_api db_api(db);
+
+      try {
+         account_update_operation op;
+         op.account = nathan.id;
+         op.active = authority(2, public_key_type(nathan_key1.get_public_key()), 1, 
+               public_key_type(nathan_key2.get_public_key()), 1, public_key_type(nathan_key3.get_public_key()), 1);
+         op.owner = *op.active;
+         trx.operations.push_back(op);
+         sign(trx, nathan_key1);
+         PUSH_TX( db, trx, database::skip_transaction_dupe_check );
+         trx.clear();
+      } FC_CAPTURE_AND_RETHROW ((nathan.active))
+
+      // two keys should work
+      {
+      	flat_set<public_key_type> public_keys;
+      	public_keys.emplace(nathan_key1.get_public_key());
+      	public_keys.emplace(nathan_key2.get_public_key());
+      	BOOST_CHECK(db_api.verify_account_authority("nathan", public_keys));
+      }
+
+      // the other two keys should work
+      {
+     	   flat_set<public_key_type> public_keys;
+      	public_keys.emplace(nathan_key2.get_public_key());
+      	public_keys.emplace(nathan_key3.get_public_key());
+     	   BOOST_CHECK(db_api.verify_account_authority("nathan", public_keys));
+      }
+
+      // just one key should not work
+      {
+     	   flat_set<public_key_type> public_keys;
+         public_keys.emplace(nathan_key1.get_public_key());
+     	   BOOST_CHECK(!db_api.verify_account_authority("nathan", public_keys));
+      }
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( verify_authority_multiple_accounts )
+{
+   try {
+      ACTORS( (nathan) (alice) (bob) );
+
+      graphene::app::database_api db_api(db);
+
+      try {
+         account_update_operation op;
+         op.account = nathan.id;
+         op.active = authority(3, nathan_public_key, 1, alice.id, 1, bob.id, 1);
+         op.owner = *op.active;
+         trx.operations.push_back(op);
+         sign(trx, nathan_private_key);
+         PUSH_TX( db, trx, database::skip_transaction_dupe_check );
+         trx.clear();
+      } FC_CAPTURE_AND_RETHROW ((nathan.active))
+
+      // requires 3 signatures
+      {
+      	flat_set<public_key_type> public_keys;
+      	public_keys.emplace(nathan_public_key);
+      	public_keys.emplace(alice_public_key);
+      	public_keys.emplace(bob_public_key);
+      	BOOST_CHECK(db_api.verify_account_authority("nathan", public_keys));
+      }
+
+      // only 2 signatures given
+      {
+      	flat_set<public_key_type> public_keys;
+      	public_keys.emplace(nathan_public_key);
+      	public_keys.emplace(bob_public_key);
+      	BOOST_CHECK(!db_api.verify_account_authority("nathan", public_keys));
+      }
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
 
 BOOST_AUTO_TEST_SUITE_END()
