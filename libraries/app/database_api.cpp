@@ -1109,6 +1109,11 @@ vector<vesting_balance_object> database_api_impl::get_vesting_balances( const st
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
+asset_id_type database_api::get_asset_id_from_string(const std::string& name_or_id)const
+{
+   return my->get_asset_from_string( name_or_id )->id; // safe?
+}
+
 vector<optional<asset_object>> database_api::get_assets(const vector<std::string>& asset_symbols_or_ids)const
 {
    return my->get_assets( asset_symbols_or_ids );

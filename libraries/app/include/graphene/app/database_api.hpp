@@ -373,6 +373,13 @@ class database_api
       // Assets //
       ////////////
 
+     /**
+      * @brief Get asset id from a name or ID
+      * @param name_or_id ID or name of the asset
+      * @return asset id
+      */
+      asset_id_type get_asset_id_from_string(const std::string& name_or_id) const;
+
       /**
        * @brief Get a list of assets by ID
        * @param asset_symbols_or_ids Symbol names or IDs of the assets to retrieve
