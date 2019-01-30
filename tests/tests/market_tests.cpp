@@ -1308,7 +1308,7 @@ BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
    BOOST_CHECK_LT( call2_to_cover.value, call2_id(db).debt.value );
    // even though call2 has a higher CR, since call's TCR is less than call2's TCR, so we expect call will cover less when called
    BOOST_CHECK_LT( call_to_cover.value, call2_to_cover.value );
-   
+
    // Create a big sell order slightly below the call price, will be matched with several orders
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(700*4), core.amount(5900*4) ) );
 
