@@ -157,12 +157,12 @@ namespace graphene { namespace chain {
        *   Throws an exception when failed.
        *
        * @param chain_id the ID of a block chain
-       * @param get_active callback function to retrieve active authority of a given account
-       * @param get_active callback function to retrieve owner authority of a given account
+       * @param get_active callback function to retrieve active authorities of a given account
+       * @param get_owner  callback function to retrieve owner authorities of a given account
        * @param allow_non_immediate_owner whether to allow owner authrity of non-immediately
        *            required accounts to authorize operations in the transaction
        * @param max_recursion maximum level of recursion when verifying, since an account
-       *            can have another account in active authority and/or owner authority
+       *            can have another account in active authorities and/or owner authorities
        */
       void verify_authority(
          const chain_id_type& chain_id,
@@ -235,12 +235,12 @@ namespace graphene { namespace chain {
     *
     * @param ops a vector of operations
     * @param sigs a set of public keys
-    * @param get_active callback function to retrieve active authority of a given account
-    * @param get_active callback function to retrieve owner authority of a given account
+    * @param get_active callback function to retrieve active authorities of a given account
+    * @param get_owner  callback function to retrieve owner authorities of a given account
     * @param allow_non_immediate_owner whether to allow owner authrity of non-immediately
     *            required accounts to authorize operations
     * @param max_recursion maximum level of recursion when verifying, since an account
-    *            can have another account in active authority and/or owner authority
+    *            can have another account in active authorities and/or owner authorities
     * @param allow_committee whether to allow the special "committee account" to authorize the operations
     * @param active_approvals accounts that approved the operations with their active authories
     * @param owner_approvals accounts that approved the operations with their owner authories
