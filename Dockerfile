@@ -23,8 +23,6 @@ RUN \
       libboost-test-dev \
       libboost-context-dev \
       libboost-regex-dev \
-      libboost-locale-dev \
-      libboost-signals-dev \
       libboost-coroutine-dev \
       doxygen \
       ca-certificates \

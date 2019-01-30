@@ -10,7 +10,7 @@ dist: xenial
 sudo: true
 
 install:
- - sudo apt-get install --allow-unauthenticated libboost-thread-dev libboost-iostreams-dev libboost-date-time-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libboost-chrono-dev libboost-test-dev libboost-context-dev libboost-regex-dev libboost-locale-dev libboost-signals-dev libboost-coroutine-dev cmake parallel
+ - sudo apt-get install --allow-unauthenticated libboost-thread-dev libboost-iostreams-dev libboost-date-time-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libboost-chrono-dev libboost-test-dev libboost-context-dev libboost-regex-dev libboost-coroutine-dev cmake parallel
 
 addons:
   sonarcloud:
