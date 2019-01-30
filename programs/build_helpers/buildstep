@@ -46,7 +46,7 @@ if [ "$CMD" != "" ]; then
 	echo "Running '$NAME' at $NOW..."
 	echo "sh -c '$CMD'"
 	echo "$max $begin $NAME $NOW" >_start_time
-	exec sh -c "$CMD"
+	exec bash -c "$CMD"
     fi
     echo "$(($begin + $max - $NOW))s left - insufficient to run '$NAME', exiting!" 1>&2
     exit 1
