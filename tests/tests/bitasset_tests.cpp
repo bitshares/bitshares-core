@@ -1089,9 +1089,6 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
          blocks += generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
          bool now_after_hf_343 = ( db.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_343_TIME );
 
-         // order is filled here
-         BOOST_CHECK( !db.find<limit_order_object>( sell_id ) );
-
          if( was_before_hf_343 && now_after_hf_343 ) // if hf 343 executed at same maintenance interval, actually after hf 890
             affected_by_hf_343 = true;
       }
@@ -1126,7 +1123,7 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
          BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
          if( i % 2 == 0) { // MCR test, median MCR should be 350% and order will not be filled except when i = 0
             BOOST_CHECK_EQUAL(usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500);
-            if(i / 2 == 0)  // order is filled with i = 0 at HARDFORK_CORE_343_TIME + mi
+            if( affected_by_hf_343 )
                BOOST_CHECK(!db.find<limit_order_object>(sell_id));
             else
                BOOST_CHECK(db.find<limit_order_object>(sell_id)); // MCR bug, order still there
