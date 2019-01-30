@@ -24,6 +24,7 @@ RUN \
       libboost-context-dev \
       libboost-regex-dev \
       libboost-coroutine-dev \
+      libtool \
       doxygen \
       ca-certificates \
       fish \
