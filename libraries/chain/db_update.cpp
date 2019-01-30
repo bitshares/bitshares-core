@@ -28,6 +28,7 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
@@ -116,9 +117,10 @@ void database::update_last_irreversible_block()
 
    static_assert( GRAPHENE_IRREVERSIBLE_THRESHOLD > 0, "irreversible threshold must be nonzero" );
 
-   // 1 1 1 2 2 2 2 2 2 2 -> 2     .7*10 = 7
+   // 1 1 1 2 2 2 2 2 2 2 -> 2     .3*10 = 3
    // 1 1 1 1 1 1 1 2 2 2 -> 1
    // 3 3 3 3 3 3 3 3 3 3 -> 3
+   // 3 3 3 4 4 4 4 4 4 4 -> 4
 
    size_t offset = ((GRAPHENE_100_PERCENT - GRAPHENE_IRREVERSIBLE_THRESHOLD) * wit_objs.size() / GRAPHENE_100_PERCENT);
 
@@ -573,6 +575,24 @@ void database::update_withdraw_permissions()
    auto& permit_index = get_index_type<withdraw_permission_index>().indices().get<by_expiration>();
    while( !permit_index.empty() && permit_index.begin()->expiration <= head_block_time() )
       remove(*permit_index.begin());
+}
+
+void database::clear_expired_htlcs()
+{
+   const auto& htlc_idx = get_index_type<htlc_index>().indices().get<by_expiration>();
+   while ( htlc_idx.begin() != htlc_idx.end()
+         && htlc_idx.begin()->expiration <= head_block_time() )
+   {
+      const htlc_object& obj = *htlc_idx.begin();
+      adjust_balance( obj.from, obj.amount );
+      // virtual op
+      htlc_refund_operation vop( obj.id, obj.from );
+      vop.htlc_id = htlc_idx.begin()->id;
+      push_applied_operation( vop );
+
+      // remove the db object
+      remove( *htlc_idx.begin() );
+   }
 }
 
 } }

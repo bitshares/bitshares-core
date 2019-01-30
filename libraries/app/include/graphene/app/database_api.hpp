@@ -501,28 +501,34 @@ class database_api
       vector<market_volume> get_top_markets(uint32_t limit)const;
 
       /**
-       * @brief Returns recent trades for the market assetA:assetB, ordered by time, most recent first. The range is [stop, start)
-       * Note: Currently, timezone offsets are not supported. The time must be UTC.
-       * @param a String name of the first asset
-       * @param b String name of the second asset
-       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
-       * @param limit Number of trasactions to retrieve, capped at 100
+       * @brief Returns recent trades for the market base:quote, ordered by time, most recent first.
+       * Note: Currently, timezone offsets are not supported. The time must be UTC. The range is [stop, start).
+       *       In case when there are more than 100 trades occurred in the same second, this API only returns
+       *       the first 100 records, can use another API `get_trade_history_by_sequence` to query for the rest.
+       * @param base symbol or ID of the base asset
+       * @param quote symbol or ID of the quote asset
        * @param start Start time as a UNIX timestamp, the latest trade to retrieve
+       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
+       * @param limit Number of trasactions to retrieve, capped at 100.
        * @return Recent transactions in the market
        */
-      vector<market_trade> get_trade_history( const string& base, const string& quote, fc::time_point_sec start, fc::time_point_sec stop, unsigned limit = 100 )const;
+      vector<market_trade> get_trade_history( const string& base, const string& quote,
+                                              fc::time_point_sec start, fc::time_point_sec stop,
+                                              unsigned limit = 100 )const;
 
       /**
-       * @brief Returns trades for the market assetA:assetB, ordered by time, most recent first. The range is [stop, start)
-       * Note: Currently, timezone offsets are not supported. The time must be UTC.
-       * @param a String name of the first asset
-       * @param b String name of the second asset
+       * @brief Returns trades for the market base:quote, ordered by time, most recent first.
+       * Note: Currently, timezone offsets are not supported. The time must be UTC. The range is [stop, start).
+       * @param base symbol or ID of the base asset
+       * @param quote symbol or ID of the quote asset
+       * @param start Start sequence as an Integer, the latest trade to retrieve
        * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
        * @param limit Number of trasactions to retrieve, capped at 100
-       * @param start Start sequence as an Integer, the latest trade to retrieve
        * @return Transactions in the market
        */
-      vector<market_trade> get_trade_history_by_sequence( const string& base, const string& quote, int64_t start, fc::time_point_sec stop, unsigned limit = 100 )const;
+      vector<market_trade> get_trade_history_by_sequence( const string& base, const string& quote,
+                                                          int64_t start, fc::time_point_sec stop,
+                                                          unsigned limit = 100 )const;
 
 
 
@@ -663,9 +669,12 @@ class database_api
       bool           verify_authority( const signed_transaction& trx )const;
 
       /**
-       * @return true if the signers have enough authority to authorize an account
+       * @brief Verify that the public keys have enough authority to approve an operation for this account
+       * @param account_name_or_id the account to check
+       * @param signers the public keys
+       * @return true if the passed in keys have enough authority to approve an operation for this account
        */
-      bool           verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )const;
+      bool verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )const;
 
       /**
        *  Validates a transaction against the current state without broadcasting it on the network.

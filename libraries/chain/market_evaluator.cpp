@@ -157,8 +157,10 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 { try {
    database& d = db();
 
+   auto next_maintenance_time = d.get_dynamic_global_properties().next_maintenance_time;
+
    // TODO: remove this check and the assertion after hf_834
-   if( d.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_834_TIME )
+   if( next_maintenance_time <= HARDFORK_CORE_834_TIME )
       FC_ASSERT( !o.extensions.value.target_collateral_ratio.valid(),
                  "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
 
@@ -166,6 +168,14 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    _debt_asset     = &o.delta_debt.asset_id(d);
    FC_ASSERT( _debt_asset->is_market_issued(), "Unable to cover ${sym} as it is not a collateralized asset.",
               ("sym", _debt_asset->symbol) );
+
+   _dynamic_data_obj = &_debt_asset->dynamic_asset_data_id(d);
+   FC_ASSERT( next_maintenance_time <= HARDFORK_CORE_1465_TIME 
+         || _dynamic_data_obj->current_supply + o.delta_debt.amount <= _debt_asset->options.max_supply,
+      "Borrowing this quantity would exceed MAX_SUPPLY" );
+
+   FC_ASSERT( _dynamic_data_obj->current_supply + o.delta_debt.amount >= 0,
+         "This transaction would bring current supply below zero.");
 
    _bitasset_data  = &_debt_asset->bitasset_data(d);
 
@@ -189,7 +199,7 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 
-void_result call_order_update_evaluator::do_apply(const call_order_update_operation& o)
+object_id_type call_order_update_evaluator::do_apply(const call_order_update_operation& o)
 { try {
    database& d = db();
 
@@ -198,9 +208,8 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
       d.adjust_balance( o.funding_account, o.delta_debt );
 
       // Deduct the debt paid from the total supply of the debt asset.
-      d.modify(_debt_asset->dynamic_asset_data_id(d), [&](asset_dynamic_data_object& dynamic_asset) {
+      d.modify(*_dynamic_data_obj, [&](asset_dynamic_data_object& dynamic_asset) {
          dynamic_asset.current_supply += o.delta_debt.amount;
-         FC_ASSERT(dynamic_asset.current_supply >= 0);
       });
    }
 
@@ -223,6 +232,7 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
    auto& call_idx = d.get_index_type<call_order_index>().indices().get<by_account>();
    auto itr = call_idx.find( boost::make_tuple(o.funding_account, o.delta_debt.asset_id) );
    const call_order_object* call_obj = nullptr;
+   call_order_id_type call_order_id;
 
    optional<price> old_collateralization;
    optional<share_type> old_debt;
@@ -243,18 +253,20 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
             call.call_price = price( asset( 1, o.delta_collateral.asset_id ), asset( 1, o.delta_debt.asset_id ) );
          call.target_collateral_ratio = o.extensions.value.target_collateral_ratio;
       });
+      call_order_id = call_obj->id;
    }
    else // updating existing debt position
    {
       call_obj = &*itr;
       auto new_collateral = call_obj->collateral + o.delta_collateral.amount;
       auto new_debt = call_obj->debt + o.delta_debt.amount;
+      call_order_id = call_obj->id;
 
       if( new_debt == 0 )
       {
          FC_ASSERT( new_collateral == 0, "Should claim all collateral when closing debt position" );
          d.remove( *call_obj );
-         return void_result();
+         return call_order_id;
       }
 
       FC_ASSERT( new_collateral > 0 && new_debt > 0,
@@ -278,8 +290,6 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
    // then we must check for margin calls and other issues
    if( !_bitasset_data->is_prediction_market )
    {
-      call_order_id_type call_order_id = call_obj->id;
-
       // check to see if the order needs to be margin called now, but don't allow black swans and require there to be
       // limit orders available that could be used to fill the order.
       // Note: due to https://github.com/bitshares/bitshares-core/issues/649, before core-343 hard fork,
@@ -341,7 +351,7 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
       }
    }
 
-   return void_result();
+   return call_order_id;
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation& o)

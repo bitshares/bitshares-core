@@ -271,4 +271,15 @@ optional<block_id_type> block_database::last_id()const
    return optional<block_id_type>();
 }
 
+size_t block_database::blocks_current_position()const
+{
+   return (size_t)_blocks.tellg();
+}
+
+size_t block_database::total_block_size()const
+{
+   _blocks.seekg( 0, _blocks.end );
+   return (size_t)_blocks.tellg();
+}
+
 } }

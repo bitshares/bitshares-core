@@ -159,18 +159,18 @@ namespace graphene { namespace app {
        }
     }
 
-    void network_broadcast_api::broadcast_transaction(const signed_transaction& trx)
+    void network_broadcast_api::broadcast_transaction(const precomputable_transaction& trx)
     {
-       trx.validate();
+       _app.chain_database()->precompute_parallel( trx ).wait();
        _app.chain_database()->push_transaction(trx);
        if( _app.p2p_node() != nullptr )
           _app.p2p_node()->broadcast_transaction(trx);
     }
 
-    fc::variant network_broadcast_api::broadcast_transaction_synchronous(const signed_transaction& trx)
+    fc::variant network_broadcast_api::broadcast_transaction_synchronous(const precomputable_transaction& trx)
     {
        fc::promise<fc::variant>::ptr prom( new fc::promise<fc::variant>() );
-       broadcast_transaction_with_callback( [=]( const fc::variant& v ){
+       broadcast_transaction_with_callback( [prom]( const fc::variant& v ){
         prom->set_value(v);
        }, trx );
 
@@ -179,14 +179,15 @@ namespace graphene { namespace app {
 
     void network_broadcast_api::broadcast_block( const signed_block& b )
     {
+       _app.chain_database()->precompute_parallel( b ).wait();
        _app.chain_database()->push_block(b);
        if( _app.p2p_node() != nullptr )
           _app.p2p_node()->broadcast( net::block_message( b ));
     }
 
-    void network_broadcast_api::broadcast_transaction_with_callback(confirmation_callback cb, const signed_transaction& trx)
+    void network_broadcast_api::broadcast_transaction_with_callback(confirmation_callback cb, const precomputable_transaction& trx)
     {
-       trx.validate();
+       _app.chain_database()->precompute_parallel( trx ).wait();
        _callbacks[trx.id()] = cb;
        _app.chain_database()->push_transaction(trx);
        if( _app.p2p_node() != nullptr )
@@ -384,9 +385,9 @@ namespace graphene { namespace app {
 
 
     vector<operation_history_object> history_api::get_relative_account_history( const std::string account_id_or_name,
-                                                                                uint32_t stop,
+                                                                                uint64_t stop,
                                                                                 unsigned limit,
-                                                                                uint32_t start) const
+                                                                                uint64_t start) const
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();

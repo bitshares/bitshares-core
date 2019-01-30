@@ -60,10 +60,12 @@
 #include <fc/thread/mutex.hpp>
 #include <fc/thread/scoped_lock.hpp>
 #include <fc/rpc/api_connection.hpp>
+#include <fc/crypto/base58.hpp>
 
 #include <graphene/app/api.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/utilities/git_revision.hpp>
 #include <graphene/utilities/key_conversion.hpp>
@@ -114,14 +116,16 @@ private:
    ostream& out;
    const wallet_api_impl& wallet;
    operation_result result;
+   operation_history_object hist;
 
    std::string fee(const asset& a) const;
 
 public:
-   operation_printer( ostream& out, const wallet_api_impl& wallet, const operation_result& r = operation_result() )
+   operation_printer( ostream& out, const wallet_api_impl& wallet, const operation_history_object& obj )
       : out(out),
         wallet(wallet),
-        result(r)
+        result(obj.result),
+        hist(obj)
    {}
    typedef std::string result_type;
 
@@ -134,6 +138,8 @@ public:
    std::string operator()(const account_create_operation& op)const;
    std::string operator()(const account_update_operation& op)const;
    std::string operator()(const asset_create_operation& op)const;
+   std::string operator()(const htlc_create_operation& op)const;
+   std::string operator()(const htlc_redeem_operation& op)const;
 };
 
 template<class T>
@@ -256,6 +262,27 @@ struct op_prototype_visitor
       if( p != string::npos )
          name = name.substr( p+1 );
       name2op[ name ] = Type();
+   }
+};
+
+class htlc_hash_to_string_visitor
+{
+public:
+   typedef string result_type;
+
+   result_type operator()( const fc::ripemd160& hash )const
+   {
+       return "RIPEMD160 " + hash.str();
+   }
+
+   result_type operator()( const fc::sha1& hash )const
+   {
+       return "SHA1 " + hash.str();
+   }
+
+   result_type operator()( const fc::sha256& hash )const
+   {
+       return "SHA256 " + hash.str();
    }
 };
 
@@ -643,6 +670,15 @@ public:
       auto opt = find_asset(asset_symbol_or_id);
       FC_ASSERT(opt);
       return *opt;
+   }
+
+   htlc_object get_htlc(string htlc_id) const
+   {
+      htlc_id_type id;
+      fc::from_variant(htlc_id, id);
+      auto obj = _remote_db->get_objects( { id }).front();
+      htlc_object htlc = obj.template as<htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS);
+      return htlc;
    }
 
    asset_id_type get_asset_id(string asset_symbol_or_id) const
@@ -1480,7 +1516,15 @@ public:
       committee_member_create_operation committee_member_create_op;
       committee_member_create_op.committee_member_account = get_account_id(owner_account);
       committee_member_create_op.url = url;
-      if (_remote_db->get_committee_member_by_account(owner_account))
+
+      /*
+       * Compatibility issue
+       * Current Date: 2018-09-28 More info: https://github.com/bitshares/bitshares-core/issues/1307
+       * Todo: remove the next 2 lines and change always_id to name in remote call after next hardfork
+      */
+      auto account = get_account(owner_account);
+      auto always_id = account_id_to_string(account.id);
+      if (_remote_db->get_committee_member_by_account(always_id))
          FC_THROW("Account ${owner_account} is already a committee_member", ("owner_account", owner_account));
 
       signed_transaction tx;
@@ -1727,6 +1771,95 @@ public:
       return sign_transaction( tx, broadcast );
    }
 
+   static htlc_hash do_hash( const string& algorithm, const std::string& hash )
+   {
+      string name_upper;
+      std::transform( algorithm.begin(), algorithm.end(), std::back_inserter(name_upper), ::toupper);
+      if( name_upper == "RIPEMD160" )
+         return fc::ripemd160( hash );
+      if( name_upper == "SHA256" )
+         return fc::sha256( hash );
+      if( name_upper == "SHA1" )
+         return fc::sha1( hash );
+      FC_THROW_EXCEPTION( fc::invalid_arg_exception, "Unknown algorithm '${a}'", ("a",algorithm) );
+   }
+
+   signed_transaction htlc_create( string source, string destination, string amount, string asset_symbol,
+         string hash_algorithm, const std::string& preimage_hash, size_t preimage_size,
+         const uint32_t claim_period_seconds, bool broadcast = false )
+   {
+      try 
+      {
+         FC_ASSERT( !self.is_locked() );
+         fc::optional<asset_object> asset_obj = get_asset(asset_symbol);
+         FC_ASSERT(asset_obj, "Could not find asset matching ${asset}", ("asset", asset_symbol));
+
+         htlc_create_operation create_op;
+         create_op.from = get_account(source).id;
+         create_op.to = get_account(destination).id;
+         create_op.amount = asset_obj->amount_from_string(amount);
+         create_op.claim_period_seconds = claim_period_seconds;
+         create_op.preimage_hash = do_hash( hash_algorithm, preimage_hash );
+         create_op.preimage_size = preimage_size;
+
+         signed_transaction tx;
+         tx.operations.push_back(create_op);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+         tx.validate();
+
+         return sign_transaction(tx, broadcast);
+      } FC_CAPTURE_AND_RETHROW( (source)(destination)(amount)(asset_symbol)(hash_algorithm)
+            (preimage_hash)(preimage_size)(claim_period_seconds)(broadcast) ) 
+   }
+
+   signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<char>& preimage, bool broadcast )
+   {
+      try 
+      {
+         FC_ASSERT( !self.is_locked() );
+         fc::optional<htlc_object> htlc_obj = get_htlc(htlc_id);
+         FC_ASSERT(htlc_obj, "Could not find HTLC matching ${htlc}", ("htlc", htlc_id));
+
+         account_object issuer_obj = get_account(issuer);
+
+         htlc_redeem_operation update_op;
+         update_op.htlc_id = htlc_obj->id;
+         update_op.redeemer = issuer_obj.id;
+         update_op.preimage = preimage;
+
+         signed_transaction tx;
+         tx.operations.push_back(update_op);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+         tx.validate();
+
+         return sign_transaction(tx, broadcast);
+      } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(preimage)(broadcast) ) 
+   }
+
+   signed_transaction htlc_extend ( string htlc_id, string issuer, const uint32_t seconds_to_add, bool broadcast)
+   {
+      try 
+      {
+         FC_ASSERT( !self.is_locked() );
+         fc::optional<htlc_object> htlc_obj = get_htlc(htlc_id);
+         FC_ASSERT(htlc_obj, "Could not find HTLC matching ${htlc}", ("htlc", htlc_id));
+
+         account_object issuer_obj = get_account(issuer);
+
+         htlc_extend_operation update_op;
+         update_op.htlc_id = htlc_obj->id;
+         update_op.update_issuer = issuer_obj.id;
+         update_op.seconds_to_add = seconds_to_add;
+
+         signed_transaction tx;
+         tx.operations.push_back(update_op);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+         tx.validate();
+
+         return sign_transaction(tx, broadcast);
+      } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(seconds_to_add)(broadcast) ) 
+   }
+
    vector< vesting_balance_object_with_info > get_vesting_balances( string account_name )
    { try {
       fc::optional<vesting_balance_id_type> vbid = maybe_id<vesting_balance_id_type>( account_name );
@@ -1738,8 +1871,15 @@ public:
          result.emplace_back( get_object<vesting_balance_object>(*vbid), now );
          return result;
       }
+      /*
+       * Compatibility issue
+       * Current Date: 2018-09-28 More info: https://github.com/bitshares/bitshares-core/issues/1307
+       * Todo: remove the next 2 lines and change always_id to name in remote call after next hardfork
+      */
+      auto account = get_account(account_name);
+      auto always_id = account_id_to_string(account.id);
 
-      vector< vesting_balance_object > vbos = _remote_db->get_vesting_balances( account_name );
+      vector< vesting_balance_object > vbos = _remote_db->get_vesting_balances( always_id );
       if( vbos.size() == 0 )
          return result;
 
@@ -1787,7 +1927,15 @@ public:
                                         bool broadcast /* = false */)
    { try {
       account_object voting_account_object = get_account(voting_account);
-      fc::optional<committee_member_object> committee_member_obj = _remote_db->get_committee_member_by_account(committee_member);
+
+      /*
+       * Compatibility issue
+       * Current Date: 2018-09-28 More info: https://github.com/bitshares/bitshares-core/issues/1307
+       * Todo: remove the next 2 lines and change always_id to name in remote call after next hardfork
+       */
+      auto account = get_account(committee_member);
+      auto always_id = account_id_to_string(account.id);
+      fc::optional<committee_member_object> committee_member_obj = _remote_db->get_committee_member_by_account(always_id);
       if (!committee_member_obj)
          FC_THROW("Account ${committee_member} is not registered as a committee_member", ("committee_member", committee_member));
       if (approve)
@@ -1821,7 +1969,14 @@ public:
    { try {
       account_object voting_account_object = get_account(voting_account);
 
-      fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(witness);
+      /*
+       * Compatibility issue
+       * Current Date: 2018-09-28 More info: https://github.com/bitshares/bitshares-core/issues/1307
+       * Todo: remove the next 2 lines and change always_id to name in remote call after next hardfork
+       */
+      auto account = get_account(witness);
+      auto always_id = account_id_to_string(account.id);
+      fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(always_id);
       if (!witness_obj)
          FC_THROW("Account ${witness} is not registered as a witness", ("witness", witness));
       if (approve)
@@ -2195,7 +2350,7 @@ public:
             auto b = _remote_db->get_block_header(i.block_num);
             FC_ASSERT(b);
             ss << b->timestamp.to_iso_string() << " ";
-            i.op.visit(operation_printer(ss, *this, i.result));
+            i.op.visit(operation_printer(ss, *this, i));
             ss << " \n";
          }
 
@@ -2212,7 +2367,7 @@ public:
             auto b = _remote_db->get_block_header(i.block_num);
             FC_ASSERT(b);
             ss << b->timestamp.to_iso_string() << " ";
-            i.op.visit(operation_printer(ss, *this, i.result));
+            i.op.visit(operation_printer(ss, *this, i));
             ss << " \n";
          }
 
@@ -2233,7 +2388,7 @@ public:
               auto b = _remote_db->get_block_header(i.block_num);
               FC_ASSERT(b);
               ss << b->timestamp.to_iso_string() << " ";
-              i.op.visit(operation_printer(ss, *this, i.result));
+              i.op.visit(operation_printer(ss, *this, i));
               ss << " transaction_id : ";
               ss << d.transaction_id.str();
               ss << " \n";
@@ -2275,7 +2430,7 @@ public:
       {
          auto r = result.as<blind_confirmation>( GRAPHENE_MAX_NESTED_OBJECTS );
          std::stringstream ss;
-         r.trx.operations[0].visit( operation_printer( ss, *this, operation_result() ) );
+         r.trx.operations[0].visit( operation_printer( ss, *this, operation_history_object() ) );
          ss << "\n";
          for( const auto& out : r.outputs )
          {
@@ -2288,7 +2443,7 @@ public:
       {
          auto r = result.as<blind_confirmation>( GRAPHENE_MAX_NESTED_OBJECTS );
          std::stringstream ss;
-         r.trx.operations[0].visit( operation_printer( ss, *this, operation_result() ) );
+         r.trx.operations[0].visit( operation_printer( ss, *this, operation_history_object() ) );
          ss << "\n";
          for( const auto& out : r.outputs )
          {
@@ -2852,6 +3007,41 @@ std::string operation_printer::operator()(const asset_create_operation& op) cons
    return fee(op.fee);
 }
 
+std::string operation_printer::operator()(const htlc_redeem_operation& op) const
+{
+   out << "Redeem HTLC with database id " 
+         << std::to_string(op.htlc_id.space_id) 
+         << "." << std::to_string(op.htlc_id.type_id) 
+         << "." << std::to_string((uint64_t)op.htlc_id.instance)
+         << " with preimage \"";
+   for (unsigned char c : op.preimage)
+      out << c;
+   out << "\"";
+   return fee(op.fee);
+}
+
+std::string operation_printer::operator()(const htlc_create_operation& op) const
+{
+   static htlc_hash_to_string_visitor vtor;
+
+   auto fee_asset = wallet.get_asset( op.fee.asset_id );
+   auto to = wallet.get_account( op.to );
+   operation_result_printer rprinter(wallet);
+   std::string database_id = result.visit(rprinter);
+
+   out << "Create HTLC to " << to.name
+         << " with id " << database_id
+         << " preimage hash: ["
+         << op.preimage_hash.visit( vtor )
+         << "] (Fee: " << fee_asset.amount_to_pretty_string( op.fee ) << ")";
+   // determine if the block that the HTLC is in is before or after LIB
+   int32_t pending_blocks = hist.block_num - wallet.get_dynamic_global_properties().last_irreversible_block_num;
+   if (pending_blocks > 0)
+      out << " (pending " << std::to_string(pending_blocks) << " blocks)";
+
+   return "";
+}
+
 std::string operation_result_printer::operator()(const void_result& x) const
 {
    return "";
@@ -2961,7 +3151,15 @@ map<string,account_id_type> wallet_api::list_accounts(const string& lowerbound, 
 
 vector<asset> wallet_api::list_account_balances(const string& id)
 {
-   return my->_remote_db->get_account_balances(id, flat_set<asset_id_type>());
+   /*
+    * Compatibility issue
+    * Current Date: 2018-09-13 More info: https://github.com/bitshares/bitshares-core/issues/1307
+    * Todo: remove the next 2 lines and change always_id to id in remote call after next hardfork
+    */
+   auto account = get_account(id);
+   auto always_id = my->account_id_to_string(account.id);
+
+   return my->_remote_db->get_account_balances(always_id, flat_set<asset_id_type>());
 }
 
 vector<asset_object> wallet_api::list_assets(const string& lowerbound, uint32_t limit)const
@@ -2974,9 +3172,55 @@ uint64_t wallet_api::get_asset_count()const
    return my->_remote_db->get_asset_count();
 }
 
+signed_transaction wallet_api::htlc_create( string source, string destination, string amount, string asset_symbol,
+         string hash_algorithm, const std::string& preimage_hash, size_t preimage_size, 
+         const uint32_t claim_period_seconds, bool broadcast)
+{
+   return my->htlc_create(source, destination, amount, asset_symbol, hash_algorithm, preimage_hash, preimage_size,
+         claim_period_seconds, broadcast);
+}
+
+variant wallet_api::get_htlc(std::string htlc_id) const
+{
+   static detail::htlc_hash_to_string_visitor vtor;
+
+   graphene::chain::htlc_object obj = my->get_htlc(htlc_id);
+   fc::mutable_variant_object ret_val;
+   ret_val["database_id"] = (std::string)obj.id;
+   ret_val["from"] = (std::string)((graphene::db::object_id_type)obj.from);
+   ret_val["to"] = (std::string)((graphene::db::object_id_type)obj.to);
+   ret_val["amount"] = obj.amount.amount.value;
+   ret_val["asset"] = (std::string)((graphene::db::object_id_type)obj.amount.asset_id);
+   ret_val["expiration"] = fc::get_approximate_relative_time_string(obj.expiration);
+   ret_val["preimage_hash"] = obj.preimage_hash.visit( vtor );
+   ret_val["preimage_size"] = obj.preimage_size;
+   return ret_val;
+}
+
+signed_transaction wallet_api::htlc_redeem( std::string htlc_id, std::string issuer, const std::string& preimage,
+      bool broadcast)
+{
+
+   return my->htlc_redeem(htlc_id, issuer, std::vector<char>(preimage.begin(), preimage.end()), broadcast);
+}
+
+signed_transaction wallet_api::htlc_extend ( std::string htlc_id, std::string issuer, const uint32_t seconds_to_add,
+      bool broadcast)
+{
+   return my->htlc_extend(htlc_id, issuer, seconds_to_add, broadcast);
+}
+
 vector<operation_detail> wallet_api::get_account_history(string name, int limit)const
 {
    vector<operation_detail> result;
+
+   /*
+    * Compatibility issue
+    * Current Date: 2018-09-14 More info: https://github.com/bitshares/bitshares-core/issues/1307
+    * Todo: remove the next 2 lines and change always_id to name in remote call after next hardfork
+    */
+   auto account = get_account(name);
+   auto always_id = my->account_id_to_string(account.id);
 
    while( limit > 0 )
    {
@@ -2997,8 +3241,11 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
 
       int page_limit = skip_first_row ? std::min( 100, limit + 1 ) : std::min( 100, limit );
 
-      vector<operation_history_object> current = my->_remote_hist->get_account_history( name, operation_history_id_type(),
-                                                                                        page_limit, start );
+      vector<operation_history_object> current = my->_remote_hist->get_account_history(
+            always_id,
+            operation_history_id_type(),
+            page_limit,
+            start );
       bool first_row = true;
       for( auto& o : current )
       {
@@ -3011,7 +3258,7 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
             }
          }
          std::stringstream ss;
-         auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
+         auto memo = o.op.visit(detail::operation_printer(ss, *my, o));
          result.push_back( operation_detail{ memo, ss.str(), o } );
       }
 
@@ -3026,13 +3273,24 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
    return result;
 }
 
-vector<operation_detail> wallet_api::get_relative_account_history(string name, uint32_t stop, int limit, uint32_t start)const
+vector<operation_detail> wallet_api::get_relative_account_history(
+      string name,
+      uint32_t stop,
+      int limit,
+      uint32_t start)const
 {
    vector<operation_detail> result;
    auto account_id = get_account(name).get_id();
 
    const account_object& account = my->get_account(account_id);
    const account_statistics_object& stats = my->get_object(account.statistics);
+
+   /*
+    * Compatibility issue
+    * Current Date: 2018-09-14 More info: https://github.com/bitshares/bitshares-core/issues/1307
+    * Todo: remove the next line and change always_id to name in remote call after next hardfork
+    */
+   auto always_id = my->account_id_to_string(account_id);
 
    if(start == 0)
        start = stats.total_ops;
@@ -3041,10 +3299,14 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
 
    while( limit > 0 )
    {
-      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(name, stop, std::min<uint32_t>(100, limit), start);
+      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(
+            always_id,
+            stop,
+            std::min<uint32_t>(100, limit),
+            start);
       for (auto &o : current) {
          std::stringstream ss;
-         auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
+         auto memo = o.op.visit(detail::operation_printer(ss, *my, o));
          result.push_back(operation_detail{memo, ss.str(), o});
       }
       if (current.size() < std::min<uint32_t>(100, limit))
@@ -3056,13 +3318,24 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
    return result;
 }
 
-account_history_operation_detail wallet_api::get_account_history_by_operations(string name, vector<uint16_t> operation_types, uint32_t start, int limit)
+account_history_operation_detail wallet_api::get_account_history_by_operations(
+      string name,
+      vector<uint16_t> operation_types,
+      uint32_t start,
+      int limit)
 {
     account_history_operation_detail result;
     auto account_id = get_account(name).get_id();
 
     const auto& account = my->get_account(account_id);
     const auto& stats = my->get_object(account.statistics);
+
+    /*
+     * Compatibility issue
+     * Current Date: 2018-09-14 More info: https://github.com/bitshares/bitshares-core/issues/1307
+     * Todo: remove the next line and change always_id to name in remote call after next hardfork
+     */
+     auto always_id = my->account_id_to_string(account_id);
 
     // sequence of account_transaction_history_object start with 1
     start = start == 0 ? 1 : start;
@@ -3074,10 +3347,10 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(s
 
     while (limit > 0 && start <= stats.total_ops) {
         uint32_t min_limit = std::min<uint32_t> (100, limit);
-        auto current = my->_remote_hist->get_account_history_by_operations(name, operation_types, start, min_limit);
+        auto current = my->_remote_hist->get_account_history_by_operations(always_id, operation_types, start, min_limit);
         for (auto& obj : current.operation_history_objs) {
             std::stringstream ss;
-            auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj.result));
+            auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj));
 
             transaction_id_type transaction_id;
             auto block = get_block(obj.block_num);
@@ -3101,17 +3374,23 @@ full_account wallet_api::get_full_account( const string& name_or_id)
     return my->_remote_db->get_full_accounts({name_or_id}, false)[name_or_id];
 }
 
-vector<bucket_object> wallet_api::get_market_history( string symbol1, string symbol2, uint32_t bucket , fc::time_point_sec start, fc::time_point_sec end )const
+vector<bucket_object> wallet_api::get_market_history(
+      string symbol1,
+      string symbol2,
+      uint32_t bucket,
+      fc::time_point_sec start,
+      fc::time_point_sec end )const
 {
    return my->_remote_hist->get_market_history( get_asset_id(symbol1), get_asset_id(symbol2), bucket, start, end );
 }
 
-vector<limit_order_object> wallet_api::get_account_limit_orders( const string& name_or_id,
-                                                                const string &base,
-                                                                const string &quote,
-                                                                uint32_t limit,
-                                                                optional<limit_order_id_type> ostart_id,
-                                                                optional<price> ostart_price)
+vector<limit_order_object> wallet_api::get_account_limit_orders(
+      const string& name_or_id,
+      const string &base,
+      const string &quote,
+      uint32_t limit,
+      optional<limit_order_id_type> ostart_id,
+      optional<price> ostart_price)
 {
    return my->_remote_db->get_account_limit_orders(name_or_id, base, quote, limit, ostart_id, ostart_price);
 }
@@ -3213,11 +3492,11 @@ signed_transaction wallet_api::propose_builder_transaction(
 }
 
 signed_transaction wallet_api::propose_builder_transaction2(
-   transaction_handle_type handle,
-   string account_name_or_id,
-   time_point_sec expiration,
-   uint32_t review_period_seconds,
-   bool broadcast)
+      transaction_handle_type handle,
+      string account_name_or_id,
+      time_point_sec expiration,
+      uint32_t review_period_seconds,
+      bool broadcast)
 {
    return my->propose_builder_transaction2(handle, account_name_or_id, expiration, review_period_seconds, broadcast);
 }

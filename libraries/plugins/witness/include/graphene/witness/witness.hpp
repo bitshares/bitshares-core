@@ -41,22 +41,14 @@ namespace block_production_condition
       no_private_key = 4,
       low_participation = 5,
       lag = 6,
-      exception_producing_block = 7
+      exception_producing_block = 7,
+      shutdown = 8
    };
 }
 
 class witness_plugin : public graphene::app::plugin {
 public:
-   ~witness_plugin() {
-      try {
-         if( _block_production_task.valid() )
-            _block_production_task.cancel_and_wait(__FUNCTION__);
-      } catch(fc::canceled_exception&) {
-         //Expected exception. Move along.
-      } catch(fc::exception& e) {
-         edump((e.to_detail_string()));
-      }
-   }
+   ~witness_plugin() { stop_block_production(); }
 
    std::string plugin_name()const override;
 
@@ -66,6 +58,7 @@ public:
       ) override;
 
    void set_block_production(bool allow) { _production_enabled = allow; }
+   void stop_block_production();
 
    virtual void plugin_initialize( const boost::program_options::variables_map& options ) override;
    virtual void plugin_startup() override;
@@ -84,10 +77,11 @@ private:
 
    boost::program_options::variables_map _options;
    bool _production_enabled = false;
+   bool _shutting_down = false;
    uint32_t _required_witness_participation = 33 * GRAPHENE_1_PERCENT;
    uint32_t _production_skip_flags = graphene::chain::database::skip_nothing;
 
-   std::map<chain::public_key_type, fc::ecc::private_key> _private_keys;
+   std::map<chain::public_key_type, fc::ecc::private_key, chain::pubkey_comparator> _private_keys;
    std::set<chain::witness_id_type> _witnesses;
    fc::future<void> _block_production_task;
 

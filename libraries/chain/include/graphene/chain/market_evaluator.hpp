@@ -80,13 +80,14 @@ namespace graphene { namespace chain {
          typedef call_order_update_operation operation_type;
 
          void_result do_evaluate( const call_order_update_operation& o );
-         void_result do_apply( const call_order_update_operation& o );
+         object_id_type do_apply( const call_order_update_operation& o );
 
          bool _closing_order = false;
          const asset_object* _debt_asset = nullptr;
          const account_object* _paying_account = nullptr;
          const call_order_object* _order = nullptr;
          const asset_bitasset_data_object* _bitasset_data = nullptr;
+         const asset_dynamic_data_object*  _dynamic_data_obj = nullptr;
    };
 
    class bid_collateral_evaluator : public evaluator<bid_collateral_evaluator>
