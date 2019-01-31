@@ -60,14 +60,13 @@ BOOST_AUTO_TEST_CASE( broadcast_transaction_with_callback_test ) {
 
       nb_api->broadcast_transaction_with_callback( callback, trx );
 
-      trx.operations.clear();
-      trx.signatures.clear();
+      trx.clear();
 
       generate_block();
 
       fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
 
-      BOOST_CHECK_EQUAL( called, 1 );
+      BOOST_CHECK_EQUAL( called, 1u );
 
    } FC_LOG_AND_RETHROW()
 }

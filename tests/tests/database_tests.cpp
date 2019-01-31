@@ -73,13 +73,13 @@ BOOST_AUTO_TEST_CASE(failed_modify_test)
                      obj.owner = account_id_type(123);
                   });
    account_balance_id_type obj_id = obj.id;
-   BOOST_CHECK_EQUAL(obj.owner.instance.value, 123);
+   BOOST_CHECK_EQUAL(obj.owner.instance.value, 123u);
 
    // Modify dummy object, check that changes stick
    db.modify(obj, [](account_balance_object& obj) {
       obj.owner = account_id_type(234);
    });
-   BOOST_CHECK_EQUAL(obj_id(db).owner.instance.value, 234);
+   BOOST_CHECK_EQUAL(obj_id(db).owner.instance.value, 234u);
 
    // Throw exception when modifying object, check that object still exists after
    BOOST_CHECK_THROW(db.modify(obj, [](account_balance_object& obj) {
@@ -136,5 +136,90 @@ BOOST_AUTO_TEST_CASE( merge_test )
       throw;
    }
 }
+
+BOOST_AUTO_TEST_CASE( direct_index_test )
+{ try {
+   try {
+      const graphene::db::primary_index< account_index, 6 > small_chunkbits( db );
+      BOOST_FAIL( "Expected assertion failure!" );
+   } catch( const fc::assert_exception& expected ) {}
+
+   graphene::db::primary_index< account_index, 8 > my_accounts( db );
+   const auto& direct = my_accounts.get_secondary_index<graphene::db::direct_index< account_object, 8 >>();
+   BOOST_CHECK_EQUAL( 0u, my_accounts.indices().size() );
+   BOOST_CHECK( nullptr == direct.find( account_id_type( 1 ) ) );
+   // BOOST_CHECK_THROW( direct.find( asset_id_type( 1 ) ), fc::assert_exception ); // compile-time error
+   BOOST_CHECK_THROW( direct.find( object_id_type( asset_id_type( 1 ) ) ), fc::assert_exception );
+   BOOST_CHECK_THROW( direct.get( account_id_type( 1 ) ), fc::assert_exception );
+
+   account_object test_account;
+   test_account.id = account_id_type(1);
+   test_account.name = "account1";
+
+   my_accounts.load( fc::raw::pack( test_account ) );
+
+   BOOST_CHECK_EQUAL( 1u, my_accounts.indices().size() );
+   BOOST_CHECK( nullptr == direct.find( account_id_type( 0 ) ) );
+   BOOST_CHECK( nullptr == direct.find( account_id_type( 2 ) ) );
+   BOOST_CHECK( nullptr != direct.find( account_id_type( 1 ) ) );
+   BOOST_CHECK_EQUAL( test_account.name, direct.get( test_account.id ).name );
+
+   // The following assumes that MAX_HOLE = 100
+   test_account.id = account_id_type(102);
+   test_account.name = "account102";
+   // highest insert was 1, direct.next is 2 => 102 is highest allowed instance
+   my_accounts.load( fc::raw::pack( test_account ) );
+   BOOST_CHECK_EQUAL( test_account.name, direct.get( test_account.id ).name );
+
+   // direct.next is now 103, but index sequence counter is 0
+   my_accounts.create( [] ( object& o ) {
+       account_object& acct = dynamic_cast< account_object& >( o );
+       BOOST_CHECK_EQUAL( 0u, acct.id.instance() );
+       acct.name = "account0";
+   } );
+
+   test_account.id = account_id_type(50);
+   test_account.name = "account50";
+   my_accounts.load( fc::raw::pack( test_account ) );
+
+   // can handle nested modification
+   my_accounts.modify( direct.get( account_id_type(0) ), [&direct,&my_accounts] ( object& outer ) {
+      account_object& _outer = dynamic_cast< account_object& >( outer );
+      my_accounts.modify( direct.get( account_id_type(50) ), [] ( object& inner ) {
+         account_object& _inner = dynamic_cast< account_object& >( inner );
+         _inner.referrer = account_id_type(102);
+      });
+      _outer.options.voting_account = GRAPHENE_PROXY_TO_SELF_ACCOUNT;
+   });
+
+   // direct.next is still 103, so 204 is not allowed
+   test_account.id = account_id_type(204);
+   test_account.name = "account204";
+   GRAPHENE_REQUIRE_THROW( my_accounts.load( fc::raw::pack( test_account ) ), fc::assert_exception );
+   // This is actually undefined behaviour. The object has been inserted into
+   // the primary index, but the secondary has refused to insert it!
+   BOOST_CHECK_EQUAL( 5u, my_accounts.indices().size() );
+
+   uint32_t count = 0;
+   for( uint32_t i = 0; i < 250; i++ )
+   {
+      const account_object* aptr = dynamic_cast< const account_object* >( my_accounts.find( account_id_type( i ) ) );
+      if( aptr )
+      {
+         count++;
+         BOOST_CHECK( aptr->id.instance() == 0 || aptr->id.instance() == 1
+                      || aptr->id.instance() == 50 || aptr->id.instance() == 102 );
+         BOOST_CHECK_EQUAL( i, aptr->id.instance() );
+         BOOST_CHECK_EQUAL( "account" + std::to_string( i ), aptr->name );
+      }
+   }
+   BOOST_CHECK_EQUAL( count, my_accounts.indices().size() - 1 );
+
+   GRAPHENE_REQUIRE_THROW( my_accounts.modify( direct.get( account_id_type( 1 ) ), [] ( object& acct ) {
+      acct.id = account_id_type(2);
+   }), fc::assert_exception );
+   // This is actually undefined behaviour. The object has been modified, but
+   // but the secondary has not updated its representation
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

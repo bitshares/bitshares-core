@@ -693,7 +693,7 @@ void distribute_fba_balances( database& db )
 void create_buyback_orders( database& db )
 {
    const auto& bbo_idx = db.get_index_type< buyback_index >().indices().get<by_id>();
-   const auto& bal_idx = db.get_index_type< account_balance_index >().indices().get< by_account_asset >();
+   const auto& bal_idx = db.get_index_type< primary_index< account_balance_index > >().get_secondary_index< balances_by_account_index >();
 
    for( const buyback_object& bbo : bbo_idx )
    {
@@ -701,7 +701,6 @@ void create_buyback_orders( database& db )
       assert( asset_to_buy.buyback_account.valid() );
 
       const account_object& buyback_account = (*(asset_to_buy.buyback_account))(db);
-      asset_id_type next_asset = asset_id_type();
 
       if( !buyback_account.allowed_assets.valid() )
       {
@@ -709,16 +708,11 @@ void create_buyback_orders( database& db )
          continue;
       }
 
-      while( true )
+      for( const auto& entry : bal_idx.get_account_balances( buyback_account.id ) )
       {
-         auto it = bal_idx.lower_bound( boost::make_tuple( buyback_account.id, next_asset ) );
-         if( it == bal_idx.end() )
-            break;
-         if( it->owner != buyback_account.id )
-            break;
+         const auto* it = entry.second;
          asset_id_type asset_to_sell = it->asset_type;
          share_type amount_to_sell = it->balance;
-         next_asset = asset_to_sell + 1;
          if( asset_to_sell == asset_to_buy.id )
             continue;
          if( amount_to_sell == 0 )
@@ -814,11 +808,14 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    while( covered < bdd.current_supply && itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == to_revive_id )
    {
       const collateral_bid_object& bid = *itr;
-      asset total_collateral = bid.inv_swan_price.quote * bad.settlement_price;
+      asset debt_in_bid = bid.inv_swan_price.quote;
+      if( debt_in_bid.amount > bdd.current_supply )
+         debt_in_bid.amount = bdd.current_supply;
+      asset total_collateral = debt_in_bid * bad.settlement_price;
       total_collateral += bid.inv_swan_price.base;
-      price call_price = price::call_price( bid.inv_swan_price.quote, total_collateral, bad.current_feed.maintenance_collateral_ratio );
+      price call_price = price::call_price( debt_in_bid, total_collateral, bad.current_feed.maintenance_collateral_ratio );
       if( ~call_price >= bad.current_feed.settlement_price ) break;
-      covered += bid.inv_swan_price.quote.amount;
+      covered += debt_in_bid.amount;
       ++itr;
    }
    if( covered < bdd.current_supply ) return;
@@ -830,9 +827,12 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    {
       const collateral_bid_object& bid = *itr;
       ++itr;
-      share_type debt = bid.inv_swan_price.quote.amount;
-      share_type collateral = (bid.inv_swan_price.quote * bad.settlement_price).amount;
-      if( bid.inv_swan_price.quote.amount >= to_cover )
+      asset debt_in_bid = bid.inv_swan_price.quote;
+      if( debt_in_bid.amount > bdd.current_supply )
+         debt_in_bid.amount = bdd.current_supply;
+      share_type debt = debt_in_bid.amount;
+      share_type collateral = (debt_in_bid * bad.settlement_price).amount;
+      if( debt >= to_cover )
       {
          debt = to_cover;
          collateral = remaining_fund;

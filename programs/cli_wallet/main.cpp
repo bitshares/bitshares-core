@@ -279,6 +279,17 @@ int main( int argc, char** argv )
       {
          wallet_cli->register_api( wapi );
          wallet_cli->start();
+
+         fc::set_signal_handler([](int signal) {
+            ilog( "Captured SIGINT not in daemon mode" );
+            fclose(stdin);
+         }, SIGINT);
+
+         fc::set_signal_handler([](int signal) {
+            ilog( "Captured SIGTERM not in daemon mode" );
+            fclose(stdin);
+         }, SIGTERM);
+
          wallet_cli->wait();
       }
       else
@@ -287,6 +298,10 @@ int main( int argc, char** argv )
         fc::set_signal_handler([&exit_promise](int signal) {
            exit_promise->set_value(signal);
         }, SIGINT);
+
+        fc::set_signal_handler([&exit_promise](int signal) {
+           exit_promise->set_value(signal);
+        }, SIGTERM);
 
         ilog( "Entering Daemon Mode, ^C to exit" );
         exit_promise->wait();

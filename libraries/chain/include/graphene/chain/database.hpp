@@ -66,15 +66,13 @@ namespace graphene { namespace chain {
             skip_witness_signature      = 1 << 0,  ///< used while reindexing
             skip_transaction_signatures = 1 << 1,  ///< used by non-witness nodes
             skip_transaction_dupe_check = 1 << 2,  ///< used while reindexing
-            skip_fork_db                = 1 << 3,  ///< used while reindexing
             skip_block_size_check       = 1 << 4,  ///< used when applying locally generated transactions
             skip_tapos_check            = 1 << 5,  ///< used while reindexing -- note this skips expiration check as well
-            skip_authority_check        = 1 << 6,  ///< used while reindexing -- disables any checking of authority on transactions
+            // skip_authority_check        = 1 << 6,  ///< removed because effectively identical to skip_transaction_signatures
             skip_merkle_check           = 1 << 7,  ///< used while reindexing
             skip_assert_evaluation      = 1 << 8,  ///< used while reindexing
             skip_undo_history_check     = 1 << 9,  ///< used while reindexing
-            skip_witness_schedule_check = 1 << 10,  ///< used while reindexing
-            skip_validate               = 1 << 11 ///< used prior to checkpoint, skips validate() call on transaction
+            skip_witness_schedule_check = 1 << 10 ///< used while reindexing
          };
 
          /**
@@ -136,9 +134,9 @@ namespace graphene { namespace chain {
          bool before_last_checkpoint()const;
 
          bool push_block( const signed_block& b, uint32_t skip = skip_nothing );
-         processed_transaction push_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
+         processed_transaction push_transaction( const precomputable_transaction& trx, uint32_t skip = skip_nothing );
          bool _push_block( const signed_block& b );
-         processed_transaction _push_transaction( const signed_transaction& trx );
+         processed_transaction _push_transaction( const precomputable_transaction& trx );
 
          ///@throws fc::exception if the proposed transaction fails to apply.
          processed_transaction push_proposal( const proposal_object& proposal );
@@ -407,7 +405,7 @@ namespace graphene { namespace chain {
 
          /** when popping a block, the transactions that were removed get cached here so they
           * can be reapplied at the proper time */
-         std::deque< signed_transaction >       _popped_tx;
+         std::deque< precomputable_transaction > _popped_tx;
 
          /**
           * @}
@@ -415,6 +413,29 @@ namespace graphene { namespace chain {
 
          /// Enable or disable tracking of votes of standby witnesses and committee members
          inline void enable_standby_votes_tracking(bool enable)  { _track_standby_votes = enable; }
+
+         /** Precomputes digests, signatures and operation validations depending
+          *  on skip flags. "Expensive" computations may be done in a parallel
+          *  thread.
+          *
+          * @param block the block to preprocess
+          * @param skip indicates which computations can be skipped
+          * @return a future that will resolve to the input block with
+          *         precomputations applied
+          */
+         fc::future<void> precompute_parallel( const signed_block& block, const uint32_t skip = skip_nothing )const;
+
+         /** Precomputes digests, signatures and operation validations.
+          *  "Expensive" computations may be done in a parallel thread.
+          *
+          * @param trx the transaction to preprocess
+          * @return a future that will resolve to the input transaction with
+          *         precomputations applied
+          */
+         fc::future<void> precompute_parallel( const precomputable_transaction& trx )const;
+   private:
+         template<typename Trx>
+         void _precompute_parallel( const Trx* trx, const size_t count, const uint32_t skip )const;
 
    protected:
          //Mark pop_undo() as protected -- we do not want outside calling pop_undo(); it should call pop_block() instead
@@ -437,6 +458,7 @@ namespace graphene { namespace chain {
          void                  apply_block( const signed_block& next_block, uint32_t skip = skip_nothing );
          processed_transaction apply_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
          operation_result      apply_operation( transaction_evaluation_state& eval_state, const operation& op );
+
       private:
          void                  _apply_block( const signed_block& next_block );
          processed_transaction _apply_transaction( const signed_transaction& trx );

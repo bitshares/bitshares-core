@@ -31,10 +31,13 @@
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <fc/io/fstream.hpp>
+#include <fc/smart_ref_impl.hpp>
 
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <queue>
+#include <tuple>
 
 namespace graphene { namespace chain {
 
@@ -73,51 +76,79 @@ void database::reindex( fc::path data_dir )
    }
    else
       _undo_db.disable();
-   for( uint32_t i = head_block_num() + 1; i <= last_block_num; ++i )
+
+   uint32_t skip = node_properties().skip_flags;
+
+   size_t total_block_size = _block_id_to_block.total_block_size();
+   const auto& gpo = get_global_properties();
+   std::queue< std::tuple< size_t, signed_block, fc::future< void > > > blocks;
+   uint32_t next_block_num = head_block_num() + 1;
+   uint32_t i = next_block_num;
+   while( next_block_num <= last_block_num || !blocks.empty() )
    {
-      if( i % 10000 == 0 ) std::cerr << "   " << double(i*100)/last_block_num << "%   "<<i << " of " <<last_block_num<<"   \n";
-      if( i == flush_point )
+      if( next_block_num <= last_block_num && blocks.size() < 20 )
       {
-         ilog( "Writing database to disk at block ${i}", ("i",i) );
-         flush();
-         ilog( "Done" );
-      }
-      fc::optional< signed_block > block = _block_id_to_block.fetch_by_number(i);
-      if( !block.valid() )
-      {
-         wlog( "Reindexing terminated due to gap:  Block ${i} does not exist!", ("i", i) );
-         uint32_t dropped_count = 0;
-         while( true )
+         const size_t processed_block_size = _block_id_to_block.blocks_current_position();
+         fc::optional< signed_block > block = _block_id_to_block.fetch_by_number( next_block_num++ );
+         if( block.valid() )
          {
-            fc::optional< block_id_type > last_id = _block_id_to_block.last_id();
-            // this can trigger if we attempt to e.g. read a file that has block #2 but no block #1
-            if( !last_id.valid() )
-               break;
-            // we've caught up to the gap
-            if( block_header::num_from_id( *last_id ) <= i )
-               break;
-            _block_id_to_block.remove( *last_id );
-            dropped_count++;
+            if( block->timestamp >= last_block->timestamp - gpo.parameters.maximum_time_until_expiration )
+               skip &= ~skip_transaction_dupe_check;
+            blocks.emplace( processed_block_size, std::move(*block), fc::future<void>() );
+            std::get<2>(blocks.back()) = precompute_parallel( std::get<1>(blocks.back()), skip );
          }
-         wlog( "Dropped ${n} blocks from after the gap", ("n", dropped_count) );
-         break;
+         else
+         {
+            wlog( "Reindexing terminated due to gap:  Block ${i} does not exist!", ("i", i) );
+            uint32_t dropped_count = 0;
+            while( true )
+            {
+               fc::optional< block_id_type > last_id = _block_id_to_block.last_id();
+               // this can trigger if we attempt to e.g. read a file that has block #2 but no block #1
+               if( !last_id.valid() )
+                  break;
+               // we've caught up to the gap
+               if( block_header::num_from_id( *last_id ) <= i )
+                  break;
+               _block_id_to_block.remove( *last_id );
+               dropped_count++;
+            }
+            wlog( "Dropped ${n} blocks from after the gap", ("n", dropped_count) );
+            next_block_num = last_block_num + 1; // don't load more blocks
+         }
       }
-      if( i < undo_point )
-         apply_block(*block, skip_witness_signature |
-                             skip_transaction_signatures |
-                             skip_transaction_dupe_check |
-                             skip_tapos_check |
-                             skip_witness_schedule_check |
-                             skip_authority_check);
       else
       {
-         _undo_db.enable();
-         push_block(*block, skip_witness_signature |
-                            skip_transaction_signatures |
-                            skip_transaction_dupe_check |
-                            skip_tapos_check |
-                            skip_witness_schedule_check |
-                            skip_authority_check);
+         std::get<2>(blocks.front()).wait();
+         const signed_block& block = std::get<1>(blocks.front());
+
+         if( i % 10000 == 0 )
+         {
+            ilog(
+               "   [by size: ${size}%   ${processed} of ${total}]   [by num: ${num}%   ${i} of ${last}]",
+               ("size", double(std::get<0>(blocks.front())) / total_block_size * 100)
+               ("processed", std::get<0>(blocks.front()))
+               ("total", total_block_size)
+               ("num", double(i*100)/last_block_num)
+               ("i", i)
+               ("last", last_block_num)
+            );
+         }
+         if( i == flush_point )
+         {
+            ilog( "Writing database to disk at block ${i}", ("i",i) );
+            flush();
+            ilog( "Done" );
+         }
+         if( i < undo_point )
+            apply_block( block, skip );
+         else
+         {
+            _undo_db.enable();
+            push_block( block, skip );
+         }
+         blocks.pop();
+         i++;
       }
    }
    _undo_db.enable();
@@ -192,6 +223,9 @@ void database::open(
 
 void database::close(bool rewind)
 {
+   if (!_opened)
+      return;
+      
    // TODO:  Save pending tx's on close()
    clear_pending();
 

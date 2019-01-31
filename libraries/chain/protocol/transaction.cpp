@@ -60,12 +60,11 @@ void transaction::validate() const
       operation_validate(op);
 }
 
-graphene::chain::transaction_id_type graphene::chain::transaction::id() const
+const transaction_id_type& transaction::id() const
 {
    auto h = digest();
-   transaction_id_type result;
-   memcpy(result._hash, h._hash, std::min(sizeof(result), sizeof(h)));
-   return result;
+   memcpy(_tx_id_buffer._hash, h._hash, std::min(sizeof(_tx_id_buffer), sizeof(h)));
+   return _tx_id_buffer;
 }
 
 const signature_type& graphene::chain::signed_transaction::sign(const private_key_type& key, const chain_id_type& chain_id)
@@ -302,7 +301,7 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
 } FC_CAPTURE_AND_RETHROW( (ops)(sigs) ) }
 
 
-flat_set<public_key_type> signed_transaction::get_signature_keys( const chain_id_type& chain_id )const
+const flat_set<public_key_type>& signed_transaction::get_signature_keys( const chain_id_type& chain_id )const
 { try {
    auto d = sig_digest( chain_id );
    flat_set<public_key_type> result;
@@ -310,12 +309,12 @@ flat_set<public_key_type> signed_transaction::get_signature_keys( const chain_id
    {
       GRAPHENE_ASSERT(
          result.insert( fc::ecc::public_key(sig,d) ).second,
-         tx_duplicate_sig,
-         "Duplicate Signature detected" );
+            tx_duplicate_sig,
+            "Duplicate Signature detected" );
    }
-   return result;
+   _signees = std::move( result );
+   return _signees;
 } FC_CAPTURE_AND_RETHROW() }
-
 
 
 set<public_key_type> signed_transaction::get_required_signatures(
@@ -330,7 +329,7 @@ set<public_key_type> signed_transaction::get_required_signatures(
    vector<authority> other;
    get_required_authorities( required_active, required_owner, other );
 
-   flat_set<public_key_type> signature_keys = get_signature_keys( chain_id );
+   const flat_set<public_key_type>& signature_keys = get_signature_keys( chain_id );
    sign_state s( signature_keys, get_active, available_keys );
    s.max_recursion = max_recursion_depth;
 
@@ -378,6 +377,29 @@ set<public_key_type> signed_transaction::minimize_required_signatures(
       result.insert( k );
    }
    return set<public_key_type>( result.begin(), result.end() );
+}
+
+const transaction_id_type& precomputable_transaction::id()const
+{
+   if( !_tx_id_buffer._hash[0] )
+      transaction::id();
+   return _tx_id_buffer;
+}
+
+void precomputable_transaction::validate() const
+{
+   if( _validated ) return;
+   transaction::validate();
+   _validated = true;
+}
+
+const flat_set<public_key_type>& precomputable_transaction::get_signature_keys( const chain_id_type& chain_id )const
+{
+   // Strictly we should check whether the given chain ID is same as the one used to initialize the `signees` field.
+   // However, we don't pass in another chain ID so far, for better performance, we skip the check.
+   if( _signees.empty() )
+      signed_transaction::get_signature_keys( chain_id );
+   return _signees;
 }
 
 void signed_transaction::verify_authority(

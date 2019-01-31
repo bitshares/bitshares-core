@@ -156,7 +156,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_fees_test)
          fc::ecc::private_key your_pk = (issuer == izzy_id) ? jill_private_key : izzy_private_key;
          sign( tx, your_pk );
          GRAPHENE_REQUIRE_THROW( PUSH_TX( db, tx ), fc::exception );
-         tx.signatures.clear();
+         tx.clear_signatures();
          sign( tx, my_pk );
          PUSH_TX( db, tx );
       };
@@ -437,11 +437,11 @@ BOOST_AUTO_TEST_CASE( cashback_test )
    PREP_ACTOR(stud);
    PREP_ACTOR(pleb);
    // use ##_public_key vars to silence unused variable warning
-   BOOST_CHECK_GT(ann_public_key.key_data.size(), 0);
-   BOOST_CHECK_GT(scud_public_key.key_data.size(), 0);
-   BOOST_CHECK_GT(dumy_public_key.key_data.size(), 0);
-   BOOST_CHECK_GT(stud_public_key.key_data.size(), 0);
-   BOOST_CHECK_GT(pleb_public_key.key_data.size(), 0);
+   BOOST_CHECK_GT(ann_public_key.key_data.size(), 0u);
+   BOOST_CHECK_GT(scud_public_key.key_data.size(), 0u);
+   BOOST_CHECK_GT(dumy_public_key.key_data.size(), 0u);
+   BOOST_CHECK_GT(stud_public_key.key_data.size(), 0u);
+   BOOST_CHECK_GT(pleb_public_key.key_data.size(), 0u);
 
    account_id_type ann_id, scud_id, dumy_id, stud_id, pleb_id;
    actor_audit alife, arog, aann, ascud, adumy, astud, apleb;
@@ -716,23 +716,23 @@ BOOST_AUTO_TEST_CASE( account_create_fee_scaling )
 
    for( int i = db.get_dynamic_global_properties().accounts_registered_this_interval; i < accounts_per_scale; ++i )
    {
-      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 1);
+      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 1u);
       create_account("shill" + fc::to_string(i));
    }
    for( int i = 0; i < accounts_per_scale; ++i )
    {
-      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 16);
+      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 16u);
       create_account("moreshills" + fc::to_string(i));
    }
    for( int i = 0; i < accounts_per_scale; ++i )
    {
-      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 256);
+      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 256u);
       create_account("moarshills" + fc::to_string(i));
    }
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 4096);
+   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 4096u);
 
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 1);
+   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 1u);
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( fee_refund_test )
@@ -759,7 +759,6 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
                     | database::skip_transaction_dupe_check
                     | database::skip_block_size_check
                     | database::skip_tapos_check
-                    | database::skip_authority_check
                     | database::skip_merkle_check
                     ;
 
@@ -897,7 +896,6 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
                     | database::skip_transaction_dupe_check
                     | database::skip_block_size_check
                     | database::skip_tapos_check
-                    | database::skip_authority_check
                     | database::skip_merkle_check
                     ;
 
@@ -1284,7 +1282,6 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
                     | database::skip_transaction_dupe_check
                     | database::skip_block_size_check
                     | database::skip_tapos_check
-                    | database::skip_authority_check
                     | database::skip_merkle_check
                     ;
 
@@ -1791,7 +1788,6 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
                     | database::skip_transaction_dupe_check
                     | database::skip_block_size_check
                     | database::skip_tapos_check
-                    | database::skip_authority_check
                     | database::skip_merkle_check
                     ;
 
@@ -2349,7 +2345,6 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
                     | database::skip_transaction_dupe_check
                     | database::skip_block_size_check
                     | database::skip_tapos_check
-                    | database::skip_authority_check
                     | database::skip_merkle_check
                     ;
 
@@ -3656,31 +3651,31 @@ BOOST_AUTO_TEST_CASE( defaults_test )
 
     // no fees set yet -> default
     asset fee = schedule.calculate_fee( limit_order_create_operation() );
-    BOOST_CHECK_EQUAL( default_order_fee.fee, fee.amount.value );
+    BOOST_CHECK_EQUAL( (int64_t)default_order_fee.fee, fee.amount.value );
 
     limit_order_create_operation::fee_parameters_type new_order_fee; new_order_fee.fee = 123;
     // set fee + check
     schedule.parameters.insert( new_order_fee );
     fee = schedule.calculate_fee( limit_order_create_operation() );
-    BOOST_CHECK_EQUAL( new_order_fee.fee, fee.amount.value );
+    BOOST_CHECK_EQUAL( (int64_t)new_order_fee.fee, fee.amount.value );
 
     // bid_collateral fee defaults to call_order_update fee
     // call_order_update fee is unset -> default
     const call_order_update_operation::fee_parameters_type default_short_fee {};
     call_order_update_operation::fee_parameters_type new_short_fee; new_short_fee.fee = 123;
     fee = schedule.calculate_fee( bid_collateral_operation() );
-    BOOST_CHECK_EQUAL( default_short_fee.fee, fee.amount.value );
+    BOOST_CHECK_EQUAL( (int64_t)default_short_fee.fee, fee.amount.value );
 
     // set call_order_update fee + check bid_collateral fee
     schedule.parameters.insert( new_short_fee );
     fee = schedule.calculate_fee( bid_collateral_operation() );
-    BOOST_CHECK_EQUAL( new_short_fee.fee, fee.amount.value );
+    BOOST_CHECK_EQUAL( (int64_t)new_short_fee.fee, fee.amount.value );
 
     // set bid_collateral fee + check
     bid_collateral_operation::fee_parameters_type new_bid_fee; new_bid_fee.fee = 124;
     schedule.parameters.insert( new_bid_fee );
     fee = schedule.calculate_fee( bid_collateral_operation() );
-    BOOST_CHECK_EQUAL( new_bid_fee.fee, fee.amount.value );
+    BOOST_CHECK_EQUAL( (int64_t)new_bid_fee.fee, fee.amount.value );
   }
   catch( const fc::exception& e )
   {

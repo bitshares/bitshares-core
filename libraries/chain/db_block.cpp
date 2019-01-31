@@ -37,6 +37,7 @@
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/evaluator.hpp>
 
+#include <fc/thread/parallel.hpp>
 #include <fc/smart_ref_impl.hpp>
 
 namespace graphene { namespace chain {
@@ -76,7 +77,6 @@ optional<signed_block> database::fetch_block_by_number( uint32_t num )const
       return results[0]->data;
    else
       return _block_id_to_block.fetch_by_number(num);
-   return optional<signed_block>();
 }
 
 const signed_transaction& database::get_recent_transaction(const transaction_id_type& trx_id) const
@@ -129,77 +129,74 @@ bool database::push_block(const signed_block& new_block, uint32_t skip)
 bool database::_push_block(const signed_block& new_block)
 { try {
    uint32_t skip = get_node_properties().skip_flags;
-   if( !(skip&skip_fork_db) )
+   // TODO: If the block is greater than the head block and before the next maintenance interval
+   // verify that the block signer is in the current set of active witnesses.
+
+   shared_ptr<fork_item> new_head = _fork_db.push_block(new_block);
+   //If the head block from the longest chain does not build off of the current head, we need to switch forks.
+   if( new_head->data.previous != head_block_id() )
    {
-      /// TODO: if the block is greater than the head block and before the next maitenance interval
-      // verify that the block signer is in the current set of active witnesses.
-
-      shared_ptr<fork_item> new_head = _fork_db.push_block(new_block);
-      //If the head block from the longest chain does not build off of the current head, we need to switch forks.
-      if( new_head->data.previous != head_block_id() )
+      //If the newly pushed block is the same height as head, we get head back in new_head
+      //Only switch forks if new_head is actually higher than head
+      if( new_head->data.block_num() > head_block_num() )
       {
-         //If the newly pushed block is the same height as head, we get head back in new_head
-         //Only switch forks if new_head is actually higher than head
-         if( new_head->data.block_num() > head_block_num() )
+         wlog( "Switching to fork: ${id}", ("id",new_head->data.id()) );
+         auto branches = _fork_db.fetch_branch_from(new_head->data.id(), head_block_id());
+
+         // pop blocks until we hit the forked block
+         while( head_block_id() != branches.second.back()->data.previous )
          {
-            wlog( "Switching to fork: ${id}", ("id",new_head->data.id()) );
-            auto branches = _fork_db.fetch_branch_from(new_head->data.id(), head_block_id());
-
-            // pop blocks until we hit the forked block
-            while( head_block_id() != branches.second.back()->data.previous )
-            {
-               ilog( "popping block #${n} ${id}", ("n",head_block_num())("id",head_block_id()) );
-               pop_block();
-            }
-
-            // push all blocks on the new fork
-            for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr )
-            {
-                ilog( "pushing block from fork #${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
-                optional<fc::exception> except;
-                try {
-                   undo_database::session session = _undo_db.start_undo_session();
-                   apply_block( (*ritr)->data, skip );
-                   _block_id_to_block.store( (*ritr)->id, (*ritr)->data );
-                   session.commit();
-                }
-                catch ( const fc::exception& e ) { except = e; }
-                if( except )
-                {
-                   wlog( "exception thrown while switching forks ${e}", ("e",except->to_detail_string() ) );
-                   // remove the rest of branches.first from the fork_db, those blocks are invalid
-                   while( ritr != branches.first.rend() )
-                   {
-                      ilog( "removing block from fork_db #${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
-                      _fork_db.remove( (*ritr)->id );
-                      ++ritr;
-                   }
-                   _fork_db.set_head( branches.second.front() );
-
-                   // pop all blocks from the bad fork
-                   while( head_block_id() != branches.second.back()->data.previous )
-                   {
-                      ilog( "popping block #${n} ${id}", ("n",head_block_num())("id",head_block_id()) );
-                      pop_block();
-                   }
-
-                   ilog( "Switching back to fork: ${id}", ("id",branches.second.front()->data.id()) );
-                   // restore all blocks from the good fork
-                   for( auto ritr2 = branches.second.rbegin(); ritr2 != branches.second.rend(); ++ritr2 )
-                   {
-                      ilog( "pushing block #${n} ${id}", ("n",(*ritr2)->data.block_num())("id",(*ritr2)->id) );
-                      auto session = _undo_db.start_undo_session();
-                      apply_block( (*ritr2)->data, skip );
-                      _block_id_to_block.store( (*ritr2)->id, (*ritr2)->data );
-                      session.commit();
-                   }
-                   throw *except;
-                }
-            }
-            return true;
+            ilog( "popping block #${n} ${id}", ("n",head_block_num())("id",head_block_id()) );
+            pop_block();
          }
-         else return false;
+
+         // push all blocks on the new fork
+         for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr )
+         {
+               ilog( "pushing block from fork #${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
+               optional<fc::exception> except;
+               try {
+                  undo_database::session session = _undo_db.start_undo_session();
+                  apply_block( (*ritr)->data, skip );
+                  _block_id_to_block.store( (*ritr)->id, (*ritr)->data );
+                  session.commit();
+               }
+               catch ( const fc::exception& e ) { except = e; }
+               if( except )
+               {
+                  wlog( "exception thrown while switching forks ${e}", ("e",except->to_detail_string() ) );
+                  // remove the rest of branches.first from the fork_db, those blocks are invalid
+                  while( ritr != branches.first.rend() )
+                  {
+                     ilog( "removing block from fork_db #${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
+                     _fork_db.remove( (*ritr)->id );
+                     ++ritr;
+                  }
+                  _fork_db.set_head( branches.second.front() );
+
+                  // pop all blocks from the bad fork
+                  while( head_block_id() != branches.second.back()->data.previous )
+                  {
+                     ilog( "popping block #${n} ${id}", ("n",head_block_num())("id",head_block_id()) );
+                     pop_block();
+                  }
+
+                  ilog( "Switching back to fork: ${id}", ("id",branches.second.front()->data.id()) );
+                  // restore all blocks from the good fork
+                  for( auto ritr2 = branches.second.rbegin(); ritr2 != branches.second.rend(); ++ritr2 )
+                  {
+                     ilog( "pushing block #${n} ${id}", ("n",(*ritr2)->data.block_num())("id",(*ritr2)->id) );
+                     auto session = _undo_db.start_undo_session();
+                     apply_block( (*ritr2)->data, skip );
+                     _block_id_to_block.store( (*ritr2)->id, (*ritr2)->data );
+                     session.commit();
+                  }
+                  throw *except;
+               }
+         }
+         return true;
       }
+      else return false;
    }
 
    try {
@@ -209,7 +206,7 @@ bool database::_push_block(const signed_block& new_block)
       session.commit();
    } catch ( const fc::exception& e ) {
       elog("Failed to push new block:\n${e}", ("e", e.to_detail_string()));
-      _fork_db.remove(new_block.id());
+      _fork_db.remove( new_block.id() );
       throw;
    }
 
@@ -225,7 +222,7 @@ bool database::_push_block(const signed_block& new_block)
  * queues full as well, it will be kept in the queue to be propagated later when a new block flushes out the pending
  * queues.
  */
-processed_transaction database::push_transaction( const signed_transaction& trx, uint32_t skip )
+processed_transaction database::push_transaction( const precomputable_transaction& trx, uint32_t skip )
 { try {
    processed_transaction result;
    detail::with_skip_flags( *this, skip, [&]()
@@ -235,7 +232,7 @@ processed_transaction database::push_transaction( const signed_transaction& trx,
    return result;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }
 
-processed_transaction database::_push_transaction( const signed_transaction& trx )
+processed_transaction database::_push_transaction( const precomputable_transaction& trx )
 {
    // If this is the first transaction pushed after applying a block, start a new undo session.
    // This allows us to quickly rewind to the clean state of the head block, in case a new block arrives.
@@ -352,20 +349,6 @@ signed_block database::_generate_block(
    witness_id_type scheduled_witness = get_scheduled_witness( slot_num );
    FC_ASSERT( scheduled_witness == witness_id );
 
-   const auto& witness_obj = witness_id(*this);
-
-   if( !(skip & skip_witness_signature) )
-      FC_ASSERT( witness_obj.signing_key == block_signing_private_key.get_public_key() );
-
-   static const size_t max_partial_block_header_size = fc::raw::pack_size( signed_block_header() )
-                                                       - fc::raw::pack_size( witness_id_type() ) // witness_id
-                                                       + 4; // space to store size of transactions
-   const size_t max_block_header_size = max_partial_block_header_size + fc::raw::pack_size( witness_id );
-   auto maximum_block_size = get_global_properties().parameters.maximum_block_size;
-   size_t total_block_size = max_block_header_size;
-
-   signed_block pending_block;
-
    //
    // The following code throws away existing pending_tx_session and
    // rebuilds it by re-applying pending transactions.
@@ -377,17 +360,40 @@ signed_block database::_generate_block(
    // the value of the "when" variable is known, which means we need to
    // re-apply pending transactions in this method.
    //
+
+   // pop pending state (reset to head block state)
    _pending_tx_session.reset();
+
+   // Check witness signing key
+   if( !(skip & skip_witness_signature) )
+   {
+      // Note: if this check failed (which won't happen in normal situations),
+      // we would have temporarily broken the invariant that
+      // _pending_tx_session is the result of applying _pending_tx.
+      // In this case, when the node received a new block,
+      // the push_block() call will re-create the _pending_tx_session.
+      FC_ASSERT( witness_id(*this).signing_key == block_signing_private_key.get_public_key() );
+   }
+
+   static const size_t max_partial_block_header_size = fc::raw::pack_size( signed_block_header() )
+                                                       - fc::raw::pack_size( witness_id_type() ) // witness_id
+                                                       + 3; // max space to store size of transactions (out of block header),
+                                                            // +3 means 3*7=21 bits so it's practically safe
+   const size_t max_block_header_size = max_partial_block_header_size + fc::raw::pack_size( witness_id );
+   auto maximum_block_size = get_global_properties().parameters.maximum_block_size;
+   size_t total_block_size = max_block_header_size;
+
+   signed_block pending_block;
+
    _pending_tx_session = _undo_db.start_undo_session();
 
    uint64_t postponed_tx_count = 0;
-   // pop pending state (reset to head block state)
    for( const processed_transaction& tx : _pending_tx )
    {
       size_t new_total_size = total_block_size + fc::raw::pack_size( tx );
 
       // postpone transaction if it would make block too big
-      if( new_total_size >= maximum_block_size )
+      if( new_total_size > maximum_block_size )
       {
          postponed_tx_count++;
          continue;
@@ -403,7 +409,7 @@ signed_block database::_generate_block(
          // their size)
          new_total_size = total_block_size + fc::raw::pack_size( ptx );
          // postpone transaction if it would make block too big
-         if( new_total_size >= maximum_block_size )
+         if( new_total_size > maximum_block_size )
          {
             postponed_tx_count++;
             continue;
@@ -442,13 +448,7 @@ signed_block database::_generate_block(
    if( !(skip & skip_witness_signature) )
       pending_block.sign( block_signing_private_key );
 
-   // TODO:  Move this to _push_block() so session is restored.
-   if( !(skip & skip_block_size_check) )
-   {
-      FC_ASSERT( fc::raw::pack_size(pending_block) <= get_global_properties().parameters.maximum_block_size );
-   }
-
-   push_block( pending_block, skip );
+   push_block( pending_block, skip | skip_transaction_signatures ); // skip authority check when pushing self-generated blocks
 
    return pending_block;
 } FC_CAPTURE_AND_RETHROW( (witness_id) ) }
@@ -460,15 +460,17 @@ signed_block database::_generate_block(
 void database::pop_block()
 { try {
    _pending_tx_session.reset();
-   auto head_id = head_block_id();
-   optional<signed_block> head_block = fetch_block_by_id( head_id );
-   GRAPHENE_ASSERT( head_block.valid(), pop_empty_chain, "there are no blocks to pop" );
-
-   _fork_db.pop_block();
+   auto fork_db_head = _fork_db.head();
+   FC_ASSERT( fork_db_head, "Trying to pop() from empty fork database!?" );
+   if( fork_db_head->id == head_block_id() )
+      _fork_db.pop_block();
+   else
+   {
+      fork_db_head = _fork_db.fetch_block( head_block_id() );
+      FC_ASSERT( fork_db_head, "Trying to pop() block that's not in fork database!?" );
+   }
    pop_undo();
-
-   _popped_tx.insert( _popped_tx.begin(), head_block->transactions.begin(), head_block->transactions.end() );
-
+   _popped_tx.insert( _popped_tx.begin(), fork_db_head->data.transactions.begin(), fork_db_head->data.transactions.end() );
 } FC_CAPTURE_AND_RETHROW() }
 
 void database::clear_pending()
@@ -532,7 +534,17 @@ void database::_apply_block( const signed_block& next_block )
    uint32_t skip = get_node_properties().skip_flags;
    _applied_ops.clear();
 
-   FC_ASSERT( (skip & skip_merkle_check) || next_block.transaction_merkle_root == next_block.calculate_merkle_root(), "", ("next_block.transaction_merkle_root",next_block.transaction_merkle_root)("calc",next_block.calculate_merkle_root())("next_block",next_block)("id",next_block.id()) );
+   if( !(skip & skip_block_size_check) )
+   {
+      FC_ASSERT( fc::raw::pack_size(next_block) <= get_global_properties().parameters.maximum_block_size );
+   }
+
+   FC_ASSERT( (skip & skip_merkle_check) || next_block.transaction_merkle_root == next_block.calculate_merkle_root(),
+              "",
+              ("next_block.transaction_merkle_root",next_block.transaction_merkle_root)
+              ("calc",next_block.calculate_merkle_root())
+              ("next_block",next_block)
+              ("id",next_block.id()) );
 
    const witness_object& signing_witness = validate_block_header(skip, next_block);
    const auto& global_props = get_global_properties();
@@ -606,19 +618,17 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
 { try {
    uint32_t skip = get_node_properties().skip_flags;
 
-   if( true || !(skip&skip_validate) )   /* issue #505 explains why this skip_flag is disabled */
-      trx.validate();
+   trx.validate();
 
    auto& trx_idx = get_mutable_index_type<transaction_index>();
    const chain_id_type& chain_id = get_chain_id();
-   auto trx_id = trx.id();
-   FC_ASSERT( (skip & skip_transaction_dupe_check) ||
-              trx_idx.indices().get<by_trx_id>().find(trx_id) == trx_idx.indices().get<by_trx_id>().end() );
+   if( !(skip & skip_transaction_dupe_check) )
+      FC_ASSERT( trx_idx.indices().get<by_trx_id>().find(trx.id()) == trx_idx.indices().get<by_trx_id>().end() );
    transaction_evaluation_state eval_state(this);
    const chain_parameters& chain_parameters = get_global_properties().parameters;
    eval_state._trx = &trx;
 
-   if( !(skip & (skip_transaction_signatures | skip_authority_check) ) )
+   if( !(skip & skip_transaction_signatures) )
    {
       auto get_active = [&]( account_id_type id ) { return &id(*this).active; };
       auto get_owner  = [&]( account_id_type id ) { return &id(*this).owner;  };
@@ -647,8 +657,8 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    //Insert transaction into unique transactions database.
    if( !(skip & skip_transaction_dupe_check) )
    {
-      create<transaction_object>([&](transaction_object& transaction) {
-         transaction.trx_id = trx_id;
+      create<transaction_object>([&trx](transaction_object& transaction) {
+         transaction.trx_id = trx.id();
          transaction.trx = trx;
       });
    }
@@ -664,14 +674,6 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
       ++_current_op_in_trx;
    }
    ptrx.operation_results = std::move(eval_state.operation_results);
-
-   if( head_block_time() < HARDFORK_CORE_1040_TIME ) // TODO totally remove this code block after hard fork
-   {
-      //Make sure the temp account has no non-zero balances
-      const auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
-      auto range = index.equal_range( boost::make_tuple( GRAPHENE_TEMP_ACCOUNT ) );
-      std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
-   }
 
    return ptrx;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }
@@ -730,6 +732,67 @@ void database::add_checkpoints( const flat_map<uint32_t,block_id_type>& checkpts
 bool database::before_last_checkpoint()const
 {
    return (_checkpoints.size() > 0) && (_checkpoints.rbegin()->first >= head_block_num());
+}
+
+
+static const uint32_t skip_expensive = database::skip_transaction_signatures | database::skip_witness_signature
+                                       | database::skip_merkle_check | database::skip_transaction_dupe_check;
+
+template<typename Trx>
+void database::_precompute_parallel( const Trx* trx, const size_t count, const uint32_t skip )const
+{
+   for( size_t i = 0; i < count; ++i, ++trx )
+   {
+      trx->validate(); // TODO - parallelize wrt confidential operations
+      if( !(skip&skip_transaction_dupe_check) )
+         trx->id();
+      if( !(skip&skip_transaction_signatures) )
+         trx->get_signature_keys( get_chain_id() );
+   }
+}
+
+fc::future<void> database::precompute_parallel( const signed_block& block, const uint32_t skip )const
+{ try {
+   std::vector<fc::future<void>> workers;
+   if( !block.transactions.empty() )
+   {
+      if( (skip & skip_expensive) == skip_expensive )
+         _precompute_parallel( &block.transactions[0], block.transactions.size(), skip );
+      else
+      {
+         uint32_t chunks = fc::asio::default_io_service_scope::get_num_threads();
+         uint32_t chunk_size = ( block.transactions.size() + chunks - 1 ) / chunks;
+         workers.reserve( chunks + 1 );
+         for( size_t base = 0; base < block.transactions.size(); base += chunk_size )
+            workers.push_back( fc::do_parallel( [this,&block,base,chunk_size,skip] () {
+               _precompute_parallel( &block.transactions[base],
+                                     base + chunk_size < block.transactions.size() ? chunk_size : block.transactions.size() - base,
+                                     skip );
+            }) );
+      }
+   }
+
+   if( !(skip&skip_witness_signature) )
+      workers.push_back( fc::do_parallel( [&block] () { block.signee(); } ) );
+   if( !(skip&skip_merkle_check) )
+      block.calculate_merkle_root();
+   block.id();
+
+   if( workers.empty() )
+      return fc::future< void >( fc::promise< void >::ptr( new fc::promise< void >( true ) ) );
+
+   auto first = workers.begin();
+   auto worker = first;
+   while( ++worker != workers.end() )
+      worker->wait();
+   return *first;
+} FC_LOG_AND_RETHROW() }
+
+fc::future<void> database::precompute_parallel( const precomputable_transaction& trx )const
+{
+   return fc::do_parallel([this,&trx] () {
+      _precompute_parallel( &trx, 1, skip_nothing );
+   });
 }
 
 } }

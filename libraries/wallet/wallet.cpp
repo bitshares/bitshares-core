@@ -1480,7 +1480,15 @@ public:
       committee_member_create_operation committee_member_create_op;
       committee_member_create_op.committee_member_account = get_account_id(owner_account);
       committee_member_create_op.url = url;
-      if (_remote_db->get_committee_member_by_account(owner_account))
+
+      /*
+       * Compatibility issue
+       * Current Date: 2018-09-28 More info: https://github.com/bitshares/bitshares-core/issues/1307
+       * Todo: remove the next 2 lines and change always_id to name in remote call after next hardfork
+      */
+      auto account = get_account(owner_account);
+      auto always_id = account_id_to_string(account.id);
+      if (_remote_db->get_committee_member_by_account(always_id))
          FC_THROW("Account ${owner_account} is already a committee_member", ("owner_account", owner_account));
 
       signed_transaction tx;
@@ -1738,8 +1746,15 @@ public:
          result.emplace_back( get_object<vesting_balance_object>(*vbid), now );
          return result;
       }
+      /*
+       * Compatibility issue
+       * Current Date: 2018-09-28 More info: https://github.com/bitshares/bitshares-core/issues/1307
+       * Todo: remove the next 2 lines and change always_id to name in remote call after next hardfork
+      */
+      auto account = get_account(account_name);
+      auto always_id = account_id_to_string(account.id);
 
-      vector< vesting_balance_object > vbos = _remote_db->get_vesting_balances( account_name );
+      vector< vesting_balance_object > vbos = _remote_db->get_vesting_balances( always_id );
       if( vbos.size() == 0 )
          return result;
 
@@ -1787,7 +1802,15 @@ public:
                                         bool broadcast /* = false */)
    { try {
       account_object voting_account_object = get_account(voting_account);
-      fc::optional<committee_member_object> committee_member_obj = _remote_db->get_committee_member_by_account(committee_member);
+
+      /*
+       * Compatibility issue
+       * Current Date: 2018-09-28 More info: https://github.com/bitshares/bitshares-core/issues/1307
+       * Todo: remove the next 2 lines and change always_id to name in remote call after next hardfork
+       */
+      auto account = get_account(committee_member);
+      auto always_id = account_id_to_string(account.id);
+      fc::optional<committee_member_object> committee_member_obj = _remote_db->get_committee_member_by_account(always_id);
       if (!committee_member_obj)
          FC_THROW("Account ${committee_member} is not registered as a committee_member", ("committee_member", committee_member));
       if (approve)
@@ -1821,7 +1844,14 @@ public:
    { try {
       account_object voting_account_object = get_account(voting_account);
 
-      fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(witness);
+      /*
+       * Compatibility issue
+       * Current Date: 2018-09-28 More info: https://github.com/bitshares/bitshares-core/issues/1307
+       * Todo: remove the next 2 lines and change always_id to name in remote call after next hardfork
+       */
+      auto account = get_account(witness);
+      auto always_id = account_id_to_string(account.id);
+      fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(always_id);
       if (!witness_obj)
          FC_THROW("Account ${witness} is not registered as a witness", ("witness", witness));
       if (approve)
@@ -1912,7 +1942,7 @@ public:
       owned_keys.reserve( pks.size() );
       std::copy_if( pks.begin(), pks.end(), std::inserter(owned_keys, owned_keys.end()),
                     [this](const public_key_type& pk){ return _keys.find(pk) != _keys.end(); } );
-      tx.signatures.clear();
+      tx.clear_signatures();
       set<public_key_type> approving_key_set = _remote_db->get_required_signatures( tx, owned_keys );
 
       auto dyn_props = get_dynamic_global_properties();
@@ -1931,7 +1961,7 @@ public:
       for (;;)
       {
          tx.set_expiration( dyn_props.time + fc::seconds(30 + expiration_time_offset) );
-         tx.signatures.clear();
+         tx.clear_signatures();
 
          for( const public_key_type& key : approving_key_set )
             tx.sign( get_private_key(key), _chain_id );
@@ -2062,7 +2092,6 @@ public:
       trx.operations = {op};
       set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
       trx.validate();
-      idump((broadcast));
 
       return sign_transaction(trx, broadcast);
    }
@@ -2087,7 +2116,6 @@ public:
       trx.operations = {op};
       set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
       trx.validate();
-      idump((broadcast));
 
       return sign_transaction(trx, broadcast);
    }
@@ -2963,7 +2991,15 @@ map<string,account_id_type> wallet_api::list_accounts(const string& lowerbound, 
 
 vector<asset> wallet_api::list_account_balances(const string& id)
 {
-   return my->_remote_db->get_account_balances(id, flat_set<asset_id_type>());
+   /*
+    * Compatibility issue
+    * Current Date: 2018-09-13 More info: https://github.com/bitshares/bitshares-core/issues/1307
+    * Todo: remove the next 2 lines and change always_id to id in remote call after next hardfork
+    */
+   auto account = get_account(id);
+   auto always_id = my->account_id_to_string(account.id);
+
+   return my->_remote_db->get_account_balances(always_id, flat_set<asset_id_type>());
 }
 
 vector<asset_object> wallet_api::list_assets(const string& lowerbound, uint32_t limit)const
@@ -2979,6 +3015,14 @@ uint64_t wallet_api::get_asset_count()const
 vector<operation_detail> wallet_api::get_account_history(string name, int limit)const
 {
    vector<operation_detail> result;
+
+   /*
+    * Compatibility issue
+    * Current Date: 2018-09-14 More info: https://github.com/bitshares/bitshares-core/issues/1307
+    * Todo: remove the next 2 lines and change always_id to name in remote call after next hardfork
+    */
+   auto account = get_account(name);
+   auto always_id = my->account_id_to_string(account.id);
 
    while( limit > 0 )
    {
@@ -2999,8 +3043,11 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
 
       int page_limit = skip_first_row ? std::min( 100, limit + 1 ) : std::min( 100, limit );
 
-      vector<operation_history_object> current = my->_remote_hist->get_account_history( name, operation_history_id_type(),
-                                                                                        page_limit, start );
+      vector<operation_history_object> current = my->_remote_hist->get_account_history(
+            always_id,
+            operation_history_id_type(),
+            page_limit,
+            start );
       bool first_row = true;
       for( auto& o : current )
       {
@@ -3028,13 +3075,24 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
    return result;
 }
 
-vector<operation_detail> wallet_api::get_relative_account_history(string name, uint32_t stop, int limit, uint32_t start)const
+vector<operation_detail> wallet_api::get_relative_account_history(
+      string name,
+      uint32_t stop,
+      int limit,
+      uint32_t start)const
 {
    vector<operation_detail> result;
    auto account_id = get_account(name).get_id();
 
    const account_object& account = my->get_account(account_id);
    const account_statistics_object& stats = my->get_object(account.statistics);
+
+   /*
+    * Compatibility issue
+    * Current Date: 2018-09-14 More info: https://github.com/bitshares/bitshares-core/issues/1307
+    * Todo: remove the next line and change always_id to name in remote call after next hardfork
+    */
+   auto always_id = my->account_id_to_string(account_id);
 
    if(start == 0)
        start = stats.total_ops;
@@ -3043,7 +3101,11 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
 
    while( limit > 0 )
    {
-      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(name, stop, std::min<uint32_t>(100, limit), start);
+      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(
+            always_id,
+            stop,
+            std::min<uint32_t>(100, limit),
+            start);
       for (auto &o : current) {
          std::stringstream ss;
          auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
@@ -3058,13 +3120,24 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
    return result;
 }
 
-account_history_operation_detail wallet_api::get_account_history_by_operations(string name, vector<uint16_t> operation_types, uint32_t start, int limit)
+account_history_operation_detail wallet_api::get_account_history_by_operations(
+      string name,
+      vector<uint16_t> operation_types,
+      uint32_t start,
+      int limit)
 {
     account_history_operation_detail result;
     auto account_id = get_account(name).get_id();
 
     const auto& account = my->get_account(account_id);
     const auto& stats = my->get_object(account.statistics);
+
+    /*
+     * Compatibility issue
+     * Current Date: 2018-09-14 More info: https://github.com/bitshares/bitshares-core/issues/1307
+     * Todo: remove the next line and change always_id to name in remote call after next hardfork
+     */
+     auto always_id = my->account_id_to_string(account_id);
 
     // sequence of account_transaction_history_object start with 1
     start = start == 0 ? 1 : start;
@@ -3076,7 +3149,7 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(s
 
     while (limit > 0 && start <= stats.total_ops) {
         uint32_t min_limit = std::min<uint32_t> (100, limit);
-        auto current = my->_remote_hist->get_account_history_by_operations(name, operation_types, start, min_limit);
+        auto current = my->_remote_hist->get_account_history_by_operations(always_id, operation_types, start, min_limit);
         for (auto& obj : current.operation_history_objs) {
             std::stringstream ss;
             auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj.result));
@@ -3103,17 +3176,23 @@ full_account wallet_api::get_full_account( const string& name_or_id)
     return my->_remote_db->get_full_accounts({name_or_id}, false)[name_or_id];
 }
 
-vector<bucket_object> wallet_api::get_market_history( string symbol1, string symbol2, uint32_t bucket , fc::time_point_sec start, fc::time_point_sec end )const
+vector<bucket_object> wallet_api::get_market_history(
+      string symbol1,
+      string symbol2,
+      uint32_t bucket,
+      fc::time_point_sec start,
+      fc::time_point_sec end )const
 {
    return my->_remote_hist->get_market_history( get_asset_id(symbol1), get_asset_id(symbol2), bucket, start, end );
 }
 
-vector<limit_order_object> wallet_api::get_account_limit_orders( const string& name_or_id,
-                                                                const string &base,
-                                                                const string &quote,
-                                                                uint32_t limit,
-                                                                optional<limit_order_id_type> ostart_id,
-                                                                optional<price> ostart_price)
+vector<limit_order_object> wallet_api::get_account_limit_orders(
+      const string& name_or_id,
+      const string &base,
+      const string &quote,
+      uint32_t limit,
+      optional<limit_order_id_type> ostart_id,
+      optional<price> ostart_price)
 {
    return my->_remote_db->get_account_limit_orders(name_or_id, base, quote, limit, ostart_id, ostart_price);
 }
@@ -3215,11 +3294,11 @@ signed_transaction wallet_api::propose_builder_transaction(
 }
 
 signed_transaction wallet_api::propose_builder_transaction2(
-   transaction_handle_type handle,
-   string account_name_or_id,
-   time_point_sec expiration,
-   uint32_t review_period_seconds,
-   bool broadcast)
+      transaction_handle_type handle,
+      string account_name_or_id,
+      time_point_sec expiration,
+      uint32_t review_period_seconds,
+      bool broadcast)
 {
    return my->propose_builder_transaction2(handle, account_name_or_id, expiration, review_period_seconds, broadcast);
 }

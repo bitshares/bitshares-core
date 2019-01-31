@@ -77,8 +77,8 @@ BOOST_AUTO_TEST_CASE( confidential_test )
 
    trx.operations = {to_blind};
    sign( trx,  dan_private_key  );
-   db.push_transaction(trx);
-   trx.signatures.clear();
+   PUSH_TX(db, trx);
+   trx.clear_signatures();
 
    BOOST_TEST_MESSAGE( "Transfering from blind to blind with change address" );
    auto Out3B  = fc::sha256::hash("Out3B");
@@ -97,7 +97,7 @@ BOOST_AUTO_TEST_CASE( confidential_test )
    blind_tr.validate();
    trx.operations = {blind_tr};
    sign( trx,  owner2_key  );
-   db.push_transaction(trx);
+   PUSH_TX(db, trx);
 
    BOOST_TEST_MESSAGE( "Attempting to double spend the same commitments" );
    blind_tr.fee = core.amount(11);
@@ -108,7 +108,7 @@ BOOST_AUTO_TEST_CASE( confidential_test )
    out4.range_proof = fc::ecc::range_proof_sign( 0, out3.commitment, InB1, nonce1, 0, 0, 750-300-11 );
    blind_tr.outputs = {out4,out3};
    trx.operations = {blind_tr};
-   BOOST_REQUIRE_THROW( db.push_transaction(trx, ~0), graphene::chain::blind_transfer_unknown_commitment );
+   BOOST_REQUIRE_THROW( PUSH_TX(db, trx, ~0), graphene::chain::blind_transfer_unknown_commitment );
 
 
    BOOST_TEST_MESSAGE( "Transfering from blind to nathan public" );
@@ -121,8 +121,8 @@ BOOST_AUTO_TEST_CASE( confidential_test )
    from_blind.blinding_factor = Out4B;
    from_blind.inputs.push_back( {out4.commitment, out4.owner} );
    trx.operations = {from_blind};
-   trx.signatures.clear();
-   db.push_transaction(trx);
+   trx.clear_signatures();
+   PUSH_TX(db, trx);
 
    BOOST_REQUIRE_EQUAL( get_balance( nathan, core ), 750-300-10-10 );
 
