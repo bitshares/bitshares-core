@@ -121,7 +121,9 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       market_ticker                      get_ticker( const string& base, const string& quote, bool skip_order_book = false )const;
       market_volume                      get_24_volume( const string& base, const string& quote )const;
       order_book                         get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
-      vector<market_volume>              get_top_markets(uint32_t limit)const;
+      vector<market_ticker>              get_top_markets(uint32_t limit)const;
+      market_ticker                      build_ticker(const market_ticker_object& mto) const;
+      market_ticker                      append_orderbook_to_ticker(market_ticker& ticker) const;
       vector<market_trade>               get_trade_history( const string& base, const string& quote, fc::time_point_sec start, fc::time_point_sec stop, unsigned limit = 100 )const;
       vector<market_trade>               get_trade_history_by_sequence( const string& base, const string& quote, int64_t start, fc::time_point_sec stop, unsigned limit = 100 )const;
 
@@ -308,6 +310,47 @@ database_api_impl::database_api_impl( graphene::chain::database& db, const appli
 database_api_impl::~database_api_impl()
 {
    elog("freeing database api ${x}", ("x",int64_t(this)) );
+}
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
+// Market ticker constructor                                        //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+market_ticker::market_ticker(const market_ticker_object& mto,
+                             const fc::time_point_sec& now,
+                             const asset_object& asset_base,
+                             const asset_object& asset_quote)
+{
+   time = now;
+   base = asset_base.symbol;
+   quote = asset_quote.symbol;
+   fc::uint128 bv;
+   fc::uint128 qv;
+   price latest_price = asset( mto.latest_base, mto.base ) / asset( mto.latest_quote, mto.quote );
+   if( mto.base != asset_base.id )
+      latest_price = ~latest_price;
+   latest = database_api_impl::price_to_string( latest_price, asset_base, asset_quote );
+   if( mto.last_day_base != 0 && mto.last_day_quote != 0 // has trade data before 24 hours
+       && ( mto.last_day_base != mto.latest_base || mto.last_day_quote != mto.latest_quote ) ) // price changed
+   {
+      price last_day_price = asset( mto.last_day_base, mto.base ) / asset( mto.last_day_quote, mto.quote );
+      if( mto.base != asset_base.id )
+         last_day_price = ~last_day_price;
+      percent_change = price_diff_percent_string( last_day_price, latest_price );
+   }
+   if( asset_base.id == mto.base )
+   {
+      bv = mto.base_volume;
+      qv = mto.quote_volume;
+   }
+   else
+   {
+      bv = mto.quote_volume;
+      qv = mto.base_volume;
+   }
+   base_volume = uint128_amount_to_string( bv, asset_base.precision );
+   quote_volume = uint128_amount_to_string( qv, asset_quote.precision );
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -1302,66 +1345,25 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
    const auto assets = lookup_asset_symbols( {base, quote} );
+
    FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
    FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
-
-   const fc::time_point_sec now = _db.head_block_time();
-
-   market_ticker result;
-   result.time = now;
-   result.base = base;
-   result.quote = quote;
-   result.latest = "0";
-   result.lowest_ask = "0";
-   result.highest_bid = "0";
-   result.percent_change = "0";
 
    auto base_id = assets[0]->id;
    auto quote_id = assets[1]->id;
    if( base_id > quote_id ) std::swap( base_id, quote_id );
-
-   fc::uint128 base_volume;
-   fc::uint128 quote_volume;
-
    const auto& ticker_idx = _db.get_index_type<graphene::market_history::market_ticker_index>().indices().get<by_market>();
    auto itr = ticker_idx.find( std::make_tuple( base_id, quote_id ) );
+   market_ticker ticker;
    if( itr != ticker_idx.end() )
    {
-      price latest_price = asset( itr->latest_base, itr->base ) / asset( itr->latest_quote, itr->quote );
-      if( itr->base != assets[0]->id )
-         latest_price = ~latest_price;
-      result.latest = price_to_string( latest_price, *assets[0], *assets[1] );
-      if( itr->last_day_base != 0 && itr->last_day_quote != 0 // has trade data before 24 hours
-            && ( itr->last_day_base != itr->latest_base || itr->last_day_quote != itr->latest_quote ) ) // price changed
-      {
-         price last_day_price = asset( itr->last_day_base, itr->base ) / asset( itr->last_day_quote, itr->quote );
-         if( itr->base != assets[0]->id )
-            last_day_price = ~last_day_price;
-         result.percent_change = price_diff_percent_string( last_day_price, latest_price );
-      }
-      if( assets[0]->id == itr->base )
-      {
-         base_volume = itr->base_volume;
-         quote_volume = itr->quote_volume;
-      }
-      else
-      {
-         base_volume = itr->quote_volume;
-         quote_volume = itr->base_volume;
-      }
+      ticker = build_ticker(*itr);
    }
-
-   result.base_volume = uint128_amount_to_string( base_volume, assets[0]->precision );
-   result.quote_volume = uint128_amount_to_string( quote_volume, assets[1]->precision );
-
    if( !skip_order_book )
    {
-      const auto orders = get_order_book( base, quote, 1 );
-      if( !orders.asks.empty() ) result.lowest_ask = orders.asks[0].price;
-      if( !orders.bids.empty() ) result.highest_bid = orders.bids[0].price;
+      return append_orderbook_to_ticker(ticker);
    }
-
-   return result;
+   return ticker;
 }
 
 market_volume database_api::get_24_volume( const string& base, const string& quote )const
@@ -1428,12 +1430,12 @@ order_book database_api_impl::get_order_book( const string& base, const string& 
    return result;
 }
 
-vector<market_volume> database_api::get_top_markets(uint32_t limit)const
+vector<market_ticker> database_api::get_top_markets(uint32_t limit)const
 {
    return my->get_top_markets(limit);
 }
 
-vector<market_volume> database_api_impl::get_top_markets(uint32_t limit)const
+vector<market_ticker> database_api_impl::get_top_markets(uint32_t limit)const
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
@@ -1441,24 +1443,33 @@ vector<market_volume> database_api_impl::get_top_markets(uint32_t limit)const
 
    const auto& volume_idx = _db.get_index_type<graphene::market_history::market_ticker_index>().indices().get<by_volume>();
    auto itr = volume_idx.rbegin();
-   vector<market_volume> result;
+   vector<market_ticker> result;
    result.reserve(limit);
-
-   const fc::time_point_sec now = fc::time_point::now();
 
    while( itr != volume_idx.rend() && result.size() < limit)
    {
-      market_volume mv;
-      mv.time = now;
-      const auto assets = get_assets( { itr->base, itr->quote } );
-      mv.base = assets[0]->symbol;
-      mv.quote = assets[1]->symbol;
-      mv.base_volume = uint128_amount_to_string( itr->base_volume, assets[0]->precision );
-      mv.quote_volume = uint128_amount_to_string( itr->quote_volume, assets[1]->precision );
-      result.emplace_back( std::move(mv) );
+      auto ticker = build_ticker(*itr);
+      result.emplace_back( append_orderbook_to_ticker(ticker) );
       ++itr;
    }
    return result;
+}
+market_ticker database_api_impl::build_ticker(const market_ticker_object& mto) const
+{
+   const auto& assets = get_assets( { mto.base, mto.quote } );
+   const fc::time_point_sec now = _db.head_block_time();
+   market_ticker ticker(mto, now, *assets[0], *assets[1]);
+   return ticker;
+}
+
+market_ticker database_api_impl::append_orderbook_to_ticker(market_ticker& ticker) const
+{
+   const auto& orders = get_order_book(ticker.base, ticker.quote, 1);
+   if (!orders.asks.empty())
+      ticker.lowest_ask = orders.asks[0].price;
+   if (!orders.bids.empty())
+      ticker.highest_bid = orders.bids[0].price;
+   return ticker;
 }
 
 vector<market_trade> database_api::get_trade_history( const string& base,

@@ -90,6 +90,12 @@ struct market_ticker
    string                     percent_change;
    string                     base_volume;
    string                     quote_volume;
+
+   market_ticker() {}
+   market_ticker(const market_ticker_object& mto,
+                 const fc::time_point_sec& now,
+                 const asset_object& asset_base,
+                 const asset_object& asset_quote);
 };
 
 struct market_volume
@@ -493,12 +499,12 @@ class database_api
       order_book get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
 
       /**
-       * @brief Returns vector of 24 hour volume markets sorted by reverse base_volume
+       * @brief Returns vector of tickers sorted by reverse base_volume
        * Note: this API is experimental and subject to change in next releases
        * @param limit Max number of results
-       * @return Desc Sorted volume vector
+       * @return Desc Sorted ticker vector
        */
-      vector<market_volume> get_top_markets(uint32_t limit)const;
+      vector<market_ticker> get_top_markets(uint32_t limit)const;
 
       /**
        * @brief Returns recent trades for the market base:quote, ordered by time, most recent first.
