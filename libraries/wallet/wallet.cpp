@@ -4146,6 +4146,52 @@ vector<variant> wallet_api::lookup_vote_ids( const vector<vote_id_type>& votes )
    return my->_remote_db->lookup_vote_ids(votes);
 }
 
+std::string wallet_api::get_transaction_hex(const signed_transaction& trx)const
+{
+   return my->_remote_id->get_transaction_hex(trx);
+}
+
+std::string wallet_api::get_transaction_hex_without_sig( const signed_transaction &trx ) const
+{
+   return my->_remote_id->get_transaction_hex_without_sig(trx);
+}
+
+set<public_key_type> wallet_api::get_required_signatures( const signed_transaction& trx, 
+                                                          const flat_set<public_key_type>& available_keys )const
+{
+   return my->_remote_id->get_required_signatures(trx, availabe_keys);
+}
+
+set<public_key_type> wallet_api::get_potential_signatures( const signed_transaction& trx )const
+{
+   return my->_remote_id->get_potential_signatures(trx);
+}
+
+set<address> wallet_api::get_potential_address_signatures( const signed_transaction& trx )const
+{
+   return my->_remote_id->get_potential_address_signatures(trx);
+}
+
+bool wallet_api::verify_authority( const signed_transaction& trx )const
+{
+   return my->_remote_id->verify_authotiry(trx);
+}
+
+bool wallet_api::verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )const
+{
+   return my->_remote_id->verify_account_authority(account_name_or_id, signers);
+}
+
+processed_transaction wallet_api::validate_transaction( const signed_transaction& trx )const
+{
+   return my->_remote_id->validate_transaction(trx);
+}
+
+vector< fc::variant > wallet_api::get_required_fees( const vector<operation>& ops, asset_id_type id )const
+{
+   return my->_remote_id->get_required_fees(ops, id);
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );

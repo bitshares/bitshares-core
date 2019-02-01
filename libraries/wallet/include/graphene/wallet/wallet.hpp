@@ -1033,6 +1033,55 @@ class wallet_api
        */
       vector<variant> lookup_vote_ids( const vector<vote_id_type>& votes )const;
 
+      ////////////////////////////
+      // Authority / validation //
+      ////////////////////////////
+
+      /// @brief Get a hexdump of the serialized binary form of a transaction
+      std::string get_transaction_hex(const signed_transaction& trx)const;
+
+      /// @brief Get a hexdump of the serialized binary form of a
+      /// signatures-stripped transaction
+      std::string get_transaction_hex_without_sig( const signed_transaction &trx ) const;
+
+      /**
+       *  This API will take a partially signed transaction and a set of public keys that the owner has the ability to sign for
+       *  and return the minimal subset of public keys that should add signatures to the transaction.
+       */
+      set<public_key_type> get_required_signatures( const signed_transaction& trx, const flat_set<public_key_type>& available_keys )const;
+
+      /**
+       *  This method will return the set of all public keys that could possibly sign for a given transaction.  This call can
+       *  be used by wallets to filter their set of public keys to just the relevant subset prior to calling @ref get_required_signatures
+       *  to get the minimum subset.
+       */
+      set<public_key_type> get_potential_signatures( const signed_transaction& trx )const;
+      set<address> get_potential_address_signatures( const signed_transaction& trx )const;
+
+      /**
+       * @return true of the @ref trx has all of the required signatures, otherwise throws an exception
+       */
+      bool           verify_authority( const signed_transaction& trx )const;
+
+      /**
+       * @brief Verify that the public keys have enough authority to approve an operation for this account
+       * @param account_name_or_id the account to check
+       * @param signers the public keys
+       * @return true if the passed in keys have enough authority to approve an operation for this account
+       */
+      bool verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )const;
+
+      /**
+       *  Validates a transaction against the current state without broadcasting it on the network.
+       */
+      processed_transaction validate_transaction( const signed_transaction& trx )const;
+
+      /**
+       *  For each operation calculate the required fee in the specified asset type.  If the asset type does
+       *  not have a valid core_exchange_rate
+       */
+      vector< fc::variant > get_required_fees( const vector<operation>& ops, asset_id_type id )const;
+
       /** Saves the current wallet to the given filename.
        * 
        * @warning This does not change the wallet filename that will be used for future
@@ -2288,4 +2337,15 @@ FC_API( graphene::wallet::wallet_api,
 
         // Votes
         (lookup_vote_ids)
+
+        // Authority / validation
+        (get_transaction_hex)
+        (get_transaction_hex_without_sig)
+        (get_required_signatures)
+        (get_potential_signatures)
+        (get_potential_address_signatures)
+        (verify_authority)
+        (verify_account_authority)
+        (validate_transaction)
+        (get_required_fees)
       )
