@@ -759,14 +759,64 @@ class wallet_api
 
       vector<vector<account_id_type>> get_key_references( vector<public_key_type> key )const;
 
-     /**
-      * Determine whether a textual representation of a public key
-      * (in Base-58 format) is *currently* linked
-      * to any *registered* (i.e. non-stealth) account on the blockchain
-      * @param public_key Public key
-      * @return Whether a public key is known
-      */
-     bool is_public_key_registered(string public_key) const;
+      /**
+       * Determine whether a textual representation of a public key
+       * (in Base-58 format) is *currently* linked
+       * to any *registered* (i.e. non-stealth) account on the blockchain
+       * @param public_key Public key
+       * @return Whether a public key is known
+       */
+      bool is_public_key_registered(string public_key) const;
+
+      //////////////
+      // Accounts //
+      //////////////
+
+      /**
+       * @brief Get a list of accounts by ID
+       * @param account_names_or_ids IDs or names of the accounts to retrieve
+       * @return The accounts corresponding to the provided IDs
+       *
+       * This function has semantics identical to @ref get_objects
+       */
+      vector<optional<account_object>> get_accounts(const vector<std::string>& account_names_or_ids)const;
+
+      /**
+       * @brief Fetch all objects relevant to the specified accounts and subscribe to updates
+       * @param callback Function to call with updates
+       * @param names_or_ids Each item must be the name or ID of an account to retrieve
+       * @return Map of string from @ref names_or_ids to the corresponding account
+       *
+       * This function fetches all relevant objects for the given accounts, and subscribes to updates to the given
+       * accounts. If any of the strings in @ref names_or_ids cannot be tied to an account, that input will be
+       * ignored. All other accounts will be retrieved and subscribed.
+       *
+       */
+      std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids, bool subscribe );
+
+      optional<account_object> get_account_by_name( string name )const;
+
+      /**
+       *  @return all accounts that referr to the key or account id in their owner or active authorities.
+       */
+      vector<account_id_type> get_account_references( const std::string account_id_or_name )const;
+
+      /**
+       * @brief Get a list of accounts by name
+       * @param account_names Names of the accounts to retrieve
+       * @return The accounts holding the provided names
+       *
+       * This function has semantics identical to @ref get_objects
+       */
+      vector<optional<account_object>> lookup_account_names(const vector<string>& account_names)const;
+
+      /**
+       * @brief Get names and IDs for registered accounts
+       * @param lower_bound_name Lower bound of the first name to return
+       * @param limit Maximum number of results to return -- must not exceed 1000
+       * @return Map of account names to corresponding IDs
+       */
+      map<string,account_id_type> lookup_accounts(const string& lower_bound_name, uint32_t limit)const;
 
       /** Saves the current wallet to the given filename.
        * 
@@ -1977,4 +2027,12 @@ FC_API( graphene::wallet::wallet_api,
         // Keys
         (get_key_references)
         (is_public_key_registered)
+
+        // Accounts
+        (get_accounts)
+        (get_full_accounts)
+        (get_account_by_name)
+        (get_account_references)
+        (lookup_account_names)
+        (lookup_accounts)
       )

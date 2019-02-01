@@ -3989,6 +3989,36 @@ bool wallet_api::is_public_key_registered(string public_key) const
    return my->_remote_db->get_key_registered(public_key);
 }
 
+vector<optional<account_object>> wallet_api::get_accounts(const vector<std::string>& account_names_or_ids)const
+{
+   return my->_remote_db->get_accounts(account_name_or_ids);
+}
+
+std::map<string,full_account> wallet_api::get_full_accounts( const vector<string>& names_or_ids, bool subscribe )
+{
+   return my->_remote_db->get_full_accounts(names_or_ids, subscribe);
+}
+
+optional<account_object> wallet_api::get_account_by_name( string name )const
+{
+   return my->_remote_db->get_account_by_name(name);
+}
+
+vector<account_id_type> wallet_api::get_account_references( const std::string account_id_or_name )const
+{
+   return my->_remote_db->get_account_references(account_id_or_name);
+}
+
+vector<optional<account_object>> wallet_api::lookup_account_names(const vector<string>& account_names)const
+{
+   return my->_remote_db->lookup_account_names(account_names);
+}
+
+map<string,account_id_type> wallet_api::lookup_accounts(const string& lower_bound_name, uint32_t limit)const
+{
+   return my->_remote_db->lookup_accounts(lower_bound_name, limit);
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );
