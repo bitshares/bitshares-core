@@ -34,7 +34,6 @@
 #include <fc/rpc/cli.hpp>
 #include <fc/rpc/http_api.hpp>
 #include <fc/rpc/websocket_api.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 #include <graphene/app/api.hpp>
 #include <graphene/chain/config.hpp>

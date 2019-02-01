@@ -38,7 +38,6 @@
 #include <graphene/chain/evaluator.hpp>
 
 #include <fc/thread/parallel.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 namespace graphene { namespace chain {
 

@@ -24,8 +24,6 @@
 
 #include <graphene/es_objects/es_objects.hpp>
 
-#include <fc/smart_ref_impl.hpp>
-
 #include <curl/curl.h>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/balance_object.hpp>

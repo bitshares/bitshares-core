@@ -35,7 +35,6 @@
 #include <graphene/chain/protocol/market.hpp>
 
 #include <fc/uint128.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 namespace graphene { namespace chain {
 void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_operation& op)
