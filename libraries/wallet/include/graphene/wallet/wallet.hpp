@@ -704,6 +704,36 @@ class wallet_api
        */
       void cancel_all_subscriptions();
 
+      /////////////////////////////
+      // Blocks and transactions //
+      /////////////////////////////
+
+      /**
+       * @brief Retrieve a block header
+       * @param block_num Height of the block whose header should be returned
+       * @return header of the referenced block, or null if no matching block was found
+       */
+      optional<block_header> get_block_header(uint32_t block_num)const;
+
+      /**
+      * @brief Retrieve multiple block header by block numbers
+      * @param block_num vector containing heights of the block whose header should be returned
+      * @return array of headers of the referenced blocks, or null if no matching block was found
+      */
+      map<uint32_t, optional<block_header>> get_block_header_batch(const vector<uint32_t> block_nums)const;
+
+      /**
+       * @brief used to fetch an individual transaction.
+       */
+      processed_transaction get_transaction( uint32_t block_num, uint32_t trx_in_block )const;
+
+      /**
+       * If the transaction has not expired, this method will return the transaction for the given ID or
+       * it will return NULL if it is not known.  Just because it is not known does not mean it wasn't
+       * included in the blockchain.
+       */
+      optional<signed_transaction> get_recent_transaction_by_id( const transaction_id_type& id )const;
+
       /** Saves the current wallet to the given filename.
        * 
        * @warning This does not change the wallet filename that will be used for future
@@ -1898,4 +1928,10 @@ FC_API( graphene::wallet::wallet_api,
         (set_pending_transaction_callback)
         (set_block_applied_callback)
         (cancel_all_subscriptions)
+
+        // Blocks and transactions
+        (get_block_header)
+        (get_block_header_batch)
+        (get_transaction)
+        (get_recent_transaction_by_id)
       )

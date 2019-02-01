@@ -3944,6 +3944,26 @@ void wallet_api::cancel_all_subscriptions()
    my->_remote_db->cancel_all_subscriptions();
 }
 
+optional<block_header> wallet_api::get_block_header(uint32_t block_num)const
+{
+   return my->_remote_db->get_block_header( block_num );
+}
+
+map<uint32_t, optional<block_header>> wallet_api::get_block_header_batch(const vector<uint32_t> block_nums)const
+{
+   return my->_remote_db->get_block_header_batch( block_nums );
+}
+
+processed_transaction wallet_api::get_transaction( uint32_t block_num, uint32_t trx_in_block )const
+{
+   return my->_remote_db->get_transaction( block_num, trx_in_block );
+}
+
+optional<signed_transaction> wallet_api::get_recent_transaction_by_id( const transaction_id_type& id )const
+{
+   return my->_remote_db->get_recent_transaction_by_id(id);
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );
