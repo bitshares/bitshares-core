@@ -25,7 +25,6 @@
 #include <graphene/elasticsearch/elasticsearch_plugin.hpp>
 #include <graphene/chain/impacted.hpp>
 #include <graphene/chain/account_evaluator.hpp>
-#include <fc/smart_ref_impl.hpp>
 #include <curl/curl.h>
 #include <graphene/utilities/elasticsearch.hpp>
 

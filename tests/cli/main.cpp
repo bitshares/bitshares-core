@@ -33,7 +33,6 @@
 #include <graphene/wallet/wallet.hpp>
 
 #include <fc/thread/thread.hpp>
-#include <fc/smart_ref_impl.hpp>
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/rpc/cli.hpp>

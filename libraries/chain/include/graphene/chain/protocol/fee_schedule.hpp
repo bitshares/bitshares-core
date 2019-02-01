@@ -152,5 +152,9 @@ namespace graphene { namespace chain {
 
 } } // graphene::chain
 
+namespace fc {
+  template<> struct get_typename<std::shared_ptr<graphene::chain::fee_schedule>> { static const char* name() { return "shared_ptr<fee_schedule>"; } };
+}
+
 FC_REFLECT_TYPENAME( graphene::chain::fee_parameters )
 FC_REFLECT( graphene::chain::fee_schedule, (parameters)(scale) )
