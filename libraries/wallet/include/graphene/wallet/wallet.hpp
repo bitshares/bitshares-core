@@ -669,6 +669,41 @@ class wallet_api
        */
       void    quit();
 
+      ///////////////////
+      // Subscriptions //
+      ///////////////////
+
+      /**
+       * @brief Register a callback handle which then can be used to subscribe to object database changes
+       * @param cb The callback handle to register
+       * @param nofity_remove_create Whether subscribe to universal object creation and removal events.
+       *        If this is set to true, the API server will notify all newly created objects and ID of all
+       *        newly removed objects to the client, no matter whether client subscribed to the objects.
+       *        By default, API servers don't allow subscribing to universal events, which can be changed
+       *        on server startup.
+       */
+      void set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_remove_create );
+      /**
+       * @brief Register a callback handle which will get notified when a transaction is pushed to database
+       * @param cb The callback handle to register
+       *
+       * Note: a transaction can be pushed to database and be popped from database several times while
+       *   processing, before and after included in a block. Everytime when a push is done, the client will
+       *   be notified.
+       */
+      void set_pending_transaction_callback( std::function<void(const variant& signed_transaction_object)> cb );
+      /**
+       * @brief Register a callback handle which will get notified when a block is pushed to database
+       * @param cb The callback handle to register
+       */
+      void set_block_applied_callback( std::function<void(const variant& block_id)> cb );
+      /**
+       * @brief Stop receiving any notifications
+       *
+       * This unsubscribes from all subscribed markets and objects.
+       */
+      void cancel_all_subscriptions();
+
       /** Saves the current wallet to the given filename.
        * 
        * @warning This does not change the wallet filename that will be used for future
@@ -1857,4 +1892,10 @@ FC_API( graphene::wallet::wallet_api,
         (receive_blind_transfer)
         (get_order_book)
         (quit)
+
+        // Subscriptions
+        (set_subscribe_callback)
+        (set_pending_transaction_callback)
+        (set_block_applied_callback)
+        (cancel_all_subscriptions)
       )

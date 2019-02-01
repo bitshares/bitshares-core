@@ -3924,6 +3924,26 @@ void wallet_api::quit()
     my->quit();
 }
 
+void wallet_api::set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_remove_create )
+{
+   my->_remote_db->set_subscribe_callback(cb, notify_remove_create);
+}
+
+void wallet_api::set_pending_transaction_callback( std::function<void(const variant& signed_transaction_object)> cb )
+{
+   my->_remote_db->set_pending_transaction_callback(cb);
+}
+
+void wallet_api::set_block_applied_callback( std::function<void(const variant& block_id)> cb )
+{
+   my->_remote_db->set_block_applied_callback(cb);
+}
+
+void wallet_api::cancel_all_subscriptions()
+{
+   my->_remote_db->cancel_all_subscriptions();
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );
