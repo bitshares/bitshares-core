@@ -3984,14 +3984,9 @@ vector<vector<account_id_type>> wallet_api::get_key_references( vector<public_ke
    return my->_remote_db->get_key_references(key);
 }
 
-bool wallet_api::is_public_key_registered(string public_key) const
-{
-   return my->_remote_db->get_key_registered(public_key);
-}
-
 vector<optional<account_object>> wallet_api::get_accounts(const vector<std::string>& account_names_or_ids)const
 {
-   return my->_remote_db->get_accounts(account_name_or_ids);
+   return my->_remote_db->get_accounts(account_names_or_ids);
 }
 
 std::map<string,full_account> wallet_api::get_full_accounts( const vector<string>& names_or_ids, bool subscribe )
@@ -4077,26 +4072,26 @@ vector<market_volume> wallet_api::get_top_markets(uint32_t limit)const
 
 vector<market_trade> wallet_api::get_trade_history( const string& base, const string& quote,
                                           fc::time_point_sec start, fc::time_point_sec stop,
-                                          unsigned limit = 100 )const
+                                          unsigned limit )const
 {
    return my->_remote_db->get_trade_history(base, quote, start, stop, limit);
 }
 
 vector<market_trade> wallet_api::get_trade_history_by_sequence( const string& base, const string& quote,
                                                       int64_t start, fc::time_point_sec stop,
-                                                      unsigned limit = 100 )const
+                                                      unsigned limit )const
 {
    return my->_remote_db->get_trade_history_by_sequence(base, quote, start, stop, limit);
 }
 
 vector<optional<witness_object>> wallet_api::get_witnesses(const vector<witness_id_type>& witness_ids)const
 {
-   return my->_remote_db->get_wintesses(witness_ids);
+   return my->_remote_db->get_witnesses(witness_ids);
 }
 
 fc::optional<witness_object> wallet_api::get_witness_by_account(const std::string account_id_or_name)const
 {
-   return my->_remote_db->get_wintess_by_account(account_id_or_name);
+   return my->_remote_db->get_witness_by_account(account_id_or_name);
 }
 
 map<string, witness_id_type> wallet_api::lookup_witness_accounts(const string& lower_bound_name, uint32_t limit)const

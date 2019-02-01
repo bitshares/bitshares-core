@@ -759,15 +759,6 @@ class wallet_api
 
       vector<vector<account_id_type>> get_key_references( vector<public_key_type> key )const;
 
-      /**
-       * Determine whether a textual representation of a public key
-       * (in Base-58 format) is *currently* linked
-       * to any *registered* (i.e. non-stealth) account on the blockchain
-       * @param public_key Public key
-       * @return Whether a public key is known
-       */
-      bool is_public_key_registered(string public_key) const;
-
       //////////////
       // Accounts //
       //////////////
@@ -2180,7 +2171,6 @@ FC_API( graphene::wallet::wallet_api,
 
         // Keys
         (get_key_references)
-        (is_public_key_registered)
 
         // Accounts
         (get_accounts)
