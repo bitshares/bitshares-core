@@ -3979,6 +3979,16 @@ chain_id_type wallet_api::get_chain_id()const
    return my->_remote_db->get_chain_id();
 }
 
+vector<vector<account_id_type>> wallet_api::get_key_references( vector<public_key_type> key )const
+{
+   return my->_remote_db->get_key_references(key);
+}
+
+bool wallet_api::is_public_key_registered(string public_key) const
+{
+   return my->_remote_db->get_key_registered(public_key);
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );
