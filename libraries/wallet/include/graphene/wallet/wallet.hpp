@@ -939,6 +939,39 @@ class wallet_api
                                                           int64_t start, fc::time_point_sec stop,
                                                           unsigned limit = 100 )const;
 
+      ///////////////
+      // Witnesses //
+      ///////////////
+
+      /**
+       * @brief Get a list of witnesses by ID
+       * @param witness_ids IDs of the witnesses to retrieve
+       * @return The witnesses corresponding to the provided IDs
+       *
+       * This function has semantics identical to @ref get_objects
+       */
+      vector<optional<witness_object>> get_witnesses(const vector<witness_id_type>& witness_ids)const;
+
+      /**
+       * @brief Get the witness owned by a given account
+       * @param account_id_or_name The ID of the account whose witness should be retrieved
+       * @return The witness object, or null if the account does not have a witness
+       */
+      fc::optional<witness_object> get_witness_by_account(const std::string account_id_or_name)const;
+
+      /**
+       * @brief Get names and IDs for registered witnesses
+       * @param lower_bound_name Lower bound of the first name to return
+       * @param limit Maximum number of results to return -- must not exceed 1000
+       * @return Map of witness names to corresponding IDs
+       */
+      map<string, witness_id_type> lookup_witness_accounts(const string& lower_bound_name, uint32_t limit)const;
+
+      /**
+       * @brief Get the total number of witnesses registered with the blockchain
+       */
+      uint64_t get_witness_count()const;
+
       /** Saves the current wallet to the given filename.
        * 
        * @warning This does not change the wallet filename that will be used for future
@@ -2175,4 +2208,10 @@ FC_API( graphene::wallet::wallet_api,
         (get_trade_history)
         (get_trade_history_by_sequence)
         (get_ticker)
+
+        // Witnesses
+        (get_witnesses)
+        (get_witness_by_account)
+        (lookup_witness_accounts)
+        (get_witness_count)
       )

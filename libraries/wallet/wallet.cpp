@@ -4089,6 +4089,26 @@ vector<market_trade> wallet_api::get_trade_history_by_sequence( const string& ba
    return my->_remote_db->get_trade_history_by_sequence(base, quote, start, stop, limit);
 }
 
+vector<optional<witness_object>> wallet_api::get_witnesses(const vector<witness_id_type>& witness_ids)const
+{
+   return my->_remote_db->get_wintesses(witness_ids);
+}
+
+fc::optional<witness_object> wallet_api::get_witness_by_account(const std::string account_id_or_name)const
+{
+   return my->_remote_db->get_wintess_by_account(account_id_or_name);
+}
+
+map<string, witness_id_type> wallet_api::lookup_witness_accounts(const string& lower_bound_name, uint32_t limit)const
+{
+   return my->_remote_db->lookup_witness_accounts(lower_bound_name, limit);
+}
+
+uint64_t wallet_api::get_witness_count()const
+{
+   return my->_remote_db->get_witness_count();
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );
