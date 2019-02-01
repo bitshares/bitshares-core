@@ -95,7 +95,8 @@ struct market_ticker
    market_ticker(const market_ticker_object& mto,
                  const fc::time_point_sec& now,
                  const asset_object& asset_base,
-                 const asset_object& asset_quote);
+                 const asset_object& asset_quote,
+                 const order_book& orders);
 };
 
 struct market_volume
