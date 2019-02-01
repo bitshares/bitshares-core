@@ -996,6 +996,29 @@ class wallet_api
       */
       uint64_t get_committee_count()const;
 
+      ///////////////////////
+      // Worker proposals  //
+      ///////////////////////
+
+      /**
+       * @brief Get all workers
+       * @return All the workers
+       *
+      */
+      vector<worker_object> get_all_workers()const;
+
+      /**
+       * @brief Get the workers owned by a given account
+       * @param account_id_or_name The ID or name of the account whose worker should be retrieved
+       * @return The worker object, or null if the account does not have a worker
+       */
+      vector<optional<worker_object>> get_workers_by_account(const std::string account_id_or_name)const;
+
+      /**
+       * @brief Get the total number of workers registered with the blockchain
+      */
+      uint64_t get_worker_count()const;
+
       /** Saves the current wallet to the given filename.
        * 
        * @warning This does not change the wallet filename that will be used for future
@@ -2243,4 +2266,9 @@ FC_API( graphene::wallet::wallet_api,
         (get_committee_member_by_account)
         (lookup_committee_member_accounts)
         (get_committee_count)
+
+        // Workers
+        (get_all_workers)
+        (get_workers_by_account)
+        (get_worker_count)
       )

@@ -4126,6 +4126,21 @@ uint64_t wallet_api::get_committee_count()const
    return my->_remote_db->get_committee_count();
 }
 
+vector<worker_object> wallet_api::get_all_workers()const
+{
+   return my->_remote_db->get_all_workers();
+}
+
+vector<optional<worker_object>> wallet_api::get_workers_by_account(const std::string account_id_or_name)const
+{
+   return my->_remote_db->get_workers_by_account(account_id_or_name);
+}
+
+uint64_t wallet_api::get_worker_count()const
+{
+   return my->_remote_db->get_worker_count();
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );
