@@ -734,6 +734,25 @@ class wallet_api
        */
       optional<signed_transaction> get_recent_transaction_by_id( const transaction_id_type& id )const;
 
+      ///////////
+      // Chain //
+      ///////////
+
+      /**
+       * @brief Retrieve the @ref chain_property_object associated with the chain
+       */
+      chain_property_object get_chain_properties()const;
+
+      /**
+       * @brief Retrieve compile-time constants
+       */
+      fc::variant_object get_config()const;
+
+      /**
+       * @brief Get the chain ID
+       */
+      chain_id_type get_chain_id()const;
+
       /** Saves the current wallet to the given filename.
        * 
        * @warning This does not change the wallet filename that will be used for future
@@ -1934,4 +1953,9 @@ FC_API( graphene::wallet::wallet_api,
         (get_block_header_batch)
         (get_transaction)
         (get_recent_transaction_by_id)
+
+        // Chain
+        (get_chain_properties)
+        (get_config)
+        (get_chain_id)
       )

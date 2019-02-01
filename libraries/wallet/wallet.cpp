@@ -3964,6 +3964,21 @@ optional<signed_transaction> wallet_api::get_recent_transaction_by_id( const tra
    return my->_remote_db->get_recent_transaction_by_id(id);
 }
 
+chain_property_object wallet_api::get_chain_properties()const
+{
+   return my->_remote_db->get_chain_properties();
+}
+
+fc::variant_object wallet_api::get_config()const
+{
+   return my->_remote_db->get_config();
+}
+
+chain_id_type wallet_api::get_chain_id()const
+{
+   return my->_remote_db->get_chain_id();
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );
