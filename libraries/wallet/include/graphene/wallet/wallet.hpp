@@ -1100,6 +1100,30 @@ class wallet_api
        */
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
 
+      /////////////////
+      // Withdrawals //
+      /////////////////
+
+      /**
+       *  @brief Get non expired withdraw permission objects for a giver(ex:recurring customer)
+       *  @param account Account ID or name to get objects from
+       *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results. Pagination purposes.
+       *  @param limit Maximum number of objects to retrieve
+       *  @return Withdraw permission objects for the account
+       */
+      vector<withdraw_permission_object> get_withdraw_permissions_by_giver(const std::string account_id_or_name, 
+                                                                     withdraw_permission_id_type start, uint32_t limit)const;
+
+      /**
+       *  @brief Get non expired withdraw permission objects for a recipient(ex:service provider)
+       *  @param account Account ID or name to get objects from
+       *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results. Pagination purposes.
+       *  @param limit Maximum number of objects to retrieve
+       *  @return Withdraw permission objects for the account
+       */
+      vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(const std::string account_id_or_name, 
+                                                                     withdraw_permission_id_type start, uint32_t limit)const;
+
       /** Saves the current wallet to the given filename.
        * 
        * @warning This does not change the wallet filename that will be used for future
@@ -2372,4 +2396,8 @@ FC_API( graphene::wallet::wallet_api,
 
         // Blinded balances
         (get_blinded_balances)
+
+        // Withdrawals
+        (get_withdraw_permissions_by_giver)
+        (get_withdraw_permissions_by_recipient)
       )

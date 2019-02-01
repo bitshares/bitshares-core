@@ -4202,6 +4202,18 @@ vector<blinded_balance_object> wallet_api::get_blinded_balances( const flat_set<
    return my->_remote_db->get_blinded_balances(commitments);
 }
 
+vector<withdraw_permission_object> wallet_api::get_withdraw_permissions_by_giver(const std::string account_id_or_name, 
+                                                                     withdraw_permission_id_type start, uint32_t limit)const
+{
+   return my->_remote_db->get_withdraw_permissions_by_giver(account_id_or_name, start, limit);
+}
+
+vector<withdraw_permission_object> wallet_api::get_withdraw_permissions_by_recipient(const std::string account_id_or_name, 
+                                                                     withdraw_permission_id_type start, uint32_t limit)const
+{
+   return my->_remote_db->get_withdraw_permissions_by_recipient(account_id_or_name, start, limit);
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );
