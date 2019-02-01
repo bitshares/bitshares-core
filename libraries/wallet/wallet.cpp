@@ -4192,6 +4192,11 @@ vector< fc::variant > wallet_api::get_required_fees( const vector<operation>& op
    return my->_remote_id->get_required_fees(ops, id);
 }
 
+vector<proposal_object> wallet_api::get_proposed_transactions( const std::string account_id_or_name )const
+{
+   return my->_remote_db->get_proposed_transactions(account_id_or_name);
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );

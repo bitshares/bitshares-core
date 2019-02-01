@@ -1082,6 +1082,15 @@ class wallet_api
        */
       vector< fc::variant > get_required_fees( const vector<operation>& ops, asset_id_type id )const;
 
+      ///////////////////////////
+      // Proposed transactions //
+      ///////////////////////////
+
+      /**
+       *  @return the set of proposed transactions relevant to the specified account id.
+       */
+      vector<proposal_object> get_proposed_transactions( const std::string account_id_or_name )const;
+
       /** Saves the current wallet to the given filename.
        * 
        * @warning This does not change the wallet filename that will be used for future
@@ -2348,4 +2357,7 @@ FC_API( graphene::wallet::wallet_api,
         (verify_account_authority)
         (validate_transaction)
         (get_required_fees)
+
+        // Proposed transactions
+        (get_proposed_transactions)
       )
