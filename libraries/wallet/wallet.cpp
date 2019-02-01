@@ -4034,6 +4034,16 @@ vector<asset> wallet_api::get_vested_balances( const vector<balance_id_type>& ob
    return my->_remote_db->get_vested_balances(objs);
 }
 
+vector<optional<asset_object>> wallet_api::get_assets(const vector<asset_id_type>& asset_ids)const
+{
+   return my->_remote_db->get_assets(asset_ids);
+}
+
+vector<optional<asset_object>> wallet_api::lookup_asset_symbols(const vector<string>& symbols_or_ids)const
+{
+   return my->_remote_db->lookup_asset_symbols(symbols_or_ids);
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );

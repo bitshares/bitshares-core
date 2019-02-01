@@ -835,6 +835,28 @@ class wallet_api
 
       vector<asset> get_vested_balances( const vector<balance_id_type>& objs )const;
 
+      ////////////
+      // Assets //
+      ////////////
+
+      /**
+       * @brief Get a list of assets by ID
+       * @param asset_ids IDs of the assets to retrieve
+       * @return The assets corresponding to the provided IDs
+       *
+       * This function has semantics identical to @ref get_objects
+       */
+      vector<optional<asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const;
+
+      /**
+       * @brief Get a list of assets by symbol
+       * @param asset_symbols Symbols or stringified IDs of the assets to retrieve
+       * @return The assets corresponding to the provided symbols or IDs
+       *
+       * This function has semantics identical to @ref get_objects
+       */
+      vector<optional<asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
+
       /** Saves the current wallet to the given filename.
        * 
        * @warning This does not change the wallet filename that will be used for future
@@ -2057,4 +2079,8 @@ FC_API( graphene::wallet::wallet_api,
         (get_account_balances)
         (get_balance_objects)
         (get_vested_balances)
+
+        // Assets
+        (get_assets)
+        (lookup_asset_symbols)
       )
