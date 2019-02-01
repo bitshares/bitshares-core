@@ -4104,6 +4104,28 @@ uint64_t wallet_api::get_witness_count()const
    return my->_remote_db->get_witness_count();
 }
 
+vector<optional<committee_member_object>> wallet_api::get_committee_members(
+                                                         const vector<committee_member_id_type>& committee_member_ids)const
+{
+   return my->_remote_db->get_committee_members(committee_member_ids);
+}
+
+fc::optional<committee_member_object> wallet_api::get_committee_member_by_account(const std::string account_id_or_name)const
+{
+   return my->_remote_db->get_committee_member_by_account(account_id_or_name);
+}
+
+map<string, committee_member_id_type> wallet_api::lookup_committee_member_accounts(const string& lower_bound_name, 
+                                                         uint32_t limit)const
+{
+   return my->_remote_db->lookup_committee_member_accounts(lower_bound_name, limit);
+}
+
+uint64_t wallet_api::get_committee_count()const
+{
+   return my->_remote_db->get_committee_count();
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );

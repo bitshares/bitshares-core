@@ -963,6 +963,39 @@ class wallet_api
        */
       uint64_t get_witness_count()const;
 
+      ///////////////////////
+      // Committee members //
+      ///////////////////////
+
+      /**
+       * @brief Get a list of committee_members by ID
+       * @param committee_member_ids IDs of the committee_members to retrieve
+       * @return The committee_members corresponding to the provided IDs
+       *
+       * This function has semantics identical to @ref get_objects
+       */
+      vector<optional<committee_member_object>> get_committee_members(const vector<committee_member_id_type>& committee_member_ids)const;
+
+      /**
+       * @brief Get the committee_member owned by a given account
+       * @param account The ID or name of the account whose committee_member should be retrieved
+       * @return The committee_member object, or null if the account does not have a committee_member
+       */
+      fc::optional<committee_member_object> get_committee_member_by_account(const std::string account_id_or_name)const;
+
+      /**
+       * @brief Get names and IDs for registered committee_members
+       * @param lower_bound_name Lower bound of the first name to return
+       * @param limit Maximum number of results to return -- must not exceed 1000
+       * @return Map of committee_member names to corresponding IDs
+       */
+      map<string, committee_member_id_type> lookup_committee_member_accounts(const string& lower_bound_name, uint32_t limit)const;
+
+      /**
+       * @brief Get the total number of committee registered with the blockchain
+      */
+      uint64_t get_committee_count()const;
+
       /** Saves the current wallet to the given filename.
        * 
        * @warning This does not change the wallet filename that will be used for future
@@ -2204,4 +2237,10 @@ FC_API( graphene::wallet::wallet_api,
         (get_witness_by_account)
         (lookup_witness_accounts)
         (get_witness_count)
+
+        // Committee members
+        (get_committee_members)
+        (get_committee_member_by_account)
+        (lookup_committee_member_accounts)
+        (get_committee_count)
       )
