@@ -3190,7 +3190,7 @@ vector<bucket_object> wallet_api::get_market_history(
       fc::time_point_sec start,
       fc::time_point_sec end )const
 {
-   return my->_remote_hist->get_market_history( get_asset_id(symbol1), get_asset_id(symbol2), bucket, start, end );
+   return my->_remote_hist->get_market_history( symbol1, symbol2, bucket, start, end );
 }
 
 vector<limit_order_object> wallet_api::get_account_limit_orders(

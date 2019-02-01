@@ -192,7 +192,7 @@ namespace graphene { namespace app {
           * @param limit Maximum records to return
           * @return a list of order_history objects, in "most recent first" order
           */
-         vector<order_history_object> get_fill_order_history( asset_id_type a, asset_id_type b, uint32_t limit )const;
+         vector<order_history_object> get_fill_order_history( std::string a, std::string b, uint32_t limit )const;
 
          /**
           * @brief Get OHLCV data of a trading pair in a time range
@@ -205,7 +205,7 @@ namespace graphene { namespace app {
           * @return A list of OHLCV data, in "least recent first" order. 
           * If there are more than 200 records in the specified time range, the first 200 records will be returned.
           */
-         vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds,
+         vector<bucket_object> get_market_history( std::string a, std::string b, uint32_t bucket_seconds,
                                                    fc::time_point_sec start, fc::time_point_sec end )const;
 
          /**
@@ -438,24 +438,24 @@ namespace graphene { namespace app {
    class asset_api
    {
       public:
-         asset_api(graphene::chain::database& db);
+         asset_api(graphene::app::application& app);
          ~asset_api();
 
          /**
           * @brief Get asset holders for a specific asset
-          * @param asset_id The specific asset
+          * @param asset The specific asset id or name
           * @param start The start index
           * @param limit Maximum limit must not exceed 100
           * @return A list of asset holders for the specified asset
           */
-         vector<account_asset_balance> get_asset_holders( asset_id_type asset_id, uint32_t start, uint32_t limit  )const;
+         vector<account_asset_balance> get_asset_holders( std::string asset, uint32_t start, uint32_t limit  )const;
 
          /**
           * @brief Get asset holders count for a specific asset
-          * @param asset_id The specific asset
+          * @param asset The specific asset id or name
           * @return Holders count for the specified asset
           */
-         int get_asset_holders_count( asset_id_type asset_id )const;
+         int get_asset_holders_count( std::string asset )const;
 
          /**
           * @brief Get all asset holders
@@ -465,6 +465,7 @@ namespace graphene { namespace app {
 
       private:
          graphene::chain::database& _db;
+         graphene::app::database_api database_api;
    };
 
    /**
@@ -473,7 +474,7 @@ namespace graphene { namespace app {
    class orders_api
    {
       public:
-         orders_api(application& app):_app(app){}
+         orders_api(application& app):_app(app), database_api( std::ref(*app.chain_database()), &(app.get_options()) ){}
          //virtual ~orders_api() {}
 
          /**
@@ -485,21 +486,22 @@ namespace graphene { namespace app {
          /**
           * @breif Get grouped limit orders in given market.
           *
-          * @param base_asset_id ID of asset being sold
-          * @param quote_asset_id ID of asset being purchased
+          * @param base_asset ID or name of asset being sold
+          * @param quote_asset ID or name of asset being purchased
           * @param group Maximum price diff within each order group, have to be one of configured values
           * @param start Optional price to indicate the first order group to retrieve
           * @param limit Maximum number of order groups to retrieve (must not exceed 101)
           * @return The grouped limit orders, ordered from best offered price to worst
           */
-         vector< limit_order_group > get_grouped_limit_orders( asset_id_type base_asset_id,
-                                                               asset_id_type quote_asset_id,
+         vector< limit_order_group > get_grouped_limit_orders( std::string base_asset,
+                                                               std::string quote_asset,
                                                                uint16_t group,
                                                                optional<price> start,
                                                                uint32_t limit )const;
 
       private:
          application& _app;
+         graphene::app::database_api database_api;
    };
 
    /**
