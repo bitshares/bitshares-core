@@ -1019,6 +1019,20 @@ class wallet_api
       */
       uint64_t get_worker_count()const;
 
+      ///////////
+      // Votes //
+      ///////////
+
+      /**
+       *  @brief Given a set of votes, return the objects they are voting for.
+       *
+       *  This will be a mixture of committee_member_object, witness_objects, and worker_objects
+       *
+       *  The results will be in the same order as the votes.  Null will be returned for
+       *  any vote ids that are not found.
+       */
+      vector<variant> lookup_vote_ids( const vector<vote_id_type>& votes )const;
+
       /** Saves the current wallet to the given filename.
        * 
        * @warning This does not change the wallet filename that will be used for future
@@ -2271,4 +2285,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_all_workers)
         (get_workers_by_account)
         (get_worker_count)
+
+        // Votes
+        (lookup_vote_ids)
       )

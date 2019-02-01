@@ -4141,6 +4141,11 @@ uint64_t wallet_api::get_worker_count()const
    return my->_remote_db->get_worker_count();
 }
 
+vector<variant> wallet_api::lookup_vote_ids( const vector<vote_id_type>& votes )const
+{
+   return my->_remote_db->lookup_vote_ids(votes);
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );
