@@ -4044,6 +4044,51 @@ vector<optional<asset_object>> wallet_api::lookup_asset_symbols(const vector<str
    return my->_remote_db->lookup_asset_symbols(symbols_or_ids);
 }
 
+vector<call_order_object> wallet_api::get_margin_positions( const std::string account_id_or_name )const
+{
+   return my->_remote_db->get_margin_positions(account_id_or_name);
+}
+
+void wallet_api::subscribe_to_market(std::function<void(const variant&)> callback,
+               asset_id_type a, asset_id_type b)
+{
+   my->_remote_db->subscribe_to_market(callback, a, b);
+}
+
+void wallet_api::unsubscribe_from_market( asset_id_type a, asset_id_type b )
+{
+   my->_remote_db->unsubscribe_from_market(a, b);
+}
+
+market_ticker wallet_api::get_ticker( const string& base, const string& quote )const
+{
+   return my->_remote_db->get_ticker(base, quote);
+}
+
+market_volume wallet_api::get_24_volume( const string& base, const string& quote )const
+{
+   return my->_remote_db->get_24_volume(base, quote);
+}
+
+vector<market_volume> wallet_api::get_top_markets(uint32_t limit)const
+{
+   return my->_remote_db->get_top_markets(limit);
+}
+
+vector<market_trade> wallet_api::get_trade_history( const string& base, const string& quote,
+                                          fc::time_point_sec start, fc::time_point_sec stop,
+                                          unsigned limit = 100 )const
+{
+   return my->_remote_db->get_trade_history(base, quote, start, stop, limit);
+}
+
+vector<market_trade> wallet_api::get_trade_history_by_sequence( const string& base, const string& quote,
+                                                      int64_t start, fc::time_point_sec stop,
+                                                      unsigned limit = 100 )const
+{
+   return my->_remote_db->get_trade_history_by_sequence(base, quote, start, stop, limit);
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );

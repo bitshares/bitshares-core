@@ -857,6 +857,88 @@ class wallet_api
        */
       vector<optional<asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
 
+      /////////////////////
+      // Markets / feeds //
+      /////////////////////
+
+      /**
+       *  @return all open margin positions for a given account id or name.
+       */
+      vector<call_order_object> get_margin_positions( const std::string account_id_or_name )const;
+
+      /**
+       * @brief Request notification when the active orders in the market between two assets changes
+       * @param callback Callback method which is called when the market changes
+       * @param a First asset ID
+       * @param b Second asset ID
+       *
+       * Callback will be passed a variant containing a vector<pair<operation, operation_result>>. The vector will
+       * contain, in order, the operations which changed the market, and their results.
+       */
+      void subscribe_to_market(std::function<void(const variant&)> callback,
+                   asset_id_type a, asset_id_type b);
+
+      /**
+       * @brief Unsubscribe from updates to a given market
+       * @param a First asset ID
+       * @param b Second asset ID
+       */
+      void unsubscribe_from_market( asset_id_type a, asset_id_type b );
+
+      /**
+       * @brief Returns the ticker for the market assetA:assetB
+       * @param a String name of the first asset
+       * @param b String name of the second asset
+       * @return The market ticker for the past 24 hours.
+       */
+      market_ticker get_ticker( const string& base, const string& quote )const;
+
+      /**
+       * @brief Returns the 24 hour volume for the market assetA:assetB
+       * @param a String name of the first asset
+       * @param b String name of the second asset
+       * @return The market volume over the past 24 hours
+       */
+      market_volume get_24_volume( const string& base, const string& quote )const;
+
+      /**
+       * @brief Returns vector of 24 hour volume markets sorted by reverse base_volume
+       * Note: this API is experimental and subject to change in next releases
+       * @param limit Max number of results
+       * @return Desc Sorted volume vector
+       */
+      vector<market_volume> get_top_markets(uint32_t limit)const;
+
+      /**
+       * @brief Returns recent trades for the market base:quote, ordered by time, most recent first.
+       * Note: Currently, timezone offsets are not supported. The time must be UTC. The range is [stop, start).
+       *       In case when there are more than 100 trades occurred in the same second, this API only returns
+       *       the first 100 records, can use another API `get_trade_history_by_sequence` to query for the rest.
+       * @param base symbol or ID of the base asset
+       * @param quote symbol or ID of the quote asset
+       * @param start Start time as a UNIX timestamp, the latest trade to retrieve
+       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
+       * @param limit Number of trasactions to retrieve, capped at 100.
+       * @return Recent transactions in the market
+       */
+      vector<market_trade> get_trade_history( const string& base, const string& quote,
+                                              fc::time_point_sec start, fc::time_point_sec stop,
+                                              unsigned limit = 100 )const;
+
+      /**
+       * @brief Returns trades for the market base:quote, ordered by time, most recent first.
+       * Note: Currently, timezone offsets are not supported. The time must be UTC. The range is [stop, start).
+       * @param base symbol or ID of the base asset
+       * @param quote symbol or ID of the quote asset
+       * @param start Start sequence as an Integer, the latest trade to retrieve
+       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
+       * @param limit Number of trasactions to retrieve, capped at 100
+       * @return Transactions in the market
+       */
+      vector<market_trade> get_trade_history_by_sequence( const string& base, const string& quote,
+                                                          int64_t start, fc::time_point_sec stop,
+                                                          unsigned limit = 100 )const;
+
       /** Saves the current wallet to the given filename.
        * 
        * @warning This does not change the wallet filename that will be used for future
@@ -2083,4 +2165,14 @@ FC_API( graphene::wallet::wallet_api,
         // Assets
         (get_assets)
         (lookup_asset_symbols)
+
+        // Markets / feeds
+        (get_margin_positions)
+        (unsubscribe_from_market)
+        (subscribe_to_market)
+        (get_24_volume)
+        (get_top_markets)
+        (get_trade_history)
+        (get_trade_history_by_sequence)
+        (get_ticker)
       )
