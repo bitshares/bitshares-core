@@ -4019,6 +4019,21 @@ map<string,account_id_type> wallet_api::lookup_accounts(const string& lower_boun
    return my->_remote_db->lookup_accounts(lower_bound_name, limit);
 }
 
+vector<asset> wallet_api::get_account_balances(const std::string& account_name_or_id, const flat_set<asset_id_type>& assets)const
+{
+   return my->_remote_db->get_account_balances(account_name_or_id, assets);
+}
+
+vector<balance_object> wallet_api::get_balance_objects( const vector<address>& addrs )const
+{
+   return my->_remote_db->get_balance_objects(addrs);
+}
+
+vector<asset> wallet_api::get_vested_balances( const vector<balance_id_type>& objs )const
+{
+   return my->_remote_db->get_vested_balances(objs);
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );

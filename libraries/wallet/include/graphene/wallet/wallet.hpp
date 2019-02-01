@@ -818,6 +818,23 @@ class wallet_api
        */
       map<string,account_id_type> lookup_accounts(const string& lower_bound_name, uint32_t limit)const;
 
+      //////////////
+      // Balances //
+      //////////////
+
+      /**
+       * @brief Get an account's balances in various assets
+       * @param account_name_or_id ID or name of the account to get balances for
+       * @param assets IDs of the assets to get balances of; if empty, get all assets account has a balance in
+       * @return Balances of the account
+       */
+      vector<asset> get_account_balances(const std::string& account_name_or_id, const flat_set<asset_id_type>& assets)const;
+
+      /** @return all unclaimed balance objects for a set of addresses */
+      vector<balance_object> get_balance_objects( const vector<address>& addrs )const;
+
+      vector<asset> get_vested_balances( const vector<balance_id_type>& objs )const;
+
       /** Saves the current wallet to the given filename.
        * 
        * @warning This does not change the wallet filename that will be used for future
@@ -2035,4 +2052,9 @@ FC_API( graphene::wallet::wallet_api,
         (get_account_references)
         (lookup_account_names)
         (lookup_accounts)
+
+        // Balances
+        (get_account_balances)
+        (get_balance_objects)
+        (get_vested_balances)
       )
