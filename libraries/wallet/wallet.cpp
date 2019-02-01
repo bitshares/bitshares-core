@@ -4197,6 +4197,11 @@ vector<proposal_object> wallet_api::get_proposed_transactions( const std::string
    return my->_remote_db->get_proposed_transactions(account_id_or_name);
 }
 
+vector<blinded_balance_object> wallet_api::get_blinded_balances( const flat_set<commitment_type>& commitments )const
+{
+   return my->_remote_db->get_blinded_balances(commitments);
+}
+
 void wallet_api::save_wallet_file( string wallet_filename )
 {
    my->save_wallet_file( wallet_filename );

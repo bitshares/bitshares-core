@@ -1091,6 +1091,15 @@ class wallet_api
        */
       vector<proposal_object> get_proposed_transactions( const std::string account_id_or_name )const;
 
+      //////////////////////
+      // Blinded balances //
+      //////////////////////
+
+      /**
+       *  @return the set of blinded balance objects by commitment ID
+       */
+      vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
+
       /** Saves the current wallet to the given filename.
        * 
        * @warning This does not change the wallet filename that will be used for future
@@ -2360,4 +2369,7 @@ FC_API( graphene::wallet::wallet_api,
 
         // Proposed transactions
         (get_proposed_transactions)
+
+        // Blinded balances
+        (get_blinded_balances)
       )
