@@ -797,6 +797,7 @@ FC_API(graphene::app::database_api,
    (list_assets)
    (lookup_asset_symbols)
    (get_asset_count)
+   (get_asset_id_from_string)
 
    // Markets / feeds
    (get_order_book)

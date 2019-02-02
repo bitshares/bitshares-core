@@ -98,6 +98,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<vesting_balance_object> get_vesting_balances( const std::string account_id_or_name )const;
 
       // Assets
+      asset_id_type get_asset_id_from_string(const std::string& symbol_or_id)const;
       vector<optional<asset_object>> get_assets(const vector<std::string>& asset_symbols_or_ids)const;
       vector<asset_object>           list_assets(const string& lower_bound_symbol, uint32_t limit)const;
       vector<optional<asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
@@ -698,7 +699,7 @@ bool database_api_impl::is_public_key_registered(string public_key) const
 
 account_id_type database_api::get_account_id_from_string(const std::string& name_or_id)const
 {
-   return my->get_account_from_string( name_or_id )->id; // safe?
+   return my->get_account_from_string( name_or_id )->id;
 }
 
 vector<optional<account_object>> database_api::get_accounts(const vector<std::string>& account_names_or_ids)const
