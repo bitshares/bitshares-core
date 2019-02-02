@@ -227,17 +227,17 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          return account;
       }
 
-      const asset_object* get_asset_from_string( const std::string& name_or_id ) const
+      const asset_object* get_asset_from_string( const std::string& symbol_or_id ) const
       {
          // TODO cache the result to avoid repeatly fetching from db
-         FC_ASSERT( name_or_id.size() > 0);
+         FC_ASSERT( symbol_or_id.size() > 0);
          const asset_object* asset = nullptr;
-         if (std::isdigit(name_or_id[0]))
-            asset = _db.find(fc::variant(name_or_id, 1).as<asset_id_type>(1));
+         if (std::isdigit(symbol_or_id[0]))
+            asset = _db.find(fc::variant(symbol_or_id, 1).as<asset_id_type>(1));
          else
          {
             const auto& idx = _db.get_index_type<asset_index>().indices().get<by_symbol>();
-            auto itr = idx.find(name_or_id);
+            auto itr = idx.find(symbol_or_id);
             if (itr != idx.end())
                asset = &*itr;
          }
@@ -1109,9 +1109,9 @@ vector<vesting_balance_object> database_api_impl::get_vesting_balances( const st
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-asset_id_type database_api::get_asset_id_from_string(const std::string& name_or_id)const
+asset_id_type database_api::get_asset_id_from_string(const std::string& symbol_or_id)const
 {
-   return my->get_asset_from_string( name_or_id )->id; // safe?
+   return my->get_asset_from_string( symbol_or_id )->id;
 }
 
 vector<optional<asset_object>> database_api::get_assets(const vector<std::string>& asset_symbols_or_ids)const
