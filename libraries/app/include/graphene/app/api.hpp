@@ -443,7 +443,7 @@ namespace graphene { namespace app {
 
          /**
           * @brief Get asset holders for a specific asset
-          * @param asset The specific asset id or name
+          * @param asset The specific asset id or symbol
           * @param start The start index
           * @param limit Maximum limit must not exceed 100
           * @return A list of asset holders for the specified asset
@@ -452,7 +452,7 @@ namespace graphene { namespace app {
 
          /**
           * @brief Get asset holders count for a specific asset
-          * @param asset The specific asset id or name
+          * @param asset The specific asset id or symbol
           * @return Holders count for the specified asset
           */
          int get_asset_holders_count( std::string asset )const;
@@ -486,8 +486,8 @@ namespace graphene { namespace app {
          /**
           * @breif Get grouped limit orders in given market.
           *
-          * @param base_asset ID or name of asset being sold
-          * @param quote_asset ID or name of asset being purchased
+          * @param base_asset ID or symbol of asset being sold
+          * @param quote_asset ID or symbol of asset being purchased
           * @param group Maximum price diff within each order group, have to be one of configured values
           * @param start Optional price to indicate the first order group to retrieve
           * @param limit Maximum number of order groups to retrieve (must not exceed 101)
