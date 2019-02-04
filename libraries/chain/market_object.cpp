@@ -25,6 +25,8 @@
 
 #include <boost/multiprecision/cpp_int.hpp>
 
+#include <functional>
+
 using namespace graphene::chain;
 
 /*
@@ -135,20 +137,18 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
    FC_ASSERT( to_pay.amount < collateral && to_cover.amount < debt );
 
    // Check whether the collateral ratio after filled is high enough
-   auto result_is_good = [after_core_hardfork_1270,this,&to_cover,&to_pay,tcr,feed_price,target_collateralization]() -> bool
-   {
-      // Before core-1270 hard fork, we check with call_price; afterwards, we check with collateralization().
-      if( !after_core_hardfork_1270 ) // before core-1270 hard fork
-      {
-         price new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
-         return ( new_call_price > feed_price );
-      }
-      else // after core-1270 hard fork
+   // Before core-1270 hard fork, we check with call_price; afterwards, we check with collateralization().
+   std::function<bool()> result_is_good = after_core_hardfork_1270 ?
+      std::function<bool()>( [this,&to_cover,&to_pay,target_collateralization]() -> bool
       {
          price new_collateralization = ( get_collateral() - to_pay ) / ( get_debt() - to_cover );
          return ( new_collateralization > target_collateralization );
-      }
-   };
+      }) :
+      std::function<bool()>( [this,&to_cover,&to_pay,tcr,feed_price]() -> bool
+      {
+         price new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
+         return ( new_call_price > feed_price );
+      });
 
    // if the result is good, we return.
    if( result_is_good() )
