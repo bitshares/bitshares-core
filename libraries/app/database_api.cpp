@@ -98,25 +98,26 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<vesting_balance_object> get_vesting_balances( const std::string account_id_or_name )const;
 
       // Assets
-      vector<optional<asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const;
+      asset_id_type get_asset_id_from_string(const std::string& symbol_or_id)const;
+      vector<optional<asset_object>> get_assets(const vector<std::string>& asset_symbols_or_ids)const;
       vector<asset_object>           list_assets(const string& lower_bound_symbol, uint32_t limit)const;
       vector<optional<asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
       uint64_t                       get_asset_count()const;
 
       // Markets / feeds
-      vector<limit_order_object>         get_limit_orders(asset_id_type a, asset_id_type b, uint32_t limit)const;
+      vector<limit_order_object>         get_limit_orders(const std::string& a, const std::string& b, uint32_t limit)const;
       vector<limit_order_object>         get_account_limit_orders( const string& account_name_or_id,
                                                                    const string &base,
                                                                    const string &quote, uint32_t limit,
                                                                    optional<limit_order_id_type> ostart_id,
                                                                    optional<price> ostart_price );
-      vector<call_order_object>          get_call_orders(asset_id_type a, uint32_t limit)const;
-      vector<force_settlement_object>    get_settle_orders(asset_id_type a, uint32_t limit)const;
+      vector<call_order_object>          get_call_orders(const std::string& a, uint32_t limit)const;
+      vector<force_settlement_object>    get_settle_orders(const std::string& a, uint32_t limit)const;
       vector<call_order_object>          get_margin_positions( const std::string account_id_or_name )const;
-      vector<collateral_bid_object>      get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const;
+      vector<collateral_bid_object>      get_collateral_bids(const std::string& asset, uint32_t limit, uint32_t start)const;
 
-      void subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b);
-      void unsubscribe_from_market(asset_id_type a, asset_id_type b);
+      void subscribe_to_market(std::function<void(const variant&)> callback, const std::string& a, const std::string& b);
+      void unsubscribe_from_market(const std::string& a, const std::string& b);
 
       market_ticker                      get_ticker( const string& base, const string& quote, bool skip_order_book = false )const;
       market_volume                      get_24_volume( const string& base, const string& quote )const;
@@ -155,7 +156,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       bool verify_authority( const signed_transaction& trx )const;
       bool verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )const;
       processed_transaction validate_transaction( const signed_transaction& trx )const;
-      vector< fc::variant > get_required_fees( const vector<operation>& ops, asset_id_type id )const;
+      vector< fc::variant > get_required_fees( const vector<operation>& ops, const std::string& asset_id_or_symbol )const;
 
       // Proposed transactions
       vector<proposal_object> get_proposed_transactions( const std::string account_id_or_name )const;
@@ -225,6 +226,69 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          }
          FC_ASSERT( account, "no such account" );
          return account;
+      }
+
+      const asset_object* get_asset_from_string( const std::string& symbol_or_id ) const
+      {
+         // TODO cache the result to avoid repeatly fetching from db
+         FC_ASSERT( symbol_or_id.size() > 0);
+         const asset_object* asset = nullptr;
+         if (std::isdigit(symbol_or_id[0]))
+            asset = _db.find(fc::variant(symbol_or_id, 1).as<asset_id_type>(1));
+         else
+         {
+            const auto& idx = _db.get_index_type<asset_index>().indices().get<by_symbol>();
+            auto itr = idx.find(symbol_or_id);
+            if (itr != idx.end())
+               asset = &*itr;
+         }
+         FC_ASSERT( asset, "no such asset" );
+         return asset;
+      }
+      vector<optional<asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const
+      {
+         vector<optional<asset_object>> result; result.reserve(asset_ids.size());
+         std::transform(asset_ids.begin(), asset_ids.end(), std::back_inserter(result),
+                 [this](asset_id_type id) -> optional<asset_object> {
+            if(auto o = _db.find(id))
+            {
+               subscribe_to_item( id );
+               return *o;
+            }
+            return {};
+         });
+         return result;
+      }
+      vector<limit_order_object> get_limit_orders(const asset_id_type a, const asset_id_type b, const uint32_t limit)const
+      {
+         FC_ASSERT( limit <= 300 );
+
+         const auto& limit_order_idx = _db.get_index_type<limit_order_index>();
+         const auto& limit_price_idx = limit_order_idx.indices().get<by_price>();
+
+         vector<limit_order_object> result;
+         result.reserve(limit*2);
+
+         uint32_t count = 0;
+         auto limit_itr = limit_price_idx.lower_bound(price::max(a,b));
+         auto limit_end = limit_price_idx.upper_bound(price::min(a,b));
+         while(limit_itr != limit_end && count < limit)
+         {
+            result.push_back(*limit_itr);
+            ++limit_itr;
+            ++count;
+         }
+         count = 0;
+         limit_itr = limit_price_idx.lower_bound(price::max(b,a));
+         limit_end = limit_price_idx.upper_bound(price::min(b,a));
+         while(limit_itr != limit_end && count < limit)
+         {
+            result.push_back(*limit_itr);
+            ++limit_itr;
+            ++count;
+         }
+
+         return result;
       }
 
       template<typename T>
@@ -635,7 +699,7 @@ bool database_api_impl::is_public_key_registered(string public_key) const
 
 account_id_type database_api::get_account_id_from_string(const std::string& name_or_id)const
 {
-   return my->get_account_from_string( name_or_id )->id; // safe?
+   return my->get_account_from_string( name_or_id )->id;
 }
 
 vector<optional<account_object>> database_api::get_accounts(const vector<std::string>& account_names_or_ids)const
@@ -1046,16 +1110,23 @@ vector<vesting_balance_object> database_api_impl::get_vesting_balances( const st
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<optional<asset_object>> database_api::get_assets(const vector<asset_id_type>& asset_ids)const
+asset_id_type database_api::get_asset_id_from_string(const std::string& symbol_or_id)const
 {
-   return my->get_assets( asset_ids );
+   return my->get_asset_from_string( symbol_or_id )->id;
 }
 
-vector<optional<asset_object>> database_api_impl::get_assets(const vector<asset_id_type>& asset_ids)const
+vector<optional<asset_object>> database_api::get_assets(const vector<std::string>& asset_symbols_or_ids)const
 {
-   vector<optional<asset_object>> result; result.reserve(asset_ids.size());
-   std::transform(asset_ids.begin(), asset_ids.end(), std::back_inserter(result),
-                  [this](asset_id_type id) -> optional<asset_object> {
+   return my->get_assets( asset_symbols_or_ids );
+}
+
+vector<optional<asset_object>> database_api_impl::get_assets(const vector<std::string>& asset_symbols_or_ids)const
+{
+   vector<optional<asset_object>> result; result.reserve(asset_symbols_or_ids.size());
+   std::transform(asset_symbols_or_ids.begin(), asset_symbols_or_ids.end(), std::back_inserter(result),
+                  [this](std::string id_or_name) -> optional<asset_object> {
+      const asset_object* asset = get_asset_from_string(id_or_name);
+      asset_id_type id = asset->id;
       if(auto o = _db.find(id))
       {
          subscribe_to_item( id );
@@ -1128,7 +1199,7 @@ vector<optional<asset_object>> database_api_impl::lookup_asset_symbols(const vec
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<limit_order_object> database_api::get_limit_orders(asset_id_type a, asset_id_type b, uint32_t limit)const
+vector<limit_order_object> database_api::get_limit_orders(std::string a, std::string b, uint32_t limit)const
 {
    return my->get_limit_orders( a, b, limit );
 }
@@ -1136,44 +1207,28 @@ vector<limit_order_object> database_api::get_limit_orders(asset_id_type a, asset
 /**
  *  @return the limit orders for both sides of the book for the two assets specified up to limit number on each side.
  */
-vector<limit_order_object> database_api_impl::get_limit_orders(asset_id_type a, asset_id_type b, uint32_t limit)const
+vector<limit_order_object> database_api_impl::get_limit_orders(const std::string& a, const std::string& b, uint32_t limit)const
 {
-   const auto& limit_order_idx = _db.get_index_type<limit_order_index>();
-   const auto& limit_price_idx = limit_order_idx.indices().get<by_price>();
+   FC_ASSERT( limit <= 300 );
 
-   vector<limit_order_object> result;
+   const asset_id_type asset_a_id = get_asset_from_string(a)->id;
+   const asset_id_type asset_b_id = get_asset_from_string(b)->id;
 
-   uint32_t count = 0;
-   auto limit_itr = limit_price_idx.lower_bound(price::max(a,b));
-   auto limit_end = limit_price_idx.upper_bound(price::min(a,b));
-   while(limit_itr != limit_end && count < limit)
-   {
-      result.push_back(*limit_itr);
-      ++limit_itr;
-      ++count;
-   }
-   count = 0;
-   limit_itr = limit_price_idx.lower_bound(price::max(b,a));
-   limit_end = limit_price_idx.upper_bound(price::min(b,a));
-   while(limit_itr != limit_end && count < limit)
-   {
-      result.push_back(*limit_itr);
-      ++limit_itr;
-      ++count;
-   }
-
-   return result;
+   return get_limit_orders(asset_a_id, asset_b_id, limit);
 }
 
-vector<call_order_object> database_api::get_call_orders(asset_id_type a, uint32_t limit)const
+vector<call_order_object> database_api::get_call_orders(const std::string& a, uint32_t limit)const
 {
    return my->get_call_orders( a, limit );
 }
 
-vector<call_order_object> database_api_impl::get_call_orders(asset_id_type a, uint32_t limit)const
+vector<call_order_object> database_api_impl::get_call_orders(const std::string& a, uint32_t limit)const
 {
+   FC_ASSERT( limit <= 300 );
+
+   const asset_id_type asset_a_id = get_asset_from_string(a)->id;
    const auto& call_index = _db.get_index_type<call_order_index>().indices().get<by_price>();
-   const asset_object& mia = _db.get(a);
+   const asset_object& mia = _db.get(asset_a_id);
    price index_price = price::min(mia.bitasset_data(_db).options.short_backing_asset, mia.get_id());
    
    vector< call_order_object> result;
@@ -1187,15 +1242,18 @@ vector<call_order_object> database_api_impl::get_call_orders(asset_id_type a, ui
    return result;
 }
 
-vector<force_settlement_object> database_api::get_settle_orders(asset_id_type a, uint32_t limit)const
+vector<force_settlement_object> database_api::get_settle_orders(const std::string& a, uint32_t limit)const
 {
    return my->get_settle_orders( a, limit );
 }
 
-vector<force_settlement_object> database_api_impl::get_settle_orders(asset_id_type a, uint32_t limit)const
+vector<force_settlement_object> database_api_impl::get_settle_orders(const std::string& a, uint32_t limit)const
 {
+   FC_ASSERT( limit <= 300 );
+
+   const asset_id_type asset_a_id = get_asset_from_string(a)->id;
    const auto& settle_index = _db.get_index_type<force_settlement_index>().indices().get<by_expiration>();
-   const asset_object& mia = _db.get(a);
+   const asset_object& mia = _db.get(asset_a_id);
 
    vector<force_settlement_object> result;
    auto itr_min = settle_index.lower_bound(mia.get_id());
@@ -1232,14 +1290,15 @@ vector<call_order_object> database_api_impl::get_margin_positions( const std::st
    } FC_CAPTURE_AND_RETHROW( (account_id_or_name) )
 }
 
-vector<collateral_bid_object> database_api::get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const
+vector<collateral_bid_object> database_api::get_collateral_bids(const std::string& asset, uint32_t limit, uint32_t start)const
 {
    return my->get_collateral_bids( asset, limit, start );
 }
 
-vector<collateral_bid_object> database_api_impl::get_collateral_bids(const asset_id_type asset_id, uint32_t limit, uint32_t skip)const
+vector<collateral_bid_object> database_api_impl::get_collateral_bids(const std::string& asset, uint32_t limit, uint32_t skip)const
 { try {
    FC_ASSERT( limit <= 100 );
+   const asset_id_type asset_id = get_asset_from_string(asset)->id;
    const asset_object& swan = asset_id(_db);
    FC_ASSERT( swan.is_market_issued() );
    const asset_bitasset_data_object& bad = swan.bitasset_data(_db);
@@ -1256,30 +1315,36 @@ vector<collateral_bid_object> database_api_impl::get_collateral_bids(const asset
       ++start;
    }
    return result;
-} FC_CAPTURE_AND_RETHROW( (asset_id)(limit)(skip) ) }
+} FC_CAPTURE_AND_RETHROW( (asset)(limit)(skip) ) }
 
-void database_api::subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b)
+void database_api::subscribe_to_market(std::function<void(const variant&)> callback, const std::string& a, const std::string& b)
 {
    my->subscribe_to_market( callback, a, b );
 }
 
-void database_api_impl::subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b)
+void database_api_impl::subscribe_to_market(std::function<void(const variant&)> callback, const std::string& a, const std::string& b)
 {
-   if(a > b) std::swap(a,b);
-   FC_ASSERT(a != b);
-   _market_subscriptions[ std::make_pair(a,b) ] = callback;
+   auto asset_a_id = get_asset_from_string(a)->id;
+   auto asset_b_id = get_asset_from_string(b)->id;
+
+   if(asset_a_id > asset_b_id) std::swap(asset_a_id,asset_b_id);
+   FC_ASSERT(asset_a_id != asset_b_id);
+   _market_subscriptions[ std::make_pair(asset_a_id,asset_b_id) ] = callback;
 }
 
-void database_api::unsubscribe_from_market(asset_id_type a, asset_id_type b)
+void database_api::unsubscribe_from_market(const std::string& a, const std::string& b)
 {
    my->unsubscribe_from_market( a, b );
 }
 
-void database_api_impl::unsubscribe_from_market(asset_id_type a, asset_id_type b)
+void database_api_impl::unsubscribe_from_market(const std::string& a, const std::string& b)
 {
-   if(a > b) std::swap(a,b);
-   FC_ASSERT(a != b);
-   _market_subscriptions.erase(std::make_pair(a,b));
+   auto asset_a_id = get_asset_from_string(a)->id;
+   auto asset_b_id = get_asset_from_string(b)->id;
+
+   if(a > b) std::swap(asset_a_id,asset_b_id);
+   FC_ASSERT(asset_a_id != asset_b_id);
+   _market_subscriptions.erase(std::make_pair(asset_a_id,asset_b_id));
 }
 
 string database_api_impl::price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote )
@@ -2098,9 +2163,9 @@ processed_transaction database_api_impl::validate_transaction( const signed_tran
    return _db.validate_transaction(trx);
 }
 
-vector< fc::variant > database_api::get_required_fees( const vector<operation>& ops, asset_id_type id )const
+vector< fc::variant > database_api::get_required_fees( const vector<operation>& ops, const std::string& asset_id_or_symbol )const
 {
-   return my->get_required_fees( ops, id );
+   return my->get_required_fees( ops, asset_id_or_symbol );
 }
 
 /**
@@ -2159,7 +2224,7 @@ struct get_required_fees_helper
    uint32_t current_recursion = 0;
 };
 
-vector< fc::variant > database_api_impl::get_required_fees( const vector<operation>& ops, asset_id_type id )const
+vector< fc::variant > database_api_impl::get_required_fees( const vector<operation>& ops, const std::string& asset_id_or_symbol )const
 {
    vector< operation > _ops = ops;
    //
@@ -2169,7 +2234,7 @@ vector< fc::variant > database_api_impl::get_required_fees( const vector<operati
 
    vector< fc::variant > result;
    result.reserve(ops.size());
-   const asset_object& a = id(_db);
+   const asset_object& a = *get_asset_from_string(asset_id_or_symbol);
    get_required_fees_helper helper(
       _db.current_fee_schedule(),
       a.options.core_exchange_rate,
