@@ -689,8 +689,7 @@ class database_api
       processed_transaction validate_transaction( const signed_transaction& trx )const;
 
       /**
-       *  For each operation calculate the required fee in the specified asset type.  If the asset type does
-       *  not have a valid core_exchange_rate
+       *  For each operation calculate the required fee in the specified asset type.
        */
       vector< fc::variant > get_required_fees( const vector<operation>& ops, const std::string& asset_id_or_symbol )const;
 

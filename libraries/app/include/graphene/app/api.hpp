@@ -187,8 +187,8 @@ namespace graphene { namespace app {
 
          /**
           * @brief Get details of order executions occurred most recently in a trading pair
-          * @param a One asset in a trading pair
-          * @param b The other asset in the trading pair
+          * @param a Asset symbol or ID in a trading pair
+          * @param b The other asset symbol or ID in the trading pair
           * @param limit Maximum records to return
           * @return a list of order_history objects, in "most recent first" order
           */
@@ -196,8 +196,8 @@ namespace graphene { namespace app {
 
          /**
           * @brief Get OHLCV data of a trading pair in a time range
-          * @param a One asset in a trading pair
-          * @param b The other asset in the trading pair
+          * @param a Asset symbol or ID in a trading pair
+          * @param b The other asset symbol or ID in the trading pair
           * @param bucket_seconds Length of each time bucket in seconds. 
           * Note: it need to be within result of get_market_history_buckets() API, otherwise no data will be returned
           * @param start The start of a time range, E.G. "2018-01-01T00:00:00"
