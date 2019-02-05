@@ -61,8 +61,7 @@ namespace graphene { namespace chain {
    // move constructor
    chain_parameters::chain_parameters(chain_parameters&& other)
    {
-      current_fees = other.current_fees;
-      other.current_fees = nullptr;
+      current_fees = std::move(other.current_fees);
       safe_copy(*this, other);
    }
 
@@ -71,8 +70,7 @@ namespace graphene { namespace chain {
    {
       if (&other != this)
       {
-         current_fees = other.current_fees;
-         other.current_fees = nullptr;
+         current_fees = std::move(other.current_fees);
          safe_copy(*this, other);
       }
       return *this;

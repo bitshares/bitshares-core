@@ -34,6 +34,7 @@ namespace graphene { namespace chain {
 
    struct chain_parameters
    {
+      /** using a shared_ptr breaks the circular dependency created between operations and the fee schedule */
       std::shared_ptr<fee_schedule> current_fees;                  ///< current schedule of fees
       uint8_t                 block_interval                      = GRAPHENE_DEFAULT_BLOCK_INTERVAL; ///< interval in seconds between blocks
       uint32_t                maintenance_interval                = GRAPHENE_DEFAULT_MAINTENANCE_INTERVAL; ///< interval in sections between blockchain maintenance events
