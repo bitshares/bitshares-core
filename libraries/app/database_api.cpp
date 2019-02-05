@@ -1174,13 +1174,13 @@ vector<call_order_object> database_api::get_call_orders(asset_id_type a, uint32_
 
 vector<call_order_object> database_api_impl::get_call_orders(asset_id_type a, uint32_t limit)const
 {
-   const auto& call_index = _db.get_index_type<call_order_index>().indices().get<by_price>();
+   const auto& call_index = _db.get_index_type<call_order_index>().indices().get<by_collateral>();
    const asset_object& mia = _db.get(a);
-   price index_price = price::min(mia.bitasset_data(_db).options.short_backing_asset, mia.get_id());
+   price index_price = price::min( mia.bitasset_data(_db).options.short_backing_asset, a );
    
    vector< call_order_object> result;
-   auto itr_min = call_index.lower_bound(index_price.min());
-   auto itr_max = call_index.lower_bound(index_price.max());
+   auto itr_min = call_index.lower_bound(index_price);
+   auto itr_max = call_index.upper_bound(index_price.max());
    while( itr_min != itr_max && result.size() < limit ) 
    {
       result.emplace_back(*itr_min);
