@@ -146,6 +146,8 @@ namespace graphene { namespace chain {
        */
       flat_set<fee_parameters> parameters;
       uint32_t                 scale = GRAPHENE_100_PERCENT; ///< fee * scale / GRAPHENE_100_PERCENT
+      private:
+      static void set_fee_parameters(fee_schedule& sched);
    };
 
    typedef fee_schedule fee_schedule_type;

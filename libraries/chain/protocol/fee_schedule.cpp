@@ -32,14 +32,19 @@ namespace graphene { namespace chain {
    {
    }
 
-   fee_schedule fee_schedule::get_default()
+   void fee_schedule::set_fee_parameters(fee_schedule& sched)
    {
-      fee_schedule result;
-      for( int i = 0; i < fee_parameters().count(); ++i )
+      for(int i = 0; i < fee_parameters().count(); ++i)
       {
          fee_parameters x; x.set_which(i);
-         result.parameters.insert(x);
+         sched.parameters.insert(x);
       }
+   }
+
+   fee_schedule fee_schedule::get_default()
+   {
+      fee_schedule result = fee_schedule{};
+      set_fee_parameters(result);
       return result;
    }
 
@@ -109,7 +114,10 @@ namespace graphene { namespace chain {
 
    void fee_schedule::zero_all_fees()
    {
-      *this = get_default();
+      // TODO: Examine why this is done:
+      //*this = get_default();
+      // I believe this does the same...
+      set_fee_parameters(*this);
       for( fee_parameters& i : parameters )
          i.visit( zero_fee_visitor() );
       this->scale = 0;
