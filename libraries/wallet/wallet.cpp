@@ -72,7 +72,6 @@
 #include <graphene/wallet/api_documentation.hpp>
 #include <graphene/wallet/reflect_util.hpp>
 #include <graphene/debug_witness/debug_api.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 #ifndef WIN32
 # include <sys/types.h>

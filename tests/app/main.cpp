@@ -35,7 +35,6 @@
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 
 #include <fc/thread/thread.hpp>
-#include <fc/smart_ref_impl.hpp>
 #include <fc/log/appender.hpp>
 #include <fc/log/logger.hpp>
 
