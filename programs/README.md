@@ -21,3 +21,4 @@ Folder | Name  | Description | Category | Status | Help
 [member_enumerator](build_helpers/member_enumerator.cpp) | Member enumerator | | Tool | Deprecated | `./member_enumerator`
 [get_dev_key](genesis_util/get_dev_key.cpp) | Get Dev Key | Create public, private and address keys. Useful in private testnets, `genesis.json` files, new blockchain creation and others. | Tool | Active | `/programs/genesis_util/get_dev_key -h`
 [genesis_util](genesis_util) | Genesis Utils | Other utilities for genesis creation. | Tool | Old |
+[network_mapper](network_mapper) | Network Mapper | Generates .DOT file that can be rendered by graphviz to make images of node connectivity. | Tool | Active | `./programs/network_mapper/network_mapper`
