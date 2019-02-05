@@ -607,9 +607,16 @@ public:
    {
       return get_account(account_name_or_id).get_id();
    }
+   std::string asset_id_to_string(asset_id_type id) const
+   {
+      std::string asset_id = fc::to_string(id.space_id) +
+                             "." + fc::to_string(id.type_id) +
+                             "." + fc::to_string(id.instance.value);
+      return asset_id;
+   }
    optional<asset_object> find_asset(asset_id_type id)const
    {
-      auto rec = _remote_db->get_assets({id}).front();
+      auto rec = _remote_db->get_assets({asset_id_to_string(id)}).front();
       return rec;
    }
    optional<asset_object> find_asset(string asset_symbol_or_id)const
@@ -3181,7 +3188,7 @@ vector<bucket_object> wallet_api::get_market_history(
       fc::time_point_sec start,
       fc::time_point_sec end )const
 {
-   return my->_remote_hist->get_market_history( get_asset_id(symbol1), get_asset_id(symbol2), bucket, start, end );
+   return my->_remote_hist->get_market_history( symbol1, symbol2, bucket, start, end );
 }
 
 vector<limit_order_object> wallet_api::get_account_limit_orders(
@@ -3195,24 +3202,24 @@ vector<limit_order_object> wallet_api::get_account_limit_orders(
    return my->_remote_db->get_account_limit_orders(name_or_id, base, quote, limit, ostart_id, ostart_price);
 }
 
-vector<limit_order_object> wallet_api::get_limit_orders(string a, string b, uint32_t limit)const
+vector<limit_order_object> wallet_api::get_limit_orders(std::string a, std::string b, uint32_t limit)const
 {
-   return my->_remote_db->get_limit_orders(get_asset(a).id, get_asset(b).id, limit);
+   return my->_remote_db->get_limit_orders(a, b, limit);
 }
 
-vector<call_order_object> wallet_api::get_call_orders(string a, uint32_t limit)const
+vector<call_order_object> wallet_api::get_call_orders(std::string a, uint32_t limit)const
 {
-   return my->_remote_db->get_call_orders(get_asset(a).id, limit);
+   return my->_remote_db->get_call_orders(a, limit);
 }
 
-vector<force_settlement_object> wallet_api::get_settle_orders(string a, uint32_t limit)const
+vector<force_settlement_object> wallet_api::get_settle_orders(std::string a, uint32_t limit)const
 {
-   return my->_remote_db->get_settle_orders(get_asset(a).id, limit);
+   return my->_remote_db->get_settle_orders(a, limit);
 }
 
-vector<collateral_bid_object> wallet_api::get_collateral_bids(string asset, uint32_t limit, uint32_t start)const
+vector<collateral_bid_object> wallet_api::get_collateral_bids(std::string asset, uint32_t limit, uint32_t start)const
 {
-   return my->_remote_db->get_collateral_bids(get_asset(asset).id, limit, start);
+   return my->_remote_db->get_collateral_bids(asset, limit, start);
 }
 
 brain_key_info wallet_api::suggest_brain_key()const
