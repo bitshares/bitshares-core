@@ -38,7 +38,6 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 
-#include <fc/smart_ref_impl.hpp>
 #include <iostream>
 
 using namespace graphene::chain;

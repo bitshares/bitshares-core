@@ -30,8 +30,6 @@
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/api.hpp>
-#include <fc/smart_ref_impl.hpp>
-
 
 namespace graphene { namespace delayed_node {
 namespace bpo = boost::program_options;

@@ -35,7 +35,6 @@
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 
 #include <fc/thread/thread.hpp>
-#include <fc/smart_ref_impl.hpp>
 #include <fc/log/appender.hpp>
 #include <fc/log/logger.hpp>
 
@@ -78,8 +77,8 @@ BOOST_AUTO_TEST_CASE(load_configuration_options_test_config_logging_files_create
    /// check post-conditions
    BOOST_CHECK(fc::exists(config_ini_file));
    BOOST_CHECK(fc::exists(logging_ini_file));
-   BOOST_CHECK_GT(fc::file_size(config_ini_file), 0);
-   BOOST_CHECK_GT(fc::file_size(logging_ini_file), 0);
+   BOOST_CHECK_GT(fc::file_size(config_ini_file), 0u);
+   BOOST_CHECK_GT(fc::file_size(logging_ini_file), 0u);
 }
 
 BOOST_AUTO_TEST_CASE(load_configuration_options_test_config_ini_options)
@@ -109,8 +108,8 @@ BOOST_AUTO_TEST_CASE(load_configuration_options_test_config_ini_options)
 
    /// check the options values are parsed into the output map
    BOOST_CHECK(!options.empty());
-   BOOST_CHECK_EQUAL(options.count("option1"), 1);
-   BOOST_CHECK_EQUAL(options.count("option2"), 1);
+   BOOST_CHECK_EQUAL(options.count("option1"), 1u);
+   BOOST_CHECK_EQUAL(options.count("option2"), 1u);
    BOOST_CHECK_EQUAL(options["option1"].as<std::string>(), "is present");
    BOOST_CHECK_EQUAL(options["option2"].as<int>(), 1);
 
@@ -151,9 +150,9 @@ BOOST_AUTO_TEST_CASE(load_configuration_options_test_logging_ini_options)
    /// this is a little bit tricky since load_configuration_options() doesn't provide output variable for logging_config
    auto logger_map = fc::get_logger_map();
    auto appender_map = fc::get_appender_map();
-   BOOST_CHECK_EQUAL(logger_map.size(), 1);
+   BOOST_CHECK_EQUAL(logger_map.size(), 1u);
    BOOST_CHECK(logger_map.count("default"));
-   BOOST_CHECK_EQUAL(appender_map.size(), 1);
+   BOOST_CHECK_EQUAL(appender_map.size(), 1u);
    BOOST_CHECK(appender_map.count("default"));
 }
 
@@ -195,16 +194,16 @@ BOOST_AUTO_TEST_CASE(load_configuration_options_test_legacy_config_ini_options)
 
    /// check the options values are parsed into the output map
    BOOST_CHECK(!options.empty());
-   BOOST_CHECK_EQUAL(options.count("option1"), 1);
-   BOOST_CHECK_EQUAL(options.count("option2"), 1);
+   BOOST_CHECK_EQUAL(options.count("option1"), 1u);
+   BOOST_CHECK_EQUAL(options.count("option2"), 1u);
    BOOST_CHECK_EQUAL(options["option1"].as<std::string>(), "is present");
    BOOST_CHECK_EQUAL(options["option2"].as<int>(), 1);
 
    auto logger_map = fc::get_logger_map();
    auto appender_map = fc::get_appender_map();
-   BOOST_CHECK_EQUAL(logger_map.size(), 1);
+   BOOST_CHECK_EQUAL(logger_map.size(), 1u);
    BOOST_CHECK(logger_map.count("default"));
-   BOOST_CHECK_EQUAL(appender_map.size(), 1);
+   BOOST_CHECK_EQUAL(appender_map.size(), 1u);
    BOOST_CHECK(appender_map.count("default"));
 }
 
@@ -256,7 +255,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app2.startup();
       fc::usleep(fc::milliseconds(500));
 
-      BOOST_REQUIRE_EQUAL(app1.p2p_node()->get_connection_count(), 1);
+      BOOST_REQUIRE_EQUAL(app1.p2p_node()->get_connection_count(), 1u);
       BOOST_CHECK_EQUAL(std::string(app1.p2p_node()->get_connected_peers().front().host.get_address()), "127.0.0.1");
       BOOST_TEST_MESSAGE( "app1 and app2 successfully connected" );
 
@@ -321,8 +320,8 @@ BOOST_AUTO_TEST_CASE( two_node_network )
 
       fc::usleep(fc::milliseconds(500));
       BOOST_TEST_MESSAGE( "Verifying nodes are still connected" );
-      BOOST_CHECK_EQUAL(app1.p2p_node()->get_connection_count(), 1);
-      BOOST_CHECK_EQUAL(app1.chain_database()->head_block_num(), 1);
+      BOOST_CHECK_EQUAL(app1.p2p_node()->get_connection_count(), 1u);
+      BOOST_CHECK_EQUAL(app1.chain_database()->head_block_num(), 1u);
 
       BOOST_TEST_MESSAGE( "Checking GRAPHENE_NULL_ACCOUNT has balance" );
    } catch( fc::exception& e ) {
