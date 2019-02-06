@@ -64,9 +64,11 @@ int main(int argc, char** argv) {
       bpo::options_description app_options("Graphene Delayed Node");
       bpo::options_description cfg_options("Graphene Delayed Node");
       app_options.add_options()
-            ("help,h", "Print this help message and exit.")
-            ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("delayed_node_data_dir"), "Directory containing databases, configuration file, etc.")
-            ;
+              ("help,h", "Print this help message and exit.")
+              ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("delayed_node_data_dir"), "Directory containing databases, configuration file, etc.")
+              ("plugins", bpo::value<std::string>()->default_value("delayed_node account_history market_history"),
+               "Space-separated list of plugins to activate");
+              ;
 
       bpo::variables_map options;
 
@@ -84,8 +86,8 @@ int main(int argc, char** argv) {
       }
       catch (const boost::program_options::error& e)
       {
-        std::cerr << "Error parsing command line: " << e.what() << "\n";
-        return 1;
+         std::cerr << "Error parsing command line: " << e.what() << "\n";
+         return 1;
       }
 
       if( options.count("help") )
@@ -160,18 +162,25 @@ int main(int argc, char** argv) {
          elog("Error parsing configuration file: ${e}", ("e", e.what()));
          return 1;
       }
-      if( !options.count("plugins") )
-         options.insert( std::make_pair( "plugins", bpo::variable_value(std::string("delayed_node account_history market_history"), true) ) );
 
+      std::set<std::string> plugins;
+      boost::split(plugins, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
+
+      std::for_each(plugins.begin(), plugins.end(), [&](const std::string& plug) mutable {
+          if (!plug.empty()) {
+             node.enable_plugin(plug);
+          }
+      });
       node.initialize(data_dir, options);
       node.initialize_plugins( options );
 
       node.startup();
+
       node.startup_plugins();
 
       fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
       fc::set_signal_handler([&exit_promise](int signal) {
-         exit_promise->set_value(signal);
+          exit_promise->set_value(signal);
       }, SIGINT);
 
       ilog("Started delayed node on a chain with ${h} blocks.", ("h", node.chain_database()->head_block_num()));
@@ -180,10 +189,11 @@ int main(int argc, char** argv) {
       int signal = exit_promise->wait();
       ilog("Exiting from signal ${n}", ("n", signal));
       node.shutdown_plugins();
-      return 0;
+      node.shutdown();
+      return EXIT_SUCCESS;
    } catch( const fc::exception& e ) {
       elog("Exiting with error:\n${e}", ("e", e.to_detail_string()));
-      return 1;
+      return EXIT_FAILURE;
    }
 }
 
@@ -241,14 +251,14 @@ fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::pat
             // stdout/stderr will be taken from ini file, everything else hard-coded here
             fc::console_appender::config console_appender_config;
             console_appender_config.level_colors.emplace_back(
-               fc::console_appender::level_color(fc::log_level::debug,
-                                                 fc::console_appender::color::green));
+                    fc::console_appender::level_color(fc::log_level::debug,
+                                                      fc::console_appender::color::green));
             console_appender_config.level_colors.emplace_back(
-               fc::console_appender::level_color(fc::log_level::warn,
-                                                 fc::console_appender::color::brown));
+                    fc::console_appender::level_color(fc::log_level::warn,
+                                                      fc::console_appender::color::brown));
             console_appender_config.level_colors.emplace_back(
-               fc::console_appender::level_color(fc::log_level::error,
-                                                 fc::console_appender::color::cyan));
+                    fc::console_appender::level_color(fc::log_level::error,
+                                                      fc::console_appender::color::cyan));
             console_appender_config.stream = fc::variant(stream_name, 1).as<fc::console_appender::stream::type>(1);
             logging_config.appenders.push_back(fc::appender_config(console_appender_name, "console", fc::variant(console_appender_config, GRAPHENE_MAX_NESTED_OBJECTS)));
             found_logging_config = true;

@@ -27,7 +27,6 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/protocol/types.hpp>
 #include <fc/io/json.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>

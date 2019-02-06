@@ -24,7 +24,6 @@
 
 #include <boost/multiprecision/integer.hpp>
 
-#include <fc/smart_ref_impl.hpp>
 #include <fc/uint128.hpp>
 
 #include <graphene/chain/database.hpp>
