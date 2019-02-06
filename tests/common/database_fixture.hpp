@@ -27,7 +27,6 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/protocol/types.hpp>
 #include <fc/io/json.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
@@ -169,6 +168,12 @@ extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;
 #define ACTORS(names) BOOST_PP_SEQ_FOR_EACH(ACTORS_IMPL, ~, names)
 
 namespace graphene { namespace chain {
+
+class clearable_block : public signed_block {
+public:
+   /** @brief Clears internal cached values like ID, signing key, Merkle root etc. */
+   void clear();
+};
 
 struct database_fixture {
    // the reason we use an app is to exercise the indexes of built-in

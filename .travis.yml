@@ -5,14 +5,12 @@ cache: ccache
 git:
   depth: 1
 
-dist: trusty
+dist: xenial
 
 sudo: true
 
 install:
- - echo "deb http://de.archive.ubuntu.com/ubuntu xenial main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
- - sudo apt-get update
- - sudo apt-get install --allow-unauthenticated g++ libboost-all-dev cmake libreadline-dev libssl-dev autoconf parallel ccache
+ - sudo apt-get install --allow-unauthenticated libboost-thread-dev libboost-iostreams-dev libboost-date-time-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libboost-chrono-dev libboost-test-dev libboost-context-dev libboost-regex-dev libboost-coroutine-dev cmake parallel
 
 addons:
   sonarcloud:
@@ -27,15 +25,21 @@ env:
     - CCACHE_SLOPPINESS=include_file_ctime,include_file_mtime,time_macros
 
 script:
- - 'echo $((`date +%s` - 120)) >_start_time'
+ - programs/build_helpers/buildstep -s 3500
  - ccache -s
- - '( [ `ccache -s | grep "files in cache" | cut -c 20-` = 0 ] && touch _empty_cache ) || true'
- - sed -i '/tests/d' libraries/fc/CMakeLists.txt
- - cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage -DBoost_USE_STATIC_LIBS=OFF -DCMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON .
- - 'which build-wrapper-linux-x86-64 && build-wrapper-linux-x86-64 --out-dir bw-output make -j 2 cli_wallet witness_node chain_test cli_test || make -j 2 cli_wallet witness_node chain_test cli_test'
+ - programs/build_helpers/buildstep Prepare 1 "sed -i '/tests/d' libraries/fc/CMakeLists.txt"
+ - programs/build_helpers/buildstep cmake 5 "cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage -DBoost_USE_STATIC_LIBS=OFF -DCMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON ."
+ - programs/build_helpers/buildstep make.cli_wallet 1600 "programs/build_helpers/make_with_sonar bw-output -j 2 cli_wallet"
+ - programs/build_helpers/buildstep make.witness_node 300 "programs/build_helpers/make_with_sonar bw-output -j 2 witness_node"
+ - programs/build_helpers/buildstep make.serializer 45 "programs/build_helpers/make_with_sonar bw-output -j 2 js_operation_serializer"
+ - programs/build_helpers/buildstep make.get_dev_key 10 "programs/build_helpers/make_with_sonar bw-output -j 2 get_dev_key"
+ - programs/build_helpers/buildstep make.chain_test 900 "programs/build_helpers/make_with_sonar bw-output -j 2 chain_test"
+ - programs/build_helpers/buildstep make.cli_test 200 "programs/build_helpers/make_with_sonar bw-output -j 2 cli_test"
+ - programs/build_helpers/buildstep make.perf_test 120 "programs/build_helpers/make_with_sonar bw-output -j 2 performance_test"
  - set -o pipefail
- - '[ -r _empty_cache ] || tests/chain_test 2>&1 | cat'
- - '[ -r _empty_cache ] || tests/cli_test 2>&1 | cat'
- - 'find libraries/[acdenptuw]*/CMakeFiles/*.dir programs/[cdgjsw]*/CMakeFiles/*.dir -type d | while read d; do gcov -o "$d" "${d/CMakeFiles*.dir//}"/*.cpp; done >/dev/null'
- - '( [ -r _empty_cache -o $((`date +%s` - `cat _start_time`)) -gt $((42 * 60)) ] && echo "WARNING! Skipping sonar scanner due to time constraints!" ) || ( which sonar-scanner && sonar-scanner || true )'
- - '[ ! -r _empty_cache ] || ( echo "Please restart with populated cache" && false )'
+ - programs/build_helpers/buildstep run.chain_test 240 "libraries/fc/tests/run-parallel-tests.sh tests/chain_test"
+ - programs/build_helpers/buildstep run.cli_test 30 "libraries/fc/tests/run-parallel-tests.sh tests/cli_test"
+ - programs/build_helpers/buildstep prepare.sonar 20 'find libraries/[acdenptuw]*/CMakeFiles/*.dir programs/[cdgjsw]*/CMakeFiles/*.dir -type d | while read d; do gcov -o "$d" "${d/CMakeFiles*.dir//}"/*.cpp; done >/dev/null'
+ - programs/build_helpers/buildstep run.sonar 400 "which sonar-scanner && sonar-scanner || true"
+ - programs/build_helpers/buildstep end 0
+ - ccache -s

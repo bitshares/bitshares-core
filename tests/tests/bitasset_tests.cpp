@@ -448,7 +448,6 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
                  | database::skip_transaction_dupe_check
                  | database::skip_block_size_check
                  | database::skip_tapos_check
-                 | database::skip_authority_check
                  | database::skip_merkle_check
                  ;
    generate_blocks(HARDFORK_615_TIME, true, skip); // get around Graphene issue #615 feed expiration bug
@@ -918,7 +917,6 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
                  | database::skip_transaction_dupe_check
                  | database::skip_block_size_check
                  | database::skip_tapos_check
-                 | database::skip_authority_check
                  | database::skip_merkle_check
                  ;
    generate_blocks( HARDFORK_615_TIME, true, skip ); // get around Graphene issue #615 feed expiration bug
