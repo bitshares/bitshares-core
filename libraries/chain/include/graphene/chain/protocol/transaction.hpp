@@ -159,7 +159,7 @@ namespace graphene { namespace chain {
        * @param chain_id the ID of a block chain
        * @param get_active callback function to retrieve active authorities of a given account
        * @param get_owner  callback function to retrieve owner authorities of a given account
-       * @param allow_non_immediate_owner whether to allow owner authrity of non-immediately
+       * @param allow_non_immediate_owner whether to allow owner authority of non-immediately
        *            required accounts to authorize operations in the transaction
        * @param max_recursion maximum level of recursion when verifying, since an account
        *            can have another account in active authorities and/or owner authorities
@@ -237,7 +237,7 @@ namespace graphene { namespace chain {
     * @param sigs a set of public keys
     * @param get_active callback function to retrieve active authorities of a given account
     * @param get_owner  callback function to retrieve owner authorities of a given account
-    * @param allow_non_immediate_owner whether to allow owner authrity of non-immediately
+    * @param allow_non_immediate_owner whether to allow owner authority of non-immediately
     *            required accounts to authorize operations
     * @param max_recursion maximum level of recursion when verifying, since an account
     *            can have another account in active authorities and/or owner authorities
