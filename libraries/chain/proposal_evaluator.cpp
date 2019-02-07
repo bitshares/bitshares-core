@@ -38,18 +38,27 @@ namespace detail {
 struct proposal_operation_hardfork_visitor
 {
    typedef void result_type;
+   const database& db;
    const fc::time_point_sec block_time;
    const fc::time_point_sec next_maintenance_time;
 
-   proposal_operation_hardfork_visitor( const fc::time_point_sec bt, const fc::time_point_sec nmt )
-   : block_time(bt), next_maintenance_time(nmt) {}
+   proposal_operation_hardfork_visitor(const database& _db, const fc::time_point_sec bt )
+         : db( _db ), block_time(bt), 
+         next_maintenance_time( db.get_dynamic_global_properties().next_maintenance_time ) {}
 
    template<typename T>
    void operator()(const T &v) const {}
 
-   // TODO review and cleanup code below after hard fork
-   // hf_834
    void operator()(const graphene::chain::call_order_update_operation &v) const {
+      if (v.delta_debt.amount > 0 && v.delta_debt.asset_id != asset_id_type( 113 ) // CNY
+            && v.delta_debt.asset_id( db ).bitasset_data_id
+            && !(*( v.delta_debt.asset_id( db ).bitasset_data_id))(db).is_prediction_market )
+      {
+         ilog( "20181206A: proposal contains call_order_update at ${bt}: ${op}", ("bt",block_time)("op",v) );
+         FC_ASSERT( block_time < fc::time_point::now() - fc::seconds(30), "Soft fork - preventing proposal with call_order_update!");
+      }
+      // TODO review and cleanup code below after hard fork
+      // hf_834
       if (next_maintenance_time <= HARDFORK_CORE_834_TIME) {
          FC_ASSERT( !v.extensions.value.target_collateral_ratio.valid(),
                     "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
@@ -126,10 +135,22 @@ struct proposal_operation_hardfork_visitor
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
    }
    // loop and self visit in proposals
-   void operator()(const graphene::chain::proposal_create_operation &v) const {
-      for (const op_wrapper &op : v.proposed_ops)
-         op.op.visit(*this);
+   void operator()(const graphene::chain::proposal_create_operation &v) const
+   {
+      bool proposal_update_seen = false;
+      const bool nested_soft_fork = block_time > fc::time_point::now() - fc::seconds(30);
+      for( const op_wrapper& op : v.proposed_ops )
+      {
+         op.op.visit( *this);
+         if ( nested_soft_fork && op.op.which() == operation::tag<proposal_update_operation>().value )
+         {
+            FC_ASSERT( !proposal_update_seen, "At most one proposal update can be nested in a proposal!" );
+            proposal_update_seen = true;
+         }
+      }
    }
+
+
 };
 
 struct hardfork_visitor_214 // non-recursive proposal visitor
@@ -172,7 +193,7 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
    // Calling the proposal hardfork visitor
    const fc::time_point_sec block_time = d.head_block_time();
    const fc::time_point_sec next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
-   proposal_operation_hardfork_visitor vtor( block_time, next_maint_time );
+   proposal_operation_hardfork_visitor vtor( d, block_time );
    vtor( o );
    if( block_time < HARDFORK_CORE_214_TIME )
    { // cannot be removed after hf, unfortunately
