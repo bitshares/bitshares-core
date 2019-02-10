@@ -111,7 +111,9 @@ namespace graphene { namespace chain {
          return results;
       }
 
-      void get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other )const;
+      void get_required_authorities( flat_set<account_id_type>& active,
+                                     flat_set<account_id_type>& owner,
+                                     vector<authority>& other )const;
 
    protected:
       // Calculate the digest used for signature validation
@@ -146,13 +148,27 @@ namespace graphene { namespace chain {
          const flat_set<public_key_type>& available_keys,
          const std::function<const authority*(account_id_type)>& get_active,
          const std::function<const authority*(account_id_type)>& get_owner,
+         bool allow_non_immediate_owner,
          uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH
          )const;
 
+      /**
+       * Checks whether signatures in this signed transaction are sufficient to authorize the transaction.
+       *   Throws an exception when failed.
+       *
+       * @param chain_id the ID of a block chain
+       * @param get_active callback function to retrieve active authorities of a given account
+       * @param get_owner  callback function to retrieve owner authorities of a given account
+       * @param allow_non_immediate_owner whether to allow owner authority of non-immediately
+       *            required accounts to authorize operations in the transaction
+       * @param max_recursion maximum level of recursion when verifying, since an account
+       *            can have another account in active authorities and/or owner authorities
+       */
       void verify_authority(
          const chain_id_type& chain_id,
          const std::function<const authority*(account_id_type)>& get_active,
          const std::function<const authority*(account_id_type)>& get_owner,
+         bool allow_non_immediate_owner,
          uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH )const;
 
       /**
@@ -161,12 +177,12 @@ namespace graphene { namespace chain {
        * some cases where get_required_signatures() returns a
        * non-minimal set.
        */
-
       set<public_key_type> minimize_required_signatures(
          const chain_id_type& chain_id,
          const flat_set<public_key_type>& available_keys,
          const std::function<const authority*(account_id_type)>& get_active,
          const std::function<const authority*(account_id_type)>& get_owner,
+         bool allow_non_immediate_owner,
          uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH
          ) const;
 
@@ -213,9 +229,26 @@ namespace graphene { namespace chain {
       mutable bool _validated = false;
    };
 
+   /**
+    * Checks whether given public keys and approvals are sufficient to authorize given operations.
+    *   Throws an exception when failed.
+    *
+    * @param ops a vector of operations
+    * @param sigs a set of public keys
+    * @param get_active callback function to retrieve active authorities of a given account
+    * @param get_owner  callback function to retrieve owner authorities of a given account
+    * @param allow_non_immediate_owner whether to allow owner authority of non-immediately
+    *            required accounts to authorize operations
+    * @param max_recursion maximum level of recursion when verifying, since an account
+    *            can have another account in active authorities and/or owner authorities
+    * @param allow_committee whether to allow the special "committee account" to authorize the operations
+    * @param active_approvals accounts that approved the operations with their active authories
+    * @param owner_approvals accounts that approved the operations with their owner authories
+    */
    void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs,
                           const std::function<const authority*(account_id_type)>& get_active,
                           const std::function<const authority*(account_id_type)>& get_owner,
+                          bool allow_non_immediate_owner,
                           uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH,
                           bool allow_committe = false,
                           const flat_set<account_id_type>& active_aprovals = flat_set<account_id_type>(),
