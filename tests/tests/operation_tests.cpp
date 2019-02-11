@@ -664,7 +664,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
       GRAPHENE_REQUIRE_THROW( call_update_proposal( bob, alice, bitusd.amount(10), core.amount(40), 1750 ), fc::assert_exception );
       GRAPHENE_REQUIRE_THROW( call_update_proposal( bob, alice, bitusd.amount(10), core.amount(40), 65535 ), fc::assert_exception );
 
-      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      generate_blocks( HARDFORK_CORE_1465_TIME + 10 );
       set_expiration( db, trx );
 
       BOOST_TEST_MESSAGE( "bob tries to propose a proposal with target_cr set, "
