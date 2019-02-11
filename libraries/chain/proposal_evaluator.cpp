@@ -127,21 +127,16 @@ struct proposal_operation_hardfork_visitor
    }
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {
-      bool contains_proposal_update = false;
+      bool already_contains_proposal_update = false;
 
       for (const op_wrapper &op : v.proposed_ops)
       {
          op.op.visit(*this);
-         /**
-          * The softfork code before HF 1479 is more restrictive than HF1479. Therefore, both
-          * must be kept until HF 1479, and the softfork code must not execute after HF 1479.
-          * If the softfork code never executes before HF 1479, it can be removed.
-          */
-         if ( block_time < HARDFORK_CORE_1479_TIME 
-               && op.op.which() == operation::tag<proposal_update_operation>().value )
+         // Do not allow more than 1 proposal_update in a proposal
+         if ( op.op.which() == operation::tag<proposal_update_operation>().value )
          {
-            FC_ASSERT( !contains_proposal_update, "At most one proposal update can be nested in a proposal!" );
-            contains_proposal_update = true;
+            FC_ASSERT( !already_contains_proposal_update, "At most one proposal update can be nested in a proposal!" );
+            already_contains_proposal_update = true;
          }
       }
    }
