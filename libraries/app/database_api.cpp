@@ -1273,10 +1273,9 @@ vector<call_order_object> database_api_impl::get_call_orders(const std::string& 
 {
    FC_ASSERT( limit <= 300 );
 
-   const asset_id_type asset_a_id = get_asset_from_string(a)->id;
+   const asset_object* mia = get_asset_from_string(a);
    const auto& call_index = _db.get_index_type<call_order_index>().indices().get<by_collateral>();
-   const asset_object& mia = _db.get(asset_a_id);
-   price index_price = price::min( mia.bitasset_data(_db).options.short_backing_asset, mia.get_id() );
+   price index_price = price::min( mia->bitasset_data(_db).options.short_backing_asset, mia->get_id() );
    
    vector< call_order_object> result;
    auto itr_min = call_index.lower_bound(index_price);
