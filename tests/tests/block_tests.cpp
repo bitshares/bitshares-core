@@ -41,6 +41,7 @@
 #include <fc/crypto/digest.hpp>
 
 #include "../common/database_fixture.hpp"
+#include "../common/application_helper.hpp"
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
@@ -776,6 +777,16 @@ BOOST_AUTO_TEST_CASE( tapos )
       edump((e.to_detail_string()));
       throw;
    }
+}
+
+BOOST_AUTO_TEST_CASE( big_block_p2p )
+{
+   graphene::test::application_runner app1;
+   graphene::test::application_runner app2;
+   app2.add_seed_node( "localhost:" + std::to_string( app1.server_port_number ) );
+
+   // connect to a node, send a very big tx, and make sure the nodes stay connected to each other
+   graphene::test::client_connection conn1(app2.get_app(), app1.server_port_number);
 }
 
 BOOST_FIXTURE_TEST_CASE( optional_tapos, database_fixture )

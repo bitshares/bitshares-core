@@ -128,7 +128,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       for( const string& endpoint_string : seeds )
       {
          try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
+            std::vector<fc::ip::endpoint> endpoints = application::resolve_string_to_ip_endpoints(endpoint_string);
             for (const fc::ip::endpoint& endpoint : endpoints)
             {
                ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
@@ -149,7 +149,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       for( const string& endpoint_string : seeds )
       {
          try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
+            std::vector<fc::ip::endpoint> endpoints = application::resolve_string_to_ip_endpoints(endpoint_string);
             for (const fc::ip::endpoint& endpoint : endpoints)
             {
                ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
@@ -188,7 +188,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       for( const string& endpoint_string : seeds )
       {
          try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
+            std::vector<fc::ip::endpoint> endpoints = application::resolve_string_to_ip_endpoints(endpoint_string);
             for (const fc::ip::endpoint& endpoint : endpoints)
             {
                ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
@@ -213,36 +213,6 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
                                         _chain_db->head_block_id()),
                            std::vector<uint32_t>());
 } FC_CAPTURE_AND_RETHROW() }
-
-std::vector<fc::ip::endpoint> application_impl::resolve_string_to_ip_endpoints(const std::string& endpoint_string)
-{
-   try
-   {
-      string::size_type colon_pos = endpoint_string.find(':');
-      if (colon_pos == std::string::npos)
-         FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
-                  ("endpoint_string", endpoint_string));
-      std::string port_string = endpoint_string.substr(colon_pos + 1);
-      try
-      {
-         uint16_t port = boost::lexical_cast<uint16_t>(port_string);
-
-         std::string hostname = endpoint_string.substr(0, colon_pos);
-         std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
-         if (endpoints.empty())
-            FC_THROW_EXCEPTION( fc::unknown_host_exception,
-                                "The host name can not be resolved: ${hostname}",
-                                ("hostname", hostname) );
-         return endpoints;
-      }
-      catch (const boost::bad_lexical_cast&)
-      {
-         FC_THROW("Bad port: ${port}", ("port", port_string));
-      }
-   }
-   FC_CAPTURE_AND_RETHROW((endpoint_string))
-}
-
 
 void application_impl::new_connection( const fc::http::websocket_connection_ptr& c )
 {
@@ -1098,6 +1068,35 @@ void application::startup_plugins()
 const application_options& application::get_options()
 {
    return my->_app_options;
+}
+
+std::vector<fc::ip::endpoint> application::resolve_string_to_ip_endpoints(const std::string& endpoint_string)
+{
+   try
+   {
+      string::size_type colon_pos = endpoint_string.find(':');
+      if (colon_pos == std::string::npos)
+         FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
+                  ("endpoint_string", endpoint_string));
+      std::string port_string = endpoint_string.substr(colon_pos + 1);
+      try
+      {
+         uint16_t port = boost::lexical_cast<uint16_t>(port_string);
+
+         std::string hostname = endpoint_string.substr(0, colon_pos);
+         std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
+         if (endpoints.empty())
+            FC_THROW_EXCEPTION( fc::unknown_host_exception,
+                                "The host name can not be resolved: ${hostname}",
+                                ("hostname", hostname) );
+         return endpoints;
+      }
+      catch (const boost::bad_lexical_cast&)
+      {
+         FC_THROW("Bad port: ${port}", ("port", port_string));
+      }
+   }
+   FC_CAPTURE_AND_RETHROW((endpoint_string))
 }
 
 // namespace detail

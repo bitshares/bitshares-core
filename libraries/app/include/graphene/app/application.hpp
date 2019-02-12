@@ -56,6 +56,7 @@ namespace graphene { namespace app {
          void shutdown();
          void startup_plugins();
          void shutdown_plugins();
+         static std::vector<fc::ip::endpoint> resolve_string_to_ip_endpoints(const std::string& endpoint_string);
 
          template<typename PluginType>
          std::shared_ptr<PluginType> register_plugin(bool auto_load = false) {

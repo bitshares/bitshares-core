@@ -20,7 +20,7 @@ target_link_libraries( performance_test graphene_chain graphene_app graphene_wit
 
 file(GLOB BENCH_MARKS "benchmarks/*.cpp")
 add_executable( chain_bench ${COMMON_SOURCES} ${BENCH_MARKS} )
-target_link_libraries( chain_bench graphene_chain graphene_app graphene_account_history graphene_elasticsearch graphene_es_objects graphene_egenesis_none fc ${PLATFORM_SPECIFIC_LIBS} )
+target_link_libraries( chain_bench graphene_chain graphene_witness graphene_app graphene_account_history graphene_elasticsearch graphene_es_objects graphene_egenesis_none fc ${PLATFORM_SPECIFIC_LIBS} )
 
 file(GLOB APP_SOURCES "app/*.cpp")
 add_executable( app_test ${APP_SOURCES} )
@@ -38,6 +38,6 @@ endif(MSVC)
 
 file(GLOB ES_SOURCES "elasticsearch/*.cpp")
 add_executable( es_test ${COMMON_SOURCES} ${ES_SOURCES} )
-target_link_libraries( es_test graphene_chain graphene_app graphene_account_history graphene_elasticsearch graphene_es_objects graphene_egenesis_none fc ${PLATFORM_SPECIFIC_LIBS} )
+target_link_libraries( es_test graphene_chain graphene_app graphene_witness graphene_account_history graphene_elasticsearch graphene_es_objects graphene_egenesis_none fc ${PLATFORM_SPECIFIC_LIBS} )
 
 add_subdirectory( generate_empty_blocks )

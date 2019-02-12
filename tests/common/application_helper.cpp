@@ -35,10 +35,10 @@ application_runner::application_runner()
 {
    _app = std::make_shared<graphene::app::application>();
 
-   _app->register_plugin<graphene::account_history::account_history_plugin>(true);
+   _app->register_plugin< graphene::account_history::account_history_plugin >(true);
    _app->register_plugin< graphene::market_history::market_history_plugin >(true);
    _app->register_plugin< graphene::witness_plugin::witness_plugin >(true);
-   _app->register_plugin< graphene::grouped_orders::grouped_orders_plugin>(true);
+   _app->register_plugin< graphene::grouped_orders::grouped_orders_plugin >(true);
    _app->startup_plugins();
    boost::program_options::variables_map cfg;
 #ifdef _WIN32
@@ -60,16 +60,14 @@ application_runner::application_runner()
    fc::usleep(fc::milliseconds(500));
 }
 
-const graphene::app::application& application_runner::get_app()
+std::shared_ptr<graphene::app::application> application_runner::get_app()
 {
-   return *_app;
+   return _app;
 }
 
-void application_runner::add_seed_node(int remote_port)
+void application_runner::add_seed_node(std::string addr)
 {
-   // add seed node
-   std::string node = "127.0.0.1:" + std::to_string(remote_port);
-   std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(node);
+   std::vector<fc::ip::endpoint> endpoints = graphene::app::application::resolve_string_to_ip_endpoints(addr);
    for(const auto& ep : endpoints)
       _app->p2p_node()->add_node(ep);
 }
