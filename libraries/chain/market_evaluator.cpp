@@ -170,10 +170,25 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
               ("sym", _debt_asset->symbol) );
 
    _dynamic_data_obj = &_debt_asset->dynamic_asset_data_id(d);
-   FC_ASSERT( next_maintenance_time <= HARDFORK_CORE_1465_TIME 
-         || _dynamic_data_obj->current_supply + o.delta_debt.amount <= _debt_asset->options.max_supply,
-      "Borrowing this quantity would exceed MAX_SUPPLY" );
 
+   /***
+    * We have softfork code already in production to prevent exceeding MAX_SUPPLY between 2018-12-21 until HF 1465.
+    * But we must allow this in replays until 2018-12-21. The HF 1465 code will correct the problem.
+    * After HF 1465, we MAY be able to remove the cleanup code IF it never executes. We MAY be able to clean
+    * up the softfork code IF it never executes. We MAY be able to turn the hardfork code into regular code IF
+    * noone ever attempted this before HF 1465.
+    */
+   if (next_maintenance_time <= SOFTFORK_CORE_1465_TIME)
+   {
+      if ( _dynamic_data_obj->current_supply + o.delta_debt.amount <= _debt_asset->options.max_supply )
+         ilog("Issue 1465... Borrowing and exceeding MAX_SUPPLY. Will be corrected at hardfork time.");
+   }
+   else
+   {
+      FC_ASSERT( _dynamic_data_obj->current_supply + o.delta_debt.amount <= _debt_asset->options.max_supply,
+            "Borrowing this quantity would exceed MAX_SUPPLY" );
+   }
+   
    FC_ASSERT( _dynamic_data_obj->current_supply + o.delta_debt.amount >= 0,
          "This transaction would bring current supply below zero.");
 
