@@ -37,7 +37,7 @@ BOOST_FIXTURE_TEST_SUITE(asset_api_tests, database_fixture)
 
 BOOST_AUTO_TEST_CASE( asset_holders )
 {
-   graphene::app::asset_api asset_api(db);
+   graphene::app::asset_api asset_api(app);
 
    // create an asset and some accounts
    create_bitasset("USD", account_id_type());
@@ -51,8 +51,8 @@ BOOST_AUTO_TEST_CASE( asset_holders )
    transfer(account_id_type()(db), bob, asset(300));
 
    // make call
-   vector<account_asset_balance> holders = asset_api.get_asset_holders(asset_id_type(), 0, 100);
-   BOOST_CHECK_EQUAL(holders.size(), 4);
+   vector<account_asset_balance> holders = asset_api.get_asset_holders( std::string( static_cast<object_id_type>(asset_id_type())), 0, 100);
+   BOOST_CHECK_EQUAL(holders.size(), 4u);
 
    // by now we can guarantee the order
    BOOST_CHECK(holders[0].name == "committee-account");

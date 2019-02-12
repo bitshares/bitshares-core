@@ -73,13 +73,13 @@ BOOST_AUTO_TEST_CASE(failed_modify_test)
                      obj.owner = account_id_type(123);
                   });
    account_balance_id_type obj_id = obj.id;
-   BOOST_CHECK_EQUAL(obj.owner.instance.value, 123);
+   BOOST_CHECK_EQUAL(obj.owner.instance.value, 123u);
 
    // Modify dummy object, check that changes stick
    db.modify(obj, [](account_balance_object& obj) {
       obj.owner = account_id_type(234);
    });
-   BOOST_CHECK_EQUAL(obj_id(db).owner.instance.value, 234);
+   BOOST_CHECK_EQUAL(obj_id(db).owner.instance.value, 234u);
 
    // Throw exception when modifying object, check that object still exists after
    BOOST_CHECK_THROW(db.modify(obj, [](account_balance_object& obj) {
@@ -146,7 +146,7 @@ BOOST_AUTO_TEST_CASE( direct_index_test )
 
    graphene::db::primary_index< account_index, 8 > my_accounts( db );
    const auto& direct = my_accounts.get_secondary_index<graphene::db::direct_index< account_object, 8 >>();
-   BOOST_CHECK_EQUAL( 0, my_accounts.indices().size() );
+   BOOST_CHECK_EQUAL( 0u, my_accounts.indices().size() );
    BOOST_CHECK( nullptr == direct.find( account_id_type( 1 ) ) );
    // BOOST_CHECK_THROW( direct.find( asset_id_type( 1 ) ), fc::assert_exception ); // compile-time error
    BOOST_CHECK_THROW( direct.find( object_id_type( asset_id_type( 1 ) ) ), fc::assert_exception );
@@ -158,7 +158,7 @@ BOOST_AUTO_TEST_CASE( direct_index_test )
 
    my_accounts.load( fc::raw::pack( test_account ) );
 
-   BOOST_CHECK_EQUAL( 1, my_accounts.indices().size() );
+   BOOST_CHECK_EQUAL( 1u, my_accounts.indices().size() );
    BOOST_CHECK( nullptr == direct.find( account_id_type( 0 ) ) );
    BOOST_CHECK( nullptr == direct.find( account_id_type( 2 ) ) );
    BOOST_CHECK( nullptr != direct.find( account_id_type( 1 ) ) );
@@ -174,7 +174,7 @@ BOOST_AUTO_TEST_CASE( direct_index_test )
    // direct.next is now 103, but index sequence counter is 0
    my_accounts.create( [] ( object& o ) {
        account_object& acct = dynamic_cast< account_object& >( o );
-       BOOST_CHECK_EQUAL( 0, acct.id.instance() );
+       BOOST_CHECK_EQUAL( 0u, acct.id.instance() );
        acct.name = "account0";
    } );
 
@@ -198,7 +198,7 @@ BOOST_AUTO_TEST_CASE( direct_index_test )
    GRAPHENE_REQUIRE_THROW( my_accounts.load( fc::raw::pack( test_account ) ), fc::assert_exception );
    // This is actually undefined behaviour. The object has been inserted into
    // the primary index, but the secondary has refused to insert it!
-   BOOST_CHECK_EQUAL( 5, my_accounts.indices().size() );
+   BOOST_CHECK_EQUAL( 5u, my_accounts.indices().size() );
 
    uint32_t count = 0;
    for( uint32_t i = 0; i < 250; i++ )
