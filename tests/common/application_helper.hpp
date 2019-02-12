@@ -17,13 +17,19 @@ class application_runner
 {
    public:
    application_runner();
-   int server_port_number;
+   void start();
+   int rpc_port_number;
+   int p2p_port_number;
    std::shared_ptr<graphene::app::application> get_app();
+   // networking
    void add_seed_node(std::string addr);
+   bool is_connected( std::string addr );
+   uint32_t get_connection_count();
    private:
    std::shared_ptr<graphene::app::application> _app;
    fc::temp_directory _dir;
    static int get_available_port();
+   std::vector<std::string> seed_nodes;
 };
 
 ///////////
@@ -56,6 +62,7 @@ public:
       wallet_api_ptr = std::make_shared<graphene::wallet::wallet_api>(wallet_data, remote_login_api);
       wallet_filename = data_dir.path().generic_string() + "/wallet.json";
       wallet_api_ptr->set_wallet_filename(wallet_filename);
+      wallet_api_ptr->save_wallet_file();
 
       wallet_api = fc::api<graphene::wallet::wallet_api>(wallet_api_ptr);
 
@@ -68,6 +75,14 @@ public:
          wallet_cli->stop();
       }));
       (void)(closed_connection);
+   }
+   bool import_nathan_account()
+   {
+      std::string wif_key = "5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3";
+      std::vector<std::string> keys( { wif_key } );
+      bool ret_val = wallet_api_ptr->import_key("nathan", wif_key);      
+      wallet_api_ptr->import_balance("nathan", keys, true);
+      return ret_val;
    }
 public:
    fc::http::websocket_client websocket_client;

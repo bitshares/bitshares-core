@@ -40,17 +40,33 @@ application_runner::application_runner()
    _app->register_plugin< graphene::witness_plugin::witness_plugin >(true);
    _app->register_plugin< graphene::grouped_orders::grouped_orders_plugin >(true);
    _app->startup_plugins();
-   boost::program_options::variables_map cfg;
 #ifdef _WIN32
    sockInit();
 #endif
-   server_port_number = get_available_port();
+   rpc_port_number = get_available_port();
+   p2p_port_number = get_available_port();
+}
+
+void application_runner::start()
+{
+   boost::program_options::variables_map cfg;
    cfg.emplace(
       "rpc-endpoint", 
-      boost::program_options::variable_value(std::string("127.0.0.1:" + std::to_string(server_port_number)), false)
+      boost::program_options::variable_value(std::string("127.0.0.1:" + std::to_string(rpc_port_number)), false)
    );
+   cfg.emplace( "p2p-endpoint", 
+         boost::program_options::variable_value(std::string("127.0.0.1:" + std::to_string(p2p_port_number)), false));
    cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(_dir), false));
-   cfg.emplace("seed-nodes", boost::program_options::variable_value(std::string("[]"), false));
+   std::string seed_node_string = "[";
+   bool isFirst = true;
+   for(auto url : seed_nodes)
+   {
+      if (!isFirst)
+         seed_node_string += ", ";
+      seed_node_string += "\"" + url + "\"";
+   }
+   seed_node_string += "]";
+   cfg.emplace("seed-nodes", boost::program_options::variable_value(seed_node_string, false));
    _app->initialize(_dir.path(), cfg);
 
    _app->initialize_plugins(cfg);
@@ -67,9 +83,29 @@ std::shared_ptr<graphene::app::application> application_runner::get_app()
 
 void application_runner::add_seed_node(std::string addr)
 {
+   /*
    std::vector<fc::ip::endpoint> endpoints = graphene::app::application::resolve_string_to_ip_endpoints(addr);
    for(const auto& ep : endpoints)
       _app->p2p_node()->add_node(ep);
+   */
+  seed_nodes.push_back(addr);
+}
+
+uint32_t application_runner::get_connection_count()
+{
+   return _app->p2p_node()->get_connection_count();
+}
+
+bool application_runner::is_connected( std::string addr )
+{
+   auto peer_statuses = _app->p2p_node()->get_connected_peers();
+   for (auto status : peer_statuses )
+   {
+      std::string host = status.host;
+      if ( host == addr )
+         return true;
+   }
+   return false;
 }
 
 //////
