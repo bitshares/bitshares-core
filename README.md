@@ -80,7 +80,7 @@ In order to run a full node with all the account history you need to remove `par
 
 | Default | Full | Minimal  | ElasticSearch 
 | --- | --- | --- | ---
-| 100G HDD, 16G RAM | 200G HDD, 160G RAM | 80G HDD, 4G RAM | 500G SSD, 32G RAM
+| 100G HDD, 16G RAM | 200G HDD, 16G RAM | 80G HDD, 4G RAM | 500G SSD, 32G RAM
 
 After starting the witness node again, in a separate terminal you can run:
 
