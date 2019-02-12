@@ -67,7 +67,6 @@ namespace graphene { namespace chain {
             skip_witness_signature      = 1 << 0,  ///< used while reindexing
             skip_transaction_signatures = 1 << 1,  ///< used by non-witness nodes
             skip_transaction_dupe_check = 1 << 2,  ///< used while reindexing
-            skip_fork_db                = 1 << 3,  ///< used while reindexing
             skip_block_size_check       = 1 << 4,  ///< used when applying locally generated transactions
             skip_tapos_check            = 1 << 5,  ///< used while reindexing -- note this skips expiration check as well
             // skip_authority_check        = 1 << 6,  ///< removed because effectively identical to skip_transaction_signatures

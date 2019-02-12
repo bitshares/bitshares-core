@@ -29,8 +29,6 @@
 #include <graphene/chain/fba_accumulator_id.hpp>
 #include <graphene/chain/hardfork.hpp>
 
-#include <fc/smart_ref_impl.hpp>
-
 namespace graphene { namespace chain {
 
 void_result transfer_to_blind_evaluator::do_evaluate( const transfer_to_blind_operation& o )

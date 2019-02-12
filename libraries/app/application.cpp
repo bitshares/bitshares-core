@@ -39,8 +39,6 @@
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
 
-#include <fc/smart_ref_impl.hpp>
-
 #include <fc/asio.hpp>
 #include <fc/io/fstream.hpp>
 #include <fc/rpc/api_connection.hpp>
@@ -165,27 +163,12 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    }
    else
    {
-      // https://bitsharestalk.org/index.php/topic,23715.0.html
       vector<string> seeds = {
-         "seed01.liondani.com:1776",          // liondani     (GERMANY)
-         "104.236.144.84:1777",               // puppies      (USA)
-         "128.199.143.47:2015",               // Harvey       (Singapore)
-         "209.105.239.13:1776",               // sahkan       (USA)
-         "45.35.12.22:1776",                  // sahkan       (USA)
-         "51.15.61.160:1776",                 // lafona       (France)
-         "bts-seed1.abit-more.com:62015",     // abit         (China)
-         "node.blckchnd.com:4243",            // blckchnd     (Germany)
-         "seed.bitsharesdex.com:50696",       // iHashFury    (Europe)
-         "seed.bitsharesnodes.com:1776",      // wackou       (Netherlands)
-         "seed.blocktrades.us:1776",          // BlockTrades  (USA)
-         "seed.cubeconnex.com:1777",          // cube         (USA)
-         "seed.roelandp.nl:1776",             // roelandp     (Canada)
-         "seed04.bts-nodes.net:1776",         // Thom         (Australia)
-         "seed05.bts-nodes.net:1776",         // Thom         (USA)
-         "seed06.bts-nodes.net:1776",         // Thom         (USA)
-         "seed07.bts-nodes.net:1776",         // Thom         (Singapore)
-         "seed.bts.bangzi.info:55501",        // Bangzi       (Germany)
-         "seeds.bitshares.eu:1776"            // pc           (http://seeds.quisquis.de/bitshares.html)
+               "seed.testnet.bitshares.eu:1776",   // BitShares Europe
+               "176.9.148.19:16543",               // Uptick.rocks
+               "31.171.251.20:1776",               // @Taconator
+               "23.92.53.25:11010",                // sahkan
+               "139.162.242.253:1700",             // rnglab
       };
       for( const string& endpoint_string : seeds )
       {
@@ -444,18 +427,14 @@ void application_impl::startup()
 
    if( _options->count("api-access") ) {
 
-      if(fc::exists(_options->at("api-access").as<boost::filesystem::path>()))
-      {
-         _apiaccess = fc::json::from_file( _options->at("api-access").as<boost::filesystem::path>() ).as<api_access>( 20 );
-         ilog( "Using api access file from ${path}",
-               ("path", _options->at("api-access").as<boost::filesystem::path>().string()) );
-      }
-      else
-      {
-         elog("Failed to load file from ${path}",
-            ("path", _options->at("api-access").as<boost::filesystem::path>().string()));
-         std::exit(EXIT_FAILURE);
-      }
+      fc::path api_access_file = _options->at("api-access").as<boost::filesystem::path>();
+
+      FC_ASSERT( fc::exists(api_access_file), 
+            "Failed to load file from ${path}", ("path", api_access_file) );
+
+      _apiaccess = fc::json::from_file( api_access_file ).as<api_access>( 20 );
+      ilog( "Using api access file from ${path}",
+            ("path", api_access_file) );
    }
    else
    {
@@ -964,8 +943,9 @@ void application::set_program_options(boost::program_options::options_descriptio
           "P2P nodes to connect to on startup (may specify multiple times)")
          ("seed-nodes", bpo::value<string>()->composing(),
           "JSON array of P2P nodes to connect to on startup")
-         ("checkpoint,c", bpo::value<vector<string>>()->composing(),
-          "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
+         ("checkpoint,c", bpo::value<vector<string>>()->default_value(
+             vector<string>(1, "[\"12204000\", \"00ba37e095ab9f3fa752f812591213a75ffc2087\"]"), "[\"12204000\", \"00ba37e095ab9f3fa752f812591213a75ffc2087\"]")->composing(),
+             "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
          ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"),
           "Endpoint for websocket RPC to listen on")
          ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"),
@@ -975,7 +955,6 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
-         ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
          ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads, default to 0 for auto-configuration")
          ("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(true),
           "Whether allow API clients to subscribe to universal object creation and removal events")
@@ -985,10 +964,6 @@ void application::set_program_options(boost::program_options::options_descriptio
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
-         ("create-genesis-json", bpo::value<boost::filesystem::path>(),
-          "Path to create a Genesis State at. If a well-formed JSON file exists at the path, it will be parsed and any "
-          "missing fields in a Genesis State will be added, and any unknown fields will be removed. If no file or an "
-          "invalid file is found, it will be replaced with an example Genesis State.")
          ("replay-blockchain", "Rebuild object graph by replaying all blocks without validation")
          ("revalidate-blockchain", "Rebuild object graph by replaying all blocks with full validation")
          ("resync-blockchain", "Delete all blocks and re-sync with network from scratch")
@@ -1005,69 +980,17 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
    my->_data_dir = data_dir;
    my->_options = &options;
 
-   if( options.count("create-genesis-json") )
-   {
-      fc::path genesis_out = options.at("create-genesis-json").as<boost::filesystem::path>();
-      genesis_state_type genesis_state = detail::create_example_genesis();
-      if( fc::exists(genesis_out) )
-      {
-         try {
-            genesis_state = fc::json::from_file(genesis_out).as<genesis_state_type>( 20 );
-         } catch(const fc::exception& e) {
-            std::cerr << "Unable to parse existing genesis file:\n" << e.to_string()
-                      << "\nWould you like to replace it? [y/N] ";
-            char response = std::cin.get();
-            if( toupper(response) != 'Y' )
-               return;
-         }
-
-         std::cerr << "Updating genesis state in file " << genesis_out.generic_string() << "\n";
-      } else {
-         std::cerr << "Creating example genesis state in file " << genesis_out.generic_string() << "\n";
-      }
-      fc::json::save_to_file(genesis_state, genesis_out);
-
-      std::exit(EXIT_SUCCESS);
-   }
-
    if ( options.count("io-threads") )
    {
       const uint16_t num_threads = options["io-threads"].as<uint16_t>();
       fc::asio::default_io_service_scope::set_num_threads(num_threads);
-   }
-
-   std::vector<string> wanted;
-   if( options.count("plugins") )
-   {
-      boost::split(wanted, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
-   }
-   else
-   {
-      wanted.push_back("witness");
-      wanted.push_back("account_history");
-      wanted.push_back("market_history");
-      wanted.push_back("grouped_orders");
-   }
-   int es_ah_conflict_counter = 0;
-   for (auto& it : wanted)
-   {
-      if(it == "account_history")
-         ++es_ah_conflict_counter;
-      if(it == "elasticsearch")
-         ++es_ah_conflict_counter;
-
-      if(es_ah_conflict_counter > 1) {
-         elog("Can't start program with elasticsearch and account_history plugin at the same time");
-         std::exit(EXIT_FAILURE);
-      }
-      if (!it.empty()) enable_plugin(it);
    }
 }
 
 void application::startup()
 {
    try {
-   my->startup();
+      my->startup();
    } catch ( const fc::exception& e ) {
       elog( "${e}", ("e",e.to_detail_string()) );
       throw;
@@ -1151,7 +1074,10 @@ void application::initialize_plugins( const boost::program_options::variables_ma
 void application::startup_plugins()
 {
    for( auto& entry : my->_active_plugins )
+   {
       entry.second->plugin_startup();
+      ilog( "Plugin ${name} started", ( "name", entry.second->plugin_name() ) );
+   }
    return;
 }
 

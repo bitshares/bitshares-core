@@ -43,7 +43,6 @@
 #include <graphene/utilities/tempdir.hpp>
 
 #include <fc/crypto/digest.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 #include <iomanip>
 
@@ -113,8 +112,17 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
 
    open_database();
 
+   /**
+    * Test specific settings
+    */
+   auto current_test_name = boost::unit_test::framework::current_test_case().p_name.value;
+   auto current_test_suite_id = boost::unit_test::framework::current_test_case().p_parent_id;
+   if (current_test_name == "get_account_history_operations")
+   {
+      options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)75, false)));
+   }
    // add account tracking for ahplugin for special test case with track-account enabled
-   if( !options.count("track-account") && boost::unit_test::framework::current_test_case().p_name.value == "track_account") {
+   if( !options.count("track-account") && current_test_name == "track_account") {
       std::vector<std::string> track_account;
       std::string track = "\"1.2.17\"";
       track_account.push_back(track);
@@ -122,7 +130,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       options.insert(std::make_pair("partial-operations", boost::program_options::variable_value(true, false)));
    }
    // account tracking 2 accounts
-   if( !options.count("track-account") && boost::unit_test::framework::current_test_case().p_name.value == "track_account2") {
+   if( !options.count("track-account") && current_test_name == "track_account2") {
       std::vector<std::string> track_account;
       std::string track = "\"1.2.0\"";
       track_account.push_back(track);
@@ -135,10 +143,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
        boost::unit_test::framework::current_test_case().p_name.value == "track_votes_committee_disabled") {
       app.chain_database()->enable_standby_votes_tracking( false );
    }
-
-   auto test_name = boost::unit_test::framework::current_test_case().p_name.value;
-   auto test_suite_id = boost::unit_test::framework::current_test_case().p_parent_id;
-   if(test_name == "elasticsearch_account_history" || test_name == "elasticsearch_suite") {
+   if(current_test_name == "elasticsearch_account_history" || current_test_name == "elasticsearch_suite") {
       auto esplugin = app.register_plugin<graphene::elasticsearch::elasticsearch_plugin>();
       esplugin->plugin_set_app(&app);
 
@@ -151,7 +156,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       esplugin->plugin_initialize(options);
       esplugin->plugin_startup();
    }
-   else if( boost::unit_test::framework::get<boost::unit_test::test_suite>(test_suite_id).p_name.value != "performance_tests" )
+   else if( boost::unit_test::framework::get<boost::unit_test::test_suite>(current_test_suite_id).p_name.value != "performance_tests" )
    {
       auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
       ahplugin->plugin_set_app(&app);
@@ -159,7 +164,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       ahplugin->plugin_startup();
    }
 
-   if(test_name == "elasticsearch_objects" || test_name == "elasticsearch_suite") {
+   if(current_test_name == "elasticsearch_objects" || current_test_name == "elasticsearch_suite") {
       auto esobjects_plugin = app.register_plugin<graphene::es_objects::es_objects_plugin>();
       esobjects_plugin->plugin_set_app(&app);
 
@@ -204,16 +209,24 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
 }
 
 database_fixture::~database_fixture()
-{ try {
-   // If we're unwinding due to an exception, don't do any more checks.
-   // This way, boost test's last checkpoint tells us approximately where the error was.
-   if( !std::uncaught_exception() )
-   {
-      verify_asset_supplies(db);
-      BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
+{ 
+   try {
+      // If we're unwinding due to an exception, don't do any more checks.
+      // This way, boost test's last checkpoint tells us approximately where the error was.
+      if( !std::uncaught_exception() )
+      {
+         verify_asset_supplies(db);
+         BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
+      }
+      return;
+   } catch (fc::exception& ex) {
+      BOOST_FAIL( std::string("fc::exception in ~database_fixture: ") + ex.to_detail_string() );
+   } catch (std::exception& e) {
+      BOOST_FAIL( std::string("std::exception in ~database_fixture:") + e.what() );
+   } catch (...) {
+      BOOST_FAIL( "Uncaught exception in ~database_fixture" );
    }
-   return;
-} FC_CAPTURE_AND_RETHROW() }
+} 
 
 fc::ecc::private_key database_fixture::generate_private_key(string seed)
 {

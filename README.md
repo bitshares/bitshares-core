@@ -1,12 +1,11 @@
-BitShares Core
-==============
+BitShares Test Network
+======================
 
 [Build Status](https://travis-ci.org/bitshares/bitshares-core/branches):
 
 `master` | `develop` | `hardfork` | `testnet` | `bitshares-fc` 
  --- | --- | --- | --- | ---
  [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=master)](https://travis-ci.org/bitshares/bitshares-core) | [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=develop)](https://travis-ci.org/bitshares/bitshares-core) | [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=hardfork)](https://travis-ci.org/bitshares/bitshares-core) | [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=testnet)](https://travis-ci.org/bitshares/bitshares-core) | [![](https://travis-ci.org/bitshares/bitshares-fc.svg?branch=master)](https://travis-ci.org/bitshares/bitshares-fc) 
-
 
 * [Getting Started](#getting-started)
 * [Support](#support)
@@ -76,11 +75,7 @@ the blockchain. After syncing, you can exit the node using Ctrl+C and setup the 
     rpc-endpoint = 127.0.0.1:8090
 
 **IMPORTANT:** By default the witness node will start in reduced memory mode by using some of the commands detailed in [Memory reduction for nodes](https://github.com/bitshares/bitshares-core/wiki/Memory-reduction-for-nodes).
-In order to run a full node with all the account history you need to remove `partial-operations` and `max-ops-per-account` from your config file. Please note that currently(2018-10-17) a full node will need more than 160GB of RAM to operate and required memory is growing fast. Consider the following table as minimal requirements before running a node:
-
-| Default | Full | Minimal  | ElasticSearch 
-| --- | --- | --- | ---
-| 100G HDD, 16G RAM | 200G HDD, 160G RAM | 80G HDD, 4G RAM | 500G SSD, 32G RAM
+In order to run a full node with all the account history you need to remove `partial-operations` and `max-ops-per-account` from your config file.
 
 After starting the witness node again, in a separate terminal you can run:
 

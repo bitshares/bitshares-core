@@ -1,0 +1,4 @@
+// Changes required for upgrading test net to latest core release
+#ifndef HARDFORK_TEST_20180807_BLOCK_NUM
+#define HARDFORK_TEST_20180807_BLOCK_NUM (19535729) // 2018-08-07T14:06:18
+#endif

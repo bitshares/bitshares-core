@@ -36,7 +36,7 @@ class application_impl : public net::node_delegate
       {
       }
 
-      ~application_impl()
+      virtual ~application_impl()
       {
       }
 
