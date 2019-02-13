@@ -1430,8 +1430,11 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
       {
          orders = get_order_book(assets[0]->symbol, assets[1]->symbol, 1);
       }
-      return market_ticker(*itr, now, *assets[0], *assets[1], orders);;
+      return market_ticker(*itr, now, *assets[0], *assets[1], orders);
    }
+   // if no ticker is found for this market we return an empty ticker
+   market_ticker empty_result;
+   return empty_result;
 }
 
 market_volume database_api::get_24_volume( const string& base, const string& quote )const
