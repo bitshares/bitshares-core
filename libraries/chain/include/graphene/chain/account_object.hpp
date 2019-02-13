@@ -169,6 +169,8 @@ namespace graphene { namespace chain {
          uint16_t network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
          /// Percentage of fee which should go to lifetime referrer.
          uint16_t lifetime_referrer_fee_percentage = 0;
+         /// Percentage of fee which should go to marketing partner.
+         uint16_t marketing_partner_fee_percentage = GRAPHENE_DEFAULT_MARKETING_PARTNER_PERCENT_OF_FEE;
          /// Percentage of referral rewards (leftover fee after paying network and lifetime referrer) which should go
          /// to referrer. The remainder of referral rewards goes to the registrar.
          uint16_t referrer_rewards_percentage = 0;
@@ -431,7 +433,8 @@ namespace graphene { namespace chain {
 FC_REFLECT_DERIVED( graphene::chain::account_object,
                     (graphene::db::object),
                     (membership_expiration_date)(registrar)(referrer)(lifetime_referrer)
-                    (network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)
+                    (network_fee_percentage)(lifetime_referrer_fee_percentage)
+                    (marketing_partner_fee_percentage)(referrer_rewards_percentage)
                     (name)(owner)(active)(options)(statistics)(whitelisting_accounts)(blacklisting_accounts)
                     (whitelisted_accounts)(blacklisted_accounts)
                     (cashback_vb)

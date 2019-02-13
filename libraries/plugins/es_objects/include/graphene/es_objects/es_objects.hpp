@@ -78,6 +78,7 @@ struct account_struct {
    account_id_type lifetime_referrer;
    uint16_t network_fee_percentage;
    uint16_t lifetime_referrer_fee_percentage;
+   uint16_t marketing_partner_fee_percentage;
    uint16_t referrer_rewards_percentage;
    string name;
    string owner_account_auths;
@@ -137,7 +138,8 @@ FC_REFLECT(
 FC_REFLECT(
         graphene::es_objects::account_struct,
         (object_id)(block_time)(block_number)(membership_expiration_date)(registrar)(referrer)(lifetime_referrer)
-        (network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)(name)(owner_account_auths)
+        (network_fee_percentage)(lifetime_referrer_fee_percentage)(marketing_partner_fee_percentage)
+        (referrer_rewards_percentage)(name)(owner_account_auths)
         (owner_key_auths)(owner_address_auths)(active_account_auths)(active_key_auths)(active_address_auths)(voting_account)(votes)
 )
 FC_REFLECT(

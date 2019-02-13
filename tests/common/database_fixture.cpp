@@ -97,6 +97,7 @@ database_fixture::database_fixture()
    init_mpa1.precision = 4;
    init_mpa1.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    init_mpa1.accumulated_fees = 0;
+   init_mpa1.accumulated_fees_for_marketing_partner = 0;
    init_mpa1.is_bitasset = true;
    // TODO add initial UIA's; add initial short positions; test non-zero accumulated_fees
    genesis_state.initial_assets.push_back( init_mpa1 );

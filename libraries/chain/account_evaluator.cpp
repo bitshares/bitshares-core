@@ -200,6 +200,7 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          const auto& params = global_properties.parameters;
          obj.network_fee_percentage = params.network_percent_of_fee;
          obj.lifetime_referrer_fee_percentage = params.lifetime_referrer_percent_of_fee;
+         obj.marketing_partner_fee_percentage = GRAPHENE_DEFAULT_MARKETING_PARTNER_PERCENT_OF_FEE;
          obj.referrer_rewards_percentage = referrer_percent;
 
          obj.name             = o.name;
@@ -436,7 +437,8 @@ void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator:
          a.statistics(d).process_fees(a, d);
          a.membership_expiration_date = time_point_sec::maximum();
          a.referrer = a.registrar = a.lifetime_referrer = a.get_id();
-         a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - a.network_fee_percentage;
+         a.lifetime_referrer_fee_percentage = GRAPHENE_DEFAULT_LIFETIME_REFERRER_PERCENT_OF_FEE;
+         a.marketing_partner_fee_percentage = GRAPHENE_DEFAULT_MARKETING_PARTNER_PERCENT_OF_FEE;
       } else if( a.is_annual_member(d.head_block_time()) ) {
          // Renew an annual subscription that's still in effect.
          FC_ASSERT( d.head_block_time() <= HARDFORK_613_TIME );

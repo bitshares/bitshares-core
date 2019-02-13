@@ -29,6 +29,8 @@ programs/genesis_util/convert_address
 programs/genesis_util/genesis_update
 programs/genesis_util/get_dev_key
 programs/size_checker/size_checker
+libraries/egenesis/egenesis_brief.cpp
+libraries/egenesis/egenesis_full.cpp
 
 tests/app_test
 tests/chain_bench
