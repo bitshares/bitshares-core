@@ -809,64 +809,16 @@ BOOST_AUTO_TEST_CASE( big_block_p2p )
       transfer_operation xfer_op;
       xfer_op.from = nathan.id;
       xfer_op.to = GRAPHENE_NULL_ACCOUNT;
-      xfer_op.amount = asset( 1000000 );
+      xfer_op.amount = asset( 400000 );
 
       graphene::wallet::transaction_handle_type trx_handle = conn1.wallet_api_ptr->begin_builder_transaction();
-      for(int i = 0; i < 100000; ++i)
+      for(int i = 0; i < 50000; ++i)
       {
          conn1.wallet_api_ptr->add_operation_to_builder_transaction( trx_handle, xfer_op );
          xfer_op.amount.amount++;
       }
       conn1.wallet_api_ptr->set_fees_on_builder_transaction( trx_handle, GRAPHENE_SYMBOL );
       conn1.wallet_api_ptr->sign_builder_transaction( trx_handle, true );
-
-      /*
-      trx.operations.push_back( xfer_op );
-      db1->current_fee_schedule().set_fee( trx.operations.back() );
-
-      trx.set_expiration( db1->get_slot_time( 10 ) );
-      trx.sign( nathan_key, db1->get_chain_id() );
-      trx.validate();
-
-      proposal_create_operation op;
-      op.expiration_time = time_point::now() + fc::minutes(30000);
-      op.review_period_seconds = 100;
-
-      fc::optional<asset_object> asset_obj = conn1.wallet_api_ptr->get_asset("TEST");
-      FC_ASSERT(asset_obj, "Could not find asset matching TEST");
-
-      account_object from_account = nathan;
-      account_object to_account = nathan;
-      account_id_type from_id = from_account.id;
-      account_id_type to_id = to_account.id;
-
-      op.fee_paying_account = nathan.id;
-
-      transfer_operation xfer_op;
-
-      xfer_op.from = from_id;
-      xfer_op.to = to_id;
-      xfer_op.amount = asset_obj->amount_from_string(amount);
-      xfer_op.fee = asset(2000000, asset_id_type(0));
-
-      signed_transaction& trx = conn1.wallet_api_ptr->get trx_handle. _builder_transactions[0];
-
-      trx.operations = {xfer_op};
-      set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees );
-
-      for (uint64_t j=0; j < 16; j++) {
-         op.proposed_ops.emplace_back( xfer_op );
-         op.proposed_ops.emplace_back( op );
-      }
-
-      trx.operations = {op};
-      set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees );
-
-      for (uint64_t i=0; i < 17; i++) 
-      {
-         fc::async([this, &trx, &broadcast](){ sign_transaction(trx, broadcast); }, "htd_attack");
-      }
-      */
 
       BOOST_CHECK( app2.is_connected( app1_p2p_address ) );
       BOOST_CHECK( app1.is_connected( app2_p2p_address ) );

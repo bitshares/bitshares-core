@@ -58,12 +58,13 @@ void application_runner::start()
          boost::program_options::variable_value(std::string("127.0.0.1:" + std::to_string(p2p_port_number)), false));
    cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(_dir), false));
    std::string seed_node_string = "[";
-   bool isFirst = true;
+   bool needs_comma = false;
    for(auto url : seed_nodes)
    {
-      if (!isFirst)
+      if (needs_comma)
          seed_node_string += ", ";
       seed_node_string += "\"" + url + "\"";
+      needs_comma = true;
    }
    seed_node_string += "]";
    cfg.emplace("seed-nodes", boost::program_options::variable_value(seed_node_string, false));
