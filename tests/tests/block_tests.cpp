@@ -830,6 +830,104 @@ BOOST_AUTO_TEST_CASE( big_block_p2p )
    
 }
 
+/*****
+ * Important: This test runs for a very long time. It SHOULD NOT be run
+ * as part of the normal test suite
+ * 
+BOOST_AUTO_TEST_CASE( big_transaction_p2p )
+{
+   try
+   {
+      graphene::test::application_runner app1;
+      app1.start();
+      std::string app1_p2p_address = "127.0.0.1:" + std::to_string( app1.p2p_port_number );
+
+      graphene::test::application_runner app2;
+      std::string app2_p2p_address = "127.0.0.1:" + std::to_string( app2.p2p_port_number );
+      app2.add_seed_node( app1_p2p_address );
+      app2.start();
+
+      BOOST_CHECK_EQUAL( app1.get_connection_count(), 1u );
+      BOOST_CHECK( app2.is_connected( app1_p2p_address ) );
+      BOOST_CHECK( app1.is_connected( app2_p2p_address ) );
+
+      // connect to a node
+      fc::temp_directory wallet_dir;
+      graphene::test::client_connection conn1(app1.get_app(), app1.rpc_port_number, wallet_dir);
+      conn1.wallet_api_ptr->set_password("supersecret");
+      conn1.wallet_api_ptr->unlock("supersecret");
+      conn1.import_nathan_account();
+
+      graphene::chain::account_object nathan = conn1.wallet_api_ptr->get_account( "nathan" );
+
+      // create a proposal
+      proposal_create_operation op;
+      op.expiration_time = time_point::now() + fc::minutes(30000);
+      op.review_period_seconds = 100;
+
+      fc::optional<asset_object> asset_obj = conn1.wallet_api_ptr->get_asset(GRAPHENE_SYMBOL);
+      FC_ASSERT(asset_obj, "Could not find asset matching ${asset}", ("asset", GRAPHENE_SYMBOL));
+
+      account_object from_account = nathan;
+      account_object to_account = nathan;
+      account_id_type from_id = from_account.id;
+      account_id_type to_id = to_account.id;
+
+      op.fee_paying_account = nathan.id;
+
+      // create a transfer operation
+      transfer_operation xfer_op;
+      xfer_op.from = from_id;
+      xfer_op.to = to_id;
+      xfer_op.amount = asset_obj->amount_from_string("1000");
+      xfer_op.fee = asset(2000000, asset_id_type(0));
+
+      // build a transaction
+      graphene::wallet::transaction_handle_type trx_handle = conn1.wallet_api_ptr->begin_builder_transaction();
+
+      // add the transfer operation to the transaction (nt sure why)
+      conn1.wallet_api_ptr->add_operation_to_builder_transaction(trx_handle, xfer_op);
+      conn1.wallet_api_ptr->set_fees_on_builder_transaction( trx_handle, GRAPHENE_SYMBOL );
+
+      // add 16 transfer operations and 16 proposal_create operations to the transaction
+      for (uint64_t j=0; j < 16; j++) {
+         op.proposed_ops.emplace_back( xfer_op );
+         op.proposed_ops.emplace_back( op );
+      }
+
+      // remove the proposal_create operation added to the transaction earlier
+      // replace it with the large proposal_create operation
+      conn1.wallet_api_ptr->replace_operation_in_builder_transaction(trx_handle, 0, op);
+
+      // calculate fees for the transaction
+      conn1.wallet_api_ptr->set_fees_on_builder_transaction( trx_handle, GRAPHENE_SYMBOL );
+
+      // send the transaction 17 times to the same server
+      auto func = [&trx_handle, &conn1](){ conn1.wallet_api_ptr->sign_builder_transaction(trx_handle, true); };
+      std::vector< fc::future<void> > futures;
+      for (uint64_t i=0; i < 17; i++) {
+         futures.push_back( fc::async(func, "htd_attack") );
+      }
+
+      // wait for everything to complete
+      for(auto f : futures)
+      {
+         f.wait();
+      }
+
+      // verify that the two nodes are still talking to each other
+      BOOST_CHECK( app2.is_connected( app1_p2p_address ) );
+      BOOST_CHECK( app1.is_connected( app2_p2p_address ) );
+
+   }
+   catch(fc::exception& e)
+   {
+      edump((e.to_detail_string()));
+   }
+
+}
+*/
+
 BOOST_FIXTURE_TEST_CASE( optional_tapos, database_fixture )
 {
    try
