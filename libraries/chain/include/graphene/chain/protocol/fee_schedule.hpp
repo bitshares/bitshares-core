@@ -22,7 +22,6 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <fc/smart_ref_impl.hpp>
 #include <graphene/chain/protocol/operations.hpp>
 
 namespace graphene { namespace chain {
