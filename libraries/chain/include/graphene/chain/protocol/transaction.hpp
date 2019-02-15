@@ -115,6 +115,8 @@ namespace graphene { namespace chain {
                                      flat_set<account_id_type>& owner,
                                      vector<authority>& other )const;
 
+      virtual uint64_t get_packed_size()const;
+
    protected:
       // Calculate the digest used for signature validation
       digest_type sig_digest( const chain_id_type& chain_id )const;
@@ -225,8 +227,10 @@ namespace graphene { namespace chain {
       virtual const transaction_id_type&       id()const override;
       virtual void                             validate()const override;
       virtual const flat_set<public_key_type>& get_signature_keys( const chain_id_type& chain_id )const override;
+      virtual uint64_t                         get_packed_size()const override;
    protected:
       mutable bool _validated = false;
+      mutable uint64_t _packed_size = 0;
    };
 
    /**

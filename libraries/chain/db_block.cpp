@@ -658,7 +658,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
                  ("trx.expiration",trx.expiration)("now",now)("max_til_exp",chain_parameters.maximum_time_until_expiration));
       FC_ASSERT( now <= trx.expiration, "", ("now",now)("trx.exp",trx.expiration) );
       FC_ASSERT( head_block_time() <= HARDFORK_CORE_1573_TIME
-            || fc::raw::pack_size(trx) <= chain_parameters.maximum_transaction_size,
+            || trx.get_packed_size() <= chain_parameters.maximum_transaction_size,
             "Transaction exceeds maximum transaction size." );
    }
 
