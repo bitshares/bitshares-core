@@ -917,7 +917,7 @@ const call_order_object* database_fixture::borrow( const account_object& who, as
 { try {
    set_expiration( db, trx );
    trx.operations.clear();
-   call_order_update_operation update;
+   call_order_update_operation update = {};
    update.funding_account = who.id;
    update.delta_collateral = collateral;
    update.delta_debt = what;
@@ -942,7 +942,7 @@ void database_fixture::cover(const account_object& who, asset what, asset collat
 { try {
    set_expiration( db, trx );
    trx.operations.clear();
-   call_order_update_operation update;
+   call_order_update_operation update = {};
    update.funding_account = who.id;
    update.delta_collateral = -collateral;
    update.delta_debt = -what;
