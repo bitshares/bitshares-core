@@ -1113,7 +1113,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
             // set the voting weight of the given account
             d.modify( stats, [voting_stake, has_proxy](account_statistics_object& aso) {
                aso.voting_statistics.has_proxy = has_proxy;
-               aso.voting_statistics.self_voting_power = voting_stake;
+               aso.voting_statistics.self_voting_stake = voting_stake;
             });
             
             if( has_proxy )

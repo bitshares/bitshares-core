@@ -103,14 +103,19 @@ namespace graphene { namespace chain {
           */
          struct voting_stat
          {
+            /// whether this account has a proxy account set or not
             bool has_proxy;
-            uint64_t self_voting_power;
+            /// the voting stake of this account
+            uint64_t self_voting_stake;
+            /// map of accounts which have this account set as proxy, together 
+            /// with the stake they are giving this account
             flat_map<account_id_type, uint64_t> proxy_for;
 
-            const uint64_t get_total_voting_power() const
+            /// returns the total stake with which this account is actually voting
+            const uint64_t get_total_voting_stake() const
             {
                if( !has_proxy ) {
-                  uint64_t total = self_voting_power;
+                  uint64_t total = self_voting_stake;
                   for( const auto& pair : proxy_for )
                      total += pair.second;
                   return total;
@@ -494,6 +499,6 @@ FC_REFLECT_DERIVED( graphene::chain::account_statistics_object,
 
 FC_REFLECT( graphene::chain::account_statistics_object::voting_stat,
             (has_proxy)
-            (self_voting_power)
+            (self_voting_stake)
             (proxy_for)
           )

@@ -236,15 +236,15 @@ BOOST_AUTO_TEST_CASE( voting_weight_maintenance_test )
    generate_blocks( next_maintenance );
    generate_block();
    
-   edump((alice_stat_id(db).voting_statistics.self_voting_power)(alice_stat_id(db).voting_statistics.get_total_voting_power())
+   edump((alice_stat_id(db).voting_statistics.self_voting_stake)(alice_stat_id(db).voting_statistics.get_total_voting_stake())
       (alice_stat_id(db).voting_statistics.has_proxy));
 
-   BOOST_CHECK( alice_stat_id(db).voting_statistics.self_voting_power == 10000 
-      && alice_stat_id(db).voting_statistics.get_total_voting_power() == 10000
+   BOOST_CHECK( alice_stat_id(db).voting_statistics.self_voting_stake == 10000 
+      && alice_stat_id(db).voting_statistics.get_total_voting_stake() == 10000
       && alice_stat_id(db).voting_statistics.has_proxy == false
    );
-   BOOST_CHECK( bob_stat_id(db).voting_statistics.self_voting_power == 5000
-      && bob_stat_id(db).voting_statistics.get_total_voting_power() == 5000
+   BOOST_CHECK( bob_stat_id(db).voting_statistics.self_voting_stake == 5000
+      && bob_stat_id(db).voting_statistics.get_total_voting_stake() == 5000
       && bob_stat_id(db).voting_statistics.has_proxy == false 
    );
 
@@ -256,12 +256,12 @@ BOOST_AUTO_TEST_CASE( voting_weight_maintenance_test )
    generate_blocks( next_maintenance );
    generate_block();
 
-   BOOST_CHECK( alice_stat_id(db).voting_statistics.self_voting_power == 20000
-      && alice_stat_id(db).voting_statistics.get_total_voting_power() == 20000
+   BOOST_CHECK( alice_stat_id(db).voting_statistics.self_voting_stake == 20000
+      && alice_stat_id(db).voting_statistics.get_total_voting_stake() == 20000
       && alice_stat_id(db).voting_statistics.has_proxy == false
    );
-   BOOST_CHECK( bob_stat_id(db).voting_statistics.self_voting_power == 5000
-      && bob_stat_id(db).voting_statistics.get_total_voting_power() == 5000
+   BOOST_CHECK( bob_stat_id(db).voting_statistics.self_voting_stake == 5000
+      && bob_stat_id(db).voting_statistics.get_total_voting_stake() == 5000
       && bob_stat_id(db).voting_statistics.has_proxy == false
    );
 
@@ -283,12 +283,12 @@ BOOST_AUTO_TEST_CASE( voting_weight_maintenance_test )
    generate_blocks( next_maintenance );
    generate_block();
 
-   BOOST_CHECK( alice_stat_id(db).voting_statistics.self_voting_power == 20000
-      && alice_stat_id(db).voting_statistics.get_total_voting_power() == 0
+   BOOST_CHECK( alice_stat_id(db).voting_statistics.self_voting_stake == 20000
+      && alice_stat_id(db).voting_statistics.get_total_voting_stake() == 0
       && alice_stat_id(db).voting_statistics.has_proxy == true
    );
-   BOOST_CHECK( bob_stat_id(db).voting_statistics.self_voting_power == 5000
-      && bob_stat_id(db).voting_statistics.get_total_voting_power() == 25000
+   BOOST_CHECK( bob_stat_id(db).voting_statistics.self_voting_stake == 5000
+      && bob_stat_id(db).voting_statistics.get_total_voting_stake() == 25000
       && bob_stat_id(db).voting_statistics.has_proxy == false
    );
 }
