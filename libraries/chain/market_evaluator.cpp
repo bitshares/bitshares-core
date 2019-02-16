@@ -183,7 +183,7 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
     */
    if (next_maintenance_time <= SOFTFORK_CORE_1465_TIME)
    {
-      if ( _dynamic_data_obj->current_supply + o.delta_debt.amount <= _debt_asset->options.max_supply )
+      if ( _dynamic_data_obj->current_supply + o.delta_debt.amount > _debt_asset->options.max_supply )
          ilog("Issue 1465... Borrowing and exceeding MAX_SUPPLY. Will be corrected at hardfork time.");
    }
    else
