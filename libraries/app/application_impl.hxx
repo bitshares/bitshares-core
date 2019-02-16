@@ -1,6 +1,8 @@
 #pragma once
 
 #include <fc/network/http/websocket.hpp>
+#include <fc/thread/parallel.hpp>
+
 #include <graphene/app/application.hpp>
 #include <graphene/app/api_access.hpp>
 #include <graphene/chain/genesis_state.hpp>
@@ -34,7 +36,7 @@ class application_impl : public net::node_delegate
       {
       }
 
-      ~application_impl()
+      virtual ~application_impl()
       {
       }
 
@@ -194,6 +196,8 @@ class application_impl : public net::node_delegate
       std::map<string, std::shared_ptr<abstract_plugin>> _available_plugins;
 
       bool _is_finished_syncing = false;
+   private:
+      fc::serial_valve valve;
    };
 
 }}} // namespace graphene namespace app namespace detail

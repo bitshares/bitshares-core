@@ -25,7 +25,6 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/protocol/protocol.hpp>
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
@@ -409,7 +408,7 @@ BOOST_AUTO_TEST_CASE( scaled_precision )
 
 BOOST_AUTO_TEST_CASE( merkle_root )
 {
-   signed_block block;
+   clearable_block block;
    vector<processed_transaction> tx;
    vector<digest_type> t;
    const uint32_t num_tx = 10;
@@ -445,6 +444,7 @@ BOOST_AUTO_TEST_CASE( merkle_root )
    dA = d(t[0], t[1]);
 
    block.transactions.push_back( tx[1] );
+   block.clear();
    BOOST_CHECK( block.calculate_merkle_root() == c(dA) );
 
    /*
@@ -459,6 +459,7 @@ BOOST_AUTO_TEST_CASE( merkle_root )
    dI = d(dA, dB);
 
    block.transactions.push_back( tx[2] );
+   block.clear();
    BOOST_CHECK( block.calculate_merkle_root() == c(dI) );
 
    /*
@@ -473,6 +474,7 @@ BOOST_AUTO_TEST_CASE( merkle_root )
    dI = d(dA, dB);
 
    block.transactions.push_back( tx[3] );
+   block.clear();
    BOOST_CHECK( block.calculate_merkle_root() == c(dI) );
 
    /*
@@ -490,6 +492,7 @@ BOOST_AUTO_TEST_CASE( merkle_root )
    dM = d(dI, dJ);
 
    block.transactions.push_back( tx[4] );
+   block.clear();
    BOOST_CHECK( block.calculate_merkle_root() == c(dM) );
 
    /*
@@ -507,6 +510,7 @@ BOOST_AUTO_TEST_CASE( merkle_root )
    dM = d(dI, dJ);
 
    block.transactions.push_back( tx[5] );
+   block.clear();
    BOOST_CHECK( block.calculate_merkle_root() == c(dM) );
 
    /*
@@ -524,6 +528,7 @@ BOOST_AUTO_TEST_CASE( merkle_root )
    dM = d(dI, dJ);
 
    block.transactions.push_back( tx[6] );
+   block.clear();
    BOOST_CHECK( block.calculate_merkle_root() == c(dM) );
 
    /*
@@ -541,6 +546,7 @@ BOOST_AUTO_TEST_CASE( merkle_root )
    dM = d(dI, dJ);
 
    block.transactions.push_back( tx[7] );
+   block.clear();
    BOOST_CHECK( block.calculate_merkle_root() == c(dM) );
 
    /*
@@ -561,6 +567,7 @@ BOOST_AUTO_TEST_CASE( merkle_root )
    dO = d(dM, dN);
 
    block.transactions.push_back( tx[8] );
+   block.clear();
    BOOST_CHECK( block.calculate_merkle_root() == c(dO) );
 
    /*
@@ -581,6 +588,7 @@ BOOST_AUTO_TEST_CASE( merkle_root )
    dO = d(dM, dN);
 
    block.transactions.push_back( tx[9] );
+   block.clear();
    BOOST_CHECK( block.calculate_merkle_root() == c(dO) );
 }
 

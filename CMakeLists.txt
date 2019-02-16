@@ -32,6 +32,8 @@ if (USE_PCH)
   include (cotire)
 endif(USE_PCH)
 
+option(USE_PROFILER "Build with GPROF support(Linux)." OFF)
+
 IF( NOT WIN32 )
   list( APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/libraries/fc/CMakeModules" )
 ENDIF( NOT WIN32 )
@@ -46,12 +48,9 @@ LIST(APPEND BOOST_COMPONENTS thread
                              system
                              filesystem
                              program_options
-                             signals
-                             serialization
                              chrono
                              unit_test_framework
-                             context
-                             locale)
+                             context)
 SET( Boost_USE_STATIC_LIBS ON CACHE STRING "ON or OFF" )
 
 IF( WIN32 )
@@ -80,12 +79,14 @@ if( WIN32 )
 
     set(CRYPTO_LIB)
 
-    #looks like this flag can have different default on some machines.
-    SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /SAFESEH:NO")
-    SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SAFESEH:NO")
+    if( MSVC )
+        #looks like this flag can have different default on some machines.
+        SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /SAFESEH:NO")
+        SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SAFESEH:NO")
 
-    # Probably cmake has a bug and vcxproj generated for executable in Debug conf. has disabled debug info
-    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /DEBUG")
+        # Probably cmake has a bug and vcxproj generated for executable in Debug conf. has disabled debug info
+        set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /DEBUG")
+    endif ( MSVC )
 
     # On windows tcl should be installed to the directory pointed by setenv.bat script
     SET(TCL_INCLUDE_PATH $ENV{TCL_ROOT}/include)
@@ -112,6 +113,9 @@ else( WIN32 ) # Apple AND Linux
         # Linux Specific Options Here
         message( STATUS "Configuring BitShares on Linux" )
         set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -Wall" )
+        if(USE_PROFILER)
+            set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg" )
+        endif( USE_PROFILER )
         set( rt_library rt )
         set( pthread_library pthread)
         if ( NOT DEFINED crypto_library )
@@ -203,3 +207,7 @@ endif(LINUX)
 
  include(CPack)
 endif(ENABLE_INSTALLER)
+
+MESSAGE( STATUS "" )
+MESSAGE( STATUS "PROFILER: ${USE_PROFILER}" )
+MESSAGE( STATUS "" )

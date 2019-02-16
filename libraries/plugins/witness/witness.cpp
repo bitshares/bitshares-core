@@ -28,7 +28,6 @@
 
 #include <graphene/utilities/key_conversion.hpp>
 
-#include <fc/smart_ref_impl.hpp>
 #include <fc/thread/thread.hpp>
 
 #include <iostream>
@@ -41,7 +40,7 @@ namespace bpo = boost::program_options;
 
 void new_chain_banner( const graphene::chain::database& db )
 {
-   std::cerr << "\n"
+   ilog("\n"
       "********************************\n"
       "*                              *\n"
       "*   ------- NEW CHAIN ------   *\n"
@@ -49,13 +48,11 @@ void new_chain_banner( const graphene::chain::database& db )
       "*   ------------------------   *\n"
       "*                              *\n"
       "********************************\n"
-      "\n";
+      "\n");
    if( db.get_slot_at_time( fc::time_point::now() ) > 200 )
    {
-      std::cerr << "Your genesis seems to have an old timestamp\n"
-         "Please consider using the --genesis-timestamp option to give your genesis a recent timestamp\n"
-         "\n"
-         ;
+      wlog("Your genesis seems to have an old timestamp");
+      wlog("Please consider using the --genesis-timestamp option to give your genesis a recent timestamp");
    }
 }
 
@@ -119,7 +116,6 @@ void witness_plugin::plugin_startup()
 { try {
    ilog("witness plugin:  plugin_startup() begin");
    chain::database& d = database();
-
    if( !_witnesses.empty() )
    {
       ilog("Launching block production for ${n} witnesses.", ("n", _witnesses.size()));
@@ -130,19 +126,56 @@ void witness_plugin::plugin_startup()
             new_chain_banner(d);
          _production_skip_flags |= graphene::chain::database::skip_undo_history_check;
       }
+      refresh_witness_key_cache();
+      d.applied_block.connect( [this]( const chain::signed_block& b )
+      {
+         refresh_witness_key_cache();
+      });
       schedule_production_loop();
-   } else
-      elog("No witnesses configured! Please add witness IDs and private keys to configuration.");
+   }
+   else
+   {
+      ilog("No witness configured.");
+   }
    ilog("witness plugin:  plugin_startup() end");
 } FC_CAPTURE_AND_RETHROW() }
 
 void witness_plugin::plugin_shutdown()
 {
-   // nothing to do
+   stop_block_production();
+}
+
+void witness_plugin::stop_block_production()
+{
+   _shutting_down = true;
+   
+   try {
+      if( _block_production_task.valid() )
+         _block_production_task.cancel_and_wait(__FUNCTION__);
+   } catch(fc::canceled_exception&) {
+      //Expected exception. Move along.
+   } catch(fc::exception& e) {
+      edump((e.to_detail_string()));
+   }
+}
+
+void witness_plugin::refresh_witness_key_cache()
+{
+   const auto& db = database();
+   for( const chain::witness_id_type wit_id : _witnesses )
+   {
+      const chain::witness_object* wit_obj = db.find( wit_id );
+      if( wit_obj )
+         _witness_key_cache[wit_id] = wit_obj->signing_key;
+      else
+         _witness_key_cache[wit_id] = fc::optional<chain::public_key_type>();
+   }
 }
 
 void witness_plugin::schedule_production_loop()
 {
+   if (_shutting_down) return;
+
    //Schedule for the next second's tick regardless of chain state
    // If we would wait less than 50ms, wait for the whole second.
    fc::time_point now = fc::time_point::now();
@@ -160,25 +193,33 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
 {
    block_production_condition::block_production_condition_enum result;
    fc::limited_mutable_variant_object capture( GRAPHENE_MAX_NESTED_OBJECTS );
-   try
+
+   if (_shutting_down) 
    {
-      result = maybe_produce_block(capture);
+      result = block_production_condition::shutdown;
    }
-   catch( const fc::canceled_exception& )
+   else
    {
-      //We're trying to exit. Go ahead and let this one out.
-      throw;
-   }
-   catch( const fc::exception& e )
-   {
-      elog("Got exception while generating block:\n${e}", ("e", e.to_detail_string()));
-      result = block_production_condition::exception_producing_block;
+      try
+      {
+         result = maybe_produce_block(capture);
+      }
+      catch( const fc::canceled_exception& )
+      {
+         //We're trying to exit. Go ahead and let this one out.
+         throw;
+      }
+      catch( const fc::exception& e )
+      {
+         elog("Got exception while generating block:\n${e}", ("e", e.to_detail_string()));
+         result = block_production_condition::exception_producing_block;
+      }
    }
 
    switch( result )
    {
       case block_production_condition::produced:
-         ilog("Generated block #${n} with timestamp ${t} at time ${c}", (capture));
+         ilog("Generated block #${n} with ${x} transaction(s) and timestamp ${t} at time ${c}", (capture));
          break;
       case block_production_condition::not_synced:
          ilog("Not producing block because production is disabled until we receive a recent block (see: --enable-stale-production)");
@@ -194,13 +235,16 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
          elog("Not producing block because node appears to be on a minority fork with only ${pct}% witness participation", (capture) );
          break;
       case block_production_condition::lag:
-         elog("Not producing block because node didn't wake up within 500ms of the slot time.");
-         break;
-      case block_production_condition::consecutive:
-         elog("Not producing block because the last block was generated by the same witness.\nThis node is probably disconnected from the network so block production has been disabled.\nDisable this check with --allow-consecutive option.");
+         elog("Not producing block because node didn't wake up within 2500ms of the slot time.");
          break;
       case block_production_condition::exception_producing_block:
          elog( "exception producing block" );
+         break;
+      case block_production_condition::shutdown:
+         ilog( "shutdown producing block" );
+         return result;
+      default:
+         elog( "unknown condition ${result} while producing block", ("result", (unsigned char)result) );
          break;
    }
 
@@ -250,7 +294,7 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
    }
 
    fc::time_point_sec scheduled_time = db.get_slot_time( slot );
-   graphene::chain::public_key_type scheduled_key = scheduled_witness( db ).signing_key;
+   graphene::chain::public_key_type scheduled_key = *_witness_key_cache[scheduled_witness]; // should be valid
    auto private_key_itr = _private_keys.find( scheduled_key );
 
    if( private_key_itr == _private_keys.end() )
@@ -266,7 +310,7 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
       return block_production_condition::low_participation;
    }
 
-   if( llabs((scheduled_time - now).count()) > fc::milliseconds( 500 ).count() )
+   if( llabs((scheduled_time - now).count()) > fc::milliseconds( 2500 ).count() )
    {
       capture("scheduled_time", scheduled_time)("now", now);
       return block_production_condition::lag;
@@ -278,7 +322,7 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
       private_key_itr->second,
       _production_skip_flags
       );
-   capture("n", block.block_num())("t", block.timestamp)("c", now);
+   capture("n", block.block_num())("t", block.timestamp)("c", now)("x", block.transactions.size());
    fc::async( [this,block](){ p2p_node().broadcast(net::block_message(block)); } );
 
    return block_production_condition::produced;

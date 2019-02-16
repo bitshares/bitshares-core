@@ -33,11 +33,11 @@ namespace graphene { namespace chain {
 
 asset database::get_balance(account_id_type owner, asset_id_type asset_id) const
 {
-   auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
-   auto itr = index.find(boost::make_tuple(owner, asset_id));
-   if( itr == index.end() )
+   auto& index = get_index_type< primary_index< account_balance_index > >().get_secondary_index<balances_by_account_index>();
+   auto abo = index.get_account_balance( owner, asset_id );
+   if( !abo )
       return asset(0, asset_id);
-   return itr->get_balance();
+   return abo->get_balance();
 }
 
 asset database::get_balance(const account_object& owner, const asset_object& asset_obj) const
@@ -55,9 +55,9 @@ void database::adjust_balance(account_id_type account, asset delta )
    if( delta.amount == 0 )
       return;
 
-   auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
-   auto itr = index.find(boost::make_tuple(account, delta.asset_id));
-   if(itr == index.end())
+   auto& index = get_index_type< primary_index< account_balance_index > >().get_secondary_index<balances_by_account_index>();
+   auto abo = index.get_account_balance( account, delta.asset_id );
+   if( !abo )
    {
       FC_ASSERT( delta.amount > 0, "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}", 
                  ("a",account(*this).name)
@@ -67,11 +67,14 @@ void database::adjust_balance(account_id_type account, asset delta )
          b.owner = account;
          b.asset_type = delta.asset_id;
          b.balance = delta.amount.value;
+         if( b.asset_type == asset_id_type() ) // CORE asset
+            b.maintenance_flag = true;
       });
    } else {
       if( delta.amount < 0 )
-         FC_ASSERT( itr->get_balance() >= -delta, "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}", ("a",account(*this).name)("b",to_pretty_string(itr->get_balance()))("r",to_pretty_string(-delta)));
-      modify(*itr, [delta](account_balance_object& b) {
+         FC_ASSERT( abo->get_balance() >= -delta, "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}",
+                    ("a",account(*this).name)("b",to_pretty_string(abo->get_balance()))("r",to_pretty_string(-delta)));
+      modify(*abo, [delta](account_balance_object& b) {
          b.adjust_balance(delta);
       });
    }
@@ -139,7 +142,7 @@ void database::deposit_cashback(const account_object& acct, share_type amount, b
        acct.get_id() == GRAPHENE_TEMP_ACCOUNT )
    {
       // The blockchain's accounts do not get cashback; it simply goes to the reserve pool.
-      modify(get(asset_id_type()).dynamic_asset_data_id(*this), [amount](asset_dynamic_data_object& d) {
+      modify( get_core_dynamic_data(), [amount](asset_dynamic_data_object& d) {
          d.current_supply -= amount;
       });
       return;
@@ -154,9 +157,13 @@ void database::deposit_cashback(const account_object& acct, share_type amount, b
 
    if( new_vbid.valid() )
    {
-      modify( acct, [&]( account_object& _acct )
+      modify( acct, [&new_vbid]( account_object& _acct )
       {
          _acct.cashback_vb = *new_vbid;
+      } );
+      modify( acct.statistics( *this ), []( account_statistics_object& aso )
+      {
+         aso.has_cashback_vb = true;
       } );
    }
 

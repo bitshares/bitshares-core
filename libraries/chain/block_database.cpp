@@ -24,7 +24,6 @@
 #include <graphene/chain/block_database.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <fc/io/raw.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 namespace graphene { namespace chain {
 
@@ -269,6 +268,17 @@ optional<block_id_type> block_database::last_id()const
    optional<index_entry> entry = last_index_entry();
    if( entry.valid() ) return entry->block_id;
    return optional<block_id_type>();
+}
+
+size_t block_database::blocks_current_position()const
+{
+   return (size_t)_blocks.tellg();
+}
+
+size_t block_database::total_block_size()const
+{
+   _blocks.seekg( 0, _blocks.end );
+   return (size_t)_blocks.tellg();
 }
 
 } }

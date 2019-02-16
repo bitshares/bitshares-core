@@ -23,11 +23,11 @@
  */
 
 #include <fc/io/json.hpp>
-#include <fc/smart_ref_impl.hpp>
 #include <fc/variant.hpp>
 #include <fc/variant_object.hpp>
 
-#include <graphene/chain/protocol/protocol.hpp>
+#include <graphene/chain/protocol/block.hpp>
+#include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <algorithm>
 #include <iostream>

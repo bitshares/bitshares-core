@@ -1,0 +1,55 @@
+#!/bin/sh
+
+usage () {
+    echo Usage:
+    echo "  ${0##*/} [-h | --help] 		Display this help message"
+    echo "  ${0##*/} -s | --start <max-time>	Initialize timing"
+    echo "  ${0##*/} <name> <est> <cmd>"
+    echo "The last form executes build step <name> consisting of shell <cmd>"
+    echo "if <est>imated time is still available, otherwise it fails fast."
+    echo "<max-time> and <est> must be specified in seconds."
+    exit $1
+}
+
+if [ "$#" = 0 -o "$1" = "--help" -o "$1" = "-h" ]; then
+    usage `test "$#" = 1; echo $?`
+fi
+
+NOW="$(date +%s)"
+
+if [ "$1" = "--start" -o "$1" = "-s" ]; then
+    if [ "$#" != 2 ]; then
+	usage 1
+    fi
+    echo "$2 $NOW" >_start_time
+    echo "Starting at $(date --date=@$NOW)"
+    exit 0
+fi
+
+NAME="$1"
+EST="$2"
+CMD="$3"
+
+if [ ! -r _start_time ]; then
+    echo "Need to initialize with '$0 -s <max-time>' first!" 1>&2
+    exit 1
+fi
+
+read max begin prev_name prev_begin <_start_time
+
+if [ "$prev_name" != "" ]; then
+    echo "'$prev_name' took $(($NOW - $prev_begin))s"
+fi
+
+if [ "$CMD" != "" ]; then
+    if [ $(($NOW - $begin + $EST)) -lt $max ]; then
+	echo "Running '$NAME' at $NOW..."
+	echo "sh -c '$CMD'"
+	echo "$max $begin $NAME $NOW" >_start_time
+	exec bash -c "$CMD"
+    fi
+    echo "$(($begin + $max - $NOW))s left - insufficient to run '$NAME', exiting!" 1>&2
+    exit 1
+fi
+
+exit 0

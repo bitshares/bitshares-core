@@ -59,17 +59,7 @@ namespace graphene { namespace db {
                {
                   mv._apply_undo = false;
                }
-               ~session() {
-                  try {
-                     if( _apply_undo ) _db.undo();
-                  }
-                  catch ( const fc::exception& e )
-                  {
-                     elog( "${e}", ("e",e.to_detail_string() ) );
-                     throw; // maybe crash..
-                  }
-                  if( _disable_on_exit ) _db.disable();
-               }
+               ~session();
                void commit() { _apply_undo = false; _db.commit();  }
                void undo()   { if( _apply_undo ) _db.undo(); _apply_undo = false; }
                void merge()  { if( _apply_undo ) _db.merge(); _apply_undo = false; }
@@ -129,6 +119,7 @@ namespace graphene { namespace db {
          std::size_t size()const { return _stack.size(); }
          void set_max_size(size_t new_max_size) { _max_size = new_max_size; }
          size_t max_size()const { return _max_size; }
+         uint32_t active_sessions()const { return _active_sessions; }
 
          const undo_state& head()const;
 

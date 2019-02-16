@@ -46,14 +46,16 @@ namespace graphene { namespace chain {
 
          account_id_type  owner;
 
+         string           name; ///< redundantly store account name here for better maintenance performance
+
          /**
           * Keep the most recent operation as a root pointer to a linked list of the transaction history.
           */
          account_transaction_history_id_type most_recent_op;
          /** Total operations related to this account. */
-         uint32_t                            total_ops = 0;
+         uint64_t                            total_ops = 0;
          /** Total operations related to this account that has been removed from the database. */
-         uint32_t                            removed_ops = 0;
+         uint64_t                            removed_ops = 0;
 
          /**
           * When calculating votes it is necessary to know how much is stored in orders (and thus unavailable for
@@ -61,6 +63,20 @@ namespace graphene { namespace chain {
           * total here and update it every time an order is created or modified.
           */
          share_type total_core_in_orders;
+
+         share_type core_in_balance = 0; ///< redundantly store core balance here for better maintenance performance
+
+         bool has_cashback_vb = false; ///< redundantly store this for better maintenance performance
+
+         bool is_voting = false; ///< redundately store whether this account is voting for better maintenance performance
+
+         time_point_sec last_vote_time; // add last time voted
+
+         /// Whether this account owns some CORE asset and is voting
+         inline bool has_some_core_voting() const
+         {
+            return is_voting && ( total_core_in_orders > 0 || core_in_balance > 0 || has_cashback_vb );
+         }
 
          /**
           * Tracks the total fees paid by this account for the purpose of calculating bulk discounts.
@@ -81,6 +97,12 @@ namespace graphene { namespace chain {
           * available for withdrawal) rather than requiring the normal vesting period.
           */
          share_type pending_vested_fees;
+
+         /// Whether this account has pending fees, no matter vested or not
+         inline bool has_pending_fees() const { return pending_fees > 0 || pending_vested_fees > 0; }
+
+         /// Whether need to process this account during the maintenance interval
+         inline bool need_maintenance() const { return has_some_core_voting() || has_pending_fees(); }
 
          /// @brief Split up and pay out @ref pending_fees and @ref pending_vested_fees
          void process_fees(const account_object& a, database& d) const;
@@ -107,6 +129,7 @@ namespace graphene { namespace chain {
          account_id_type   owner;
          asset_id_type     asset_type;
          share_type        balance;
+         bool              maintenance_flag = false; ///< Whether need to process this balance object in maintenance interval
 
          asset get_balance()const { return asset(balance, asset_type); }
          void  adjust_balance(const asset& delta);
@@ -279,20 +302,20 @@ namespace graphene { namespace chain {
 
 
          /** given an account or key, map it to the set of accounts that reference it in an active or owner authority */
-         map< account_id_type, set<account_id_type> > account_to_account_memberships;
-         map< public_key_type, set<account_id_type> > account_to_key_memberships;
+         map< account_id_type, set<account_id_type> >                    account_to_account_memberships;
+         map< public_key_type, set<account_id_type>, pubkey_comparator > account_to_key_memberships;
          /** some accounts use address authorities in the genesis block */
-         map< address, set<account_id_type> >         account_to_address_memberships;
+         map< address, set<account_id_type> >                            account_to_address_memberships;
 
 
       protected:
-         set<account_id_type>  get_account_members( const account_object& a )const;
-         set<public_key_type>  get_key_members( const account_object& a )const;
-         set<address>          get_address_members( const account_object& a )const;
+         set<account_id_type>                    get_account_members( const account_object& a )const;
+         set<public_key_type, pubkey_comparator> get_key_members( const account_object& a )const;
+         set<address>                            get_address_members( const account_object& a )const;
 
-         set<account_id_type>  before_account_members;
-         set<public_key_type>  before_key_members;
-         set<address>          before_address_members;
+         set<account_id_type>                    before_account_members;
+         set<public_key_type, pubkey_comparator> before_key_members;
+         set<address>                            before_address_members;
    };
 
 
@@ -312,8 +335,32 @@ namespace graphene { namespace chain {
          map< account_id_type, set<account_id_type> > referred_by;
    };
 
-   struct by_account_asset;
+   /**
+    *  @brief This secondary index will allow fast access to the balance objects
+    *         that belonging to an account.
+    */
+   class balances_by_account_index : public secondary_index
+   {
+      public:
+         virtual void object_inserted( const object& obj ) override;
+         virtual void object_removed( const object& obj ) override;
+         virtual void about_to_modify( const object& before ) override;
+         virtual void object_modified( const object& after  ) override;
+
+         const map< asset_id_type, const account_balance_object* >& get_account_balances( const account_id_type& acct )const;
+         const account_balance_object* get_account_balance( const account_id_type& acct, const asset_id_type& asset )const;
+
+      private:
+         static const uint8_t  bits;
+         static const uint64_t mask;
+
+         /** Maps each account to its balance objects */
+         vector< vector< map< asset_id_type, const account_balance_object* > > > balances;
+         std::stack< object_id_type > ids_being_modified;
+   };
+
    struct by_asset_balance;
+   struct by_maintenance_flag;
    /**
     * @ingroup object_index
     */
@@ -321,13 +368,8 @@ namespace graphene { namespace chain {
       account_balance_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-         ordered_unique< tag<by_account_asset>,
-            composite_key<
-               account_balance_object,
-               member<account_balance_object, account_id_type, &account_balance_object::owner>,
-               member<account_balance_object, asset_id_type, &account_balance_object::asset_type>
-            >
-         >,
+         ordered_non_unique< tag<by_maintenance_flag>,
+                             member< account_balance_object, bool, &account_balance_object::maintenance_flag > >,
          ordered_unique< tag<by_asset_balance>,
             composite_key<
                account_balance_object,
@@ -367,6 +409,33 @@ namespace graphene { namespace chain {
     */
    typedef generic_index<account_object, account_multi_index_type> account_index;
 
+   struct by_owner;
+   struct by_maintenance_seq;
+
+   /**
+    * @ingroup object_index
+    */
+   typedef multi_index_container<
+      account_statistics_object,
+      indexed_by<
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_unique< tag<by_owner>,
+                         member< account_statistics_object, account_id_type, &account_statistics_object::owner > >,
+         ordered_unique< tag<by_maintenance_seq>,
+            composite_key<
+               account_statistics_object,
+               const_mem_fun<account_statistics_object, bool, &account_statistics_object::need_maintenance>,
+               member<account_statistics_object, string, &account_statistics_object::name>
+            >
+         >
+      >
+   > account_stats_multi_index_type;
+
+   /**
+    * @ingroup object_index
+    */
+   typedef generic_index<account_statistics_object, account_stats_multi_index_type> account_stats_index;
+
 }}
 
 FC_REFLECT_DERIVED( graphene::chain::account_object,
@@ -383,14 +452,18 @@ FC_REFLECT_DERIVED( graphene::chain::account_object,
 
 FC_REFLECT_DERIVED( graphene::chain::account_balance_object,
                     (graphene::db::object),
-                    (owner)(asset_type)(balance) )
+                    (owner)(asset_type)(balance)(maintenance_flag) )
 
 FC_REFLECT_DERIVED( graphene::chain::account_statistics_object,
                     (graphene::chain::object),
-                    (owner)
+                    (owner)(name)
                     (most_recent_op)
                     (total_ops)(removed_ops)
                     (total_core_in_orders)
+                    (core_in_balance)
+                    (has_cashback_vb)
+                    (is_voting)
+                    (last_vote_time)
                     (lifetime_fees_paid)
                     (pending_fees)(pending_vested_fees)
                   )

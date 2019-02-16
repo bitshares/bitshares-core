@@ -18,7 +18,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include <graphene/chain/protocol/protocol.hpp>
+#include <graphene/chain/protocol/block.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
@@ -28,7 +28,6 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
-#include <fc/smart_ref_impl.hpp>
 #include <iostream>
 
 using namespace graphene::chain;

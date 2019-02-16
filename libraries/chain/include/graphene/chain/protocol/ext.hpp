@@ -229,4 +229,15 @@ void unpack( Stream& s, graphene::chain::extension<T>& value, uint32_t _max_dept
 
 } // fc::raw
 
+template<typename T> struct get_typename< graphene::chain::extension<T> >
+{ 
+   static const char* name()
+   { 
+      static std::string n = std::string("graphene::chain::extension<") 
+         + fc::get_typename<T>::name() + std::string(">");
+      return n.c_str();
+   } 
+};
+
+
 } // fc
