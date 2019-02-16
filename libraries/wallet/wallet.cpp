@@ -772,7 +772,7 @@ public:
     *        The transaction could have been partially signed already,
     *        if set to false, the corresponding public key of existing
     *        signatures won't be returned.
-    *        If set to true, the existing signatures will be erase and
+    *        If set to true, the existing signatures will be erased and
     *        all required keys returned.
    */
    set<public_key_type> get_owned_required_keys( signed_transaction &tx,
@@ -793,11 +793,10 @@ public:
       return _remote_db->get_required_signatures( tx, owned_keys );
    }
 
-   signed_transaction sign_transaction2( signed_transaction tx,
+   signed_transaction add_transaction_signature( signed_transaction tx,
                                                  bool broadcast )
    {
-      set<public_key_type> approving_key_set =
-         std::move( get_owned_required_keys( tx, false ) );
+      set<public_key_type> approving_key_set = get_owned_required_keys(tx, false);
 
       if ( ( ( tx.ref_block_num == 0 && tx.ref_block_prefix == 0 ) ||
              tx.expiration == fc::time_point_sec() ) &&
@@ -822,7 +821,7 @@ public:
          {
             elog( "Caught exception while broadcasting tx ${id}:  ${e}",
                   ( "id", tx.id().str() )( "e", e.to_detail_string() ) );
-            FC_THROW( "" );
+            FC_THROW( "Caught exception while broadcasting tx" );
          }
       }
 
@@ -1931,8 +1930,7 @@ public:
 
    signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false)
    {
-      set<public_key_type> approving_key_set =
-         std::move( get_owned_required_keys( tx ) );
+      set<public_key_type> approving_key_set = get_owned_required_keys(tx);
 
       auto dyn_props = get_dynamic_global_properties();
       tx.set_reference_block( dyn_props.head_block_id );
@@ -3742,10 +3740,10 @@ dynamic_global_property_object wallet_api::get_dynamic_global_properties() const
    return my->get_dynamic_global_properties();
 }
 
-signed_transaction wallet_api::sign_transaction2( signed_transaction tx,
+signed_transaction wallet_api::add_transaction_signature( signed_transaction tx,
                                                           bool broadcast )
 {
-   return my->sign_transaction2( tx, broadcast );
+   return my->add_transaction_signature( tx, broadcast );
 }
 
 string wallet_api::help()const

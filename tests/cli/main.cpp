@@ -476,7 +476,7 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
       // case1: sign a transaction without TaPoS and expiration fields
       // expect: return a transaction with TaPoS and expiration filled
       transfer_tx2 =
-         con.wallet_api_ptr->sign_transaction2( transfer_tx2, false );
+         con.wallet_api_ptr->add_transaction_signature( transfer_tx2, false );
       BOOST_CHECK( ( transfer_tx2.ref_block_num != 0 &&
                      transfer_tx2.ref_block_prefix != 0 ) ||
                    ( transfer_tx2.expiration != fc::time_point_sec() ) );
@@ -491,11 +491,11 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
       //
       // expect: exception with missing active authority
       BOOST_CHECK(con.wallet_api_ptr->import_key("cifer.test", bki2.wif_priv_key));
-      BOOST_CHECK_THROW(con.wallet_api_ptr->sign_transaction2(transfer_tx2, true), fc::exception);
+      BOOST_CHECK_THROW(con.wallet_api_ptr->add_transaction_signature(transfer_tx2, true), fc::exception);
 
       // case4: sign again as signature exists
       // expect: num of signatures not increase
-      transfer_tx2 = con.wallet_api_ptr->sign_transaction2(transfer_tx2, false);
+      transfer_tx2 = con.wallet_api_ptr->add_transaction_signature(transfer_tx2, false);
       BOOST_CHECK_EQUAL(transfer_tx2.signatures.size(), 1);
 
       // case5:
@@ -503,7 +503,7 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
       //
       // expect: transaction broadcast successfully
       BOOST_CHECK(con.wallet_api_ptr->import_key("cifer.test", bki3.wif_priv_key));
-      con.wallet_api_ptr->sign_transaction2(transfer_tx2, true);
+      con.wallet_api_ptr->add_transaction_signature(transfer_tx2, true);
       auto balances = con.wallet_api_ptr->list_account_balances( "cifer.test" );
       for (auto b : balances) {
          if (b.asset_id == asset_id_type()) {
