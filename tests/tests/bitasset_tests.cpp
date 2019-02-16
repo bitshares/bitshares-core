@@ -930,6 +930,13 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
    // need additional block to avoid prev: popping block would leave head block null error
    generate_block( skip );
 
+   // testnet needs a lot more blocks(35) here to pass
+   if(strcmp(GRAPHENE_SYMBOL, "TEST") == 0) {
+      for(int b = 0; b<35; b++)
+         generate_block( skip );
+   }
+
+
    for( int i = 0; i < 8; ++i )
    {
       idump( (i) );

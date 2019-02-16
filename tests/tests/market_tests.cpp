@@ -1817,13 +1817,13 @@ BOOST_AUTO_TEST_CASE(mcr_bug_cross1270)
    auto mi = db.get_global_properties().parameters.maintenance_interval;
    generate_blocks(HARDFORK_CORE_1270_TIME - mi);
 
-   const asset_object& core = get_asset("BTS");
+   const asset_object& core = get_asset(GRAPHENE_SYMBOL);
    const asset_object& bitusd = get_asset("USDBIT");
    const asset_id_type bitusd_id = bitusd.id;
    const account_object& feedproducer = get_account("feedproducer");
 
    // feed is expired
-   BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).current_feed.maintenance_collateral_ratio, 1750);
+   BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).current_feed.maintenance_collateral_ratio, GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
    BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).feed_is_expired(db.head_block_time()), false); // should be true?
 
    // make new feed
