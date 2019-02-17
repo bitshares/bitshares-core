@@ -1824,7 +1824,6 @@ BOOST_AUTO_TEST_CASE(mcr_bug_cross1270)
 
    // feed is expired
    BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).current_feed.maintenance_collateral_ratio, GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
-   BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).feed_is_expired(db.head_block_time()), false); // should be true?
 
    // make new feed
    price_feed current_feed;
@@ -1834,7 +1833,6 @@ BOOST_AUTO_TEST_CASE(mcr_bug_cross1270)
    publish_feed( bitusd, feedproducer, current_feed );
 
    BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).current_feed.maintenance_collateral_ratio, 2000);
-   BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).feed_is_expired(db.head_block_time()), false);
 
    // pass hardfork
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
