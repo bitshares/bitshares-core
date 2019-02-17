@@ -72,6 +72,23 @@ vector<std::reference_wrapper<const typename Index::object_type>> database::sort
    return refs;
 }
 
+void database::handle_marketing_fees()
+{
+   const global_property_object& gpo = get_global_properties();
+   auto& acnt_indx = get_index_type<account_index>();
+   auto marketing_partner_itr = acnt_indx.indices().get<by_name>().find( gpo.marketing_partner_account_name );
+   if( marketing_partner_itr == acnt_indx.indices().get<by_name>().end() )
+   {
+      // Found current marketing partner account.
+      // Now give the marketing partner all the accumulated fees for them and zero it out on the db
+      const asset_dynamic_data_object& core_dd = get_core_dynamic_data();
+      adjust_balance(marketing_partner_itr->id,  asset(core_dd.accumulated_fees_for_marketing_partner, asset_id_type()));
+      modify( core_dd, [](asset_dynamic_data_object& addo) {
+         addo.accumulated_fees_for_marketing_partner = 0;
+      });
+   }
+}
+
 template<class Type>
 void database::perform_account_maintenance(Type tally_helper)
 {
@@ -1154,6 +1171,8 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    } tally_helper(*this, gpo);
 
    perform_account_maintenance( tally_helper );
+   handle_marketing_fees();
+   
 
    struct clear_canary {
       clear_canary(vector<uint64_t>& target): target(target){}

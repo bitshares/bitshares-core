@@ -112,6 +112,7 @@ struct genesis_state_type {
    vector<initial_witness_type>             initial_witness_candidates;
    vector<initial_committee_member_type>    initial_committee_candidates;
    vector<initial_worker_type>              initial_worker_candidates;
+   string                                   initial_marketing_partner_account_name;
 
    /**
     * Temporary, will be moved elsewhere.
@@ -153,4 +154,5 @@ FC_REFLECT(graphene::chain::genesis_state_type,
            (initial_vesting_balances)(initial_active_witnesses)(initial_witness_candidates)
            (initial_committee_candidates)(initial_worker_candidates)
            (initial_chain_id)
-           (immutable_parameters))
+           (immutable_parameters)
+           (initial_marketing_partner_account_name))

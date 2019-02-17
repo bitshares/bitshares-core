@@ -47,6 +47,7 @@ namespace graphene { namespace chain {
 
          chain_parameters           parameters;
          optional<chain_parameters> pending_parameters;
+         string                     marketing_partner_account_name;
 
          uint32_t                           next_available_vote_id = 0;
          vector<committee_member_id_type>   active_committee_members; // updated once per maintenance interval
