@@ -22,19 +22,20 @@
  * THE SOFTWARE.
  */
 #pragma once
+#include <memory>
 #include <graphene/chain/protocol/base.hpp>
 #include <graphene/chain/protocol/types.hpp>
-#include <fc/smart_ref_fwd.hpp>
-
-namespace graphene { namespace chain { struct fee_schedule; } }
 
 namespace graphene { namespace chain {
 
    typedef static_variant<>  parameter_extension; 
+
+   struct fee_schedule;
+
    struct chain_parameters
    {
-      /** using a smart ref breaks the circular dependency created between operations and the fee schedule */
-      smart_ref<fee_schedule> current_fees;                       ///< current schedule of fees
+      /** using a shared_ptr breaks the circular dependency created between operations and the fee schedule */
+      std::shared_ptr<fee_schedule> current_fees;                  ///< current schedule of fees
       uint8_t                 block_interval                      = GRAPHENE_DEFAULT_BLOCK_INTERVAL; ///< interval in seconds between blocks
       uint32_t                maintenance_interval                = GRAPHENE_DEFAULT_MAINTENANCE_INTERVAL; ///< interval in sections between blockchain maintenance events
       uint8_t                 maintenance_skip_slots              = GRAPHENE_DEFAULT_MAINTENANCE_SKIP_SLOTS; ///< number of block_intervals to skip at maintenance time
@@ -67,6 +68,15 @@ namespace graphene { namespace chain {
 
       /** defined in fee_schedule.cpp */
       void validate()const;
+      
+      chain_parameters();
+      chain_parameters(const chain_parameters& other);
+      chain_parameters(chain_parameters&& other);
+      chain_parameters& operator=(const chain_parameters& other);
+      chain_parameters& operator=(chain_parameters&& other);
+
+      private:
+      static void safe_copy(chain_parameters& to, const chain_parameters& from);
    };
 
 } }  // graphene::chain
