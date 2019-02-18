@@ -407,7 +407,6 @@ void precomputable_transaction::validate() const
 {
    if( _validated ) return;
    transaction::validate();
-   get_packed_size();
    _validated = true;
 }
 

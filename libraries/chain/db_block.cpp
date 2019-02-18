@@ -752,6 +752,7 @@ void database::_precompute_parallel( const Trx* trx, const size_t count, const u
    for( size_t i = 0; i < count; ++i, ++trx )
    {
       trx->validate(); // TODO - parallelize wrt confidential operations
+      trx->get_packed_size();
       if( !(skip&skip_transaction_dupe_check) )
          trx->id();
       if( !(skip&skip_transaction_signatures) )
