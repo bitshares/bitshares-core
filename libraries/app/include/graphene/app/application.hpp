@@ -40,6 +40,17 @@ namespace graphene { namespace app {
       public:
          bool enable_subscribe_to_all = false;
          bool has_market_history_plugin = false;
+         uint64_t api_limit_get_account_history_operations=100;
+         uint64_t api_limit_get_account_history=100;
+         uint64_t api_limit_get_grouped_limit_orders=101;
+         uint64_t api_limit_get_relative_account_history=100;
+         uint64_t api_limit_get_account_history_by_operations=100;
+         uint64_t api_limit_get_asset_holders=100;
+         uint64_t api_limit_get_key_references=100;
+         uint64_t api_limit_get_limit_orders=300;
+         uint64_t api_limit_get_call_orders=300;
+         uint64_t api_limit_get_settle_orders=300;
+         uint64_t api_limit_get_order_book=50;
    };
 
    class application
@@ -90,7 +101,7 @@ namespace graphene { namespace app {
 
          net::node_ptr                    p2p_node();
          std::shared_ptr<chain::database> chain_database()const;
-
+         void set_dgb_api_limit_api();
          void set_block_production(bool producing_blocks);
          fc::optional< api_access_info > get_api_access_info( const string& username )const;
          void set_api_access_info(const string& username, api_access_info&& permissions);

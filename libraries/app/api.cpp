@@ -317,7 +317,8 @@ namespace graphene { namespace app {
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
-       FC_ASSERT( limit <= 100 );
+       uint64_t api_limit_get_account_history=_app.get_options().api_limit_get_account_history;
+       FC_ASSERT( limit <= api_limit_get_account_history );
        vector<operation_history_object> result;
        account_id_type account;
        try {
@@ -353,7 +354,8 @@ namespace graphene { namespace app {
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
-       FC_ASSERT( limit <= 100 );
+       uint64_t api_limit_get_account_history_operations=_app.get_options().api_limit_get_account_history_operations;
+       FC_ASSERT(limit <= api_limit_get_account_history_operations);
        vector<operation_history_object> result;
        account_id_type account;
        try {
@@ -392,7 +394,8 @@ namespace graphene { namespace app {
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
-       FC_ASSERT(limit <= 100);
+       uint64_t api_limit_get_relative_account_history=_app.get_options().api_limit_get_relative_account_history;
+       FC_ASSERT(limit <= api_limit_get_relative_account_history);
        vector<operation_history_object> result;
        account_id_type account;
        try {
@@ -431,7 +434,8 @@ namespace graphene { namespace app {
 
     history_operation_detail history_api::get_account_history_by_operations(const std::string account_id_or_name, vector<uint16_t> operation_types, uint32_t start, unsigned limit)
     {
-       FC_ASSERT(limit <= 100);
+       uint64_t api_limit_get_account_history_by_operations=_app.get_options().api_limit_get_account_history_by_operations;
+       FC_ASSERT(limit <= api_limit_get_account_history_by_operations);
        history_operation_detail result;
        vector<operation_history_object> objs = get_relative_account_history(account_id_or_name, start, limit, limit + start - 1);
        std::for_each(objs.begin(), objs.end(), [&](const operation_history_object &o) {
@@ -530,14 +534,15 @@ namespace graphene { namespace app {
 
     // asset_api
     asset_api::asset_api(graphene::app::application& app) :
-         _db( *app.chain_database()), 
-         database_api( std::ref(*app.chain_database()), &(app.get_options()) 
+         _app(app),
+         _db( *app.chain_database()),
+         database_api( std::ref(*app.chain_database()), &(app.get_options())
          ) { }
     asset_api::~asset_api() { }
 
     vector<account_asset_balance> asset_api::get_asset_holders( std::string asset, uint32_t start, uint32_t limit ) const {
-      FC_ASSERT(limit <= 100);
-
+      uint64_t api_limit_get_asset_holders=_app.get_options().api_limit_get_asset_holders;
+      FC_ASSERT(limit <= api_limit_get_asset_holders);
       asset_id_type asset_id = database_api.get_asset_id_from_string( asset );
 
       const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
@@ -622,8 +627,9 @@ namespace graphene { namespace app {
                                                                optional<price> start,
                                                                uint32_t limit )const
    {
-      FC_ASSERT( limit <= 101 );
-      auto plugin = _app.get_plugin<grouped_orders_plugin>( "grouped_orders" );
+      uint64_t api_limit_get_grouped_limit_orders=_app.get_options().api_limit_get_grouped_limit_orders;
+      FC_ASSERT( limit <= api_limit_get_grouped_limit_orders );
+      auto plugin = _app.get_plugin<graphene::grouped_orders::grouped_orders_plugin>( "grouped_orders" );
       FC_ASSERT( plugin );
       const auto& limit_groups = plugin->limit_order_groups();
       vector< limit_order_group > result;
