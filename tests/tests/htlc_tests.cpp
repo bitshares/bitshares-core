@@ -56,9 +56,9 @@ using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( htlc_tests, database_fixture )
 
-void generate_random_preimage(uint16_t key_size, std::vector<char>& vec)
+void generate_random_preimage(std::vector<char>& vec)
 {
-	std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned char> rbe;
+	std::independent_bits_engine<std::default_random_engine, sizeof(unsigned), unsigned> rbe;
 	std::generate(begin(vec), end(vec), std::ref(rbe));
 	return;
 }
@@ -178,7 +178,7 @@ try {
 
    uint16_t preimage_size = 256;
    std::vector<char> pre_image(256);
-   generate_random_preimage(preimage_size, pre_image);
+   generate_random_preimage(pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
    // cler everything out
@@ -235,7 +235,7 @@ try {
    
    uint16_t preimage_size = 256;
    std::vector<char> pre_image(preimage_size);
-   generate_random_preimage(preimage_size, pre_image);
+   generate_random_preimage(pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
    // clear everything out
@@ -315,7 +315,7 @@ try {
 
    uint16_t preimage_size = 256;
    std::vector<char> pre_image(256);
-   generate_random_preimage(preimage_size, pre_image);
+   generate_random_preimage(pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
    // cler everything out
@@ -503,7 +503,7 @@ BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
 
    uint16_t preimage_size = 256;
    std::vector<char> pre_image(256);
-   generate_random_preimage(preimage_size, pre_image);
+   generate_random_preimage(pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
    // clear everything out

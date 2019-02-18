@@ -21,6 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#ifdef _WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <graphene/app/application.hpp>
 #include <graphene/app/plugin.hpp>
 #include <graphene/app/config_util.hpp>
