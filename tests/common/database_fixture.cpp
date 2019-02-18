@@ -86,7 +86,11 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
 
    genesis_state.initial_timestamp = initial_timestamp;
 
-   genesis_state.initial_active_witnesses = 10;
+   if(boost::unit_test::framework::current_test_case().p_name.value == "hf_935_test")
+      genesis_state.initial_active_witnesses = 20;
+   else
+      genesis_state.initial_active_witnesses = 10;
+
    for( unsigned int i = 0; i < genesis_state.initial_active_witnesses; ++i )
    {
       auto name = "init"+fc::to_string(i);

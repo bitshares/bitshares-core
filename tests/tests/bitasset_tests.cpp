@@ -927,9 +927,6 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
    generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
    generate_block( skip );
 
-   // need additional block to avoid prev: popping block would leave head block null error
-   generate_block( skip );
-
    for( int i = 0; i < 8; ++i )
    {
       idump( (i) );

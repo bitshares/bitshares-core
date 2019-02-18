@@ -1817,14 +1817,14 @@ BOOST_AUTO_TEST_CASE(mcr_bug_cross1270)
    auto mi = db.get_global_properties().parameters.maintenance_interval;
    generate_blocks(HARDFORK_CORE_1270_TIME - mi);
 
-   const asset_object& core = get_asset("BTS");
+   const asset_object& core = get_asset(GRAPHENE_SYMBOL);
    const asset_object& bitusd = get_asset("USDBIT");
    const asset_id_type bitusd_id = bitusd.id;
    const account_object& feedproducer = get_account("feedproducer");
 
    // feed is expired
-   BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).current_feed.maintenance_collateral_ratio, 1750);
-   BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).feed_is_expired(db.head_block_time()), false); // should be true?
+   auto mcr = (*bitusd_id(db).bitasset_data_id)(db).current_feed.maintenance_collateral_ratio;
+   BOOST_CHECK_EQUAL(mcr, GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
    // make new feed
    price_feed current_feed;
@@ -1833,15 +1833,16 @@ BOOST_AUTO_TEST_CASE(mcr_bug_cross1270)
    current_feed.maximum_short_squeeze_ratio  = 1100;
    publish_feed( bitusd, feedproducer, current_feed );
 
-   BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).current_feed.maintenance_collateral_ratio, 2000);
-   BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).feed_is_expired(db.head_block_time()), false);
+   mcr = (*bitusd_id(db).bitasset_data_id)(db).current_feed.maintenance_collateral_ratio;
+   BOOST_CHECK_EQUAL(mcr, 2000);
 
    // pass hardfork
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    generate_block();
 
    // feed is still valid
-   BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).current_feed.maintenance_collateral_ratio, 2000);
+   mcr = (*bitusd_id(db).bitasset_data_id)(db).current_feed.maintenance_collateral_ratio;
+   BOOST_CHECK_EQUAL(mcr, 2000);
 
    // margin call is traded
    print_market(asset_id_type(1)(db).symbol, asset_id_type()(db).symbol);
