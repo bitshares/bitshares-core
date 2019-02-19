@@ -40,6 +40,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/container/flat_set.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include <graphene/utilities/git_revision.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -64,9 +65,11 @@ int main(int argc, char** argv) {
       bpo::options_description cfg_options("Graphene Witness Node");
       app_options.add_options()
             ("help,h", "Print this help message and exit.")
-            ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("witness_node_data_dir"), "Directory containing databases, configuration file, etc.")
+            ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("witness_node_data_dir"),
+                    "Directory containing databases, configuration file, etc.")
             ("version,v", "Display version information")
-            ;
+            ("plugins", bpo::value<std::string>()->default_value("witness account_history market_history grouped_orders"),
+                    "Space-separated list of plugins to activate");
 
       bpo::variables_map options;
 
@@ -90,10 +93,24 @@ int main(int argc, char** argv) {
       }
       catch (const boost::program_options::error& e)
       {
-        std::cerr << "Error parsing command line: " << e.what() << "\n";
-        return 1;
+         std::cerr << "Error parsing command line: " << e.what() << "\n";
+         return 1;
       }
 
+      std::set<std::string> plugins;
+      boost::split(plugins, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
+
+      if(plugins.count("account_history") && plugins.count("elasticsearch")) {
+         std::cerr << "Plugin conflict: Cannot load both account_history plugin and elasticsearch plugin\n";
+         return 1;
+      }
+
+      std::for_each(plugins.begin(), plugins.end(), [node](const std::string& plug) mutable {
+         if (!plug.empty()) {
+            node->enable_plugin(plug);
+         }
+      });
+      
       if( options.count("help") )
       {
          std::cout << app_options << "\n";
@@ -120,6 +137,7 @@ int main(int argc, char** argv) {
       app::load_configuration_options(data_dir, cfg_options, options);
 
       bpo::notify(options);
+
       node->initialize(data_dir, options);
       node->initialize_plugins( options );
 
@@ -146,7 +164,7 @@ int main(int argc, char** argv) {
       node->shutdown_plugins();
       node->shutdown();
       delete node;
-      return 0;
+      return EXIT_SUCCESS;
    } catch( const fc::exception& e ) {
       // deleting the node can yield, so do this outside the exception handler
       unhandled_exception = e;
@@ -157,7 +175,7 @@ int main(int argc, char** argv) {
       elog("Exiting with error:\n${e}", ("e", unhandled_exception->to_detail_string()));
       node->shutdown();
       delete node;
-      return 1;
+      return EXIT_FAILURE;
    }
 }
 

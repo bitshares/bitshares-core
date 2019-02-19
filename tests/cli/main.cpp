@@ -33,7 +33,6 @@
 #include <graphene/wallet/wallet.hpp>
 
 #include <fc/thread/thread.hpp>
-#include <fc/smart_ref_impl.hpp>
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/rpc/cli.hpp>
@@ -114,10 +113,10 @@ int get_available_port()
 std::shared_ptr<graphene::app::application> start_application(fc::temp_directory& app_dir, int& server_port_number) {
    std::shared_ptr<graphene::app::application> app1(new graphene::app::application{});
 
-   app1->register_plugin<graphene::account_history::account_history_plugin>();
-   app1->register_plugin< graphene::market_history::market_history_plugin >();
-   app1->register_plugin< graphene::witness_plugin::witness_plugin >();
-   app1->register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
+   app1->register_plugin<graphene::account_history::account_history_plugin>(true);
+   app1->register_plugin< graphene::market_history::market_history_plugin >(true);
+   app1->register_plugin< graphene::witness_plugin::witness_plugin >(true);
+   app1->register_plugin< graphene::grouped_orders::grouped_orders_plugin>(true);
    app1->startup_plugins();
    boost::program_options::variables_map cfg;
 #ifdef _WIN32
@@ -549,7 +548,7 @@ BOOST_FIXTURE_TEST_CASE( account_history_pagination, cli_fixture )
 
       // now get account history and make sure everything is there (and no duplicates)
       std::vector<graphene::wallet::operation_detail> history = con.wallet_api_ptr->get_account_history("jmjatlanta", 300);
-      BOOST_CHECK_EQUAL(201, history.size() );
+      BOOST_CHECK_EQUAL(201u, history.size() );
 
       std::set<object_id_type> operation_ids;
 

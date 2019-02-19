@@ -303,7 +303,7 @@ BOOST_AUTO_TEST_CASE( asset_settle_cancel_operation_test_after_hf588 )
       pcop.proposed_ops.emplace_back(ascop);
       trx.operations.push_back(pcop);
 
-      BOOST_CHECK_EXCEPTION(db.push_transaction(trx), fc::assert_exception,
+      BOOST_CHECK_EXCEPTION(PUSH_TX(db, trx), fc::assert_exception,
             [](fc::assert_exception const &e) -> bool {
                std::cout << e.to_string() << std::endl;
                if (e.to_string().find("Virtual operation") != std::string::npos)
@@ -333,7 +333,7 @@ BOOST_AUTO_TEST_CASE( asset_settle_cancel_operation_test_after_hf588 )
 
       trx.operations.push_back(pcop);
 
-      BOOST_CHECK_EXCEPTION(db.push_transaction(trx), fc::assert_exception,
+      BOOST_CHECK_EXCEPTION(PUSH_TX(db, trx), fc::assert_exception,
             [](fc::assert_exception const &e) -> bool {
                std::cout << e.to_string() << std::endl;
                if (e.to_string().find("Virtual operation") != std::string::npos)
@@ -656,7 +656,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
          tx.operations.push_back( prop );
          db.current_fee_schedule().set_fee( tx.operations.back() );
          set_expiration( db, tx );
-         db.push_transaction( tx, ~0 );
+         PUSH_TX( db, tx, ~0 );
       };
 
       BOOST_TEST_MESSAGE( "bob tries to propose a proposal with target_cr set, "
@@ -1731,7 +1731,7 @@ BOOST_AUTO_TEST_CASE( witness_feeds )
       vector<account_id_type> active_witnesses;
       for( const witness_id_type& wit_id : global_props.active_witnesses )
          active_witnesses.push_back( wit_id(db).witness_account );
-      BOOST_REQUIRE_EQUAL(active_witnesses.size(), 10);
+      BOOST_REQUIRE_EQUAL(active_witnesses.size(), 10u);
 
       asset_publish_feed_operation op;
       op.publisher = active_witnesses[0];
@@ -1828,7 +1828,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    const asset_object* core = &asset_id_type()(db);
    const account_object* nathan = &get_account("nathan");
    enable_fees();
-   BOOST_CHECK_GT(db.current_fee_schedule().get<account_upgrade_operation>().membership_lifetime_fee, 0);
+   BOOST_CHECK_GT(db.current_fee_schedule().get<account_upgrade_operation>().membership_lifetime_fee, 0u);
    // Based on the size of the reserve fund later in the test, the witness budget will be set to this value
    const uint64_t ref_budget =
       ((uint64_t( db.current_fee_schedule().get<account_upgrade_operation>().membership_lifetime_fee )
@@ -1838,10 +1838,10 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
       ) >> GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS
       ;
    // change this if ref_budget changes
-   BOOST_CHECK_EQUAL( ref_budget, 594 );
+   BOOST_CHECK_EQUAL( ref_budget, 594u );
    const uint64_t witness_ppb = ref_budget * 10 / 23 + 1;
    // change this if ref_budget changes
-   BOOST_CHECK_EQUAL( witness_ppb, 259 );
+   BOOST_CHECK_EQUAL( witness_ppb, 259u );
    // following two inequalities need to hold for maximal code coverage
    BOOST_CHECK_LT( witness_ppb * 2, ref_budget );
    BOOST_CHECK_GT( witness_ppb * 3, ref_budget );
@@ -1887,28 +1887,28 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
       generate_block();
       BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
    }
-   BOOST_CHECK_EQUAL( db.head_block_time().sec_since_epoch() - pay_fee_time, 24 * block_interval );
+   BOOST_CHECK_EQUAL( db.head_block_time().sec_since_epoch() - pay_fee_time, 24u * block_interval );
 
    schedule_maint();
    // The 80% lifetime referral fee went to the committee account, which burned it. Check that it's here.
    BOOST_CHECK( core->reserved(db).value == 8000*prec );
    generate_block();
    BOOST_CHECK_EQUAL( core->reserved(db).value, 999999406 );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, (int64_t)ref_budget );
    // first witness paid from old budget (so no pay)
    BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
    // second witness finally gets paid!
    generate_block();
-   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, witness_ppb );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget - witness_ppb );
+   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)witness_ppb );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, (int64_t)(ref_budget - witness_ppb) );
 
    generate_block();
-   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, witness_ppb );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget - 2 * witness_ppb );
+   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)witness_ppb );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, (int64_t)(ref_budget - 2 * witness_ppb) );
 
    generate_block();
-   BOOST_CHECK_LT( last_witness_vbo_balance().value, witness_ppb );
-   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, ref_budget - 2 * witness_ppb );
+   BOOST_CHECK_LT( last_witness_vbo_balance().value, (int64_t)witness_ppb );
+   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)(ref_budget - 2 * witness_ppb) );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
 
    generate_block();
@@ -1940,7 +1940,7 @@ BOOST_AUTO_TEST_CASE( reserve_asset_test )
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         db.push_transaction( tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
       auto _issue_uia = [&]( const account_object& recipient, asset amount )
@@ -1952,7 +1952,7 @@ BOOST_AUTO_TEST_CASE( reserve_asset_test )
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         db.push_transaction( tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
       int64_t init_balance = 10000;
@@ -2043,7 +2043,7 @@ BOOST_AUTO_TEST_CASE( cover_with_collateral_test )
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         db.push_transaction( tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
       // margin call requirement:  1.75x

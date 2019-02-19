@@ -30,7 +30,6 @@
 #include <boost/algorithm/string.hpp>
 
 #include <fc/filesystem.hpp>
-#include <fc/smart_ref_impl.hpp>   // required for gcc in release mode
 #include <fc/string.hpp>
 #include <fc/io/fstream.hpp>
 #include <fc/io/json.hpp>

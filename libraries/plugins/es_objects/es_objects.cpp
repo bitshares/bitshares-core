@@ -24,15 +24,14 @@
 
 #include <graphene/es_objects/es_objects.hpp>
 
-#include <fc/smart_ref_impl.hpp>
-
 #include <curl/curl.h>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/market_object.hpp>
+#include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/account_object.hpp>
 
 #include <graphene/utilities/elasticsearch.hpp>
-
 
 namespace graphene { namespace es_objects {
 
@@ -62,6 +61,7 @@ class es_objects_plugin_impl
       bool _es_objects_limit_orders = true;
       bool _es_objects_asset_bitasset = true;
       std::string _es_objects_index_prefix = "objects-";
+      uint32_t _es_objects_start_es_after_block = 0;
       CURL *curl; // curl handler
       vector <std::string> bulk;
       vector<std::string> prepare;
@@ -72,12 +72,8 @@ class es_objects_plugin_impl
       fc::time_point_sec block_time;
 
    private:
-      void prepare_proposal(const proposal_object& proposal_object);
-      void prepare_account(const account_object& account_object);
-      void prepare_asset(const asset_object& asset_object);
-      void prepare_balance(const account_balance_object& account_balance_object);
-      void prepare_limit(const limit_order_object& limit_object);
-      void prepare_bitasset(const asset_bitasset_data_object& bitasset_object);
+      template<typename T>
+      void prepareTemplate(T blockchain_object, string index_name);
 };
 
 bool es_objects_plugin_impl::index_database( const vector<object_id_type>& ids, std::string action)
@@ -87,88 +83,87 @@ bool es_objects_plugin_impl::index_database( const vector<object_id_type>& ids, 
    block_time = db.head_block_time();
    block_number = db.head_block_num();
 
-   // check if we are in replay or in sync and change number of bulk documents accordingly
-   uint32_t limit_documents = 0;
-   if((fc::time_point::now() - block_time) < fc::seconds(30))
-      limit_documents = _es_objects_bulk_sync;
-   else
-      limit_documents = _es_objects_bulk_replay;
+   if(block_number > _es_objects_start_es_after_block) {
 
-   for(auto const& value: ids) {
-      if(value.is<proposal_object>() && _es_objects_proposals) {
-         auto obj = db.find_object(value);
-         auto p = static_cast<const proposal_object*>(obj);
-         if(p != nullptr) {
-            if(action == "delete")
-               remove_from_database(p->id, "proposal");
-            else
-               prepare_proposal(*p);
-         }
-      }
-      else if(value.is<account_object>() && _es_objects_accounts) {
-         auto obj = db.find_object(value);
-         auto a = static_cast<const account_object*>(obj);
-         if(a != nullptr) {
-            if(action == "delete")
-               remove_from_database(a->id, "account");
-            else
-               prepare_account(*a);
-         }
-      }
-      else if(value.is<asset_object>() && _es_objects_assets) {
-         auto obj = db.find_object(value);
-         auto a = static_cast<const asset_object*>(obj);
-         if(a != nullptr) {
-            if(action == "delete")
-               remove_from_database(a->id, "asset");
-            else
-               prepare_asset(*a);
-         }
-      }
-      else if(value.is<account_balance_object>() && _es_objects_balances) {
-         auto obj = db.find_object(value);
-         auto b = static_cast<const account_balance_object*>(obj);
-         if(b != nullptr) {
-            if(action == "delete")
-               remove_from_database(b->id, "balance");
-            else
-               prepare_balance(*b);
-         }
-      }
-      else if(value.is<limit_order_object>() && _es_objects_limit_orders) {
-         auto obj = db.find_object(value);
-         auto l = static_cast<const limit_order_object*>(obj);
-         if(l != nullptr) {
-            if(action == "delete")
-               remove_from_database(l->id, "limitorder");
-            else
-               prepare_limit(*l);
-         }
-      }
-      else if(value.is<asset_bitasset_data_object>() && _es_objects_asset_bitasset) {
-         auto obj = db.find_object(value);
-         auto ba = static_cast<const asset_bitasset_data_object*>(obj);
-         if(ba != nullptr) {
-            if(action == "delete")
-               remove_from_database(ba->id, "bitasset");
-            else
-               prepare_bitasset(*ba);
-         }
-      }
-   }
-
-   if (curl && bulk.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
-
-      graphene::utilities::ES es;
-      es.curl = curl;
-      es.bulk_lines = bulk;
-      es.elasticsearch_url = _es_objects_elasticsearch_url;
-      es.auth = _es_objects_auth;
-
-      if(!graphene::utilities::SendBulk(std::move(es)))
-         return false;
+      // check if we are in replay or in sync and change number of bulk documents accordingly
+      uint32_t limit_documents = 0;
+      if ((fc::time_point::now() - block_time) < fc::seconds(30))
+         limit_documents = _es_objects_bulk_sync;
       else
-         bulk.clear();
+         limit_documents = _es_objects_bulk_replay;
+
+
+      for (auto const &value: ids) {
+         if (value.is<proposal_object>() && _es_objects_proposals) {
+            auto obj = db.find_object(value);
+            auto p = static_cast<const proposal_object *>(obj);
+            if (p != nullptr) {
+               if (action == "delete")
+                  remove_from_database(p->id, "proposal");
+               else
+                  prepareTemplate<proposal_object>(*p, "proposal");
+            }
+         } else if (value.is<account_object>() && _es_objects_accounts) {
+            auto obj = db.find_object(value);
+            auto a = static_cast<const account_object *>(obj);
+            if (a != nullptr) {
+               if (action == "delete")
+                  remove_from_database(a->id, "account");
+               else
+                  prepareTemplate<account_object>(*a, "account");
+            }
+         } else if (value.is<asset_object>() && _es_objects_assets) {
+            auto obj = db.find_object(value);
+            auto a = static_cast<const asset_object *>(obj);
+            if (a != nullptr) {
+               if (action == "delete")
+                  remove_from_database(a->id, "asset");
+               else
+                  prepareTemplate<asset_object>(*a, "asset");
+            }
+         } else if (value.is<account_balance_object>() && _es_objects_balances) {
+            auto obj = db.find_object(value);
+            auto b = static_cast<const account_balance_object *>(obj);
+            if (b != nullptr) {
+               if (action == "delete")
+                  remove_from_database(b->id, "balance");
+               else
+                  prepareTemplate<account_balance_object>(*b, "balance");
+            }
+         } else if (value.is<limit_order_object>() && _es_objects_limit_orders) {
+            auto obj = db.find_object(value);
+            auto l = static_cast<const limit_order_object *>(obj);
+            if (l != nullptr) {
+               if (action == "delete")
+                  remove_from_database(l->id, "limitorder");
+               else
+                  prepareTemplate<limit_order_object>(*l, "limitorder");
+            }
+         } else if (value.is<asset_bitasset_data_object>() && _es_objects_asset_bitasset) {
+            auto obj = db.find_object(value);
+            auto ba = static_cast<const asset_bitasset_data_object *>(obj);
+            if (ba != nullptr) {
+               if (action == "delete")
+                  remove_from_database(ba->id, "bitasset");
+               else
+                  prepareTemplate<asset_bitasset_data_object>(*ba, "bitasset");
+            }
+         }
+      }
+
+      if (curl && bulk.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
+
+         graphene::utilities::ES es;
+         es.curl = curl;
+         es.bulk_lines = bulk;
+         es.elasticsearch_url = _es_objects_elasticsearch_url;
+         es.auth = _es_objects_auth;
+
+         if (!graphene::utilities::SendBulk(std::move(es)))
+            return false;
+         else
+            bulk.clear();
+      }
    }
 
    return true;
@@ -190,179 +185,31 @@ void es_objects_plugin_impl::remove_from_database( object_id_type id, std::strin
    }
 }
 
-void es_objects_plugin_impl::prepare_proposal(const proposal_object& proposal_object)
+template<typename T>
+void es_objects_plugin_impl::prepareTemplate(T blockchain_object, string index_name)
 {
-   proposal_struct prop;
-   prop.object_id = proposal_object.id;
-   prop.block_time = block_time;
-   prop.block_number = block_number;
-   prop.expiration_time = proposal_object.expiration_time;
-   prop.review_period_time = proposal_object.review_period_time;
-   prop.proposed_transaction = fc::json::to_string(proposal_object.proposed_transaction);
-   prop.required_owner_approvals = fc::json::to_string(proposal_object.required_owner_approvals);
-   prop.available_owner_approvals = fc::json::to_string(proposal_object.available_owner_approvals);
-   prop.required_active_approvals = fc::json::to_string(proposal_object.required_active_approvals);
-   prop.available_key_approvals = fc::json::to_string(proposal_object.available_key_approvals);
-   prop.proposer = proposal_object.proposer;
-
-   std::string data = fc::json::to_string(prop);
-
    fc::mutable_variant_object bulk_header;
-   bulk_header["_index"] = _es_objects_index_prefix + "proposal";
+   bulk_header["_index"] = _es_objects_index_prefix + index_name;
    bulk_header["_type"] = "data";
    if(_es_objects_keep_only_current)
    {
-      bulk_header["_id"] = string(prop.object_id);
+      bulk_header["_id"] = string(blockchain_object.id);
    }
+
+   adaptor_struct adaptor;
+   fc::variant blockchain_object_variant;
+   fc::to_variant( blockchain_object, blockchain_object_variant, GRAPHENE_NET_MAX_NESTED_OBJECTS );
+   fc::mutable_variant_object o = adaptor.adapt(blockchain_object_variant.get_object());
+
+   o["object_id"] = string(blockchain_object.id);
+   o["block_time"] = block_time;
+   o["block_number"] = block_number;
+
+   string data = fc::json::to_string(o, fc::json::legacy_generator);
 
    prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
    std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk));
    prepare.clear();
-}
-
-void es_objects_plugin_impl::prepare_account(const account_object& account_object)
-{
-   account_struct acct;
-   acct.object_id = account_object.id;
-   acct.block_time = block_time;
-   acct.block_number = block_number;
-   acct.membership_expiration_date = account_object.membership_expiration_date;
-   acct.registrar = account_object.registrar;
-   acct.referrer = account_object.referrer;
-   acct.lifetime_referrer = account_object.lifetime_referrer;
-   acct.network_fee_percentage = account_object.network_fee_percentage;
-   acct.lifetime_referrer_fee_percentage = account_object.lifetime_referrer_fee_percentage;
-   acct.referrer_rewards_percentage = account_object.referrer_rewards_percentage;
-   acct.name = account_object.name;
-   acct.owner_account_auths = fc::json::to_string(account_object.owner.account_auths);
-   acct.owner_key_auths = fc::json::to_string(account_object.owner.key_auths);
-   acct.owner_address_auths = fc::json::to_string(account_object.owner.address_auths);
-   acct.active_account_auths = fc::json::to_string(account_object.active.account_auths);
-   acct.active_key_auths = fc::json::to_string(account_object.active.key_auths);
-   acct.active_address_auths = fc::json::to_string(account_object.active.address_auths);
-   acct.voting_account = account_object.options.voting_account;
-   acct.votes = fc::json::to_string(account_object.options.votes);
-
-   std::string data = fc::json::to_string(acct);
-
-   fc::mutable_variant_object bulk_header;
-   bulk_header["_index"] = _es_objects_index_prefix + "account";
-   bulk_header["_type"] = "data";
-   if(_es_objects_keep_only_current)
-   {
-      bulk_header["_id"] = string(acct.object_id);
-   }
-
-   prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
-   std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk));
-   prepare.clear();
-}
-
-void es_objects_plugin_impl::prepare_asset(const asset_object& asset_object)
-{
-   asset_struct asset;
-   asset.object_id = asset_object.id;
-   asset.block_time = block_time;
-   asset.block_number = block_number;
-   asset.symbol = asset_object.symbol;
-   asset.issuer = asset_object.issuer;
-   asset.is_market_issued = asset_object.is_market_issued();
-   asset.dynamic_asset_data_id = asset_object.dynamic_asset_data_id;
-   asset.bitasset_data_id = asset_object.bitasset_data_id;
-
-   std::string data = fc::json::to_string(asset);
-
-   fc::mutable_variant_object bulk_header;
-   bulk_header["_index"] = _es_objects_index_prefix + "asset";
-   bulk_header["_type"] = "data";
-   if(_es_objects_keep_only_current)
-   {
-      bulk_header["_id"] = string(asset.object_id);
-   }
-
-   prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
-   std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk));
-   prepare.clear();
-}
-
-void es_objects_plugin_impl::prepare_balance(const account_balance_object& account_balance_object)
-{
-   balance_struct balance;
-   balance.object_id = account_balance_object.id;
-   balance.block_time = block_time;
-   balance.block_number = block_number;
-   balance.owner = account_balance_object.owner;
-   balance.asset_type = account_balance_object.asset_type;
-   balance.balance = account_balance_object.balance;
-   balance.maintenance_flag = account_balance_object.maintenance_flag;
-
-   std::string data = fc::json::to_string(balance);
-
-   fc::mutable_variant_object bulk_header;
-   bulk_header["_index"] = _es_objects_index_prefix + "balance";
-   bulk_header["_type"] = "data";
-   if(_es_objects_keep_only_current)
-   {
-      bulk_header["_id"] = string(balance.object_id);
-   }
-
-   prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
-   std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk));
-   prepare.clear();
-}
-
-void es_objects_plugin_impl::prepare_limit(const limit_order_object& limit_object)
-{
-   limit_order_struct limit;
-   limit.object_id = limit_object.id;
-   limit.block_time = block_time;
-   limit.block_number = block_number;
-   limit.expiration = limit_object.expiration;
-   limit.seller = limit_object.seller;
-   limit.for_sale = limit_object.for_sale;
-   limit.sell_price = limit_object.sell_price;
-   limit.deferred_fee = limit_object.deferred_fee;
-
-   std::string data = fc::json::to_string(limit);
-
-   fc::mutable_variant_object bulk_header;
-   bulk_header["_index"] = _es_objects_index_prefix + "limitorder";
-   bulk_header["_type"] = "data";
-   if(_es_objects_keep_only_current)
-   {
-      bulk_header["_id"] = string(limit.object_id);
-   }
-
-   prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
-   std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk));
-   prepare.clear();
-}
-
-void es_objects_plugin_impl::prepare_bitasset(const asset_bitasset_data_object& bitasset_object)
-{
-   if(!bitasset_object.is_prediction_market) {
-
-      bitasset_struct bitasset;
-      bitasset.object_id = bitasset_object.id;
-      bitasset.block_time = block_time;
-      bitasset.block_number = block_number;
-      bitasset.current_feed = fc::json::to_string(bitasset_object.current_feed);
-      bitasset.current_feed_publication_time = bitasset_object.current_feed_publication_time;
-
-      std::string data = fc::json::to_string(bitasset);
-
-      fc::mutable_variant_object bulk_header;
-      bulk_header["_index"] = _es_objects_index_prefix + "bitasset";
-      bulk_header["_type"] = "data";
-      if(_es_objects_keep_only_current)
-      {
-         bulk_header["_id"] = string(bitasset.object_id);
-      }
-
-      prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
-      std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk));
-      prepare.clear();
-   }
 }
 
 es_objects_plugin_impl::~es_objects_plugin_impl()
@@ -408,6 +255,7 @@ void es_objects_plugin::plugin_set_program_options(
          ("es-objects-asset-bitasset", boost::program_options::value<bool>(), "Store feed data(true)")
          ("es-objects-index-prefix", boost::program_options::value<std::string>(), "Add a prefix to the index(objects-)")
          ("es-objects-keep-only-current", boost::program_options::value<bool>(), "Keep only current state of the objects(true)")
+         ("es-objects-start-es-after-block", boost::program_options::value<uint32_t>(), "Start doing ES job after block(0)")
          ;
    cfg.add(cli);
 }
@@ -469,6 +317,9 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
    }
    if (options.count("es-objects-keep-only-current")) {
       my->_es_objects_keep_only_current = options["es-objects-keep-only-current"].as<bool>();
+   }
+   if (options.count("es-objects-start-es-after-block")) {
+      my->_es_objects_start_es_after_block = options["es-objects-start-es-after-block"].as<uint32_t>();
    }
 }
 
