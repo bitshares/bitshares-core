@@ -59,6 +59,11 @@ void transaction::validate() const
       operation_validate(op);
 }
 
+uint64_t transaction::get_packed_size() const
+{
+   return fc::raw::pack_size(*this);
+}
+
 const transaction_id_type& transaction::id() const
 {
    auto h = digest();
@@ -403,6 +408,13 @@ void precomputable_transaction::validate() const
    if( _validated ) return;
    transaction::validate();
    _validated = true;
+}
+
+uint64_t precomputable_transaction::get_packed_size()const
+{
+   if( _packed_size == 0 )
+      _packed_size = transaction::get_packed_size();
+   return _packed_size;
 }
 
 const flat_set<public_key_type>& precomputable_transaction::get_signature_keys( const chain_id_type& chain_id )const
