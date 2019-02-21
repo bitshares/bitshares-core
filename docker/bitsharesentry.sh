@@ -1,5 +1,10 @@
 #!/bin/bash
 BITSHARESD="/usr/local/bin/witness_node"
+DATA_PATH="/var/lib/bitshares"
+
+API_ACCESS_FILENAME="${DATA_PATH}/api-access.json"
+GENESIS_FILENAME="${DATA_PATH}/genesis.json"
+CONFIG_FILE="${DATA_PATH}/config.ini"
 
 # For blockchain download
 VERSION=`cat /etc/bitshares/version`
@@ -19,6 +24,9 @@ VERSION=`cat /etc/bitshares/version`
 #   * $BITSHARESD_MAX_OPS_PER_ACCOUNT
 #   * $BITSHARESD_ES_NODE_URL
 #   * $BITSHARESD_TRUSTED_NODE
+#   * $BITSHARESD_API_ACCESS_CONTENT
+#   * $BITSHARESD_GENESIS_CONTENT
+#   * $BITSHARESD_CONFIG_CONTENT
 #
 
 ARGS=""
@@ -74,14 +82,28 @@ if [[ ! -z "$BITSHARESD_TRUSTED_NODE" ]]; then
     ARGS+=" --trusted-node=${BITSHARESD_TRUSTED_NODE}"
 fi
 
-## Link the bitshares config file into home
-## This link has been created in Dockerfile, already
-ln -f -s /etc/bitshares/config.ini /var/lib/bitshares
+if [[ ! -z "$BITSHARESD_API_ACCESS_CONTENT" ]]; then
+    echo "${BITSHARESD_API_ACCESS_CONTENT}" > ${API_ACCESS_FILENAME}
+    ARGS+=" --api-access=${API_ACCESS_FILENAME}"
+fi
+if [[ ! -z "$BITSHARESD_GENESIS_CONTENT" ]]; then
+    echo "${BITSHARESD_GENESIS_CONTENT}" > ${GENESIS_FILENAME}
+    ARGS+=" --genesis-json=${GENESIS_FILENAME}"
+fi
+
+if [[ ! -z "$BITSHARESD_CONFIG_CONTENT" ]]; then
+    echo "${BITSHARESD_CONFIG_CONTENT}" > ${CONFIG_FILE}
+    ARGS+=" --genesis-json=${GENESIS_FILENAME}"
+else
+   ## Link the BITSHARESD config file into home
+   ## This link has been created in Dockerfile, already
+   ln -f -s /etc/BITSHARESD/config.ini ${CONFIG_FILE}
+fi
 
 # Plugins need to be provided in a space-separated list, which
 # makes it necessary to write it like this
 if [[ ! -z "$BITSHARESD_PLUGINS" ]]; then
-   exec $BITSHARESD --data-dir ${HOME} ${ARGS} ${BITSHARESD_ARGS} --plugins "${BITSHARESD_PLUGINS}"
+   exec $BITSHARESD --data-dir ${DATA_PATH} ${ARGS} ${BITSHARESD_ARGS} --plugins "${BITSHARESD_PLUGINS}"
 else
-   exec $BITSHARESD --data-dir ${HOME} ${ARGS} ${BITSHARESD_ARGS}
+   exec $BITSHARESD --data-dir ${DATA_PATH} ${ARGS} ${BITSHARESD_ARGS}
 fi
