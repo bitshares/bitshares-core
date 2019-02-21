@@ -136,16 +136,13 @@ void set_committee_parameters(database_fixture* db_fixture)
    
    db_fixture->trx.operations.push_back(cop);
    graphene::chain::processed_transaction proc_trx =db_fixture->db.push_transaction(db_fixture->trx);
+   db_fixture->trx.clear();
    proposal_id_type good_proposal_id = proc_trx.operation_results[0].get<object_id_type>();
 
    proposal_update_operation puo;
    puo.proposal = good_proposal_id;
    puo.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
-   puo.active_approvals_to_add = {
-         db_fixture->get_account("init0").get_id(), db_fixture->get_account("init1").get_id(),
-         db_fixture->get_account("init2").get_id(), db_fixture->get_account("init3").get_id(),
-         db_fixture->get_account("init4").get_id(), db_fixture->get_account("init5").get_id(),
-         db_fixture->get_account("init6").get_id(), db_fixture->get_account("init7").get_id()};
+   puo.key_approvals_to_add.emplace( db_fixture->init_account_priv_key.get_public_key() );
    db_fixture->trx.operations.push_back(puo);
    db_fixture->sign( db_fixture->trx, db_fixture->init_account_priv_key );
    db_fixture->db.push_transaction(db_fixture->trx);
