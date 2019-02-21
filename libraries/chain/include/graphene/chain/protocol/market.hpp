@@ -73,6 +73,35 @@ namespace graphene { namespace chain {
       price           get_price()const { return amount_to_sell / min_to_receive; }
    };
 
+   /**
+    * @ingroup operations
+    * Used to update an existing limit order.
+    *
+    * Charges a higher fee if @ref delta_amount_to_sell is set, as this requires updating
+    * the account balance as well as the order object.
+    */
+   struct limit_order_update_operation : public base_operation
+   {
+       struct fee_parameters_type {
+           uint64_t price_fee = GRAPHENE_BLOCKCHAIN_PRECISION / 2;
+           uint64_t amount_fee = GRAPHENE_BLOCKCHAIN_PRECISION;
+       };
+
+       asset fee;
+       account_id_type seller;
+       limit_order_id_type order;
+       optional<price> new_price;
+       optional<asset> delta_amount_to_sell;
+       optional<time_point_sec> new_expiration;
+
+       extensions_type extensions;
+
+       account_id_type fee_payer() { return seller; }
+       void validate() const;
+       share_type calculate_fee(const fee_parameters_type& k) const {
+           return delta_amount_to_sell? k.amount_fee : k.price_fee;
+       }
+   };
 
    /**
     *  @ingroup operations
@@ -219,6 +248,7 @@ namespace graphene { namespace chain {
 } } // graphene::chain
 
 FC_REFLECT( graphene::chain::limit_order_create_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::limit_order_update_operation::fee_parameters_type, (price_fee)(amount_fee) )
 FC_REFLECT( graphene::chain::limit_order_cancel_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::call_order_update_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::bid_collateral_operation::fee_parameters_type, (fee) )
@@ -230,6 +260,7 @@ FC_REFLECT( graphene::chain::call_order_update_operation::options_type, (target_
 FC_REFLECT_TYPENAME( graphene::chain::call_order_update_operation::extensions_type )
 
 FC_REFLECT( graphene::chain::limit_order_create_operation,(fee)(seller)(amount_to_sell)(min_to_receive)(expiration)(fill_or_kill)(extensions))
+FC_REFLECT( graphene::chain::limit_order_update_operation,(fee)(seller)(order)(new_price)(delta_amount_to_sell)(new_expiration)(extensions))
 FC_REFLECT( graphene::chain::limit_order_cancel_operation,(fee)(fee_paying_account)(order)(extensions) )
 FC_REFLECT( graphene::chain::call_order_update_operation, (fee)(funding_account)(delta_collateral)(delta_debt)(extensions) )
 FC_REFLECT( graphene::chain::fill_order_operation, (fee)(order_id)(account_id)(pays)(receives)(fill_price)(is_maker) )
