@@ -265,17 +265,8 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       BOOST_TEST_MESSAGE( "Attempting to transfer from nathan after blacklisting, should fail" );
       op.amount = advanced.amount(50);
       trx.operations.back() = op;
-      //Fail because nathan is blacklisted
-      if( db.head_block_time() <= HARDFORK_419_TIME )
-      {
-         // before the hardfork time, it fails because the whitelist check fails
-         GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), transfer_from_account_not_whitelisted );
-      }
-      else
-      {
-         // after the hardfork time, it fails because the fees are not in a whitelisted asset
-         GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception );
-      }
+      // it fails because the fees are not in a whitelisted asset
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception );
 
       BOOST_TEST_MESSAGE( "Attempting to burn from nathan after blacklisting, should fail" );
       asset_reserve_operation burn;
