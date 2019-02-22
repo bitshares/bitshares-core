@@ -3432,7 +3432,6 @@ BOOST_AUTO_TEST_CASE( stealth_fba_test )
       ACTORS( (alice)(bob)(chloe)(dan)(izzy)(philbin)(tom) );
       upgrade_to_lifetime_member(philbin_id);
 
-      generate_blocks( HARDFORK_538_TIME );
       generate_blocks( HARDFORK_555_TIME );
       generate_blocks( HARDFORK_563_TIME );
       generate_blocks( HARDFORK_572_TIME );

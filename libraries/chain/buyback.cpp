@@ -31,7 +31,6 @@ namespace graphene { namespace chain {
 
 void evaluate_buyback_account_options( const database& db, const buyback_account_options& bbo )
 {
-   FC_ASSERT( db.head_block_time() >= HARDFORK_538_TIME );
    const asset_object& a = bbo.asset_to_buy(db);
    GRAPHENE_ASSERT( a.issuer == bbo.asset_to_buy_issuer,
       account_create_buyback_incorrect_issuer, "Incorrect asset issuer specified in buyback_account_options", ("asset", a)("bbo", bbo) );
