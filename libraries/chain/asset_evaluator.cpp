@@ -266,7 +266,6 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    database& d = db();
 
    const asset_object& a = o.asset_to_update(d);
-   auto old_options = a.options;
    auto a_copy = a;
    a_copy.options = o.new_options;
    a_copy.validate();
@@ -290,16 +289,10 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
              "Flag change is forbidden by issuer permissions");
 
    // TODO HARDFORKCHECK
-   // change of the disable_modify_max_supply flag; should only be set from 0 to 1
-   FC_ASSERT( ( old_options.flags & disable_modify_max_supply == o.new_options.flags & disable_modify_max_supply
-           || ( old_options.flags & disable_modify_max_supply ) == 0 ),
-           "The disable_modify_max_supply flag can not be deactivated." );
-
-   // TODO HARDFORKCHECK
    // maximum supply can only be changed if the disable_modify_max_supply flag is 0
-   FC_ASSERT( ( old_options.max_supply == o.new_options.max_supply
-           || ( old_options.flags & disable_modify_max_supply ) == 0 ),
-           "Modification of the maximum supply is forbidden by permission flag." );
+   FC_ASSERT( ( a.options.max_supply == o.new_options.max_supply
+           || ( a.options.flags & disable_modify_max_supply ) == 0 ),
+           "Modification of the maximum supply is forbidden" );
 
    asset_to_update = &a;
    FC_ASSERT( o.issuer == a.issuer,
