@@ -279,13 +279,6 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
         // deposit 100 BTS to the fee pool of ALICEUSD asset
         fund_fee_pool( alice_id(db), aliceusd_id(db), _core(100).amount );
 
-        // Unable to claim pool before the hardfork
-        GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, aliceusd_id, _core(1), core_asset), fc::exception );
-        GRAPHENE_REQUIRE_THROW( claim_pool_proposal( alice_id, aliceusd_id, _core(1), core_asset), fc::exception );
-
-        // Fast forward to hard fork date
-        generate_blocks( HARDFORK_CORE_188_TIME );
-
         // New reference for core_asset after having produced blocks
         const asset_object& core_asset_hf = asset_id_type()(db);
 

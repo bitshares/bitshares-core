@@ -62,12 +62,6 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(false, "Not allowed until hardfork 199");
       }
    }
-   // hf_188
-   void operator()(const graphene::chain::asset_claim_pool_operation &v) const {
-      if (block_time < HARDFORK_CORE_188_TIME) {
-         FC_ASSERT(false, "Not allowed until hardfork 188");
-      }
-   }
    // hf_588
    // issue #588
    //
