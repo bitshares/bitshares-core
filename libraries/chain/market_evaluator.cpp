@@ -132,11 +132,21 @@ void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_o
    // Check this is my order
    FC_ASSERT(o.seller == _order->seller, "Cannot update someone else's order");
 
-   // Check new price is compatible
-   if (o.new_price)
-      FC_ASSERT(o.new_price->base.asset_id == _order->sell_price.base.asset_id &&
-                o.new_price->quote.asset_id == _order->sell_price.quote.asset_id,
+   // Check new price is compatible, and determine whether it becomes the best offer on the market
+   if (o.new_price) {
+      auto base_id = o.new_price->base.asset_id;
+      auto quote_id = o.new_price->quote.asset_id;
+      FC_ASSERT(base_id == _order->sell_price.base.asset_id && quote_id == _order->sell_price.quote.asset_id,
                 "Cannot update limit order with incompatible price");
+      const auto& order_index = d.get_index_type<limit_order_index>().indices().get<by_price>();
+      auto top_of_book = order_index.upper_bound(boost::make_tuple(price::max(base_id, quote_id)));
+      FC_ASSERT(top_of_book->sell_price.base.asset_id == base_id && top_of_book->sell_price.quote.asset_id == quote_id,
+                "Paradox: attempting to update an order in a market that has no orders? There's a logic error somewhere.");
+
+      // If the new price of our order is greater than the price of the order at the top of the book, we should match orders at the end.
+      // Otherwise, we can skip matching because there's no way this change could trigger orders to fill.
+      should_match_orders = (*o.new_price > top_of_book->sell_price);
+   }
 
    // Check delta asset is compatible
    if (o.delta_amount_to_sell) {
@@ -156,7 +166,7 @@ void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_o
       FC_ASSERT(*o.new_expiration >= d.head_block_time(),
                 "Cannot update limit order with past expiration");
 
-   return void_result();
+   return {};
 } FC_CAPTURE_AND_RETHROW((o)) }
 
 void_result limit_order_update_evaluator::do_apply(const limit_order_update_operation& o)
@@ -182,9 +192,11 @@ void_result limit_order_update_evaluator::do_apply(const limit_order_update_oper
          loo.expiration = *o.new_expiration;
    });
 
-   // TODO: check if order is at front of book and price moved in favor of buyer; if so, trigger matching
+   // Perform order matching if necessary
+   if (should_match_orders)
+       d.apply_order(*_order);
 
-   return void_result();
+   return {};
 } FC_CAPTURE_AND_RETHROW((o)) }
 
 void_result limit_order_cancel_evaluator::do_evaluate(const limit_order_cancel_operation& o)

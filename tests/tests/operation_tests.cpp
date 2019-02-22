@@ -172,6 +172,50 @@ BOOST_AUTO_TEST_CASE(limit_order_update_test)
    }
 }
 
+BOOST_AUTO_TEST_CASE(limit_order_update_match_test)
+{
+   try {
+      ACTORS((nathan));
+      const auto& munee = create_user_issued_asset("MUNEE");
+
+      transfer(committee_account, nathan_id, asset(10000));
+      issue_uia(nathan, munee.amount(1000));
+
+      auto expiration = db.head_block_time() + 1000;
+      limit_order_id_type order_id_1 = create_sell_order(nathan, asset(999), munee.amount(100), expiration)->id;
+      limit_order_id_type order_id_2 = create_sell_order(nathan, munee.amount(100), asset(1001), expiration)->id;
+
+      update_limit_order(order_id_1, price(asset(1001), munee.amount(100)), asset(1));
+      BOOST_REQUIRE_EQUAL(db.find(order_id_1), nullptr);
+      BOOST_REQUIRE_EQUAL(db.find(order_id_2)->amount_for_sale().amount.value, 1);
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE(limit_order_update_match_test_2)
+{
+   try {
+      ACTORS((nathan));
+      const auto& munee = create_user_issued_asset("MUNEE");
+
+      transfer(committee_account, nathan_id, asset(10000));
+      issue_uia(nathan, munee.amount(1000));
+
+      auto expiration = db.head_block_time() + 1000;
+      limit_order_id_type order_id_1 = create_sell_order(nathan, asset(999), munee.amount(100), expiration)->id;
+      limit_order_id_type order_id_2 = create_sell_order(nathan, munee.amount(100), asset(1001), expiration)->id;
+
+      update_limit_order(order_id_2, price(munee.amount(100), asset(999)));
+      BOOST_REQUIRE_EQUAL(db.find(order_id_1), nullptr);
+      BOOST_REQUIRE_EQUAL(db.find(order_id_2), nullptr);
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( call_order_update_test )
 {
    try {
