@@ -49,13 +49,6 @@ struct proposal_operation_hardfork_visitor
                     "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
       }
    }
-   // hf_620
-   void operator()(const graphene::chain::asset_create_operation &v) const {
-      if (block_time < HARDFORK_CORE_620_TIME) {
-         static const std::locale &loc = std::locale::classic();
-         FC_ASSERT(isalpha(v.symbol.back(), loc), "Asset ${s} must end with alpha character before hardfork 620", ("s", v.symbol));
-      }
-   }
    // hf_199
    void operator()(const graphene::chain::asset_update_issuer_operation &v) const {
       if (block_time < HARDFORK_CORE_199_TIME) {
