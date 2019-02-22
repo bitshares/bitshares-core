@@ -351,7 +351,6 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_whitelist_asset_test )
                  | database::skip_merkle_check
                  ;
 
-   generate_blocks( HARDFORK_415_TIME, true, skip ); // get over Graphene 415 asset whitelisting bug
    generate_block( skip );
 
    for( int i=0; i<2; i++ )
