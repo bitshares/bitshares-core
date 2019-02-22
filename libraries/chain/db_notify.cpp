@@ -43,6 +43,10 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // seller
    }
+   void operator()(const limit_order_update_operation& op)
+   {
+      _impacted.insert(op.fee_payer()); // seller
+   }
    void operator()( const limit_order_cancel_operation& op )
    {
       _impacted.insert( op.fee_payer() ); // fee_paying_account

@@ -96,7 +96,7 @@ namespace graphene { namespace chain {
 
        extensions_type extensions;
 
-       account_id_type fee_payer() { return seller; }
+       account_id_type fee_payer() const { return seller; }
        void validate() const;
        share_type calculate_fee(const fee_parameters_type& k) const {
            return delta_amount_to_sell? k.amount_fee : k.price_fee;

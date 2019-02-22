@@ -80,6 +80,98 @@ BOOST_AUTO_TEST_CASE( feed_limit_logic_test )
    }
 }
 
+BOOST_AUTO_TEST_CASE(limit_order_update_test)
+{
+   try {
+      ACTORS((nathan));
+      const auto& bitusd = create_bitasset("USDBIT", nathan.id);
+      const auto& munee = create_user_issued_asset("MUNEE");
+      const auto& core   = asset_id_type()(db);
+
+      update_feed_producers(bitusd, {nathan_id});
+      price_feed current_feed;
+      current_feed.settlement_price = bitusd.amount(200) / core.amount(100);
+      current_feed.maintenance_collateral_ratio = 1750;
+      publish_feed(bitusd, nathan, current_feed);
+
+      transfer(committee_account, nathan_id, asset(1500));
+      issue_uia(nathan, munee.amount(100));
+      borrow(nathan_id, bitusd.amount(100), asset(500));
+
+      auto expiration = db.head_block_time() + 1000;
+      auto sell_price = price(asset(500), bitusd.amount(1000));
+      limit_order_id_type order_id = create_sell_order(nathan, asset(500), bitusd.amount(1000), expiration)->id;
+      BOOST_REQUIRE_EQUAL(order_id(db).for_sale.value, 500);
+      BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+      BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+
+      // Cannot update order without changing anything
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id), fc::assert_exception);
+      // Cannot update order to use inverted price assets
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(bitusd.amount(2), asset(1))), fc::assert_exception);
+      // Cannot update order to use different assets
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(bitusd.amount(2), munee.amount(1))), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(munee.amount(2), bitusd.amount(1))), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(2), munee.amount(1))), fc::assert_exception);
+      // Cannot update order to expire in the past
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, {}, db.head_block_time() - 10), fc::assert_exception);
+      // Cannot update order to add more funds than seller has
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset(501)), fc::assert_exception);
+      // Cannot update order to remove more funds than order has
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset(-501)), fc::assert_exception);
+      // Cannot update order to remove all funds in order
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset(-500)), fc::assert_exception);
+      // Cannot update order to add or remove different kind of funds
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, bitusd.amount(50)), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, bitusd.amount(-50)), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, munee.amount(50)), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, munee.amount(-50)), fc::assert_exception);
+
+      // Try changing price
+      sell_price.base = asset(501);
+      update_limit_order(order_id, sell_price);
+      BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+      sell_price.base = asset(500);
+      sell_price.quote = bitusd.amount(999);
+      update_limit_order(order_id, sell_price);
+      BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+      sell_price.quote = bitusd.amount(1000);
+      update_limit_order(order_id, sell_price);
+      BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+
+      // Try changing expiration
+      expiration += 50;
+      update_limit_order(order_id, {}, {}, expiration);
+      BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+      expiration -= 100;
+      update_limit_order(order_id, {}, {}, expiration);
+      BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+
+      // Try adding funds
+      update_limit_order(order_id, {}, asset(50));
+      BOOST_REQUIRE_EQUAL(order_id(db).amount_for_sale().amount.value, 550);
+      BOOST_REQUIRE_EQUAL(db.get_balance(nathan_id, core.get_id()).amount.value, 450);
+
+      // Try removing funds
+      update_limit_order(order_id, {}, asset(-100));
+      BOOST_REQUIRE_EQUAL(order_id(db).amount_for_sale().amount.value, 450);
+      BOOST_REQUIRE_EQUAL(db.get_balance(nathan_id, core.get_id()).amount.value, 550);
+
+      // Try changing everything at once
+      expiration += 50;
+      sell_price.base = asset(499);
+      sell_price.quote = bitusd.amount(1001);
+      update_limit_order(order_id, sell_price, 50, expiration);
+      BOOST_REQUIRE_EQUAL(fc::json::to_string(order_id(db).sell_price), fc::json::to_string(sell_price));
+      BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+      BOOST_REQUIRE_EQUAL(order_id(db).amount_for_sale().amount.value, 500);
+      BOOST_REQUIRE_EQUAL(db.get_balance(nathan_id, core.get_id()).amount.value, 500);
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( call_order_update_test )
 {
    try {

@@ -126,35 +126,37 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
 
 void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_operation& o)
 { try {
-    const database& d = db();
-    _order = &o.order(d);
+   const database& d = db();
+   _order = &o.order(d);
 
-    // Check this is my order
-    FC_ASSERT(o.seller == _order->seller, "Cannot update someone else's order");
+   // Check this is my order
+   FC_ASSERT(o.seller == _order->seller, "Cannot update someone else's order");
 
-    // Check new price is compatible
-    if (o.new_price)
-        FC_ASSERT(o.new_price->base.asset_id == _order->sell_price.base.asset_id &&
-                  o.new_price->quote.asset_id == _order->sell_price.quote.asset_id,
-                  "Cannot update limit order with incompatible price");
+   // Check new price is compatible
+   if (o.new_price)
+      FC_ASSERT(o.new_price->base.asset_id == _order->sell_price.base.asset_id &&
+                o.new_price->quote.asset_id == _order->sell_price.quote.asset_id,
+                "Cannot update limit order with incompatible price");
 
-    // Check delta asset is compatible
-    if (o.delta_amount_to_sell) {
-        const auto& delta = *o.delta_amount_to_sell;
-        FC_ASSERT(delta.asset_id == _order->sell_price.base.asset_id,
-                  "Cannot update limit order with incompatible asset");
-        if (delta.amount > 0)
-            FC_ASSERT(d.get_balance(o.seller, delta.asset_id) > delta,
-                      "Insufficient balance to increase order amount");
-        else
-            FC_ASSERT(_order->for_sale > -delta.amount,
-                      "Cannot deduct more from order than order contains");
-    }
+   // Check delta asset is compatible
+   if (o.delta_amount_to_sell) {
+      const auto& delta = *o.delta_amount_to_sell;
+      FC_ASSERT(delta.asset_id == _order->sell_price.base.asset_id,
+                "Cannot update limit order with incompatible asset");
+      if (delta.amount > 0)
+          FC_ASSERT(d.get_balance(o.seller, delta.asset_id) > delta,
+                    "Insufficient balance to increase order amount");
+      else
+          FC_ASSERT(_order->for_sale > -delta.amount,
+                    "Cannot deduct more from order than order contains");
+   }
 
-    // Check expiration is in the future
-    if (o.new_expiration)
-        FC_ASSERT(*o.new_expiration >= d.head_block_time(),
-                  "Cannot update limit order with past expiration");
+   // Check expiration is in the future
+   if (o.new_expiration)
+      FC_ASSERT(*o.new_expiration >= d.head_block_time(),
+                "Cannot update limit order with past expiration");
+
+   return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
 
 void_result limit_order_update_evaluator::do_apply(const limit_order_update_operation& o)
@@ -162,8 +164,13 @@ void_result limit_order_update_evaluator::do_apply(const limit_order_update_oper
    database& d = db();
 
    // Adjust account balance
+   const auto& seller_stats = o.seller(d).statistics(d);
+   if (o.delta_amount_to_sell && o.delta_amount_to_sell->asset_id == asset_id_type())
+       db().modify(seller_stats, [&o](account_statistics_object& bal) {
+           bal.total_core_in_orders += o.delta_amount_to_sell->amount;
+       });
    if (o.delta_amount_to_sell)
-      d.adjust_balance(o.seller, *o.delta_amount_to_sell);
+      d.adjust_balance(o.seller, -*o.delta_amount_to_sell);
 
    // Update order
    d.modify(*_order, [&o](limit_order_object& loo) {
@@ -174,6 +181,10 @@ void_result limit_order_update_evaluator::do_apply(const limit_order_update_oper
       if (o.new_expiration)
          loo.expiration = *o.new_expiration;
    });
+
+   // TODO: check if order is at front of book and price moved in favor of buyer; if so, trigger matching
+
+   return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
 
 void_result limit_order_cancel_evaluator::do_evaluate(const limit_order_cancel_operation& o)

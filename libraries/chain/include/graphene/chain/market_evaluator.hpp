@@ -63,7 +63,7 @@ namespace graphene { namespace chain {
          const asset_object*                 _receive_asset = nullptr;
    };
 
-   class limit_order_update_evaluator : public evaluator<limit_order_update_operation>
+   class limit_order_update_evaluator : public evaluator<limit_order_update_evaluator>
    {
    public:
        using operation_type = limit_order_update_operation;

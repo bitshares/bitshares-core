@@ -751,7 +751,7 @@ const limit_order_object* database_fixture::create_sell_order( const account_obj
    buy_order.amount_to_sell = amount;
    buy_order.min_to_receive = recv;
    buy_order.expiration = order_expiration;
-   trx.operations.push_back(buy_order);
+   trx.operations = {buy_order};
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op, fee_core_exchange_rate);
    trx.validate();
    auto processed = PUSH_TX(db, trx, ~0);
@@ -760,17 +760,42 @@ const limit_order_object* database_fixture::create_sell_order( const account_obj
    return db.find<limit_order_object>( processed.operation_results[0].get<object_id_type>() );
 }
 
+void database_fixture::update_limit_order(const limit_order_object& order,
+                                          fc::optional<price> new_price,
+                                          fc::optional<asset> delta_amount,
+                                          fc::optional<time_point_sec> new_expiration) {
+   limit_order_update_operation update_order;
+   update_order.seller = order.seller;
+   update_order.order = order.id;
+   update_order.new_price = new_price;
+   update_order.delta_amount_to_sell = delta_amount;
+   update_order.new_expiration = new_expiration;
+   trx.operations = {update_order};
+   for(auto& op : trx.operations) db.current_fee_schedule().set_fee(op);
+   trx.validate();
+   auto processed = PUSH_TX(db, trx, ~0);
+   trx.operations.clear();
+   verify_asset_supplies(db);
+}
+
+void database_fixture::update_limit_order(limit_order_id_type order_id,
+                                          fc::optional<price> new_price,
+                                          fc::optional<asset> delta_amount,
+                                          fc::optional<time_point_sec> new_expiration) {
+    update_limit_order(order_id(db), new_price, delta_amount, new_expiration);
+}
+
 asset database_fixture::cancel_limit_order( const limit_order_object& order )
 {
   limit_order_cancel_operation cancel_order;
   cancel_order.fee_paying_account = order.seller;
   cancel_order.order = order.id;
-  trx.operations.push_back(cancel_order);
+  trx.operations = {cancel_order};
   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
   trx.validate();
   auto processed = PUSH_TX(db, trx, ~0);
   trx.operations.clear();
-   verify_asset_supplies(db);
+  verify_asset_supplies(db);
   return processed.operation_results[0].get<asset>();
 }
 

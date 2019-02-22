@@ -34,15 +34,15 @@ void limit_order_create_operation::validate()const
 }
 
 void limit_order_update_operation::validate() const
-{
+{ try {
    FC_ASSERT(fee.amount >= 0, "Fee must not be negative");
    FC_ASSERT(new_price || delta_amount_to_sell || new_expiration,
-              "Cannot update limit order if nothing is specified to update");
+             "Cannot update limit order if nothing is specified to update");
    if (new_price)
-       new_price->validate();
+      new_price->validate();
    if (delta_amount_to_sell)
-       FC_ASSERT(delta_amount_to_sell->amount != 0, "Cannot change limit order amount by zero");
-}
+      FC_ASSERT(delta_amount_to_sell->amount != 0, "Cannot change limit order amount by zero");
+} FC_CAPTURE_AND_RETHROW((*this)) }
 
 void limit_order_cancel_operation::validate()const
 {
