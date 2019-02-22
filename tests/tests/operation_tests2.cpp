@@ -355,12 +355,6 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_whitelist_asset_test )
 
    for( int i=0; i<2; i++ )
    {
-      if( i == 1 )
-      {
-         generate_blocks( HARDFORK_CORE_942_TIME, true, skip );
-         generate_block( skip );
-      }
-
       int blocks = 0;
       set_expiration( db, trx );
 
@@ -424,10 +418,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_whitelist_asset_test )
          op.withdraw_to_account = dan_id;
          op.amount_to_withdraw = asset(5, uia_id);
          trx.operations.push_back(op);
-         if( i == 0 ) // before hard fork, should pass
-            PUSH_TX( db, trx, ~0 );
-         else // after hard fork, should throw
-            GRAPHENE_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::assert_exception );
+         GRAPHENE_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::assert_exception );
          trx.operations.clear();
       }
 

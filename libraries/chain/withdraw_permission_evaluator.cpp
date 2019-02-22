@@ -84,17 +84,9 @@ void_result withdraw_permission_claim_evaluator::do_evaluate(const withdraw_perm
 
    const account_object& from  = op.withdraw_from_account(d);
    bool from_is_authorized = ( is_authorized_asset( d, from, _asset ) );
-   if( head_block_time > HARDFORK_CORE_942_TIME ) // TODO remove this check after hard fork if things in `else` did not occur
-   {
-      FC_ASSERT( from_is_authorized,
-                 "Account ${acct} '${name}' is unauthorized to withdraw asset ${a} '${sym}' due to whitelist / blacklist",
-                 ("acct", from.id)("name", from.name)("a", _asset.id)("sym", _asset.symbol) );
-   }
-   else
-   {
-      if( !from_is_authorized )
-         wlog( "Unauthorized asset withdrawal (issue #942) occurred at block ${b}", ("b", d.head_block_num()) );
-   }
+   FC_ASSERT( from_is_authorized,
+         "Account ${acct} '${name}' is unauthorized to withdraw asset ${a} '${sym}' due to whitelist / blacklist",
+         ("acct", from.id)("name", from.name)("a", _asset.id)("sym", _asset.symbol) );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
