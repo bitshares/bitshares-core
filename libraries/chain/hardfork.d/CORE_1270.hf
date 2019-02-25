@@ -1,4 +1,4 @@
 // bitshares-core issue #1270 Call price is inconsistent when MCR changed
 #ifndef HARDFORK_CORE_1270_TIME
-#define HARDFORK_CORE_1270_TIME (fc::time_point_sec( 1551276120 )) // Wednesday, February 27, 2019 2:02:00 PM
+#define HARDFORK_CORE_1270_TIME (fc::time_point_sec( 1551362520 )) // Thursday, February 28, 2019 2:02:00 PM
 #endif
