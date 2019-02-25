@@ -1791,7 +1791,7 @@ public:
    }
 
    signed_transaction htlc_create( string source, string destination, string amount, string asset_symbol,
-         string hash_algorithm, const std::string& preimage_hash, size_t preimage_size,
+         string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
          const uint32_t claim_period_seconds, bool broadcast = false )
    {
       try 
@@ -3179,7 +3179,7 @@ uint64_t wallet_api::get_asset_count()const
 }
 
 signed_transaction wallet_api::htlc_create( string source, string destination, string amount, string asset_symbol,
-         string hash_algorithm, const std::string& preimage_hash, size_t preimage_size, 
+         string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size, 
          const uint32_t claim_period_seconds, bool broadcast)
 {
    return my->htlc_create(source, destination, amount, asset_symbol, hash_algorithm, preimage_hash, preimage_size,

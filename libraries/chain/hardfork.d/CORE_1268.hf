@@ -1,0 +1,4 @@
+// #1268 Distribute Asset Market Fees to Referral Program 
+#ifndef HARDFORK_1268_TIME
+#define HARDFORK_1268_TIME (fc::time_point_sec( 1551362520 )) // Thursday, February 28, 2019 2:02:00 PM
+#endif

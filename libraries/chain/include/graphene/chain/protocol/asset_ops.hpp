@@ -27,6 +27,13 @@
 
 namespace graphene { namespace chain { 
 
+   struct additional_asset_options
+   {
+      fc::optional<uint16_t>                  reward_percent;
+      fc::optional<flat_set<account_id_type>> whitelist_market_fee_sharing;
+   };
+   typedef extension<additional_asset_options> additional_asset_options_t;
+
    bool is_valid_symbol( const string& symbol );
 
    /**
@@ -75,7 +82,7 @@ namespace graphene { namespace chain {
        * size of description.
        */
       string description;
-      extensions_type extensions;
+      additional_asset_options_t extensions;
 
       /// Perform internal consistency checks.
       /// @throws fc::exception if any check fails
@@ -535,7 +542,7 @@ FC_REFLECT( graphene::chain::bitasset_options,
             (extensions)
           )
 
-
+FC_REFLECT( graphene::chain::additional_asset_options, (reward_percent)(whitelist_market_fee_sharing) )
 FC_REFLECT( graphene::chain::asset_create_operation::fee_parameters_type, (symbol3)(symbol4)(long_symbol)(price_per_kbyte) )
 FC_REFLECT( graphene::chain::asset_global_settle_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::asset_settle_operation::fee_parameters_type, (fee) )

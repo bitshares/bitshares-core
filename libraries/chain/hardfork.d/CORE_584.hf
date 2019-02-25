@@ -1,0 +1,5 @@
+// bitshares-core issue #584 Owner keys of non-immediately required accounts can not authorize a transaction
+// https://github.com/bitshares/bitshares-core/issues/584
+#ifndef HARDFORK_CORE_584_TIME
+#define HARDFORK_CORE_584_TIME (fc::time_point_sec( 1551362520 )) //  Thursday, February 28, 2019 2:02:00 PM
+#endif
