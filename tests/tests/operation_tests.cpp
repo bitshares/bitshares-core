@@ -172,6 +172,27 @@ BOOST_AUTO_TEST_CASE(limit_order_update_test)
    }
 }
 
+BOOST_AUTO_TEST_CASE(limit_order_update_dust_test)
+{
+   try {
+      ACTORS((nathan));
+      const auto& munee = create_user_issued_asset("MUNEE");
+
+      transfer(committee_account, nathan_id, asset(10000));
+      issue_uia(nathan, munee.amount(1000));
+
+      auto expiration = db.head_block_time() + 1000;
+      limit_order_id_type order_id = create_sell_order(nathan, asset(1000), munee.amount(100), expiration)->id;
+
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, asset(-995)), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(1000000), munee.amount(100))), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(2000), munee.amount(100)), asset(-985)), fc::assert_exception);
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE(limit_order_update_match_test)
 {
    try {

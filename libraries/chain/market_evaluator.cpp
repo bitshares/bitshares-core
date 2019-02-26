@@ -161,6 +161,17 @@ void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_o
                     "Cannot deduct more from order than order contains");
    }
 
+   // Check dust
+   if (o.new_price || (o.delta_amount_to_sell && o.delta_amount_to_sell->amount < 0)) {
+      auto new_price = o.new_price? *o.new_price : _order->sell_price;
+      auto new_amount = _order->amount_for_sale();
+      if (o.delta_amount_to_sell)
+          new_amount += *o.delta_amount_to_sell;
+      auto new_amount_to_receive = new_amount * new_price;
+
+      FC_ASSERT(new_amount_to_receive.amount > 0, "Cannot update limit order: order becomes too small; cancel order instead");
+   }
+
    // Check expiration is in the future
    if (o.new_expiration)
       FC_ASSERT(*o.new_expiration >= d.head_block_time(),
