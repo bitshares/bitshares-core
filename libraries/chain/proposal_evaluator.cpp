@@ -42,6 +42,10 @@ struct proposal_operation_hardfork_visitor
    void operator()(const T &v) const {}
 
    // TODO review and cleanup code below after hard fork
+   // hf_1604
+   void operator()(const graphene::chain::limit_order_update_operation &) const {
+      FC_ASSERT(block_time > HARDFORK_CORE_1604_TIME, "Operation is not enabled yet");
+   }
    // hf_834
    void operator()(const graphene::chain::call_order_update_operation &v) const {
       if (next_maintenance_time <= HARDFORK_CORE_834_TIME) {

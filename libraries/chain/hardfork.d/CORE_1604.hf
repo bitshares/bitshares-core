@@ -1,0 +1,4 @@
+// bitshares-core issue #1604 Operation to modify existing limit order
+#ifndef HARDFORK_CORE_1604_TIME
+#define HARDFORK_CORE_1604_TIME (fc::time_point_sec(1893456000)) // Jan 1 00:00:00 2030 (Not yet scheduled)
+#endif

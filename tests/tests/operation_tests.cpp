@@ -88,6 +88,8 @@ BOOST_AUTO_TEST_CASE(limit_order_update_test)
       const auto& munee = create_user_issued_asset("MUNEE");
       const auto& core   = asset_id_type()(db);
 
+      generate_blocks(HARDFORK_CORE_1604_TIME + 10);
+
       update_feed_producers(bitusd, {nathan_id});
       price_feed current_feed;
       current_feed.settlement_price = bitusd.amount(200) / core.amount(100);
@@ -178,6 +180,8 @@ BOOST_AUTO_TEST_CASE(limit_order_update_dust_test)
       ACTORS((nathan));
       const auto& munee = create_user_issued_asset("MUNEE");
 
+      generate_blocks(HARDFORK_CORE_1604_TIME + 10);
+
       transfer(committee_account, nathan_id, asset(10000));
       issue_uia(nathan, munee.amount(1000));
 
@@ -198,6 +202,8 @@ BOOST_AUTO_TEST_CASE(limit_order_update_match_test)
    try {
       ACTORS((nathan));
       const auto& munee = create_user_issued_asset("MUNEE");
+
+      generate_blocks(HARDFORK_CORE_1604_TIME + 10);
 
       transfer(committee_account, nathan_id, asset(10000));
       issue_uia(nathan, munee.amount(1000));
@@ -220,6 +226,8 @@ BOOST_AUTO_TEST_CASE(limit_order_update_match_test_2)
    try {
       ACTORS((nathan));
       const auto& munee = create_user_issued_asset("MUNEE");
+
+      generate_blocks(HARDFORK_CORE_1604_TIME + 10);
 
       transfer(committee_account, nathan_id, asset(10000));
       issue_uia(nathan, munee.amount(1000));
