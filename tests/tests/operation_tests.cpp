@@ -111,6 +111,9 @@ BOOST_AUTO_TEST_CASE(limit_order_update_test)
       GRAPHENE_REQUIRE_THROW(update_limit_order(order_id), fc::assert_exception);
       // Cannot update order to use inverted price assets
       GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(bitusd.amount(2), asset(1))), fc::assert_exception);
+      // Cannot update order to use negative price
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(-1), bitusd.amount(2))), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(asset(1), bitusd.amount(-2))), fc::assert_exception);
       // Cannot update order to use different assets
       GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(bitusd.amount(2), munee.amount(1))), fc::assert_exception);
       GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, price(munee.amount(2), bitusd.amount(1))), fc::assert_exception);
