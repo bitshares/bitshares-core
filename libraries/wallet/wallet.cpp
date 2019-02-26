@@ -2140,6 +2140,8 @@ public:
          signed_transaction trx;
 
          limit_order_cancel_operation op;
+         const auto order = get_object<limit_order_object>(order_id);
+         op.market = order.get_market();
          op.fee_paying_account = get_object<limit_order_object>(order_id).seller;
          op.order = order_id;
          trx.operations = {op};

@@ -763,6 +763,7 @@ const limit_order_object* database_fixture::create_sell_order( const account_obj
 asset database_fixture::cancel_limit_order( const limit_order_object& order )
 {
   limit_order_cancel_operation cancel_order;
+  cancel_order.market = order.get_market();
   cancel_order.fee_paying_account = order.seller;
   cancel_order.order = order.id;
   trx.operations.push_back(cancel_order);

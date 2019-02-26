@@ -25,6 +25,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/app/database_api.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <fc/crypto/digest.hpp>
 
@@ -939,6 +940,120 @@ BOOST_AUTO_TEST_CASE( verify_authority_multiple_accounts )
       edump((e.to_detail_string()));
       throw;
    }
+}
+
+BOOST_AUTO_TEST_CASE( subscribe_to_market_test )
+{
+   try {
+      ACTORS( (alice) (bob) );
+
+      generate_blocks(HARDFORK_CORE_625_TIME);
+      set_expiration(db, trx);
+
+      const auto usd = create_user_issued_asset("USD");
+      const auto eur = create_user_issued_asset("EUR");
+      const auto core = asset_id_type()(db);
+
+      fund(alice);
+      issue_uia(bob_id, usd.amount(30000));
+      issue_uia(bob_id, eur.amount(30000));
+
+      graphene::app::database_api db_api(db);
+
+      generate_block();
+
+      auto market_event_count = 0u;
+      auto on_market_callback = [&]( const variant& v )
+      {
+         ++market_event_count;
+         //std::cout << "\n\non_market_callback: BEGIN " << market_event_count << std::endl;
+         //std::cout << fc::json::to_pretty_string(v) << std::endl;
+         //std::cout << "on_market_callback: END " << market_event_count << std::endl;
+      };
+
+      db_api.subscribe_to_market_events(on_market_callback, std::string(static_cast<object_id_type>(usd.get_id())),
+                                                            std::string(static_cast<object_id_type>(core.get_id())));
+
+      generate_block();
+
+      // Full match in the same block
+      {
+         create_sell_order(alice, core.amount(100), usd.amount(100));
+         create_sell_order(bob, usd.amount(100), core.amount(100));
+         generate_block();
+         fc::usleep( fc::seconds(2) );
+         // 4 Events were got at once:
+         // [limit_order_create_operation, limit_order_create_operation, fill_order_operation, fill_order_operation]
+         BOOST_CHECK_EQUAL(market_event_count, 1);
+         market_event_count = 0u;
+      }
+      // Full match in different blocks
+       {
+          generate_block();
+          create_sell_order(alice, core.amount(100), usd.amount(100));
+          generate_block();
+          generate_block();
+          create_sell_order(bob, usd.amount(100), core.amount(100));
+          generate_block();
+          fc::usleep( fc::seconds(2) );
+         // 4 Events were got in two call of callback:
+         // 1: [limit_order_create_operation]
+         // 2: [limit_order_create_operation, fill_order_operation, fill_order_operation]
+
+          BOOST_CHECK_EQUAL(market_event_count, 2);
+          market_event_count = 0u;
+      }
+      set_expiration(db, trx);
+      // Partly match in the same block and cancel second order
+      {
+          generate_block();
+          create_sell_order(alice, core.amount(100), usd.amount(100));
+          auto order = *create_sell_order(bob, usd.amount(200), core.amount(200));
+          generate_block();
+          cancel_limit_order(order);
+          generate_block();
+          fc::usleep( fc::seconds(2) );
+
+         // 4 Events were got in two call of callback:
+         // 1: [limit_order_create_operation, limit_order_create_operation, fill_order_operation, fill_order_operation]
+         // 2: [limit_order_cancel_operation]
+          BOOST_CHECK_EQUAL(market_event_count, 2);
+          market_event_count = 0u;
+      }
+
+      // Partly match in the same block and cancel second order by expiretion
+      {
+         generate_block();
+         create_sell_order(alice, core.amount(100), usd.amount(100), db.head_block_time() + fc::seconds(10));
+         create_sell_order(bob, usd.amount(200), core.amount(200), db.head_block_time() + fc::seconds(10));
+         generate_block();
+         generate_block();
+         fc::usleep( fc::seconds(2) );
+         // 4 Events were got in two call of callback:
+         // 1: [limit_order_create_operation, limit_order_create_operation, fill_order_operation, fill_order_operation]
+         // 2: [limit_order_cancel_operation]
+          BOOST_CHECK_EQUAL(market_event_count, 2);
+          market_event_count = 0u;
+      }
+      set_expiration(db, trx);
+      // Partly match in the different blocks and cancel second order by expiretion
+      {
+         generate_block();
+         create_sell_order(alice, core.amount(100), usd.amount(100), db.head_block_time() + fc::seconds(10));
+         generate_block();
+         create_sell_order(bob, usd.amount(200), core.amount(200), db.head_block_time() + fc::seconds(10));
+         generate_block();
+         generate_block();
+         fc::usleep( fc::seconds(2) );
+         // 4 Events were got in three call of callback:
+         // 1: [limit_order_create_operation]
+         // 2: [limit_order_create_operation, fill_order_operation, fill_order_operation]
+         // 3: [limit_order_cancel_operation]
+          BOOST_CHECK_EQUAL(market_event_count, 3);
+          market_event_count = 0u;
+      }
+
+   } FC_LOG_AND_RETHROW()
 }
 
 BOOST_AUTO_TEST_SUITE_END()

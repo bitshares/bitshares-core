@@ -484,6 +484,9 @@ class database_api
        */
       void unsubscribe_from_market( const std::string& a, const std::string& b );
 
+
+      void subscribe_to_market_events(std::function<void(const variant&)> callback, const std::string& a, const std::string& b);
+
       /**
        * @brief Returns the ticker for the market assetA:assetB
        * @param a String name of the first asset

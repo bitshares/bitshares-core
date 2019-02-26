@@ -215,6 +215,7 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
    asset deferred_paid_fee = order.deferred_paid_fee;
    if( create_virtual_op )
    {
+      vop.market = order.get_market();
       vop.order = order.id;
       vop.fee_paying_account = order.seller;
       // only deduct fee if not skipping fee, and there is any fee deferred
