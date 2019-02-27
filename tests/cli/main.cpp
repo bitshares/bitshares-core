@@ -37,6 +37,8 @@
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/rpc/cli.hpp>
 
+#include <fc/crypto/aes.hpp>
+
 #ifdef _WIN32
    #ifndef _WIN32_WINNT
       #define _WIN32_WINNT 0x0501
@@ -579,4 +581,42 @@ BOOST_FIXTURE_TEST_CASE( account_history_pagination, cli_fixture )
       edump((e.to_detail_string()));
       throw;
    }
+}
+
+graphene::wallet::plain_keys decrypt_keys( const std::string& password, const vector<char>& cipher_keys )
+{
+   auto pw = fc::sha512::hash( password.c_str(), password.size() );
+   vector<char> decrypted = fc::aes_decrypt( pw, cipher_keys );
+   return fc::raw::unpack<graphene::wallet::plain_keys>( decrypted );
+}
+
+BOOST_AUTO_TEST_CASE( saving_keys_wallet_test ) {
+   cli_fixture cli;
+
+   cli.con.wallet_api_ptr->import_balance( "nathan", cli.nathan_keys, true );
+   cli.con.wallet_api_ptr->upgrade_account( "nathan", true );
+   std::string brain_key( "FICTIVE WEARY MINIBUS LENS HAWKIE MAIDISH MINTY GLYPH GYTE KNOT COCKSHY LENTIGO PROPS BIFORM KHUTBAH BRAZIL" );
+   cli.con.wallet_api_ptr->create_account_with_brain_key( brain_key, "account1", "nathan", "nathan", true );
+
+   BOOST_CHECK_NO_THROW( cli.con.wallet_api_ptr->transfer( "nathan", "account1", "9000", "1.3.0", "", true ) );
+
+   std::string path( cli.app_dir.path().generic_string() + "/wallet.json" );
+   graphene::wallet::wallet_data wallet = fc::json::from_file( path ).as<graphene::wallet::wallet_data>( 2 * GRAPHENE_MAX_NESTED_OBJECTS );
+   BOOST_CHECK( wallet.extra_keys.size() == 1 ); // nathan
+   BOOST_CHECK( wallet.pending_account_registrations.size() == 1 ); // account1
+   BOOST_CHECK( wallet.pending_account_registrations["account1"].size() == 2 ); // account1 active key + account1 memo key
+
+   graphene::wallet::plain_keys pk = decrypt_keys( "supersecret", wallet.cipher_keys );
+   BOOST_CHECK( pk.keys.size() == 1 ); // nathan key
+
+   BOOST_CHECK( generate_block( cli.app1 ) );
+   fc::usleep( fc::seconds(1) );
+
+   wallet = fc::json::from_file( path ).as<graphene::wallet::wallet_data>( 2 * GRAPHENE_MAX_NESTED_OBJECTS );
+   BOOST_CHECK( wallet.extra_keys.size() == 2 ); // nathan + account1
+   BOOST_CHECK( wallet.pending_account_registrations.empty() );
+   BOOST_CHECK_NO_THROW( cli.con.wallet_api_ptr->transfer( "account1", "nathan", "1000", "1.3.0", "", true ) );
+
+   pk = decrypt_keys( "supersecret", wallet.cipher_keys );
+   BOOST_CHECK( pk.keys.size() == 3 ); // nathan key + account1 active key + account1 memo key
 }

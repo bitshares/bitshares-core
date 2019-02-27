@@ -265,7 +265,7 @@ public:
 private:
    void claim_registered_account(const account_object& account)
    {
-      std::vector<std::string> import_keys;
+      bool import_keys = false;
       auto it = _wallet.pending_account_registrations.find( account.name );
       FC_ASSERT( it != _wallet.pending_account_registrations.end() );
       for (const std::string& wif_key : it->second) {
@@ -282,20 +282,13 @@ private:
             //    name is available, the user can always
             //    manually re-register)
          } else {
-            import_keys.push_back( wif_key );
+            import_keys = true;
          }
       }
       _wallet.pending_account_registrations.erase( it );
 
-      for( const auto& k : import_keys ) {
-         fc::optional<fc::ecc::private_key> optional_private_key = wif_to_key( k );
-         if (!optional_private_key)
-            FC_THROW("Invalid private key");
-         string shorthash = detail::address_to_shorthash(optional_private_key->get_public_key());
-         copy_wallet_file( "before-import-key-" + shorthash );
-
+      if( import_keys ) {
          save_wallet_file();
-         copy_wallet_file( "after-import-key-" + shorthash );
       }
    }
 
