@@ -223,6 +223,11 @@ public:
       }));
       (void)(closed_connection);
    }
+   ~client_connection()
+   {
+      // wait for everything to finish up
+      fc::usleep(fc::milliseconds(500));
+   }
 public:
    fc::http::websocket_client websocket_client;
    graphene::wallet::wallet_data wallet_data;
@@ -241,6 +246,16 @@ public:
 
 struct cli_fixture
 {
+   class dummy
+   {
+      public:
+         ~dummy()
+         {
+            // wait for everything to finish up
+            fc::usleep(fc::milliseconds(500));
+         }
+   };
+   dummy dmy;
    int server_port_number;
    fc::temp_directory app_dir;
    std::shared_ptr<graphene::app::application> app1;
