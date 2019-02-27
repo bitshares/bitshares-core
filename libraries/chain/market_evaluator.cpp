@@ -175,8 +175,8 @@ void_result limit_order_update_evaluator::do_evaluate(const limit_order_update_o
 
    // Check expiration is in the future
    if (o.new_expiration)
-      FC_ASSERT(*o.new_expiration >= d.head_block_time(),
-                "Cannot update limit order with past expiration");
+      FC_ASSERT(*o.new_expiration > _order->expiration,
+                "Cannot update limit order to expire sooner; new expiration must be later than old one.");
 
    return {};
 } FC_CAPTURE_AND_RETHROW((o)) }

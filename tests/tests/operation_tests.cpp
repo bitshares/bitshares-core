@@ -148,9 +148,11 @@ BOOST_AUTO_TEST_CASE(limit_order_update_test)
       expiration += 50;
       update_limit_order(order_id, {}, {}, expiration);
       BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
-      expiration -= 100;
-      update_limit_order(order_id, {}, {}, expiration);
-      BOOST_REQUIRE_EQUAL(order_id(db).expiration.sec_since_epoch(), expiration.sec_since_epoch());
+      // Cannot make expiration same as before
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, {}, expiration), fc::assert_exception);
+      // Cannot make expiration sooner; only later
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, {}, expiration - 100), fc::assert_exception);
+      GRAPHENE_REQUIRE_THROW(update_limit_order(order_id, {}, {}, expiration - 1), fc::assert_exception);
 
       // Try adding funds
       update_limit_order(order_id, {}, asset(50));
