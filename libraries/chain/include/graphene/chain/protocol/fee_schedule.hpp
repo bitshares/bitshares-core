@@ -140,6 +140,12 @@ namespace graphene { namespace chain {
       {
          return fee_helper<Operation>().get(parameters);
       }
+      template<typename Operation>
+      const bool exists()const
+      {
+         auto itr = parameters.find(typename Operation::fee_parameters_type());
+         return itr != parameters.end();
+      }
 
       /**
        *  @note must be sorted by fee_parameters.which() and have no duplicates
