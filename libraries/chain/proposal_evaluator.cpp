@@ -96,6 +96,11 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!"Virtual operation");
       }
    }
+   void operator()(const graphene::chain::committee_member_update_global_parameters_operation &op) const {
+       if (block_time < HARDFORK_CORE_1604_TIME)
+           FC_ASSERT(!op.new_parameters.current_fees->exists<graphene::chain::limit_order_update_operation>(),
+                     "Cannot set fees for limit_order_update_operation before its hardfork time");
+   }
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {
       for (const op_wrapper &op : v.proposed_ops)
