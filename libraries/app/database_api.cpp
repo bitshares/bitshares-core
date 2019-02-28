@@ -425,8 +425,8 @@ market_ticker::market_ticker(const fc::time_point_sec& now,
                              const asset_object& asset_quote)
 {
    time = now;
-   base = base;
-   quote = quote;
+   base = asset_base.symbol;
+   quote = asset_quote.symbol;
    latest = "0";
    lowest_ask = "0";
    highest_bid = "0";
