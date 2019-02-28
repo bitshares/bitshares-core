@@ -388,6 +388,9 @@ market_ticker::market_ticker(const market_ticker_object& mto,
    base = asset_base.symbol;
    quote = asset_quote.symbol;
    percent_change = "0";
+   lowest_ask = "0";
+   highest_bid = "0";
+
    fc::uint128 bv;
    fc::uint128 qv;
    price latest_price = asset( mto.latest_base, mto.base ) / asset( mto.latest_quote, mto.quote );
