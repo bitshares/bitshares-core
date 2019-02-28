@@ -248,12 +248,12 @@ struct cli_fixture
 {
    class dummy
    {
-      public:
-         ~dummy()
-         {
-            // wait for everything to finish up
-            fc::usleep(fc::milliseconds(500));
-         }
+   public:
+      ~dummy()
+      {
+         // wait for everything to finish up
+         fc::usleep(fc::milliseconds(500));
+      }
    };
    dummy dmy;
    int server_port_number;
