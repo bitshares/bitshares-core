@@ -264,21 +264,26 @@ struct sign_state
 };
 
 
-void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs,
-                       const std::function<const authority*(account_id_type)>& get_active,
-                       const std::function<const authority*(account_id_type)>& get_owner,
-                       bool allow_non_immediate_owner,
-                       uint32_t max_recursion_depth,
-                       bool  allow_committe,
-                       const flat_set<account_id_type>& active_aprovals,
-                       const flat_set<account_id_type>& owner_approvals )
+void verify_authority(const vector<operation>& ops, const flat_set<public_key_type>& sigs,
+                      const std::function<const authority*(account_id_type)>& get_active,
+                      const std::function<const authority*(account_id_type)>& get_owner,
+                      bool allow_non_immediate_owner,
+                      bool ignore_custom_operation_required_auths,
+                      uint32_t max_recursion_depth,
+                      bool  allow_committe,
+                      const flat_set<account_id_type>& active_aprovals,
+                      const flat_set<account_id_type>& owner_approvals)
 { try {
    flat_set<account_id_type> required_active;
    flat_set<account_id_type> required_owner;
    vector<authority> other;
 
-   for( const auto& op : ops )
-      operation_get_required_authorities( op, required_active, required_owner, other );
+   for (const auto& op : ops) {
+      if (op.which() == operation::tag<custom_operation>::value && ignore_custom_operation_required_auths)
+         required_active.insert(op.get<custom_operation>().fee_payer());
+      else
+         operation_get_required_authorities( op, required_active, required_owner, other );
+   }
 
    if( !allow_committe )
       GRAPHENE_ASSERT( required_active.find(GRAPHENE_COMMITTEE_ACCOUNT) == required_active.end(),
@@ -429,15 +434,15 @@ const flat_set<public_key_type>& precomputable_transaction::get_signature_keys( 
    return _signees;
 }
 
-void signed_transaction::verify_authority(
-   const chain_id_type& chain_id,
-   const std::function<const authority*(account_id_type)>& get_active,
-   const std::function<const authority*(account_id_type)>& get_owner,
-   bool allow_non_immediate_owner,
-   uint32_t max_recursion )const
+void signed_transaction::verify_authority(const chain_id_type& chain_id,
+                                          const std::function<const authority*(account_id_type)>& get_active,
+                                          const std::function<const authority*(account_id_type)>& get_owner,
+                                          bool allow_non_immediate_owner,
+                                          bool ignore_custom_operation_required_auths,
+                                          uint32_t max_recursion)const
 { try {
    graphene::protocol::verify_authority( operations, get_signature_keys( chain_id ), get_active, get_owner,
-                                         allow_non_immediate_owner, max_recursion );
+                                         allow_non_immediate_owner, ignore_custom_operation_required_auths, max_recursion );
 } FC_CAPTURE_AND_RETHROW( (*this) ) }
 
 } } // graphene::protocol

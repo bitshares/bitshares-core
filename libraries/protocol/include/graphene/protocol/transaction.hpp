@@ -162,15 +162,17 @@ namespace graphene { namespace protocol {
        * @param get_owner  callback function to retrieve owner authorities of a given account
        * @param allow_non_immediate_owner whether to allow owner authority of non-immediately
        *            required accounts to authorize operations in the transaction
+       * @param ignore_custom_operation_required_auths See issue #210; whether to ignore the
+       *            required_auths field of custom_operation or not
        * @param max_recursion maximum level of recursion when verifying, since an account
        *            can have another account in active authorities and/or owner authorities
        */
-      void verify_authority(
-         const chain_id_type& chain_id,
-         const std::function<const authority*(account_id_type)>& get_active,
-         const std::function<const authority*(account_id_type)>& get_owner,
-         bool allow_non_immediate_owner,
-         uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH )const;
+      void verify_authority(const chain_id_type& chain_id,
+                            const std::function<const authority*(account_id_type)>& get_active,
+                            const std::function<const authority*(account_id_type)>& get_owner,
+                            bool allow_non_immediate_owner,
+                            bool ignore_custom_operation_required_auths = false,
+                            uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH)const;
 
       /**
        * This is a slower replacement for get_required_signatures()
@@ -243,20 +245,23 @@ namespace graphene { namespace protocol {
     * @param get_owner  callback function to retrieve owner authorities of a given account
     * @param allow_non_immediate_owner whether to allow owner authority of non-immediately
     *            required accounts to authorize operations
+    * @param ignore_custom_operation_required_auths See issue #210; whether to ignore the
+    *            required_auths field of custom_operation or not
     * @param max_recursion maximum level of recursion when verifying, since an account
     *            can have another account in active authorities and/or owner authorities
     * @param allow_committee whether to allow the special "committee account" to authorize the operations
     * @param active_approvals accounts that approved the operations with their active authories
     * @param owner_approvals accounts that approved the operations with their owner authories
     */
-   void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs,
-                          const std::function<const authority*(account_id_type)>& get_active,
-                          const std::function<const authority*(account_id_type)>& get_owner,
-                          bool allow_non_immediate_owner,
-                          uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH,
-                          bool allow_committe = false,
-                          const flat_set<account_id_type>& active_aprovals = flat_set<account_id_type>(),
-                          const flat_set<account_id_type>& owner_approvals = flat_set<account_id_type>());
+   void verify_authority(const vector<operation>& ops, const flat_set<public_key_type>& sigs,
+                         const std::function<const authority*(account_id_type)>& get_active,
+                         const std::function<const authority*(account_id_type)>& get_owner,
+                         bool allow_non_immediate_owner,
+                         bool ignore_custom_operation_required_auths = false,
+                         uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH,
+                         bool allow_committe = false,
+                         const flat_set<account_id_type>& active_aprovals = flat_set<account_id_type>(),
+                         const flat_set<account_id_type>& owner_approvals = flat_set<account_id_type>());
 
    /**
     *  @brief captures the result of evaluating the operations contained in the transaction
