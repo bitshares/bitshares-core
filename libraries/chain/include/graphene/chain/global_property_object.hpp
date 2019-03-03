@@ -22,12 +22,13 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <fc/uint128.hpp>
 
 #include <graphene/protocol/chain_parameters.hpp>
 #include <graphene/chain/types.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/db/object.hpp>
+
+#include <fc/uint128.hpp>
 
 namespace graphene { namespace chain {
 

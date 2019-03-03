@@ -24,9 +24,9 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include <graphene/app/util.hpp>
-
 #include "../common/database_fixture.hpp"
+
+#include <graphene/app/util.hpp>
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
