@@ -21,9 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <boost/endian/conversion.hpp>
 #include <graphene/protocol/block.hpp>
 #include <fc/io/raw.hpp>
-#include <fc/bitutil.hpp>
 #include <algorithm>
 
 namespace graphene { namespace protocol {
@@ -34,7 +34,7 @@ namespace graphene { namespace protocol {
 
    uint32_t block_header::num_from_id(const block_id_type& id)
    {
-      return fc::endian_reverse_u32(id._hash[0]);
+      return boost::endian::big_to_native(id._hash[0]);
    }
 
    const block_id_type& signed_block_header::id()const
@@ -42,7 +42,7 @@ namespace graphene { namespace protocol {
       if( !_block_id._hash[0] )
       {
          auto tmp = fc::sha224::hash( *this );
-         tmp._hash[0] = fc::endian_reverse_u32(block_num()); // store the block num in the ID, 160 bits is plenty for the hash
+         tmp._hash[0] = boost::endian::native_to_big(block_num()); // store the block num in the ID, 160 bits is plenty for the hash
          static_assert( sizeof(tmp._hash[0]) == 4, "should be 4 bytes" );
          memcpy(_block_id._hash, tmp._hash, std::min(sizeof(_block_id), sizeof(tmp)));
       }

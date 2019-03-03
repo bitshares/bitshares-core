@@ -25,8 +25,8 @@
 #include <graphene/protocol/fee_schedule.hpp>
 #include <graphene/protocol/block.hpp>
 #include <graphene/protocol/exceptions.hpp>
+#include <boost/endian/conversion.hpp>
 #include <fc/io/raw.hpp>
-#include <fc/bitutil.hpp>
 #include <algorithm>
 
 namespace graphene { namespace protocol {
@@ -94,7 +94,7 @@ void transaction::set_expiration( fc::time_point_sec expiration_time )
 
 void transaction::set_reference_block( const block_id_type& reference_block )
 {
-   ref_block_num = fc::endian_reverse_u32(reference_block._hash[0]);
+   ref_block_num = boost::endian::big_to_native(reference_block._hash[0]);
    ref_block_prefix = reference_block._hash[1];
 }
 
