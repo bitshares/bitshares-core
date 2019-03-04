@@ -37,6 +37,8 @@
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/rpc/cli.hpp>
 
+#include <fc/crypto/aes.hpp>
+
 #ifdef _WIN32
    #ifndef _WIN32_WINNT
       #define _WIN32_WINNT 0x0501
@@ -124,7 +126,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 #endif
    server_port_number = get_available_port();
    cfg.emplace(
-      "rpc-endpoint", 
+      "rpc-endpoint",
       boost::program_options::variable_value(string("127.0.0.1:" + std::to_string(server_port_number)), false)
    );
    cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
@@ -191,8 +193,8 @@ public:
    // constructor
    /////////
    client_connection(
-      std::shared_ptr<graphene::app::application> app, 
-      const fc::temp_directory& data_dir, 
+      std::shared_ptr<graphene::app::application> app,
+      const fc::temp_directory& data_dir,
       const int server_port_number
    )
    {
@@ -223,6 +225,11 @@ public:
       }));
       (void)(closed_connection);
    }
+   ~client_connection()
+   {
+      // wait for everything to finish up
+      fc::usleep(fc::milliseconds(500));
+   }
 public:
    fc::http::websocket_client websocket_client;
    graphene::wallet::wallet_data wallet_data;
@@ -241,16 +248,26 @@ public:
 
 struct cli_fixture
 {
+   class dummy
+   {
+   public:
+      ~dummy()
+      {
+         // wait for everything to finish up
+         fc::usleep(fc::milliseconds(500));
+      }
+   };
+   dummy dmy;
    int server_port_number;
    fc::temp_directory app_dir;
    std::shared_ptr<graphene::app::application> app1;
    client_connection con;
    std::vector<std::string> nathan_keys;
 
-   cli_fixture() : 
+   cli_fixture() :
       server_port_number(0),
       app_dir( graphene::utilities::temp_directory_path() ),
-      app1( start_application(app_dir, server_port_number) ), 
+      app1( start_application(app_dir, server_port_number) ),
       con( app1, app_dir, server_port_number ),
       nathan_keys( {"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"} )
    {
@@ -259,7 +276,7 @@ struct cli_fixture
       using namespace graphene::chain;
       using namespace graphene::app;
 
-      try 
+      try
       {
          BOOST_TEST_MESSAGE("Setting wallet password");
          con.wallet_api_ptr->set_password("supersecret");
@@ -281,7 +298,7 @@ struct cli_fixture
 
       // wait for everything to finish up
       fc::usleep(fc::seconds(1));
-        
+
       app1->shutdown();
 #ifdef _WIN32
       sockQuit();
@@ -331,10 +348,10 @@ BOOST_FIXTURE_TEST_CASE( upgrade_nathan_account, cli_fixture )
       nathan_acct_after_upgrade = con.wallet_api_ptr->get_account("nathan");
 
       // verify that the upgrade was successful
-      BOOST_CHECK_PREDICATE( 
-         std::not_equal_to<uint32_t>(), 
+      BOOST_CHECK_PREDICATE(
+         std::not_equal_to<uint32_t>(),
          (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())
-         (nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) 
+         (nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch())
       );
       BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
    } catch( fc::exception& e ) {
@@ -458,7 +475,7 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
 
       unsigned int head_block = 0;
       auto & W = *con.wallet_api_ptr; // Wallet alias
-      
+
       BOOST_TEST_MESSAGE("Creating blind accounts");
       graphene::wallet::brain_key_info bki_nathan = W.suggest_brain_key();
       graphene::wallet::brain_key_info bki_alice = W.suggest_brain_key();
@@ -565,6 +582,7 @@ BOOST_FIXTURE_TEST_CASE( account_history_pagination, cli_fixture )
       throw;
    }
 }
+
 
 ///////////////////////
 // Create a multi-sig account and verify that only when all signatures are
@@ -695,4 +713,42 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
       throw;
    }
    app1->shutdown();
+}
+
+graphene::wallet::plain_keys decrypt_keys( const std::string& password, const vector<char>& cipher_keys )
+{
+   auto pw = fc::sha512::hash( password.c_str(), password.size() );
+   vector<char> decrypted = fc::aes_decrypt( pw, cipher_keys );
+   return fc::raw::unpack<graphene::wallet::plain_keys>( decrypted );
+}
+
+BOOST_AUTO_TEST_CASE( saving_keys_wallet_test ) {
+   cli_fixture cli;
+
+   cli.con.wallet_api_ptr->import_balance( "nathan", cli.nathan_keys, true );
+   cli.con.wallet_api_ptr->upgrade_account( "nathan", true );
+   std::string brain_key( "FICTIVE WEARY MINIBUS LENS HAWKIE MAIDISH MINTY GLYPH GYTE KNOT COCKSHY LENTIGO PROPS BIFORM KHUTBAH BRAZIL" );
+   cli.con.wallet_api_ptr->create_account_with_brain_key( brain_key, "account1", "nathan", "nathan", true );
+
+   BOOST_CHECK_NO_THROW( cli.con.wallet_api_ptr->transfer( "nathan", "account1", "9000", "1.3.0", "", true ) );
+
+   std::string path( cli.app_dir.path().generic_string() + "/wallet.json" );
+   graphene::wallet::wallet_data wallet = fc::json::from_file( path ).as<graphene::wallet::wallet_data>( 2 * GRAPHENE_MAX_NESTED_OBJECTS );
+   BOOST_CHECK( wallet.extra_keys.size() == 1 ); // nathan
+   BOOST_CHECK( wallet.pending_account_registrations.size() == 1 ); // account1
+   BOOST_CHECK( wallet.pending_account_registrations["account1"].size() == 2 ); // account1 active key + account1 memo key
+
+   graphene::wallet::plain_keys pk = decrypt_keys( "supersecret", wallet.cipher_keys );
+   BOOST_CHECK( pk.keys.size() == 1 ); // nathan key
+
+   BOOST_CHECK( generate_block( cli.app1 ) );
+   fc::usleep( fc::seconds(1) );
+
+   wallet = fc::json::from_file( path ).as<graphene::wallet::wallet_data>( 2 * GRAPHENE_MAX_NESTED_OBJECTS );
+   BOOST_CHECK( wallet.extra_keys.size() == 2 ); // nathan + account1
+   BOOST_CHECK( wallet.pending_account_registrations.empty() );
+   BOOST_CHECK_NO_THROW( cli.con.wallet_api_ptr->transfer( "account1", "nathan", "1000", "1.3.0", "", true ) );
+
+   pk = decrypt_keys( "supersecret", wallet.cipher_keys );
+   BOOST_CHECK( pk.keys.size() == 3 ); // nathan key + account1 active key + account1 memo key
 }

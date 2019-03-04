@@ -265,9 +265,10 @@ public:
 private:
    void claim_registered_account(const account_object& account)
    {
+      bool import_keys = false;
       auto it = _wallet.pending_account_registrations.find( account.name );
       FC_ASSERT( it != _wallet.pending_account_registrations.end() );
-      for (const std::string& wif_key : it->second)
+      for (const std::string& wif_key : it->second) {
          if( !import_key( account.name, wif_key ) )
          {
             // somebody else beat our pending registration, there is
@@ -280,8 +281,15 @@ private:
             //    possibility of migrating to a fork where the
             //    name is available, the user can always
             //    manually re-register)
+         } else {
+            import_keys = true;
          }
+      }
       _wallet.pending_account_registrations.erase( it );
+
+      if( import_keys ) {
+         save_wallet_file();
+      }
    }
 
    // after a witness registration succeeds, this saves the private key in the wallet permanently
@@ -503,10 +511,10 @@ public:
       return ob.template as<T>( GRAPHENE_MAX_NESTED_OBJECTS );
    }
 
-   void set_operation_fees( signed_transaction& tx, const fee_schedule& s  )
+   void set_operation_fees( signed_transaction& tx, const std::shared_ptr<fee_schedule> s  )
    {
       for( auto& op : tx.operations )
-         s.set_fee(op);
+         s->set_fee(op);
    }
 
    variant info() const
@@ -1075,8 +1083,7 @@ public:
 
       tx.operations.push_back( account_create_op );
 
-      auto current_fees = _remote_db->get_global_properties().parameters.current_fees;
-      set_operation_fees( tx, current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
 
       vector<public_key_type> paying_keys = registrar_account_object.active.get_keys();
 
@@ -2601,7 +2608,7 @@ public:
       new_fees.scale = scale;
 
       chain_parameters new_params = current_params;
-      new_params.current_fees = new_fees;
+      new_params.current_fees = std::make_shared<fee_schedule>(new_fees);
 
       committee_member_update_global_parameters_operation update_op;
       update_op.new_parameters = new_params;

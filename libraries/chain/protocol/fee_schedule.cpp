@@ -24,18 +24,6 @@
 #include <algorithm>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
-namespace fc
-{
-   // these are required on certain platforms in Release mode
-   template<> 
-   bool smart_ref<graphene::chain::fee_schedule>::operator !()const
-   {
-      throw std::logic_error("Not Implemented"); 
-   }
-
-   template class smart_ref<graphene::chain::fee_schedule>;
-}
-
 #define MAX_FEE_STABILIZATION_ITERATION 4
 
 namespace graphene { namespace chain {

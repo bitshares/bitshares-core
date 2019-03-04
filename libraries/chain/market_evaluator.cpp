@@ -95,13 +95,12 @@ void limit_order_create_evaluator::pay_fee()
 
 object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_operation& op)
 { try {
-   const auto& seller_stats = _seller->statistics(db());
-   db().modify(seller_stats, [&](account_statistics_object& bal) {
-         if( op.amount_to_sell.asset_id == asset_id_type() )
-         {
-            bal.total_core_in_orders += op.amount_to_sell.amount;
-         }
-   });
+   if( op.amount_to_sell.asset_id == asset_id_type() )
+   {
+      db().modify( _seller->statistics(db()), [&op](account_statistics_object& bal) {
+         bal.total_core_in_orders += op.amount_to_sell.amount;
+      });
+   }
 
    db().adjust_balance(op.seller, -op.amount_to_sell);
 
