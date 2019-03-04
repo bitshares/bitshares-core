@@ -647,17 +647,8 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
       auto get_active = [&]( account_id_type id ) { return &id(*this).active; };
       auto get_owner  = [&]( account_id_type id ) { return &id(*this).owner;  };
 
-      // See bitshares-core issue #210 for discussion
-      // The custom_operation::get_required_active_authorities() method initially failed to report the authorities
-      // from the custom_operaton::required_auths field. This was a bug. It's a simple fix in that method, but the
-      // fix is a hardfork, and thus we need a hardfork guard. Since that method cannot access chain time, we must
-      // implement the guard here, and skip the call to get_required_active_authorities() prior to the hardfork.
-      // Therefore, if the head_block_time() is prior to the 210 hardfork, we ignore the required auths specified
-      // by the custom_operation.
-      bool ignore_custom_operation_required_auths = (head_block_time() <= HARDFORK_CORE_210_TIME);
-
       trx.verify_authority(chain_id, get_active, get_owner, allow_non_immediate_owner,
-                           ignore_custom_operation_required_auths,
+                           MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(head_block_time()),
                            get_global_properties().parameters.max_authority_depth);
    }
 
