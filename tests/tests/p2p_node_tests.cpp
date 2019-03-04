@@ -32,12 +32,7 @@
 
 #include <graphene/net/peer_connection.hpp>
 
-namespace graphene
-{
-namespace net
-{
-namespace detail
-{
+namespace graphene { namespace net  { namespace detail {
 
 class node_impl : public graphene::net::peer_connection_delegate
 {
@@ -47,9 +42,8 @@ public:
    void on_connection_closed(peer_connection* originating_peer);
    message get_message_for_item(const item_id& item);
 };
-}
-}
-}
+
+} } } // namespace graphene::net::detail
 
 class test_node : public graphene::net::node {
 public:
@@ -66,23 +60,37 @@ public:
    std::shared_ptr<graphene::net::message> message_received;
    void send_message(const graphene::net::message& message_to_send, size_t message_send_time_field_offset = (size_t)-1) override
    {
-      message_received = std::shared_ptr<graphene::net::message>(new graphene::net::message(message_to_send));
+      message_received = std::make_shared<graphene::net::message>(message_to_send);
    }
 public:
    test_peer(graphene::net::peer_connection_delegate* del) : graphene::net::peer_connection(del) {
       message_received = nullptr;
    }
-
 };
+
+void test_address_message( std::shared_ptr<graphene::net::message> msg, std::size_t num_elements)
+{
+   if (msg != nullptr)
+   {
+      graphene::net::address_message addr_msg = static_cast<graphene::net::address_message>( msg->as<graphene::net::address_message>() );
+      BOOST_CHECK_EQUAL(addr_msg.addresses.size(), num_elements);
+   } 
+   else 
+   {
+      BOOST_FAIL( "address_message was null" );
+   }
+}
 
 BOOST_AUTO_TEST_SUITE( p2p_node_tests )
 
-BOOST_AUTO_TEST_CASE( p2p_disable_peer_advertising )
+BOOST_AUTO_TEST_CASE( disable_peer_advertising )
 {
    // set up my node
    test_node my_node("Hello");
-   graphene::net::detail::node_impl del;
+   my_node.disable_peer_advertising();
+
    // a fake peer
+   graphene::net::detail::node_impl del;
    std::shared_ptr<test_peer> my_peer(new test_peer{&del});
 
    // act like my_node received an address_request message from my_peer
@@ -91,12 +99,25 @@ BOOST_AUTO_TEST_CASE( p2p_disable_peer_advertising )
 
    // check the results
    std::shared_ptr<graphene::net::message> msg = my_peer->message_received;
-   BOOST_CHECK( msg != nullptr);
-   BOOST_CHECK( msg->data.size() == 0 );
-   // now try with "disable_peer_advertising" set
-   my_node.disable_peer_advertising();
-   BOOST_CHECK( msg != nullptr );
-   BOOST_CHECK( msg->data.size() == 0 );
+   test_address_message(msg, 0);
+}
+
+BOOST_AUTO_TEST_CASE( advertise_list )
+{
+   std::vector<std::string> advert_list = { "127.0.0.1:8090"};
+   // set up my node
+   test_node my_node("Hello");
+   my_node.set_advertise_algorithm( "list", advert_list );
+   graphene::net::detail::node_impl del;
+   // a fake peer
+   std::shared_ptr<test_peer> my_peer(new test_peer{&del});
+
+   // act like my_node received an address_request message from my_peer
+   graphene::net::address_request_message address_request_message_received;
+   my_node.on_message( my_peer, address_request_message_received );
+   // check the results
+   std::shared_ptr<graphene::net::message> msg = my_peer->message_received;
+   test_address_message( msg, 1 );
 }
 
 BOOST_AUTO_TEST_SUITE_END()

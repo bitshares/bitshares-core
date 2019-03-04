@@ -286,46 +286,67 @@ namespace graphene { namespace net { namespace detail {
 #define MAXIMUM_NUMBER_OF_BLOCKS_TO_HANDLE_AT_ONE_TIME 200
 #define MAXIMUM_NUMBER_OF_BLOCKS_TO_PREFETCH (10 * MAXIMUM_NUMBER_OF_BLOCKS_TO_HANDLE_AT_ONE_TIME)
 
-    class random_address_builder : public node_impl::address_builder
-    {
-       void build(node_impl* impl, address_message& reply )
-       {
-          // return a random list of nodes
-          srand( time( NULL ) );
-          for (const peer_connection_ptr& active_peer : impl->_active_connections)
-          {
-             // should we add this one?
-             if ( rand () % 2 == 1)
-             {
-                reply.addresses.emplace_back(update_address_record(impl, active_peer));
-             } // randomness
-          } // each active peer
-       }
-    };
+   class random_address_builder : public node_impl::address_builder
+   {
+      void build(node_impl* impl, address_message& reply )
+      {
+         // return a random list of nodes
+         srand( time( NULL ) );
+         for (const peer_connection_ptr& active_peer : impl->_active_connections)
+         {
+            // should we add this one?
+            if ( rand () % 2 == 1)
+            {
+               reply.addresses.emplace_back(update_address_record(impl, active_peer));
+            } // randomness
+         } // each active peer
+      }
+   };
 
-    class list_address_builder : public node_impl::address_builder
-    {
-       void build(node_impl* impl, address_message& reply)
-       {
-          for (const peer_connection_ptr& active_peer : impl->_active_connections)
-          {
-             //TODO: is this connection in the seed list?
-             reply.addresses.emplace_back(update_address_record(impl, active_peer));
-          }
-       }
-    };
+   class list_address_builder : public node_impl::address_builder
+   {
+      public:
+      list_address_builder(std::vector<std::string> address_list)
+      {
+         advertise_list.reserve( address_list.size() );
+         auto& list = advertise_list;
+         std::for_each( address_list.begin(), address_list.end(), [&list]( std::string str ) {
+               // ignore fc exceptions (like poorly formatted endpoints)
+               try
+               {
+                  list.emplace_back( graphene::net::address_info(
+                     fc::ip::endpoint::from_string(str),
+                     fc::time_point_sec(),
+                     fc::microseconds(0),
+                     node_id_t(),
+                     peer_connection_direction::unknown,
+                     firewalled_state::unknown ));
+               }
+               catch(const fc::exception& ) {
+                  wlog( "Address ${addr} invalid.", ("addr", str) );
+               } 
+            } );
+      }
 
-    class all_address_builder : public node_impl::address_builder
-    {
-       void build( node_impl* impl, address_message& reply )
-       {
-          reply.addresses.reserve(impl->_active_connections.size());
-          for (const peer_connection_ptr& active_peer : impl->_active_connections)
-          {
-             reply.addresses.emplace_back(update_address_record(impl, active_peer));
-          }
-       }
-    };
+      void build(node_impl* impl, address_message& reply)
+      {
+         reply.addresses = advertise_list;
+      }
+      private:
+      std::vector<graphene::net::address_info> advertise_list;
+   };
+
+   class all_address_builder : public node_impl::address_builder
+   {
+      void build( node_impl* impl, address_message& reply )
+      {
+         reply.addresses.reserve(impl->_active_connections.size());
+         for (const peer_connection_ptr& active_peer : impl->_active_connections)
+         {
+            reply.addresses.emplace_back(update_address_record(impl, active_peer));
+         }
+      }
+   };
 
 
 
@@ -1740,7 +1761,7 @@ namespace graphene { namespace net { namespace detail {
       originating_peer->send_message(reply);
     }
 
-    void node_impl::set_advertise_algorithm( std::string algo )
+    void node_impl::set_advertise_algorithm( std::string algo, std::vector<std::string> advertise_list )
     {
        if (algo == "random")
        {
@@ -1748,7 +1769,7 @@ namespace graphene { namespace net { namespace detail {
        }
        else if (algo == "list")
        {
-          _address_builder = std::make_shared<list_address_builder>();
+          _address_builder = std::make_shared<list_address_builder>(advertise_list);
        }
        else if (algo == "nothing")
        {
@@ -5211,9 +5232,9 @@ namespace graphene { namespace net { namespace detail {
 
   }
 
-  void node::set_advertise_algorithm( std::string algo )
+  void node::set_advertise_algorithm( std::string algo, std::vector<std::string> advertise_list )
   {
-     my->set_advertise_algorithm( algo );
+     my->set_advertise_algorithm( algo, advertise_list );
   }
 
 } } // end namespace graphene::net

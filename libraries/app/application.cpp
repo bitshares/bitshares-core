@@ -170,7 +170,14 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    ilog("Configured p2p node to listen on ${ip}", ("ip", _p2p_network->get_actual_listening_endpoint()));
 
    if (_options->count("advertise-peer-algorithm") )
-      _p2p_network->set_advertise_algorithm( _options->at("advertise-peer-algorithm").as<string>() );
+   {
+      if ( _options->count("advertise-peer-list") )
+         _p2p_network->set_advertise_algorithm( 
+               _options->at("advertise-peer-algorithm").as<string>(),
+               _options->at("advertise-peer-list").as<std::vector<std::string>>() );
+      else
+         _p2p_network->set_advertise_algorithm( _options->at("advertise-peer-algorithm").as<string>() );
+   }
 
    if (_options->count("accept-incoming-connections") )
       _p2p_network->accept_incoming_connections( _options->at("accept-incoming-connections").as<bool>() );
@@ -960,6 +967,8 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
          ("accept-incoming-connections", bpo::value<bool>()->implicit_value(true), "Accept incoming connections")
          ("advertise-peer-algorithm", bpo::value<string>()->implicit_value("all"), "Determines which peers are advertised")
+         ("advertise-peer-list", bpo::value<vector<string>>()->composing(), 
+            "P2P nodes to advertise (may specify multiple times")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()

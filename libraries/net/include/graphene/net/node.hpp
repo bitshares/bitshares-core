@@ -199,7 +199,7 @@ namespace graphene { namespace net {
         void close();
 
         void      set_node_delegate( node_delegate* del );
-        void      set_advertise_algorithm( std::string algo );
+        void      set_advertise_algorithm( std::string algo, std::vector<std::string> advertise_list = std::vector<std::string>() );
 
         void      load_configuration( const fc::path& configuration_directory );
 
