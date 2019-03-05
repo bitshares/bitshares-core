@@ -80,6 +80,7 @@ if( WIN32 )
     set(CRYPTO_LIB)
 
     if( MSVC )
+	add_definitions(-DWIN32_LEAN_AND_MEAN)
         #looks like this flag can have different default on some machines.
         SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /SAFESEH:NO")
         SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SAFESEH:NO")
