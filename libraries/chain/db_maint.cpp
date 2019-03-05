@@ -311,7 +311,7 @@ void database::update_active_committee_members()
    if( stake_target > 0 )
    {
       while( (committee_member_count < _committee_count_histogram_buffer.size() - 1)
-             && (stake_tally <= stake_target) )
+             && (stake_tally <= stake_target.value) )
       {
          stake_tally += _committee_count_histogram_buffer[++committee_member_count];
       }
