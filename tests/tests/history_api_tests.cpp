@@ -25,6 +25,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/app/api.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 
@@ -601,6 +602,156 @@ BOOST_AUTO_TEST_CASE(get_account_history_operations) {
    } catch (fc::exception &e) {
       edump((e.to_detail_string()));
       throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( market_history )
+{
+   class simple_tx
+   {
+      public:
+      simple_tx() {}
+      simple_tx(
+         const graphene::chain::account_object& from, 
+         const graphene::chain::account_object& to, 
+         const graphene::chain::price& amount)
+         : from(from), to(to), amount(amount) {}
+      const graphene::chain::account_object to;
+      const graphene::chain::account_object from;
+      const graphene::chain::price amount;
+   };
+   class time_series
+   {
+      public:
+      time_series() {}
+      time_series(uint32_t secs, std::vector<simple_tx> transactions) : secs(secs), transactions(transactions) {}
+      uint32_t secs;
+      std::vector<simple_tx> transactions;
+   };
+   try {
+      app.enable_plugin("market_history");
+      graphene::app::history_api hist_api( app );
+
+      // create the needed things on the chain
+      ACTORS( (bob) (alice) );
+      transfer( committee_account, alice.id, asset(1000000000) );
+      transfer( committee_account, bob.id  , asset(1000000000) );
+      const graphene::chain::asset_object& usd = create_bitasset( "USD", account_id_type() );
+      // set up feed producers
+      {
+         asset_update_feed_producers_operation op;
+         op.asset_to_update = usd.id;
+         op.issuer = committee_account;
+         op.new_feed_producers = {committee_account, alice.id, bob.id};
+         trx.operations.push_back(op);
+         sign( trx, private_key );
+         PUSH_TX( db, trx, ~0 );
+         generate_block();
+         trx.clear();
+         publish_feed( committee_account, asset_id_type(), 2, usd.id, 1, asset_id_type() );
+         publish_feed( alice.id, asset_id_type(), 1, usd.id, 2, asset_id_type() );
+         publish_feed( bob.id, asset_id_type(), 2, usd.id, 1, asset_id_type() );
+      }
+      const graphene::chain::asset_object& cny = create_bitasset( "CNY", account_id_type() );
+      // set up feed producers
+      {
+         asset_update_feed_producers_operation op;
+         op.asset_to_update = cny.id;
+         op.issuer = committee_account;
+         op.new_feed_producers = {committee_account, alice.id, bob.id};
+         trx.operations.push_back(op);
+         sign( trx, private_key );
+         PUSH_TX( db, trx, ~0 );
+         generate_block();
+         trx.clear();
+         publish_feed( committee_account, asset_id_type(), 1, cny.id, 2, asset_id_type() );
+         publish_feed( alice.id, asset_id_type(), 1, cny.id, 2, asset_id_type() );
+         publish_feed( bob.id, asset_id_type(), 2, cny.id, 1, asset_id_type() );
+      }
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      borrow( alice, asset(100000, usd.id), asset(1000000) );
+      borrow( bob  , asset(100000, usd.id), asset(1000000) );
+      borrow( alice, asset(100000, cny.id), asset(1000000) );
+      borrow( bob  , asset(100000, cny.id), asset(1000000) );
+
+      // get bucket size
+      boost::container::flat_set<uint32_t> bucket_sizes = hist_api.get_market_history_buckets();
+      uint32_t bucket_size = *bucket_sizes.begin(); // 15 secs when I checked.
+
+      // make some transaction data
+      uint32_t current_price = 5000;
+
+      // a function to transmit a transaction
+      auto transmit_tx = [this, alice, bob, alice_private_key, bob_private_key](const simple_tx& tx) {
+         const auto seller_private_key = ( tx.from.id == alice.id ? alice_private_key : bob_private_key );
+         const auto buyer_private_key  = ( tx.from.id == alice.id ? bob_private_key : alice_private_key );
+         // create an order
+         graphene::chain::limit_order_create_operation limit;
+         limit.amount_to_sell = tx.amount.base;
+         limit.min_to_receive = tx.amount.quote;
+         limit.fill_or_kill = false;
+         limit.seller = tx.from.id;
+         limit.expiration = fc::time_point_sec( fc::time_point::now().sec_since_epoch() + 60 );
+         // send the order
+         set_expiration( db, trx );
+         trx.operations.push_back( limit );
+         sign( trx, seller_private_key );
+         PUSH_TX( db,  trx, ~0 );
+         trx.clear();
+         // send a second order that will fill the first
+         graphene::chain::limit_order_create_operation buy;
+         buy.amount_to_sell = tx.amount.quote;
+         buy.min_to_receive = tx.amount.base;
+         buy.fill_or_kill = false;
+         buy.seller = tx.to.id;
+         buy.expiration = limit.expiration;
+         set_expiration( db, trx );
+         trx.operations.push_back( buy );
+         sign( trx, buyer_private_key );
+         PUSH_TX( db,  trx, ~0 );
+         trx.clear();
+      };
+
+      uint32_t num_bars = 10;
+      std::vector<time_series> bars(num_bars);
+
+      generate_blocks( HARDFORK_CORE_625_TIME );
+
+      for( uint32_t i = 0; i < num_bars; ++i )  // each bucket
+      {
+         uint32_t num_transactions = std::rand() % 100;
+         std::vector<simple_tx> trxs(num_transactions);
+         for( int tx_num = 0; tx_num < num_transactions; ++tx_num )
+         {
+            bool alice_buys = std::rand() % 2;
+            bool buy_usd = std::rand() % 2;
+            current_price = ( current_price + ( std::rand() % 2 ? 1 : -1) );
+            simple_tx stx(
+               ( alice_buys ? alice : bob ),
+               ( alice_buys ? bob : alice ),
+               graphene::chain::price( 
+                  graphene::chain::asset(1, (buy_usd ? cny.id : usd.id ) ), 
+                  graphene::chain::asset(current_price, (buy_usd ? usd.id : cny.id ) )
+               )
+               );
+            trxs.push_back(stx);
+            // send matching buy and sell to the server
+            transmit_tx(stx);
+         }
+         generate_block();
+         bars.push_back( time_series(i, trxs) );
+      }
+      // grab history
+      auto server_history = hist_api.get_market_history( 
+            static_cast<std::string>(usd.id), // asset_id_type
+            static_cast<std::string>(cny.id), // asset_id_type
+            bucket_size, // bucket_seconds
+            fc::time_point_sec(0), // start
+            fc::time_point_sec(db.head_block_time()) ); // end
+      // compare what comes back with what we think we should have
+      BOOST_CHECK_EQUAL( server_history.size(), 0 );
+   } catch ( fc::exception &e ) {
+      BOOST_FAIL( e.to_detail_string() );
    }
 }
 
