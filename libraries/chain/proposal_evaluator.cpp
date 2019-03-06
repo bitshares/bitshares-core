@@ -198,10 +198,12 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
                        std::inserter(_required_active_auths, _required_active_auths.begin()));
 
    // TODO: what about other???
-   FC_ASSERT (other.empty(), "Proposals containing operations requiring non-account authorities are not yet implemented.");
+   FC_ASSERT (other.empty(),
+              "Proposals containing operations requiring non-account authorities are not yet implemented.");
 
    // If we're dealing with the committee authority, make sure this transaction has a sufficient review period.
-   if (_required_active_auths.count(GRAPHENE_COMMITTEE_ACCOUNT) || _required_owner_auths.count(GRAPHENE_COMMITTEE_ACCOUNT)) {
+   if (_required_active_auths.count(GRAPHENE_COMMITTEE_ACCOUNT) ||
+       _required_owner_auths.count(GRAPHENE_COMMITTEE_ACCOUNT)) {
       GRAPHENE_ASSERT(o.review_period_seconds.valid(),
                       proposal_create_review_period_required,
                       "Review period not given, but at least ${min} required",

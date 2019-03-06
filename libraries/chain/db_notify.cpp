@@ -520,6 +520,6 @@ void database::notify_changed_objects()
            GRAPHENE_TRY_NOTIFY(removed_objects, removed_ids, removed, removed_accounts_impacted)
       }
    }
-} FC_LOG_AND_RETHROW() }
+} FC_CAPTURE_AND_LOG( (0) ) }
 
 } }

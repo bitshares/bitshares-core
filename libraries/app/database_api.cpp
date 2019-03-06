@@ -2275,13 +2275,13 @@ set<public_key_type> database_api_impl::get_potential_signatures(const signed_tr
    bool ignore_custom_op_reqd_auths = MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(chain_time);
 
    set<public_key_type> result;
-   auto get_active = [&](account_id_type id) {
+   auto get_active = [this, &result](account_id_type id) {
       const auto& auth = id(_db).active;
       for (const auto& k : auth.get_keys())
          result.insert(k);
       return &auth;
    };
-   auto get_owner = [&](account_id_type id) {
+   auto get_owner = [this, &result](account_id_type id) {
       const auto& auth = id(_db).owner;
       for (const auto& k : auth.get_keys())
          result.insert(k);
@@ -2314,13 +2314,13 @@ set<address> database_api_impl::get_potential_address_signatures(const signed_tr
    bool ignore_custom_op_reqd_auths = MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(chain_time);
 
    set<address> result;
-   auto get_active = [&](account_id_type id) {
+   auto get_active = [this, &result](account_id_type id) {
       const auto& auth = id(_db).active;
       for (const auto& k : auth.get_addresses())
          result.insert(k);
       return &auth;
    };
-   auto get_owner = [&](account_id_type id) {
+   auto get_owner = [this, &result](account_id_type id) {
       const auto& auth = id(_db).owner;
       for (const auto& k : auth.get_addresses())
          result.insert(k);
