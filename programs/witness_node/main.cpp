@@ -97,6 +97,19 @@ int main(int argc, char** argv) {
          return 1;
       }
 
+      cfg_options.add_options()
+              ("plugins", bpo::value<std::string>()->default_value(options.at("plugins").as<std::string>()),
+               "Space-separated list of plugins to activate");
+
+      fc::path data_dir;
+      if( options.count("data-dir") )
+      {
+         data_dir = options["data-dir"].as<boost::filesystem::path>();
+         if( data_dir.is_relative() )
+            data_dir = fc::current_path() / data_dir;
+      }
+      app::load_configuration_options(data_dir, cfg_options, options);
+
       std::set<std::string> plugins;
       boost::split(plugins, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
 
@@ -110,7 +123,7 @@ int main(int argc, char** argv) {
             node->enable_plugin(plug);
          }
       });
-      
+
       if( options.count("help") )
       {
          std::cout << app_options << "\n";
@@ -126,15 +139,6 @@ int main(int argc, char** argv) {
          std::cout << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version << "\n";
          return 0;
       }
-
-      fc::path data_dir;
-      if( options.count("data-dir") )
-      {
-         data_dir = options["data-dir"].as<boost::filesystem::path>();
-         if( data_dir.is_relative() )
-            data_dir = fc::current_path() / data_dir;
-      }
-      app::load_configuration_options(data_dir, cfg_options, options);
 
       bpo::notify(options);
 
