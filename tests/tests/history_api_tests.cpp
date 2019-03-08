@@ -605,6 +605,11 @@ BOOST_AUTO_TEST_CASE(get_account_history_operations) {
    }
 }
 
+/***
+ * This was an attempt to create market history. But due
+ * to the way it is done, it will take to long to generate
+ * the data needed.
+ */
 BOOST_AUTO_TEST_CASE( market_history )
 {
    class simple_tx
@@ -634,8 +639,8 @@ BOOST_AUTO_TEST_CASE( market_history )
 
       // create the needed things on the chain
       ACTORS( (bob) (alice) );
-      transfer( committee_account, alice.id, asset(1000000000) );
-      transfer( committee_account, bob.id  , asset(1000000000) );
+      transfer( committee_account, alice.id, asset(10000000000) );
+      transfer( committee_account, bob.id  , asset(10000000000) );
       const graphene::chain::asset_object& usd = create_bitasset( "USD", account_id_type() );
       // set up feed producers
       {
@@ -669,17 +674,18 @@ BOOST_AUTO_TEST_CASE( market_history )
          publish_feed( bob.id, asset_id_type(), 2, cny.id, 1, asset_id_type() );
       }
       generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
-      borrow( alice, asset(100000, usd.id), asset(1000000) );
-      borrow( bob  , asset(100000, usd.id), asset(1000000) );
-      borrow( alice, asset(100000, cny.id), asset(1000000) );
-      borrow( bob  , asset(100000, cny.id), asset(1000000) );
+      borrow( alice, asset(1000000, usd.id), asset(10000000) );
+      borrow( bob  , asset(1000000, usd.id), asset(10000000) );
+      borrow( alice, asset(1000000, cny.id), asset(10000000) );
+      borrow( bob  , asset(1000000, cny.id), asset(10000000) );
 
       // get bucket size
       boost::container::flat_set<uint32_t> bucket_sizes = hist_api.get_market_history_buckets();
       uint32_t bucket_size = *bucket_sizes.begin(); // 15 secs when I checked.
+      BOOST_TEST_MESSAGE( "Bucket size: " + std::to_string(bucket_size) );
 
       // make some transaction data
-      uint32_t current_price = 5000;
+      uint32_t current_price = 500;
 
       // a function to transmit a transaction
       auto transmit_tx = [this, alice, bob, alice_private_key, bob_private_key](const simple_tx& tx) {
@@ -712,7 +718,7 @@ BOOST_AUTO_TEST_CASE( market_history )
          trx.clear();
       };
 
-      uint32_t num_bars = 10;
+      uint32_t num_bars = 800;
       std::vector<time_series> bars(num_bars);
 
       generate_blocks( HARDFORK_CORE_625_TIME );
@@ -738,7 +744,13 @@ BOOST_AUTO_TEST_CASE( market_history )
             // send matching buy and sell to the server
             transmit_tx(stx);
          }
-         generate_block();
+         graphene::chain::signed_block blk = generate_block();
+         if ( (i+1) % 10 == 0)
+         {
+            BOOST_TEST_MESSAGE( "Block " + std::to_string( (i+1)) 
+                  + " of " + std::to_string(num_bars)
+                  + " created with " + std::to_string(blk.transactions.size()) + " transactions." );
+         }
          bars.push_back( time_series(i, trxs) );
       }
       // grab history
@@ -748,8 +760,17 @@ BOOST_AUTO_TEST_CASE( market_history )
             bucket_size, // bucket_seconds
             fc::time_point_sec(0), // start
             fc::time_point_sec(db.head_block_time()) ); // end
-      // compare what comes back with what we think we should have
-      BOOST_CHECK_EQUAL( server_history.size(), 0 );
+      BOOST_CHECK_EQUAL( server_history.size(), 200 );
+      // grab the last traunch of history
+      auto last_date = (*(--server_history.end())).key.open;
+      auto server_history2 = hist_api.get_market_history( 
+            static_cast<std::string>(usd.id), // asset_id_type
+            static_cast<std::string>(cny.id), // asset_id_type
+            bucket_size, // bucket_seconds
+            fc::time_point_sec(last_date + bucket_size), // start
+            fc::time_point_sec(db.head_block_time()) ); // end
+      BOOST_CHECK_EQUAL( server_history2.size(), 67 );
+      // now match up the data to assure it is correct.
    } catch ( fc::exception &e ) {
       BOOST_FAIL( e.to_detail_string() );
    }
