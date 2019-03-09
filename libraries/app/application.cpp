@@ -572,7 +572,15 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
                           ("e", e.to_detail_string()) );
    } catch( const fc::exception& e ) {
       elog("Error when pushing block:\n${e}", ("e", e.to_detail_string()));
-      throw;
+      // if the exception type got lost but the code remains
+      if( e.code() == 3080000 ) {
+        elog( "Rethrowing as graphene::net exception" );
+        FC_THROW_EXCEPTION( graphene::net::unlinkable_block_exception,
+                            "Error when pushing block:\n${e}",
+                            ("e", e.to_detail_string()) );
+      } else {
+        throw;
+      }
    }
 
    if( !_is_finished_syncing && !sync_mode )
