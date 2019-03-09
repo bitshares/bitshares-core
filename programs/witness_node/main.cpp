@@ -97,6 +97,22 @@ int main(int argc, char** argv) {
          return 1;
       }
 
+      if( options.count("help") )
+      {
+         std::cout << app_options << "\n";
+         return 0;
+      }
+      if( options.count("version") )
+      {
+         std::cout << "Version: " << graphene::utilities::git_revision_description << "\n";
+         std::cout << "SHA: " << graphene::utilities::git_revision_sha << "\n";
+         std::cout << "Timestamp: " << fc::get_approximate_relative_time_string(fc::time_point_sec(graphene::utilities::git_revision_unix_timestamp)) << "\n";
+         std::cout << "SSL: " << OPENSSL_VERSION_TEXT << "\n";
+         std::cout << "Boost: " << boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".") << "\n";
+         std::cout << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version << "\n";
+         return 0;
+      }
+
       cfg_options.add_options()
               ("plugins", bpo::value<std::string>()->default_value(options.at("plugins").as<std::string>()),
                "Space-separated list of plugins to activate");
@@ -123,22 +139,6 @@ int main(int argc, char** argv) {
             node->enable_plugin(plug);
          }
       });
-
-      if( options.count("help") )
-      {
-         std::cout << app_options << "\n";
-         return 0;
-      }
-      if( options.count("version") )
-      {
-         std::cout << "Version: " << graphene::utilities::git_revision_description << "\n";
-         std::cout << "SHA: " << graphene::utilities::git_revision_sha << "\n";
-         std::cout << "Timestamp: " << fc::get_approximate_relative_time_string(fc::time_point_sec(graphene::utilities::git_revision_unix_timestamp)) << "\n";
-         std::cout << "SSL: " << OPENSSL_VERSION_TEXT << "\n";
-         std::cout << "Boost: " << boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".") << "\n";
-         std::cout << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version << "\n";
-         return 0;
-      }
 
       bpo::notify(options);
 
