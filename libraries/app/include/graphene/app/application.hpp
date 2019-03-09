@@ -72,7 +72,7 @@ namespace graphene { namespace app {
             if( !plugin_cfg_options.options().empty() )
             {
                std::string header_name = "plugin-cfg-header-" + plug->plugin_name();
-               std::string header_desc = "=============== " + plug->plugin_name() + " plugin options ===============";
+               std::string header_desc = plug->plugin_name() + " plugin options";
                _cfg_options.add_options()(header_name.c_str(), header_desc.c_str());
                _cfg_options.add(plugin_cfg_options);
             }
