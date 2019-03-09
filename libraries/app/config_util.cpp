@@ -265,6 +265,13 @@ static void create_new_config_file(const fc::path& config_ini_path, const fc::pa
 
       if( !od->description().empty() )
          out_cfg << "# " << od->description() << "\n";
+
+      if( od->long_name().find("plugin-cfg-header-") == 0 )
+      {
+         out_cfg << "\n";
+         continue;
+      }
+
       boost::any store;
       if( !od->semantic()->apply_default(store) )
          out_cfg << "# " << od->long_name() << " = \n";
@@ -284,6 +291,7 @@ static void create_new_config_file(const fc::path& config_ini_path, const fc::pa
    }
 
    out_cfg << "\n"
+           << "# =============== logging options ===============\n"
            << "# Logging configuration is loaded from logging.ini by default.\n"
            << "# If logging.ini exists, logging configuration added in this file will be ignored.\n";
    out_cfg.close();
