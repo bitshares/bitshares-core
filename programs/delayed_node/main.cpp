@@ -72,10 +72,6 @@ int main(int argc, char** argv) {
 
       bpo::variables_map options;
 
-      auto delayed_plug = node.register_plugin<delayed_node::delayed_node_plugin>();
-      auto history_plug = node.register_plugin<account_history::account_history_plugin>();
-      auto market_history_plug = node.register_plugin<market_history::market_history_plugin>();
-
       try
       {
          bpo::options_description cli, cfg;
@@ -95,6 +91,19 @@ int main(int argc, char** argv) {
          std::cout << app_options << "\n";
          return 0;
       }
+
+      cfg_options.add_options()
+              ("plugins", bpo::value<std::string>()->default_value(options.at("plugins").as<std::string>()),
+               "Space-separated list of plugins to activate");
+
+      auto delayed_plug = node.register_plugin<delayed_node::delayed_node_plugin>();
+      auto history_plug = node.register_plugin<account_history::account_history_plugin>();
+      auto market_history_plug = node.register_plugin<market_history::market_history_plugin>();
+
+      // add plugin options to config
+      bpo::options_description cli, cfg;
+      node.set_program_options(cli, cfg);
+      cfg_options.add(cfg);
 
       fc::path data_dir;
       if( options.count("data-dir") )
