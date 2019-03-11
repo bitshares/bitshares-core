@@ -715,7 +715,7 @@ BOOST_AUTO_TEST_CASE( market_history )
       uint32_t num_estimated_bars = 800;
 
       std::vector<simple_tx> trxs;
-      uint64_t total_transactions_sent = 0;
+      //uint64_t total_transactions_sent = 0;
       // make a dead spot 15 blocks in for 4 blocks
       for( uint32_t i = 0; i < num_estimated_bars; ++i )  // each (hopeful) bar
       {
@@ -747,6 +747,7 @@ BOOST_AUTO_TEST_CASE( market_history )
          }
          
          graphene::chain::signed_block blk = generate_block();
+         /*
          if ( (i+1) % 10 == 0)
          {
             uint64_t transactions_sent_this_block = trxs.size() - total_transactions_sent;
@@ -755,6 +756,7 @@ BOOST_AUTO_TEST_CASE( market_history )
                   + " created with " + std::to_string(transactions_sent_this_block) + " transactions." );
             total_transactions_sent = trxs.size();
          }
+         */
       }
       // grab history
       auto server_history = hist_api.get_market_history( 
