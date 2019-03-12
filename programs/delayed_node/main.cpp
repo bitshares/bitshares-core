@@ -93,7 +93,7 @@ int main(int argc, char** argv) {
       }
 
       cfg_options.add_options()
-              ("plugins", bpo::value<std::string>()->default_value(options.at("plugins").as<std::string>()),
+              ("plugins", bpo::value<std::string>()->default_value("delayed_node account_history market_history"),
                "Space-separated list of plugins to activate");
 
       auto delayed_plug = node.register_plugin<delayed_node::delayed_node_plugin>();
