@@ -1151,7 +1151,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    distribute_fba_balances(*this);
    create_buyback_orders(*this);
 
-   on_maintenance_begin( next_block.id() );
+   on_maintenance_begin( next_block.block_num() );
 
    struct vote_tally_helper {
       database& d;
@@ -1332,6 +1332,8 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    // process_budget needs to run at the bottom because
    //   it needs to know the next_maintenance_time
    process_budget();
+
+   on_maintenance_end();
 }
 
 } }

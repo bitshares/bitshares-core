@@ -34,6 +34,7 @@
 #include <graphene/es_objects/es_objects.hpp>
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 #include <graphene/api_helper_indexes/api_helper_indexes.hpp>
+#include <graphene/voting_stat/voting_stat_plugin.hpp>
 
 #include <fc/thread/thread.hpp>
 #include <fc/interprocess/signals.hpp>
@@ -50,7 +51,7 @@
 #include <iostream>
 
 #ifdef WIN32
-# include <signal.h> 
+# include <signal.h>
 #else
 # include <csignal>
 #endif
@@ -96,8 +97,10 @@ int main(int argc, char** argv) {
       auto es_objects_plug = node->register_plugin<es_objects::es_objects_plugin>();
       auto grouped_orders_plug = node->register_plugin<grouped_orders::grouped_orders_plugin>();
       auto api_helper_indexes_plug = node->register_plugin<api_helper_indexes::api_helper_indexes>();
+      auto voting_stat_plug = node->register_plugin<voting_stat::voting_stat_plugin>();
 
       // add plugin options to config
+
       try
       {
          bpo::options_description cli, cfg;
