@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
       }
 
       cfg_options.add_options()
-              ("plugins", bpo::value<std::string>()->default_value(options.at("plugins").as<std::string>()),
+              ("plugins", bpo::value<std::string>()->default_value("witness account_history market_history grouped_orders"),
                "Space-separated list of plugins to activate");
 
       auto witness_plug = node->register_plugin<witness_plugin::witness_plugin>();
