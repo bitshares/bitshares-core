@@ -1638,6 +1638,20 @@ class wallet_api
          
       order_book get_order_book( const string& base, const string& quote, unsigned limit = 50);
 
+      /** Signs a transaction.
+       *
+       * Given a fully-formed transaction with or without signatures, signs
+       * the transaction with the owned keys and optionally broadcasts the
+       * transaction.
+       *
+       * @param tx the unsigned transaction
+       * @param broadcast true if you wish to broadcast the transaction
+       *
+       * @return the signed transaction
+       */
+      signed_transaction add_transaction_signature( signed_transaction tx,
+                                                    bool broadcast = false );
+
       void dbg_make_uia(string creator, string symbol);
       void dbg_make_mia(string creator, string symbol);
       void dbg_push_blocks( std::string src_filename, uint32_t count );
@@ -1828,6 +1842,7 @@ FC_API( graphene::wallet::wallet_api,
         (save_wallet_file)
         (serialize_transaction)
         (sign_transaction)
+        (add_transaction_signature)
         (get_prototype_operation)
         (propose_parameter_change)
         (propose_fee_change)
