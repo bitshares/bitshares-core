@@ -112,11 +112,11 @@ namespace graphene { namespace protocol {
     *
     *  @return a set of required authorities for @ref op
     */
-   void operation_get_required_authorities(const operation& op,
-                                           flat_set<account_id_type>& active,
-                                           flat_set<account_id_type>& owner,
-                                           vector<authority>& other,
-                                           bool ignore_custom_operation_required_auths);
+   void operation_get_required_authorities( const operation& op,
+                                            flat_set<account_id_type>& active,
+                                            flat_set<account_id_type>& owner,
+                                            vector<authority>& other,
+                                            bool ignore_custom_operation_required_auths );
 
    void operation_validate( const operation& op );
 

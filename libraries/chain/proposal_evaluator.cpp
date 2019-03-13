@@ -160,103 +160,108 @@ void hardfork_visitor_1479::operator()(const graphene::chain::proposal_create_op
       op.op.visit(*this);
 }
 
-void_result proposal_create_evaluator::do_evaluate(const proposal_create_operation& o)
+void_result proposal_create_evaluator::do_evaluate( const proposal_create_operation& o )
 { try {
    const database& d = db();
 
    // Calling the proposal hardfork visitor
    const fc::time_point_sec block_time = d.head_block_time();
-   proposal_operation_hardfork_visitor vtor(d, block_time);
-   vtor(o);
-   if (block_time < HARDFORK_CORE_214_TIME) {
+   proposal_operation_hardfork_visitor vtor( d, block_time );
+   vtor( o );
+   if( block_time < HARDFORK_CORE_214_TIME )
+   {
       // cannot be removed after hf, unfortunately
       hardfork_visitor_214 hf214;
-      for (const op_wrapper &op : o.proposed_ops)
-         op.op.visit(hf214);
+      for( const op_wrapper &op : o.proposed_ops )
+         op.op.visit( hf214 );
    }
-   vtor_1479(o);
+   vtor_1479( o );
 
    const auto& global_parameters = d.get_global_properties().parameters;
 
-   FC_ASSERT (o.expiration_time > block_time, "Proposal has already expired on creation.");
-   FC_ASSERT (o.expiration_time <= block_time + global_parameters.maximum_proposal_lifetime,
-              "Proposal expiration time is too far in the future.");
-   FC_ASSERT (!o.review_period_seconds || fc::seconds(*o.review_period_seconds) < (o.expiration_time - block_time),
-              "Proposal review period must be less than its overall lifetime.");
+   FC_ASSERT( o.expiration_time > block_time, "Proposal has already expired on creation." );
+   FC_ASSERT( o.expiration_time <= block_time + global_parameters.maximum_proposal_lifetime,
+              "Proposal expiration time is too far in the future." );
+   FC_ASSERT( !o.review_period_seconds || fc::seconds( *o.review_period_seconds ) < ( o.expiration_time - block_time ),
+              "Proposal review period must be less than its overall lifetime." );
 
    // Find all authorities required by the proposed operations
    flat_set<account_id_type> tmp_required_active_auths;
    vector<authority> other;
-   for (auto& op : o.proposed_ops) {
-      operation_get_required_authorities(op.op, tmp_required_active_auths, _required_owner_auths, other,
-                                         MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(block_time));
+   for( auto& op : o.proposed_ops )
+   {
+      operation_get_required_authorities( op.op, tmp_required_active_auths, _required_owner_auths, other,
+                                          MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( block_time ) );
    }
    // All accounts which must provide both owner and active authority should be omitted from the active authority set;
    // owner authority approval implies active authority approval.
-   std::set_difference(tmp_required_active_auths.begin(), tmp_required_active_auths.end(),
-                       _required_owner_auths.begin(), _required_owner_auths.end(),
-                       std::inserter(_required_active_auths, _required_active_auths.begin()));
+   std::set_difference( tmp_required_active_auths.begin(), tmp_required_active_auths.end(),
+                        _required_owner_auths.begin(), _required_owner_auths.end(),
+                        std::inserter( _required_active_auths, _required_active_auths.begin() ) );
 
    // TODO: what about other???
-   FC_ASSERT (other.empty(),
-              "Proposals containing operations requiring non-account authorities are not yet implemented.");
+   FC_ASSERT ( other.empty(),
+               "Proposals containing operations requiring non-account authorities are not yet implemented." );
 
    // If we're dealing with the committee authority, make sure this transaction has a sufficient review period.
-   if (_required_active_auths.count(GRAPHENE_COMMITTEE_ACCOUNT) ||
-       _required_owner_auths.count(GRAPHENE_COMMITTEE_ACCOUNT)) {
-      GRAPHENE_ASSERT(o.review_period_seconds.valid(),
-                      proposal_create_review_period_required,
-                      "Review period not given, but at least ${min} required",
-                      ("min", global_parameters.committee_proposal_review_period));
-      GRAPHENE_ASSERT(*o.review_period_seconds >= global_parameters.committee_proposal_review_period,
-                      proposal_create_review_period_insufficient,
-                      "Review period of ${t} specified, but at least ${min} required",
-                      ("t", *o.review_period_seconds)
-                      ("min", global_parameters.committee_proposal_review_period));
+   if( _required_active_auths.count( GRAPHENE_COMMITTEE_ACCOUNT ) ||
+       _required_owner_auths.count( GRAPHENE_COMMITTEE_ACCOUNT ) )
+   {
+      GRAPHENE_ASSERT( o.review_period_seconds.valid(),
+                       proposal_create_review_period_required,
+                       "Review period not given, but at least ${min} required",
+                       ("min", global_parameters.committee_proposal_review_period) );
+      GRAPHENE_ASSERT( *o.review_period_seconds >= global_parameters.committee_proposal_review_period,
+                       proposal_create_review_period_insufficient,
+                       "Review period of ${t} specified, but at least ${min} required",
+                       ("t", *o.review_period_seconds)
+                       ("min", global_parameters.committee_proposal_review_period) );
    }
 
-   for (const op_wrapper& op : o.proposed_ops)
-      _proposed_trx.operations.push_back(op.op);
+   for( const op_wrapper& op : o.proposed_ops )
+      _proposed_trx.operations.push_back( op.op );
 
    _proposed_trx.validate();
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-object_id_type proposal_create_evaluator::do_apply(const proposal_create_operation& o)
+object_id_type proposal_create_evaluator::do_apply( const proposal_create_operation& o )
 { try {
    database& d = db();
+   auto chain_time = d.head_block_time();
 
-   const proposal_object& proposal = d.create<proposal_object>([&](proposal_object& proposal) {
+   const proposal_object& proposal = d.create<proposal_object>( [&o, this, chain_time](proposal_object& proposal) {
       _proposed_trx.expiration = o.expiration_time;
       proposal.proposed_transaction = _proposed_trx;
       proposal.expiration_time = o.expiration_time;
       proposal.proposer = o.fee_paying_account;
-      if (o.review_period_seconds)
+      if( o.review_period_seconds )
          proposal.review_period_time = o.expiration_time - *o.review_period_seconds;
 
       //Populate the required approval sets
-      proposal.required_owner_approvals.insert(_required_owner_auths.begin(), _required_owner_auths.end());
-      proposal.required_active_approvals.insert(_required_active_auths.begin(), _required_active_auths.end());
+      proposal.required_owner_approvals.insert( _required_owner_auths.begin(), _required_owner_auths.end() );
+      proposal.required_active_approvals.insert( _required_active_auths.begin(), _required_active_auths.end() );
 
-      if (d.head_block_time() > HARDFORK_CORE_1479_TIME)
-         FC_ASSERT (vtor_1479.nested_update_count == 0 || proposal.id.instance() > vtor_1479.max_update_instance,
-                    "Cannot update/delete a proposal with a future id!");
-      else if (vtor_1479.nested_update_count > 0 && proposal.id.instance() <= vtor_1479.max_update_instance) {
+      if( chain_time > HARDFORK_CORE_1479_TIME )
+         FC_ASSERT( vtor_1479.nested_update_count == 0 || proposal.id.instance() > vtor_1479.max_update_instance,
+                    "Cannot update/delete a proposal with a future id!" );
+      else if( vtor_1479.nested_update_count > 0 && proposal.id.instance() <= vtor_1479.max_update_instance )
+      {
          // prevent approval
          transfer_operation top;
          top.from = GRAPHENE_NULL_ACCOUNT;
          top.to = GRAPHENE_RELAXED_COMMITTEE_ACCOUNT;
-         top.amount = asset(GRAPHENE_MAX_SHARE_SUPPLY);
-         proposal.proposed_transaction.operations.emplace_back(top);
-         wlog("Issue 1479: ${p}", ("p",proposal));
+         top.amount = asset( GRAPHENE_MAX_SHARE_SUPPLY );
+         proposal.proposed_transaction.operations.emplace_back( top );
+         wlog( "Issue 1479: ${p}", ("p",proposal) );
       }
    });
 
    return proposal.id;
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-void_result proposal_update_evaluator::do_evaluate(const proposal_update_operation& o)
+void_result proposal_update_evaluator::do_evaluate( const proposal_update_operation& o )
 { try {
    database& d = db();
 

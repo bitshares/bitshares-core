@@ -1906,7 +1906,7 @@ BOOST_AUTO_TEST_CASE( custom_operation_required_auths_before_fork ) {
       db.push_transaction(trx);
 
       // The proposal should have processed. Check it's not still in the database
-      BOOST_REQUIRE_EQUAL(db.find(pid), nullptr);
+      BOOST_REQUIRE(db.find(pid) == nullptr);
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -1975,7 +1975,7 @@ BOOST_AUTO_TEST_CASE( custom_operation_required_auths_after_fork ) {
       db.push_transaction(trx);
 
       // Now the proposal should have processed and been removed from the database
-      BOOST_REQUIRE_EQUAL(db.find(pid), nullptr);
+      BOOST_REQUIRE(db.find(pid) == nullptr);
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;

@@ -27,8 +27,8 @@ struct get_impacted_account_visitor
    flat_set<account_id_type>& _impacted;
    bool _ignore_custom_op_reqd_auths;
 
-   get_impacted_account_visitor(flat_set<account_id_type>& impact, bool ignore_custom_operation_required_auths)
-      : _impacted(impact), _ignore_custom_op_reqd_auths(ignore_custom_operation_required_auths)
+   get_impacted_account_visitor( flat_set<account_id_type>& impact, bool ignore_custom_operation_required_auths )
+      : _impacted( impact ), _ignore_custom_op_reqd_auths( ignore_custom_operation_required_auths )
    {}
 
    using result_type = void;
@@ -158,10 +158,10 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // fee_paying_account
       vector<authority> other;
-      for (const auto& proposed_op : op.proposed_ops)
-         operation_get_required_authorities(proposed_op.op, _impacted, _impacted, other, _ignore_custom_op_reqd_auths);
-      for (auto& o : other)
-         add_authority_accounts(_impacted, o);
+      for( const auto& proposed_op : op.proposed_ops )
+         operation_get_required_authorities( proposed_op.op, _impacted, _impacted, other, _ignore_custom_op_reqd_auths );
+      for( auto& o : other )
+         add_authority_accounts( _impacted, o );
    }
    void operator()( const proposal_update_operation& op )
    {
@@ -218,9 +218,9 @@ struct get_impacted_account_visitor
    }
    void operator()( const custom_operation& op )
    {
-      _impacted.insert(op.fee_payer()); // payer
-      if (!_ignore_custom_op_reqd_auths)
-         _impacted.insert(op.required_auths.begin(), op.required_auths.end());
+      _impacted.insert( op.fee_payer() ); // payer
+      if( !_ignore_custom_op_reqd_auths )
+         _impacted.insert( op.required_auths.begin(), op.required_auths.end() );
    }
    void operator()( const assert_operation& op )
    {
@@ -290,17 +290,17 @@ struct get_impacted_account_visitor
    }
 };
 
-void graphene::chain::operation_get_impacted_accounts(const operation& op, flat_set<account_id_type>& result, bool ignore_custom_operation_required_auths) {
-  get_impacted_account_visitor vtor = get_impacted_account_visitor(result, ignore_custom_operation_required_auths);
-  op.visit(vtor);
+void graphene::chain::operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result, bool ignore_custom_operation_required_auths ) {
+  get_impacted_account_visitor vtor = get_impacted_account_visitor( result, ignore_custom_operation_required_auths );
+  op.visit( vtor );
 }
 
-void graphene::chain::transaction_get_impacted_accounts(const transaction& tx, flat_set<account_id_type>& result, bool ignore_custom_operation_required_auths) {
-  for (const auto& op : tx.operations)
-    operation_get_impacted_accounts(op, result, ignore_custom_operation_required_auths);
+void graphene::chain::transaction_get_impacted_accounts( const transaction& tx, flat_set<account_id_type>& result, bool ignore_custom_operation_required_auths ) {
+  for( const auto& op : tx.operations )
+    operation_get_impacted_accounts( op, result, ignore_custom_operation_required_auths );
 }
 
-void get_relevant_accounts(const object* obj, flat_set<account_id_type>& accounts, bool ignore_custom_operation_required_auths) {
+void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accounts, bool ignore_custom_operation_required_auths ) {
    if( obj->id.space() == protocol_ids )
    {
       switch( (object_type)obj->id.type() )
@@ -346,14 +346,14 @@ void get_relevant_accounts(const object* obj, flat_set<account_id_type>& account
         } case proposal_object_type:{
            const auto& aobj = dynamic_cast<const proposal_object*>(obj);
            FC_ASSERT( aobj != nullptr );
-           transaction_get_impacted_accounts(aobj->proposed_transaction, accounts,
-                                             ignore_custom_operation_required_auths);
+           transaction_get_impacted_accounts( aobj->proposed_transaction, accounts,
+                                              ignore_custom_operation_required_auths );
            break;
         } case operation_history_object_type:{
            const auto& aobj = dynamic_cast<const operation_history_object*>(obj);
            FC_ASSERT( aobj != nullptr );
-           operation_get_impacted_accounts(aobj->op, accounts,
-                                           ignore_custom_operation_required_auths);
+           operation_get_impacted_accounts( aobj->op, accounts,
+                                            ignore_custom_operation_required_auths );
            break;
         } case withdraw_permission_object_type:{
            const auto& aobj = dynamic_cast<const withdraw_permission_object*>(obj);
@@ -410,8 +410,8 @@ void get_relevant_accounts(const object* obj, flat_set<account_id_type>& account
            } case impl_transaction_history_object_type:{
               const auto& aobj = dynamic_cast<const transaction_history_object*>(obj);
               FC_ASSERT( aobj != nullptr );
-              transaction_get_impacted_accounts(aobj->trx, accounts,
-                                                ignore_custom_operation_required_auths);
+              transaction_get_impacted_accounts( aobj->trx, accounts,
+                                                 ignore_custom_operation_required_auths );
               break;
            } case impl_blinded_balance_object_type:{
               const auto& aobj = dynamic_cast<const blinded_balance_object*>(obj);
@@ -517,7 +517,7 @@ void database::notify_changed_objects()
         }
 
         if( removed_ids.size() )
-           GRAPHENE_TRY_NOTIFY(removed_objects, removed_ids, removed, removed_accounts_impacted)
+           GRAPHENE_TRY_NOTIFY( removed_objects, removed_ids, removed, removed_accounts_impacted )
       }
    }
 } FC_CAPTURE_AND_LOG( (0) ) }

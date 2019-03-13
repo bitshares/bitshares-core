@@ -67,28 +67,28 @@ struct operation_get_required_auth
    bool                       ignore_custom_op_reqd_auths;
 
 
-   operation_get_required_auth(flat_set<account_id_type>& a,
-                               flat_set<account_id_type>& own,
-                               vector<authority>& oth,
-                               bool ignore_custom_operation_required_auths)
-       : active(a), owner(own), other(oth),
-         ignore_custom_op_reqd_auths(ignore_custom_operation_required_auths)
+   operation_get_required_auth( flat_set<account_id_type>& a,
+                                flat_set<account_id_type>& own,
+                                vector<authority>& oth,
+                                bool ignore_custom_operation_required_auths )
+       : active( a ), owner( own ), other( oth ),
+         ignore_custom_op_reqd_auths( ignore_custom_operation_required_auths )
    {}
 
    template<typename T>
-   void operator()(const T& v) const {
-      active.insert(v.fee_payer());
-      v.get_required_active_authorities(active);
-      v.get_required_owner_authorities(owner);
-      v.get_required_authorities(other);
+   void operator()( const T& v ) const {
+      active.insert( v.fee_payer() );
+      v.get_required_active_authorities( active );
+      v.get_required_owner_authorities( owner );
+      v.get_required_authorities( other );
    }
 
-   void operator()(const custom_operation& op) const {
-      active.insert(op.fee_payer());
-      if (!ignore_custom_op_reqd_auths) {
-         op.get_required_active_authorities(active);
-         op.get_required_owner_authorities(owner);
-         op.get_required_authorities(other);
+   void operator()( const custom_operation& op ) const {
+      active.insert( op.fee_payer() );
+      if( !ignore_custom_op_reqd_auths ) {
+         op.get_required_active_authorities( active );
+         op.get_required_owner_authorities( owner );
+         op.get_required_authorities( other );
       }
    }
 };
@@ -98,13 +98,13 @@ void operation_validate( const operation& op )
    op.visit( operation_validator() );
 }
 
-void operation_get_required_authorities(const operation& op,
-                                        flat_set<account_id_type>& active,
-                                        flat_set<account_id_type>& owner,
-                                        vector<authority>& other,
-                                        bool ignore_custom_operation_required_auths)
+void operation_get_required_authorities( const operation& op,
+                                         flat_set<account_id_type>& active,
+                                         flat_set<account_id_type>& owner,
+                                         vector<authority>& other,
+                                         bool ignore_custom_operation_required_auths )
 {
-   op.visit(operation_get_required_auth(active, owner, other, ignore_custom_operation_required_auths));
+   op.visit( operation_get_required_auth( active, owner, other, ignore_custom_operation_required_auths ) );
 }
 
 } } // namespace graphene::protocol
