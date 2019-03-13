@@ -86,12 +86,6 @@ int main(int argc, char** argv) {
          return 1;
       }
 
-      if( options.count("help") )
-      {
-         std::cout << app_options << "\n";
-         return 0;
-      }
-
       cfg_options.add_options()
               ("plugins", bpo::value<std::string>()->default_value("delayed_node account_history market_history"),
                "Space-separated list of plugins to activate");
@@ -103,7 +97,14 @@ int main(int argc, char** argv) {
       // add plugin options to config
       bpo::options_description cli, cfg;
       node.set_program_options(cli, cfg);
+      app_options.add(cli);
       cfg_options.add(cfg);
+
+      if( options.count("help") )
+      {
+         std::cout << app_options << "\n";
+         return 0;
+      }
 
       fc::path data_dir;
       if( options.count("data-dir") )
