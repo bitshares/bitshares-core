@@ -73,19 +73,10 @@ int main(int argc, char** argv) {
 
       bpo::variables_map options;
 
-      try
-      {
-         bpo::options_description cli, cfg;
-         node->set_program_options(cli, cfg);
-         app_options.add(cli);
-         cfg_options.add(cfg);
-         bpo::store(bpo::parse_command_line(argc, argv, app_options), options);
-      }
-      catch (const boost::program_options::error& e)
-      {
-         std::cerr << "Error parsing command line: " << e.what() << "\n";
-         return 1;
-      }
+      bpo::options_description cli, cfg;
+      node->set_program_options(cli, cfg);
+      app_options.add(cli);
+      cfg_options.add(cfg);
 
       if( options.count("version") )
       {
@@ -113,10 +104,19 @@ int main(int argc, char** argv) {
       auto grouped_orders_plug = node->register_plugin<grouped_orders::grouped_orders_plugin>();
 
       // add plugin options to config
-      bpo::options_description cli, cfg;
-      node->set_program_options(cli, cfg);
-      app_options.add(cli);
-      cfg_options.add(cfg);
+      try
+      {
+         bpo::options_description cli, cfg;
+         node->set_program_options(cli, cfg);
+         app_options.add(cli);
+         cfg_options.add(cfg);
+	 bpo::store(bpo::parse_command_line(argc, argv, app_options), options);
+      }
+      catch (const boost::program_options::error& e)
+      {
+         std::cerr << "Error parsing command line: " << e.what() << "\n";
+         return 1;
+      }
 
       if( options.count("help") )
       {

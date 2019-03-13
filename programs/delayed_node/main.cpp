@@ -72,6 +72,20 @@ int main(int argc, char** argv) {
 
       bpo::variables_map options;
 
+      bpo::options_description cli, cfg;
+      node.set_program_options(cli, cfg);
+      app_options.add(cli);
+      cfg_options.add(cfg);
+
+      cfg_options.add_options()
+              ("plugins", bpo::value<std::string>()->default_value("delayed_node account_history market_history"),
+               "Space-separated list of plugins to activate");
+
+      auto delayed_plug = node.register_plugin<delayed_node::delayed_node_plugin>();
+      auto history_plug = node.register_plugin<account_history::account_history_plugin>();
+      auto market_history_plug = node.register_plugin<market_history::market_history_plugin>();
+
+      // add plugin options to config
       try
       {
          bpo::options_description cli, cfg;
@@ -85,20 +99,6 @@ int main(int argc, char** argv) {
          std::cerr << "Error parsing command line: " << e.what() << "\n";
          return 1;
       }
-
-      cfg_options.add_options()
-              ("plugins", bpo::value<std::string>()->default_value("delayed_node account_history market_history"),
-               "Space-separated list of plugins to activate");
-
-      auto delayed_plug = node.register_plugin<delayed_node::delayed_node_plugin>();
-      auto history_plug = node.register_plugin<account_history::account_history_plugin>();
-      auto market_history_plug = node.register_plugin<market_history::market_history_plugin>();
-
-      // add plugin options to config
-      bpo::options_description cli, cfg;
-      node.set_program_options(cli, cfg);
-      app_options.add(cli);
-      cfg_options.add(cfg);
 
       if( options.count("help") )
       {
