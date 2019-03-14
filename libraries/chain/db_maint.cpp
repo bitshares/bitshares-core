@@ -737,9 +737,11 @@ void create_buyback_orders( database& db )
 
             limit_order_id_type order_id = db.apply_operation( buyback_context, create_vop ).get< object_id_type >();
 
-            if( db.find( order_id ) != nullptr )
+            const auto order = db.find( order_id );
+            if( order != nullptr )
             {
                limit_order_cancel_operation cancel_vop;
+               cancel_vop.market = order->get_market();
                cancel_vop.fee = asset( 0, asset_id_type() );
                cancel_vop.order = order_id;
                cancel_vop.fee_paying_account = buyback_account.id;

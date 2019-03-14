@@ -90,6 +90,12 @@ namespace graphene { namespace chain {
       /** must be order->seller */
       account_id_type     fee_paying_account;
       extensions_type   extensions;
+      pair<asset_id_type,asset_id_type> market;
+
+      pair<asset_id_type,asset_id_type> get_market()const
+      {
+         return market;
+      }
 
       account_id_type fee_payer()const { return fee_paying_account; }
       void            validate()const;

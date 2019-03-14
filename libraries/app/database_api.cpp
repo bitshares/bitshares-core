@@ -118,6 +118,9 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       void subscribe_to_market(std::function<void(const variant&)> callback, const std::string& a, const std::string& b);
       void unsubscribe_from_market(const std::string& a, const std::string& b);
 
+      void subscribe_to_market_events(std::function<void(const variant&)> callback, const std::string& a, const std::string& b);
+      void parse_market_operations();
+
       market_ticker                      get_ticker( const string& base, const string& quote, bool skip_order_book = false )const;
       market_volume                      get_24_volume( const string& base, const string& quote )const;
       order_book                         get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
@@ -333,6 +336,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       boost::signals2::scoped_connection                                                                                           _applied_block_connection;
       boost::signals2::scoped_connection                                                                                           _pending_trx_connection;
       map< pair<asset_id_type,asset_id_type>, std::function<void(const variant&)> >      _market_subscriptions;
+      map< pair<asset_id_type,asset_id_type>, std::function<void(const variant&)> >      _market_events_subscriptions;
       graphene::chain::database&                                                                                                            _db;
       const application_options* _app_options = nullptr;
 };
@@ -1394,6 +1398,21 @@ void database_api_impl::subscribe_to_market(std::function<void(const variant&)> 
    if(asset_a_id > asset_b_id) std::swap(asset_a_id,asset_b_id);
    FC_ASSERT(asset_a_id != asset_b_id);
    _market_subscriptions[ std::make_pair(asset_a_id,asset_b_id) ] = callback;
+}
+
+void database_api::subscribe_to_market_events(std::function<void(const variant&)> callback, const std::string& a, const std::string& b)
+{
+   my->subscribe_to_market_events( callback, a, b );
+}
+
+void database_api_impl::subscribe_to_market_events(std::function<void(const variant&)> callback, const std::string& a, const std::string& b)
+{
+   auto asset_a_id = get_asset_from_string(a)->id;
+   auto asset_b_id = get_asset_from_string(b)->id;
+
+   if(asset_a_id > asset_b_id) std::swap(asset_a_id,asset_b_id);
+   FC_ASSERT(asset_a_id != asset_b_id);
+   _market_events_subscriptions[ std::make_pair(asset_a_id,asset_b_id) ] = callback;
 }
 
 void database_api::unsubscribe_from_market(const std::string& a, const std::string& b)
@@ -2491,6 +2510,61 @@ void database_api_impl::handle_object_changed(bool force_notify, bool full_objec
    }
 }
 
+void database_api_impl::parse_market_operations()
+{
+   if (_market_events_subscriptions.size() == 0)
+   {
+      return;
+   }
+
+   const auto& ops = _db.get_applied_operations();
+   map< std::pair<asset_id_type,asset_id_type>, vector<pair<operation, operation_result>> > markets_ops;
+
+   for(const optional< operation_history_object >& o_op : ops)
+   {
+      if( !o_op.valid() )
+      {
+         continue;
+      }
+      const operation_history_object& op = *o_op;
+
+      optional< std::pair<asset_id_type,asset_id_type> > market;
+      switch(op.op.which())
+      {
+         case operation::tag<limit_order_create_operation>::value:
+            market = op.op.get<limit_order_create_operation>().get_market();
+            break;
+
+         case operation::tag<fill_order_operation>::value:
+            market = op.op.get<fill_order_operation>().get_market();
+            break;
+
+         case operation::tag<limit_order_cancel_operation>::value:
+            market = op.op.get<limit_order_cancel_operation>().get_market();
+            break;
+         default: break;
+      }
+
+      if( market.valid() && _market_events_subscriptions.count(*market) )
+      {
+         markets_ops[*market].emplace_back(std::make_pair(op.op, op.result));
+      }
+   }
+   /// we need to ensure the database_api is not deleted for the life of the async operation
+   auto capture_this = shared_from_this();
+   fc::async([this, capture_this, markets_ops]() {
+      for(auto item : markets_ops)
+      {
+         auto itr = _market_events_subscriptions.find(item.first);
+         if( itr != _market_events_subscriptions.end() )
+         {
+            itr->second(fc::variant(item.second, GRAPHENE_NET_MAX_NESTED_OBJECTS));
+         }
+      }
+   });
+}
+
+
 /** note: this method cannot yield because it is called in the middle of
  * apply a block.
  */
@@ -2504,6 +2578,8 @@ void database_api_impl::on_applied_block()
          _block_applied_callback(fc::variant(block_id, 1));
       });
    }
+
+   parse_market_operations();
 
    if(_market_subscriptions.size() == 0)
       return;
