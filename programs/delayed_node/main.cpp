@@ -74,7 +74,6 @@ int main(int argc, char** argv) {
 
       bpo::options_description cli, cfg;
       node.set_program_options(cli, cfg);
-      app_options.add(cli);
       cfg_options.add(cfg);
 
       cfg_options.add_options()
