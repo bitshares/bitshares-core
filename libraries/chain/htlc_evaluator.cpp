@@ -48,13 +48,15 @@ namespace graphene {
          FC_ASSERT( o.preimage_size <= htlc_options->max_preimage_size, "HTLC preimage length exceeds allowed length" ); 
          // make sure the sender has the funds for the HTLC
          FC_ASSERT( d.get_balance( o.from, o.amount.asset_id) >= (o.amount), "Insufficient funds") ;
-         const auto& asset_to_transfer = o.amount.asset_id(d);
-         const auto& from_account = o.from(d);
-         const auto& to_account = o.to(d);
+         const auto& asset_to_transfer = o.amount.asset_id( d );
+         const auto& from_account = o.from( d );
+         const auto& to_account = o.to( d );
          FC_ASSERT( is_authorized_asset( d, from_account, asset_to_transfer ), 
-               "Asset ${asset} is not authorized for account ${acct}.", ("asset",asset_to_transfer.id)("acct",from_account.id) );
+               "Asset ${asset} is not authorized for account ${acct}.", 
+               ( "asset", asset_to_transfer.id )( "acct", from_account.id ) );
          FC_ASSERT( is_authorized_asset( d, to_account, asset_to_transfer ), 
-               "Asset ${asset} is not authorized for account ${acct}.", ("asset",asset_to_transfer.id)("acct",to_account.id) );
+               "Asset ${asset} is not authorized for account ${acct}.", 
+               ( "asset", asset_to_transfer.id )( "acct", to_account.id ) );
          return void_result();
       }
 
