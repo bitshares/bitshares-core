@@ -633,4 +633,125 @@ BOOST_AUTO_TEST_CASE( fee_calculations )
    }
 }
 
+BOOST_AUTO_TEST_CASE( htlc_blacklist )
+{
+try {
+   ACTORS((nathan)(alice)(bob));
+
+   upgrade_to_lifetime_member( nathan );
+
+   // create a UIA
+   const asset_id_type uia_id = create_user_issued_asset( "NATHANCOIN", nathan, white_list ).id;
+   // Make a whitelist authority
+   {
+      BOOST_TEST_MESSAGE( "Changing the whitelist authority" );
+      asset_update_operation uop;
+      uop.issuer = nathan_id;
+      uop.asset_to_update = uia_id;
+      uop.new_options = uia_id(db).options;
+      uop.new_options.blacklist_authorities.insert(nathan_id);
+      trx.operations.push_back(uop);
+      PUSH_TX( db, trx, ~0 );
+      trx.operations.clear();
+   }
+
+
+   int64_t init_balance(100 * GRAPHENE_BLOCKCHAIN_PRECISION);
+   transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
+   transfer( committee_account, bob_id, graphene::chain::asset(init_balance) );
+
+   advance_past_hardfork(this);
+
+   // blacklist bob
+   {
+      graphene::chain::account_whitelist_operation op;
+      op.authorizing_account = nathan_id;
+      op.account_to_list = bob_id;
+      op.new_listing = graphene::chain::account_whitelist_operation::account_listing::black_listed;
+      op.fee = db.current_fee_schedule().calculate_fee( op );
+      trx.operations.push_back( op );
+      sign( trx, nathan_private_key );
+      PUSH_TX( db, trx, ~0 );
+      trx.clear();
+      generate_block();
+   }
+
+   issue_uia( alice_id, asset( init_balance, uia_id ) );
+
+   uint16_t preimage_size = 256;
+   std::vector<char> pre_image(preimage_size);
+   generate_random_preimage(preimage_size, pre_image);
+
+   // Alice attempts to put a contract on the blockchain
+   {
+      graphene::chain::htlc_create_operation create_operation;
+
+      create_operation.amount = graphene::chain::asset( 20 * GRAPHENE_BLOCKCHAIN_PRECISION, uia_id );
+      create_operation.to = bob_id;
+      create_operation.claim_period_seconds = 86400;
+      create_operation.preimage_hash = hash_it<fc::sha1>( pre_image );
+      create_operation.preimage_size = preimage_size;
+      create_operation.from = alice_id;
+      create_operation.fee = db.current_fee_schedule().calculate_fee( create_operation );
+      trx.operations.push_back( create_operation );
+      sign(trx, alice_private_key);
+      // bob cannot accept it, so it fails
+      GRAPHENE_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+      trx.clear();
+   }
+
+   // unblacklist Bob
+   {
+      graphene::chain::account_whitelist_operation op;
+      op.authorizing_account = nathan_id;
+      op.account_to_list = bob_id;
+      op.new_listing = graphene::chain::account_whitelist_operation::account_listing::no_listing;
+      op.fee = db.current_fee_schedule().calculate_fee( op );
+      trx.operations.push_back( op );
+      sign( trx, nathan_private_key );
+      PUSH_TX( db, trx, ~0 );
+      trx.clear();
+      generate_block();
+   }
+
+   graphene::chain::htlc_id_type alice_htlc_id;
+
+   // Alice again attempts to put a contract on the blockchain
+   {
+      graphene::chain::htlc_create_operation create_operation;
+
+      create_operation.amount = graphene::chain::asset( 20 * GRAPHENE_BLOCKCHAIN_PRECISION, uia_id );
+      create_operation.to = bob_id;
+      create_operation.claim_period_seconds = 86400;
+      create_operation.preimage_hash = hash_it<fc::sha1>( pre_image );
+      create_operation.preimage_size = preimage_size;
+      create_operation.from = alice_id;
+      create_operation.fee = db.current_fee_schedule().calculate_fee( create_operation );
+      trx.operations.push_back( create_operation );
+      sign(trx, alice_private_key);
+      // bob can now accept it, so it works
+      PUSH_TX( db, trx, ~0 );
+      trx.clear();
+      graphene::chain::signed_block blk = generate_block();
+      processed_transaction alice_trx = blk.transactions[0];
+      alice_htlc_id = alice_trx.operation_results[0].get<object_id_type>();
+   }
+
+   // bob can redeem
+   {
+      graphene::chain::htlc_redeem_operation update_operation;
+      update_operation.redeemer = bob_id;
+      update_operation.htlc_id = alice_htlc_id;
+      update_operation.preimage = pre_image;
+      update_operation.fee = db.current_fee_schedule().calculate_fee( update_operation );
+      trx.operations.push_back( update_operation );
+      sign(trx, bob_private_key);
+      PUSH_TX( db, trx, ~0 );
+      generate_block();
+      trx.clear();
+   }
+
+} FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_SUITE_END()

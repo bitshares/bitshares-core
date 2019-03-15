@@ -25,6 +25,7 @@
 #include <graphene/chain/htlc_evaluator.hpp>
 #include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/is_authorized_asset.hpp>
 
 namespace graphene { 
    namespace chain {
@@ -36,6 +37,7 @@ namespace graphene {
 
       void_result htlc_create_evaluator::do_evaluate(const htlc_create_operation& o)
       {
+         graphene::chain::database& d = db();
          optional<htlc_options> htlc_options = get_committee_htlc_options(db());
 
          FC_ASSERT(htlc_options, "HTLC Committee options are not set.");
@@ -45,7 +47,14 @@ namespace graphene {
          // make sure the preimage length is reasonable
          FC_ASSERT( o.preimage_size <= htlc_options->max_preimage_size, "HTLC preimage length exceeds allowed length" ); 
          // make sure the sender has the funds for the HTLC
-         FC_ASSERT( db().get_balance( o.from, o.amount.asset_id) >= (o.amount), "Insufficient funds") ;
+         FC_ASSERT( d.get_balance( o.from, o.amount.asset_id) >= (o.amount), "Insufficient funds") ;
+         const auto& asset_to_transfer = o.amount.asset_id(d);
+         const auto& from_account = o.from(d);
+         const auto& to_account = o.to(d);
+         FC_ASSERT( is_authorized_asset( d, from_account, asset_to_transfer ), 
+               "Asset ${asset} is not authorized for account ${acct}.", ("asset",asset_to_transfer.id)("acct",from_account.id) );
+         FC_ASSERT( is_authorized_asset( d, to_account, asset_to_transfer ), 
+               "Asset ${asset} is not authorized for account ${acct}.", ("asset",asset_to_transfer.id)("acct",to_account.id) );
          return void_result();
       }
 
