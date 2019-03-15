@@ -264,24 +264,54 @@ struct op_prototype_visitor
    }
 };
 
-class htlc_hash_to_string_visitor
+class htlc_hash_to_mutable_variant_visitor
 {
 public:
-   typedef string result_type;
+   typedef fc::mutable_variant_object result_type;
 
    result_type operator()( const fc::ripemd160& hash )const
    {
-       return "RIPEMD160 " + hash.str();
+      fc::mutable_variant_object ret_val;
+      ret_val["preimage_hash"] = hash.str();
+      ret_val["hash_algo"] = "RIPEMD160";
+      return ret_val;
    }
 
    result_type operator()( const fc::sha1& hash )const
    {
-       return "SHA1 " + hash.str();
+      fc::mutable_variant_object ret_val;
+      ret_val["preimage_hash"] = hash.str();
+      ret_val["hash_algo"] = "SHA1";
+      return ret_val;
    }
 
    result_type operator()( const fc::sha256& hash )const
    {
-       return "SHA256 " + hash.str();
+      fc::mutable_variant_object ret_val;
+      ret_val["preimage_hash"] = hash.str();
+      ret_val["hash_algo"] = "SHA256";
+      return ret_val;
+   }
+};
+
+class htlc_hash_to_string_visitor
+{
+public:
+   typedef std::string result_type;
+
+   result_type operator()( const fc::ripemd160& hash )const
+   {
+      return "RIPEMD160 " + hash.str();
+   }
+
+   result_type operator()( const fc::sha1& hash )const
+   {
+      return "SHA1 " + hash.str();
+   }
+
+   result_type operator()( const fc::sha256& hash )const
+   {
+      return "SHA256 " + hash.str();
    }
 };
 
@@ -3188,18 +3218,25 @@ signed_transaction wallet_api::htlc_create( string source, string destination, s
 
 variant wallet_api::get_htlc(std::string htlc_id) const
 {
-   static detail::htlc_hash_to_string_visitor vtor;
+   static detail::htlc_hash_to_mutable_variant_visitor vtor;
 
    graphene::chain::htlc_object obj = my->get_htlc(htlc_id);
    fc::mutable_variant_object ret_val;
    ret_val["database_id"] = (std::string)obj.id;
-   ret_val["from"] = (std::string)((graphene::db::object_id_type)obj.from);
-   ret_val["to"] = (std::string)((graphene::db::object_id_type)obj.to);
-   ret_val["amount"] = obj.amount.amount.value;
-   ret_val["asset"] = (std::string)((graphene::db::object_id_type)obj.amount.asset_id);
-   ret_val["expiration"] = fc::get_approximate_relative_time_string(obj.expiration);
-   ret_val["preimage_hash"] = obj.preimage_hash.visit( vtor );
-   ret_val["preimage_size"] = obj.preimage_size;
+   fc::mutable_variant_object transfer;
+   transfer["from"] = (std::string)((graphene::db::object_id_type)obj.from);
+   transfer["to"] = (std::string)((graphene::db::object_id_type)obj.to);
+   transfer["amount"] = obj.amount.amount.value;
+   transfer["asset"] = (std::string)((graphene::db::object_id_type)obj.amount.asset_id);
+   ret_val["transfer"] = transfer;
+   fc::mutable_variant_object conditions;
+   fc::mutable_variant_object hash_lock = obj.preimage_hash.visit( vtor );
+   hash_lock["preimage_length"] = obj.preimage_size;
+   conditions["hash_lock"] = hash_lock;
+   fc::mutable_variant_object time_lock;
+   time_lock["expiration"] = obj.expiration.to_iso_string();
+   conditions["time_lock"] = time_lock;
+   ret_val["conditions"] = conditions;
    return ret_val;
 }
 
