@@ -495,7 +495,7 @@ class wallet_api
        * @param htlc_id the id of the HTLC object.
        * @returns the information about the HTLC object
        */
-      variant                           get_htlc(string htlc_id) const;
+      optional<variant>                 get_htlc(string htlc_id) const;
 
       /** Lookup the id of a named account.
        * @param account_name_or_id the name of the account to look up
