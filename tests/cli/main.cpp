@@ -680,7 +680,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       std::string preimage_string = "My Secret";
       fc::sha256 preimage_md = fc::sha256::hash(preimage_string);
       std::stringstream ss;
-      for(int i = 0; i < preimage_md.data_size(); i++)
+      for(size_t i = 0; i < preimage_md.data_size(); i++)
       {
          char d = preimage_md.data()[i];
          unsigned char uc = static_cast<unsigned char>(d);
