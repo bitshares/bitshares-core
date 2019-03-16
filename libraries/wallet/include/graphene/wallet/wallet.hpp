@@ -23,6 +23,8 @@
  */
 #pragma once
 
+#include <fc/optional.hpp>
+#include <graphene/chain/htlc_object.hpp>
 #include <graphene/app/api.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 
@@ -495,7 +497,7 @@ class wallet_api
        * @param htlc_id the id of the HTLC object.
        * @returns the information about the HTLC object
        */
-      optional<variant>                 get_htlc(string htlc_id) const;
+      optional<htlc_object>             get_htlc(string htlc_id) const;
 
       /** Lookup the id of a named account.
        * @param account_name_or_id the name of the account to look up

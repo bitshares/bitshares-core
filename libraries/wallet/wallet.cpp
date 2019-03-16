@@ -264,36 +264,6 @@ struct op_prototype_visitor
    }
 };
 
-class htlc_hash_to_mutable_variant_visitor
-{
-public:
-   typedef fc::mutable_variant_object result_type;
-
-   result_type operator()( const fc::ripemd160& hash )const
-   {
-      fc::mutable_variant_object ret_val;
-      ret_val["preimage_hash"] = hash.str();
-      ret_val["hash_algo"] = "RIPEMD160";
-      return ret_val;
-   }
-
-   result_type operator()( const fc::sha1& hash )const
-   {
-      fc::mutable_variant_object ret_val;
-      ret_val["preimage_hash"] = hash.str();
-      ret_val["hash_algo"] = "SHA1";
-      return ret_val;
-   }
-
-   result_type operator()( const fc::sha256& hash )const
-   {
-      fc::mutable_variant_object ret_val;
-      ret_val["preimage_hash"] = hash.str();
-      ret_val["hash_algo"] = "SHA256";
-      return ret_val;
-   }
-};
-
 class htlc_hash_to_string_visitor
 {
 public:
@@ -3217,34 +3187,9 @@ signed_transaction wallet_api::htlc_create( string source, string destination, s
          claim_period_seconds, broadcast);
 }
 
-optional<variant> wallet_api::get_htlc(std::string htlc_id) const
+optional<htlc_object> wallet_api::get_htlc(std::string htlc_id) const
 {
-   static detail::htlc_hash_to_mutable_variant_visitor vtor;
-
-   optional<graphene::chain::htlc_object> opt_obj = my->get_htlc(htlc_id);
-   optional<fc::mutable_variant_object> return_val;
-   if (opt_obj)
-   {
-      return_val = fc::mutable_variant_object();
-      const graphene::chain::htlc_object& obj = *opt_obj;
-      fc::mutable_variant_object& ret_val = *return_val;
-      ret_val["database_id"] = (std::string)obj.id;
-      fc::mutable_variant_object transfer;
-      transfer["from"] = (std::string)((graphene::db::object_id_type)obj.from);
-      transfer["to"] = (std::string)((graphene::db::object_id_type)obj.to);
-      transfer["amount"] = obj.amount.amount.value;
-      transfer["asset"] = (std::string)((graphene::db::object_id_type)obj.amount.asset_id);
-      ret_val["transfer"] = transfer;
-      fc::mutable_variant_object conditions;
-      fc::mutable_variant_object hash_lock = obj.preimage_hash.visit( vtor );
-      hash_lock["preimage_length"] = obj.preimage_size;
-      conditions["hash_lock"] = hash_lock;
-      fc::mutable_variant_object time_lock;
-      time_lock["expiration"] = obj.expiration.to_iso_string();
-      conditions["time_lock"] = time_lock;
-      ret_val["conditions"] = conditions;
-   }
-   return return_val;
+   return my->get_htlc(htlc_id);
 }
 
 signed_transaction wallet_api::htlc_redeem( std::string htlc_id, std::string issuer, const std::string& preimage,
