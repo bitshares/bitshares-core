@@ -657,8 +657,8 @@ try {
 
 
    int64_t init_balance(100 * GRAPHENE_BLOCKCHAIN_PRECISION);
-   transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
-   transfer( committee_account, bob_id, graphene::chain::asset(init_balance) );
+   fund( alice, graphene::chain::asset(init_balance) );
+   fund( bob, graphene::chain::asset(init_balance) );
 
    advance_past_hardfork(this);
 
@@ -737,7 +737,21 @@ try {
       alice_htlc_id = alice_trx.operation_results[0].get<object_id_type>();
    }
 
-   // bob can redeem
+   // blacklist bob
+   {
+      graphene::chain::account_whitelist_operation op;
+      op.authorizing_account = nathan_id;
+      op.account_to_list = bob_id;
+      op.new_listing = graphene::chain::account_whitelist_operation::account_listing::black_listed;
+      op.fee = db.current_fee_schedule().calculate_fee( op );
+      trx.operations.push_back( op );
+      sign( trx, nathan_private_key );
+      PUSH_TX( db, trx, ~0 );
+      trx.clear();
+      generate_block();
+   }
+
+   // bob can redeem even though he's blacklisted
    {
       graphene::chain::htlc_redeem_operation update_operation;
       update_operation.redeemer = bob_id;
