@@ -204,6 +204,16 @@ namespace graphene { namespace chain {
           */
          fc::signal<void(const vector<object_id_type>&, const vector<const object*>&, const flat_set<account_id_type>&)>  removed_objects;
 
+         /**
+          * Emitted after the calculation of the voting_stake (occurs in the maintenance interval)
+          */
+         fc::signal<void(const account_object&, const account_object&, const uint64_t)> on_voting_stake_calculated;
+
+         /**
+          * Emitted after the beginning of the maintenance interval
+          */
+         fc::signal<void(const block_id_type)> on_maintenance_begin;
+
          //////////////////// db_witness_schedule.cpp ////////////////////
 
          /**

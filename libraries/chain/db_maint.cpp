@@ -44,6 +44,7 @@
 #include <graphene/chain/vote_count.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/voting_statistics_object.hpp>
 
 namespace graphene { namespace chain {
 
@@ -1081,6 +1082,8 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    distribute_fba_balances(*this);
    create_buyback_orders(*this);
 
+   on_maintenance_begin( next_block.id() );
+
    struct vote_tally_helper {
       database& d;
       const global_property_object& props;
@@ -1109,6 +1112,8 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
             uint64_t voting_stake = stats.total_core_in_orders.value
                   + (stake_account.cashback_vb.valid() ? (*stake_account.cashback_vb)(d).balance.amount.value: 0)
                   + stats.core_in_balance.value;
+
+            d.on_voting_stake_calculated( stake_account, opinion_account, voting_stake );
 
             for( vote_id_type id : opinion_account.options.votes )
             {
