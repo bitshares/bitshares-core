@@ -52,4 +52,8 @@ target_link_libraries( es_test
                        graphene_es_objects graphene_egenesis_none graphene_api_helper_indexes
                        fc ${PLATFORM_SPECIFIC_LIBS} )
 
+file( GLOB VOTING_STAT_SOURCES "voting_stat/*.cpp" )
+add_executable( voting_stat_test ${COMMON_SOURCES} ${VOTING_STAT_SOURCES} )
+target_link_libraries( voting_stat_test graphene_chain graphene_app graphene_voting_stat graphene_elasticsearch graphene_es_objects graphene_egenesis_none fc ${PLATFORM_SPECIFIC_LIBS} )
+
 add_subdirectory( generate_empty_blocks )
