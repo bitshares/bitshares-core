@@ -31,7 +31,6 @@
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <fc/io/fstream.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 #include <fstream>
 #include <functional>
@@ -223,6 +222,9 @@ void database::open(
 
 void database::close(bool rewind)
 {
+   if (!_opened)
+      return;
+      
    // TODO:  Save pending tx's on close()
    clear_pending();
 

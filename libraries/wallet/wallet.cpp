@@ -72,7 +72,6 @@
 #include <graphene/wallet/api_documentation.hpp>
 #include <graphene/wallet/reflect_util.hpp>
 #include <graphene/debug_witness/debug_api.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 #ifndef WIN32
 # include <sys/types.h>
@@ -266,9 +265,10 @@ public:
 private:
    void claim_registered_account(const account_object& account)
    {
+      bool import_keys = false;
       auto it = _wallet.pending_account_registrations.find( account.name );
       FC_ASSERT( it != _wallet.pending_account_registrations.end() );
-      for (const std::string& wif_key : it->second)
+      for (const std::string& wif_key : it->second) {
          if( !import_key( account.name, wif_key ) )
          {
             // somebody else beat our pending registration, there is
@@ -281,8 +281,15 @@ private:
             //    possibility of migrating to a fork where the
             //    name is available, the user can always
             //    manually re-register)
+         } else {
+            import_keys = true;
          }
+      }
       _wallet.pending_account_registrations.erase( it );
+
+      if( import_keys ) {
+         save_wallet_file();
+      }
    }
 
    // after a witness registration succeeds, this saves the private key in the wallet permanently
@@ -504,10 +511,10 @@ public:
       return ob.template as<T>( GRAPHENE_MAX_NESTED_OBJECTS );
    }
 
-   void set_operation_fees( signed_transaction& tx, const fee_schedule& s  )
+   void set_operation_fees( signed_transaction& tx, const std::shared_ptr<fee_schedule> s  )
    {
       for( auto& op : tx.operations )
-         s.set_fee(op);
+         s->set_fee(op);
    }
 
    variant info() const
@@ -608,9 +615,16 @@ public:
    {
       return get_account(account_name_or_id).get_id();
    }
+   std::string asset_id_to_string(asset_id_type id) const
+   {
+      std::string asset_id = fc::to_string(id.space_id) +
+                             "." + fc::to_string(id.type_id) +
+                             "." + fc::to_string(id.instance.value);
+      return asset_id;
+   }
    optional<asset_object> find_asset(asset_id_type id)const
    {
-      auto rec = _remote_db->get_assets({id}).front();
+      auto rec = _remote_db->get_assets({asset_id_to_string(id)}).front();
       return rec;
    }
    optional<asset_object> find_asset(string asset_symbol_or_id)const
@@ -773,6 +787,74 @@ public:
       }
 
       return true;
+   }
+
+   /**
+    * Get the required public keys to sign the transaction which had been
+    * owned by us
+    *
+    * NOTE, if `erase_existing_sigs` set to true, the original trasaction's
+    * signatures will be erased
+    *
+    * @param tx           The transaction to be signed
+    * @param erase_existing_sigs
+    *        The transaction could have been partially signed already,
+    *        if set to false, the corresponding public key of existing
+    *        signatures won't be returned.
+    *        If set to true, the existing signatures will be erased and
+    *        all required keys returned.
+   */
+   set<public_key_type> get_owned_required_keys( signed_transaction &tx,
+                                                    bool erase_existing_sigs = true)
+   {
+      set<public_key_type> pks = _remote_db->get_potential_signatures( tx );
+      flat_set<public_key_type> owned_keys;
+      owned_keys.reserve( pks.size() );
+      std::copy_if( pks.begin(), pks.end(),
+                    std::inserter( owned_keys, owned_keys.end() ),
+                    [this]( const public_key_type &pk ) {
+                       return _keys.find( pk ) != _keys.end();
+                    } );
+
+      if ( erase_existing_sigs )
+         tx.signatures.clear();
+
+      return _remote_db->get_required_signatures( tx, owned_keys );
+   }
+
+   signed_transaction add_transaction_signature( signed_transaction tx,
+                                                 bool broadcast )
+   {
+      set<public_key_type> approving_key_set = get_owned_required_keys(tx, false);
+
+      if ( ( ( tx.ref_block_num == 0 && tx.ref_block_prefix == 0 ) ||
+             tx.expiration == fc::time_point_sec() ) &&
+           tx.signatures.empty() )
+      {
+         auto dyn_props = get_dynamic_global_properties();
+         auto parameters = get_global_properties().parameters;
+         fc::time_point_sec now = dyn_props.time;
+         tx.set_reference_block( dyn_props.head_block_id );
+         tx.set_expiration( now + parameters.maximum_time_until_expiration );
+      }
+      for ( const public_key_type &key : approving_key_set )
+         tx.sign( get_private_key( key ), _chain_id );
+
+      if ( broadcast )
+      {
+         try
+         {
+            _remote_net_broadcast->broadcast_transaction( tx );
+         }
+         catch ( const fc::exception &e )
+         {
+            elog( "Caught exception while broadcasting tx ${id}:  ${e}",
+                  ( "id", tx.id().str() )( "e", e.to_detail_string() ) );
+            FC_THROW( "Caught exception while broadcasting tx" );
+         }
+      }
+
+      return tx;
    }
 
     void quit()
@@ -962,7 +1044,6 @@ public:
       _builder_transactions.erase(handle);
    }
 
-
    signed_transaction register_account(string name,
                                        public_key_type owner,
                                        public_key_type active,
@@ -1002,8 +1083,7 @@ public:
 
       tx.operations.push_back( account_create_op );
 
-      auto current_fees = _remote_db->get_global_properties().parameters.current_fees;
-      set_operation_fees( tx, current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
 
       vector<public_key_type> paying_keys = registrar_account_object.active.get_keys();
 
@@ -1031,7 +1111,6 @@ public:
       return tx;
    } FC_CAPTURE_AND_RETHROW( (name)(owner)(active)(registrar_account)(referrer_account)(referrer_percent)(broadcast) ) }
 
-
    signed_transaction upgrade_account(string name, bool broadcast)
    { try {
       FC_ASSERT( !self.is_locked() );
@@ -1048,7 +1127,6 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (name) ) }
-
 
    // This function generates derived keys starting with index 0 and keeps incrementing
    // the index until it finds a key that isn't registered in the block chain.  To be
@@ -1440,6 +1518,8 @@ public:
       optional<asset_object> debt_asset = find_asset(debt_symbol);
       if (!debt_asset)
         FC_THROW("No asset with that symbol exists!");
+
+      FC_ASSERT(debt_asset->bitasset_data_id.valid(), "Not a bitasset, bidding not possible.");
       const asset_object& collateral = get_asset(get_object(*debt_asset->bitasset_data_id).options.short_backing_asset);
 
       bid_collateral_operation op;
@@ -1937,13 +2017,8 @@ public:
 
    signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false)
    {
-      set<public_key_type> pks = _remote_db->get_potential_signatures( tx );
-      flat_set<public_key_type> owned_keys;
-      owned_keys.reserve( pks.size() );
-      std::copy_if( pks.begin(), pks.end(), std::inserter(owned_keys, owned_keys.end()),
-                    [this](const public_key_type& pk){ return _keys.find(pk) != _keys.end(); } );
-      tx.clear_signatures();
-      set<public_key_type> approving_key_set = _remote_db->get_required_signatures( tx, owned_keys );
+
+      set<public_key_type> approving_key_set = get_owned_required_keys(tx);
 
       auto dyn_props = get_dynamic_global_properties();
       tx.set_reference_block( dyn_props.head_block_id );
@@ -2535,7 +2610,7 @@ public:
       new_fees.scale = scale;
 
       chain_parameters new_params = current_params;
-      new_params.current_fees = new_fees;
+      new_params.current_fees = std::make_shared<fee_schedule>(new_fees);
 
       committee_member_update_global_parameters_operation update_op;
       update_op.new_parameters = new_params;
@@ -3183,7 +3258,7 @@ vector<bucket_object> wallet_api::get_market_history(
       fc::time_point_sec start,
       fc::time_point_sec end )const
 {
-   return my->_remote_hist->get_market_history( get_asset_id(symbol1), get_asset_id(symbol2), bucket, start, end );
+   return my->_remote_hist->get_market_history( symbol1, symbol2, bucket, start, end );
 }
 
 vector<limit_order_object> wallet_api::get_account_limit_orders(
@@ -3197,24 +3272,24 @@ vector<limit_order_object> wallet_api::get_account_limit_orders(
    return my->_remote_db->get_account_limit_orders(name_or_id, base, quote, limit, ostart_id, ostart_price);
 }
 
-vector<limit_order_object> wallet_api::get_limit_orders(string a, string b, uint32_t limit)const
+vector<limit_order_object> wallet_api::get_limit_orders(std::string a, std::string b, uint32_t limit)const
 {
-   return my->_remote_db->get_limit_orders(get_asset(a).id, get_asset(b).id, limit);
+   return my->_remote_db->get_limit_orders(a, b, limit);
 }
 
-vector<call_order_object> wallet_api::get_call_orders(string a, uint32_t limit)const
+vector<call_order_object> wallet_api::get_call_orders(std::string a, uint32_t limit)const
 {
-   return my->_remote_db->get_call_orders(get_asset(a).id, limit);
+   return my->_remote_db->get_call_orders(a, limit);
 }
 
-vector<force_settlement_object> wallet_api::get_settle_orders(string a, uint32_t limit)const
+vector<force_settlement_object> wallet_api::get_settle_orders(std::string a, uint32_t limit)const
 {
-   return my->_remote_db->get_settle_orders(get_asset(a).id, limit);
+   return my->_remote_db->get_settle_orders(a, limit);
 }
 
-vector<collateral_bid_object> wallet_api::get_collateral_bids(string asset, uint32_t limit, uint32_t start)const
+vector<collateral_bid_object> wallet_api::get_collateral_bids(std::string asset, uint32_t limit, uint32_t start)const
 {
-   return my->_remote_db->get_collateral_bids(get_asset(asset).id, limit, start);
+   return my->_remote_db->get_collateral_bids(asset, limit, start);
 }
 
 brain_key_info wallet_api::suggest_brain_key()const
@@ -3836,6 +3911,12 @@ global_property_object wallet_api::get_global_properties() const
 dynamic_global_property_object wallet_api::get_dynamic_global_properties() const
 {
    return my->get_dynamic_global_properties();
+}
+
+signed_transaction wallet_api::add_transaction_signature( signed_transaction tx,
+                                                          bool broadcast )
+{
+   return my->add_transaction_signature( tx, broadcast );
 }
 
 string wallet_api::help()const

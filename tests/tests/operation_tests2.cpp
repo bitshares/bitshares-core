@@ -968,7 +968,7 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
    }
    {
       const asset_bitasset_data_object& obj = bit_usd_id(db).bitasset_data(db);
-      BOOST_CHECK_EQUAL(obj.feeds.size(), 3);
+      BOOST_CHECK_EQUAL(obj.feeds.size(), 3u);
       BOOST_CHECK(obj.current_feed == price_feed());
    }
    {
@@ -1086,7 +1086,7 @@ BOOST_AUTO_TEST_CASE( witness_create )
    witness_id_type nathan_witness_id = create_witness(nathan_id, nathan_private_key, skip).id;
 
    // nathan should be in the cache
-   BOOST_CHECK_EQUAL( caching_witnesses.count(nathan_witness_id), 1 );
+   BOOST_CHECK_EQUAL( caching_witnesses.count(nathan_witness_id), 1u );
 
    // nathan's key in the cache should still be null before a new block is generated
    auto nathan_itr = wit_key_cache.find( nathan_witness_id );

@@ -41,7 +41,6 @@
 #include <graphene/utilities/tempdir.hpp>
 
 #include <fc/crypto/digest.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 #include <iomanip>
 
@@ -255,16 +254,24 @@ database_fixture::database_fixture()
 }
 
 database_fixture::~database_fixture()
-{ try {
-   // If we're unwinding due to an exception, don't do any more checks.
-   // This way, boost test's last checkpoint tells us approximately where the error was.
-   if( !std::uncaught_exception() )
-   {
-      verify_asset_supplies(db);
-      BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
+{ 
+   try {
+      // If we're unwinding due to an exception, don't do any more checks.
+      // This way, boost test's last checkpoint tells us approximately where the error was.
+      if( !std::uncaught_exception() )
+      {
+         verify_asset_supplies(db);
+         BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
+      }
+      return;
+   } catch (fc::exception& ex) {
+      BOOST_FAIL( std::string("fc::exception in ~database_fixture: ") + ex.to_detail_string() );
+   } catch (std::exception& e) {
+      BOOST_FAIL( std::string("std::exception in ~database_fixture:") + e.what() );
+   } catch (...) {
+      BOOST_FAIL( "Uncaught exception in ~database_fixture" );
    }
-   return;
-} FC_CAPTURE_AND_RETHROW() }
+} 
 
 fc::ecc::private_key database_fixture::generate_private_key(string seed)
 {
@@ -634,7 +641,7 @@ void database_fixture::change_fees(
       new_fees.scale = new_scale;
 
    chain_parameters new_chain_params = current_chain_params;
-   new_chain_params.current_fees = new_fees;
+   new_chain_params.current_fees = std::make_shared<fee_schedule>(new_fees);
 
    db.modify(db.get_global_properties(), [&](global_property_object& p) {
       p.parameters = new_chain_params;
@@ -957,7 +964,7 @@ const call_order_object* database_fixture::borrow( const account_object& who, as
 { try {
    set_expiration( db, trx );
    trx.operations.clear();
-   call_order_update_operation update;
+   call_order_update_operation update = {};
    update.funding_account = who.id;
    update.delta_collateral = collateral;
    update.delta_debt = what;
@@ -982,7 +989,7 @@ void database_fixture::cover(const account_object& who, asset what, asset collat
 { try {
    set_expiration( db, trx );
    trx.operations.clear();
-   call_order_update_operation update;
+   call_order_update_operation update = {};
    update.funding_account = who.id;
    update.delta_collateral = -collateral;
    update.delta_debt = -what;
@@ -1031,7 +1038,7 @@ void database_fixture::enable_fees()
 {
    db.modify(global_property_id_type()(db), [](global_property_object& gpo)
    {
-      gpo.parameters.current_fees = fee_schedule::get_default();
+      gpo.parameters.current_fees = std::make_shared<fee_schedule>(fee_schedule::get_default());
    });
 }
 

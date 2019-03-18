@@ -210,7 +210,7 @@ namespace graphene { namespace db {
       // private
          static const size_t MAX_HOLE = 100;
          static const size_t _mask = ((1 << chunkbits) - 1);
-         size_t next = 0;
+         uint64_t next = 0;
          vector< vector< const Object* > > content;
          std::stack< object_id_type > ids_being_modified;
 

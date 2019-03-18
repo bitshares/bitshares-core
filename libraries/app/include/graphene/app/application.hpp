@@ -55,30 +55,40 @@ namespace graphene { namespace app {
          application();
          ~application();
 
-         void set_program_options( boost::program_options::options_description& command_line_options,
-                                   boost::program_options::options_description& configuration_file_options )const;
-         void initialize(const fc::path& data_dir, const boost::program_options::variables_map&options);
-         void initialize_plugins( const boost::program_options::variables_map& options );
+         void set_program_options(boost::program_options::options_description& command_line_options,
+                                  boost::program_options::options_description& configuration_file_options)const;
+         void initialize(const fc::path& data_dir, const boost::program_options::variables_map& options);
+         void initialize_plugins(const boost::program_options::variables_map& options);
          void startup();
          void shutdown();
          void startup_plugins();
          void shutdown_plugins();
 
          template<typename PluginType>
-         std::shared_ptr<PluginType> register_plugin()
-         {
+         std::shared_ptr<PluginType> register_plugin(bool auto_load = false) {
             auto plug = std::make_shared<PluginType>();
             plug->plugin_set_app(this);
 
-            boost::program_options::options_description plugin_cli_options(plug->plugin_name() + " plugin. " + plug->plugin_description() + "\nOptions"), plugin_cfg_options;
-            //boost::program_options::options_description plugin_cli_options("Options for plugin " + plug->plugin_name()), plugin_cfg_options;
+            string cli_plugin_desc = plug->plugin_name() + " plugin. " + plug->plugin_description() + "\nOptions";
+            boost::program_options::options_description plugin_cli_options( cli_plugin_desc ), plugin_cfg_options;
             plug->plugin_set_program_options(plugin_cli_options, plugin_cfg_options);
+
             if( !plugin_cli_options.options().empty() )
                _cli_options.add(plugin_cli_options);
+
             if( !plugin_cfg_options.options().empty() )
+            {
+               std::string header_name = "plugin-cfg-header-" + plug->plugin_name();
+               std::string header_desc = plug->plugin_name() + " plugin options";
+               _cfg_options.add_options()(header_name.c_str(), header_desc.c_str());
                _cfg_options.add(plugin_cfg_options);
+            }
 
             add_available_plugin( plug );
+
+            if (auto_load)
+                enable_plugin(plug->plugin_name());
+
             return plug;
          }
          std::shared_ptr<abstract_plugin> get_plugin( const string& name )const;
@@ -105,8 +115,9 @@ namespace graphene { namespace app {
 
          const application_options& get_options();
 
-      private:
          void enable_plugin( const string& name );
+
+      private:
          void add_available_plugin( std::shared_ptr<abstract_plugin> p );
          std::shared_ptr<detail::application_impl> my;
 

@@ -38,7 +38,6 @@
 #include <graphene/chain/evaluator.hpp>
 
 #include <fc/thread/parallel.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 namespace graphene { namespace chain {
 
@@ -129,77 +128,74 @@ bool database::push_block(const signed_block& new_block, uint32_t skip)
 bool database::_push_block(const signed_block& new_block)
 { try {
    uint32_t skip = get_node_properties().skip_flags;
-   if( !(skip&skip_fork_db) )
+   // TODO: If the block is greater than the head block and before the next maintenance interval
+   // verify that the block signer is in the current set of active witnesses.
+
+   shared_ptr<fork_item> new_head = _fork_db.push_block(new_block);
+   //If the head block from the longest chain does not build off of the current head, we need to switch forks.
+   if( new_head->data.previous != head_block_id() )
    {
-      /// TODO: if the block is greater than the head block and before the next maitenance interval
-      // verify that the block signer is in the current set of active witnesses.
-
-      shared_ptr<fork_item> new_head = _fork_db.push_block(new_block);
-      //If the head block from the longest chain does not build off of the current head, we need to switch forks.
-      if( new_head->data.previous != head_block_id() )
+      //If the newly pushed block is the same height as head, we get head back in new_head
+      //Only switch forks if new_head is actually higher than head
+      if( new_head->data.block_num() > head_block_num() )
       {
-         //If the newly pushed block is the same height as head, we get head back in new_head
-         //Only switch forks if new_head is actually higher than head
-         if( new_head->data.block_num() > head_block_num() )
+         wlog( "Switching to fork: ${id}", ("id",new_head->data.id()) );
+         auto branches = _fork_db.fetch_branch_from(new_head->data.id(), head_block_id());
+
+         // pop blocks until we hit the forked block
+         while( head_block_id() != branches.second.back()->data.previous )
          {
-            wlog( "Switching to fork: ${id}", ("id",new_head->data.id()) );
-            auto branches = _fork_db.fetch_branch_from(new_head->data.id(), head_block_id());
-
-            // pop blocks until we hit the forked block
-            while( head_block_id() != branches.second.back()->data.previous )
-            {
-               ilog( "popping block #${n} ${id}", ("n",head_block_num())("id",head_block_id()) );
-               pop_block();
-            }
-
-            // push all blocks on the new fork
-            for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr )
-            {
-                ilog( "pushing block from fork #${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
-                optional<fc::exception> except;
-                try {
-                   undo_database::session session = _undo_db.start_undo_session();
-                   apply_block( (*ritr)->data, skip );
-                   _block_id_to_block.store( (*ritr)->id, (*ritr)->data );
-                   session.commit();
-                }
-                catch ( const fc::exception& e ) { except = e; }
-                if( except )
-                {
-                   wlog( "exception thrown while switching forks ${e}", ("e",except->to_detail_string() ) );
-                   // remove the rest of branches.first from the fork_db, those blocks are invalid
-                   while( ritr != branches.first.rend() )
-                   {
-                      ilog( "removing block from fork_db #${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
-                      _fork_db.remove( (*ritr)->id );
-                      ++ritr;
-                   }
-                   _fork_db.set_head( branches.second.front() );
-
-                   // pop all blocks from the bad fork
-                   while( head_block_id() != branches.second.back()->data.previous )
-                   {
-                      ilog( "popping block #${n} ${id}", ("n",head_block_num())("id",head_block_id()) );
-                      pop_block();
-                   }
-
-                   ilog( "Switching back to fork: ${id}", ("id",branches.second.front()->data.id()) );
-                   // restore all blocks from the good fork
-                   for( auto ritr2 = branches.second.rbegin(); ritr2 != branches.second.rend(); ++ritr2 )
-                   {
-                      ilog( "pushing block #${n} ${id}", ("n",(*ritr2)->data.block_num())("id",(*ritr2)->id) );
-                      auto session = _undo_db.start_undo_session();
-                      apply_block( (*ritr2)->data, skip );
-                      _block_id_to_block.store( (*ritr2)->id, (*ritr2)->data );
-                      session.commit();
-                   }
-                   throw *except;
-                }
-            }
-            return true;
+            ilog( "popping block #${n} ${id}", ("n",head_block_num())("id",head_block_id()) );
+            pop_block();
          }
-         else return false;
+
+         // push all blocks on the new fork
+         for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr )
+         {
+               ilog( "pushing block from fork #${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
+               optional<fc::exception> except;
+               try {
+                  undo_database::session session = _undo_db.start_undo_session();
+                  apply_block( (*ritr)->data, skip );
+                  _block_id_to_block.store( (*ritr)->id, (*ritr)->data );
+                  session.commit();
+               }
+               catch ( const fc::exception& e ) { except = e; }
+               if( except )
+               {
+                  wlog( "exception thrown while switching forks ${e}", ("e",except->to_detail_string() ) );
+                  // remove the rest of branches.first from the fork_db, those blocks are invalid
+                  while( ritr != branches.first.rend() )
+                  {
+                     ilog( "removing block from fork_db #${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
+                     _fork_db.remove( (*ritr)->id );
+                     ++ritr;
+                  }
+                  _fork_db.set_head( branches.second.front() );
+
+                  // pop all blocks from the bad fork
+                  while( head_block_id() != branches.second.back()->data.previous )
+                  {
+                     ilog( "popping block #${n} ${id}", ("n",head_block_num())("id",head_block_id()) );
+                     pop_block();
+                  }
+
+                  ilog( "Switching back to fork: ${id}", ("id",branches.second.front()->data.id()) );
+                  // restore all blocks from the good fork
+                  for( auto ritr2 = branches.second.rbegin(); ritr2 != branches.second.rend(); ++ritr2 )
+                  {
+                     ilog( "pushing block #${n} ${id}", ("n",(*ritr2)->data.block_num())("id",(*ritr2)->id) );
+                     auto session = _undo_db.start_undo_session();
+                     apply_block( (*ritr2)->data, skip );
+                     _block_id_to_block.store( (*ritr2)->id, (*ritr2)->data );
+                     session.commit();
+                  }
+                  throw *except;
+               }
+         }
+         return true;
       }
+      else return false;
    }
 
    try {
@@ -209,10 +205,7 @@ bool database::_push_block(const signed_block& new_block)
       session.commit();
    } catch ( const fc::exception& e ) {
       elog("Failed to push new block:\n${e}", ("e", e.to_detail_string()));
-      if( !(skip&skip_fork_db) )
-      {
-         _fork_db.remove( new_block.id() );
-      }
+      _fork_db.remove( new_block.id() );
       throw;
    }
 
@@ -230,6 +223,8 @@ bool database::_push_block(const signed_block& new_block)
  */
 processed_transaction database::push_transaction( const precomputable_transaction& trx, uint32_t skip )
 { try {
+   // see https://github.com/bitshares/bitshares-core/issues/1573
+   FC_ASSERT( fc::raw::pack_size( trx ) < (1024 * 1024), "Transaction exceeds maximum transaction size." );
    processed_transaction result;
    detail::with_skip_flags( *this, skip, [&]()
    {

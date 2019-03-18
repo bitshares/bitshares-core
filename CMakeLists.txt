@@ -23,7 +23,7 @@ endif()
 list( APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules" )
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS "ON")
-set(GRAPHENE_EGENESIS_JSON "${CMAKE_CURRENT_SOURCE_DIR}/genesis.json" )
+set(GRAPHENE_EGENESIS_JSON "${CMAKE_CURRENT_SOURCE_DIR}/libraries/egenesis/genesis.json" )
 
 #set (ENABLE_INSTALLER 1)
 #set (USE_PCH 1)
@@ -48,11 +48,9 @@ LIST(APPEND BOOST_COMPONENTS thread
                              system
                              filesystem
                              program_options
-                             serialization
                              chrono
                              unit_test_framework
-                             context
-                             locale)
+                             context)
 SET( Boost_USE_STATIC_LIBS ON CACHE STRING "ON or OFF" )
 
 IF( WIN32 )
@@ -82,6 +80,7 @@ if( WIN32 )
     set(CRYPTO_LIB)
 
     if( MSVC )
+	add_definitions(-DWIN32_LEAN_AND_MEAN)
         #looks like this flag can have different default on some machines.
         SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /SAFESEH:NO")
         SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SAFESEH:NO")
