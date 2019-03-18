@@ -678,14 +678,16 @@ public:
       return *opt;
    }
 
-   optional<htlc_object> get_htlc(string htlc_id) const
+   fc::optional<htlc_object> get_htlc(string htlc_id) const
    {
       htlc_id_type id;
       fc::from_variant(htlc_id, id);
       auto obj = _remote_db->get_objects( { id }).front();
       if (!obj.is_null())
-         return optional<htlc_object>(obj.template as<htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS));
-      return optional<htlc_object>();
+      {
+         return fc::optional<htlc_object>(obj.template as<htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS));
+      }
+      return fc::optional<htlc_object>();
    }
 
    asset_id_type get_asset_id(string asset_symbol_or_id) const
@@ -3187,9 +3189,55 @@ signed_transaction wallet_api::htlc_create( string source, string destination, s
          claim_period_seconds, broadcast);
 }
 
-optional<htlc_object> wallet_api::get_htlc(std::string htlc_id) const
+fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
 {
-   return my->get_htlc(htlc_id);
+   fc::optional<htlc_object> optional_obj = my->get_htlc(htlc_id);
+   if (optional_obj)
+   {
+      const htlc_object& obj = *optional_obj;
+      // convert to formatted variant
+      fc::mutable_variant_object transfer;
+      const auto& from = my->get_account( obj.transfer.from );
+      transfer["from"] = from.name;
+      const auto& to = my->get_account( obj.transfer.to );
+      transfer["to"] = to.name;
+      const auto& asset = my->get_asset( obj.transfer.asset_id );
+      transfer["asset"] = asset.symbol;
+      transfer["amount"] = obj.transfer.amount.value;
+      class htlc_hash_to_variant_visitor
+      {
+         public:
+         typedef fc::mutable_variant_object result_type;
+
+         result_type operator()(const fc::ripemd160& obj)const 
+         { return convert("RIPEMD160", obj.str()); }
+         result_type operator()(const fc::sha1& obj)const 
+         { return convert("SHA1", obj.str()); }
+         result_type operator()(const fc::sha256& obj)const 
+         { return convert("SHA256", obj.str()); }
+         private:
+         result_type convert(const std::string& type, const std::string& hash)const
+         {
+            fc::mutable_variant_object ret_val; 
+            ret_val["hash_algo"] = type; 
+            ret_val["preimage_hash"] = hash; 
+            return ret_val;
+         }
+      };
+      static htlc_hash_to_variant_visitor hash_visitor;
+      fc::mutable_variant_object htlc_lock = obj.conditions.hash_lock.preimage_hash.visit(hash_visitor);
+      htlc_lock["preimage_size"] = obj.conditions.hash_lock.preimage_size;
+      fc::mutable_variant_object time_lock;
+      time_lock["expiration"] = obj.conditions.time_lock.expiration;
+      fc::mutable_variant_object conditions;
+      conditions["htlc_lock"] = htlc_lock;
+      conditions["time_lock"] = time_lock;
+      fc::mutable_variant_object result;
+      result["transfer"] = transfer;
+      result["conditions"] = conditions;
+      return fc::optional<fc::variant>(result);
+   }
+   return fc::optional<fc::variant>();
 }
 
 signed_transaction wallet_api::htlc_redeem( std::string htlc_id, std::string issuer, const std::string& preimage,
