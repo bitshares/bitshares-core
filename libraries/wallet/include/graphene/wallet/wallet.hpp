@@ -1491,6 +1491,8 @@ class wallet_api
                                            bool approve,
                                            bool broadcast = false);
 
+      signed_transaction update_account( account_update_operation account_update_op, bool broadcast = false );
+
       /** Vote for a given witness.
        *
        * An account can publish a list of all witnesses they approve of.  This 
@@ -1815,6 +1817,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_vesting_balances)
         (withdraw_vesting)
         (vote_for_committee_member)
+        (update_account)
         (vote_for_witness)
         (set_voting_proxy)
         (set_desired_witness_and_committee_member_count)

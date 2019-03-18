@@ -1917,6 +1917,16 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (voting_account)(committee_member)(approve)(broadcast) ) }
 
+   signed_transaction update_account( account_update_operation account_update_op, bool broadcast /* = false */ )
+   { try {
+      signed_transaction tx;
+      tx.operations.push_back( account_update_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (account_update_op)(broadcast) ) }
+
    signed_transaction vote_for_witness(string voting_account,
                                         string witness,
                                         bool approve,
@@ -3784,6 +3794,11 @@ signed_transaction wallet_api::vote_for_committee_member(string voting_account,
                                                  bool broadcast /* = false */)
 {
    return my->vote_for_committee_member(voting_account, witness, approve, broadcast);
+}
+
+signed_transaction wallet_api::update_account( account_update_operation account_update_op, bool broadcast /* = false */ )
+{
+   return my->update_account(account_update_op, broadcast);
 }
 
 signed_transaction wallet_api::vote_for_witness(string voting_account,
