@@ -131,14 +131,14 @@ int main( int argc, char** argv )
          signed_block b = db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot), nathan_priv_key, database::skip_nothing);
          FC_ASSERT( db.head_block_id() == b.id() );
          fc::sha256 h = b.digest();
-         uint64_t rand = h._hash[0];
+         uint64_t rand = h._hash[0].value();
          slot = 1;
          while(true)
          {
             if( (rand % 100) < miss_rate )
             {
                slot++;
-               rand = (rand/100) ^ h._hash[slot&3];
+               rand = (rand/100) ^ h._hash[slot&3].value();
                missed++;
             }
             else

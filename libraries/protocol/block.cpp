@@ -34,15 +34,15 @@ namespace graphene { namespace protocol {
 
    uint32_t block_header::num_from_id(const block_id_type& id)
    {
-      return boost::endian::big_to_native(id._hash[0]);
+      return boost::endian::endian_reverse(id._hash[0].value());
    }
 
    const block_id_type& signed_block_header::id()const
    {
-      if( !_block_id._hash[0] )
+      if( !_block_id._hash[0].value() )
       {
          auto tmp = fc::sha224::hash( *this );
-         tmp._hash[0] = boost::endian::native_to_big(block_num()); // store the block num in the ID, 160 bits is plenty for the hash
+         tmp._hash[0] = boost::endian::endian_reverse(block_num()); // store the block num in the ID, 160 bits is plenty for the hash
          static_assert( sizeof(tmp._hash[0]) == 4, "should be 4 bytes" );
          memcpy(_block_id._hash, tmp._hash, std::min(sizeof(_block_id), sizeof(tmp)));
       }
@@ -72,7 +72,7 @@ namespace graphene { namespace protocol {
       if( transactions.size() == 0 ) 
          return empty_checksum;
 
-      if( !_calculated_merkle_root._hash[0] )
+      if( !_calculated_merkle_root._hash[0].value() )
       {
          vector<digest_type> ids;
          ids.resize( transactions.size() );
