@@ -63,6 +63,7 @@
 #include <fc/crypto/base58.hpp>
 
 #include <graphene/app/api.hpp>
+#include <graphene/app/util.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/htlc_object.hpp>
@@ -3203,7 +3204,7 @@ fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
       transfer["to"] = to.name;
       const auto& asset = my->get_asset( obj.transfer.asset_id );
       transfer["asset"] = asset.symbol;
-      transfer["amount"] = obj.transfer.amount.value;
+      transfer["amount"] = graphene::app::uint128_amount_to_string( obj.transfer.amount.value, asset.precision );
       class htlc_hash_to_variant_visitor
       {
          public:
