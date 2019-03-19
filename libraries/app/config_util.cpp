@@ -258,10 +258,21 @@ static void create_new_config_file(const fc::path& config_ini_path, const fc::pa
    };
    deduplicator dedup(modify_option_defaults);
    std::ofstream out_cfg(config_ini_path.preferred_string());
+   std::string plugin_header_surrounding( 78, '=' );
    for( const boost::shared_ptr<bpo::option_description> opt : cfg_options.options() )
    {
       const boost::shared_ptr<bpo::option_description> od = dedup.next(opt);
       if( !od ) continue;
+
+      if( od->long_name().find("plugin-cfg-header-") == 0 ) // it's a plugin header
+      {
+         out_cfg << "\n";
+         out_cfg << "# " << plugin_header_surrounding << "\n";
+         out_cfg << "# " << od->description() << "\n";
+         out_cfg << "# " << plugin_header_surrounding << "\n";
+         out_cfg << "\n";
+         continue;
+      }
 
       if( !od->description().empty() )
          out_cfg << "# " << od->description() << "\n";
@@ -284,6 +295,10 @@ static void create_new_config_file(const fc::path& config_ini_path, const fc::pa
    }
 
    out_cfg << "\n"
+           << "# " << plugin_header_surrounding << "\n"
+           << "# logging options\n"
+           << "# " << plugin_header_surrounding << "\n"
+           << "#\n"
            << "# Logging configuration is loaded from logging.ini by default.\n"
            << "# If logging.ini exists, logging configuration added in this file will be ignored.\n";
    out_cfg.close();

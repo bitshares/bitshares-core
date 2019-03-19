@@ -65,6 +65,7 @@ namespace graphene { namespace chain {
    class transaction
    {
    public:
+      virtual ~transaction() = default;
       /**
        * Least significant 16 bits from the reference block number. If @ref relative_expiration is zero, this field
        * must be zero as well.
@@ -127,6 +128,7 @@ namespace graphene { namespace chain {
    public:
       signed_transaction( const transaction& trx = transaction() )
          : transaction(trx){}
+      virtual ~signed_transaction() = default;
 
       /** signs and appends to signatures */
       const signature_type& sign( const private_key_type& key, const chain_id_type& chain_id );
@@ -205,6 +207,7 @@ namespace graphene { namespace chain {
       precomputable_transaction() {}
       precomputable_transaction( const signed_transaction& tx ) : signed_transaction(tx) {};
       precomputable_transaction( signed_transaction&& tx ) : signed_transaction( std::move(tx) ) {};
+      virtual ~precomputable_transaction() = default;
 
       virtual const transaction_id_type&       id()const override;
       virtual void                             validate()const override;
@@ -238,6 +241,7 @@ namespace graphene { namespace chain {
    {
       processed_transaction( const signed_transaction& trx = signed_transaction() )
          : precomputable_transaction(trx){}
+      virtual ~processed_transaction() = default;
 
       vector<operation_result> operation_results;
 
