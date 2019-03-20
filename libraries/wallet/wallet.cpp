@@ -3230,6 +3230,7 @@ fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
       htlc_lock["preimage_size"] = obj.conditions.hash_lock.preimage_size;
       fc::mutable_variant_object time_lock;
       time_lock["expiration"] = obj.conditions.time_lock.expiration;
+      time_lock["time_left"] = fc::get_approximate_relative_time_string(obj.conditions.time_lock.expiration);
       fc::mutable_variant_object conditions;
       conditions["htlc_lock"] = htlc_lock;
       conditions["time_lock"] = time_lock;
