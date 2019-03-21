@@ -461,7 +461,12 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
 {
    using namespace graphene::wallet;
    try {
-      std::vector<signed_transaction> import_txs;
+      // we need to increase the default max transaction size to run this test.
+      this->app1->chain_database()->modify(
+         this->app1->chain_database()->get_global_properties(), 
+         []( global_property_object& p) {
+            p.parameters.maximum_transaction_size = 8192;
+      });      std::vector<signed_transaction> import_txs;
 
       BOOST_TEST_MESSAGE("Importing nathan's balance");
       import_txs = con.wallet_api_ptr->import_balance("nathan", nathan_keys, true);
@@ -680,7 +685,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       std::string preimage_string = "My Secret";
       fc::sha256 preimage_md = fc::sha256::hash(preimage_string);
       std::stringstream ss;
-      for(int i = 0; i < preimage_md.data_size(); i++)
+      for(size_t i = 0; i < preimage_md.data_size(); i++)
       {
          char d = preimage_md.data()[i];
          unsigned char uc = static_cast<unsigned char>(d);
