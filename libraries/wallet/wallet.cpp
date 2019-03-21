@@ -684,7 +684,7 @@ public:
       htlc_id_type id;
       fc::from_variant(htlc_id, id);
       auto obj = _remote_db->get_objects( { id }).front();
-      if (!obj.is_null())
+      if ( !obj.is_null() )
       {
          return fc::optional<htlc_object>(obj.template as<htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS));
       }
@@ -3193,7 +3193,7 @@ signed_transaction wallet_api::htlc_create( string source, string destination, s
 fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
 {
    fc::optional<htlc_object> optional_obj = my->get_htlc(htlc_id);
-   if (optional_obj)
+   if ( optional_obj.valid() )
    {
       const htlc_object& obj = *optional_obj;
       // convert to formatted variant
