@@ -318,7 +318,7 @@ void database_fixture::verify_asset_supplies( const database& db )
    const auto& htlc_idx = db.get_index_type< htlc_index >().indices().get< by_id >();
    for( auto itr = htlc_idx.begin(); itr != htlc_idx.end(); ++itr )
    {
-      total_balances[itr->amount.asset_id] += itr->amount.amount;
+      total_balances[itr->transfer.asset_id] += itr->transfer.amount;
    }
 
    for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )

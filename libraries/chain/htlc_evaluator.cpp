@@ -67,12 +67,13 @@ namespace graphene {
             dbase.adjust_balance( o.from, -o.amount );
 
             const htlc_object& esc = db().create<htlc_object>([&dbase,&o]( htlc_object& esc ) {
-               esc.from                  = o.from;
-               esc.to                    = o.to;
-               esc.amount                = o.amount;
-               esc.preimage_hash         = o.preimage_hash;
-               esc.preimage_size         = o.preimage_size;
-               esc.expiration            = dbase.head_block_time() + o.claim_period_seconds;
+               esc.transfer.from                  = o.from;
+               esc.transfer.to                    = o.to;
+               esc.transfer.amount                = o.amount.amount;
+               esc.transfer.asset_id              = o.amount.asset_id;
+               esc.conditions.hash_lock.preimage_hash = o.preimage_hash;
+               esc.conditions.hash_lock.preimage_size = o.preimage_size;
+               esc.conditions.time_lock.expiration    = dbase.head_block_time() + o.claim_period_seconds;
             });
             return  esc.id;
 
@@ -100,19 +101,20 @@ namespace graphene {
       {
          htlc_obj = &db().get<htlc_object>(o.htlc_id);
 
-         FC_ASSERT(o.preimage.size() == htlc_obj->preimage_size, "Preimage size mismatch.");
+         FC_ASSERT(o.preimage.size() == htlc_obj->conditions.hash_lock.preimage_size, "Preimage size mismatch.");
 
          const htlc_redeem_visitor vtor( o.preimage );
-         FC_ASSERT( htlc_obj->preimage_hash.visit( vtor ), "Provided preimage does not generate correct hash.");
+         FC_ASSERT( htlc_obj->conditions.hash_lock.preimage_hash.visit( vtor ), "Provided preimage does not generate correct hash.");
 
          return void_result();
       }
 
       void_result htlc_redeem_evaluator::do_apply(const htlc_redeem_operation& o)
       {
-         db().adjust_balance(htlc_obj->to, htlc_obj->amount);
+         db().adjust_balance(htlc_obj->transfer.to, asset(htlc_obj->transfer.amount, htlc_obj->transfer.asset_id) );
          // notify related parties
-         htlc_redeemed_operation virt_op( htlc_obj->id, htlc_obj->from, htlc_obj->to, htlc_obj->amount );
+         htlc_redeemed_operation virt_op( htlc_obj->id, htlc_obj->transfer.from, htlc_obj->transfer.to, 
+               asset(htlc_obj->transfer.amount, htlc_obj->transfer.asset_id ) );
          db().push_applied_operation( virt_op );
          db().remove(*htlc_obj);
          return void_result();
@@ -127,7 +129,7 @@ namespace graphene {
       void_result htlc_extend_evaluator::do_apply(const htlc_extend_operation& o)
       {
          db().modify(*htlc_obj, [&o](htlc_object& db_obj) {
-            db_obj.expiration += o.seconds_to_add;
+            db_obj.conditions.time_lock.expiration += o.seconds_to_add;
          });
 
          return void_result();
