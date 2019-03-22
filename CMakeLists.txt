@@ -1,6 +1,6 @@
 # Defines BitShares library target.
 project( BitShares )
-cmake_minimum_required( VERSION 2.8.12 )
+cmake_minimum_required( VERSION 3.1 )
 
 set( BLOCKCHAIN_NAME "BitShares" )
 
@@ -8,6 +8,10 @@ set( CLI_CLIENT_EXECUTABLE_NAME graphene_client )
 set( GUI_CLIENT_EXECUTABLE_NAME BitShares )
 set( CUSTOM_URL_SCHEME "gcs" )
 set( INSTALLER_APP_ID "68ad7005-8eee-49c9-95ce-9eed97e5b347" )
+
+set( CMAKE_CXX_STANDARD 14 )
+set( CMAKE_CXX_STANDARD_REQUIRED ON )
+set( CMAKE_CXX_EXTENSIONS OFF )
 
 # http://stackoverflow.com/a/18369825
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
