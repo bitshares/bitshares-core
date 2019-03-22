@@ -581,12 +581,12 @@ void database::clear_expired_htlcs()
 {
    const auto& htlc_idx = get_index_type<htlc_index>().indices().get<by_expiration>();
    while ( htlc_idx.begin() != htlc_idx.end()
-         && htlc_idx.begin()->expiration <= head_block_time() )
+         && htlc_idx.begin()->conditions.time_lock.expiration <= head_block_time() )
    {
       const htlc_object& obj = *htlc_idx.begin();
-      adjust_balance( obj.from, obj.amount );
+      adjust_balance( obj.transfer.from, asset(obj.transfer.amount, obj.transfer.asset_id) );
       // virtual op
-      htlc_refund_operation vop( obj.id, obj.from );
+      htlc_refund_operation vop( obj.id, obj.transfer.from );
       vop.htlc_id = htlc_idx.begin()->id;
       push_applied_operation( vop );
 
