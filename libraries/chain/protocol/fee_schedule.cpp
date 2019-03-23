@@ -158,7 +158,7 @@ namespace graphene { namespace chain {
 
    void chain_parameters::validate()const
    {
-      current_fees->validate();
+      get_current_fees().validate();
       FC_ASSERT( reserve_percent_of_fee <= GRAPHENE_100_PERCENT );
       FC_ASSERT( network_percent_of_fee <= GRAPHENE_100_PERCENT );
       FC_ASSERT( lifetime_referrer_percent_of_fee <= GRAPHENE_100_PERCENT );

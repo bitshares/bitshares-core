@@ -101,7 +101,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       genesis_state.initial_committee_candidates.push_back({name});
       genesis_state.initial_witness_candidates.push_back({name, init_account_priv_key.get_public_key()});
    }
-   genesis_state.initial_parameters.current_fees->zero_all_fees();
+   genesis_state.initial_parameters.get_current_fees().zero_all_fees();
 
    genesis_state_type::initial_asset_type init_mpa1;
    init_mpa1.symbol = "INITMPA";
@@ -642,7 +642,7 @@ void database_fixture::change_fees(
    )
 {
    const chain_parameters& current_chain_params = db.get_global_properties().parameters;
-   const fee_schedule& current_fees = *(current_chain_params.current_fees);
+   const fee_schedule& current_fees = current_chain_params.get_current_fees();
 
    flat_map< int, fee_parameters > fee_map;
    fee_map.reserve( current_fees.parameters.size() );
@@ -659,7 +659,7 @@ void database_fixture::change_fees(
       new_fees.scale = new_scale;
 
    chain_parameters new_chain_params = current_chain_params;
-   new_chain_params.current_fees = std::make_shared<fee_schedule>(new_fees);
+   new_chain_params.get_current_fees() = new_fees;
 
    db.modify(db.get_global_properties(), [&](global_property_object& p) {
       p.parameters = new_chain_params;
@@ -1061,7 +1061,7 @@ void database_fixture::enable_fees()
 {
    db.modify(global_property_id_type()(db), [](global_property_object& gpo)
    {
-      gpo.parameters.current_fees = std::make_shared<fee_schedule>(fee_schedule::get_default());
+      gpo.parameters.get_current_fees() = fee_schedule::get_default();
    });
 }
 
@@ -1077,7 +1077,7 @@ void database_fixture::upgrade_to_lifetime_member( const account_object& account
       account_upgrade_operation op;
       op.account_to_upgrade = account.get_id();
       op.upgrade_to_lifetime_member = true;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
+      op.fee = db.get_global_properties().parameters.get_current_fees().calculate_fee(op);
       trx.operations = {op};
       PUSH_TX(db, trx, ~0);
       FC_ASSERT( op.account_to_upgrade(db).is_lifetime_member() );
@@ -1097,7 +1097,7 @@ void database_fixture::upgrade_to_annual_member(const account_object& account)
    try {
       account_upgrade_operation op;
       op.account_to_upgrade = account.get_id();
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
+      op.fee = db.get_global_properties().parameters.get_current_fees().calculate_fee(op);
       trx.operations = {op};
       PUSH_TX(db, trx, ~0);
       FC_ASSERT( op.account_to_upgrade(db).is_member(db.head_block_time()) );
