@@ -155,7 +155,7 @@ extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;
 
 #define ACTOR(name) \
    PREP_ACTOR(name) \
-   const auto& name = create_account(BOOST_PP_STRINGIZE(name), name ## _public_key); \
+   const auto name = create_account(BOOST_PP_STRINGIZE(name), name ## _public_key); \
    graphene::chain::account_id_type name ## _id = name.id; (void)name ## _id;
 
 #define GET_ACTOR(name) \
@@ -191,8 +191,10 @@ struct database_fixture {
    optional<fc::temp_directory> data_dir;
    bool skip_key_index_test = false;
    uint32_t anon_acct_count;
+   bool hf1270 = false;
 
-   database_fixture();
+    database_fixture(const fc::time_point_sec &initial_timestamp =
+                        fc::time_point_sec(GRAPHENE_TESTING_GENESIS_TIMESTAMP));
    ~database_fixture();
 
    static fc::ecc::private_key generate_private_key(string seed);
@@ -225,7 +227,7 @@ struct database_fixture {
       const std::string& name,
       const account_object& registrar,
       const account_object& referrer,
-      uint8_t referrer_percent = 100,
+      uint16_t referrer_percent = 100,
       public_key_type key = public_key_type()
       );
 
@@ -289,7 +291,9 @@ struct database_fixture {
                                                  const account_object& issuer,
                                                  uint16_t flags,
                                                  const price& core_exchange_rate = price(asset(1, asset_id_type(1)), asset(1)),
-                                                 uint16_t precision = 2 /* traditional precision for tests */);
+                                                 uint8_t precision = 2 /* traditional precision for tests */,
+                                                 uint16_t market_fee_percent = 0,
+                                                 additional_asset_options_t options = additional_asset_options_t());
    void issue_uia( const account_object& recipient, asset amount );
    void issue_uia( account_id_type recipient_id, asset amount );
 
@@ -302,7 +306,7 @@ struct database_fixture {
       const string& name,
       const account_object& registrar,
       const account_object& referrer,
-      uint8_t referrer_percent = 100,
+      uint16_t referrer_percent = 100,
       const public_key_type& key = public_key_type()
       );
 
@@ -311,7 +315,7 @@ struct database_fixture {
       const private_key_type& key,
       const account_id_type& registrar_id = account_id_type(),
       const account_id_type& referrer_id = account_id_type(),
-      uint8_t referrer_percent = 100
+      uint16_t referrer_percent = 100
       );
 
    const committee_member_object& create_committee_member( const account_object& owner );
@@ -335,6 +339,10 @@ struct database_fixture {
    void transfer( account_id_type from, account_id_type to, const asset& amount, const asset& fee = asset() );
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );
    void fund_fee_pool( const account_object& from, const asset_object& asset_to_fund, const share_type amount );
+   /**
+    * NOTE: This modifies the database directly. You will probably have to call this each time you
+    * finish creating a block
+    */
    void enable_fees();
    void change_fees( const flat_set< fee_parameters >& new_params, uint32_t new_scale = 0 );
    void upgrade_to_lifetime_member( account_id_type account );
@@ -348,6 +356,10 @@ struct database_fixture {
    void print_joint_market( const string& syma, const string& symb )const;
    int64_t get_balance( account_id_type account, asset_id_type a )const;
    int64_t get_balance( const account_object& account, const asset_object& a )const;
+
+   int64_t get_market_fee_reward( account_id_type account, asset_id_type asset )const;
+   int64_t get_market_fee_reward( const account_object& account, const asset_object& asset )const;
+
    vector< operation_history_object > get_operation_history( account_id_type account_id )const;
    vector< graphene::market_history::order_history_object > get_market_order_history( asset_id_type a, asset_id_type b )const;
 };

@@ -30,7 +30,12 @@ namespace graphene { namespace chain { struct fee_schedule; } }
 
 namespace graphene { namespace chain {
 
-   typedef static_variant<>  parameter_extension; 
+   struct htlc_options
+   {
+      uint32_t max_timeout_secs;
+      uint32_t max_preimage_size;
+   };
+
    struct chain_parameters
    {
       /** using a smart ref breaks the circular dependency created between operations and the fee schedule */
@@ -63,13 +68,29 @@ namespace graphene { namespace chain {
       uint16_t                accounts_per_fee_scale              = GRAPHENE_DEFAULT_ACCOUNTS_PER_FEE_SCALE; ///< number of accounts between fee scalings
       uint8_t                 account_fee_scale_bitshifts         = GRAPHENE_DEFAULT_ACCOUNT_FEE_SCALE_BITSHIFTS; ///< number of times to left bitshift account registration fee at each scaling
       uint8_t                 max_authority_depth                 = GRAPHENE_MAX_SIG_CHECK_DEPTH;
-      extensions_type         extensions;
+
+      struct ext
+      {
+         optional< htlc_options > updatable_htlc_options;
+      };
+
+      extension<ext> extensions;
 
       /** defined in fee_schedule.cpp */
       void validate()const;
+
    };
 
 } }  // graphene::chain
+
+FC_REFLECT( graphene::chain::htlc_options, 
+      (max_timeout_secs) 
+      (max_preimage_size) 
+)
+
+FC_REFLECT( graphene::chain::chain_parameters::ext, 
+      (updatable_htlc_options)
+)
 
 FC_REFLECT( graphene::chain::chain_parameters,
             (current_fees)

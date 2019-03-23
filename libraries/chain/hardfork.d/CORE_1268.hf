@@ -1,0 +1,4 @@
+// #1268 Distribute Asset Market Fees to Referral Program 
+#ifndef HARDFORK_1268_TIME
+#define HARDFORK_1268_TIME (fc::time_point_sec( 1577880000 )) // Wednesday, January 1, 2020 12:00:00 PM
+#endif
