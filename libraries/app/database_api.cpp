@@ -260,7 +260,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       }
       vector<limit_order_object> get_limit_orders(const asset_id_type a, const asset_id_type b, const uint32_t limit)const
       {
-         FC_ASSERT( limit <= 300 );
+         uint64_t api_limit_get_limit_orders=_app_options->api_limit_get_limit_orders;
+         FC_ASSERT( limit <= api_limit_get_limit_orders );
 
          const auto& limit_order_idx = _db.get_index_type<limit_order_index>();
          const auto& limit_price_idx = limit_order_idx.indices().get<by_price>();
@@ -1274,7 +1275,8 @@ vector<limit_order_object> database_api::get_limit_orders(std::string a, std::st
  */
 vector<limit_order_object> database_api_impl::get_limit_orders(const std::string& a, const std::string& b, uint32_t limit)const
 {
-   FC_ASSERT( limit <= 300 );
+   uint64_t api_limit_get_limit_orders=_app_options->api_limit_get_limit_orders;
+   FC_ASSERT( limit <= api_limit_get_limit_orders );
 
    const asset_id_type asset_a_id = get_asset_from_string(a)->id;
    const asset_id_type asset_b_id = get_asset_from_string(b)->id;
@@ -1289,7 +1291,8 @@ vector<call_order_object> database_api::get_call_orders(const std::string& a, ui
 
 vector<call_order_object> database_api_impl::get_call_orders(const std::string& a, uint32_t limit)const
 {
-   FC_ASSERT( limit <= 300 );
+   uint64_t api_limit_get_call_orders=_app_options->api_limit_get_call_orders;
+   FC_ASSERT( limit <= api_limit_get_call_orders );
 
    const asset_id_type asset_a_id = get_asset_from_string(a)->id;
    const auto& call_index = _db.get_index_type<call_order_index>().indices().get<by_price>();
@@ -1314,7 +1317,8 @@ vector<force_settlement_object> database_api::get_settle_orders(const std::strin
 
 vector<force_settlement_object> database_api_impl::get_settle_orders(const std::string& a, uint32_t limit)const
 {
-   FC_ASSERT( limit <= 300 );
+   uint64_t api_limit_get_settle_orders=_app_options->api_limit_get_settle_orders;
+   FC_ASSERT( limit <= api_limit_get_settle_orders );
 
    const asset_id_type asset_a_id = get_asset_from_string(a)->id;
    const auto& settle_index = _db.get_index_type<force_settlement_index>().indices().get<by_expiration>();
@@ -1483,7 +1487,8 @@ order_book database_api::get_order_book( const string& base, const string& quote
 order_book database_api_impl::get_order_book( const string& base, const string& quote, unsigned limit )const
 {
    using boost::multiprecision::uint128_t;
-   FC_ASSERT( limit <= 50 );
+   uint64_t api_limit_get_order_book=_app_options->api_limit_get_order_book;
+   FC_ASSERT( limit <= api_limit_get_order_book );
 
    order_book result;
    result.base = base;
