@@ -52,6 +52,26 @@ namespace graphene { namespace chain { namespace detail {
  * No more asset updates may be issued.
 */
 void database::globally_settle_asset( const asset_object& mia, const price& settlement_price )
+{
+   auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+   bool before_core_hardfork_1270 = ( maint_time <= HARDFORK_CORE_1270_TIME ); // call price caching issue
+
+   const auto& call_index = get_index_type<call_order_index>().indices();
+   const auto& call_price_index = call_index.get<by_price>();
+   const auto& call_collateral_index = call_index.get<by_collateral>();
+
+   if( before_core_hardfork_1270 )
+   {
+      globally_settle_asset_impl( mia, settlement_price, call_price_index );
+   }
+   else
+   {
+      globally_settle_asset_impl( mia, settlement_price, call_collateral_index );
+   }
+}
+
+template<typename IndexType>
+void database::globally_settle_asset_impl( const asset_object& mia, const price& settlement_price, const IndexType& call_index )
 { try {
    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
    FC_ASSERT( !bitasset.has_settlement(), "black swan already occurred, it should not happen again" );
@@ -64,41 +84,16 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
 
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
-   bool before_core_hardfork_1270 = ( maint_time <= HARDFORK_CORE_1270_TIME ); // call price caching issue
 
    // cancel all call orders and accumulate it into collateral_gathered
-   const auto& call_index = get_index_type<call_order_index>().indices();
-   const auto& call_price_index = call_index.get<by_price>();
-   const auto& call_collateral_index = call_index.get<by_collateral>();
-
-   auto call_min = price::min( bitasset.options.short_backing_asset, mia.id );
-   auto call_max = price::max( bitasset.options.short_backing_asset, mia.id );
-
-   auto call_price_itr = call_price_index.begin();
-   auto call_price_end = call_price_itr;
-   auto call_collateral_itr = call_collateral_index.begin();
-   auto call_collateral_end = call_collateral_itr;
-
-   if( before_core_hardfork_1270 )
-   {
-      call_price_itr = call_price_index.lower_bound( call_min );
-      call_price_end = call_price_index.upper_bound( call_max );
-   }
-   else
-   {
-      call_collateral_itr = call_collateral_index.lower_bound( call_min );
-      call_collateral_end = call_collateral_index.upper_bound( call_max );
-   }
+   auto call_itr = call_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
+   auto call_end = call_index.upper_bound( price::max( bitasset.options.short_backing_asset, mia.id ) );
 
    asset pays;
-   while( ( before_core_hardfork_1270 && call_price_itr != call_price_end )
-         || (!before_core_hardfork_1270 && call_collateral_itr != call_collateral_end ) )
+   while( call_itr != call_end )
    {
-      const call_order_object& order = ( before_core_hardfork_1270 ? *call_price_itr : *call_collateral_itr );
-      if( before_core_hardfork_1270 )
-         ++call_price_itr;
-      else
-         ++call_collateral_itr;
+      const call_order_object& order = *call_itr;
+      ++call_itr;
 
       if( before_core_hardfork_342 )
       {

@@ -353,6 +353,11 @@ namespace graphene { namespace chain {
          void cancel_bid(const collateral_bid_object& bid, bool create_virtual_op = true);
          void execute_bid( const collateral_bid_object& bid, share_type debt_covered, share_type collateral_from_fund, const price_feed& current_feed );
 
+      private:
+         template<typename IndexType>
+         void globally_settle_asset_impl( const asset_object& bitasset, const price& settle_price, const IndexType& call_index );
+
+      public:
          /**
           * @brief Process a new limit order through the markets
           * @param order The new order to process
