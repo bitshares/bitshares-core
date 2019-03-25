@@ -69,7 +69,9 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
 }
 
 template<typename IndexType>
-void database::globally_settle_asset_impl( const asset_object& mia, const price& settlement_price, const IndexType& call_index )
+void database::globally_settle_asset_impl( const asset_object& mia,
+                                           const price& settlement_price,
+                                           const IndexType& call_index )
 { try {
    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
    FC_ASSERT( !bitasset.has_settlement(), "black swan already occurred, it should not happen again" );

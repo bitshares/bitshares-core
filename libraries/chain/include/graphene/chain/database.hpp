@@ -355,7 +355,9 @@ namespace graphene { namespace chain {
 
       private:
          template<typename IndexType>
-         void globally_settle_asset_impl( const asset_object& bitasset, const price& settle_price, const IndexType& call_index );
+         void globally_settle_asset_impl( const asset_object& bitasset,
+                                          const price& settle_price,
+                                          const IndexType& call_index );
 
       public:
          /**
