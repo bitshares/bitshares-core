@@ -369,7 +369,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test )
       GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
 
       BOOST_TEST_MESSAGE( "alice borrow using 4x collateral at 1:1 price" );
-      borrow( alice, bitusd.amount(100000), core.amount(400000) )->id;
+      BOOST_CHECK( borrow( alice, bitusd.amount(100000), core.amount(400000) ) != nullptr );
       BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
 
@@ -476,7 +476,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
       GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
 
       BOOST_TEST_MESSAGE( "alice borrow using 4x collateral at 1:1 price" );
-      borrow( alice, bitusd.amount(100000), core.amount(400000) )->id;
+      BOOST_CHECK( borrow( alice, bitusd.amount(100000), core.amount(400000) ) != nullptr );
       BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
 
