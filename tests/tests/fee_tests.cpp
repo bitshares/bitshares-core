@@ -709,8 +709,8 @@ BOOST_AUTO_TEST_CASE( account_create_fee_scaling )
    auto accounts_per_scale = db.get_global_properties().parameters.accounts_per_fee_scale;
    db.modify(global_property_id_type()(db), [](global_property_object& gpo)
    {
-      gpo.parameters.get_current_fees() = fee_schedule::get_default();
-      gpo.parameters.get_current_fees().get<account_create_operation>().basic_fee = 1;
+      gpo.parameters.get_mutable_fees() = fee_schedule::get_default();
+      gpo.parameters.get_mutable_fees().get<account_create_operation>().basic_fee = 1;
    });
 
    for( int i = db.get_dynamic_global_properties().accounts_registered_this_interval; i < accounts_per_scale; ++i )

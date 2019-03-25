@@ -101,7 +101,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       genesis_state.initial_committee_candidates.push_back({name});
       genesis_state.initial_witness_candidates.push_back({name, init_account_priv_key.get_public_key()});
    }
-   genesis_state.initial_parameters.get_current_fees().zero_all_fees();
+   genesis_state.initial_parameters.get_mutable_fees().zero_all_fees();
 
    genesis_state_type::initial_asset_type init_mpa1;
    init_mpa1.symbol = "INITMPA";
@@ -659,7 +659,7 @@ void database_fixture::change_fees(
       new_fees.scale = new_scale;
 
    chain_parameters new_chain_params = current_chain_params;
-   new_chain_params.get_current_fees() = new_fees;
+   new_chain_params.get_mutable_fees() = new_fees;
 
    db.modify(db.get_global_properties(), [&](global_property_object& p) {
       p.parameters = new_chain_params;
@@ -1061,7 +1061,7 @@ void database_fixture::enable_fees()
 {
    db.modify(global_property_id_type()(db), [](global_property_object& gpo)
    {
-      gpo.parameters.get_current_fees() = fee_schedule::get_default();
+      gpo.parameters.get_mutable_fees() = fee_schedule::get_default();
    });
 }
 
