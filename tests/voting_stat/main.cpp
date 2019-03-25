@@ -26,6 +26,8 @@
 #include <fc/optional.hpp>
 
 #include <graphene/voting_stat/voting_stat_plugin.hpp>
+#include <graphene/es_objects/es_objects.hpp>
+#include <graphene/utilities/elasticsearch.hpp>
 
 #include <graphene/app/api.hpp>
 
@@ -43,16 +45,55 @@ using namespace graphene::app;
 using namespace graphene::chain;
 using namespace graphene::chain::test;
 using namespace graphene::voting_stat;
+using namespace graphene::es_objects;
+using namespace graphene::utilities;
+namespace bpo = boost::program_options;
 
 struct voting_stat_fixture : public database_fixture
 {
     vote_id_type default_vote_id;
-
+    CURL *_curl;
+    ES _es;
+        
     voting_stat_fixture()
     {
-        app.register_plugin<voting_stat_plugin>( true );
-        app.initialize_plugins( boost::program_options::variables_map() ); // TODO
-        app.startup_plugins();
+        try 
+        {
+            _curl = curl_easy_init();
+            _es.curl = _curl;
+            _es.elasticsearch_url = "http://localhost:9200/";
+            _es.index_prefix = "objects-";            
+            
+            app.register_plugin<voting_stat_plugin>( true );
+            app.register_plugin<es_objects_plugin>( true );
+
+            auto es_object = app.get_plugin<es_objects_plugin>("es_objects");
+            bpo::options_description cli;
+            bpo::options_description cfi;
+            es_object->plugin_set_program_options( cli, cfi );
+
+            bpo::variables_map var_map;
+
+            int plugin_argc = 17;
+            const char* const plugin_argv[]{ "voting_stat",
+                "--es-objects-bulk-replay", "1",
+                "--es-objects-proposals", "false",
+                "--es-objects-accounts", "false",
+                "--es-objects-assets", "false",
+                "--es-objects-balances", "false",
+                "--es-objects-limit-orders", "false",
+                "--es-objects-asset-bitasset", "false",
+                "--es-objects-keep-only-current", "false"
+            };
+
+            bpo::store( bpo::parse_command_line( plugin_argc, plugin_argv, cfi ), var_map );
+            app.initialize_plugins( var_map ); 
+        } 
+        catch(fc::exception &e)
+        {
+            edump((e.to_detail_string() ));
+        }
+        
     };
 
     void make_next_maintenance_interval()
@@ -90,7 +131,6 @@ struct voting_stat_fixture : public database_fixture
 };
 
 BOOST_FIXTURE_TEST_SUITE( voting_stat_tests, voting_stat_fixture )
-
 
 BOOST_AUTO_TEST_CASE( block_id_changes_with_each_interval )
 { try {
@@ -148,7 +188,12 @@ BOOST_AUTO_TEST_CASE( voting_statistics_without_proxy )
 
 BOOST_AUTO_TEST_CASE( voting_statistics_with_proxy ) 
 { try {
-    
+    /* clear es-db */
+    auto objects_deleted = graphene::utilities::deleteAll(_es);
+    if( !objects_deleted )
+        BOOST_FAIL( "elastic search DB could not be deleted" );
+
+
     ACTORS( (alice)(bob)(charlie) );
     transfer( committee_account, alice_id, asset(1), asset() );
     transfer( committee_account, bob_id, asset(2), asset() );
@@ -244,6 +289,16 @@ BOOST_AUTO_TEST_CASE( voting_statistics_with_proxy )
     BOOST_CHECK( bob_stat4.get_total_voting_stake() == 0 );
     BOOST_CHECK( charlie_stat4.stake == 333 );
     BOOST_CHECK( charlie_stat4.get_total_voting_stake() == 222 ); 
+    
+    
+    /* wait for es */
+    fc::usleep(fc::milliseconds(1000));
+    string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
+    _es.endpoint = _es.index_prefix + "*/data/_count";
+    _es.query = query;
+    auto res = graphene::utilities::simpleQuery(_es);
+    variant j = fc::json::from_string(res);
+    BOOST_CHECK( j["count"].as_int64() == 12 );
 
 } FC_LOG_AND_RETHROW() }
 
