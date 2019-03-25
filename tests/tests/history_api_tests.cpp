@@ -642,7 +642,6 @@ BOOST_AUTO_TEST_CASE( market_history )
          op.issuer = committee_account;
          op.new_feed_producers = { committee_account, alice.id, bob.id };
          trx.operations.push_back( op );
-         sign( trx, private_key );
          PUSH_TX( db, trx, ~0 );
          generate_block();
          trx.clear();
@@ -658,7 +657,6 @@ BOOST_AUTO_TEST_CASE( market_history )
          op.issuer = committee_account;
          op.new_feed_producers = { committee_account, alice.id, bob.id };
          trx.operations.push_back( op );
-         sign( trx, private_key );
          PUSH_TX( db, trx, ~0 );
          generate_block();
          trx.clear();
@@ -691,7 +689,6 @@ BOOST_AUTO_TEST_CASE( market_history )
          // send the order
          set_expiration( db, trx );
          trx.operations.push_back( limit );
-         sign( trx, seller_private_key );
          PUSH_TX( db,  trx, ~0 );
          trx.clear();
          // send a second order that will fill the first
@@ -703,7 +700,6 @@ BOOST_AUTO_TEST_CASE( market_history )
          buy.expiration = limit.expiration;
          set_expiration( db, trx );
          trx.operations.push_back( buy );
-         sign( trx, buyer_private_key );
          PUSH_TX( db,  trx, ~0 );
          trx.clear();
       };
