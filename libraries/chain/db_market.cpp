@@ -56,17 +56,15 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
    bool before_core_hardfork_1270 = ( maint_time <= HARDFORK_CORE_1270_TIME ); // call price caching issue
 
-   const auto& call_index = get_index_type<call_order_index>().indices();
-   const auto& call_price_index = call_index.get<by_price>();
-   const auto& call_collateral_index = call_index.get<by_collateral>();
-
    if( before_core_hardfork_1270 )
    {
-      globally_settle_asset_impl( mia, settlement_price, call_price_index );
+      globally_settle_asset_impl( mia, settlement_price,
+                                  get_index_type<call_order_index>().indices().get<by_price>() );
    }
    else
    {
-      globally_settle_asset_impl( mia, settlement_price, call_collateral_index );
+      globally_settle_asset_impl( mia, settlement_price,
+                                  get_index_type<call_order_index>().indices().get<by_collateral>() );
    }
 }
 
