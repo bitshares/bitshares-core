@@ -2357,6 +2357,99 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
    // TODO:  Test with non-core asset and Bob account
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE( asset_only_issuer_limit_orders_allowed_test )
+{
+    ACTORS( (alice) (bob) );
+
+    signed_transaction trx;
+    asset_object       test_asset;
+    asset_id_type      test_asset_id;
+
+    generate_blocks( HARDFORK_572_TIME + fc::seconds(20) );
+    generate_block();
+
+    #define EDUMP(X) edump((X));
+
+    EDUMP( "creating a test asset with only_issuer_limit_orders_allowed" );
+    {
+        asset_options a_opt;
+        a_opt.max_supply         = 1000;
+        a_opt.core_exchange_rate = price( asset( 4, asset_id_type(1) ), asset( 4, asset_id_type() ) );
+        a_opt.flags              = only_issuer_limit_orders_allowed;
+
+        asset_create_operation acop;
+        acop.fee            = asset(0);
+        acop.issuer         = alice_id;
+        acop.symbol         = "TST";
+        acop.common_options = a_opt;
+
+        set_expiration( db, trx );
+        trx.operations.push_back( acop );
+        PUSH_TX( db, trx, ~0 );
+
+        test_asset    = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("TST");
+        test_asset_id = test_asset.get_id();
+
+        BOOST_CHECK( test_asset.only_issuer_limit_orders_allowed() );
+    }
+
+    EDUMP( "creating a limit order with alice acc" );
+    {
+        // issue the asset
+        asset_issue_operation aiop;
+        aiop.fee              = asset(0);
+        aiop.issuer           = alice_id;
+        aiop.issue_to_account = alice_id;
+        aiop.asset_to_issue   = asset( test_asset.options.max_supply, test_asset_id );
+    
+        trx = signed_transaction();
+        set_expiration( db, trx );
+        trx.operations.push_back( aiop );
+        PUSH_TX( db, trx, ~0 );
+
+        // create limit order
+        limit_order_create_operation locop;
+        locop.fee            = asset(0);
+        locop.seller         = alice_id;
+        locop.amount_to_sell = asset( 100, test_asset_id ); 
+        locop.min_to_receive = asset( 100 );
+
+        trx = signed_transaction();
+        set_expiration( db, trx );
+        trx.operations.push_back( locop );
+        
+        PUSH_TX( db, trx, ~0 );
+    }
+
+    EDUMP( "creating a limit order with bob acc" );
+    {
+        // transfer test_asset to bob
+        transfer_operation top;
+        top.fee    = asset(0);
+        top.amount = asset( 200, test_asset_id );
+        top.from   = alice_id;
+        top.to     = bob_id;
+
+        trx = signed_transaction();
+        set_expiration( db, trx );
+        trx.operations.push_back( top );
+        
+        PUSH_TX( db, trx, ~0 );
+ 
+        // create limit order
+        limit_order_create_operation locop;
+        locop.fee            = asset(0);
+        locop.seller         = bob_id;
+        locop.amount_to_sell = asset( 100, test_asset_id ); 
+        locop.min_to_receive = asset( 100 );
+
+        trx = signed_transaction();
+        set_expiration( db, trx );
+        trx.operations.push_back( locop );
+
+        GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::assert_exception );
+    }
+}
 // TODO:  Write linear VBO tests
 
 BOOST_AUTO_TEST_SUITE_END()
