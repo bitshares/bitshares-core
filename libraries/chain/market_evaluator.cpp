@@ -226,8 +226,10 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
       d.adjust_balance( o.funding_account, o.delta_debt );
 
       // Deduct the debt paid from the total supply of the debt asset.
-      d.modify(*_dynamic_data_obj, [&](asset_dynamic_data_object& dynamic_asset) {
+     d.modify(_debt_asset->dynamic_asset_data_id(d), [&o](asset_dynamic_data_object& dynamic_asset) {
+         FC_ASSERT( dynamic_asset.current_supply + o.delta_debt.amount <= GRAPHENE_MAX_SHARE_SUPPLY ); //_debt_asset->options.max_supply );
          dynamic_asset.current_supply += o.delta_debt.amount;
+         FC_ASSERT(dynamic_asset.current_supply >= 0);
       });
    }
 

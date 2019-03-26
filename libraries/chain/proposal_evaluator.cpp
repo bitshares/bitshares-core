@@ -41,7 +41,8 @@ struct proposal_operation_hardfork_visitor
    const fc::time_point_sec next_maintenance_time;
 
    proposal_operation_hardfork_visitor( const database& _db, const fc::time_point_sec bt )
-   : db( _db ), block_time(bt), next_maintenance_time( db.get_dynamic_global_properties().next_maintenance_time ) {}
+         : db( _db ), block_time(bt), 
+         next_maintenance_time( db.get_dynamic_global_properties().next_maintenance_time ) {}
 
    template<typename T>
    void operator()(const T &v) const {}
