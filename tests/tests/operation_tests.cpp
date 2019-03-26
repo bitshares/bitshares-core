@@ -2013,7 +2013,8 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
       const auto& core   = asset_id_type()(db);
 
       // attempt to increase current supply beyond max_supply
-      const auto& bitjmj = create_bitasset( "JMJBIT", alice_id );
+      const auto& bitjmj = create_bitasset( "JMJBIT", alice_id, 100, charge_market_fee, 2U, 
+            asset_id_type{}, GRAPHENE_MAX_SHARE_SUPPLY / 2 );
       auto bitjmj_id = bitjmj.get_id();
       share_type original_max_supply = bitjmj.options.max_supply;
 
@@ -2047,7 +2048,8 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
       BOOST_REQUIRE_GT(newbitjmj.options.max_supply.value, original_max_supply.value);
 
       // now try with an asset after the hardfork
-      const auto& bitusd = create_bitasset( "USDBIT", alice_id );
+      const auto& bitusd = create_bitasset( "USDBIT", alice_id, 100, charge_market_fee, 2U, 
+            asset_id_type{}, GRAPHENE_MAX_SHARE_SUPPLY / 2 );
 
       {
          BOOST_TEST_MESSAGE( "Setting price feed to $100000 / 1" );
