@@ -470,14 +470,15 @@ const asset_object& database_fixture::create_bitasset(
    uint16_t market_fee_percent /* = 100 */ /* 1% */,
    uint16_t flags /* = charge_market_fee */,
    uint16_t precision /* = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS */,
-   asset_id_type backing_asset /* = CORE */
+   asset_id_type backing_asset /* = CORE */,
+   share_type max_supply  /* = GRAPHENE_MAX_SHARE_SUPPLY */
    )
 { try {
    asset_create_operation creator;
    creator.issuer = issuer;
    creator.fee = asset();
    creator.symbol = name;
-   creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY / 2;
+   creator.common_options.max_supply = max_supply;
    creator.precision = precision;
    creator.common_options.market_fee_percent = market_fee_percent;
    if( issuer == GRAPHENE_WITNESS_ACCOUNT )
