@@ -58,6 +58,7 @@ struct worker_init_visitor
        w.balance = db.create<vesting_balance_object>([&](vesting_balance_object& b) {
          b.owner = worker.worker_account;
          b.balance = asset(0);
+         b.balance_type = vesting_balance_type::worker;
 
          cdd_vesting_policy policy;
          policy.vesting_seconds = fc::days(i.pay_vesting_period_days).to_seconds();

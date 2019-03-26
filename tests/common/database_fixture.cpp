@@ -23,6 +23,7 @@
  */
 #include <boost/test/unit_test.hpp>
 #include <boost/program_options.hpp>
+#include <boost/range/algorithm.hpp>
 
 #include <graphene/account_history/account_history_plugin.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
@@ -37,6 +38,7 @@
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/htlc_object.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 
@@ -62,7 +64,7 @@ void clearable_block::clear()
    _block_id = block_id_type();
 }
 
-database_fixture::database_fixture()
+database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    : app(), db( *app.chain_database() )
 {
    try {
@@ -82,9 +84,13 @@ database_fixture::database_fixture()
 
    boost::program_options::variables_map options;
 
-   genesis_state.initial_timestamp = time_point_sec( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
+   genesis_state.initial_timestamp = initial_timestamp;
 
-   genesis_state.initial_active_witnesses = 10;
+   if(boost::unit_test::framework::current_test_case().p_name.value == "hf_935_test")
+      genesis_state.initial_active_witnesses = 20;
+   else
+      genesis_state.initial_active_witnesses = 10;
+
    for( unsigned int i = 0; i < genesis_state.initial_active_witnesses; ++i )
    {
       auto name = "init"+fc::to_string(i);
@@ -308,6 +314,13 @@ void database_fixture::verify_asset_supplies( const database& db )
       BOOST_CHECK_EQUAL(item.first(db).dynamic_asset_data_id(db).current_supply.value, item.second.value);
    }
 
+   // htlc
+   const auto& htlc_idx = db.get_index_type< htlc_index >().indices().get< by_id >();
+   for( auto itr = htlc_idx.begin(); itr != htlc_idx.end(); ++itr )
+   {
+      total_balances[itr->transfer.asset_id] += itr->transfer.amount;
+   }
+
    for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )
    {
       BOOST_CHECK_EQUAL(total_balances[asset_obj.id].value, asset_obj.dynamic_asset_data_id(db).current_supply.value);
@@ -398,7 +411,7 @@ account_create_operation database_fixture::make_account(
    const std::string& name,
    const account_object& registrar,
    const account_object& referrer,
-   uint8_t referrer_percent /* = 100 */,
+   uint16_t referrer_percent /* = 100 */,
    public_key_type key /* = public_key_type() */
    )
 {
@@ -457,14 +470,15 @@ const asset_object& database_fixture::create_bitasset(
    uint16_t market_fee_percent /* = 100 */ /* 1% */,
    uint16_t flags /* = charge_market_fee */,
    uint16_t precision /* = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS */,
-   asset_id_type backing_asset /* = CORE */
+   asset_id_type backing_asset /* = CORE */,
+   share_type max_supply  /* = GRAPHENE_MAX_SHARE_SUPPLY */
    )
 { try {
    asset_create_operation creator;
    creator.issuer = issuer;
    creator.fee = asset();
    creator.symbol = name;
-   creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+   creator.common_options.max_supply = max_supply;
    creator.precision = precision;
    creator.common_options.market_fee_percent = market_fee_percent;
    if( issuer == GRAPHENE_WITNESS_ACCOUNT )
@@ -532,8 +546,10 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    return db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
 }
 
-const asset_object& database_fixture::create_user_issued_asset( const string& name, const account_object& issuer, uint16_t flags,
-                                                                const price& core_exchange_rate, uint16_t precision)
+const asset_object& database_fixture::create_user_issued_asset( const string& name, const account_object& issuer,
+                                                               uint16_t flags, const price& core_exchange_rate,
+                                                               uint8_t precision, uint16_t market_fee_percent,
+                                                               additional_asset_options_t additional_options)
 {
    asset_create_operation creator;
    creator.issuer = issuer.id;
@@ -545,6 +561,8 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    creator.common_options.flags = flags;
    creator.common_options.issuer_permissions = flags;
+   creator.common_options.market_fee_percent = market_fee_percent;
+   creator.common_options.extensions = std::move(additional_options);
    trx.operations.clear();
    trx.operations.push_back(std::move(creator));
    set_expiration( db, trx );
@@ -618,7 +636,7 @@ const account_object& database_fixture::create_account(
    const string& name,
    const account_object& registrar,
    const account_object& referrer,
-   uint8_t referrer_percent /* = 100 */,
+   uint16_t referrer_percent /* = 100 (1%)*/,
    const public_key_type& key /*= public_key_type()*/
    )
 {
@@ -640,7 +658,7 @@ const account_object& database_fixture::create_account(
    const private_key_type& key,
    const account_id_type& registrar_id /* = account_id_type() */,
    const account_id_type& referrer_id /* = account_id_type() */,
-   uint8_t referrer_percent /* = 100 */
+   uint16_t referrer_percent /* = 100 (1%)*/
    )
 {
    try
@@ -650,6 +668,8 @@ const account_object& database_fixture::create_account(
       account_create_operation account_create_op;
 
       account_create_op.registrar = registrar_id;
+      account_create_op.referrer = referrer_id;
+      account_create_op.referrer_percent = referrer_percent;
       account_create_op.name = name;
       account_create_op.owner = authority(1234, public_key_type(key.get_public_key()), 1234);
       account_create_op.active = authority(5678, public_key_type(key.get_public_key()), 5678);
@@ -746,6 +766,9 @@ const limit_order_object* database_fixture::create_sell_order( const account_obj
                                                 const time_point_sec order_expiration,
                                                 const price& fee_core_exchange_rate )
 {
+   set_expiration( db, trx );
+   trx.operations.clear();
+
    limit_order_create_operation buy_order;
    buy_order.seller = user.id;
    buy_order.amount_to_sell = amount;
@@ -1141,6 +1164,16 @@ int64_t database_fixture::get_balance( account_id_type account, asset_id_type a 
 int64_t database_fixture::get_balance( const account_object& account, const asset_object& a )const
 {
   return db.get_balance(account.get_id(), a.get_id()).amount.value;
+}
+
+int64_t database_fixture::get_market_fee_reward( account_id_type account_id, asset_id_type asset_id)const
+{
+   return db.get_market_fee_vesting_balance(account_id, asset_id).amount.value;
+}
+
+int64_t database_fixture::get_market_fee_reward( const account_object& account, const asset_object& asset )const
+{
+  return get_market_fee_reward(account.get_id(), asset.get_id());
 }
 
 vector< operation_history_object > database_fixture::get_operation_history( account_id_type account_id )const
