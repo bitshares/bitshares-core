@@ -449,14 +449,14 @@ BOOST_FIXTURE_TEST_CASE( cli_get_signed_transaction_signers, cli_fixture )
       con.wallet_api_ptr->register_account(
          "test", test_bki.pub_key, test_bki.pub_key, "nathan", "nathan", 0, true
       );
-      con.wallet_api_ptr->transfer("nathan", "test", "1000", "BTS", "", true);
+      con.wallet_api_ptr->transfer("nathan", "test", "1000", "1.3.0", "", true);
 
       // import key and save wallet
       BOOST_CHECK(con.wallet_api_ptr->import_key("test", test_bki.wif_priv_key));
       con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
 
       // create transaction and check expected result
-      auto signed_trx = con.wallet_api_ptr->transfer("test", "nathan", "10", "BTS", "", true);
+      auto signed_trx = con.wallet_api_ptr->transfer("test", "nathan", "10", "1.3.0", "", true);
 
       const auto &test_acc = con.wallet_api_ptr->get_account("test");
       flat_set<public_key_type> expected_signers = {test_bki.pub_key};
