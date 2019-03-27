@@ -266,6 +266,7 @@ void database_fixture::verify_asset_supplies( const database& db )
    {
       const auto& dasset_obj = asset_obj.dynamic_asset_data_id(db);
       total_balances[asset_obj.id] += dasset_obj.accumulated_fees;
+      total_balances[asset_obj.id] += dasset_obj.accumulated_fees_for_marketing_partner;
       total_balances[asset_id_type()] += dasset_obj.fee_pool;
       if( asset_obj.is_market_issued() )
       {
