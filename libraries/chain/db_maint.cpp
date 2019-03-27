@@ -846,7 +846,9 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    _cancel_bids_and_revive_mpa( to_revive, bad );
 }
 
-void update_and_match_call_orders( database& db )
+/// Reset call_price of all call orders according to their remaining collateral and debt.
+/// Do not update orders of prediction markets because we're sure they're up to date.
+void update_call_orders_hf_343( database& db )
 {
    // Update call_price
    wlog( "Updating all call orders for hardfork core-343 at block ${n}", ("n",db.head_block_num()) );
@@ -867,7 +869,30 @@ void update_and_match_call_orders( database& db )
                                                 abd->current_feed.maintenance_collateral_ratio );
       });
    }
+   wlog( "Done updating all call orders for hardfork core-343 at block ${n}", ("n",db.head_block_num()) );
+}
+
+/// Reset call_price of all call orders to (1,1) since it won't be used in the future.
+/// Update PMs as well.
+void update_call_orders_hf_1270( database& db )
+{
+   // Update call_price
+   wlog( "Updating all call orders for hardfork core-1270 at block ${n}", ("n",db.head_block_num()) );
+   for( const auto& call_obj : db.get_index_type<call_order_index>().indices().get<by_id>() )
+   {
+      db.modify( call_obj, []( call_order_object& call ) {
+         call.call_price.base.amount = 1;
+         call.call_price.quote.amount = 1;
+      });
+   }
+   wlog( "Done updating all call orders for hardfork core-1270 at block ${n}", ("n",db.head_block_num()) );
+}
+
+/// Match call orders for all bitAssets, including PMs.
+void match_call_orders( database& db )
+{
    // Match call orders
+   wlog( "Matching call orders at block ${n}", ("n",db.head_block_num()) );
    const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
    auto itr = asset_idx.lower_bound( true /** market issued */ );
    while( itr != asset_idx.end() )
@@ -877,7 +902,7 @@ void update_and_match_call_orders( database& db )
       // be here, next_maintenance_time should have been updated already
       db.check_call_orders( a, true, false ); // allow black swan, and call orders are taker
    }
-   wlog( "Done updating all call orders for hardfork core-343 at block ${n}", ("n",db.head_block_num()) );
+   wlog( "Done matching call orders at block ${n}", ("n",db.head_block_num()) );
 }
 
 void database::process_bitassets()
@@ -918,6 +943,49 @@ void database::process_bitassets()
    }
 }
 
+/****
+ * @brief a one-time data process to correct max_supply
+ */
+void process_hf_1465( database& db )
+{
+   const auto head_num = db.head_block_num();
+   wlog( "Processing hard fork core-1465 at block ${n}", ("n",head_num) );
+   // for each market issued asset
+   const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
+   for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
+   {
+      const auto& current_asset = *asset_itr;
+      graphene::chain::share_type current_supply = current_asset.dynamic_data(db).current_supply;
+      graphene::chain::share_type max_supply = current_asset.options.max_supply;
+      if (current_supply > max_supply && max_supply != GRAPHENE_MAX_SHARE_SUPPLY)
+      {
+         wlog( "Adjusting max_supply of ${asset} because current_supply (${current_supply}) is greater than ${old}.", 
+               ("asset", current_asset.symbol) 
+               ("current_supply", current_supply.value)
+               ("old", max_supply));
+         db.modify<asset_object>( current_asset, [current_supply](asset_object& obj) {
+            obj.options.max_supply = graphene::chain::share_type(std::min(current_supply.value, GRAPHENE_MAX_SHARE_SUPPLY));
+         });
+      }
+   }
+}
+
+void update_median_feeds(database& db)
+{
+   time_point_sec head_time = db.head_block_time();
+   time_point_sec next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
+
+   const auto update_bitasset = [head_time, next_maint_time]( asset_bitasset_data_object &o )
+   {
+      o.update_median_feeds( head_time, next_maint_time );
+   };
+
+   for( const auto& d : db.get_index_type<asset_bitasset_data_index>().indices() )
+   {
+      db.modify( d, update_bitasset );
+   }
+}
+
 /******
  * @brief one-time data process for hard fork core-868-890
  *
@@ -939,6 +1007,7 @@ void database::process_bitassets()
 //       * NOTE: the removal can't be applied to testnet
 void process_hf_868_890( database& db, bool skip_check_call_orders )
 {
+   const auto next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
    const auto head_time = db.head_block_time();
    const auto head_num = db.head_block_num();
    wlog( "Processing hard fork core-868-890 at block ${n}", ("n",head_num) );
@@ -998,8 +1067,8 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
       }
 
       // always update the median feed due to https://github.com/bitshares/bitshares-core/issues/890
-      db.modify( bitasset_data, [&head_time]( asset_bitasset_data_object &obj ) {
-         obj.update_median_feeds( head_time );
+      db.modify( bitasset_data, [head_time,next_maint_time]( asset_bitasset_data_object &obj ) {
+         obj.update_median_feeds( head_time, next_maint_time );
       });
 
       bool median_changed = ( old_feed.settlement_price != bitasset_data.current_feed.settlement_price );
@@ -1210,28 +1279,48 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    if( (dgpo.next_maintenance_time < HARDFORK_613_TIME) && (next_maintenance_time >= HARDFORK_613_TIME) )
       deprecate_annual_members(*this);
 
-   // To reset call_price of all call orders, then match by new rule
-   bool to_update_and_match_call_orders = false;
+   // To reset call_price of all call orders, then match by new rule, for hard fork core-343
+   bool to_update_and_match_call_orders_for_hf_343 = false;
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_343_TIME) && (next_maintenance_time > HARDFORK_CORE_343_TIME) )
-      to_update_and_match_call_orders = true;
+      to_update_and_match_call_orders_for_hf_343 = true;
 
    // Process inconsistent price feeds
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_868_890_TIME) && (next_maintenance_time > HARDFORK_CORE_868_890_TIME) )
-      process_hf_868_890( *this, to_update_and_match_call_orders );
+      process_hf_868_890( *this, to_update_and_match_call_orders_for_hf_343 );
 
    // Explicitly call check_call_orders of all markets
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_935_TIME) && (next_maintenance_time > HARDFORK_CORE_935_TIME)
-         && !to_update_and_match_call_orders )
+         && !to_update_and_match_call_orders_for_hf_343 )
       process_hf_935( *this );
+
+   // To reset call_price of all call orders, then match by new rule, for hard fork core-1270
+   bool to_update_and_match_call_orders_for_hf_1270 = false;
+   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_1270_TIME) && (next_maintenance_time > HARDFORK_CORE_1270_TIME) )
+      to_update_and_match_call_orders_for_hf_1270 = true;
+
+   // make sure current_supply is less than or equal to max_supply
+   if ( dgpo.next_maintenance_time <= HARDFORK_CORE_1465_TIME && next_maintenance_time > HARDFORK_CORE_1465_TIME )
+      process_hf_1465(*this);
 
    modify(dgpo, [next_maintenance_time](dynamic_global_property_object& d) {
       d.next_maintenance_time = next_maintenance_time;
       d.accounts_registered_this_interval = 0;
    });
 
-   // We need to do it after updated next_maintenance_time, to apply new rules here
-   if( to_update_and_match_call_orders )
-      update_and_match_call_orders(*this);
+   // We need to do it after updated next_maintenance_time, to apply new rules here, for hard fork core-343
+   if( to_update_and_match_call_orders_for_hf_343 )
+   {
+      update_call_orders_hf_343(*this);
+      match_call_orders(*this);
+   }
+
+   // We need to do it after updated next_maintenance_time, to apply new rules here, for hard fork core-1270.
+   if( to_update_and_match_call_orders_for_hf_1270 )
+   {
+      update_call_orders_hf_1270(*this);
+      update_median_feeds(*this);
+      match_call_orders(*this);
+   }
 
    process_bitassets();
 

@@ -58,7 +58,7 @@ add_library( graphene_chain
              protocol/fee_schedule.cpp
              protocol/confidential.cpp
              protocol/vote.cpp
-
+             protocol/htlc.cpp
              genesis_state.cpp
              get_config.cpp
 
@@ -77,6 +77,7 @@ add_library( graphene_chain
              vesting_balance_evaluator.cpp
              withdraw_permission_evaluator.cpp
              worker_evaluator.cpp
+             htlc_evaluator.cpp
              confidential_evaluator.cpp
              special_authority.cpp
              buyback.cpp

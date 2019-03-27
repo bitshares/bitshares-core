@@ -108,6 +108,46 @@ namespace graphene { namespace chain {
       }
    };
 
+   template<>
+   class fee_helper<htlc_create_operation> {
+     public:
+      const htlc_create_operation::fee_parameters_type& cget(const flat_set<fee_parameters>& parameters)const
+      {
+         auto itr = parameters.find( htlc_create_operation::fee_parameters_type() );
+         if ( itr != parameters.end() )
+            return itr->get<htlc_create_operation::fee_parameters_type>();
+
+         static htlc_create_operation::fee_parameters_type htlc_create_operation_fee_dummy;
+         return htlc_create_operation_fee_dummy;
+      }
+   };
+
+   template<>
+   class fee_helper<htlc_redeem_operation> {
+     public:
+      const htlc_redeem_operation::fee_parameters_type& cget(const flat_set<fee_parameters>& parameters)const
+      {
+         auto itr = parameters.find( htlc_redeem_operation::fee_parameters_type() );
+         if ( itr != parameters.end() )
+            return itr->get<htlc_redeem_operation::fee_parameters_type>();
+
+         static htlc_redeem_operation::fee_parameters_type htlc_redeem_operation_fee_dummy;
+         return htlc_redeem_operation_fee_dummy;
+      }
+   };
+   template<>
+   class fee_helper<htlc_extend_operation> {
+     public:
+      const htlc_extend_operation::fee_parameters_type& cget(const flat_set<fee_parameters>& parameters)const
+      {
+         auto itr = parameters.find( htlc_extend_operation::fee_parameters_type() );
+         if ( itr != parameters.end() )
+            return itr->get<htlc_extend_operation::fee_parameters_type>();
+
+         static htlc_extend_operation::fee_parameters_type htlc_extend_operation_fee_dummy;
+         return htlc_extend_operation_fee_dummy;
+      }
+   };
    /**
     *  @brief contains all of the parameters necessary to calculate the fee for any operation
     */
@@ -140,6 +180,12 @@ namespace graphene { namespace chain {
       typename Operation::fee_parameters_type& get()
       {
          return fee_helper<Operation>().get(parameters);
+      }
+      template<typename Operation>
+      const bool exists()const
+      {
+         auto itr = parameters.find(typename Operation::fee_parameters_type());
+         return itr != parameters.end();
       }
 
       /**

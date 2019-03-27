@@ -23,6 +23,8 @@
  */
 #pragma once
 
+#include <fc/optional.hpp>
+#include <graphene/chain/htlc_object.hpp>
 #include <graphene/app/api.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 
@@ -489,6 +491,13 @@ class wallet_api
        * @returns the BitAsset-specific data for this asset
        */
       asset_bitasset_data_object        get_bitasset_data(string asset_name_or_id)const;
+
+      /**
+       * Returns information about the given HTLC object.
+       * @param htlc_id the id of the HTLC object.
+       * @returns the information about the HTLC object
+       */
+      fc::optional<fc::variant>             get_htlc(string htlc_id) const;
 
       /** Lookup the id of a named account.
        * @param account_name_or_id the name of the account to look up
@@ -1449,6 +1458,44 @@ class wallet_api
          );
 
       /**
+       * Create a hashed time lock contract
+       * 
+       * @param source The account that will reserve the funds (and pay the fee)
+       * @param destination The account that will receive the funds if the preimage is presented
+       * @param amount the amount of the asset that is to be traded
+       * @param asset_symbol The asset that is to be traded
+       * @param hash_algorithm the algorithm used to generate the hash from the preimage. Can be RIPEMD160, SHA1 or SHA256.
+       * @param preimage_hash the hash of the preimage
+       * @param preimage_size the size of the preimage in bytes
+       * @param claim_period_seconds how long after creation until the lock expires
+       * @param broadcast true if you wish to broadcast the transaction
+       */
+      signed_transaction htlc_create( string source, string destination, string amount, string asset_symbol,
+            string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size, 
+            const uint32_t claim_period_seconds, bool broadcast = false );
+
+      /****
+       * Update a hashed time lock contract
+       * 
+       * @param htlc_id The object identifier of the HTLC on the blockchain
+       * @param issuer Who is performing this operation (and paying the fee)
+       * @param preimage the preimage that should evaluate to the preimage_hash
+       */
+      signed_transaction htlc_redeem( string htlc_id, string issuer, const std::string& preimage, 
+            bool broadcast = false );
+
+      /*****
+       * Increase the timelock on an existing HTLC
+       * 
+       * @param htlc_id The object identifier of the HTLC on the blockchain
+       * @param issuer Who is performing this operation (and paying the fee)
+       * @param seconds_to_add how many seconds to add to the existing timelock
+       * @param broadcast true to broadcast to the network
+       */
+      signed_transaction htlc_extend(string htlc_id, string issuer, const uint32_t seconds_to_add,
+            bool broadcast = false);
+
+      /**
        * Get information about a vesting balance object.
        *
        * @param account_name An account name, account ID, or vesting balance object ID.
@@ -1777,6 +1824,7 @@ FC_API( graphene::wallet::wallet_api,
         (update_asset)
         (update_asset_issuer)
         (update_bitasset)
+        (get_htlc)
         (update_asset_feed_producers)
         (publish_asset_feed)
         (issue_asset)
@@ -1798,6 +1846,9 @@ FC_API( graphene::wallet::wallet_api,
         (update_witness)
         (create_worker)
         (update_worker_votes)
+        (htlc_create)
+        (htlc_redeem)
+        (htlc_extend)
         (get_vesting_balances)
         (withdraw_vesting)
         (vote_for_committee_member)

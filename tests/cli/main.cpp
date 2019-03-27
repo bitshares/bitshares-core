@@ -36,6 +36,7 @@
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/rpc/cli.hpp>
+#include <fc/crypto/base58.hpp>
 
 #ifdef _WIN32
    #ifndef _WIN32_WINNT
@@ -48,6 +49,7 @@
    #include <netinet/ip.h>
    #include <sys/types.h>
 #endif
+#include <thread>
 
 #include <boost/filesystem/path.hpp>
 
@@ -142,13 +144,15 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 ///////////
 /// Send a block to the db
 /// @param app the application
+/// @param returned_block the signed block
 /// @returns true on success
 ///////////
-bool generate_block(std::shared_ptr<graphene::app::application> app) {
+bool generate_block(std::shared_ptr<graphene::app::application> app, graphene::chain::signed_block& returned_block) 
+{
    try {
       fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
       auto db = app->chain_database();
-      auto block_1 = db->generate_block( db->get_slot_time(1),
+      returned_block = db->generate_block( db->get_slot_time(1),
                                          db->get_scheduled_witness(1),
                                          committee_key,
                                          database::skip_nothing );
@@ -156,6 +160,12 @@ bool generate_block(std::shared_ptr<graphene::app::application> app) {
    } catch (exception &e) {
       return false;
    }
+}
+
+bool generate_block(std::shared_ptr<graphene::app::application> app) 
+{
+   graphene::chain::signed_block returned_block;
+   return generate_block(app, returned_block);
 }
 
 ///////////
@@ -451,6 +461,12 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
 {
    using namespace graphene::wallet;
    try {
+      // we need to increase the default max transaction size to run this test.
+      this->app1->chain_database()->modify(
+         this->app1->chain_database()->get_global_properties(), 
+         []( global_property_object& p) {
+            p.parameters.maximum_transaction_size = 8192;
+      });      
       std::vector<signed_transaction> import_txs;
 
       BOOST_TEST_MESSAGE("Importing nathan's balance");
@@ -564,4 +580,189 @@ BOOST_FIXTURE_TEST_CASE( account_history_pagination, cli_fixture )
       edump((e.to_detail_string()));
       throw;
    }
+}
+
+///////////////////////
+// Start a server and connect using the same calls as the CLI
+// Create an HTLC
+///////////////////////
+BOOST_AUTO_TEST_CASE( cli_create_htlc )
+{
+   using namespace graphene::chain;
+   using namespace graphene::app;
+   std::shared_ptr<graphene::app::application> app1;
+   try {
+      fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
+
+      int server_port_number = 0;
+      app1 = start_application(app_dir, server_port_number);
+      // set committee parameters
+      app1->chain_database()->modify(app1->chain_database()->get_global_properties(), [](global_property_object& p) {
+         graphene::chain::htlc_options params;
+         params.max_preimage_size = 1024;
+         params.max_timeout_secs = 60 * 60 * 24 * 28;
+         p.parameters.extensions.value.updatable_htlc_options = params;
+      });
+
+      // connect to the server
+      client_connection con(app1, app_dir, server_port_number);
+
+      BOOST_TEST_MESSAGE("Setting wallet password");
+      con.wallet_api_ptr->set_password("supersecret");
+      con.wallet_api_ptr->unlock("supersecret");
+
+      // import Nathan account
+      BOOST_TEST_MESSAGE("Importing nathan key");
+      std::vector<std::string> nathan_keys{"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"};
+      BOOST_CHECK_EQUAL(nathan_keys[0], "5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3");
+      BOOST_CHECK(con.wallet_api_ptr->import_key("nathan", nathan_keys[0]));
+
+      BOOST_TEST_MESSAGE("Importing nathan's balance");
+      std::vector<signed_transaction> import_txs = con.wallet_api_ptr->import_balance("nathan", nathan_keys, true);
+      account_object nathan_acct_before_upgrade = con.wallet_api_ptr->get_account("nathan");
+
+      // upgrade nathan
+      BOOST_TEST_MESSAGE("Upgrading Nathan to LTM");
+      signed_transaction upgrade_tx = con.wallet_api_ptr->upgrade_account("nathan", true);
+      account_object nathan_acct_after_upgrade = con.wallet_api_ptr->get_account("nathan");
+
+      // verify that the upgrade was successful
+      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())
+            (nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
+      BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
+
+      // Create new asset called BOBCOIN
+      try 
+      {
+         graphene::chain::asset_options asset_ops;
+         asset_ops.max_supply = 1000000;
+         asset_ops.core_exchange_rate = price(asset(2),asset(1,asset_id_type(1)));
+         fc::optional<graphene::chain::bitasset_options> bit_opts;
+         con.wallet_api_ptr->create_asset("nathan", "BOBCOIN", 5, asset_ops, bit_opts, true);
+      }
+      catch(exception& e)
+      {
+         BOOST_FAIL(e.what());
+      }
+      catch(...)
+      {
+         BOOST_FAIL("Unknown exception creating BOBCOIN");
+      }
+
+      // create a new account for Alice
+      {
+         graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
+         BOOST_CHECK(!bki.brain_priv_key.empty());
+         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "alice", 
+               "nathan", "nathan", true);
+         // save the private key for this new account in the wallet file
+         BOOST_CHECK(con.wallet_api_ptr->import_key("alice", bki.wif_priv_key));
+         con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
+         // attempt to give alice some bitsahres
+         BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to alice");
+         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "alice", "10000", "1.3.0", 
+               "Here are some CORE token for your new account", true);
+      }
+
+      // create a new account for Bob
+      {
+         graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
+         BOOST_CHECK(!bki.brain_priv_key.empty());
+         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "bob", 
+               "nathan", "nathan", true);
+         // save the private key for this new account in the wallet file
+         BOOST_CHECK(con.wallet_api_ptr->import_key("bob", bki.wif_priv_key));
+         con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
+         // attempt to give bob some bitsahres
+         BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to Bob");
+         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "bob", "10000", "1.3.0", 
+               "Here are some CORE token for your new account", true);
+         con.wallet_api_ptr->issue_asset("bob", "5", "BOBCOIN", "Here are your BOBCOINs", true);
+      }
+
+
+      BOOST_TEST_MESSAGE("Alice has agreed to buy 3 BOBCOIN from Bob for 3 BTS. Alice creates an HTLC");
+      // create an HTLC
+      std::string preimage_string = "My Secret";
+      fc::sha256 preimage_md = fc::sha256::hash(preimage_string);
+      std::stringstream ss;
+      for(size_t i = 0; i < preimage_md.data_size(); i++)
+      {
+         char d = preimage_md.data()[i];
+         unsigned char uc = static_cast<unsigned char>(d);
+         ss << std::setfill('0') << std::setw(2) << std::hex << (int)uc;
+      }
+      std::string hash_str = ss.str();
+      BOOST_TEST_MESSAGE("Secret is " + preimage_string + " and hash is " + hash_str);
+      uint32_t timelock = fc::days(1).to_seconds();
+      graphene::chain::signed_transaction result_tx 
+            = con.wallet_api_ptr->htlc_create("alice", "bob", 
+            "3", "1.3.0", "SHA256", hash_str, preimage_string.size(), timelock, true);
+
+      // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
+      std::string alice_htlc_id_as_string;
+      {
+         BOOST_TEST_MESSAGE("The system is generating a block");
+         graphene::chain::signed_block result_block;
+         BOOST_CHECK(generate_block(app1, result_block));
+
+         // get the ID:
+         htlc_id_type htlc_id = result_block.transactions[result_block.transactions.size()-1].operation_results[0].get<object_id_type>();
+         alice_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
+         BOOST_TEST_MESSAGE("Alice shares the HTLC ID with Bob. The HTLC ID is: " + alice_htlc_id_as_string);
+      }
+
+      // Bob can now look over Alice's HTLC, to see if it is what was agreed to.
+      BOOST_TEST_MESSAGE("Bob retrieves the HTLC Object by ID to examine it.");
+      auto alice_htlc = con.wallet_api_ptr->get_htlc(alice_htlc_id_as_string);
+      BOOST_TEST_MESSAGE("The HTLC Object is: " + fc::json::to_pretty_string(alice_htlc));
+
+      // Bob likes what he sees, so he creates an HTLC, using the info he retrieved from Alice's HTLC
+      con.wallet_api_ptr->htlc_create("bob", "alice",
+            "3", "BOBCOIN", "SHA256", hash_str, preimage_string.size(), timelock, true);
+
+      // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
+      std::string bob_htlc_id_as_string;
+      {
+         BOOST_TEST_MESSAGE("The system is generating a block");
+         graphene::chain::signed_block result_block;
+         BOOST_CHECK(generate_block(app1, result_block));
+
+         // get the ID:
+         htlc_id_type htlc_id = result_block.transactions[result_block.transactions.size()-1].operation_results[0].get<object_id_type>();
+         bob_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
+         BOOST_TEST_MESSAGE("Bob shares the HTLC ID with Alice. The HTLC ID is: " + bob_htlc_id_as_string);
+      }
+
+      // Alice can now look over Bob's HTLC, to see if it is what was agreed to:
+      BOOST_TEST_MESSAGE("Alice retrieves the HTLC Object by ID to examine it.");
+      auto bob_htlc = con.wallet_api_ptr->get_htlc(bob_htlc_id_as_string);
+      BOOST_TEST_MESSAGE("The HTLC Object is: " + fc::json::to_pretty_string(bob_htlc));
+
+      // Alice likes what she sees, so uses her preimage to get her BOBCOIN
+      {
+         BOOST_TEST_MESSAGE("Alice uses her preimage to retrieve the BOBCOIN");
+         std::string secret = "My Secret";
+         con.wallet_api_ptr->htlc_redeem(bob_htlc_id_as_string, "alice", secret, true);
+         BOOST_TEST_MESSAGE("The system is generating a block");
+         BOOST_CHECK(generate_block(app1));
+      }
+
+      // TODO: Bob can look at Alice's history to see her preimage
+      // Bob can use the preimage to retrieve his BTS
+      {
+         BOOST_TEST_MESSAGE("Bob uses Alice's preimage to retrieve the BOBCOIN");
+         std::string secret = "My Secret";
+         con.wallet_api_ptr->htlc_redeem(alice_htlc_id_as_string, "bob", secret, true);
+         BOOST_TEST_MESSAGE("The system is generating a block");
+         BOOST_CHECK(generate_block(app1));
+      }
+
+      // wait for everything to finish up
+      fc::usleep(fc::seconds(1));
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+   app1->shutdown();
 }
