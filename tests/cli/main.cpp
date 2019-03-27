@@ -438,6 +438,130 @@ BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
    }
 }
 
+BOOST_FIXTURE_TEST_CASE( cli_get_signed_transaction_signers, cli_fixture )
+{
+   try
+   {
+      INVOKE(upgrade_nathan_account);
+
+      // register account and transfer funds
+      const auto test_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+         "test", test_bki.pub_key, test_bki.pub_key, "nathan", "nathan", 0, true
+      );
+      con.wallet_api_ptr->transfer("nathan", "test", "1000", "1.3.0", "", true);
+
+      // import key and save wallet
+      BOOST_CHECK(con.wallet_api_ptr->import_key("test", test_bki.wif_priv_key));
+      con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
+
+      // create transaction and check expected result
+      auto signed_trx = con.wallet_api_ptr->transfer("test", "nathan", "10", "1.3.0", "", true);
+
+      const auto &test_acc = con.wallet_api_ptr->get_account("test");
+      flat_set<public_key_type> expected_signers = {test_bki.pub_key};
+      vector<vector<account_id_type> > expected_key_refs{{test_acc.id, test_acc.id}};
+
+      auto signers = con.wallet_api_ptr->get_transaction_signers(signed_trx);
+      BOOST_CHECK(signers == expected_signers);
+
+      auto key_refs = con.wallet_api_ptr->get_key_references({expected_signers.begin(), expected_signers.end()});
+      BOOST_CHECK(key_refs == expected_key_refs);
+
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_FIXTURE_TEST_CASE( cli_get_available_transaction_signers, cli_fixture )
+{
+   try
+   {
+      INVOKE(upgrade_nathan_account);
+
+      // register account
+      const auto test_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+         "test", test_bki.pub_key, test_bki.pub_key, "nathan", "nathan", 0, true
+      );
+      const auto &test_acc = con.wallet_api_ptr->get_account("test");
+
+      // create and sign transaction
+      signed_transaction trx;
+      trx.operations = {transfer_operation()};
+
+      // sign with test key
+      const auto test_privkey = wif_to_key( test_bki.wif_priv_key );
+      BOOST_REQUIRE( test_privkey );
+      trx.sign( *test_privkey, con.wallet_data.chain_id );
+
+      // sign with other keys
+      const auto privkey_1 = fc::ecc::private_key::generate();
+      trx.sign( privkey_1, con.wallet_data.chain_id );
+
+      const auto privkey_2 = fc::ecc::private_key::generate();
+      trx.sign( privkey_2, con.wallet_data.chain_id );
+
+      // verify expected result
+      flat_set<public_key_type> expected_signers = {test_bki.pub_key, 
+                                                    privkey_1.get_public_key(), 
+                                                    privkey_2.get_public_key()};
+
+      auto signers = con.wallet_api_ptr->get_transaction_signers(trx);
+      BOOST_CHECK(signers == expected_signers);
+
+      // blockchain has no references to unknown accounts (privkey_1, privkey_2)
+      // only test account available
+      vector<vector<account_id_type> > expected_key_refs{{}, {}, {test_acc.id, test_acc.id}};
+
+      auto key_refs = con.wallet_api_ptr->get_key_references({expected_signers.begin(), expected_signers.end()});
+      std::sort(key_refs.begin(), key_refs.end());
+
+      BOOST_CHECK(key_refs == expected_key_refs);
+
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_FIXTURE_TEST_CASE( cli_cant_get_signers_from_modified_transaction, cli_fixture )
+{
+   try
+   {
+      INVOKE(upgrade_nathan_account);
+
+      // register account
+      const auto test_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+         "test", test_bki.pub_key, test_bki.pub_key, "nathan", "nathan", 0, true
+      );
+      const auto &test_acc = con.wallet_api_ptr->get_account("test");
+
+      // create and sign transaction
+      signed_transaction trx;
+      trx.operations = {transfer_operation()};
+
+      // sign with test key
+      const auto test_privkey = wif_to_key( test_bki.wif_priv_key );
+      BOOST_REQUIRE( test_privkey );
+      trx.sign( *test_privkey, con.wallet_data.chain_id );
+
+      // modify transaction (MITM-attack)
+      trx.operations.clear();
+
+      // verify if transaction has no valid signature of test account 
+      flat_set<public_key_type> expected_signers_of_valid_transaction = {test_bki.pub_key};
+      auto signers = con.wallet_api_ptr->get_transaction_signers(trx);
+      BOOST_CHECK(signers != expected_signers_of_valid_transaction);
+
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 ///////////////////
 // Start a server and connect using the same calls as the CLI
 // Set a voting proxy and be assured that it sticks

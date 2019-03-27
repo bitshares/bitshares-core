@@ -1571,6 +1571,23 @@ class wallet_api
        */
       signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false);
 
+      /** Get transaction signers.
+       *
+       * Returns information about who signed the transaction, specifically,
+       * the corresponding public keys of the private keys used to sign the transaction.
+       * @param tx the signed transaction
+       * @return the set of public_keys
+       */
+      flat_set<public_key_type> get_transaction_signers(const signed_transaction &tx) const;
+
+      /** Get key references.
+       *
+       * Returns accounts related to given public keys.
+       * @param keys public keys to search for related accounts
+       * @return the set of related accounts
+       */
+      vector<vector<account_id_type>> get_key_references(const vector<public_key_type> &keys) const;
+
       /** Returns an uninitialized object representing a given blockchain operation.
        *
        * This returns a default-initialized object of the given type; it can be used 
@@ -1843,6 +1860,8 @@ FC_API( graphene::wallet::wallet_api,
         (serialize_transaction)
         (sign_transaction)
         (add_transaction_signature)
+        (get_transaction_signers)
+        (get_key_references)
         (get_prototype_operation)
         (propose_parameter_change)
         (propose_fee_change)

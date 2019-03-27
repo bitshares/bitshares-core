@@ -2075,6 +2075,16 @@ public:
       return tx;
    }
 
+   flat_set<public_key_type> get_transaction_signers(const signed_transaction &tx) const
+   {
+      return tx.get_signature_keys(_chain_id);
+   }
+
+   vector<vector<account_id_type>> get_key_references(const vector<public_key_type> &keys) const
+   {
+       return _remote_db->get_key_references(keys);
+   }
+
    memo_data sign_memo(string from, string to, string memo)
    {
       FC_ASSERT( !self.is_locked() );
@@ -3821,6 +3831,16 @@ signed_transaction wallet_api::sign_transaction(signed_transaction tx, bool broa
 { try {
    return my->sign_transaction( tx, broadcast);
 } FC_CAPTURE_AND_RETHROW( (tx) ) }
+
+flat_set<public_key_type> wallet_api::get_transaction_signers(const signed_transaction &tx) const
+{ try {
+   return my->get_transaction_signers(tx);
+} FC_CAPTURE_AND_RETHROW( (tx) ) }
+
+vector<vector<account_id_type>> wallet_api::get_key_references(const vector<public_key_type> &keys) const
+{ try {
+   return my->get_key_references(keys);
+} FC_CAPTURE_AND_RETHROW( (keys) ) }
 
 operation wallet_api::get_prototype_operation(string operation_name)
 {
