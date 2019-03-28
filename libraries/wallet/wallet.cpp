@@ -859,12 +859,12 @@ public:
       return tx;
    }
 
-    void quit()
-    {
-        ilog( "Quitting Cli Wallet ..." );
+   void quit()
+   {
+      ilog( "Quitting Cli Wallet ..." );
         
-        throw fc::canceled_exception();
-    }
+      throw fc::canceled_exception();
+   }
 
    void save_wallet_file(string wallet_filename = "")
    {
@@ -4024,7 +4024,7 @@ bool wallet_api::load_wallet_file( string wallet_filename )
 
 void wallet_api::quit()
 {
-    my->quit();
+   my->quit();
 }
 
 void wallet_api::save_wallet_file( string wallet_filename )
