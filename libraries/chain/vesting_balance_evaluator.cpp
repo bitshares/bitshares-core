@@ -26,8 +26,20 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/vesting_balance_evaluator.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 namespace graphene { namespace chain {
+namespace detail {
+   // TODO review and remove code below and links to it after hf_1268
+   void check_vesting_balance_policy_hf_1268(const fc::time_point_sec& block_time, const vesting_policy_initializer& policy)
+   {
+      if( block_time < HARDFORK_1268_TIME )
+      {
+         FC_ASSERT( policy.which() != vesting_policy_initializer::tag<instant_vesting_policy_initializer>::value,
+           "Instant vesting policy is only available after HARDFORK_1268_TIME!");
+      }
+   }
+}
 
 void_result vesting_balance_create_evaluator::do_evaluate( const vesting_balance_create_operation& op )
 { try {
@@ -41,6 +53,8 @@ void_result vesting_balance_create_evaluator::do_evaluate( const vesting_balance
    FC_ASSERT( op.amount.amount > 0 );
    FC_ASSERT( d.get_balance( creator_account.id, op.amount.asset_id ) >= op.amount );
    FC_ASSERT( !op.amount.asset_id(d).is_transfer_restricted() );
+
+   detail::check_vesting_balance_policy_hf_1268(d.head_block_time(), op.policy);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -76,6 +90,12 @@ struct init_policy_visitor
       policy.coin_seconds_earned_last_update = now;
       p = policy;
    }
+
+   void operator()( const instant_vesting_policy_initializer& i )const
+   {
+      p = instant_vesting_policy{};
+   }
+
 };
 
 object_id_type vesting_balance_create_evaluator::do_apply( const vesting_balance_create_operation& op )
