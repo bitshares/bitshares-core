@@ -4920,7 +4920,7 @@ namespace graphene { namespace net { namespace detail {
         return _node_delegate->method_name(__VA_ARGS__); \
       } \
       else \
-        return _thread->async([&](){ \
+        return _thread->async([&, statistics_collector](){ \
           call_statistics_collector::actual_execution_measurement_helper helper(statistics_collector); \
           return _node_delegate->method_name(__VA_ARGS__); \
         }, "invoke " BOOST_STRINGIZE(method_name)).wait(); \
@@ -4953,7 +4953,7 @@ namespace graphene { namespace net { namespace detail {
       return _node_delegate->method_name(__VA_ARGS__); \
     } \
     else \
-      return _thread->async([&](){ \
+      return _thread->async([&, statistics_collector](){ \
         call_statistics_collector::actual_execution_measurement_helper helper(statistics_collector); \
         return _node_delegate->method_name(__VA_ARGS__); \
       }, "invoke " BOOST_STRINGIZE(method_name)).wait()
