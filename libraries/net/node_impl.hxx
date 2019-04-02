@@ -86,7 +86,7 @@ private:
         {
           std::shared_ptr<call_statistics_collector> _collector;
         public:
-          actual_execution_measurement_helper(call_statistics_collector& collector) :
+          actual_execution_measurement_helper(std::shared_ptr<call_statistics_collector> collector) :
             _collector(collector)
           {
             _collector->starting_execution();
