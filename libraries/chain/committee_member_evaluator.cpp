@@ -24,6 +24,7 @@
 #include <graphene/chain/committee_member_evaluator.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/protocol/vote.hpp>
@@ -74,6 +75,9 @@ void_result committee_member_update_evaluator::do_apply( const committee_member_
 void_result committee_member_update_global_parameters_evaluator::do_evaluate(const committee_member_update_global_parameters_operation& o)
 { try {
    FC_ASSERT(trx_state->_is_proposed_trx);
+
+   FC_ASSERT( db().head_block_time() > HARDFORK_CORE_1468_TIME || !o.new_parameters.extensions.value.updatable_htlc_options.valid(), 
+         "Unable to set HTLC parameters until hardfork." );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
