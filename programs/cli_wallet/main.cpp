@@ -193,7 +193,7 @@ int main( int argc, char** argv )
       fc::http::websocket_client client;
       idump((wdata.ws_server));
       auto con  = client.connect( wdata.ws_server );
-      auto apic = std::make_shared<fc::rpc::websocket_api_connection>(*con, GRAPHENE_MAX_NESTED_OBJECTS);
+      auto apic = std::make_shared<fc::rpc::websocket_api_connection>(con, GRAPHENE_MAX_NESTED_OBJECTS);
 
       auto remote_api = apic->get_remote_api< login_api >(1);
       edump((wdata.ws_user)(wdata.ws_password) );
@@ -230,7 +230,7 @@ int main( int argc, char** argv )
       if( options.count("rpc-endpoint") )
       {
          _websocket_server->on_connection([&wapi]( const fc::http::websocket_connection_ptr& c ){
-            auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c, GRAPHENE_MAX_NESTED_OBJECTS);
+            auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(c, GRAPHENE_MAX_NESTED_OBJECTS);
             wsc->register_api(wapi);
             c->set_session_data( wsc );
          });
@@ -247,7 +247,7 @@ int main( int argc, char** argv )
       if( options.count("rpc-tls-endpoint") )
       {
          _websocket_tls_server->on_connection([&wapi]( const fc::http::websocket_connection_ptr& c ){
-            auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c, GRAPHENE_MAX_NESTED_OBJECTS);
+            auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(c, GRAPHENE_MAX_NESTED_OBJECTS);
             wsc->register_api(wapi);
             c->set_session_data( wsc );
          });
