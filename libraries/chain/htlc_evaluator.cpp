@@ -45,7 +45,7 @@ namespace graphene {
          // make sure the expiration is reasonable
          FC_ASSERT( o.claim_period_seconds <= htlc_options->max_timeout_secs, "HTLC Timeout exceeds allowed length" );
          // make sure the preimage length is reasonable
-         FC_ASSERT( o.preimage_size <= htlc_options->max_preimage_size, "HTLC preimage length exceeds allowed length" ); 
+         FC_ASSERT( o.preimage_size <= htlc_options->max_preimage_size, "HTLC preimage length exceeds allowed length" );
          // make sure the sender has the funds for the HTLC
          FC_ASSERT( d.get_balance( o.from, o.amount.asset_id) >= (o.amount), "Insufficient funds") ;
          const auto& asset_to_transfer = o.amount.asset_id( d );
@@ -104,7 +104,8 @@ namespace graphene {
          FC_ASSERT(o.preimage.size() == htlc_obj->conditions.hash_lock.preimage_size, "Preimage size mismatch.");
          FC_ASSERT(o.redeemer == htlc_obj->transfer.to, "Only the recipient can redeem.");
          const htlc_redeem_visitor vtor( o.preimage );
-         FC_ASSERT( htlc_obj->conditions.hash_lock.preimage_hash.visit( vtor ), "Provided preimage does not generate correct hash.");
+         FC_ASSERT( htlc_obj->conditions.hash_lock.preimage_hash.visit( vtor ), 
+               "Provided preimage does not generate correct hash.");
 
          return void_result();
       }
@@ -126,9 +127,11 @@ namespace graphene {
          FC_ASSERT(o.update_issuer == htlc_obj->transfer.from, "HTLC may only be extended by its creator.");
          optional<htlc_options> htlc_options = get_committee_htlc_options(db());
          FC_ASSERT( htlc_obj->conditions.time_lock.expiration.sec_since_epoch() 
-               + static_cast<uint64_t>(o.seconds_to_add) < fc::time_point_sec::maximum().sec_since_epoch(), "Extension would cause an invalid date");
+               + static_cast<uint64_t>(o.seconds_to_add) < fc::time_point_sec::maximum().sec_since_epoch(), 
+               "Extension would cause an invalid date");
          FC_ASSERT( htlc_obj->conditions.time_lock.expiration + o.seconds_to_add
-                <=  db().head_block_time() + htlc_options->max_timeout_secs, "Extension pushes contract too far into the future" );
+                <=  db().head_block_time() + htlc_options->max_timeout_secs, 
+                "Extension pushes contract too far into the future" );
          return void_result();
       }
 
