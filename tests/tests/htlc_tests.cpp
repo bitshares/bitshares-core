@@ -210,10 +210,60 @@ try {
    auto obj = db_api.get_objects( {alice_htlc_id }).front();
    graphene::chain::htlc_object htlc = obj.template as<graphene::chain::htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS);
 
+   // someone else attempts to extend it (bob says he's alice, but he's not)
+   {
+      graphene::chain::htlc_extend_operation bad_extend;
+      bad_extend.htlc_id = alice_htlc_id;
+      bad_extend.seconds_to_add = 10;
+      bad_extend.fee = db.get_global_properties().parameters.current_fees->calculate_fee(bad_extend);
+      bad_extend.update_issuer = alice_id;
+      trx.operations.push_back(bad_extend);
+      sign(trx, bob_private_key);
+      GRAPHENE_CHECK_THROW( PUSH_TX(db, trx, database::skip_nothing ), fc::exception );
+      trx.clear();
+   }
+   // someone else attempts to extend it (bob wants to extend Alice's contract)
+   {
+      graphene::chain::htlc_extend_operation bad_extend;
+      bad_extend.htlc_id = alice_htlc_id;
+      bad_extend.seconds_to_add = 10;
+      bad_extend.fee = db.get_global_properties().parameters.current_fees->calculate_fee(bad_extend);
+      bad_extend.update_issuer = bob_id;
+      trx.operations.push_back(bad_extend);
+      sign(trx, bob_private_key);
+      GRAPHENE_CHECK_THROW( PUSH_TX(db, trx, ~0 ), fc::exception );
+      trx.clear();
+   }
+   // attempt to extend it with too much time
+   {
+      graphene::chain::htlc_extend_operation big_extend;
+      big_extend.htlc_id = alice_htlc_id;
+      big_extend.seconds_to_add = (fc::time_point_sec::maximum() - 59).sec_since_epoch();
+      big_extend.fee = db.get_global_properties().parameters.current_fees->calculate_fee(big_extend);
+      big_extend.update_issuer = alice_id;
+      trx.operations.push_back(big_extend);
+      sign(trx, alice_private_key);
+      GRAPHENE_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      trx.clear();
+   }
+
+   // attempt to extend properly
+   {
+      graphene::chain::htlc_extend_operation extend;
+      extend.htlc_id = alice_htlc_id;
+      extend.seconds_to_add = 10;
+      extend.fee = db.get_global_properties().parameters.current_fees->calculate_fee(extend);
+      extend.update_issuer = alice_id;
+      trx.operations.push_back(extend);
+      sign(trx, alice_private_key);
+      PUSH_TX(db, trx, ~0);
+      trx.clear();
+   }
+
    // let it expire (wait for timeout)
    generate_blocks( db.head_block_time() + fc::seconds(120) );
    // verify funds return (minus the fees)
-   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 96 * GRAPHENE_BLOCKCHAIN_PRECISION );
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 92 * GRAPHENE_BLOCKCHAIN_PRECISION );
    // verify Bob cannot execute the contract after the fact
 } FC_LOG_AND_RETHROW()
 }
