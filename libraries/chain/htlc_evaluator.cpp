@@ -123,6 +123,9 @@ namespace graphene {
       void_result htlc_extend_evaluator::do_evaluate(const htlc_extend_operation& o)
       {
          htlc_obj = &db().get<htlc_object>(o.htlc_id);
+         FC_ASSERT(o.fee_payer() == htlc_obj->transfer.from, "HTLC may only be extended by its creator.");
+         FC_ASSERT(o.seconds_to_add < fc::time_point_sec::maximum().sec_since_epoch()
+               - htlc_obj->conditions.time_lock.expiration.sec_since_epoch(), "Invalid number of seconds" );
          return void_result();
       }
 
