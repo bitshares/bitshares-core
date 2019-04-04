@@ -238,7 +238,7 @@ try {
    {
       graphene::chain::htlc_extend_operation big_extend;
       big_extend.htlc_id = alice_htlc_id;
-      big_extend.seconds_to_add = (fc::time_point_sec::maximum() - 59).sec_since_epoch();
+      big_extend.seconds_to_add = db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_timeout_secs + 10;
       big_extend.fee = db.get_global_properties().parameters.current_fees->calculate_fee(big_extend);
       big_extend.update_issuer = alice_id;
       trx.operations.push_back(big_extend);

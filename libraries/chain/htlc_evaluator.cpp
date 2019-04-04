@@ -124,8 +124,11 @@ namespace graphene {
       {
          htlc_obj = &db().get<htlc_object>(o.htlc_id);
          FC_ASSERT(o.update_issuer == htlc_obj->transfer.from, "HTLC may only be extended by its creator.");
-         FC_ASSERT(o.seconds_to_add <= fc::time_point_sec::maximum().sec_since_epoch()
-               - htlc_obj->conditions.time_lock.expiration.sec_since_epoch(), "Invalid number of seconds" );
+         optional<htlc_options> htlc_options = get_committee_htlc_options(db());
+         FC_ASSERT( htlc_obj->conditions.time_lock.expiration.sec_since_epoch() 
+               + static_cast<uint64_t>(o.seconds_to_add) < fc::time_point_sec::maximum().sec_since_epoch(), "Extension would cause an invalid date");
+         FC_ASSERT( htlc_obj->conditions.time_lock.expiration + o.seconds_to_add
+                <=  db().head_block_time() + htlc_options->max_timeout_secs, "Extension pushes contract too far into the future" );
          return void_result();
       }
 
