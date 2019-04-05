@@ -119,6 +119,7 @@ template<typename T> struct js_name< fc::safe<T> > { static std::string name(){ 
 
 template<> struct js_name< std::vector<char> > { static std::string name(){ return "bytes()";     } };
 template<> struct js_name<fc::uint160>         { static std::string name(){ return "bytes(20)";   } };
+template<> struct js_name<fc::sha1>            { static std::string name(){ return "bytes(20)";   } };
 template<> struct js_name<fc::sha224>          { static std::string name(){ return "bytes(28)";   } };
 template<> struct js_name<fc::sha256>          { static std::string name(){ return "bytes(32)";   } };
 template<> struct js_name<fc::unsigned_int>    { static std::string name(){ return "varuint64";  } };
@@ -157,7 +158,7 @@ struct js_name< fc::static_variant<T...> >
    static std::string name( std::string n = ""){
       static const std::string name = n;
       if( name == "" )
-         return "static_variant([" + js_sv_name<T...>::name() + "\n])";
+         return "static_variant([" + js_sv_name<T...>::name() + "\n]);";
       else return name;
    }
 };
@@ -167,7 +168,7 @@ struct js_name< fc::static_variant<> >
    static std::string name( std::string n = ""){
       static const std::string name = n;
       if( name == "" )
-         return "static_variant []";
+         return "static_variant([]);";
       else return name;
    }
 };
@@ -300,7 +301,7 @@ struct serializer< fc::static_variant<T...>, false >
 
    static void generate()
    {
-      std::cout << "var " <<  js_name<fc::static_variant<T...>>::name() << " = static_variant([" + js_sv_name<T...>::name() + "\n])\n\n";
+      std::cout << "var " <<  js_name<fc::static_variant<T...>>::name() << " = static_variant([" + js_sv_name<T...>::name() + "\n]);\n\n";
    }
 };
 template<>
@@ -319,7 +320,7 @@ struct serializer< fc::static_variant<>, false >
 
    static void generate()
    {
-      std::cout <<  js_name<fc::static_variant<>>::name() << " = static_variant([])\n\n";
+      std::cout <<  js_name<fc::static_variant<>>::name() << " = static_variant([]);\n\n";
    }
 };
 
