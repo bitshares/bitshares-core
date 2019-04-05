@@ -102,7 +102,6 @@ namespace graphene {
          htlc_obj = &db().get<htlc_object>(o.htlc_id);
 
          FC_ASSERT(o.preimage.size() == htlc_obj->conditions.hash_lock.preimage_size, "Preimage size mismatch.");
-         FC_ASSERT(o.redeemer == htlc_obj->transfer.to, "Only the recipient can redeem.");
          const htlc_redeem_visitor vtor( o.preimage );
          FC_ASSERT( htlc_obj->conditions.hash_lock.preimage_hash.visit( vtor ), 
                "Provided preimage does not generate correct hash.");
@@ -114,8 +113,8 @@ namespace graphene {
       {
          db().adjust_balance(htlc_obj->transfer.to, asset(htlc_obj->transfer.amount, htlc_obj->transfer.asset_id) );
          // notify related parties
-         htlc_redeemed_operation virt_op( htlc_obj->id, htlc_obj->transfer.from, htlc_obj->transfer.to, 
-               asset(htlc_obj->transfer.amount, htlc_obj->transfer.asset_id ) );
+         htlc_redeemed_operation virt_op( htlc_obj->id, htlc_obj->transfer.from, htlc_obj->transfer.to,
+               o.redeemer, asset(htlc_obj->transfer.amount, htlc_obj->transfer.asset_id ) );
          db().push_applied_operation( virt_op );
          db().remove(*htlc_obj);
          return void_result();

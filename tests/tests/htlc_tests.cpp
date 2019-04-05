@@ -271,12 +271,13 @@ try {
 BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 {
 try {
-   ACTORS((alice)(bob));
+   ACTORS((alice)(bob)(joker));
 
    int64_t init_balance(100 * GRAPHENE_BLOCKCHAIN_PRECISION);
 
    transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
    transfer( committee_account, bob_id, graphene::chain::asset(init_balance) );
+   transfer( committee_account, joker_id, graphene::chain::asset(init_balance) );
 
    advance_past_hardfork(this);
    
@@ -329,23 +330,32 @@ try {
    // make sure Alice's money is still on hold, and account for extra fee
    BOOST_CHECK_EQUAL( get_balance( alice_id, graphene::chain::asset_id_type()), 72 * GRAPHENE_BLOCKCHAIN_PRECISION );
 
-   // send a redeem operation to claim the funds
+   // grab number of history objects to make sure everyone gets notified
+   size_t alice_num_history = get_operation_history(alice_id).size();
+   size_t bob_num_history = get_operation_history(bob_id).size();
+   size_t joker_num_history = get_operation_history(joker_id).size();
+
+   // joker sends a redeem operation to claim the funds for bob
    {
       graphene::chain::htlc_redeem_operation update_operation;
-      update_operation.redeemer = bob_id;
+      update_operation.redeemer = joker_id;
       update_operation.htlc_id = alice_htlc_id;
       update_operation.preimage = pre_image;
       update_operation.fee = db.current_fee_schedule().calculate_fee( update_operation );
       trx.operations.push_back( update_operation );
-      sign(trx, bob_private_key);
+      sign(trx, joker_private_key);
       PUSH_TX( db, trx, ~0 );
       generate_block();
       trx.clear();
    }
-   // verify funds end up in Bob's account (100 + 20 - 4(fee) )
-   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 116 * GRAPHENE_BLOCKCHAIN_PRECISION );
+   // verify funds end up in Bob's account (100 + 20 )
+   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 120 * GRAPHENE_BLOCKCHAIN_PRECISION );
    // verify funds remain out of Alice's acount ( 100 - 20 - 4 )
    BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 72 * GRAPHENE_BLOCKCHAIN_PRECISION );
+   // verify all three get notified
+   BOOST_CHECK_EQUAL( get_operation_history(alice_id).size(), alice_num_history + 1);
+   BOOST_CHECK_EQUAL( get_operation_history(bob_id).size(), bob_num_history + 1);
+   BOOST_CHECK_EQUAL( get_operation_history(joker_id).size(), joker_num_history + 1);
 } FC_LOG_AND_RETHROW()
 }
 
