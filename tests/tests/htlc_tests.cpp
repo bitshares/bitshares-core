@@ -58,7 +58,7 @@ BOOST_FIXTURE_TEST_SUITE( htlc_tests, database_fixture )
 
 void generate_random_preimage(uint16_t key_size, std::vector<char>& vec)
 {
-	std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned char> rbe;
+	std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned int> rbe;
 	std::generate(begin(vec), end(vec), std::ref(rbe));
 	return;
 }
