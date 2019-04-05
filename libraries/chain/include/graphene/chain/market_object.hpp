@@ -136,8 +136,20 @@ class call_order_object : public abstract_object<call_order_object>
          return tmp;
       }
 
-      /// Calculate maximum quantity of debt to cover to satisfy @ref target_collateral_ratio.
-      share_type get_max_debt_to_cover( price match_price, price feed_price, const uint16_t maintenance_collateral_ratio )const;
+      /**
+       *  Calculate maximum quantity of debt to cover to satisfy @ref target_collateral_ratio.
+       *
+       *  @param match_price the matching price if this call order is margin called
+       *  @param feed_price median settlement price of debt asset
+       *  @param maintenance_collateral_ratio median maintenance collateral ratio of debt asset
+       *  @param maintenance_collateralization maintenance collateralization of debt asset,
+       *                                       should only be valid after core-1270 hard fork
+       *  @return maximum amount of debt that can be called
+       */
+      share_type get_max_debt_to_cover( price match_price,
+                                        price feed_price,
+                                        const uint16_t maintenance_collateral_ratio,
+                                        const optional<price>& maintenance_collateralization = optional<price>() )const;
 };
 
 /**

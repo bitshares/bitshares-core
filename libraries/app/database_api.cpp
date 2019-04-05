@@ -25,6 +25,7 @@
 #include <graphene/app/database_api.hpp>
 #include <graphene/app/util.hpp>
 #include <graphene/chain/get_config.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <fc/bloom_filter.hpp>
 
@@ -1290,14 +1291,13 @@ vector<call_order_object> database_api_impl::get_call_orders(const std::string& 
 {
    FC_ASSERT( limit <= 300 );
 
-   const asset_id_type asset_a_id = get_asset_from_string(a)->id;
-   const auto& call_index = _db.get_index_type<call_order_index>().indices().get<by_price>();
-   const asset_object& mia = _db.get(asset_a_id);
-   price index_price = price::min(mia.bitasset_data(_db).options.short_backing_asset, mia.get_id());
+   const asset_object* mia = get_asset_from_string(a);
+   const auto& call_index = _db.get_index_type<call_order_index>().indices().get<by_collateral>();
+   price index_price = price::min( mia->bitasset_data(_db).options.short_backing_asset, mia->get_id() );
    
    vector< call_order_object> result;
-   auto itr_min = call_index.lower_bound(index_price.min());
-   auto itr_max = call_index.lower_bound(index_price.max());
+   auto itr_min = call_index.lower_bound(index_price);
+   auto itr_max = call_index.upper_bound(index_price.max());
    while( itr_min != itr_max && result.size() < limit ) 
    {
       result.emplace_back(*itr_min);
@@ -2057,10 +2057,12 @@ set<public_key_type> database_api::get_required_signatures( const signed_transac
 
 set<public_key_type> database_api_impl::get_required_signatures( const signed_transaction& trx, const flat_set<public_key_type>& available_keys )const
 {
+   bool allow_non_immediate_owner = ( _db.head_block_time() >= HARDFORK_CORE_584_TIME );
    auto result = trx.get_required_signatures( _db.get_chain_id(),
                                        available_keys,
                                        [&]( account_id_type id ){ return &id(_db).active; },
                                        [&]( account_id_type id ){ return &id(_db).owner; },
+                                       allow_non_immediate_owner,
                                        _db.get_global_properties().parameters.max_authority_depth );
    return result;
 }
@@ -2076,6 +2078,7 @@ set<address> database_api::get_potential_address_signatures( const signed_transa
 
 set<public_key_type> database_api_impl::get_potential_signatures( const signed_transaction& trx )const
 {
+   bool allow_non_immediate_owner = ( _db.head_block_time() >= HARDFORK_CORE_584_TIME );
    set<public_key_type> result;
    trx.get_required_signatures(
       _db.get_chain_id(),
@@ -2094,6 +2097,7 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
             result.insert(k);
          return &auth;
       },
+      allow_non_immediate_owner,
       _db.get_global_properties().parameters.max_authority_depth
    );
 
@@ -2141,10 +2145,12 @@ bool database_api::verify_authority( const signed_transaction& trx )const
 
 bool database_api_impl::verify_authority( const signed_transaction& trx )const
 {
+   bool allow_non_immediate_owner = ( _db.head_block_time() >= HARDFORK_CORE_584_TIME );
    trx.verify_authority( _db.get_chain_id(),
                          [this]( account_id_type id ){ return &id(_db).active; },
                          [this]( account_id_type id ){ return &id(_db).owner; },
-                          _db.get_global_properties().parameters.max_authority_depth );
+                         allow_non_immediate_owner,
+                         _db.get_global_properties().parameters.max_authority_depth );
    return true;
 }
 
@@ -2166,7 +2172,8 @@ bool database_api_impl::verify_account_authority( const string& account_name_or_
    {
       graphene::chain::verify_authority(ops, keys,
             [this]( account_id_type id ){ return &id(_db).active; },
-            [this]( account_id_type id ){ return &id(_db).owner; } );
+            [this]( account_id_type id ){ return &id(_db).owner; },
+            true );
    } 
    catch (fc::exception& ex)
    {

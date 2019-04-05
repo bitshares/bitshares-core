@@ -453,6 +453,10 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
    generate_blocks(HARDFORK_615_TIME, true, skip); // get around Graphene issue #615 feed expiration bug
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
 
+   auto hf_time = HARDFORK_CORE_868_890_TIME;
+   if(hf1270)
+      hf_time = HARDFORK_CORE_1270_TIME;
+
    for( int i=0; i<2; ++i )
    {
       int blocks = 0;
@@ -460,7 +464,7 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
 
       if( i == 1 ) // go beyond hard fork
       {
-         blocks += generate_blocks(HARDFORK_CORE_868_890_TIME - mi, true, skip);
+         blocks += generate_blocks(hf_time - mi, true, skip);
          blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
       }
       set_expiration( db, trx );
@@ -526,7 +530,7 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
          ba_op.asset_to_update = usd_id;
          ba_op.issuer = asset_to_update.issuer;
          ba_op.new_options = asset_to_update.bitasset_data(db).options;
-         ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_868_890_TIME.sec_since_epoch()
+         ba_op.new_options.feed_lifetime_sec = hf_time.sec_since_epoch()
                                              - db.head_block_time().sec_since_epoch()
                                              + mi
                                              + 1800;
@@ -542,7 +546,7 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
          BOOST_CHECK( db.find<limit_order_object>( sell_id ) );
 
          // go beyond hard fork
-         blocks += generate_blocks(HARDFORK_CORE_868_890_TIME - mi, true, skip);
+         blocks += generate_blocks(hf_time - mi, true, skip);
          blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
       }
 
@@ -923,7 +927,7 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
    generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
    generate_block( skip );
 
-   for( int i = 0; i < 6; ++i )
+   for( int i = 0; i < 8; ++i )
    {
       idump( (i) );
       int blocks = 0;
@@ -937,6 +941,11 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
       else if( i == 4 ) // go beyond hard fork 935
       {
          generate_blocks( HARDFORK_CORE_935_TIME - mi, true, skip );
+         generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
+      }
+      else if( i == 6 ) // go beyond hard fork 1270
+      {
+         generate_blocks( HARDFORK_CORE_1270_TIME - mi, true, skip );
          generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
       }
       set_expiration( db, trx );
@@ -1049,7 +1058,7 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
          ba_op.asset_to_update = usd_id;
          ba_op.issuer = asset_to_update.issuer;
          ba_op.new_options = asset_to_update.bitasset_data(db).options;
-         ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_935_TIME.sec_since_epoch()
+         ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_1270_TIME.sec_since_epoch()
                                              + mi * 3 + 86400 * 2
                                              - db.head_block_time().sec_since_epoch();
          trx.operations.push_back(ba_op);
@@ -1102,22 +1111,39 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
          blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
       }
 
-      // after hard fork 935, the limit order should be filled
+      // after hard fork 935, the limit order is filled only for the MSSR test
+      if( db.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_935_TIME &&
+          db.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_1270_TIME)
       {
          // check median
          BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
-         if( i % 2 == 0 ) // MCR test, median MCR should be 350%
-            BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
-         else // MSSR test, MSSR should be 125%
-            BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1250 );
-         // the limit order should have been filled
-         // TODO FIXME this test case is failing for MCR test,
-         //            because call_order's call_price didn't get updated after MCR changed
-         // BOOST_CHECK( !db.find<limit_order_object>( sell_id ) );
-         if( i % 2 == 1 ) // MSSR test
-            BOOST_CHECK( !db.find<limit_order_object>( sell_id ) );
+         if( i % 2 == 0) { // MCR test, median MCR should be 350% and order will not be filled except when i = 0
+            BOOST_CHECK_EQUAL(usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500);
+            if( affected_by_hf_343 )
+               BOOST_CHECK(!db.find<limit_order_object>(sell_id));
+            else
+               BOOST_CHECK(db.find<limit_order_object>(sell_id)); // MCR bug, order still there
+         }
+         else { // MSSR test, MSSR should be 125% and order is filled
+            BOOST_CHECK_EQUAL(usd_id(db).bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1250);
+            BOOST_CHECK(!db.find<limit_order_object>(sell_id)); // order filled
+         }
+
+         // go beyond hard fork 1270
+         blocks += generate_blocks(HARDFORK_CORE_1270_TIME - mi, true, skip);
+         blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
       }
 
+      // after hard fork 1270, the limit order should be filled for MCR test
+      if( db.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_1270_TIME)
+      {
+         // check median
+         BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+         if( i % 2 == 0 ) { // MCR test, order filled
+            BOOST_CHECK_EQUAL(usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500);
+            BOOST_CHECK(!db.find<limit_order_object>(sell_id));
+         }
+      }
 
       // undo above tx's and reset
       generate_block( skip );
@@ -1375,5 +1401,11 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_switching_to_witness_fed )
    }
 }
 */
+BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(hf_890_test);
+
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
