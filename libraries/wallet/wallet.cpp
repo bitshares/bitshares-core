@@ -3565,7 +3565,7 @@ string wallet_api::serialize_transaction( signed_transaction tx )const
 
 variant wallet_api::get_object( object_id_type id ) const
 {
-   return my->_remote_db->get_objects({id});
+   return my->_remote_db->get_objects({id}).front();
 }
 
 string wallet_api::get_wallet_filename() const
