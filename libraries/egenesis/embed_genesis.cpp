@@ -285,4 +285,4 @@ int main( int argc, char** argv )
    }
 
    return main_return;
-} catch( fc::exception& e ) { edump((e)); throw; } }
+} FC_LOG_AND_RETHROW() }
