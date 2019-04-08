@@ -431,6 +431,7 @@ BOOST_AUTO_TEST_CASE( cashback_test )
 
    ACTOR(life);
    ACTOR(rog);
+   ACTOR(nathan);
    PREP_ACTOR(ann);
    PREP_ACTOR(scud);
    PREP_ACTOR(dumy);
@@ -444,7 +445,7 @@ BOOST_AUTO_TEST_CASE( cashback_test )
    BOOST_CHECK_GT(pleb_public_key.key_data.size(), 0);
 
    account_id_type ann_id, scud_id, dumy_id, stud_id, pleb_id;
-   actor_audit alife, arog, aann, ascud, adumy, astud, apleb;
+   actor_audit alife, arog, anathan, aann, ascud, adumy, astud, apleb;
 
    alife.b0 = 100000000;
    arog.b0 = 100000000;
@@ -461,6 +462,7 @@ BOOST_AUTO_TEST_CASE( cashback_test )
    arog.bal += arog.b0;
    upgrade_to_lifetime_member(life_id);
    upgrade_to_lifetime_member(rog_id);
+   upgrade_to_lifetime_member(nathan_id);
 
    BOOST_TEST_MESSAGE("Enable fees");
    enable_fees();
@@ -472,13 +474,13 @@ BOOST_AUTO_TEST_CASE( cashback_test )
       account_create_operation::fee_parameters_type acc_fee_params;
       acc_fee_params.basic_fee = 100;
       acc_fee_params.premium_fee = 100;
-      acc_fee_params.price_per_kbyte = 1;
+      acc_fee_params.price_per_kbyte = 0;
       new_fees.insert( acc_fee_params );
    }
    {
       transfer_operation::fee_parameters_type transfer_fee_params;
       transfer_fee_params.fee = 200;
-      transfer_fee_params.price_per_kbyte = 1;
+      transfer_fee_params.price_per_kbyte = 0;
       new_fees.insert( transfer_fee_params );
    }
    {
@@ -507,6 +509,7 @@ BOOST_AUTO_TEST_CASE( cashback_test )
       actor_name ## _id = PUSH_TX( db, trx ).operation_results.front().get<object_id_type>(); \
       trx.clear(); \
    }
+
 #define CustomAuditActor(actor_name)                                \
    if( actor_name ## _id != account_id_type() )                     \
    {                                                                \
@@ -533,7 +536,7 @@ BOOST_AUTO_TEST_CASE( cashback_test )
    int64_t upg_lt_fee = fees->get< account_upgrade_operation >().membership_lifetime_fee;
    // all percentages here are cut from whole pie!
    uint64_t network_pct = 20 * P1;
-   uint64_t lt_pct = 50 * P1;
+   uint64_t lt_pct = 30 * P1;
    uint64_t mp_pct = 30 * P1;
 
    BOOST_TEST_MESSAGE("Register and upgrade Ann");
@@ -600,9 +603,12 @@ REG : net' ltm' ref'
 */
 
    // audit distribution of fees from stud
-   alife.ubal += pct( P100-network_pct-mp_pct,      lt_pct,                     astud.ucb );
-   aann.ubal  += pct( P100-network_pct-mp_pct, P100-lt_pct,      astud.ref_pct, astud.ucb );
-   arog.ubal  += pct( P100-network_pct-mp_pct, P100-lt_pct, P100-astud.ref_pct, astud.ucb );
+   // life gets lifetime amount
+   alife.ubal += pct( lt_pct, astud.ucb );
+   // ann gets 80% of referral amount from stud's fees
+   aann.ubal  += pct( astud.ref_pct, P100-network_pct-mp_pct-lt_pct, astud.ucb );
+   // rog gets the remaining 20% of referral amount from stud's fees
+   arog.ubal  += pct( P100-astud.ref_pct, P100-network_pct-mp_pct-lt_pct, astud.ucb );
    astud.ucb  = 0;
    CustomAudit();
 
@@ -617,11 +623,12 @@ REG : net' ltm' ref'
    CustomAudit();
 
    generate_block();
-
+   
    BOOST_TEST_MESSAGE("Wait for maintenance interval");
 
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    // audit distribution of fees from life
+   change_fees( new_fees );
    alife.ubal += pct( P100-network_pct-mp_pct, alife.ucb +alife.vcb );
    alife.ucb = 0; alife.vcb = 0;
 
@@ -677,10 +684,11 @@ REG : net' ltm' ref'
    adumy.bal += -200000-xfer_fee; adumy.vcb += xfer_fee; arog.bal += 200000;
    CustomAudit();
 
+   generate_block();
    BOOST_TEST_MESSAGE("Waiting for maintenance time");
 
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-
+   change_fees( new_fees );
    // audit distribution of fees from life
    alife.ubal += pct( P100-network_pct-mp_pct, alife.ucb +alife.vcb );
    alife.ucb = 0; alife.vcb = 0;
@@ -723,7 +731,7 @@ REG : net' ltm' ref'
 
    generate_blocks(ann_id(db).membership_expiration_date);
    generate_block();
-
+   change_fees( new_fees );
    BOOST_TEST_MESSAGE("Transferring from scud to pleb");
 
    //ann's membership has expired, so scud's fee should go up to life instead.
@@ -734,7 +742,7 @@ REG : net' ltm' ref'
    BOOST_TEST_MESSAGE("Waiting for maint interval");
 
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-
+   change_fees( new_fees );
    // audit distribution of fees from scud
    alife.ubal += pct( P100-network_pct-mp_pct,      lt_pct,                     ascud.ucb+ascud.vcb );
    alife.ubal += pct( P100-network_pct-mp_pct, P100-lt_pct,      ascud.ref_pct, ascud.ucb+ascud.vcb );
