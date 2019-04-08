@@ -388,6 +388,10 @@ market_ticker::market_ticker(const market_ticker_object& mto,
    time = now;
    base = asset_base.symbol;
    quote = asset_quote.symbol;
+   percent_change = "0";
+   lowest_ask = "0";
+   highest_bid = "0";
+
    fc::uint128 bv;
    fc::uint128 qv;
    price latest_price = asset( mto.latest_base, mto.base ) / asset( mto.latest_quote, mto.quote );
@@ -419,6 +423,20 @@ market_ticker::market_ticker(const market_ticker_object& mto,
       lowest_ask = orders.asks[0].price;
    if(!orders.bids.empty())
       highest_bid = orders.bids[0].price;
+}
+market_ticker::market_ticker(const fc::time_point_sec& now,
+                             const asset_object& asset_base,
+                             const asset_object& asset_quote)
+{
+   time = now;
+   base = asset_base.symbol;
+   quote = asset_quote.symbol;
+   latest = "0";
+   lowest_ask = "0";
+   highest_bid = "0";
+   percent_change = "0";
+   base_volume = "0";
+   quote_volume = "0";
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -1433,7 +1451,7 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
       return market_ticker(*itr, now, *assets[0], *assets[1], orders);
    }
    // if no ticker is found for this market we return an empty ticker
-   market_ticker empty_result;
+   market_ticker empty_result(now, *assets[0], *assets[1]);
    return empty_result;
 }
 
