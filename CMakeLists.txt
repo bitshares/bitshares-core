@@ -140,11 +140,6 @@ endif(USE_PCH)
 
 option(USE_PROFILER "Build with GPROF support(Linux)." OFF)
 
-IF( NOT WIN32 )
-    get_property(FC_ROOT_PATH GLOBAL PROPERTY FC_ROOT_PATH)
-    set(FC_CMAKE_MODULE_PATH ${FC_ROOT_PATH}/CMakeModules)
-    list( APPEND CMAKE_MODULE_PATH ${FC_CMAKE_MODULE_PATH} ${FC_CMAKE_MODULE_PATH}/Legacy )
-ENDIF( NOT WIN32 )
 list( APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/libraries/fc/GitVersionGen" )
 include( GetGitRevisionDescription )
 get_git_head_revision( GIT_REFSPEC GIT_SHA2 )
@@ -159,7 +154,8 @@ LIST(APPEND BOOST_COMPONENTS thread
                              chrono
                              unit_test_framework
                              context
-                             coroutine)
+                             coroutine
+                             regex)
 # boost::endian is also required, but FindBoost can't handle header-only libs
 SET( Boost_USE_STATIC_LIBS ON CACHE STRING "ON or OFF" )
 
@@ -181,7 +177,7 @@ ELSE( WIN32 )
    ENDIF( APPLE )
 ENDIF(WIN32)
 
-FIND_PACKAGE(Boost 1.57 REQUIRED COMPONENTS ${BOOST_COMPONENTS})
+FIND_PACKAGE(Boost CONFIG REQUIRED COMPONENTS ${BOOST_COMPONENTS})
 
 # enforce more strict compiler warnings and errors
 add_compiler_flag_if_available("-Wall")
@@ -210,7 +206,7 @@ if( WIN32 )
     SET( DEFAULT_EXECUTABLE_INSTALL_DIR bin/ )
 
     if( MSVC )
-	    add_definitions(-DWIN32_LEAN_AND_MEAN)
+        add_definitions(-DWIN32_LEAN_AND_MEAN)
         #looks like this flag can have different default on some machines.
         SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /SAFESEH:NO")
         SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SAFESEH:NO")
