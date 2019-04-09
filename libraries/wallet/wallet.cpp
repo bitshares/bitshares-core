@@ -1890,7 +1890,7 @@ public:
 
          signed_transaction tx;
          tx.operations.push_back(create_op);
-         set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
          tx.validate();
 
          return sign_transaction(tx, broadcast);
@@ -1915,7 +1915,7 @@ public:
 
          signed_transaction tx;
          tx.operations.push_back(update_op);
-         set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
          tx.validate();
 
          return sign_transaction(tx, broadcast);
@@ -1939,7 +1939,7 @@ public:
 
          signed_transaction tx;
          tx.operations.push_back(update_op);
-         set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
          tx.validate();
 
          return sign_transaction(tx, broadcast);
