@@ -552,6 +552,12 @@ void database::_apply_block( const signed_block& next_block )
    const auto& dynamic_global_props = get_dynamic_global_properties();
    bool maint_needed = (dynamic_global_props.next_maintenance_time <= next_block.timestamp);
 
+   // trx_in_block starts from 0.
+   // For real operations which are explicitly included in a transaction, op_in_trx starts from 0, virtual_op is 0.
+   // For virtual operations that are derived directly from a real operation,
+   //     use the real operation's (block_num,trx_in_block,op_in_trx), virtual_op starts from 1.
+   // For virtual operations created after processed all transactions,
+   //     trx_in_block = the_block.trsanctions.size(), op_in_trx is 0, virtual_op starts from 0.
    _current_block_num    = next_block_num;
    _current_trx_in_block = 0;
 
@@ -568,6 +574,9 @@ void database::_apply_block( const signed_block& next_block )
       apply_transaction( trx, skip );
       ++_current_trx_in_block;
    }
+
+   _current_op_in_trx    = 0;
+   _current_virtual_op   = 0;
 
    const uint32_t missed = update_witness_missed_blocks( next_block );
    update_global_dynamic_data( next_block, missed );
@@ -680,6 +689,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    _current_op_in_trx = 0;
    for( const auto& op : ptrx.operations )
    {
+      _current_virtual_op = 0;
       eval_state.operation_results.emplace_back(apply_operation(eval_state, op));
       ++_current_op_in_trx;
    }
