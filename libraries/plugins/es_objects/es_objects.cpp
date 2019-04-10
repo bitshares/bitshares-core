@@ -214,6 +214,10 @@ void es_objects_plugin_impl::prepareTemplate(T blockchain_object, string index_n
 
 es_objects_plugin_impl::~es_objects_plugin_impl()
 {
+   if (curl) {
+      curl_easy_cleanup(curl);
+      curl = nullptr;
+   }
    return;
 }
 
