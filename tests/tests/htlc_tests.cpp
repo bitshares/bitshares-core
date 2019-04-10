@@ -210,10 +210,60 @@ try {
    auto obj = db_api.get_objects( {alice_htlc_id }).front();
    graphene::chain::htlc_object htlc = obj.template as<graphene::chain::htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS);
 
+   // someone else attempts to extend it (bob says he's alice, but he's not)
+   {
+      graphene::chain::htlc_extend_operation bad_extend;
+      bad_extend.htlc_id = alice_htlc_id;
+      bad_extend.seconds_to_add = 10;
+      bad_extend.fee = db.get_global_properties().parameters.current_fees->calculate_fee(bad_extend);
+      bad_extend.update_issuer = alice_id;
+      trx.operations.push_back(bad_extend);
+      sign(trx, bob_private_key);
+      GRAPHENE_CHECK_THROW( PUSH_TX(db, trx, database::skip_nothing ), fc::exception );
+      trx.clear();
+   }
+   // someone else attempts to extend it (bob wants to extend Alice's contract)
+   {
+      graphene::chain::htlc_extend_operation bad_extend;
+      bad_extend.htlc_id = alice_htlc_id;
+      bad_extend.seconds_to_add = 10;
+      bad_extend.fee = db.get_global_properties().parameters.current_fees->calculate_fee(bad_extend);
+      bad_extend.update_issuer = bob_id;
+      trx.operations.push_back(bad_extend);
+      sign(trx, bob_private_key);
+      GRAPHENE_CHECK_THROW( PUSH_TX(db, trx, ~0 ), fc::exception );
+      trx.clear();
+   }
+   // attempt to extend it with too much time
+   {
+      graphene::chain::htlc_extend_operation big_extend;
+      big_extend.htlc_id = alice_htlc_id;
+      big_extend.seconds_to_add = db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_timeout_secs + 10;
+      big_extend.fee = db.get_global_properties().parameters.current_fees->calculate_fee(big_extend);
+      big_extend.update_issuer = alice_id;
+      trx.operations.push_back(big_extend);
+      sign(trx, alice_private_key);
+      GRAPHENE_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      trx.clear();
+   }
+
+   // attempt to extend properly
+   {
+      graphene::chain::htlc_extend_operation extend;
+      extend.htlc_id = alice_htlc_id;
+      extend.seconds_to_add = 10;
+      extend.fee = db.get_global_properties().parameters.current_fees->calculate_fee(extend);
+      extend.update_issuer = alice_id;
+      trx.operations.push_back(extend);
+      sign(trx, alice_private_key);
+      PUSH_TX(db, trx, ~0);
+      trx.clear();
+   }
+
    // let it expire (wait for timeout)
    generate_blocks( db.head_block_time() + fc::seconds(120) );
    // verify funds return (minus the fees)
-   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 96 * GRAPHENE_BLOCKCHAIN_PRECISION );
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 92 * GRAPHENE_BLOCKCHAIN_PRECISION );
    // verify Bob cannot execute the contract after the fact
 } FC_LOG_AND_RETHROW()
 }
@@ -221,12 +271,13 @@ try {
 BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 {
 try {
-   ACTORS((alice)(bob));
+   ACTORS((alice)(bob)(joker));
 
    int64_t init_balance(100 * GRAPHENE_BLOCKCHAIN_PRECISION);
 
    transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
    transfer( committee_account, bob_id, graphene::chain::asset(init_balance) );
+   transfer( committee_account, joker_id, graphene::chain::asset(init_balance) );
 
    advance_past_hardfork(this);
    
@@ -279,23 +330,32 @@ try {
    // make sure Alice's money is still on hold, and account for extra fee
    BOOST_CHECK_EQUAL( get_balance( alice_id, graphene::chain::asset_id_type()), 72 * GRAPHENE_BLOCKCHAIN_PRECISION );
 
-   // send a redeem operation to claim the funds
+   // grab number of history objects to make sure everyone gets notified
+   size_t alice_num_history = get_operation_history(alice_id).size();
+   size_t bob_num_history = get_operation_history(bob_id).size();
+   size_t joker_num_history = get_operation_history(joker_id).size();
+
+   // joker sends a redeem operation to claim the funds for bob
    {
       graphene::chain::htlc_redeem_operation update_operation;
-      update_operation.redeemer = bob_id;
+      update_operation.redeemer = joker_id;
       update_operation.htlc_id = alice_htlc_id;
       update_operation.preimage = pre_image;
       update_operation.fee = db.current_fee_schedule().calculate_fee( update_operation );
       trx.operations.push_back( update_operation );
-      sign(trx, bob_private_key);
+      sign(trx, joker_private_key);
       PUSH_TX( db, trx, ~0 );
       generate_block();
       trx.clear();
    }
-   // verify funds end up in Bob's account (100 + 20 - 4(fee) )
-   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 116 * GRAPHENE_BLOCKCHAIN_PRECISION );
+   // verify funds end up in Bob's account (100 + 20 )
+   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 120 * GRAPHENE_BLOCKCHAIN_PRECISION );
    // verify funds remain out of Alice's acount ( 100 - 20 - 4 )
    BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 72 * GRAPHENE_BLOCKCHAIN_PRECISION );
+   // verify all three get notified
+   BOOST_CHECK_EQUAL( get_operation_history(alice_id).size(), alice_num_history + 1);
+   BOOST_CHECK_EQUAL( get_operation_history(bob_id).size(), bob_num_history + 1);
+   BOOST_CHECK_EQUAL( get_operation_history(joker_id).size(), joker_num_history + 1);
 } FC_LOG_AND_RETHROW()
 }
 

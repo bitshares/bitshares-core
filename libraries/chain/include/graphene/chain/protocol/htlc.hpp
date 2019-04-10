@@ -126,8 +126,8 @@ namespace graphene {
          struct fee_parameters_type {};
 
          htlc_redeemed_operation() {}
-         htlc_redeemed_operation( htlc_id_type htlc_id, account_id_type from, account_id_type to, asset amount) :
-               htlc_id(htlc_id), from(from), to(to), amount(amount) {}
+         htlc_redeemed_operation( htlc_id_type htlc_id, account_id_type from, account_id_type to, account_id_type redeemer, asset amount ) :
+               htlc_id(htlc_id), from(from), to(to), redeemer(redeemer), amount(amount) {}
 
          account_id_type fee_payer()const { return to; }
          void validate()const { FC_ASSERT( !"virtual operation" ); }
@@ -135,7 +135,7 @@ namespace graphene {
          share_type      calculate_fee(const fee_parameters_type& k)const { return 0; }
 
          htlc_id_type htlc_id;
-         account_id_type from, to;
+         account_id_type from, to, redeemer;
          asset amount;
          asset fee;
       };
@@ -206,6 +206,6 @@ FC_REFLECT( graphene::chain::htlc_refund_operation::fee_parameters_type, ) // VI
 FC_REFLECT( graphene::chain::htlc_create_operation, 
       (fee)(from)(to)(amount)(preimage_hash)(preimage_size)(claim_period_seconds)(extensions))
 FC_REFLECT( graphene::chain::htlc_redeem_operation, (fee)(htlc_id)(redeemer)(preimage)(extensions))
-FC_REFLECT( graphene::chain::htlc_redeemed_operation, (fee)(htlc_id)(from)(to)(amount) )
+FC_REFLECT( graphene::chain::htlc_redeemed_operation, (fee)(htlc_id)(from)(to)(redeemer)(amount) )
 FC_REFLECT( graphene::chain::htlc_extend_operation, (fee)(htlc_id)(update_issuer)(seconds_to_add)(extensions))
 FC_REFLECT( graphene::chain::htlc_refund_operation, (fee)(htlc_id)(to))
