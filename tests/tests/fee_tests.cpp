@@ -414,17 +414,17 @@ BOOST_AUTO_TEST_CASE( cashback_test )
     *                                                         L------->| pleb (Basic) |  *
     *                                                       95 Refers  \--------------/  *
     *                                                                                    *
-    * Fee distribution chains (80-20 referral/net split, 50-30 referrer/LTM split)       *
-    * life : 80% -> life, 20% -> net                                                     *
-    * rog: 80% -> rog, 20% -> net                                                        *
-    * ann (before upg): 80% -> life, 20% -> net                                          *
-    * ann (after upg): 80% * 5/8 -> ann, 80% * 3/8 -> life, 20% -> net                   *
-    * stud (before upg): 80% * 5/8 -> ann, 80% * 3/8 -> life, 20% * 80% -> rog,          *
-    *                    20% -> net                                                      *
-    * stud (after upg): 80% -> stud, 20% -> net                                          *
-    * dumy : 75% * 80% -> life, 25% * 80% -> rog, 20% -> net                             *
-    * scud : 80% * 5/8 -> ann, 80% * 3/8 -> life, 20% * 80% -> stud, 20% -> net          *
-    * pleb : 95% * 80% -> stud, 5% * 80% -> rog, 20% -> net                              *
+    * Fee distribution chains (50/30/20 referral/marketing partner/net split, 20-30 referrer/LTM split)       *
+    * life : 50% -> life, 30% -> mp, 20% -> net                                                     *
+    * rog: 50% -> rog, 20% -> net                                                        *
+    * ann (before upg): 50% -> life, 30% -> mp, 20% -> net                                          *
+    * ann (after upg): 75% * 20% -> ann, 25% * 20% + 30% -> life, 20% -> mp, 20% -> net                   *
+    * stud (before upg): 50% * 5/8 -> ann, 50% * 3/8 -> life, 20% * 50% -> rog,          *
+    *                    30% -> mp, 20% -> net                                                      *
+    * stud (after upg): 50% -> stud, 30% -> mp, 20% -> net                                            *
+    * dumy : 75% * 20% + 30% -> life, 25% * 20% -> rog, 30% -> mp, 20% -> net                              *
+    * scud : 20% * 80% -> ann, 30% -> life, 20% * 20%-> stud, 30% -> mp, 20% -> net           *
+    * pleb : 95% * 20% + 30% -> stud, 5% * 20% -> rog, 30% -> mp, 20% -> net                               *
     */
 
    BOOST_TEST_MESSAGE("Creating actors");
@@ -542,19 +542,6 @@ BOOST_AUTO_TEST_CASE( cashback_test )
    BOOST_TEST_MESSAGE("Register and upgrade Ann");
    {
       CustomRegisterActor(ann, life, life, 75);
-      // account_create_operation op; 
-      // op.registrar = life_id; 
-      // op.referrer = life_id; 
-      // op.referrer_percent = 75*GRAPHENE_1_PERCENT; 
-      // op.name = "ann"; 
-      // op.options.memo_key = ann_private_key.get_public_key(); 
-      // op.active = authority(1, public_key_type(ann_private_key.get_public_key()), 1); 
-      // op.owner = op.active; 
-      // op.fee = fees->calculate_fee(op); 
-      // trx.operations = {op}; 
-      // sign( trx,  life_private_key ); 
-      // ann_id = PUSH_TX( db, trx ).operation_results.front().get<object_id_type>(); 
-      // trx.clear();
       alife.vcb += reg_fee; alife.bal += -reg_fee;
       CustomAudit();
 
@@ -627,8 +614,9 @@ REG : net' ltm' ref'
    BOOST_TEST_MESSAGE("Wait for maintenance interval");
 
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-   // audit distribution of fees from life
+
    change_fees( new_fees );
+   // audit distribution of fees from life
    alife.ubal += pct( P100-network_pct-mp_pct, alife.ucb +alife.vcb );
    alife.ucb = 0; alife.vcb = 0;
 
@@ -637,31 +625,31 @@ REG : net' ltm' ref'
    arog.ucb = 0; arog.vcb = 0;
 
    // audit distribution of fees from ann
-   alife.ubal += pct( P100-network_pct-mp_pct,      lt_pct,                    aann.ucb+aann.vcb );
-   aann.ubal  += pct( P100-network_pct-mp_pct, P100-lt_pct,      aann.ref_pct, aann.ucb+aann.vcb );
-   alife.ubal += pct( P100-network_pct-mp_pct, P100-lt_pct, P100-aann.ref_pct, aann.ucb+aann.vcb );
+   alife.ubal += pct(lt_pct, aann.ucb+aann.vcb );
+   alife.ubal += pct(P100-adumy.ref_pct, P100-network_pct-mp_pct-lt_pct, aann.ucb+aann.vcb );
+   aann.ubal  += pct(adumy.ref_pct, P100-network_pct-mp_pct-lt_pct,  aann.ucb+aann.vcb );
    aann.ucb = 0; aann.vcb = 0;
 
    // audit distribution of fees from stud
-   astud.ubal += pct( P100-network_pct-mp_pct,                                  astud.ucb+astud.vcb );
+   astud.ubal += pct( P100-network_pct-mp_pct,  astud.ucb+astud.vcb );
    astud.ucb = 0; astud.vcb = 0;
 
    // audit distribution of fees from dumy
-   alife.ubal += pct( P100-network_pct-mp_pct,      lt_pct,                     adumy.ucb+adumy.vcb );
-   alife.ubal += pct( P100-network_pct-mp_pct, P100-lt_pct,      adumy.ref_pct, adumy.ucb+adumy.vcb );
-   arog.ubal  += pct( P100-network_pct-mp_pct, P100-lt_pct, P100-adumy.ref_pct, adumy.ucb+adumy.vcb );
+   alife.ubal += pct(adumy.ref_pct, P100-network_pct-mp_pct-lt_pct, adumy.ucb+adumy.vcb );
+   alife.ubal += pct(lt_pct, adumy.ucb+adumy.vcb );
+   arog.ubal  += pct(P100-adumy.ref_pct, P100-network_pct-mp_pct-lt_pct, adumy.ucb+adumy.vcb );
    adumy.ucb = 0; adumy.vcb = 0;
 
    // audit distribution of fees from scud
-   alife.ubal += pct( P100-network_pct-mp_pct,      lt_pct,                     ascud.ucb+ascud.vcb );
-   aann.ubal  += pct( P100-network_pct-mp_pct, P100-lt_pct,      ascud.ref_pct, ascud.ucb+ascud.vcb );
-   astud.ubal += pct( P100-network_pct-mp_pct, P100-lt_pct, P100-ascud.ref_pct, ascud.ucb+ascud.vcb );
+   alife.ubal += pct( lt_pct,  ascud.ucb+ascud.vcb );
+   aann.ubal  += pct(ascud.ref_pct, P100-network_pct-mp_pct-lt_pct,  ascud.ucb+ascud.vcb );
+   astud.ubal += pct(P100-ascud.ref_pct,  P100-network_pct-mp_pct-lt_pct,  ascud.ucb+ascud.vcb ); 
    ascud.ucb = 0; ascud.vcb = 0;
 
    // audit distribution of fees from pleb
-   astud.ubal += pct( P100-network_pct-mp_pct,      lt_pct,                     apleb.ucb+apleb.vcb );
-   astud.ubal += pct( P100-network_pct-mp_pct, P100-lt_pct,      apleb.ref_pct, apleb.ucb+apleb.vcb );
-   arog.ubal  += pct( P100-network_pct-mp_pct, P100-lt_pct, P100-apleb.ref_pct, apleb.ucb+apleb.vcb );
+   astud.ubal += pct(apleb.ref_pct, P100-network_pct-mp_pct-lt_pct, apleb.ucb+apleb.vcb );
+   astud.ubal += pct(lt_pct, apleb.ucb+apleb.vcb );
+   arog.ubal  += pct(P100-apleb.ref_pct, P100-network_pct-mp_pct-lt_pct, apleb.ucb+apleb.vcb );
    apleb.ucb = 0; apleb.vcb = 0;
 
    CustomAudit();
@@ -698,9 +686,11 @@ REG : net' ltm' ref'
    arog.ucb = 0; arog.vcb = 0;
 
    // audit distribution of fees from ann
-   alife.ubal += pct( P100-network_pct-mp_pct,      lt_pct,                    aann.ucb+aann.vcb );
-   aann.ubal  += pct( P100-network_pct-mp_pct, P100-lt_pct,      aann.ref_pct, aann.ucb+aann.vcb );
-   alife.ubal += pct( P100-network_pct-mp_pct, P100-lt_pct, P100-aann.ref_pct, aann.ucb+aann.vcb );
+   alife.ubal += pct(lt_pct, aann.ucb+aann.vcb );
+   alife.ubal += pct(P100-adumy.ref_pct, P100-network_pct-mp_pct-lt_pct, aann.ucb+aann.vcb );
+   aann.ubal  += pct(adumy.ref_pct, P100-network_pct-mp_pct-lt_pct,  aann.ucb+aann.vcb );
+   //aann.ubal  += pct( P100-network_pct-mp_pct, P100-lt_pct,      aann.ref_pct, aann.ucb+aann.vcb );
+   //alife.ubal += pct( P100-network_pct-mp_pct, P100-lt_pct, P100-aann.ref_pct, aann.ucb+aann.vcb );
    aann.ucb = 0; aann.vcb = 0;
 
    // audit distribution of fees from stud
@@ -708,23 +698,23 @@ REG : net' ltm' ref'
    astud.ucb = 0; astud.vcb = 0;
 
    // audit distribution of fees from dumy
-   alife.ubal += pct( P100-network_pct-mp_pct,      lt_pct,                     adumy.ucb+adumy.vcb );
-   alife.ubal += pct( P100-network_pct-mp_pct, P100-lt_pct,      adumy.ref_pct, adumy.ucb+adumy.vcb );
-   arog.ubal  += pct( P100-network_pct-mp_pct, P100-lt_pct, P100-adumy.ref_pct, adumy.ucb+adumy.vcb );
+   alife.ubal += pct(adumy.ref_pct, P100-network_pct-mp_pct-lt_pct, adumy.ucb+adumy.vcb );
+   alife.ubal += pct(lt_pct, adumy.ucb+adumy.vcb );
+   arog.ubal  += pct(P100-adumy.ref_pct, P100-network_pct-mp_pct-lt_pct, adumy.ucb+adumy.vcb );
    adumy.ucb = 0; adumy.vcb = 0;
 
    // audit distribution of fees from scud
-   alife.ubal += pct( P100-network_pct-mp_pct,      lt_pct,                     ascud.ucb+ascud.vcb );
-   aann.ubal  += pct( P100-network_pct-mp_pct, P100-lt_pct,      ascud.ref_pct, ascud.ucb+ascud.vcb );
-   astud.ubal += pct( P100-network_pct-mp_pct, P100-lt_pct, P100-ascud.ref_pct, ascud.ucb+ascud.vcb );
+   alife.ubal += pct( lt_pct,  ascud.ucb+ascud.vcb );
+   aann.ubal  += pct(ascud.ref_pct, P100-network_pct-mp_pct-lt_pct,  ascud.ucb+ascud.vcb );
+   astud.ubal += pct(P100-ascud.ref_pct,  P100-network_pct-mp_pct-lt_pct,  ascud.ucb+ascud.vcb ); 
    ascud.ucb = 0; ascud.vcb = 0;
 
    // audit distribution of fees from pleb
-   astud.ubal += pct( P100-network_pct-mp_pct,      lt_pct,                     apleb.ucb+apleb.vcb );
-   astud.ubal += pct( P100-network_pct-mp_pct, P100-lt_pct,      apleb.ref_pct, apleb.ucb+apleb.vcb );
-   arog.ubal  += pct( P100-network_pct-mp_pct, P100-lt_pct, P100-apleb.ref_pct, apleb.ucb+apleb.vcb );
+   astud.ubal += pct(apleb.ref_pct, P100-network_pct-mp_pct-lt_pct, apleb.ucb+apleb.vcb );
+   astud.ubal += pct(lt_pct, apleb.ucb+apleb.vcb );
+   arog.ubal  += pct(P100-apleb.ref_pct, P100-network_pct-mp_pct-lt_pct, apleb.ucb+apleb.vcb );
    apleb.ucb = 0; apleb.vcb = 0;
-
+   
    CustomAudit();
 
    BOOST_TEST_MESSAGE("Waiting for annual membership to expire");
@@ -744,9 +734,9 @@ REG : net' ltm' ref'
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    change_fees( new_fees );
    // audit distribution of fees from scud
-   alife.ubal += pct( P100-network_pct-mp_pct,      lt_pct,                     ascud.ucb+ascud.vcb );
-   alife.ubal += pct( P100-network_pct-mp_pct, P100-lt_pct,      ascud.ref_pct, ascud.ucb+ascud.vcb );
-   astud.ubal += pct( P100-network_pct-mp_pct, P100-lt_pct, P100-ascud.ref_pct, ascud.ucb+ascud.vcb );
+   alife.ubal += pct( lt_pct,  ascud.ucb+ascud.vcb );
+   aann.ubal  += pct(80*P1, P100-network_pct-mp_pct-lt_pct,  ascud.ucb+ascud.vcb );
+   astud.ubal += pct(20*P1,  P100-network_pct-mp_pct-lt_pct,  ascud.ucb+ascud.vcb ); 
    ascud.ucb = 0; ascud.vcb = 0;
 
    CustomAudit();
