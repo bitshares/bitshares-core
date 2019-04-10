@@ -643,7 +643,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
          op.delta_debt = delta_debt;
          op.extensions.value.target_collateral_ratio = target_cr;
 
-         const auto& curfees = *db.get_global_properties().parameters.current_fees;
+         const auto& curfees = db.get_global_properties().parameters.get_current_fees();
          const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
          proposal_create_operation prop;
          prop.fee_paying_account = proposer.id;
@@ -968,7 +968,7 @@ BOOST_AUTO_TEST_CASE( update_account )
          account_upgrade_operation op;
          op.account_to_upgrade = nathan.id;
          op.upgrade_to_lifetime_member = true;
-         op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
+         op.fee = db.get_global_properties().parameters.get_current_fees().calculate_fee(op);
          trx.operations = {op};
          PUSH_TX( db, trx, ~0 );
       }
@@ -1316,7 +1316,7 @@ BOOST_AUTO_TEST_CASE( update_uia_issuer )
           op.new_issuer = new_issuer.id;
           op.asset_to_update = asset_id;
 
-          const auto& curfees = *db.get_global_properties().parameters.current_fees;
+          const auto& curfees = db.get_global_properties().parameters.get_current_fees();
           const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
           proposal_create_operation prop;
           prop.fee_paying_account = issuer.id;

@@ -334,6 +334,9 @@ namespace graphene { namespace chain {
       friend bool operator == ( const extended_private_key_type& p1, const extended_private_key_type& p2);
       friend bool operator != ( const extended_private_key_type& p1, const extended_private_key_type& p2);
    };
+
+   // Forward-declare fee_schedule to allow typename reflection below
+   struct fee_schedule;
 } }  // graphene::chain
 
 namespace fc
@@ -344,7 +347,21 @@ namespace fc
     void from_variant( const fc::variant& var, graphene::chain::extended_public_key_type& vo, uint32_t max_depth = 2 );
     void to_variant( const graphene::chain::extended_private_key_type& var, fc::variant& vo, uint32_t max_depth = 2 );
     void from_variant( const fc::variant& var, graphene::chain::extended_private_key_type& vo, uint32_t max_depth = 2 );
+
+    // Define typename reflectors for shared_ptr<fee_schedule> here, so they're available everywhere that needs them
+    // (Cannot be done in fee_schedule.hpp because chain_parameters.hpp forward declares fee_schedule to make a shared_ptr to one)
+    template<> struct get_typename<std::shared_ptr<const graphene::chain::fee_schedule>> { static const char* name() {
+        return "shared_ptr<const fee_schedule>";
+    } };
+    template<> struct get_typename<std::shared_ptr<graphene::chain::fee_schedule>> { static const char* name() {
+        return "shared_ptr<fee_schedule>";
+    } };
+    void from_variant( const fc::variant& var, std::shared_ptr<const graphene::chain::fee_schedule>& vo,
+                       uint32_t max_depth = 2 );
 }
+namespace fc {
+}
+
 
 FC_REFLECT( graphene::chain::public_key_type, (key_data) )
 FC_REFLECT( graphene::chain::public_key_type::binary_key, (data)(check) )

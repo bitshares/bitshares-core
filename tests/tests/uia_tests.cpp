@@ -543,7 +543,7 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       op_p.common_options.core_exchange_rate = asset( 1 ) / asset( 1, asset_id_type( 1 ) );
       op_p.fee = core.amount(0);
 
-      const auto& curfees = *db.get_global_properties().parameters.current_fees;
+      const auto& curfees = db.get_global_properties().parameters.get_current_fees();
       const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
       proposal_create_operation prop;
       prop.fee_paying_account = alice_id;
