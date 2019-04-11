@@ -71,7 +71,6 @@
 #include <fc/network/rate_limiting.hpp>
 #include <fc/network/ip.hpp>
 #include <fc/network/resolve.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 #include <graphene/net/node.hpp>
 #include <graphene/net/peer_database.hpp>
