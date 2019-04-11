@@ -321,7 +321,6 @@ namespace graphene { namespace net {
         fc::variant_object get_call_statistics() const;
       protected:
         std::unique_ptr<detail::node_impl, detail::node_impl_deleter> my;
-      protected:
         // This should only be used for testing
         std::shared_ptr<fc::thread> get_thread();
    };
