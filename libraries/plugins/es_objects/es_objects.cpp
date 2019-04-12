@@ -46,8 +46,9 @@ class es_objects_plugin_impl
       {  curl = curl_easy_init(); }
       virtual ~es_objects_plugin_impl();
 
-      bool index_database( const vector<object_id_type>& ids, std::string action);
-      void remove_from_database( object_id_type id, std::string index);
+      bool index_database(const vector<object_id_type>& ids, std::string action);
+      void genesis();
+      void remove_from_database(object_id_type id, std::string index);
 
       es_objects_plugin& _self;
       std::string _es_objects_elasticsearch_url = "http://localhost:9200/";
@@ -67,6 +68,7 @@ class es_objects_plugin_impl
       vector<std::string> prepare;
 
       bool _es_objects_keep_only_current = true;
+      bool _es_objects_load_genesis = true;
 
       uint32_t block_number;
       fc::time_point_sec block_time;
@@ -76,9 +78,63 @@ class es_objects_plugin_impl
       void prepareTemplate(T blockchain_object, string index_name);
 };
 
-bool es_objects_plugin_impl::index_database( const vector<object_id_type>& ids, std::string action)
+void es_objects_plugin_impl::genesis()
+{
+   ilog("elasticsearch OBJECTS: inserting data from genesis");
+
+   graphene::chain::database &db = _self.database();
+
+   block_number = 1;
+   auto block1 = db.fetch_block_by_number(1);
+   if(block1.valid())
+      block_time = block1->timestamp;
+   else
+      block_time = db.head_block_time();
+
+   if(_es_objects_accounts) {
+      auto& index_accounts = db.get_index( 1, 2 );
+      index_accounts.inspect_all_objects([this, &db](const graphene::db::object& o) {
+         auto obj = db.find_object(o.id);
+         auto a = static_cast<const account_object *>(obj);
+         prepareTemplate<account_object>(*a, "account");
+      });
+   }
+   if(_es_objects_assets) {
+      auto &index_assets = db.get_index(1, 3);
+      index_assets.inspect_all_objects([this, &db](const graphene::db::object &o) {
+         auto obj = db.find_object(o.id);
+         auto a = static_cast<const asset_object *>(obj);
+         prepareTemplate<asset_object>(*a, "asset");
+      });
+   }
+   if(_es_objects_balances) {
+      auto &index_balances = db.get_index(2, 5);
+      index_balances.inspect_all_objects([this, &db](const graphene::db::object &o) {
+         auto obj = db.find_object(o.id);
+         auto b = static_cast<const account_balance_object *>(obj);
+         prepareTemplate<account_balance_object>(*b, "balance");
+      });
+   }
+
+   graphene::utilities::ES es;
+   es.curl = curl;
+   es.bulk_lines = bulk;
+   es.elasticsearch_url = _es_objects_elasticsearch_url;
+   es.auth = _es_objects_auth;
+   if(!graphene::utilities::SendBulk(std::move(es)))
+      FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error inserting genesis data.");
+   else
+      bulk.clear();
+}
+
+bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, std::string action)
 {
    graphene::chain::database &db = _self.database();
+
+   if(_es_objects_load_genesis) {
+      genesis();
+      _es_objects_load_genesis = false;
+   }
 
    block_time = db.head_block_time();
    block_number = db.head_block_num();
@@ -260,6 +316,7 @@ void es_objects_plugin::plugin_set_program_options(
          ("es-objects-index-prefix", boost::program_options::value<std::string>(), "Add a prefix to the index(objects-)")
          ("es-objects-keep-only-current", boost::program_options::value<bool>(), "Keep only current state of the objects(true)")
          ("es-objects-start-es-after-block", boost::program_options::value<uint32_t>(), "Start doing ES job after block(0)")
+         ("es-objects-load-genesis", boost::program_options::value<bool>(), "Load genesis data to ES(true)")
          ;
    cfg.add(cli);
 }
@@ -324,6 +381,9 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
    }
    if (options.count("es-objects-start-es-after-block")) {
       my->_es_objects_start_es_after_block = options["es-objects-start-es-after-block"].as<uint32_t>();
+   }
+   if (options.count("es-objects-load-genesis")) {
+      my->_es_objects_load_genesis = options["es-objects-load-genesis"].as<bool>();
    }
 }
 
