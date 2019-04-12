@@ -58,6 +58,7 @@ BOOST_AUTO_TEST_CASE( create_advanced_uia )
       creator.common_options.flags = charge_market_fee|white_list|override_authority|disable_confidential;
       creator.common_options.core_exchange_rate = price(asset(2),asset(1,asset_id_type(1)));
       creator.common_options.whitelist_authorities = creator.common_options.blacklist_authorities = {account_id_type()};
+
       trx.operations.push_back(std::move(creator));
       PUSH_TX( db, trx, ~0 );
 
@@ -73,6 +74,7 @@ BOOST_AUTO_TEST_CASE( create_advanced_uia )
       BOOST_CHECK(test_asset_dynamic_data.current_supply == 0);
       BOOST_CHECK(test_asset_dynamic_data.accumulated_fees == 0);
       BOOST_CHECK(test_asset_dynamic_data.fee_pool == 0);
+
    } catch(fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -520,7 +522,7 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       op_p.common_options.core_exchange_rate = asset( 1 ) / asset( 1, asset_id_type( 1 ) );
       op_p.fee = core.amount(0);
 
-      const auto& curfees = *db.get_global_properties().parameters.current_fees;
+      const auto& curfees = db.get_global_properties().parameters.get_current_fees();
       const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
       proposal_create_operation prop;
       prop.fee_paying_account = alice_id;

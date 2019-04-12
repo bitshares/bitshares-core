@@ -25,6 +25,7 @@
 #include <graphene/app/database_api.hpp>
 #include <graphene/app/util.hpp>
 #include <graphene/chain/get_config.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <fc/bloom_filter.hpp>
 
@@ -387,6 +388,10 @@ market_ticker::market_ticker(const market_ticker_object& mto,
    time = now;
    base = asset_base.symbol;
    quote = asset_quote.symbol;
+   percent_change = "0";
+   lowest_ask = "0";
+   highest_bid = "0";
+
    fc::uint128 bv;
    fc::uint128 qv;
    price latest_price = asset( mto.latest_base, mto.base ) / asset( mto.latest_quote, mto.quote );
@@ -418,6 +423,20 @@ market_ticker::market_ticker(const market_ticker_object& mto,
       lowest_ask = orders.asks[0].price;
    if(!orders.bids.empty())
       highest_bid = orders.bids[0].price;
+}
+market_ticker::market_ticker(const fc::time_point_sec& now,
+                             const asset_object& asset_base,
+                             const asset_object& asset_quote)
+{
+   time = now;
+   base = asset_base.symbol;
+   quote = asset_quote.symbol;
+   latest = "0";
+   lowest_ask = "0";
+   highest_bid = "0";
+   percent_change = "0";
+   base_volume = "0";
+   quote_volume = "0";
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -649,7 +668,6 @@ dynamic_global_property_object database_api_impl::get_dynamic_global_properties(
 
 vector<vector<account_id_type>> database_api::get_key_references( vector<public_key_type> key )const
 {
-   FC_ASSERT(key.size() <= 100, "Number of keys must be 100 or less");
    return my->get_key_references( key );
 }
 
@@ -658,6 +676,8 @@ vector<vector<account_id_type>> database_api::get_key_references( vector<public_
  */
 vector<vector<account_id_type>> database_api_impl::get_key_references( vector<public_key_type> keys )const
 {
+   uint64_t api_limit_get_key_references=_app_options->api_limit_get_key_references;
+   FC_ASSERT(keys.size() <= api_limit_get_key_references);
    const auto& idx = _db.get_index_type<account_index>();
    const auto& aidx = dynamic_cast<const base_primary_index&>(idx);
    const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
@@ -1272,14 +1292,13 @@ vector<call_order_object> database_api_impl::get_call_orders(const std::string& 
 {
    FC_ASSERT( limit <= 300 );
 
-   const asset_id_type asset_a_id = get_asset_from_string(a)->id;
-   const auto& call_index = _db.get_index_type<call_order_index>().indices().get<by_price>();
-   const asset_object& mia = _db.get(asset_a_id);
-   price index_price = price::min(mia.bitasset_data(_db).options.short_backing_asset, mia.get_id());
+   const asset_object* mia = get_asset_from_string(a);
+   const auto& call_index = _db.get_index_type<call_order_index>().indices().get<by_collateral>();
+   price index_price = price::min( mia->bitasset_data(_db).options.short_backing_asset, mia->get_id() );
    
    vector< call_order_object> result;
-   auto itr_min = call_index.lower_bound(index_price.min());
-   auto itr_max = call_index.lower_bound(index_price.max());
+   auto itr_min = call_index.lower_bound(index_price);
+   auto itr_max = call_index.upper_bound(index_price.max());
    while( itr_min != itr_max && result.size() < limit ) 
    {
       result.emplace_back(*itr_min);
@@ -1433,7 +1452,7 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
       return market_ticker(*itr, now, *assets[0], *assets[1], orders);
    }
    // if no ticker is found for this market we return an empty ticker
-   market_ticker empty_result;
+   market_ticker empty_result(now, *assets[0], *assets[1]);
    return empty_result;
 }
 
@@ -2039,10 +2058,12 @@ set<public_key_type> database_api::get_required_signatures( const signed_transac
 
 set<public_key_type> database_api_impl::get_required_signatures( const signed_transaction& trx, const flat_set<public_key_type>& available_keys )const
 {
+   bool allow_non_immediate_owner = ( _db.head_block_time() >= HARDFORK_CORE_584_TIME );
    auto result = trx.get_required_signatures( _db.get_chain_id(),
                                        available_keys,
                                        [&]( account_id_type id ){ return &id(_db).active; },
                                        [&]( account_id_type id ){ return &id(_db).owner; },
+                                       allow_non_immediate_owner,
                                        _db.get_global_properties().parameters.max_authority_depth );
    return result;
 }
@@ -2058,6 +2079,7 @@ set<address> database_api::get_potential_address_signatures( const signed_transa
 
 set<public_key_type> database_api_impl::get_potential_signatures( const signed_transaction& trx )const
 {
+   bool allow_non_immediate_owner = ( _db.head_block_time() >= HARDFORK_CORE_584_TIME );
    set<public_key_type> result;
    trx.get_required_signatures(
       _db.get_chain_id(),
@@ -2076,6 +2098,7 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
             result.insert(k);
          return &auth;
       },
+      allow_non_immediate_owner,
       _db.get_global_properties().parameters.max_authority_depth
    );
 
@@ -2123,10 +2146,12 @@ bool database_api::verify_authority( const signed_transaction& trx )const
 
 bool database_api_impl::verify_authority( const signed_transaction& trx )const
 {
+   bool allow_non_immediate_owner = ( _db.head_block_time() >= HARDFORK_CORE_584_TIME );
    trx.verify_authority( _db.get_chain_id(),
                          [this]( account_id_type id ){ return &id(_db).active; },
                          [this]( account_id_type id ){ return &id(_db).owner; },
-                          _db.get_global_properties().parameters.max_authority_depth );
+                         allow_non_immediate_owner,
+                         _db.get_global_properties().parameters.max_authority_depth );
    return true;
 }
 
@@ -2148,7 +2173,8 @@ bool database_api_impl::verify_account_authority( const string& account_name_or_
    {
       graphene::chain::verify_authority(ops, keys,
             [this]( account_id_type id ){ return &id(_db).active; },
-            [this]( account_id_type id ){ return &id(_db).owner; } );
+            [this]( account_id_type id ){ return &id(_db).owner; },
+            true );
    } 
    catch (fc::exception& ex)
    {

@@ -233,7 +233,7 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          && global_properties.parameters.account_fee_scale_bitshifts != 0 )
    {
       d.modify(global_properties, [](global_property_object& p) {
-         p.parameters.current_fees->get<account_create_operation>().basic_fee <<= p.parameters.account_fee_scale_bitshifts;
+         p.parameters.get_mutable_fees().get<account_create_operation>().basic_fee <<= p.parameters.account_fee_scale_bitshifts;
       });
    }
 

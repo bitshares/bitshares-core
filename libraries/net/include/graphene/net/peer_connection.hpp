@@ -65,6 +65,7 @@ namespace graphene { namespace net
     class peer_connection_delegate
     {
     public:
+      virtual ~peer_connection_delegate() = default;
       virtual void on_message(peer_connection* originating_peer,
                               const message& received_message) = 0;
       virtual void on_connection_closed(peer_connection* originating_peer) = 0;

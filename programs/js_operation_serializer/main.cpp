@@ -31,6 +31,7 @@
 #include <graphene/chain/confidential_object.hpp>
 #include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/market_object.hpp>
+#include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
