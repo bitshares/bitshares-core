@@ -84,12 +84,8 @@ void es_objects_plugin_impl::genesis()
 
    graphene::chain::database &db = _self.database();
 
-   block_number = 1;
-   auto block1 = db.fetch_block_by_number(1);
-   if(block1.valid())
-      block_time = block1->timestamp;
-   else
-      block_time = db.head_block_time();
+   block_number = db.head_block_num();
+   block_time = db.head_block_time();
 
    if(_es_objects_accounts) {
       auto& index_accounts = db.get_index( 1, 2 );
@@ -316,7 +312,8 @@ void es_objects_plugin::plugin_set_program_options(
          ("es-objects-index-prefix", boost::program_options::value<std::string>(), "Add a prefix to the index(objects-)")
          ("es-objects-keep-only-current", boost::program_options::value<bool>(), "Keep only current state of the objects(true)")
          ("es-objects-start-es-after-block", boost::program_options::value<uint32_t>(), "Start doing ES job after block(0)")
-         ("es-objects-load-genesis", boost::program_options::value<bool>(), "Load genesis data to ES(true)")
+         ("es-objects-load-genesis", boost::program_options::value<bool>(), "Index whatever is in the database on startup."
+                                                                            "Used to load genesis data into ES(true)")
          ;
    cfg.add(cli);
 }
