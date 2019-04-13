@@ -73,12 +73,17 @@ class required_approval_index : public secondary_index
    public:
       virtual void object_inserted( const object& obj ) override;
       virtual void object_removed( const object& obj ) override;
-      virtual void about_to_modify( const object& before ) override{};
-      virtual void object_modified( const object& after  ) override{};
-
-      void remove( account_id_type a, proposal_id_type p );
+      virtual void about_to_modify( const object& before ) override;
+      virtual void object_modified( const object& after  ) override;
 
       map<account_id_type, set<proposal_id_type> > _account_to_proposals;
+
+   private:
+      void remove( account_id_type a, proposal_id_type p );
+      void insert_or_remove_delta( proposal_id_type p, const flat_set<account_id_type>& before,
+                                   const flat_set<account_id_type>& after );
+      flat_set<account_id_type> available_active_before_modify;
+      flat_set<account_id_type> available_owner_before_modify;
 };
 
 struct by_expiration{};
