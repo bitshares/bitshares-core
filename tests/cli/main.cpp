@@ -547,7 +547,6 @@ BOOST_FIXTURE_TEST_CASE( cli_cant_get_signers_from_modified_transaction, cli_fix
       con.wallet_api_ptr->register_account(
          "test", test_bki.pub_key, test_bki.pub_key, "nathan", "nathan", 0, true
       );
-      const auto &test_acc = con.wallet_api_ptr->get_account("test");
 
       // create and sign transaction
       signed_transaction trx;
