@@ -533,7 +533,7 @@ public:
    }
 
    template<typename ID>
-   typename graphene::db::object_downcast_t<ID>get_object(ID id)const
+   graphene::db::object_downcast_t<ID> get_object(ID id)const
    {
       auto ob = _remote_db->get_objects({id}).front();
       return ob.template as<graphene::db::object_downcast_t<ID>>( GRAPHENE_MAX_NESTED_OBJECTS );
