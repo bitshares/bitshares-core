@@ -1805,7 +1805,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
 { try {
 
    const share_type prec = asset::scaled_precision( asset_id_type()(db).precision );
-
+   
    // there is an immediate maintenance interval in the first block
    //   which will initialize last_budget_time
    generate_block();
@@ -1828,20 +1828,24 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    const asset_object* core = &asset_id_type()(db);
    const account_object* nathan = &get_account("nathan");
    enable_fees();
+
+   // Marketing_partner takes 30% of fees, the rest goes into network/lifetime/referral
+   BOOST_CHECK_EQUAL( db.current_fee_schedule().get<account_upgrade_operation>().membership_lifetime_fee *.7, 700000000 );
    BOOST_CHECK_GT(db.current_fee_schedule().get<account_upgrade_operation>().membership_lifetime_fee, 0);
    // Based on the size of the reserve fund later in the test, the witness budget will be set to this value
    const uint64_t ref_budget =
-      ((uint64_t( db.current_fee_schedule().get<account_upgrade_operation>().membership_lifetime_fee )
+      ((uint64_t( db.current_fee_schedule().get<account_upgrade_operation>().membership_lifetime_fee *.7 )
          * GRAPHENE_CORE_ASSET_CYCLE_RATE * 30
          * block_interval
        ) + ((uint64_t(1) << GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS)-1)
       ) >> GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS
       ;
+
    // change this if ref_budget changes
-   BOOST_CHECK_EQUAL( ref_budget, 594 );
+   BOOST_CHECK_EQUAL( ref_budget, 416 );
    const uint64_t witness_ppb = ref_budget * 10 / 23 + 1;
    // change this if ref_budget changes
-   BOOST_CHECK_EQUAL( witness_ppb, 259 );
+   BOOST_CHECK_EQUAL( witness_ppb, 181 );
    // following two inequalities need to hold for maximal code coverage
    BOOST_CHECK_LT( witness_ppb * 2, ref_budget );
    BOOST_CHECK_GT( witness_ppb * 3, ref_budget );
@@ -1890,10 +1894,10 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    BOOST_CHECK_EQUAL( db.head_block_time().sec_since_epoch() - pay_fee_time, 24 * block_interval );
 
    schedule_maint();
-   // The 80% lifetime referral fee went to the committee account, which burned it. Check that it's here.
-   BOOST_CHECK( core->reserved(db).value == 8000*prec );
+   // The 50% lifetime referral fee went to the committee account, which burned it. Check that it's here.
+   BOOST_CHECK( core->reserved(db).value == 5000*prec );
    generate_block();
-   BOOST_CHECK_EQUAL( core->reserved(db).value, 999999406 );
+   BOOST_CHECK_EQUAL( core->reserved(db).value, 699999584 );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget );
    // first witness paid from old budget (so no pay)
    BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
@@ -1914,7 +1918,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    generate_block();
    BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
-   BOOST_CHECK_EQUAL(core->reserved(db).value, 999999406 );
+   BOOST_CHECK_EQUAL(core->reserved(db).value, 699999584 );
 
 } FC_LOG_AND_RETHROW() }
 

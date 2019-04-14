@@ -79,7 +79,7 @@ void database::handle_marketing_fees()
    {
       auto& acnt_indx = get_index_type<account_index>();
       auto marketing_partner_itr = acnt_indx.indices().get<by_name>().find( gpo.marketing_partner_account_name );
-      if ( marketing_partner_itr == acnt_indx.indices().get<by_name>().end() )
+      if ( marketing_partner_itr != acnt_indx.indices().get<by_name>().end() )
       {
          // Found current marketing partner account.
          // Now give the marketing partner all the accumulated fees for them and zero it out on the db
