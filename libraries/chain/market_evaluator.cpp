@@ -32,7 +32,7 @@
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/is_authorized_asset.hpp>
 
-#include <graphene/chain/protocol/market.hpp>
+#include <graphene/protocol/market.hpp>
 
 #include <fc/uint128.hpp>
 

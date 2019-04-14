@@ -33,7 +33,7 @@
 #include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/market_evaluator.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 
 #include <fc/uint128.hpp>
 
@@ -58,7 +58,7 @@ database& generic_evaluator::db()const { return trx_state->db(); }
       fee_paying_account = &account_id(d);
       fee_paying_account_statistics = &fee_paying_account->statistics(d);
 
-      fee_asset = &fee.asset_id(d);
+      fee_asset = &asset_id_type(fee.asset_id)(d);
       fee_asset_dyn_data = &fee_asset->dynamic_asset_data_id(d);
 
       FC_ASSERT( is_authorized_asset( d, *fee_paying_account, *fee_asset ), 

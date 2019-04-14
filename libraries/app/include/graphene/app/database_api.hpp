@@ -25,7 +25,7 @@
 
 #include <graphene/app/full_account.hpp>
 
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/types.hpp>
 
 #include <graphene/chain/database.hpp>
 

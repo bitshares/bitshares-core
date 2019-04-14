@@ -28,7 +28,7 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/mem_fun.hpp>
 
-namespace graphene { namespace chain {
+namespace graphene { namespace db {
 
    using boost::multi_index_container;
    using namespace boost::multi_index;

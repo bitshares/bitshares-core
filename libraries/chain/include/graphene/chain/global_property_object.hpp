@@ -24,8 +24,8 @@
 #pragma once
 #include <fc/uint128.hpp>
 
-#include <graphene/chain/protocol/chain_parameters.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/chain_parameters.hpp>
+#include <graphene/chain/types.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/db/object.hpp>
 
@@ -123,6 +123,9 @@ namespace graphene { namespace chain {
          };
    };
 }}
+
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::dynamic_global_property_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::global_property_object)
 
 FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_object, (graphene::db::object),
                     (head_block_number)

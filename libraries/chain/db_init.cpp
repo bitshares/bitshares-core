@@ -64,8 +64,6 @@
 #include <graphene/chain/worker_evaluator.hpp>
 #include <graphene/chain/htlc_evaluator.hpp>
 
-#include <graphene/chain/protocol/fee_schedule.hpp>
-
 #include <fc/uint128.hpp>
 #include <fc/crypto/digest.hpp>
 

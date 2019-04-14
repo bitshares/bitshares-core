@@ -25,7 +25,7 @@
 
 #include <graphene/app/plugin.hpp>
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/types.hpp>
 
 #include <fc/thread/future.hpp>
 #include <fc/container/flat.hpp>

@@ -29,7 +29,7 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/get_config.hpp>
 #include <graphene/utilities/key_conversion.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 #include <graphene/chain/confidential_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/transaction_object.hpp>

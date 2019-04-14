@@ -24,7 +24,7 @@
 #pragma once
 
 #include <graphene/net/config.hpp>
-#include <graphene/chain/protocol/block.hpp>
+#include <graphene/protocol/block.hpp>
 
 #include <fc/crypto/ripemd160.hpp>
 #include <fc/crypto/elliptic.hpp>
@@ -40,10 +40,10 @@
 #include <vector>
 
 namespace graphene { namespace net {
-  using graphene::chain::signed_transaction;
-  using graphene::chain::block_id_type;
-  using graphene::chain::transaction_id_type;
-  using graphene::chain::signed_block;
+  using graphene::protocol::signed_transaction;
+  using graphene::protocol::block_id_type;
+  using graphene::protocol::transaction_id_type;
+  using graphene::protocol::signed_block;
 
   typedef fc::ecc::public_key_data node_id_t;
   typedef fc::ripemd160 item_hash_t;
@@ -95,9 +95,9 @@ namespace graphene { namespace net {
    {
       static const core_message_type_enum type;
 
-      graphene::chain::precomputable_transaction trx;
+      graphene::protocol::precomputable_transaction trx;
       trx_message() {}
-      trx_message(graphene::chain::signed_transaction transaction) :
+      trx_message(graphene::protocol::signed_transaction transaction) :
         trx(std::move(transaction))
       {}
    };

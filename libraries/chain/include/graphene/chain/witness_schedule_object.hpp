@@ -22,7 +22,7 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/types.hpp>
 #include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
 
@@ -40,6 +40,8 @@ class witness_schedule_object : public graphene::db::abstract_object<witness_sch
 };
 
 } }
+
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::witness_schedule_object)
 
 FC_REFLECT_DERIVED(
    graphene::chain::witness_schedule_object,

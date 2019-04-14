@@ -38,7 +38,7 @@
 
 #include <fc/optional.hpp>
 
-#include <graphene/chain/protocol/htlc.hpp>
+#include <graphene/protocol/htlc.hpp>
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/hardfork.hpp>

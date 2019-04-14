@@ -25,13 +25,14 @@
 
 #include <boost/multi_index/composite_key.hpp>
 #include <fc/time.hpp>
-#include <graphene/chain/protocol/types.hpp>
-#include <graphene/chain/protocol/htlc.hpp>
-#include <graphene/chain/protocol/asset.hpp>
+#include <graphene/protocol/types.hpp>
+#include <graphene/protocol/htlc.hpp>
+#include <graphene/protocol/asset.hpp>
 #include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
 
 namespace graphene { namespace chain {
+   using namespace protocol;
 
    /**
     * @brief database object to store HTLCs
@@ -118,6 +119,8 @@ namespace graphene { namespace chain {
    typedef generic_index< htlc_object, htlc_object_index_type > htlc_index;
 
 } } // namespace graphene::chain
+
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::htlc_object)
 
 FC_REFLECT( graphene::chain::htlc_object::transfer_info, 
    (from) (to) (amount) (asset_id) )

@@ -24,7 +24,7 @@
 
 #include <graphene/chain/get_config.hpp>
 #include <graphene/chain/config.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/types.hpp>
 
 namespace graphene { namespace chain {
 

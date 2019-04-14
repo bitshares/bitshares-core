@@ -22,28 +22,10 @@
  * THE SOFTWARE.
  */
 
-#include <graphene/chain/protocol/special_authority.hpp>
+#include <graphene/chain/special_authority.hpp>
 #include <graphene/chain/database.hpp>
 
 namespace graphene { namespace chain {
-
-struct special_authority_validate_visitor
-{
-   typedef void result_type;
-
-   void operator()( const no_special_authority& a ) {}
-
-   void operator()( const top_holders_special_authority& a )
-   {
-      FC_ASSERT( a.num_top_holders > 0 );
-   }
-};
-
-void validate_special_authority( const special_authority& a )
-{
-   special_authority_validate_visitor vtor;
-   a.visit( vtor );
-}
 
 struct special_authority_evaluate_visitor
 {
@@ -55,7 +37,7 @@ struct special_authority_evaluate_visitor
 
    void operator()( const top_holders_special_authority& a )
    {
-      a.asset(db);     // require asset to exist
+      db.get(a.asset);     // require asset to exist
    }
 
    const database& db;

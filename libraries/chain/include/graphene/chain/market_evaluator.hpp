@@ -23,7 +23,7 @@
  */
 #pragma once
 #include <graphene/chain/evaluator.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/chain/types.hpp>
 
 namespace graphene { namespace chain {
 
@@ -31,10 +31,8 @@ namespace graphene { namespace chain {
    class asset_object;
    class asset_bitasset_data_object;
    class call_order_object;
-   struct bid_collateral_operation;
-   struct call_order_update_operation;
-   struct limit_order_cancel_operation;
-   struct limit_order_create_operation;
+   class limit_order_object;
+   class collateral_bid_object;
 
    class limit_order_create_evaluator : public evaluator<limit_order_create_evaluator>
    {

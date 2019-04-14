@@ -91,14 +91,23 @@ namespace graphene { namespace db {
    class object;
    class object_database;
 
-   template<uint8_t SpaceID, uint8_t TypeID, typename T = object>
+   /// This template is used to downcast a generic object type to a specific xyz_object type.
+   template<typename ObjectID>
+   struct object_downcast { using type = object; };
+   // This macro specializes the above template for a specific xyz_object type
+#define MAP_OBJECT_ID_TO_TYPE(OBJECT) \
+   namespace graphene { namespace db { \
+   template<> \
+   struct object_downcast<graphene::db::object_id<OBJECT::space_id, OBJECT::type_id>> { using type = OBJECT; }; \
+   } }
+
+   template<uint8_t SpaceID, uint8_t TypeID>
    struct object_id
    {
-      typedef T type;
       static const uint8_t space_id = SpaceID;
       static const uint8_t type_id = TypeID;
 
-      object_id(){}
+      object_id() = default;
       object_id( unsigned_int i ):instance(i){}
       explicit object_id( uint64_t i ):instance(i)
       {
@@ -115,14 +124,18 @@ namespace graphene { namespace db {
       explicit operator uint64_t()const { return object_id_type( *this ).number; }
 
       template<typename DB>
-      const T& operator()(const DB& db)const { return db.get(*this); }
+      auto operator()(const DB& db)const -> const decltype(db.get(*this))& { return db.get(*this); }
 
       friend bool  operator == ( const object_id& a, const object_id& b ) { return a.instance == b.instance; }
       friend bool  operator != ( const object_id& a, const object_id& b ) { return a.instance != b.instance; }
       friend bool  operator == ( const object_id_type& a, const object_id& b ) { return a == object_id_type(b); }
       friend bool  operator != ( const object_id_type& a, const object_id& b ) { return a != object_id_type(b); }
-      friend bool  operator == ( const object_id& b, const object_id_type& a ) { return a == object_id_type(b); }
-      friend bool  operator != ( const object_id& b, const object_id_type& a ) { return a != object_id_type(b); }
+      friend bool  operator == ( const object_id& a, const object_id_type& b ) { return object_id_type(a) == b; }
+      friend bool  operator != ( const object_id& a, const object_id_type& b ) { return object_id_type(a) != b; }
+      friend bool  operator == ( const object_id& a, const fc::unsigned_int& b ) { return a.instance == b; }
+      friend bool  operator != ( const object_id& a, const fc::unsigned_int& b ) { return a.instance != b; }
+      friend bool  operator == ( const fc::unsigned_int& a, const object_id& b ) { return a == b.instance; }
+      friend bool  operator != ( const fc::unsigned_int& a, const object_id& b ) { return a != b.instance; }
 
       friend bool  operator < ( const object_id& a, const object_id& b ) { return a.instance.value < b.instance.value; }
       friend bool  operator > ( const object_id& a, const object_id& b ) { return a.instance.value > b.instance.value; }
@@ -138,8 +151,8 @@ FC_REFLECT( graphene::db::object_id_type, (number) )
 
 // REFLECT object_id manually because it has 2 template params
 namespace fc {
-template<uint8_t SpaceID, uint8_t TypeID, typename T>
-struct get_typename<graphene::db::object_id<SpaceID,TypeID,T>>
+template<uint8_t SpaceID, uint8_t TypeID>
+struct get_typename<graphene::db::object_id<SpaceID,TypeID>>
 {
    static const char* name() {
       return typeid(get_typename).name();
@@ -148,10 +161,10 @@ struct get_typename<graphene::db::object_id<SpaceID,TypeID,T>>
    }
 };
 
-template<uint8_t SpaceID, uint8_t TypeID, typename T>
-struct reflector<graphene::db::object_id<SpaceID,TypeID,T> >
+template<uint8_t SpaceID, uint8_t TypeID>
+struct reflector<graphene::db::object_id<SpaceID,TypeID> >
 {
-    typedef graphene::db::object_id<SpaceID,TypeID,T> type;
+    typedef graphene::db::object_id<SpaceID,TypeID> type;
     typedef fc::true_type  is_defined;
     typedef fc::false_type is_enum;
     enum  member_count_enum {
@@ -188,13 +201,13 @@ struct reflector<graphene::db::object_id<SpaceID,TypeID,T> >
     FC_ASSERT( type_id <= 0xff );
     vo.number |= (space_id << 56) | (type_id << 48);
  } FC_CAPTURE_AND_RETHROW( (var) ) }
- template<uint8_t SpaceID, uint8_t TypeID, typename T>
- void to_variant( const graphene::db::object_id<SpaceID,TypeID,T>& var,  fc::variant& vo, uint32_t max_depth = 1 )
+ template<uint8_t SpaceID, uint8_t TypeID>
+ void to_variant( const graphene::db::object_id<SpaceID,TypeID>& var,  fc::variant& vo, uint32_t max_depth = 1 )
  {
     vo = fc::to_string(SpaceID) + "." + fc::to_string(TypeID) + "." + fc::to_string(var.instance.value);
  }
- template<uint8_t SpaceID, uint8_t TypeID, typename T>
- void from_variant( const fc::variant& var,  graphene::db::object_id<SpaceID,TypeID,T>& vo, uint32_t max_depth = 1 )
+ template<uint8_t SpaceID, uint8_t TypeID>
+ void from_variant( const fc::variant& var,  graphene::db::object_id<SpaceID,TypeID>& vo, uint32_t max_depth = 1 )
  { try {
     const auto& s = var.get_string();
     auto first_dot = s.find('.');

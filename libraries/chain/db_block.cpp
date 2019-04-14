@@ -33,9 +33,10 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
 #include <graphene/chain/witness_object.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/evaluator.hpp>
+
+#include <graphene/protocol/fee_schedule.hpp>
 
 #include <fc/thread/parallel.hpp>
 

@@ -26,13 +26,13 @@
  * Convert BTC / PTS addresses to a Graphene address.
  */
 
-#include <graphene/chain/pts_address.hpp>
-#include <graphene/chain/protocol/address.hpp>
+#include <graphene/protocol/pts_address.hpp>
+#include <graphene/protocol/address.hpp>
 
 #include <iostream>
 #include <string>
 
-using namespace graphene::chain;
+using namespace graphene::protocol;
 
 int main(int argc, char** argv)
 {

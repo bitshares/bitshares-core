@@ -82,7 +82,7 @@ class account_history_plugin : public graphene::app::plugin
 
 } } //graphene::account_history
 
-/*struct by_id;
+/*
 struct by_seq;
 struct by_op;
 typedef boost::multi_index_container<
