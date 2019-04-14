@@ -100,6 +100,8 @@ namespace graphene { namespace db {
    template<> \
    struct object_downcast<graphene::db::object_id<OBJECT::space_id, OBJECT::type_id>> { using type = OBJECT; }; \
    } }
+   template<typename ObjectID>
+   using object_downcast_t = typename object_downcast<ObjectID>::type;
 
    template<uint8_t SpaceID, uint8_t TypeID>
    struct object_id

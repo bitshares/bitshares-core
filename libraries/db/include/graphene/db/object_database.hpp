@@ -122,13 +122,13 @@ namespace graphene { namespace db {
          }
 
          template<uint8_t SpaceID, uint8_t TypeID>
-         auto find( object_id<SpaceID,TypeID> id )const -> const typename object_downcast<decltype(id)>::type* {
-             return find<typename object_downcast<decltype(id)>::type>(id);
+         auto find( object_id<SpaceID,TypeID> id )const -> const object_downcast_t<decltype(id)>* {
+             return find<object_downcast_t<decltype(id)>>(id);
          }
 
          template<uint8_t SpaceID, uint8_t TypeID>
-         auto get( object_id<SpaceID,TypeID> id )const -> const typename object_downcast<decltype(id)>::type& {
-             return get<typename object_downcast<decltype(id)>::type>(id);
+         auto get( object_id<SpaceID,TypeID> id )const -> const object_downcast_t<decltype(id)>& {
+             return get<object_downcast_t<decltype(id)>>(id);
          }
 
          template<typename IndexType>

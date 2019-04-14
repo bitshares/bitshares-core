@@ -533,10 +533,10 @@ public:
    }
 
    template<typename ID>
-   typename graphene::db::object_downcast<ID>::type get_object(ID id)const
+   typename graphene::db::object_downcast_t<ID>get_object(ID id)const
    {
       auto ob = _remote_db->get_objects({id}).front();
-      return ob.template as<typename graphene::db::object_downcast<ID>::type>( GRAPHENE_MAX_NESTED_OBJECTS );
+      return ob.template as<graphene::db::object_downcast_t<ID>>( GRAPHENE_MAX_NESTED_OBJECTS );
    }
 
    void set_operation_fees( signed_transaction& tx, const fee_schedule& s  )

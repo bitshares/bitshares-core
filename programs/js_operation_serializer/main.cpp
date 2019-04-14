@@ -126,7 +126,7 @@ template<> struct js_name< vote_id_type >      { static std::string name(){ retu
 template<> struct js_name< time_point_sec >    { static std::string name(){ return "time_point_sec"; } };
 
 template<uint8_t S, uint8_t T>
-struct js_name<graphene::db::object_id<S,T> >
+struct js_name<graphene::protocol::object_id<S,T> >
 {
    static std::string name(){
       return "protocol_id_type(\"" +
