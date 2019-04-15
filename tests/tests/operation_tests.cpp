@@ -1349,16 +1349,6 @@ BOOST_AUTO_TEST_CASE( update_uia_issuer )
       const auto& test = create_user_issued_asset("UPDATEISSUER", alice_id(db), 0);
       const asset_id_type test_id = test.id;
 
-      BOOST_TEST_MESSAGE( "can't use this operation before the hardfork" );
-      GRAPHENE_REQUIRE_THROW( update_issuer( test_id, alice_id(db), bob_id(db), alice_owner), fc::exception );
-
-      BOOST_TEST_MESSAGE( "can't use this operation before the hardfork (even if wrapped into a proposal)" );
-      GRAPHENE_REQUIRE_THROW( update_issuer_proposal( test_id, alice_id(db), bob_id(db), alice_owner), fc::exception );
-
-      // Fast Forward to Hardfork time
-      generate_blocks( HARDFORK_CORE_199_TIME );
-
-      BOOST_TEST_MESSAGE( "After hardfork time, proposal goes through (but doesn't execute yet)" );
       update_issuer_proposal( test_id, alice_id(db), bob_id(db), alice_owner);
 
       BOOST_TEST_MESSAGE( "Can't change issuer if not my asset" );

@@ -76,12 +76,6 @@ struct proposal_operation_hardfork_visitor
    void operator()(const graphene::chain::vesting_balance_create_operation &v) const {
       detail::check_vesting_balance_policy_hf_1268(block_time, v.policy);
    }
-   // hf_199
-   void operator()(const graphene::chain::asset_update_issuer_operation &v) const {
-      if (block_time < HARDFORK_CORE_199_TIME) {
-         FC_ASSERT(false, "Not allowed until hardfork 199");
-      }
-   }
    // hf_588
    // issue #588
    //

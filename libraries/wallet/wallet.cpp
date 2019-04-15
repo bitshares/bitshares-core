@@ -1331,10 +1331,7 @@ public:
       optional<account_id_type> new_issuer_account_id;
       if (new_issuer)
       {
-        FC_ASSERT( _remote_db->get_dynamic_global_properties().time < HARDFORK_CORE_199_TIME,
-              "The use of 'new_issuer' is no longer supported. Please use `update_asset_issuer' instead!");
-        account_object new_issuer_account = get_account(*new_issuer);
-        new_issuer_account_id = new_issuer_account.id;
+        FC_ASSERT( false, "The use of 'new_issuer' is no longer supported. Please use `update_asset_issuer' instead!");
       }
 
       asset_update_operation update_op;
