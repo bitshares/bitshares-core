@@ -285,23 +285,9 @@ namespace graphene { namespace net { namespace detail {
 #define MAXIMUM_NUMBER_OF_BLOCKS_TO_HANDLE_AT_ONE_TIME 200
 #define MAXIMUM_NUMBER_OF_BLOCKS_TO_PREFETCH (10 * MAXIMUM_NUMBER_OF_BLOCKS_TO_HANDLE_AT_ONE_TIME)
 
-   class random_address_builder : public node_impl::address_builder
-   {
-      void build(node_impl* impl, address_message& reply )
-      {
-         // return a random list of nodes
-         srand( time( NULL ) );
-         for (const peer_connection_ptr& active_peer : impl->_active_connections)
-         {
-            // should we add this one?
-            if ( rand () % 2 == 1)
-            {
-               reply.addresses.emplace_back(update_address_record(impl, active_peer));
-            } // randomness
-         } // each active peer
-      }
-   };
-
+   /******
+    * Use information passed from command line or config file to advertise nodes
+    */
    class list_address_builder : public node_impl::address_builder
    {
       public:
@@ -338,6 +324,44 @@ namespace graphene { namespace net { namespace detail {
       std::vector<graphene::net::address_info> advertise_list;
    };
 
+   /****
+    * Advertise all nodes except a predefined list
+    */
+   class exclude_address_builder : public node_impl::address_builder
+   {
+      public:
+      exclude_address_builder(fc::optional<std::vector<std::string>> address_list)
+      {
+         if (address_list.valid())
+         {
+            exclude_list = *address_list;
+         }
+      }
+      void build(node_impl* impl, address_message& reply)
+      {
+         reply.addresses.reserve(impl->_active_connections.size());
+         for(const peer_connection_ptr& active_peer : impl->_active_connections)
+         {
+            if (!exists_in_list(active_peer, exclude_list))
+               reply.addresses.emplace_back(update_address_record(impl, active_peer));
+         }
+         reply.addresses.shrink_to_fit();
+      }
+      private:
+      std::vector<std::string> exclude_list;
+      bool exists_in_list(const peer_connection_ptr& peer, const std::vector<std::string>& exclude_list) const
+      {
+         std::string remote = *peer->get_remote_endpoint();
+         for( auto list_item : exclude_list )
+            if (list_item == remote )
+               return true;
+         return false;
+      }
+   };
+
+   /***
+    * Return all peers when node asks
+    */
    class all_address_builder : public node_impl::address_builder
    {
       void build( node_impl* impl, address_message& reply )
@@ -349,8 +373,6 @@ namespace graphene { namespace net { namespace detail {
          }
       }
    };
-
-
 
     node_impl::node_impl(const std::string& user_agent) :
 #ifdef P2P_IN_DEDICATED_THREAD
@@ -1766,9 +1788,9 @@ namespace graphene { namespace net { namespace detail {
     void node_impl::set_advertise_algorithm( std::string algo, 
          const fc::optional<std::vector<std::string>>& advertise_list )
     {
-       if (algo == "random")
+       if (algo == "exclude_list")
        {
-          _address_builder = std::make_shared<random_address_builder>();
+          _address_builder = std::make_shared<exclude_address_builder>(advertise_list);
        }
        else if (algo == "list")
        {
