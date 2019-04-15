@@ -1763,7 +1763,8 @@ namespace graphene { namespace net { namespace detail {
       originating_peer->send_message(reply);
     }
 
-    void node_impl::set_advertise_algorithm( std::string algo, fc::optional<std::vector<std::string>> advertise_list )
+    void node_impl::set_advertise_algorithm( std::string algo, 
+         const fc::optional<std::vector<std::string>>& advertise_list )
     {
        if (algo == "random")
        {
@@ -5234,7 +5235,7 @@ namespace graphene { namespace net { namespace detail {
 
   }
 
-  void node::set_advertise_algorithm( std::string algo, fc::optional<std::vector<std::string>> advertise_list )
+  void node::set_advertise_algorithm( std::string algo, const fc::optional<std::vector<std::string>>& advertise_list )
   {
      my->set_advertise_algorithm( algo, advertise_list );
   }

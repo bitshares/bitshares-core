@@ -489,7 +489,7 @@ class node_impl : public peer_connection_delegate
       void listen_to_p2p_network();
       void connect_to_p2p_network();
       void add_node( const fc::ip::endpoint& ep );
-      void set_advertise_algorithm( std::string algo, fc::optional<std::vector<std::string>> advertise_list );
+      void set_advertise_algorithm( std::string algo, const fc::optional<std::vector<std::string>>& advertise_list );
       /****
        * @brief Add an endpoint as a seed to the p2p network
        *
