@@ -56,13 +56,6 @@ struct proposal_operation_hardfork_visitor
             || (v.delta_debt.asset_id( db ).bitasset_data_id
             && (*(v.delta_debt.asset_id( db ).bitasset_data_id))( db ).is_prediction_market )
             , "Soft fork - preventing proposal with call_order_update!" );
-   
-      // TODO review and cleanup code below after hard fork
-      // hf_834
-      if (next_maintenance_time <= HARDFORK_CORE_834_TIME) {
-         FC_ASSERT( !v.extensions.value.target_collateral_ratio.valid(),
-                    "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
-      }
    }
    // hf_1268
    void operator()(const graphene::chain::asset_create_operation &v) const {
