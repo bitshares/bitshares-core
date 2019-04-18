@@ -68,7 +68,6 @@ class es_objects_plugin_impl
       vector<std::string> prepare;
 
       bool _es_objects_keep_only_current = true;
-      bool _es_objects_load_genesis = true;
 
       uint32_t block_number;
       fc::time_point_sec block_time;
