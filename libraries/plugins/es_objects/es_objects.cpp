@@ -80,52 +80,49 @@ class es_objects_plugin_impl
 
 bool es_objects_plugin_impl::genesis()
 {
-   if(_es_objects_load_genesis) {
 
-      ilog("elasticsearch OBJECTS: inserting data from genesis");
+   ilog("elasticsearch OBJECTS: inserting data from genesis");
 
-      graphene::chain::database &db = _self.database();
+   graphene::chain::database &db = _self.database();
 
-      block_number = db.head_block_num();
-      block_time = db.head_block_time();
+   block_number = db.head_block_num();
+   block_time = db.head_block_time();
 
-      if (_es_objects_accounts) {
-         auto &index_accounts = db.get_index(1, 2);
-         index_accounts.inspect_all_objects([this, &db](const graphene::db::object &o) {
-            auto obj = db.find_object(o.id);
-            auto a = static_cast<const account_object *>(obj);
-            prepareTemplate<account_object>(*a, "account");
-         });
-      }
-      if (_es_objects_assets) {
-         auto &index_assets = db.get_index(1, 3);
-         index_assets.inspect_all_objects([this, &db](const graphene::db::object &o) {
-            auto obj = db.find_object(o.id);
-            auto a = static_cast<const asset_object *>(obj);
-            prepareTemplate<asset_object>(*a, "asset");
-         });
-      }
-      if (_es_objects_balances) {
-         auto &index_balances = db.get_index(2, 5);
-         index_balances.inspect_all_objects([this, &db](const graphene::db::object &o) {
-            auto obj = db.find_object(o.id);
-            auto b = static_cast<const account_balance_object *>(obj);
-            prepareTemplate<account_balance_object>(*b, "balance");
-         });
-      }
-
-      graphene::utilities::ES es;
-      es.curl = curl;
-      es.bulk_lines = bulk;
-      es.elasticsearch_url = _es_objects_elasticsearch_url;
-      es.auth = _es_objects_auth;
-      if (!graphene::utilities::SendBulk(std::move(es)))
-         FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error inserting genesis data.");
-      else {
-         bulk.clear();
-         return true;
-      }
+   if (_es_objects_accounts) {
+      auto &index_accounts = db.get_index(1, 2);
+      index_accounts.inspect_all_objects([this, &db](const graphene::db::object &o) {
+         auto obj = db.find_object(o.id);
+         auto a = static_cast<const account_object *>(obj);
+         prepareTemplate<account_object>(*a, "account");
+      });
    }
+   if (_es_objects_assets) {
+      auto &index_assets = db.get_index(1, 3);
+      index_assets.inspect_all_objects([this, &db](const graphene::db::object &o) {
+         auto obj = db.find_object(o.id);
+         auto a = static_cast<const asset_object *>(obj);
+         prepareTemplate<asset_object>(*a, "asset");
+      });
+   }
+   if (_es_objects_balances) {
+      auto &index_balances = db.get_index(2, 5);
+      index_balances.inspect_all_objects([this, &db](const graphene::db::object &o) {
+         auto obj = db.find_object(o.id);
+         auto b = static_cast<const account_balance_object *>(obj);
+         prepareTemplate<account_balance_object>(*b, "balance");
+      });
+   }
+
+   graphene::utilities::ES es;
+   es.curl = curl;
+   es.bulk_lines = bulk;
+   es.elasticsearch_url = _es_objects_elasticsearch_url;
+   es.auth = _es_objects_auth;
+   if (!graphene::utilities::SendBulk(std::move(es)))
+      FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error inserting genesis data.");
+   else
+      bulk.clear();
+
    return true;
 }
 
@@ -313,8 +310,6 @@ void es_objects_plugin::plugin_set_program_options(
          ("es-objects-index-prefix", boost::program_options::value<std::string>(), "Add a prefix to the index(objects-)")
          ("es-objects-keep-only-current", boost::program_options::value<bool>(), "Keep only current state of the objects(true)")
          ("es-objects-start-es-after-block", boost::program_options::value<uint32_t>(), "Start doing ES job after block(0)")
-         ("es-objects-load-genesis", boost::program_options::value<bool>(), "Index whatever is in the database on startup."
-                                                                            "Used to load genesis data into ES(true)")
          ;
    cfg.add(cli);
 }
@@ -386,9 +381,6 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
    }
    if (options.count("es-objects-start-es-after-block")) {
       my->_es_objects_start_es_after_block = options["es-objects-start-es-after-block"].as<uint32_t>();
-   }
-   if (options.count("es-objects-load-genesis")) {
-      my->_es_objects_load_genesis = options["es-objects-load-genesis"].as<bool>();
    }
 }
 
