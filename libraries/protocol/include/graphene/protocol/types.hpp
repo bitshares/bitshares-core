@@ -46,7 +46,7 @@
 #include <deque>
 #include <cstdint>
 #include <graphene/protocol/address.hpp>
-#include <graphene/db/object_id.hpp>
+#include <graphene/protocol/object_id.hpp>
 #include <graphene/protocol/config.hpp>
 
 #include <boost/rational.hpp>

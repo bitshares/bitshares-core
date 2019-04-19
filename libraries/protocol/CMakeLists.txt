@@ -29,7 +29,7 @@ list(APPEND SOURCES account.cpp
 
 
 add_library( graphene_protocol ${SOURCES} ${HEADERS} )
-target_link_libraries( graphene_protocol graphene_db fc )
+target_link_libraries( graphene_protocol fc )
 target_include_directories( graphene_protocol PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 
 install( TARGETS
