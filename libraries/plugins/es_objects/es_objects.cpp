@@ -315,7 +315,7 @@ void es_objects_plugin::plugin_set_program_options(
 
 void es_objects_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
-   database().applied_block.connect([&](const signed_block &b) {
+   database().applied_block.connect([this](const signed_block &b) {
       if(b.block_num() == 1) {
          if (!my->genesis())
             FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error populating genesis data.");
