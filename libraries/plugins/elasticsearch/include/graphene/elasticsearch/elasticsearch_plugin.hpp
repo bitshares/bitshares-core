@@ -73,8 +73,6 @@ class elasticsearch_plugin : public graphene::app::plugin
 
    private:
       operation_history_object fromEStoOperation(variant source);
-      template<typename T>
-      std::string idToString(T id);
       graphene::utilities::ES prepareHistoryQuery(string query);
 };
 

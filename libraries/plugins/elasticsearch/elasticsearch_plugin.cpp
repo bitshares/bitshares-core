@@ -493,7 +493,7 @@ void elasticsearch_plugin::plugin_startup()
 
 operation_history_object elasticsearch_plugin::get_operation_by_id(operation_history_id_type id)
 {
-   const string operation_id_string = idToString(id);
+   const string operation_id_string = std::string(object_id_type(id));
 
    const string query = R"(
    {
@@ -532,7 +532,7 @@ vector<operation_history_object> elasticsearch_plugin::get_account_history(
       unsigned limit = 100,
       operation_history_id_type start = operation_history_id_type())
 {
-   const string account_id_string = idToString(account_id);
+   const string account_id_string = std::string(object_id_type(account_id));
 
    const auto stop_number = stop.instance.value;
    const auto start_number = start.instance.value;
@@ -609,12 +609,6 @@ operation_history_object elasticsearch_plugin::fromEStoOperation(variant source)
    result.trx_in_block = source["operation_history"]["virtual_op"].as_uint64();
 
    return result;
-}
-
-template<typename T>
-std::string elasticsearch_plugin::idToString(T id)
-{
-   return fc::to_string(id.space_id) + "." + fc::to_string(id.type_id) + "." + fc::to_string(id.instance.value);
 }
 
 graphene::utilities::ES elasticsearch_plugin::prepareHistoryQuery(string query)
