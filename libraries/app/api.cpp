@@ -328,6 +328,10 @@ namespace graphene { namespace app {
              start = node.operation_id;
        } catch(...) { return result; }
 
+       auto es = _app.get_plugin<elasticsearch::elasticsearch_plugin>("elasticsearch");
+       if(es)
+          return es->get_account_history(account, stop, limit, start);
+
        const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
        const auto& by_op_idx = hist_idx.indices().get<by_op>();
        auto index_start = by_op_idx.begin();

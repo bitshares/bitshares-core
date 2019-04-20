@@ -186,15 +186,18 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
        boost::unit_test::framework::current_test_case().p_name.value == "track_votes_committee_disabled") {
       app.chain_database()->enable_standby_votes_tracking( false );
    }
-   if(current_test_name == "elasticsearch_account_history" || current_test_name == "elasticsearch_suite") {
+   if(current_test_name == "elasticsearch_account_history" || current_test_name == "elasticsearch_suite" ||
+      current_test_name == "elasticsearch_history_api") {
       auto esplugin = app.register_plugin<graphene::elasticsearch::elasticsearch_plugin>();
       esplugin->plugin_set_app(&app);
 
       options.insert(std::make_pair("elasticsearch-node-url", boost::program_options::variable_value(string("http://localhost:9200/"), false)));
       options.insert(std::make_pair("elasticsearch-bulk-replay", boost::program_options::variable_value(uint32_t(2), false)));
       options.insert(std::make_pair("elasticsearch-bulk-sync", boost::program_options::variable_value(uint32_t(2), false)));
-      options.insert(std::make_pair("elasticsearch-visitor", boost::program_options::variable_value(true, false)));
-      //options.insert(std::make_pair("elasticsearch-basic-auth", boost::program_options::variable_value(string("elastic:changeme"), false)));
+      options.insert(std::make_pair("elasticsearch-start-es-after-block", boost::program_options::variable_value(uint32_t(0), false)));
+      options.insert(std::make_pair("elasticsearch-visitor", boost::program_options::variable_value(false, false)));
+      options.insert(std::make_pair("elasticsearch-operation-object", boost::program_options::variable_value(true, false)));
+      options.insert(std::make_pair("elasticsearch-operation-string", boost::program_options::variable_value(true, false)));
 
       esplugin->plugin_initialize(options);
       esplugin->plugin_startup();
