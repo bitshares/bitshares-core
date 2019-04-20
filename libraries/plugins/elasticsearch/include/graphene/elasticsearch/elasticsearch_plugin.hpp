@@ -26,6 +26,7 @@
 #include <graphene/app/plugin.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/operation_history_object.hpp>
+#include <graphene/utilities/elasticsearch.hpp>
 
 namespace graphene { namespace elasticsearch {
    using namespace chain;
@@ -63,8 +64,18 @@ class elasticsearch_plugin : public graphene::app::plugin
       virtual void plugin_initialize(const boost::program_options::variables_map& options) override;
       virtual void plugin_startup() override;
 
+      operation_history_object get_operation_by_id(operation_history_id_type id);
+      vector<operation_history_object> get_account_history(const account_id_type account_id,
+            operation_history_id_type stop, unsigned limit, operation_history_id_type start);
+
       friend class detail::elasticsearch_plugin_impl;
       std::unique_ptr<detail::elasticsearch_plugin_impl> my;
+
+   private:
+      operation_history_object fromEStoOperation(variant source);
+      template<typename T>
+      std::string idToString(T id);
+      graphene::utilities::ES prepareHistoryQuery(string query);
 };
 
 struct operation_visitor
