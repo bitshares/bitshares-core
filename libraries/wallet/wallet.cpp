@@ -543,6 +543,7 @@ public:
       auto global_props = get_global_properties();
       auto dynamic_props = get_dynamic_global_properties();
       fc::mutable_variant_object result;
+
       result["head_block_num"] = dynamic_props.head_block_number;
       result["head_block_id"] = fc::variant(dynamic_props.head_block_id, 1);
       result["head_block_age"] = fc::get_approximate_relative_time_string(dynamic_props.time,
@@ -586,6 +587,10 @@ public:
       std::string os = "other";
 #endif
       result["build"] = os + " " + bitness;
+
+      result["server-rpc-endpoint"]      = _wallet.ws_server;
+      result["server-rpc-user"]          = _wallet.ws_user;
+      //result["server-rpc-password"]      = _wallet.ws_password;
 
       return result;
    }
