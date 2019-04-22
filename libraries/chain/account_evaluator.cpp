@@ -36,8 +36,88 @@
 #include <graphene/chain/worker_object.hpp>
 
 #include <algorithm>
+#include <tuple>
 
-namespace graphene { namespace chain {
+namespace graphene { namespace chain { namespace detail {
+
+   template<class Lambda>
+   struct authority_cycle_detector
+   {
+      using authority_t = flat_set<account_id_type>;
+
+      const database& db;
+      /** Getter that returns an authority to check. */
+      Lambda get_authority;
+
+     /**
+       * Detects if autority contains a cycle.
+       * Throw exeption if it finds a cycle.
+       *
+       * @param d a database
+       * @param auth_to_check an authority to check
+       * @param account_id for that account need to check authority
+       * @param getter Lambda that returns an authority to check.
+       */
+      explicit authority_cycle_detector(const database& d, const authority& auth_to_check, const account_id_type& account_id, Lambda getter)
+      : db{d}, get_authority{getter}
+      {
+         /** Set of accounts ids used to detect a cycle.*/
+         authority_t account_ids{};
+         const auto& chain_params = db.get_global_properties().parameters;
+         detect_cycle(account_id, auth_to_check, account_ids, chain_params.maximum_authority_membership);
+      }
+
+      /**
+       * Recursively detects if autority contains a cycle.
+       * Get authorities for each account from auth_to_check and check for cycle 
+       * taking in account path
+       * Throw exeption if it finds a cycle.
+       *
+       * @param account_id find a cycle from this account
+       * @param auth_to_check an authority to check
+       * @param path a chain off accounts that led to account_id 
+       */
+      void detect_cycle(const account_id_type& account_id, const authority& auth_to_check, authority_t& path, uint16_t max_depth)
+      {
+         GRAPHENE_ASSERT(max_depth > 0, internal_verify_auth_max_auth_exceeded, "Maximum authority membership exceeded" );
+
+         auto inserted = false;
+         std::tie(std::ignore, inserted) = path.insert(account_id);
+         FC_ASSERT(inserted, "Account ${a} already is in authority.", ("a", account_id));
+
+         for(const auto& el : auth_to_check.account_auths)
+         {
+            const auto& account = el.first(db);
+            const auto& auth = get_authority(account);
+            detect_cycle(el.first, auth, path, max_depth - 1);
+         }
+         path.erase(account_id);
+      }
+   };
+
+   void verify_account_authorities( const database& db,
+      const account_id_type& account_id,
+      const fc::optional<authority>& active,
+      const fc::optional<authority>& owner)
+   {
+      if( db.head_block_time() < HARDFORK_CYCLED_ACCOUNTS_TIME )
+      {
+         return;
+      }
+
+      if( active )
+      {
+         auto active_auth_getter = [](const account_object& account) { return account.active; };
+         authority_cycle_detector<decltype(active_auth_getter)> validator{ db, *active, account_id, active_auth_getter };
+      }
+
+      if( owner )
+      {
+         auto owner_auth_getter = [](const account_object& account) { return account.owner; };
+         authority_cycle_detector<decltype(owner_auth_getter)> validator{ db, *owner, account_id, owner_auth_getter };
+      }
+   }
+}//detail
 
 void verify_authority_accounts( const database& db, const authority& a )
 {
@@ -133,6 +213,9 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
    {
       verify_authority_accounts( d, op.owner );
       verify_authority_accounts( d, op.active );
+
+      // avoid cycles in authorities
+      detail::verify_account_authorities(d, account_id_type{}, op.active, op.owner);
    }
    GRAPHENE_RECODE_EXC( internal_verify_auth_max_auth_exceeded, account_create_max_auth_exceeded )
    GRAPHENE_RECODE_EXC( internal_verify_auth_account_not_found, account_create_auth_account_not_found )
@@ -276,8 +359,16 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
 
    try
    {
-      if( o.owner )  verify_authority_accounts( d, *o.owner );
-      if( o.active ) verify_authority_accounts( d, *o.active );
+      if( o.owner )
+      {
+         verify_authority_accounts( d, *o.owner );
+      }
+      if( o.active )
+      {
+         verify_authority_accounts( d, *o.active );
+      }
+      // avoid cycles in authorities started from o.account
+      detail::verify_account_authorities(d, o.account, o.active, o.owner);
    }
    GRAPHENE_RECODE_EXC( internal_verify_auth_max_auth_exceeded, account_update_max_auth_exceeded )
    GRAPHENE_RECODE_EXC( internal_verify_auth_account_not_found, account_update_auth_account_not_found )
