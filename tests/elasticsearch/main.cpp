@@ -29,7 +29,6 @@
 #include <graphene/utilities/elasticsearch.hpp>
 
 #include "../common/database_fixture.hpp"
-#include "../../libraries/chain/account_evaluator.cpp"
 
 #define BOOST_TEST_MODULE Elastic Search Database Tests
 #include <boost/test/included/unit_test.hpp>
@@ -37,14 +36,6 @@
 using namespace graphene::chain;
 using namespace graphene::chain::test;
 using namespace graphene::app;
-
-#include <boost/filesystem.hpp>
-#include <fstream>
-#include <streambuf>
-#include <map>
-#include <memory>
-
-namespace fs = boost::filesystem;
 
 BOOST_FIXTURE_TEST_SUITE( elasticsearch_tests, database_fixture )
 
@@ -217,140 +208,6 @@ BOOST_AUTO_TEST_CASE(elasticsearch_suite) {
       edump((e.to_detail_string()));
       throw;
    }
-}
-
-struct locked_account_finder
-{
-   const database& db;
-   std::unique_ptr<CURL, void(*)(CURL*)> curl;
-   const std::string potentially_locked_file = "/potentially_locked.json";
-   fs::path current_path;
-
-   mutable std::map<account_id_type, account_object> accounts;
-
-   locked_account_finder(const database& d)
-   : db(d)
-   , curl(curl_easy_init(), curl_easy_cleanup)
-   {
-      current_path = fs::current_path();
-   }
-
-   time_point_sec head_block_time() const
-   {
-      return HARDFORK_CYCLED_ACCOUNTS_TIME;
-   }
-
-   const global_property_object& get_global_properties() const
-   {
-      return db.get_global_properties();
-   }
-
-   const account_object& get( account_id_type id ) const
-   {
-      auto it = accounts.find(id);
-      if (accounts.end() != it)
-      {
-         return it->second;
-      }
-
-      auto account = get_from_bts(id);
-      auto res = accounts.insert(std::make_pair(account.get_id(), account));
-      return res.first->second;
-   }
-
-   account_object get_from_bts(account_id_type account_id) const
-   {
-      variant vo;
-      to_variant(account_id, vo);
-      auto id_str = vo.as_string();
-
-      graphene::utilities::CurlRequest curl_request;
-      curl_request.handler = curl.get();
-      curl_request.url = "http://127.0.0.1:8092/rpc";
-      curl_request.type = "POST";
-      curl_request.query = R"({"jsonrpc":"2.0","method":"get_account","params":[")" + id_str + R"("],"id":1})";
-      auto response = doCurl(curl_request);
-
-      variant variant_response = fc::json::from_string(response);
-      optional<account_object> account;
-      fc::from_variant(variant_response["result"], account, FC_PACK_MAX_DEPTH);
-      return *account;
-   }
-
-   void store_potentially_locked_accounts(const fs::path& file_path) const
-   {
-      constexpr auto ES_URL = "http://bselastic.dev.aetsoft.by/";
-      graphene::utilities::ES es;
-      es.curl = curl.get();
-      es.elasticsearch_url = ES_URL;
-      es.index_prefix = "objects-account";
-      es.endpoint = es.index_prefix + "/_search?size=0&pretty=true";
-      es.query = R"({"_source": ["object_id"])";
-      es.query.append(R"(,"query":{"bool":{"should":[{"bool":{"must_not":{"term":{"active_account_auths.keyword":"[]"}}}})");
-      es.query.append(R"(,{"bool":{"must_not":{"term":{"owner_account_auths.keyword":"[]"}}}}]}}})");
-      auto res = graphene::utilities::simpleQuery(es);
-      variant json_result = fc::json::from_string(res);
-      auto count = json_result["hits"]["total"].as_string();
-      std::cout << "total:" << count << std::endl;
-
-      es.endpoint = es.index_prefix + "/_search?size=" + count +"&pretty=true";
-      res = graphene::utilities::simpleQuery(es);
-
-      // save accounts to file
-      std::ofstream file(file_path.string(), std::ofstream::out);
-      std::copy(res.begin(),res.end(), std::ostreambuf_iterator<char>(file));
-   }
-
-   variant get_potentially_locked(const fs::path& file_path) const
-   {
-      std::ifstream file(file_path.string());
-      std::string data((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-      return fc::json::from_string(data);
-   }
-
-   void run() const
-   {
-      auto potentially_locked_path = current_path;
-      potentially_locked_path += potentially_locked_file;
-      if ( !fs::exists( fs::status(potentially_locked_path) ) )
-      {
-         store_potentially_locked_accounts(potentially_locked_path);
-      }
-      auto potentially_locked_accounts = get_potentially_locked(potentially_locked_path);
-
-      const auto total_count =  potentially_locked_accounts["hits"]["total"].as_int64();
-
-      auto locked_path = current_path;
-      locked_path += "/locked.txt";
-      std::ofstream locked_file(locked_path.string(), std::ofstream::out);
-
-      for(auto i = 0; i < total_count; ++i)
-      {
-         account_id_type account_id;
-         const auto v_account_id = potentially_locked_accounts["hits"]["hits"][size_t(i)]["_source"]["object_id"];
-         from_variant(v_account_id, account_id);
-
-         auto account = get(account_id);
-         std::cout << "id: " << v_account_id.as_string() << " checked: " << i << " from: " << total_count << std::endl;
-         try
-         {
-            graphene::chain::detail::check_account_authorities(account.get_id(), *this, account.active, account.owner);
-         }
-         catch(const tx_missing_active_auth &)
-         {
-            locked_file << v_account_id.as_string() << std::endl;
-         }
-      }
-   }
-};
-
-BOOST_AUTO_TEST_CASE(find_locked_accounts) {
-   try {
-
-      locked_account_finder finder(db);
-      finder.run();
-   }
-   FC_LOG_AND_RETHROW()
 }
 
 BOOST_AUTO_TEST_SUITE_END()

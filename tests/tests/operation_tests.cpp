@@ -1146,7 +1146,6 @@ BOOST_AUTO_TEST_CASE( update_account_self_cycled_authority_after_HARDFORK_CYCLED
       auo.active = authority(1, bob_id, 1);
       trx.operations.push_back( auo );
       sign( trx, alice_private_key );
-      //PUSH_TX( db, trx );
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
       trx.clear();
 
@@ -1257,7 +1256,7 @@ BOOST_AUTO_TEST_CASE( update_account_make_cycled_authority_before_HARDFORK_CYCLE
 
       trx.operations.clear();
       trx.operations.push_back(op);
-      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+      PUSH_TX( db, trx, ~0 );
    }
    FC_LOG_AND_RETHROW()
 }
@@ -1296,7 +1295,10 @@ BOOST_AUTO_TEST_CASE( update_account_make_cycled_authority_after_HARDFORK_CYCLED
 
       trx.operations.clear();
       trx.operations.push_back(op);
-      PUSH_TX( db, trx, ~0 );
+      
+      GRAPHENE_CHECK_THROW(
+         PUSH_TX( db, trx, ~0 ),
+         graphene::chain::tx_missing_active_auth);
    }
    FC_LOG_AND_RETHROW()
 }
