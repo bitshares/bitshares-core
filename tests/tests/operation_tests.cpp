@@ -962,6 +962,64 @@ BOOST_AUTO_TEST_CASE( update_account )
    }
 }
 
+BOOST_AUTO_TEST_CASE( update_account_lead_to_cycled_authority_before_HARDFORK_CYCLED_ACCOUNTS_TIME_test )
+{
+   /*
+      see https://github.com/bitshares/bsips/pull/149#discussion_r270407694
+      Precondition:
+         There are three accounts Alice, Bob and Charlie
+      Steps:
+         1. Alice sets Bob to her active and owner authority
+         2. Charlie sets Alice to his active and owner authority
+         3. Alice sets Charlie to her active and owner authority
+         4. Bob sets Charlie to his active and owner authority
+      Expected:
+         Before HARDFORK_CYCLED_ACCOUNTS_TIME it should work
+   */
+   try {
+      ACTORS( (bob) (alice) (charlie) );
+
+      auto update_auth = [&](const account_update_operation& op){
+         trx.operations.clear();
+         trx.operations.push_back(op);
+         PUSH_TX( db, trx, ~0 );
+      };
+
+      {
+         account_update_operation op;
+         op.account = alice_id;
+         op.active = authority(1, bob_id, 1);
+         op.owner = op.active;
+         update_auth(op);
+      }
+
+      {
+         account_update_operation op;
+         op.account = charlie_id;
+         op.active = authority(1, alice_id, 1);
+         op.owner = op.active;
+         update_auth(op);
+      }
+
+      {
+         account_update_operation op;
+         op.account = alice_id;
+         op.active = authority(1, charlie_id, 1);
+         op.owner = op.active;
+         update_auth(op);
+      }
+
+      {
+         account_update_operation op;
+         op.account = bob_id;
+         op.active = authority(1, charlie_id, 1);
+         op.owner = op.active;
+         update_auth(op);
+      }
+   }
+   FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_CASE( create_account_with_cycled_authority_before_HARDFORK_CYCLED_ACCOUNTS_TIME_test )
 {
    try {
