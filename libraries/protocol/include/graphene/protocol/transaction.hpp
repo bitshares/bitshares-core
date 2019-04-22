@@ -258,6 +258,10 @@ namespace graphene { namespace protocol {
                           const flat_set<account_id_type>& active_aprovals = flat_set<account_id_type>(),
                           const flat_set<account_id_type>& owner_approvals = flat_set<account_id_type>());
 
+// void verify_cycled_authority( const account_id_type& id, 
+//                               const std::function<const authority*(account_id_type)>& get_active,
+//                               const std::function<const authority*(account_id_type)>& get_owner,
+//                               uint32_t max_recursion_depth );
    /**
     *  @brief captures the result of evaluating the operations contained in the transaction
     *

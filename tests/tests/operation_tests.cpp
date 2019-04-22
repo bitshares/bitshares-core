@@ -1093,30 +1093,68 @@ BOOST_AUTO_TEST_CASE( update_account_self_cycled_authority_before_HARDFORK_CYCLE
 BOOST_AUTO_TEST_CASE( update_account_self_cycled_authority_after_HARDFORK_CYCLED_ACCOUNTS_TIME_test )
 {
    try {
-      ACTOR(nathan);
+      ACTOR(alice);
+      ACTOR(bob);
+
+      fund(bob);
+      fund(alice);
 
       generate_blocks(HARDFORK_CYCLED_ACCOUNTS_TIME);
+      trx.clear();
       set_expiration( db, trx );
 
-      auto update_auth = [&](const account_update_operation& op){
-         trx.operations.clear();
-         trx.operations.push_back(op);
-         PUSH_TX( db, trx, ~0 );
+      auto fill_transfer = [&](const account_object& from,
+                           const account_object& to,
+                           const asset& amount,
+                           const asset& fee = asset())
+      {
+         transfer_operation trans;
+         trans.from = from.id;
+         trans.to   = to.id;
+         trans.amount = amount;
+         trx.operations.push_back(trans);
+
+         if( fee == asset() )
+         {
+            for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
+         }
+         trx.validate();
       };
 
-      account_update_operation op;
-      op.account = nathan_id;
-      // make cycle to self in active auth
-      {
-         op.active = authority(1, nathan_id, 1);
-         GRAPHENE_CHECK_THROW(update_auth(op), fc::exception);
-      }
-      // make cycle to self in owner auth
-      {
-         op.owner = {};
-         op.active = authority(1, nathan_id, 1);
-         GRAPHENE_CHECK_THROW(update_auth(op), fc::exception);
-      }
+      // make cycle to self in active and owner authority for Alice
+      account_update_operation auo;
+      auo.account = alice_id;
+      auo.owner = authority(1, alice_id, 1);
+      auo.active = authority(1, alice_id, 1);
+      trx.operations.push_back( auo );
+      sign( trx, alice_private_key );
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
+      trx.clear();
+
+      // Add Alice to Bob's authority
+      auo.account = bob_id;
+      auo.active = authority( 1, alice_id, 1 );
+      auo.owner  = authority( 1, alice_id, 1 );
+      trx.operations.push_back( auo );
+      sign( trx, bob_private_key );
+      PUSH_TX( db, trx );
+      trx.clear();
+
+      // make cycle to self in active and owner authority via Bob for Alice
+      auo.account = alice_id;
+      auo.owner = authority(1, bob_id, 1);
+      auo.active = authority(1, bob_id, 1);
+      trx.operations.push_back( auo );
+      sign( trx, alice_private_key );
+      //PUSH_TX( db, trx );
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
+      trx.clear();
+
+      fill_transfer(alice, bob, asset(10));
+      sign( trx, bob_private_key );
+      sign( trx, alice_private_key );
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
+      trx.clear();
    }
    FC_LOG_AND_RETHROW()
 }
@@ -1151,6 +1189,7 @@ BOOST_AUTO_TEST_CASE( update_account_authority_test )
       {
          op.account = bob_id;
          op.active = authority(2, alice_id, 1, jill_id, 1);
+         op.owner = op.active;
          update_auth(op);
          {
             GET_ACTOR(bob);
@@ -1159,6 +1198,7 @@ BOOST_AUTO_TEST_CASE( update_account_authority_test )
 
          op.account = alice_id;
          op.active = authority(2, jill_id, 1, nathan_id, 1);
+         op.owner = op.active;
          update_auth(op);
          {
             GET_ACTOR(alice);
@@ -1167,6 +1207,7 @@ BOOST_AUTO_TEST_CASE( update_account_authority_test )
 
          op.account = jill_id;
          op.active = authority(1, izzy_id, 1);
+         op.owner = op.active;
          update_auth(op);
          {
             GET_ACTOR(jill);
@@ -1175,6 +1216,7 @@ BOOST_AUTO_TEST_CASE( update_account_authority_test )
 
          op.account = izzy_id;
          op.active = authority(1, nathan_id, 1);
+         op.owner = op.active;
          update_auth(op);
          {
             GET_ACTOR(izzy);
@@ -1215,7 +1257,7 @@ BOOST_AUTO_TEST_CASE( update_account_make_cycled_authority_before_HARDFORK_CYCLE
 
       trx.operations.clear();
       trx.operations.push_back(op);
-      PUSH_TX( db, trx, ~0 );
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
    }
    FC_LOG_AND_RETHROW()
 }
@@ -1250,10 +1292,11 @@ BOOST_AUTO_TEST_CASE( update_account_make_cycled_authority_after_HARDFORK_CYCLED
       account_update_operation op;
       op.account = nathan_id;
       op.active = authority(1, bob_id, 1);
+      op.owner = authority(1, bob_id, 1);
 
       trx.operations.clear();
       trx.operations.push_back(op);
-      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+      PUSH_TX( db, trx, ~0 );
    }
    FC_LOG_AND_RETHROW()
 }
@@ -1293,7 +1336,7 @@ BOOST_AUTO_TEST_CASE( update_account_max_authority_depth_after_HARDFORK_CYCLED_A
       set_expiration( db, trx );
 
       db.modify( db.get_global_properties(), [&]( global_property_object& gpo ) {
-         gpo.parameters.maximum_authority_membership = 1;
+         gpo.parameters.max_authority_depth = 1;
       });
 
       account_update_operation op;
@@ -1303,6 +1346,109 @@ BOOST_AUTO_TEST_CASE( update_account_max_authority_depth_after_HARDFORK_CYCLED_A
       trx.operations.clear();
       trx.operations.push_back(op);
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE( update_account_exceed_max_authority_depth_after_HARDFORK_CYCLED_ACCOUNTS_TIME_test )
+{
+   // make account authority with exceeded depth limit
+   // this special case possible despite prevention logic defined after HARDFORK_CYCLED_ACCOUNTS_TIME
+   //
+   // initial accounts: alice, bob, charlie, dan
+   // step by step delegate authorities
+   // 1) alice--->bob
+   // 2) bob--->charlie
+   // 3) charlie--->dan
+   // account alice locked due to exceeded authority depth limit!!!
+
+   try {
+      ACTORS((alice)(bob)(charlie)(dan))
+
+      fund(alice);
+      fund(bob);
+      fund(charlie);
+
+      generate_blocks(HARDFORK_CYCLED_ACCOUNTS_TIME);
+      trx.clear();
+      set_expiration( db, trx );
+
+      auto delegate_authorities = [&](const account_id_type& from,
+                                      const private_key_type& from_key, 
+                                      const account_id_type& to)
+      {
+         account_update_operation auo;
+         auo.account = from;
+         auo.active = authority( 1, to, 1 );
+         auo.owner  = authority( 1, to, 1 );
+         trx.operations.push_back( auo );
+         sign( trx, from_key );
+         PUSH_TX( db, trx );
+         trx.clear();
+      };
+
+      delegate_authorities(alice_id, alice_private_key, bob_id);
+      delegate_authorities(bob_id, bob_private_key, charlie_id);
+      delegate_authorities(charlie_id, charlie_private_key, dan_id);
+
+      {
+         transfer_operation tr_op;
+         tr_op.from = alice_id;
+         tr_op.to = dan_id;
+         tr_op.amount = asset(10);
+
+         trx.operations = { tr_op };
+         sign( trx, dan_private_key );
+         trx.validate();
+
+         GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), graphene::chain::tx_missing_active_auth);
+         trx.clear();
+      }
+
+   } FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE( cant_create_auth_chain_longer_than_max_authority_depth_limit_after_HARDFORK_CYCLED_ACCOUNTS_TIME_test )
+{
+   //
+   // initial accounts: alice, bob, charlie, dan
+   // step by step delegate authorities
+   // 1) charlie--->dan
+   // 2) bob--->charlie
+   // 3) alice--->bob
+   // alice can't delegete auth to bob due to exceeded authority depth limit!!!
+
+   try {
+      ACTORS((alice)(bob)(charlie)(dan))
+
+      fund(alice);
+      fund(bob);
+      fund(charlie);
+
+      generate_blocks(HARDFORK_CYCLED_ACCOUNTS_TIME);
+      trx.clear();
+      set_expiration( db, trx );
+
+      auto delegate_authorities = [&](const account_id_type& from,
+                                      const private_key_type& from_key, 
+                                      const account_id_type& to)
+      {
+         account_update_operation auo;
+         auo.account = from;
+         auo.active = authority( 1, to, 1 );
+         auo.owner  = authority( 1, to, 1 );
+         trx.operations.push_back( auo );
+         sign( trx, from_key );
+         PUSH_TX( db, trx );
+         trx.clear();
+      };
+
+      delegate_authorities(charlie_id, charlie_private_key, dan_id);
+      delegate_authorities(bob_id, bob_private_key, charlie_id);
+
+      GRAPHENE_CHECK_THROW(
+         delegate_authorities(alice_id, alice_private_key, bob_id), 
+         graphene::chain::tx_missing_active_auth);
    }
    FC_LOG_AND_RETHROW()
 }
