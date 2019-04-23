@@ -101,7 +101,9 @@ namespace graphene { namespace chain {
       authority       active;
 
       account_options options;
-      extension< ext > extensions;
+
+      typedef extension<ext> extensions_type;
+      extensions_type extensions;
 
       account_id_type fee_payer()const { return registrar; }
       void            validate()const;
@@ -149,7 +151,9 @@ namespace graphene { namespace chain {
 
       /// New account options
       optional<account_options> new_options;
-      extension< ext > extensions;
+
+      typedef extension<ext> extensions_type;
+      extensions_type extensions;
 
       account_id_type fee_payer()const { return account; }
       void       validate()const;
@@ -281,11 +285,15 @@ FC_REFLECT( graphene::chain::account_create_operation,
             (name)(owner)(active)(options)(extensions)
           )
 
+FC_REFLECT_TYPENAME( graphene::chain::account_create_operation::extensions_type )
+
 FC_REFLECT(graphene::chain::account_update_operation::ext, (null_ext)(owner_special_authority)(active_special_authority) )
 FC_REFLECT_TYPENAME(graphene::chain::extension<graphene::chain::account_update_operation::ext>)
 FC_REFLECT( graphene::chain::account_update_operation,
             (fee)(account)(owner)(active)(new_options)(extensions)
           )
+
+FC_REFLECT_TYPENAME( graphene::chain::account_update_operation::extensions_type )
 
 FC_REFLECT( graphene::chain::account_upgrade_operation,
             (fee)(account_to_upgrade)(upgrade_to_lifetime_member)(extensions) )

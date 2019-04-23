@@ -271,6 +271,13 @@ struct serializer<fc::optional<T>,false>
    static void generate(){}
 };
 
+template<typename T>
+struct serializer<graphene::chain::extension<T>,false>
+{
+   static void init() { serializer<T>::init(); }
+   static void generate(){}
+};
+
 template<uint8_t SpaceID, uint8_t TypeID, typename T>
 struct serializer< graphene::db::object_id<SpaceID,TypeID,T> ,true>
 {
