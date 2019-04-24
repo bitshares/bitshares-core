@@ -1160,12 +1160,16 @@ map<string,account_id_type> database_api_impl::lookup_accounts(const string& low
    const auto& accounts_by_name = _db.get_index_type<account_index>().indices().get<by_name>();
    map<string,account_id_type> result;
 
+   if( limit == 0 ) // shortcut to save a database query
+      return result;
+
+   bool to_subscribe = (limit == 1 && _enabled_auto_subscription); // auto-subscribe if only look for one account
    for( auto itr = accounts_by_name.lower_bound(lower_bound_name);
         limit-- && itr != accounts_by_name.end();
         ++itr )
    {
       result.insert(make_pair(itr->name, itr->get_id()));
-      if( limit == 1 && _enabled_auto_subscription )
+      if( to_subscribe )
          subscribe_to_item( itr->get_id() );
    }
 
