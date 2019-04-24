@@ -787,7 +787,7 @@ BOOST_AUTO_TEST_CASE( set_subscribe_callback_disable_notify_all_test )
       opt.enable_subscribe_to_all = true;
 
       graphene::app::database_api db_api2( db, &opt );
-      db_api2.set_subscribe_callback( callback2, true );
+      db_api2.set_subscribe_callback( callback2, true ); // subscribing to all should succeed
 
       graphene::app::database_api db_api3( db, &opt );
       db_api3.set_subscribe_callback( callback3, false );
@@ -796,15 +796,24 @@ BOOST_AUTO_TEST_CASE( set_subscribe_callback_disable_notify_all_test )
       ids.push_back( alice_id );
 
       db_api1.get_objects( ids ); // db_api1 subscribe to Alice
-      db_api2.get_objects( ids ); // db_api2 subscribe to Alice
 
       generate_block();
-      ++expected_objects_changed2; // subscribed to all, notify block changes
+      ++expected_objects_changed1; // db_api1 subscribed to Alice, notify Alice account creation
+      ++expected_objects_changed2; // db_api2 subscribed to all, notify new objects
+      // db_api3 didn't subscribe to anything, nothing would be notified
+
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      BOOST_CHECK_EQUAL( expected_objects_changed1, objects_changed1 );
+      BOOST_CHECK_EQUAL( expected_objects_changed2, objects_changed2 );
+      BOOST_CHECK_EQUAL( expected_objects_changed3, objects_changed3 );
 
       transfer( account_id_type(), alice_id, asset(1) );
       generate_block();
-      ++expected_objects_changed1; // subscribed to Alice, notify Alice balance change
-      ++expected_objects_changed2; // subscribed to all, notify block changes
+      // db_api1 didn't subscribe to Alice with get_full_accounts but only subscribed to the account object,
+      //   nothing would be notified
+      ++expected_objects_changed2; // db_api2 subscribed to all, notify new balance object and etc
+      // db_api3 didn't subscribe to anything, nothing would be notified
 
       fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
 
