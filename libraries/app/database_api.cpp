@@ -187,26 +187,44 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
    //private:
       static string price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote );
 
+      // Note:
+      //   Different type of object_id<T> objects could become identical after packed.
+      //   For example, both `account_id_type a=1.2.0` and `asset_id_type b=1.3.0` will become `0` after packed.
+      //   In order to avoid collision, here we explicitly list a few types, rather than using a template.
+      vector<char> get_subscription_key( const object_id_type& item )const
+      {
+         return fc::raw::pack(item);
+      }
+      vector<char> get_subscription_key( const public_key_type& item )const
+      {
+         return fc::raw::pack(item);
+      }
+      vector<char> get_subscription_key( const address& item )const
+      {
+         return fc::raw::pack(item);
+      }
+
       template<typename T>
-      void subscribe_to_item( const T& i )const
+      void subscribe_to_item( const T& item )const
       {
          if( !_subscribe_callback )
             return;
 
-         if( !is_subscribed_to_item(i) )
+         vector<char> key = get_subscription_key( item );
+         if( !_subscribe_filter.contains( key.data(), key.size() ) )
          {
-            auto vec = fc::raw::pack(i);
-            _subscribe_filter.insert( vec.data(), vec.size() );
+            _subscribe_filter.insert( key.data(), key.size() );
          }
       }
 
       template<typename T>
-      bool is_subscribed_to_item( const T& i )const
+      bool is_subscribed_to_item( const T& item )const
       {
          if( !_subscribe_callback )
             return false;
 
-         return _subscribe_filter.contains( i );
+         vector<char> key = get_subscription_key( item );
+         return _subscribe_filter.contains( key.data(), key.size() );
       }
 
       bool is_impacted_account( const flat_set<account_id_type>& accounts)
