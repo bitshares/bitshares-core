@@ -163,8 +163,26 @@ class database_api
        *        newly removed objects to the client, no matter whether client subscribed to the objects.
        *        By default, API servers don't allow subscribing to universal events, which can be changed
        *        on server startup.
+       *
+       * Note: auto-subscription is enabled by default and can be disabled with "set_auto_subscription" API.
        */
       void set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_remove_create );
+      /**
+       * @brief Set auto-subscription behavior of follow-up API queries
+       * @param enable whether follow-up API queries will automatically subscribe to queried objects
+       *
+       * Impacts behavior of these APIs:
+       * - get_accounts
+       * - get_assets
+       * - get_balance_objects
+       * - get_key_references
+       * - get_objects
+       * - lookup_accounts
+       *
+       * Does not impact this API:
+       * - get_full_accounts
+       */
+      void set_auto_subscription( bool enable );
       /**
        * @brief Register a callback handle which will get notified when a transaction is pushed to database
        * @param cb The callback handle to register
