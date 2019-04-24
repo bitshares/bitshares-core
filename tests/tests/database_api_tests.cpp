@@ -751,14 +751,17 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not )
    } FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE( set_subscribe_callback_disable_notify_all_test )
+BOOST_AUTO_TEST_CASE( subscription_notification_test )
 {
    try {
-      ACTORS( (alice) );
+      ACTORS( (alice)(bob) );
 
       uint32_t objects_changed1 = 0;
       uint32_t objects_changed2 = 0;
       uint32_t objects_changed3 = 0;
+      uint32_t objects_changed4 = 0;
+      uint32_t objects_changed5 = 0;
+      uint32_t objects_changed6 = 0;
       auto callback1 = [&]( const variant& v )
       {
          ++objects_changed1;
@@ -771,10 +774,25 @@ BOOST_AUTO_TEST_CASE( set_subscribe_callback_disable_notify_all_test )
       {
          ++objects_changed3;
       };
+      auto callback4 = [&]( const variant& v )
+      {
+         ++objects_changed4;
+      };
+      auto callback5 = [&]( const variant& v )
+      {
+         ++objects_changed5;
+      };
+      auto callback6 = [&]( const variant& v )
+      {
+         ++objects_changed6;
+      };
 
       uint32_t expected_objects_changed1 = 0;
       uint32_t expected_objects_changed2 = 0;
       uint32_t expected_objects_changed3 = 0;
+      uint32_t expected_objects_changed4 = 0;
+      uint32_t expected_objects_changed5 = 0;
+      uint32_t expected_objects_changed6 = 0;
 
       graphene::app::database_api db_api1(db);
 
@@ -792,21 +810,43 @@ BOOST_AUTO_TEST_CASE( set_subscribe_callback_disable_notify_all_test )
       graphene::app::database_api db_api3( db, &opt );
       db_api3.set_subscribe_callback( callback3, false );
 
+      graphene::app::database_api db_api4( db, &opt );
+      db_api4.set_subscribe_callback( callback4, false );
+
+      graphene::app::database_api db_api5( db, &opt );
+      db_api5.set_subscribe_callback( callback5, false );
+
+      graphene::app::database_api db_api6( db, &opt );
+      db_api6.set_subscribe_callback( callback6, false );
+
       vector<object_id_type> ids;
       ids.push_back( alice_id );
-
       db_api1.get_objects( ids ); // db_api1 subscribe to Alice
+
+      vector<string> account_names;
+      account_names.push_back( "alice" );
+      db_api4.get_accounts( account_names ); // db_api4 subscribe to Alice
+
+      db_api5.lookup_accounts( "ali", 1 ); // db_api5 subscribe to Alice
+
+      db_api6.lookup_accounts( "alice", 3 ); // db_api6 does not subscribe to Alice
 
       generate_block();
       ++expected_objects_changed1; // db_api1 subscribed to Alice, notify Alice account creation
       ++expected_objects_changed2; // db_api2 subscribed to all, notify new objects
       // db_api3 didn't subscribe to anything, nothing would be notified
+      ++expected_objects_changed4; // db_api4 subscribed to Alice, notify Alice account creation
+      ++expected_objects_changed5; // db_api4 subscribed to Alice, notify Alice account creation
+      // db_api6 didn't subscribe to anything, nothing would be notified
 
       fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
 
       BOOST_CHECK_EQUAL( expected_objects_changed1, objects_changed1 );
       BOOST_CHECK_EQUAL( expected_objects_changed2, objects_changed2 );
       BOOST_CHECK_EQUAL( expected_objects_changed3, objects_changed3 );
+      BOOST_CHECK_EQUAL( expected_objects_changed4, objects_changed4 );
+      BOOST_CHECK_EQUAL( expected_objects_changed5, objects_changed5 );
+      BOOST_CHECK_EQUAL( expected_objects_changed6, objects_changed6 );
 
       transfer( account_id_type(), alice_id, asset(1) );
       generate_block();
@@ -814,12 +854,18 @@ BOOST_AUTO_TEST_CASE( set_subscribe_callback_disable_notify_all_test )
       //   nothing would be notified
       ++expected_objects_changed2; // db_api2 subscribed to all, notify new balance object and etc
       // db_api3 didn't subscribe to anything, nothing would be notified
+      // db_api4 only subscribed to the account object of Alice, nothing notified
+      // db_api5 only subscribed to the account object of Alice, nothing notified
+      // db_api6 didn't subscribe to anything, nothing would be notified
 
       fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
 
       BOOST_CHECK_EQUAL( expected_objects_changed1, objects_changed1 );
       BOOST_CHECK_EQUAL( expected_objects_changed2, objects_changed2 );
       BOOST_CHECK_EQUAL( expected_objects_changed3, objects_changed3 );
+      BOOST_CHECK_EQUAL( expected_objects_changed4, objects_changed4 );
+      BOOST_CHECK_EQUAL( expected_objects_changed5, objects_changed5 );
+      BOOST_CHECK_EQUAL( expected_objects_changed6, objects_changed6 );
 
    } FC_LOG_AND_RETHROW()
 }
