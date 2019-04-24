@@ -756,12 +756,15 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
    try {
       ACTORS( (alice)(bob) );
 
+      create_user_issued_asset( "UIATEST" );
+
       uint32_t objects_changed1 = 0;
       uint32_t objects_changed2 = 0;
       uint32_t objects_changed3 = 0;
       uint32_t objects_changed4 = 0;
       uint32_t objects_changed5 = 0;
       uint32_t objects_changed6 = 0;
+      uint32_t objects_changed7 = 0;
       auto callback1 = [&]( const variant& v )
       {
          ++objects_changed1;
@@ -786,6 +789,10 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       {
          ++objects_changed6;
       };
+      auto callback7 = [&]( const variant& v )
+      {
+         ++objects_changed7;
+      };
 
       uint32_t expected_objects_changed1 = 0;
       uint32_t expected_objects_changed2 = 0;
@@ -793,6 +800,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       uint32_t expected_objects_changed4 = 0;
       uint32_t expected_objects_changed5 = 0;
       uint32_t expected_objects_changed6 = 0;
+      uint32_t expected_objects_changed7 = 0;
 
       graphene::app::database_api db_api1(db);
 
@@ -819,9 +827,12 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       graphene::app::database_api db_api6( db, &opt );
       db_api6.set_subscribe_callback( callback6, false );
 
-      vector<object_id_type> ids;
-      ids.push_back( alice_id );
-      db_api1.get_objects( ids ); // db_api1 subscribe to Alice
+      graphene::app::database_api db_api7( db, &opt );
+      db_api7.set_subscribe_callback( callback7, false );
+
+      vector<object_id_type> account_ids;
+      account_ids.push_back( alice_id );
+      db_api1.get_objects( account_ids ); // db_api1 subscribe to Alice
 
       vector<string> account_names;
       account_names.push_back( "alice" );
@@ -831,13 +842,18 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
 
       db_api6.lookup_accounts( "alice", 3 ); // db_api6 does not subscribe to Alice
 
+      vector<string> asset_names;
+      asset_names.push_back( "UIATEST" );
+      db_api7.get_assets( asset_names ); // db_api7 subscribe to UIA
+
       generate_block();
       ++expected_objects_changed1; // db_api1 subscribed to Alice, notify Alice account creation
       ++expected_objects_changed2; // db_api2 subscribed to all, notify new objects
       // db_api3 didn't subscribe to anything, nothing would be notified
       ++expected_objects_changed4; // db_api4 subscribed to Alice, notify Alice account creation
-      ++expected_objects_changed5; // db_api4 subscribed to Alice, notify Alice account creation
+      ++expected_objects_changed5; // db_api5 subscribed to Alice, notify Alice account creation
       // db_api6 didn't subscribe to anything, nothing would be notified
+      ++expected_objects_changed7; // db_api7 subscribed to UIA, notify asset creation
 
       fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
 
@@ -847,6 +863,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       BOOST_CHECK_EQUAL( expected_objects_changed4, objects_changed4 );
       BOOST_CHECK_EQUAL( expected_objects_changed5, objects_changed5 );
       BOOST_CHECK_EQUAL( expected_objects_changed6, objects_changed6 );
+      BOOST_CHECK_EQUAL( expected_objects_changed7, objects_changed7 );
 
       transfer( account_id_type(), alice_id, asset(1) );
       generate_block();
@@ -857,6 +874,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       // db_api4 only subscribed to the account object of Alice, nothing notified
       // db_api5 only subscribed to the account object of Alice, nothing notified
       // db_api6 didn't subscribe to anything, nothing would be notified
+      // db_api7: no change on UIA, nothing would be notified
 
       fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
 
@@ -866,6 +884,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       BOOST_CHECK_EQUAL( expected_objects_changed4, objects_changed4 );
       BOOST_CHECK_EQUAL( expected_objects_changed5, objects_changed5 );
       BOOST_CHECK_EQUAL( expected_objects_changed6, objects_changed6 );
+      BOOST_CHECK_EQUAL( expected_objects_changed7, objects_changed7 );
 
    } FC_LOG_AND_RETHROW()
 }
