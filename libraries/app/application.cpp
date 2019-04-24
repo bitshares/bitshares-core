@@ -103,7 +103,7 @@ namespace detail {
                                                 GRAPHENE_SYMBOL,
                                                 GRAPHENE_MAX_SHARE_SUPPLY});
       initial_state.initial_chain_id = fc::sha256::hash( "BOGUS" );
-
+      initial_state.initial_marketing_partner_account_name = "nathan";
       return initial_state;
    }
 

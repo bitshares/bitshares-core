@@ -232,6 +232,7 @@ void es_objects_plugin_impl::prepare_account(const account_object& account_objec
    acct.lifetime_referrer = account_object.lifetime_referrer;
    acct.network_fee_percentage = account_object.network_fee_percentage;
    acct.lifetime_referrer_fee_percentage = account_object.lifetime_referrer_fee_percentage;
+   acct.marketing_partner_fee_percentage = account_object.marketing_partner_fee_percentage;
    acct.referrer_rewards_percentage = account_object.referrer_rewards_percentage;
    acct.name = account_object.name;
    acct.owner_account_auths = fc::json::to_string(account_object.owner.account_auths);

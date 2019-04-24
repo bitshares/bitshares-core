@@ -74,10 +74,12 @@ void account_statistics_object::process_fees(const account_object& a, database& 
          assert( accumulated + reserveed == network_cut );
 #endif
          share_type lifetime_cut = cut_fee(core_fee_total, account.lifetime_referrer_fee_percentage);
-         share_type referral = core_fee_total - network_cut - lifetime_cut;
+         share_type marketing_partner_cut = cut_fee(core_fee_total, account.marketing_partner_fee_percentage);
+         share_type referral = core_fee_total - network_cut - lifetime_cut - marketing_partner_cut;
 
-         d.modify( d.get_core_dynamic_data(), [network_cut](asset_dynamic_data_object& addo) {
+         d.modify( d.get_core_dynamic_data(), [network_cut, marketing_partner_cut](asset_dynamic_data_object& addo) {
             addo.accumulated_fees += network_cut;
+            addo.accumulated_fees_for_marketing_partner += marketing_partner_cut;
          });
 
          // Potential optimization: Skip some of this math and object lookups by special casing on the account type.
@@ -90,7 +92,7 @@ void account_statistics_object::process_fees(const account_object& a, database& 
          d.deposit_cashback(d.get(account.referrer), referrer_cut, require_vesting);
          d.deposit_cashback(d.get(account.registrar), registrar_cut, require_vesting);
 
-         assert( referrer_cut + registrar_cut + accumulated + reserveed + lifetime_cut == core_fee_total );
+         assert( referrer_cut + registrar_cut + accumulated + reserveed + lifetime_cut + marketing_partner_cut == core_fee_total );
       };
 
       pay_out_fees(a, pending_fees, true);

@@ -88,6 +88,7 @@ database_fixture::database_fixture()
       genesis_state.initial_committee_candidates.push_back({name});
       genesis_state.initial_witness_candidates.push_back({name, init_account_priv_key.get_public_key()});
    }
+   genesis_state.initial_marketing_partner_account_name = "nathan";
    genesis_state.initial_parameters.current_fees->zero_all_fees();
 
    genesis_state_type::initial_asset_type init_mpa1;
@@ -97,6 +98,7 @@ database_fixture::database_fixture()
    init_mpa1.precision = 4;
    init_mpa1.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    init_mpa1.accumulated_fees = 0;
+   init_mpa1.accumulated_fees_for_marketing_partner = 0;
    init_mpa1.is_bitasset = true;
    // TODO add initial UIA's; add initial short positions; test non-zero accumulated_fees
    genesis_state.initial_assets.push_back( init_mpa1 );
@@ -265,6 +267,7 @@ void database_fixture::verify_asset_supplies( const database& db )
    {
       const auto& dasset_obj = asset_obj.dynamic_asset_data_id(db);
       total_balances[asset_obj.id] += dasset_obj.accumulated_fees;
+      total_balances[asset_obj.id] += dasset_obj.accumulated_fees_for_marketing_partner;
       total_balances[asset_id_type()] += dasset_obj.fee_pool;
       if( asset_obj.is_market_issued() )
       {

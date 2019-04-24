@@ -175,7 +175,7 @@ namespace graphene { namespace chain {
       FC_ASSERT( reserve_percent_of_fee <= GRAPHENE_100_PERCENT );
       FC_ASSERT( network_percent_of_fee <= GRAPHENE_100_PERCENT );
       FC_ASSERT( lifetime_referrer_percent_of_fee <= GRAPHENE_100_PERCENT );
-      FC_ASSERT( network_percent_of_fee + lifetime_referrer_percent_of_fee <= GRAPHENE_100_PERCENT );
+      FC_ASSERT( network_percent_of_fee + lifetime_referrer_percent_of_fee + GRAPHENE_DEFAULT_MARKETING_PARTNER_PERCENT_OF_FEE <= GRAPHENE_100_PERCENT );
 
       FC_ASSERT( block_interval >= GRAPHENE_MIN_BLOCK_INTERVAL );
       FC_ASSERT( block_interval <= GRAPHENE_MAX_BLOCK_INTERVAL );
