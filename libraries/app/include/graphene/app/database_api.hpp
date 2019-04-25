@@ -174,8 +174,6 @@ class database_api
        * Impacts behavior of these APIs:
        * - get_accounts
        * - get_assets
-       * - get_balance_objects
-       * - get_key_references
        * - get_objects
        * - lookup_accounts
        *
