@@ -40,6 +40,8 @@
 
 #include <boost/filesystem/path.hpp>
 
+#include "../../libraries/app/application_impl.hxx"
+
 #define BOOST_TEST_MODULE Test Application
 #include <boost/test/included/unit_test.hpp>
 
@@ -331,8 +333,6 @@ BOOST_AUTO_TEST_CASE( two_node_network )
 }
 
 // a contrived example to test the breaking out of application_impl to a header file
-
-#include "../../libraries/app/application_impl.hxx"
 
 BOOST_AUTO_TEST_CASE(application_impl_breakout) {
    class test_impl : public graphene::app::detail::application_impl {
