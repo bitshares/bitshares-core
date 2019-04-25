@@ -50,7 +50,7 @@ namespace graphene {
       std::vector<char> v;
       try
       {
-		     v = fc::from_base58( base58str.substr( prefix_len ) );
+         v = fc::from_base58( base58str.substr( prefix_len ) );
       }
       catch( const fc::parse_error_exception& e )
       {
