@@ -764,12 +764,19 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       uint32_t objects_changed ## i = 0; \
       auto callback ## i = [&]( const variant& v ) \
       { \
+         idump((i)(v)); \
          ++objects_changed ## i; \
       }; \
       uint32_t expected_objects_changed ## i = 0;
 
 #define SUB_NOTIF_TEST_CHECK(z, i, data) \
-      BOOST_CHECK_EQUAL( expected_objects_changed ## i, objects_changed ## i );
+      if( expected_objects_changed ## i > 0 ) { \
+         BOOST_CHECK_LE( expected_objects_changed ## i, objects_changed ## i ); \
+      } else { \
+         BOOST_CHECK_EQUAL( expected_objects_changed ## i, objects_changed ## i ); \
+      } \
+      expected_objects_changed ## i = 0; \
+      objects_changed ## i = 0;
 
       BOOST_PP_REPEAT_FROM_TO( 1, SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE, SUB_NOTIF_TEST_INIT_CALLBACKS, unused );
 
@@ -829,7 +836,6 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       ++expected_objects_changed7; // db_api7 subscribed to UIA, notify asset creation
 
       fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
-
       check_results();
 
       transfer( account_id_type(), alice_id, asset(1) );
@@ -844,7 +850,97 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       // db_api7: no change on UIA, nothing would be notified
 
       fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      check_results();
 
+      vector<object_id_type> obj_ids;
+      obj_ids.push_back( db.get_dynamic_global_properties().id );
+      db_api3.get_objects( obj_ids ); // db_api3 subscribe to dynamic global properties
+
+      db_api4.get_full_accounts( account_names, true );  // db_api4 subscribe to Alice with get_full_accounts
+      db_api5.get_full_accounts( account_names, false ); // db_api5 doesn't subscribe
+
+      transfer( account_id_type(), alice_id, asset(1) );
+      generate_block();
+      // db_api1 didn't subscribe to Alice with get_full_accounts but only subscribed to the account object,
+      //   nothing would be notified
+      ++expected_objects_changed2; // db_api2 subscribed to all, notify new history records and etc
+      ++expected_objects_changed3; // db_api3 subscribed to dynamic global properties, would be notified
+      ++expected_objects_changed4; // db_api4 subscribed to full account data of Alice, would be notified
+      // db_api5 only subscribed to the account object of Alice, nothing notified
+      // db_api6 didn't subscribe to anything, nothing would be notified
+      // db_api7: no change on UIA, nothing would be notified
+
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      check_results();
+
+      db_api6.set_auto_subscription( false );
+      db_api6.get_objects( obj_ids ); // db_api6 doesn't auto-subscribe to dynamic global properties
+
+      generate_block();
+      // db_api1 only subscribed to the account object of Alice, nothing notified
+      // db_api2 subscribed to all, but no object is created or removed in this block, so nothing notified
+      ++expected_objects_changed3; // db_api3 subscribed to dynamic global properties, would be notified
+      // db_api4 subscribed to full account data of Alice, nothing would be notified
+      // db_api5 only subscribed to the account object of Alice, nothing notified
+      // db_api6 didn't subscribe to anything, nothing would be notified
+      // db_api7: no change on UIA, nothing would be notified
+
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      check_results();
+
+      account_names.clear();
+      account_names.push_back( "bob" );
+      db_api5.set_auto_subscription( false );
+      db_api5.get_full_accounts( account_names, true ); // db_api5 subscribe to full account data of Bob
+
+      db_api6.get_full_accounts( account_names, false ); // db_api6 doesn't subscribe
+
+      transfer( account_id_type(), bob_id, asset(1) );
+
+      generate_block();
+      // db_api1 only subscribed to the account object of Alice, nothing notified
+      ++expected_objects_changed2; // db_api2 subscribed to all, notify new history records and etc
+      ++expected_objects_changed3; // db_api3 subscribed to dynamic global properties, would be notified
+      // db_api4 subscribed to full account data of Alice, nothing would be notified
+      ++expected_objects_changed5; // db_api5 subscribed to full account data of Bob, would be notified
+      // db_api6 didn't subscribe to anything, nothing would be notified
+      // db_api7: no change on UIA, nothing would be notified
+
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      check_results();
+
+      db_api6.set_auto_subscription( true );
+      db_api6.get_objects( obj_ids ); // db_api6 auto-subscribe to dynamic global properties
+
+      generate_block();
+      // db_api1 only subscribed to the account object of Alice, nothing notified
+      // db_api2 subscribed to all, but no object is created or removed in this block, so nothing notified
+      ++expected_objects_changed3; // db_api3 subscribed to dynamic global properties, would be notified
+      // db_api4 subscribed to full account data of Alice, nothing would be notified
+      // db_api5 subscribed to full account data of Bob, nothing notified
+      ++expected_objects_changed6; // db_api6 subscribed to dynamic global properties, would be notified
+      // db_api7: no change on UIA, nothing would be notified
+
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      check_results();
+
+      db_api5.set_subscribe_callback( callback5, false ); // reset subscription
+
+      db_api6.cancel_all_subscriptions();
+      db_api6.get_objects( obj_ids ); // db_api6 doesn't auto-subscribe to dynamic global properties
+
+      transfer( alice_id, bob_id, asset(1) );
+
+      generate_block();
+      // db_api1 only subscribed to the account object of Alice, nothing notified
+      ++expected_objects_changed2; // db_api2 subscribed to all, notify new history records and etc
+      ++expected_objects_changed3; // db_api3 subscribed to dynamic global properties, would be notified
+      ++expected_objects_changed4; // db_api4 subscribed to full account data of Alice, would be notified
+      // db_api5 subscribed to anything, nothing notified
+      // db_api6 subscribed to anything, nothing notified
+      // db_api7: no change on UIA, nothing would be notified
+
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
       check_results();
 
    } FC_LOG_AND_RETHROW()
