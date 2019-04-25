@@ -758,49 +758,28 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
 
       create_user_issued_asset( "UIATEST" );
 
-      uint32_t objects_changed1 = 0;
-      uint32_t objects_changed2 = 0;
-      uint32_t objects_changed3 = 0;
-      uint32_t objects_changed4 = 0;
-      uint32_t objects_changed5 = 0;
-      uint32_t objects_changed6 = 0;
-      uint32_t objects_changed7 = 0;
-      auto callback1 = [&]( const variant& v )
+#define SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE 8
+
+#define SUB_NOTIF_TEST_INIT_CALLBACKS(z, i, data) \
+      uint32_t objects_changed ## i = 0; \
+      auto callback ## i = [&]( const variant& v ) \
+      { \
+         ++objects_changed ## i; \
+      }; \
+      uint32_t expected_objects_changed ## i = 0;
+
+#define SUB_NOTIF_TEST_CHECK(z, i, data) \
+      BOOST_CHECK_EQUAL( expected_objects_changed ## i, objects_changed ## i );
+
+      BOOST_PP_REPEAT_FROM_TO( 1, SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE, SUB_NOTIF_TEST_INIT_CALLBACKS, unused );
+
+      auto check_results = [&]()
       {
-         ++objects_changed1;
-      };
-      auto callback2 = [&]( const variant& v )
-      {
-         ++objects_changed2;
-      };
-      auto callback3 = [&]( const variant& v )
-      {
-         ++objects_changed3;
-      };
-      auto callback4 = [&]( const variant& v )
-      {
-         ++objects_changed4;
-      };
-      auto callback5 = [&]( const variant& v )
-      {
-         ++objects_changed5;
-      };
-      auto callback6 = [&]( const variant& v )
-      {
-         ++objects_changed6;
-      };
-      auto callback7 = [&]( const variant& v )
-      {
-         ++objects_changed7;
+         BOOST_PP_REPEAT_FROM_TO( 1, SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE, SUB_NOTIF_TEST_CHECK, unused );
       };
 
-      uint32_t expected_objects_changed1 = 0;
-      uint32_t expected_objects_changed2 = 0;
-      uint32_t expected_objects_changed3 = 0;
-      uint32_t expected_objects_changed4 = 0;
-      uint32_t expected_objects_changed5 = 0;
-      uint32_t expected_objects_changed6 = 0;
-      uint32_t expected_objects_changed7 = 0;
+#undef SUB_NOTIF_TEST_CHECK
+#undef SUB_NOTIF_TEST_INIT_CALLBACKS
 
       graphene::app::database_api db_api1(db);
 
@@ -815,20 +794,14 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       graphene::app::database_api db_api2( db, &opt );
       db_api2.set_subscribe_callback( callback2, true ); // subscribing to all should succeed
 
-      graphene::app::database_api db_api3( db, &opt );
-      db_api3.set_subscribe_callback( callback3, false );
+#define SUB_NOTIF_TEST_INIT_APIS(z, i, data) \
+      graphene::app::database_api db_api ## i( db, &opt ); \
+      db_api ## i.set_subscribe_callback( callback ## i, false );
 
-      graphene::app::database_api db_api4( db, &opt );
-      db_api4.set_subscribe_callback( callback4, false );
+      BOOST_PP_REPEAT_FROM_TO( 3, SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE, SUB_NOTIF_TEST_INIT_APIS, unused );
 
-      graphene::app::database_api db_api5( db, &opt );
-      db_api5.set_subscribe_callback( callback5, false );
-
-      graphene::app::database_api db_api6( db, &opt );
-      db_api6.set_subscribe_callback( callback6, false );
-
-      graphene::app::database_api db_api7( db, &opt );
-      db_api7.set_subscribe_callback( callback7, false );
+#undef SUB_NOTIF_TEST_INIT_APIS
+#undef SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE
 
       vector<object_id_type> account_ids;
       account_ids.push_back( alice_id );
@@ -857,13 +830,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
 
       fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
 
-      BOOST_CHECK_EQUAL( expected_objects_changed1, objects_changed1 );
-      BOOST_CHECK_EQUAL( expected_objects_changed2, objects_changed2 );
-      BOOST_CHECK_EQUAL( expected_objects_changed3, objects_changed3 );
-      BOOST_CHECK_EQUAL( expected_objects_changed4, objects_changed4 );
-      BOOST_CHECK_EQUAL( expected_objects_changed5, objects_changed5 );
-      BOOST_CHECK_EQUAL( expected_objects_changed6, objects_changed6 );
-      BOOST_CHECK_EQUAL( expected_objects_changed7, objects_changed7 );
+      check_results();
 
       transfer( account_id_type(), alice_id, asset(1) );
       generate_block();
@@ -878,13 +845,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
 
       fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
 
-      BOOST_CHECK_EQUAL( expected_objects_changed1, objects_changed1 );
-      BOOST_CHECK_EQUAL( expected_objects_changed2, objects_changed2 );
-      BOOST_CHECK_EQUAL( expected_objects_changed3, objects_changed3 );
-      BOOST_CHECK_EQUAL( expected_objects_changed4, objects_changed4 );
-      BOOST_CHECK_EQUAL( expected_objects_changed5, objects_changed5 );
-      BOOST_CHECK_EQUAL( expected_objects_changed6, objects_changed6 );
-      BOOST_CHECK_EQUAL( expected_objects_changed7, objects_changed7 );
+      check_results();
 
    } FC_LOG_AND_RETHROW()
 }
