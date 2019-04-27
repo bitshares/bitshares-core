@@ -180,7 +180,7 @@ namespace graphene { namespace app {
 
     fc::variant network_broadcast_api::broadcast_transaction_synchronous(const precomputable_transaction& trx)
     {
-       fc::promise<fc::variant>::ptr prom( new fc::promise<fc::variant>() );
+       fc::promise<fc::variant>::ptr prom = fc::promise<fc::variant>::create();
        broadcast_transaction_with_callback( [prom]( const fc::variant& v ){
         prom->set_value(v);
        }, trx );
