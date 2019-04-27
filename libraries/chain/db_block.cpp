@@ -808,7 +808,7 @@ fc::future<void> database::precompute_parallel( const signed_block& block, const
    block.id();
 
    if( workers.empty() )
-      return fc::future< void >( fc::promise< void >::ptr( new fc::promise< void >( true ) ) );
+      return fc::future< void >( fc::promise< void >::create( true ) );
 
    auto first = workers.begin();
    auto worker = first;
