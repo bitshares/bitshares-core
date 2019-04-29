@@ -928,7 +928,7 @@ try {
       set_expiration( db, trx );
    }
 
-   graphene::app::database_api db_api(db);
+   graphene::app::database_api db_api(db, &(this->app.get_options()) ) ;
 
    auto htlc = db_api.get_htlc(alice_htlc_id_bob);
    BOOST_CHECK_EQUAL( htlc->id.instance(), 0);

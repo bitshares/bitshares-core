@@ -986,7 +986,6 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
                if ( std::find(acnt.htlcs.begin(), acnt.htlcs.end(), htlc) == acnt.htlcs.end() )
                   acnt.htlcs.emplace_back(htlc);
                });
-
       results[account_name_or_id] = acnt;
    }
    return results;
@@ -2427,7 +2426,7 @@ vector<htlc_object> database_api::get_htlc_by_from(const std::string account_id_
 
 vector<htlc_object> database_api_impl::get_htlc_by_from(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const
 {
-   FC_ASSERT( limit <= 101 );
+   FC_ASSERT( limit <= _app_options->api_limit_get_htlc_by );
    vector<htlc_object> result;
 
    const auto& htlc_idx = _db.get_index_type< htlc_index >().indices().get< by_from_id >();
@@ -2451,7 +2450,7 @@ vector<htlc_object> database_api::get_htlc_by_to(const std::string account_id_or
 vector<htlc_object> database_api_impl::get_htlc_by_to(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const
 {
 
-   FC_ASSERT( limit <= 101 );
+   FC_ASSERT( limit <= _app_options->api_limit_get_htlc_by );
    vector<htlc_object> result;
 
    const auto& htlc_idx = _db.get_index_type< htlc_index >().indices().get< by_to_id >();
