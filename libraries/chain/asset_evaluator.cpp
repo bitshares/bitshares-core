@@ -83,11 +83,6 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
          FC_ASSERT( asset_symbol_itr->issuer == op.issuer, "Asset ${s} may only be created by issuer of ${p}, ${i}",
                     ("s",op.symbol)("p",prefix)("i", op.issuer(d).name) );
       }
-
-      if(d.head_block_time() <= HARDFORK_CORE_620_TIME ) { // TODO: remove this check after hf_620
-         static const std::locale& loc = std::locale::classic();
-         FC_ASSERT(isalpha(op.symbol.back(), loc), "Asset ${s} must end with alpha character before hardfork 620", ("s",op.symbol));
-      }
    }
    else
    {
@@ -374,12 +369,6 @@ void_result asset_update_issuer_evaluator::do_evaluate(const asset_update_issuer
    FC_ASSERT( o.issuer == a.issuer,
               "Incorrect issuer for asset! (${o.issuer} != ${a.issuer})",
               ("o.issuer", o.issuer)("a.issuer", a.issuer) );
-
-   if( d.head_block_time() < HARDFORK_CORE_199_TIME )
-   {
-      // TODO: remove after HARDFORK_CORE_199_TIME has passed
-      FC_ASSERT(false, "Not allowed until hardfork 199");
-   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
@@ -1043,7 +1032,6 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
 
 void_result asset_claim_fees_evaluator::do_evaluate( const asset_claim_fees_operation& o )
 { try {
-   FC_ASSERT( db().head_block_time() > HARDFORK_413_TIME );
    FC_ASSERT( o.amount_to_claim.asset_id(db()).issuer == o.issuer, "Asset fees may only be claimed by the issuer" );
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -1069,8 +1057,6 @@ void_result asset_claim_fees_evaluator::do_apply( const asset_claim_fees_operati
 
 void_result asset_claim_pool_evaluator::do_evaluate( const asset_claim_pool_operation& o )
 { try {
-    FC_ASSERT( db().head_block_time() >= HARDFORK_CORE_188_TIME,
-         "This operation is only available after Hardfork #188!" );
     FC_ASSERT( o.asset_id(db()).issuer == o.issuer, "Asset fee pool may only be claimed by the issuer" );
 
     return void_result();

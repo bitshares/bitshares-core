@@ -56,21 +56,9 @@ struct proposal_operation_hardfork_visitor
             || (v.delta_debt.asset_id( db ).bitasset_data_id
             && (*(v.delta_debt.asset_id( db ).bitasset_data_id))( db ).is_prediction_market )
             , "Soft fork - preventing proposal with call_order_update!" );
-   
-      // TODO review and cleanup code below after hard fork
-      // hf_834
-      if (next_maintenance_time <= HARDFORK_CORE_834_TIME) {
-         FC_ASSERT( !v.extensions.value.target_collateral_ratio.valid(),
-                    "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
-      }
    }
-   // hf_620
+   // hf_1268
    void operator()(const graphene::chain::asset_create_operation &v) const {
-      if (block_time < HARDFORK_CORE_620_TIME) {
-         static const std::locale &loc = std::locale::classic();
-         FC_ASSERT(isalpha(v.symbol.back(), loc), "Asset ${s} must end with alpha character before hardfork 620", ("s", v.symbol));
-      }
-
       detail::check_asset_options_hf_1268(block_time, v.common_options);
    }
    // hf_1268
@@ -80,18 +68,6 @@ struct proposal_operation_hardfork_visitor
    // hf_1268
    void operator()(const graphene::chain::vesting_balance_create_operation &v) const {
       detail::check_vesting_balance_policy_hf_1268(block_time, v.policy);
-   }
-   // hf_199
-   void operator()(const graphene::chain::asset_update_issuer_operation &v) const {
-      if (block_time < HARDFORK_CORE_199_TIME) {
-         FC_ASSERT(false, "Not allowed until hardfork 199");
-      }
-   }
-   // hf_188
-   void operator()(const graphene::chain::asset_claim_pool_operation &v) const {
-      if (block_time < HARDFORK_CORE_188_TIME) {
-         FC_ASSERT(false, "Not allowed until hardfork 188");
-      }
    }
    // hf_588
    // issue #588

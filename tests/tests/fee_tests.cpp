@@ -173,17 +173,6 @@ BOOST_AUTO_TEST_CASE(asset_claim_fees_test)
 
       }
 
-      if( db.head_block_time() <= HARDFORK_413_TIME )
-      {
-         // can't claim before hardfork
-         GRAPHENE_REQUIRE_THROW( claim_fees( izzy_id, _izzy(1) ), fc::exception );
-         generate_blocks( HARDFORK_413_TIME );
-         while( db.head_block_time() <= HARDFORK_413_TIME )
-         {
-            generate_block();
-         }
-      }
-
       {
          const asset_object& izzycoin = izzycoin_id(db);
          const asset_object& jillcoin = jillcoin_id(db);
@@ -289,13 +278,6 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
 
         // deposit 100 BTS to the fee pool of ALICEUSD asset
         fund_fee_pool( alice_id(db), aliceusd_id(db), _core(100).amount );
-
-        // Unable to claim pool before the hardfork
-        GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, aliceusd_id, _core(1), core_asset), fc::exception );
-        GRAPHENE_REQUIRE_THROW( claim_pool_proposal( alice_id, aliceusd_id, _core(1), core_asset), fc::exception );
-
-        // Fast forward to hard fork date
-        generate_blocks( HARDFORK_CORE_188_TIME );
 
         // New reference for core_asset after having produced blocks
         const asset_object& core_asset_hf = asset_id_type()(db);
@@ -3443,11 +3425,9 @@ BOOST_AUTO_TEST_CASE( stealth_fba_test )
       ACTORS( (alice)(bob)(chloe)(dan)(izzy)(philbin)(tom) );
       upgrade_to_lifetime_member(philbin_id);
 
-      generate_blocks( HARDFORK_538_TIME );
       generate_blocks( HARDFORK_555_TIME );
       generate_blocks( HARDFORK_563_TIME );
       generate_blocks( HARDFORK_572_TIME );
-      generate_blocks( HARDFORK_599_TIME );
 
       // Philbin (registrar who registers Rex)
 

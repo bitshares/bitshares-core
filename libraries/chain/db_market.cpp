@@ -641,25 +641,16 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    // TODO remove when we're sure it's always false
    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
    // TODO remove when we're sure it's always false
-   bool before_core_hardfork_834 = ( maint_time <= HARDFORK_CORE_834_TIME ); // target collateral ratio option
    if( before_core_hardfork_184 )
       ilog( "match(limit,call) is called before hardfork core-184 at block #${block}", ("block",head_block_num()) );
    if( before_core_hardfork_342 )
       ilog( "match(limit,call) is called before hardfork core-342 at block #${block}", ("block",head_block_num()) );
-   if( before_core_hardfork_834 )
-      ilog( "match(limit,call) is called before hardfork core-834 at block #${block}", ("block",head_block_num()) );
 
    bool cull_taker = false;
 
    asset usd_for_sale = bid.amount_for_sale();
-   // TODO if we're sure `before_core_hardfork_834` is always false, remove the check
-   asset usd_to_buy   = ( before_core_hardfork_834 ?
-                          ask.get_debt() :
-                          asset( ask.get_max_debt_to_cover( match_price,
-                                                            feed_price,
-                                                            maintenance_collateral_ratio,
-                                                            maintenance_collateralization ),
-                                 ask.debt_type() ) );
+   asset usd_to_buy   = asset( ask.get_max_debt_to_cover( match_price, feed_price, 
+         maintenance_collateral_ratio,  maintenance_collateralization ), ask.debt_type() );
 
    asset call_pays, call_receives, order_pays, order_receives;
    if( usd_to_buy > usd_for_sale )
