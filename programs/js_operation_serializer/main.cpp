@@ -110,7 +110,6 @@ struct js_name<fc::array<T,N>>
 template<size_t N>   struct js_name<fc::array<char,N>>    { static std::string name(){ return  "bytes("+ fc::to_string(N) + ")"; }; };
 template<size_t N>   struct js_name<fc::array<uint8_t,N>> { static std::string name(){ return  "bytes("+ fc::to_string(N) + ")"; }; };
 template<typename T> struct js_name< fc::optional<T> >    { static std::string name(){ return "optional(" + js_name<T>::name() + ")"; } };
-template<typename T> struct js_name< fc::smart_ref<T> >   { static std::string name(){ return js_name<T>::name(); } };
 template<>           struct js_name< object_id_type >     { static std::string name(){ return "object_id_type"; } };
 template<typename T> struct js_name< fc::flat_set<T> >    { static std::string name(){ return "set(" + js_name<T>::name() + ")"; } };
 template<typename T> struct js_name< std::vector<T> >     { static std::string name(){ return "array(" + js_name<T>::name() + ")"; } };
