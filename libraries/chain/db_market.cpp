@@ -1253,7 +1253,7 @@ asset database::pay_market_fees(const account_object& seller, const asset_object
 
                if ( referrer_rewards_value > 0 && is_authorized_asset(*this, seller.referrer(*this), recv_asset))
                {
-                  FC_ASSERT ( referrer_rewards_value <= reward.amount, "Referrer reward shouldn't be greater than total reward" );
+                  FC_ASSERT ( referrer_rewards_value <= reward.amount.value, "Referrer reward shouldn't be greater than total reward" );
                   const asset referrer_reward = recv_asset.amount(referrer_rewards_value);
                   registrar_reward -= referrer_reward;
                   deposit_market_fee_vesting_balance(seller.referrer, referrer_reward);
