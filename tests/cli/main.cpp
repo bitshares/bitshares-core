@@ -117,7 +117,6 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    app1->register_plugin<graphene::account_history::account_history_plugin>();
    app1->register_plugin< graphene::market_history::market_history_plugin >();
    app1->register_plugin< graphene::witness_plugin::witness_plugin >();
-   app1->register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
    app1->startup_plugins();
    boost::program_options::variables_map cfg;
 #ifdef _WIN32

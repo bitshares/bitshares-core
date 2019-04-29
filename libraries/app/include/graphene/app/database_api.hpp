@@ -277,35 +277,6 @@ class database_api
       vector<optional<account_object>> get_accounts(const vector<std::string>& account_names_or_ids)const;
 
       /**
-       * @brief Fetch all orders relevant to the specified account and specified market, result orders
-       *        are sorted descendingly by price
-       *
-       * @param account_name_or_id  The name or ID of an account to retrieve
-       * @param base  Base asset
-       * @param quote  Quote asset
-       * @param limit  The limitation of items each query can fetch, not greater than 101
-       * @param start_id  Start order id, fetch orders which price lower than this order, or price equal to this order
-       *                  but order ID greater than this order
-       * @param start_price  Fetch orders with price lower than or equal to this price
-       *
-       * @return List of orders from @ref account_name_or_id to the corresponding account
-       *
-       * @note
-       * 1. if @ref account_name_or_id cannot be tied to an account, empty result will be returned
-       * 2. @ref start_id and @ref start_price can be empty, if so the api will return the "first page" of orders;
-       *    if start_id is specified, its price will be used to do page query preferentially, otherwise the start_price
-       *    will be used; start_id and start_price may be used cooperatively in case of the order specified by start_id
-       *    was just canceled accidentally, in such case, the result orders' price may lower or equal to start_price,
-       *    but orders' id greater than start_id
-       */
-      vector<limit_order_object> get_account_limit_orders( const string& account_name_or_id,
-                                                  const string &base,
-                                                  const string &quote,
-                                                  uint32_t limit = 101,
-                                                  optional<limit_order_id_type> ostart_id = optional<limit_order_id_type>(),
-                                                  optional<price> ostart_price = optional<price>());
-
-      /**
        * @brief Fetch all objects relevant to the specified accounts and subscribe to updates
        * @param callback Function to call with updates
        * @param names_or_ids Each item must be the name or ID of an account to retrieve
@@ -404,133 +375,6 @@ class database_api
        * @return The assets count
        */
       uint64_t get_asset_count()const;
-
-      /////////////////////
-      // Markets / feeds //
-      /////////////////////
-
-      /**
-       * @brief Get limit orders in a given market
-       * @param a ID of asset being sold
-       * @param b ID of asset being purchased
-       * @param limit Maximum number of orders to retrieve
-       * @return The limit orders, ordered from least price to greatest
-       */
-      vector<limit_order_object> get_limit_orders(asset_id_type a, asset_id_type b, uint32_t limit)const;
-
-      /**
-       * @brief Get call orders in a given asset
-       * @param a ID of asset being called
-       * @param limit Maximum number of orders to retrieve
-       * @return The call orders, ordered from earliest to be called to latest
-       */
-      vector<call_order_object> get_call_orders(asset_id_type a, uint32_t limit)const;
-
-      /**
-       * @brief Get forced settlement orders in a given asset
-       * @param a ID of asset being settled
-       * @param limit Maximum number of orders to retrieve
-       * @return The settle orders, ordered from earliest settlement date to latest
-       */
-      vector<force_settlement_object> get_settle_orders(asset_id_type a, uint32_t limit)const;
-
-      /**
-       * @brief Get collateral_bid_objects for a given asset
-       * @param a ID of asset
-       * @param limit Maximum number of objects to retrieve
-       * @param start skip that many results
-       * @return The settle orders, ordered from earliest settlement date to latest
-       */
-      vector<collateral_bid_object> get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const;
-
-      /**
-       *  @return all open margin positions for a given account id or name.
-       */
-      vector<call_order_object> get_margin_positions( const std::string account_id_or_name )const;
-
-      /**
-       * @brief Request notification when the active orders in the market between two assets changes
-       * @param callback Callback method which is called when the market changes
-       * @param a First asset ID
-       * @param b Second asset ID
-       *
-       * Callback will be passed a variant containing a vector<pair<operation, operation_result>>. The vector will
-       * contain, in order, the operations which changed the market, and their results.
-       */
-      void subscribe_to_market(std::function<void(const variant&)> callback,
-                   asset_id_type a, asset_id_type b);
-
-      /**
-       * @brief Unsubscribe from updates to a given market
-       * @param a First asset ID
-       * @param b Second asset ID
-       */
-      void unsubscribe_from_market( asset_id_type a, asset_id_type b );
-
-      /**
-       * @brief Returns the ticker for the market assetA:assetB
-       * @param a String name of the first asset
-       * @param b String name of the second asset
-       * @return The market ticker for the past 24 hours.
-       */
-      market_ticker get_ticker( const string& base, const string& quote )const;
-
-      /**
-       * @brief Returns the 24 hour volume for the market assetA:assetB
-       * @param a String name of the first asset
-       * @param b String name of the second asset
-       * @return The market volume over the past 24 hours
-       */
-      market_volume get_24_volume( const string& base, const string& quote )const;
-
-      /**
-       * @brief Returns the order book for the market base:quote
-       * @param base String name of the first asset
-       * @param quote String name of the second asset
-       * @param depth of the order book. Up to depth of each asks and bids, capped at 50. Prioritizes most moderate of each
-       * @return Order book of the market
-       */
-      order_book get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
-
-      /**
-       * @brief Returns vector of 24 hour volume markets sorted by reverse base_volume
-       * Note: this API is experimental and subject to change in next releases
-       * @param limit Max number of results
-       * @return Desc Sorted volume vector
-       */
-      vector<market_volume> get_top_markets(uint32_t limit)const;
-
-      /**
-       * @brief Returns recent trades for the market base:quote, ordered by time, most recent first.
-       * Note: Currently, timezone offsets are not supported. The time must be UTC. The range is [stop, start).
-       *       In case when there are more than 100 trades occurred in the same second, this API only returns
-       *       the first 100 records, can use another API `get_trade_history_by_sequence` to query for the rest.
-       * @param base symbol or ID of the base asset
-       * @param quote symbol or ID of the quote asset
-       * @param start Start time as a UNIX timestamp, the latest trade to retrieve
-       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
-       * @param limit Number of trasactions to retrieve, capped at 100.
-       * @return Recent transactions in the market
-       */
-      vector<market_trade> get_trade_history( const string& base, const string& quote,
-                                              fc::time_point_sec start, fc::time_point_sec stop,
-                                              unsigned limit = 100 )const;
-
-      /**
-       * @brief Returns trades for the market base:quote, ordered by time, most recent first.
-       * Note: Currently, timezone offsets are not supported. The time must be UTC. The range is [stop, start).
-       * @param base symbol or ID of the base asset
-       * @param quote symbol or ID of the quote asset
-       * @param start Start sequence as an Integer, the latest trade to retrieve
-       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
-       * @param limit Number of trasactions to retrieve, capped at 100
-       * @return Transactions in the market
-       */
-      vector<market_trade> get_trade_history_by_sequence( const string& base, const string& quote,
-                                                          int64_t start, fc::time_point_sec stop,
-                                                          unsigned limit = 100 )const;
-
-
 
       ///////////////
       // Witnesses //
@@ -787,22 +631,6 @@ FC_API(graphene::app::database_api,
    (list_assets)
    (lookup_asset_symbols)
    (get_asset_count)
-
-   // Markets / feeds
-   // (get_order_book)
-   // (get_limit_orders)
-   // (get_account_limit_orders)
-   // (get_call_orders)
-   // (get_settle_orders)
-   // (get_margin_positions)
-   // (get_collateral_bids)
-   // (subscribe_to_market)
-   // (unsubscribe_from_market)
-   // (get_ticker)
-   // (get_24_volume)
-   // (get_top_markets)
-   // (get_trade_history)
-   // (get_trade_history_by_sequence)
 
    // Witnesses
    (get_witnesses)
