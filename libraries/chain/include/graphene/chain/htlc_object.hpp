@@ -85,6 +85,8 @@ namespace graphene { namespace chain {
          const result_type& operator()(const htlc_object& o)const { return o.transfer.to; }
       };
 
+      bool operator==(const htlc_object& in) { return this->id == in.id; }
+
    };
 
    struct by_from_id;

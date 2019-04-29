@@ -750,15 +750,15 @@ class database_api
 
       /**
        *  @brief Get HTLC object
-       *  @param id HTLC contarct id
+       *  @param id HTLC contract id
        *  @return HTLC object for the id
        */
       optional<htlc_object> get_htlc(htlc_id_type id) const;
 
       /**
        *  @brief Get non expired HTLC objects using the sender account
-       *  @param account Account ID or name to get objects from
-       *  @param start Withdraw permission objects(1.16.X) before this ID will be skipped in results. Pagination purposes.
+       *  @param account_id_or_name Account ID or name to get objects from
+       *  @param start htlc objects before this ID will be skipped in results. Pagination purposes.
        *  @param limit Maximum number of objects to retrieve
        *  @return HTLC objects for the account
        */
@@ -766,8 +766,8 @@ class database_api
 
       /**
        *  @brief Get non expired HTLC objects using the receiver account
-       *  @param account Account ID or name to get objects from
-       *  @param start Withdraw permission objects(1.16.X) before this ID will be skipped in results. Pagination purposes.
+       *  @param account_id_or_name Account ID or name to get objects from
+       *  @param start htlc objects before this ID will be skipped in results. Pagination purposes.
        *  @param limit Maximum number of objects to retrieve
        *  @return HTLC objects for the account
       */

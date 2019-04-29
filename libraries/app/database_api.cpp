@@ -168,7 +168,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<withdraw_permission_object> get_withdraw_permissions_by_giver(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
       vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
 
-      // HTCL
+      // HTLC
       optional<htlc_object> get_htlc(htlc_id_type id) const;
       vector<htlc_object> get_htlc_by_from(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const;
       vector<htlc_object> get_htlc_by_to(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const;
@@ -975,11 +975,17 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
                     });
 
       // get htlcs
-      auto htlc_range = _db.get_index_type<htlc_index>().indices().get<by_from_id>().equal_range(account->id);
-      std::for_each(htlc_range.first, htlc_range.second,
-                    [&acnt] (const htlc_object& htlc) {
-                       acnt.htlcs.emplace_back(htlc);
-                    });
+      auto htlc_from_range = _db.get_index_type<htlc_index>().indices().get<by_from_id>().equal_range(account->id);
+      std::for_each(htlc_from_range.first, htlc_from_range.second,
+            [&acnt] (const htlc_object& htlc) {
+               acnt.htlcs.emplace_back(htlc);
+            });
+      auto htlc_to_range = _db.get_index_type<htlc_index>().indices().get<by_to_id>().equal_range(account->id);
+      std::for_each(htlc_to_range.first, htlc_to_range.second,
+            [&acnt] (const htlc_object& htlc) {
+               if ( std::find(acnt.htlcs.begin(), acnt.htlcs.end(), htlc) == acnt.htlcs.end() )
+                  acnt.htlcs.emplace_back(htlc);
+               });
 
       results[account_name_or_id] = acnt;
    }
