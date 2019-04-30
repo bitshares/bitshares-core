@@ -156,14 +156,6 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       op.issue_to_account = nathan_id;
       trx.operations.emplace_back(op);
       set_expiration( db, trx );
-      //Fail because nathan is not whitelisted, but only before hardfork time
-      if( db.head_block_time() <= HARDFORK_415_TIME )
-      {
-         GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
-         generate_blocks( HARDFORK_415_TIME );
-         generate_block();
-         set_expiration( db, trx );
-      }
       PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK(is_authorized_asset( db, nathan_id(db), uia_id(db) ));
@@ -275,17 +267,8 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       BOOST_TEST_MESSAGE( "Attempting to transfer from nathan after blacklisting, should fail" );
       op.amount = advanced.amount(50);
       trx.operations.back() = op;
-      //Fail because nathan is blacklisted
-      if( db.head_block_time() <= HARDFORK_419_TIME )
-      {
-         // before the hardfork time, it fails because the whitelist check fails
-         GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), transfer_from_account_not_whitelisted );
-      }
-      else
-      {
-         // after the hardfork time, it fails because the fees are not in a whitelisted asset
-         GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception );
-      }
+      // it fails because the fees are not in a whitelisted asset
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception );
 
       BOOST_TEST_MESSAGE( "Attempting to burn from nathan after blacklisting, should fail" );
       asset_reserve_operation burn;
@@ -531,11 +514,7 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       create_user_issued_asset( "ALPHA.ONE", alice_id(db), 0 );
       BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( has_asset("ALPHA.ONE") );
 
-      // Sam tries to create asset ending in a number but fails before hf_620
-      GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "SP500", sam_id(db), 0 ), fc::assert_exception );
-      BOOST_CHECK(  !has_asset("SP500") );
-
-      // create a proposal to create asset ending in a number, this will fail before hf_620
+      // create a proposal to create asset ending in a number
       auto& core = asset_id_type()(db);
       asset_create_operation op_p;
       op_p.issuer = alice_id;
@@ -543,7 +522,7 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       op_p.common_options.core_exchange_rate = asset( 1 ) / asset( 1, asset_id_type( 1 ) );
       op_p.fee = core.amount(0);
 
-      const auto& curfees = *db.get_global_properties().parameters.current_fees;
+      const auto& curfees = db.get_global_properties().parameters.get_current_fees();
       const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
       proposal_create_operation prop;
       prop.fee_paying_account = alice_id;
@@ -556,9 +535,8 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       db.current_fee_schedule().set_fee( tx.operations.back() );
       set_expiration( db, tx );
       sign( tx, alice_private_key );
-      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, tx ), fc::assert_exception);
+      PUSH_TX( db, tx );
 
-      generate_blocks( HARDFORK_CORE_620_TIME + 1);
       generate_block();
 
       // Sam can create asset ending in number after hf_620

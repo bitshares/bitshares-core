@@ -168,6 +168,11 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<withdraw_permission_object> get_withdraw_permissions_by_giver(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
       vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
 
+      // HTLC
+      optional<htlc_object> get_htlc(htlc_id_type id) const;
+      vector<htlc_object> get_htlc_by_from(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const;
+      vector<htlc_object> get_htlc_by_to(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const;
+
    //private:
       static string price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote );
 
@@ -668,7 +673,6 @@ dynamic_global_property_object database_api_impl::get_dynamic_global_properties(
 
 vector<vector<account_id_type>> database_api::get_key_references( vector<public_key_type> key )const
 {
-   FC_ASSERT(key.size() <= 100, "Number of keys must be 100 or less");
    return my->get_key_references( key );
 }
 
@@ -677,6 +681,8 @@ vector<vector<account_id_type>> database_api::get_key_references( vector<public_
  */
 vector<vector<account_id_type>> database_api_impl::get_key_references( vector<public_key_type> keys )const
 {
+   uint64_t api_limit_get_key_references=_app_options->api_limit_get_key_references;
+   FC_ASSERT(keys.size() <= api_limit_get_key_references);
    const auto& idx = _db.get_index_type<account_index>();
    const auto& aidx = dynamic_cast<const base_primary_index&>(idx);
    const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
@@ -968,7 +974,18 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
                        acnt.withdraws.emplace_back(withdraw);
                     });
 
-
+      // get htlcs
+      auto htlc_from_range = _db.get_index_type<htlc_index>().indices().get<by_from_id>().equal_range(account->id);
+      std::for_each(htlc_from_range.first, htlc_from_range.second,
+            [&acnt] (const htlc_object& htlc) {
+               acnt.htlcs.emplace_back(htlc);
+            });
+      auto htlc_to_range = _db.get_index_type<htlc_index>().indices().get<by_to_id>().equal_range(account->id);
+      std::for_each(htlc_to_range.first, htlc_to_range.second,
+            [&acnt] (const htlc_object& htlc) {
+               if ( std::find(acnt.htlcs.begin(), acnt.htlcs.end(), htlc) == acnt.htlcs.end() )
+                  acnt.htlcs.emplace_back(htlc);
+               });
       results[account_name_or_id] = acnt;
    }
    return results;
@@ -2377,6 +2394,74 @@ vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_b
    {
       result.push_back(*withdraw_itr);
       ++withdraw_itr;
+   }
+   return result;
+}
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
+//  HTLC                                                            //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+optional<htlc_object> database_api::get_htlc(htlc_id_type id)const
+{
+   return my->get_htlc(id);
+}
+
+fc::optional<htlc_object> database_api_impl::get_htlc(htlc_id_type id) const
+{
+   auto obj = get_objects( { id }).front();
+   if ( !obj.is_null() )
+   {
+      return fc::optional<htlc_object>(obj.template as<htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS));
+   }
+   return fc::optional<htlc_object>();
+}
+
+vector<htlc_object> database_api::get_htlc_by_from(const std::string account_id_or_name, htlc_id_type start, uint32_t limit)const
+{
+   return my->get_htlc_by_from(account_id_or_name, start, limit);
+}
+
+vector<htlc_object> database_api_impl::get_htlc_by_from(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const
+{
+   FC_ASSERT( limit <= _app_options->api_limit_get_htlc_by );
+   vector<htlc_object> result;
+
+   const auto& htlc_idx = _db.get_index_type< htlc_index >().indices().get< by_from_id >();
+   auto htlc_index_end = htlc_idx.end();
+   const account_id_type account = get_account_from_string(account_id_or_name)->id;
+   auto htlc_itr = htlc_idx.lower_bound(boost::make_tuple(account, start));
+
+   while(htlc_itr != htlc_index_end && htlc_itr->transfer.from == account && result.size() < limit)
+   {
+      result.push_back(*htlc_itr);
+      ++htlc_itr;
+   }
+   return result;
+}
+
+vector<htlc_object> database_api::get_htlc_by_to(const std::string account_id_or_name, htlc_id_type start, uint32_t limit)const
+{
+   return my->get_htlc_by_to(account_id_or_name, start, limit);
+}
+
+vector<htlc_object> database_api_impl::get_htlc_by_to(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const
+{
+
+   FC_ASSERT( limit <= _app_options->api_limit_get_htlc_by );
+   vector<htlc_object> result;
+
+   const auto& htlc_idx = _db.get_index_type< htlc_index >().indices().get< by_to_id >();
+   auto htlc_index_end = htlc_idx.end();
+   const account_id_type account = get_account_from_string(account_id_or_name)->id;
+   auto htlc_itr = htlc_idx.lower_bound(boost::make_tuple(account, start));
+
+   while(htlc_itr != htlc_index_end && htlc_itr->transfer.to == account && result.size() < limit)
+   {
+      result.push_back(*htlc_itr);
+      ++htlc_itr;
    }
    return result;
 }

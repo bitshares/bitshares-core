@@ -77,10 +77,21 @@ namespace graphene { namespace chain {
          const result_type& operator()(const htlc_object& o)const { return o.transfer.from; }
       };
 
+      /*****
+       * Index helper for to
+       */
+      struct to_extractor {
+         typedef account_id_type result_type;
+         const result_type& operator()(const htlc_object& o)const { return o.transfer.to; }
+      };
+
+      bool operator==(const htlc_object& in) { return this->id == in.id; }
+
    };
 
    struct by_from_id;
    struct by_expiration;
+   struct by_to_id;
    typedef multi_index_container<
          htlc_object,
          indexed_by<
@@ -94,8 +105,13 @@ namespace graphene { namespace chain {
             ordered_unique< tag< by_from_id >,
                   composite_key< htlc_object, 
                   htlc_object::from_extractor,
+                  member< object, object_id_type, &object::id > > >,
+
+            ordered_unique< tag< by_to_id >,
+                  composite_key< htlc_object,
+                  htlc_object::to_extractor,
                   member< object, object_id_type, &object::id > > >
-         >
+      >
 
    > htlc_object_index_type;
 

@@ -24,18 +24,6 @@
 #include <algorithm>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
-namespace fc
-{
-   // these are required on certain platforms in Release mode
-   template<> 
-   bool smart_ref<graphene::chain::fee_schedule>::operator !()const
-   {
-      throw std::logic_error("Not Implemented"); 
-   }
-
-   template class smart_ref<graphene::chain::fee_schedule>;
-}
-
 #define MAX_FEE_STABILIZATION_ITERATION 4
 
 namespace graphene { namespace chain {
@@ -127,21 +115,23 @@ namespace graphene { namespace chain {
       this->scale = 0;
    }
 
+   asset fee_schedule::calculate_fee( const operation& op )const
+   {
+      uint64_t required_fee = op.visit( calc_fee_visitor( *this, op ) );
+      if( scale != GRAPHENE_100_PERCENT )
+      {
+         auto scaled = fc::uint128(required_fee) * scale;
+         scaled /= GRAPHENE_100_PERCENT;
+         FC_ASSERT( scaled <= GRAPHENE_MAX_SHARE_SUPPLY,
+                    "Required fee after scaling would exceed maximum possible supply" );
+         required_fee = scaled.to_uint64();
+      }
+      return asset( required_fee );
+   }
+
    asset fee_schedule::calculate_fee( const operation& op, const price& core_exchange_rate )const
    {
-      auto base_value = op.visit( calc_fee_visitor( *this, op ) );
-      auto scaled = fc::uint128(base_value) * scale;
-      scaled /= GRAPHENE_100_PERCENT;
-      FC_ASSERT( scaled <= GRAPHENE_MAX_SHARE_SUPPLY );
-      //idump( (base_value)(scaled)(core_exchange_rate) );
-      auto result = asset( scaled.to_uint64(), asset_id_type(0) ) * core_exchange_rate;
-      //FC_ASSERT( result * core_exchange_rate >= asset( scaled.to_uint64()) );
-
-      while( result * core_exchange_rate < asset( scaled.to_uint64()) )
-        result.amount++;
-
-      FC_ASSERT( result.amount <= GRAPHENE_MAX_SHARE_SUPPLY );
-      return result;
+      return calculate_fee( op ).multiply_and_round_up( core_exchange_rate );
    }
 
    asset fee_schedule::set_fee( operation& op, const price& core_exchange_rate )const
@@ -168,7 +158,7 @@ namespace graphene { namespace chain {
 
    void chain_parameters::validate()const
    {
-      current_fees->validate();
+      get_current_fees().validate();
       FC_ASSERT( reserve_percent_of_fee <= GRAPHENE_100_PERCENT );
       FC_ASSERT( network_percent_of_fee <= GRAPHENE_100_PERCENT );
       FC_ASSERT( lifetime_referrer_percent_of_fee <= GRAPHENE_100_PERCENT );

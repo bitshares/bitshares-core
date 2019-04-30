@@ -105,9 +105,7 @@ struct reward_database_fixture : database_fixture
 
    void create_vesting_balance_object(const account_id_type& account_id, vesting_balance_type balance_type )
    {
-      auto block_time = db.head_block_time();
-
-      db.create<vesting_balance_object>([&account_id, &block_time, balance_type] (vesting_balance_object &vbo) {
+      db.create<vesting_balance_object>([&account_id, balance_type] (vesting_balance_object &vbo) {
          vbo.owner = account_id;
          vbo.balance_type = balance_type;
       });

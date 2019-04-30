@@ -40,6 +40,14 @@ namespace graphene { namespace app {
       public:
          bool enable_subscribe_to_all = false;
          bool has_market_history_plugin = false;
+         uint64_t api_limit_get_account_history_operations = 100;
+         uint64_t api_limit_get_account_history = 100;
+         uint64_t api_limit_get_grouped_limit_orders = 101;
+         uint64_t api_limit_get_relative_account_history = 100;
+         uint64_t api_limit_get_account_history_by_operations = 100;
+         uint64_t api_limit_get_asset_holders = 100;
+         uint64_t api_limit_get_key_references = 100;
+         uint64_t api_limit_get_htlc_by = 100;
    };
 
    class application
@@ -62,13 +70,20 @@ namespace graphene { namespace app {
             auto plug = std::make_shared<PluginType>();
             plug->plugin_set_app(this);
 
-            boost::program_options::options_description plugin_cli_options(plug->plugin_name() + " plugin. " + plug->plugin_description() + "\nOptions"), plugin_cfg_options;
-            //boost::program_options::options_description plugin_cli_options("Options for plugin " + plug->plugin_name()), plugin_cfg_options;
+            string cli_plugin_desc = plug->plugin_name() + " plugin. " + plug->plugin_description() + "\nOptions";
+            boost::program_options::options_description plugin_cli_options( cli_plugin_desc ), plugin_cfg_options;
             plug->plugin_set_program_options(plugin_cli_options, plugin_cfg_options);
+
             if( !plugin_cli_options.options().empty() )
                _cli_options.add(plugin_cli_options);
+
             if( !plugin_cfg_options.options().empty() )
+            {
+               std::string header_name = "plugin-cfg-header-" + plug->plugin_name();
+               std::string header_desc = plug->plugin_name() + " plugin options";
+               _cfg_options.add_options()(header_name.c_str(), header_desc.c_str());
                _cfg_options.add(plugin_cfg_options);
+            }
 
             add_available_plugin( plug );
 
@@ -90,7 +105,7 @@ namespace graphene { namespace app {
 
          net::node_ptr                    p2p_node();
          std::shared_ptr<chain::database> chain_database()const;
-
+         void set_api_limit();
          void set_block_production(bool producing_blocks);
          fc::optional< api_access_info > get_api_access_info( const string& username )const;
          void set_api_access_info(const string& username, api_access_info&& permissions);
