@@ -23,6 +23,7 @@
  */
 #include <graphene/chain/config.hpp>
 #include <graphene/chain/protocol/types.hpp>
+#include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <fc/crypto/base58.hpp>
 #include <fc/crypto/ripemd160.hpp>
@@ -228,5 +229,14 @@ namespace fc
     void from_variant( const fc::variant& var, graphene::chain::extended_private_key_type& vo, uint32_t max_depth )
     {
        vo = graphene::chain::extended_private_key_type( var.as_string() );
+    }
+
+    void from_variant( const fc::variant& var, std::shared_ptr<const graphene::chain::fee_schedule>& vo,
+                       uint32_t max_depth ) {
+        // If it's null, just make a new one
+        if (!vo) vo = std::make_shared<const graphene::chain::fee_schedule>();
+        // Convert the non-const shared_ptr<const fee_schedule> to a non-const fee_schedule& so we can write it
+        // Don't decrement max_depth since we're not actually deserializing at this step
+        from_variant(var, const_cast<graphene::chain::fee_schedule&>(*vo), max_depth);
     }
 } // fc

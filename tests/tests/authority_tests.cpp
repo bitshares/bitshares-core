@@ -1858,6 +1858,44 @@ BOOST_FIXTURE_TEST_CASE( parent_owner_test, database_fixture )
    }
 }
 
+BOOST_FIXTURE_TEST_CASE( owner_delegation_test, database_fixture )
+{ try {
+   ACTORS( (alice)(bob) );
+
+   fc::ecc::private_key bob_active_key = fc::ecc::private_key::regenerate(fc::digest("bob_active"));
+   fc::ecc::private_key bob_owner_key  = fc::ecc::private_key::regenerate(fc::digest("bob_owner"));
+
+   trx.clear();
+
+   // Make sure Bob has different keys
+   account_update_operation auo;
+   auo.account = bob_id;
+   auo.active = authority( 1, public_key_type(bob_active_key.get_public_key()), 1 );
+   auo.owner  = authority( 1, public_key_type(bob_owner_key.get_public_key()), 1 );
+   trx.operations.push_back( auo );
+   sign( trx, bob_private_key );
+   PUSH_TX( db, trx );
+   trx.clear();
+
+   // Delegate Alice's owner auth to herself and active auth to Bob
+   auo.account = alice_id;
+   auo.active = authority( 1, bob_id, 1 );
+   auo.owner  = authority( 1, alice_id, 1 );
+   trx.operations.push_back( auo );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+   trx.clear();
+
+   // Now Bob has full control over Alice's account
+   auo.account = alice_id;
+   auo.active.reset();
+   auo.owner  = authority( 1, bob_id, 1 );
+   trx.operations.push_back( auo );
+   sign( trx, bob_active_key );
+   PUSH_TX( db, trx );
+   trx.clear();
+} FC_LOG_AND_RETHROW() }
+
 /// This test case reproduces https://github.com/bitshares/bitshares-core/issues/944
 ///                       and https://github.com/bitshares/bitshares-core/issues/580
 BOOST_FIXTURE_TEST_CASE( missing_owner_auth_test, database_fixture )

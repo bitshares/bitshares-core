@@ -95,13 +95,12 @@ void limit_order_create_evaluator::pay_fee()
 
 object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_operation& op)
 { try {
-   const auto& seller_stats = _seller->statistics(db());
-   db().modify(seller_stats, [&](account_statistics_object& bal) {
-         if( op.amount_to_sell.asset_id == asset_id_type() )
-         {
-            bal.total_core_in_orders += op.amount_to_sell.amount;
-         }
-   });
+   if( op.amount_to_sell.asset_id == asset_id_type() )
+   {
+      db().modify( _seller->statistics(db()), [&op](account_statistics_object& bal) {
+         bal.total_core_in_orders += op.amount_to_sell.amount;
+      });
+   }
 
    db().adjust_balance(op.seller, -op.amount_to_sell);
 
@@ -161,11 +160,6 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    database& d = db();
 
    auto next_maintenance_time = d.get_dynamic_global_properties().next_maintenance_time;
-
-   // TODO: remove this check and the assertion after hf_834
-   if( next_maintenance_time <= HARDFORK_CORE_834_TIME )
-      FC_ASSERT( !o.extensions.value.target_collateral_ratio.valid(),
-                 "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
 
    _paying_account = &o.funding_account(d);
    _debt_asset     = &o.delta_debt.asset_id(d);
@@ -331,7 +325,7 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
          call_obj = d.find(call_order_id);
          // we know no black swan event has occurred
          FC_ASSERT( call_obj, "no margin call was executed and yet the call object was deleted" );
-         if( d.head_block_time() <= HARDFORK_CORE_583_TIME ) // TODO remove after hard fork core-583
+         if( d.head_block_time() <= HARDFORK_CORE_583_TIME )
          {
             // We didn't fill any call orders.  This may be because we
             // aren't in margin call territory, or it may be because there

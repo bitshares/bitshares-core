@@ -57,7 +57,7 @@ const dynamic_global_property_object& database::get_dynamic_global_properties() 
 
 const fee_schedule&  database::current_fee_schedule()const
 {
-   return get_global_properties().parameters.current_fees;
+   return get_global_properties().parameters.get_current_fees();
 }
 
 time_point_sec database::head_block_time()const

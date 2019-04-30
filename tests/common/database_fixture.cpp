@@ -101,7 +101,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       genesis_state.initial_committee_candidates.push_back({name});
       genesis_state.initial_witness_candidates.push_back({name, init_account_priv_key.get_public_key()});
    }
-   genesis_state.initial_parameters.current_fees->zero_all_fees();
+   genesis_state.initial_parameters.get_mutable_fees().zero_all_fees();
 
    genesis_state_type::initial_asset_type init_mpa1;
    init_mpa1.symbol = "INITMPA";
@@ -124,6 +124,45 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    if (current_test_name == "get_account_history_operations")
    {
       options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)75, false)));
+   }
+   if (current_test_name == "api_limit_get_account_history_operations")
+   {
+    options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
+    options.insert(std::make_pair("api-limit-get-account-history-operations", boost::program_options::variable_value((uint64_t)300, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+   }
+   if(current_test_name =="api_limit_get_account_history")
+   {
+    options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
+    options.insert(std::make_pair("api-limit-get-account-history", boost::program_options::variable_value((uint64_t)250, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+   }
+   if(current_test_name =="api_limit_get_grouped_limit_orders")
+   {
+    options.insert(std::make_pair("api-limit-get-grouped-limit-orders", boost::program_options::variable_value((uint64_t)250, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("grouped_orders"), false)));
+   }
+   if(current_test_name =="api_limit_get_relative_account_history")
+   {
+    options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
+    options.insert(std::make_pair("api-limit-get-relative-account-history", boost::program_options::variable_value((uint64_t)250, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+   }
+   if(current_test_name =="api_limit_get_account_history_by_operations")
+   {
+    options.insert(std::make_pair("api-limit-get-account-history-by-operations", boost::program_options::variable_value((uint64_t)250, false)));
+    options.insert(std::make_pair("api-limit-get-relative-account-history", boost::program_options::variable_value((uint64_t)250, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+   }
+   if(current_test_name =="api_limit_get_asset_holders")
+   {
+    options.insert(std::make_pair("api-limit-get-asset-holders", boost::program_options::variable_value((uint64_t)250, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+   }
+   if(current_test_name =="api_limit_get_key_references")
+   {
+    options.insert(std::make_pair("api-limit-get-key-references", boost::program_options::variable_value((uint64_t)200, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
    // add account tracking for ahplugin for special test case with track-account enabled
    if( !options.count("track-account") && current_test_name == "track_account") {
@@ -166,6 +205,14 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       ahplugin->plugin_set_app(&app);
       ahplugin->plugin_initialize(options);
       ahplugin->plugin_startup();
+      if (current_test_name == "api_limit_get_account_history_operations" || current_test_name == "api_limit_get_account_history"
+      || current_test_name == "api_limit_get_grouped_limit_orders" || current_test_name == "api_limit_get_relative_account_history"
+      || current_test_name == "api_limit_get_account_history_by_operations" || current_test_name =="api_limit_get_asset_holders"
+      || current_test_name =="api_limit_get_key_references")
+      {
+          app.initialize(graphene::utilities::temp_directory_path(), options);
+          app.set_api_limit();
+      }
    }
 
    if(current_test_name == "elasticsearch_objects" || current_test_name == "elasticsearch_suite") {
@@ -595,7 +642,7 @@ void database_fixture::change_fees(
    )
 {
    const chain_parameters& current_chain_params = db.get_global_properties().parameters;
-   const fee_schedule& current_fees = *(current_chain_params.current_fees);
+   const fee_schedule& current_fees = current_chain_params.get_current_fees();
 
    flat_map< int, fee_parameters > fee_map;
    fee_map.reserve( current_fees.parameters.size() );
@@ -612,7 +659,7 @@ void database_fixture::change_fees(
       new_fees.scale = new_scale;
 
    chain_parameters new_chain_params = current_chain_params;
-   new_chain_params.current_fees = new_fees;
+   new_chain_params.get_mutable_fees() = new_fees;
 
    db.modify(db.get_global_properties(), [&](global_property_object& p) {
       p.parameters = new_chain_params;
@@ -940,7 +987,7 @@ const call_order_object* database_fixture::borrow( const account_object& who, as
 { try {
    set_expiration( db, trx );
    trx.operations.clear();
-   call_order_update_operation update;
+   call_order_update_operation update = {};
    update.funding_account = who.id;
    update.delta_collateral = collateral;
    update.delta_debt = what;
@@ -965,7 +1012,7 @@ void database_fixture::cover(const account_object& who, asset what, asset collat
 { try {
    set_expiration( db, trx );
    trx.operations.clear();
-   call_order_update_operation update;
+   call_order_update_operation update = {};
    update.funding_account = who.id;
    update.delta_collateral = -collateral;
    update.delta_debt = -what;
@@ -1014,7 +1061,7 @@ void database_fixture::enable_fees()
 {
    db.modify(global_property_id_type()(db), [](global_property_object& gpo)
    {
-      gpo.parameters.current_fees = fee_schedule::get_default();
+      gpo.parameters.get_mutable_fees() = fee_schedule::get_default();
    });
 }
 
@@ -1030,7 +1077,7 @@ void database_fixture::upgrade_to_lifetime_member( const account_object& account
       account_upgrade_operation op;
       op.account_to_upgrade = account.get_id();
       op.upgrade_to_lifetime_member = true;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
+      op.fee = db.get_global_properties().parameters.get_current_fees().calculate_fee(op);
       trx.operations = {op};
       PUSH_TX(db, trx, ~0);
       FC_ASSERT( op.account_to_upgrade(db).is_lifetime_member() );
@@ -1050,7 +1097,7 @@ void database_fixture::upgrade_to_annual_member(const account_object& account)
    try {
       account_upgrade_operation op;
       op.account_to_upgrade = account.get_id();
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
+      op.fee = db.get_global_properties().parameters.get_current_fees().calculate_fee(op);
       trx.operations = {op};
       PUSH_TX(db, trx, ~0);
       FC_ASSERT( op.account_to_upgrade(db).is_member(db.head_block_time()) );
