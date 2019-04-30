@@ -48,6 +48,7 @@ namespace graphene { namespace app {
       vector<proposal_object>          proposals;
       vector<asset_id_type>            assets;
       vector<withdraw_permission_object> withdraws;
+      vector<htlc_object>              htlcs;
    };
 
 } }
@@ -68,4 +69,5 @@ FC_REFLECT( graphene::app::full_account,
             (proposals)
             (assets)
             (withdraws)
+            (htlcs)
           )

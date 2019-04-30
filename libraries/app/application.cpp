@@ -340,6 +340,9 @@ void application_impl::set_api_limit() {
 	if(_options->count("api-limit-get-key-references")){
 		_app_options.api_limit_get_key_references = _options->at("api-limit-get-key-references").as<uint64_t>();
 	}
+   if(_options->count("api-limit-get-htlc-by")) {
+      _app_options.api_limit_get_htlc_by = _options->at("api-limit-get-htlc-by").as<uint64_t>();
+   }
 }
 
 void application_impl::startup()
