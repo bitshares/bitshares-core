@@ -98,7 +98,8 @@ namespace graphene { namespace db {
 #define MAP_OBJECT_ID_TO_TYPE(OBJECT) \
    namespace graphene { namespace db { \
    template<> \
-   struct object_downcast<graphene::db::object_id<OBJECT::space_id, OBJECT::type_id>> { using type = OBJECT; }; \
+   struct object_downcast<graphene::db::object_id<OBJECT::space_id, \
+                                                  OBJECT::type_id>> { using type = OBJECT; }; \
    } }
    template<typename ObjectID>
    using object_downcast_t = typename object_downcast<ObjectID>::type;
