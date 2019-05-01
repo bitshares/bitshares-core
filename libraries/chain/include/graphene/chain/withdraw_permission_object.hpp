@@ -24,6 +24,7 @@
 #pragma once
 #include <graphene/protocol/authority.hpp>
 #include <graphene/db/generic_index.hpp>
+#include <graphene/chain/types.hpp>
 #include <boost/multi_index/composite_key.hpp>
 
 namespace graphene { namespace chain {
