@@ -202,56 +202,12 @@ public:
     }
 };
 
-struct extended_public_key_type {
-    struct binary_key {
-        binary_key() = default;
-        uint32_t check = 0;
-        fc::ecc::extended_key_data data;
-    };
-
-    fc::ecc::extended_key_data key_data;
-
-    extended_public_key_type();
-    extended_public_key_type(const fc::ecc::extended_key_data& data);
-    extended_public_key_type(const fc::ecc::extended_public_key& extpubkey);
-    explicit extended_public_key_type(const std::string& base58str);
-    operator fc::ecc::extended_public_key() const;
-    explicit operator std::string() const;
-    friend bool operator == (const extended_public_key_type& p1, const fc::ecc::extended_public_key& p2);
-    friend bool operator == (const extended_public_key_type& p1, const extended_public_key_type& p2);
-    friend bool operator != (const extended_public_key_type& p1, const extended_public_key_type& p2);
-};
-
-struct extended_private_key_type {
-    struct binary_key {
-        binary_key() = default;
-        uint32_t check = 0;
-        fc::ecc::extended_key_data data;
-    };
-
-    fc::ecc::extended_key_data key_data;
-
-    extended_private_key_type();
-    extended_private_key_type(const fc::ecc::extended_key_data& data);
-    extended_private_key_type(const fc::ecc::extended_private_key& extprivkey);
-    explicit extended_private_key_type(const std::string& base58str);
-    operator fc::ecc::extended_private_key() const;
-    explicit operator std::string() const;
-    friend bool operator == (const extended_private_key_type& p1, const fc::ecc::extended_private_key& p);
-    friend bool operator == (const extended_private_key_type& p1, const extended_private_key_type& p);
-    friend bool operator != (const extended_private_key_type& p1, const extended_private_key_type& p);
-};
-
 struct fee_schedule;
 } }  // graphene::protocol
 
 namespace fc {
 void to_variant(const graphene::protocol::public_key_type& var,  fc::variant& vo, uint32_t max_depth = 2);
 void from_variant(const fc::variant& var,  graphene::protocol::public_key_type& vo, uint32_t max_depth = 2);
-void to_variant(const graphene::protocol::extended_public_key_type& var, fc::variant& vo, uint32_t max_depth = 2);
-void from_variant(const fc::variant& var, graphene::protocol::extended_public_key_type& vo, uint32_t max_depth = 2);
-void to_variant(const graphene::protocol::extended_private_key_type& var, fc::variant& vo, uint32_t max_depth = 2);
-void from_variant(const fc::variant& var, graphene::protocol::extended_private_key_type& vo, uint32_t max_depth = 2);
 
 
 template<>
@@ -304,10 +260,6 @@ FC_REFLECT_TYPENAME(graphene::protocol::htlc_id_type)
 
 FC_REFLECT(graphene::protocol::public_key_type, (key_data))
 FC_REFLECT(graphene::protocol::public_key_type::binary_key, (data)(check))
-FC_REFLECT(graphene::protocol::extended_public_key_type, (key_data))
-FC_REFLECT(graphene::protocol::extended_public_key_type::binary_key, (check)(data))
-FC_REFLECT(graphene::protocol::extended_private_key_type, (key_data))
-FC_REFLECT(graphene::protocol::extended_private_key_type::binary_key, (check)(data))
 
 FC_REFLECT_TYPENAME(graphene::protocol::share_type)
 FC_REFLECT(graphene::protocol::void_t,)
