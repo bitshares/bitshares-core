@@ -643,7 +643,7 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
    // TODO remove when we're sure it's always false
    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
-   // TODO remove when we're sure it's always false
+
    if( before_core_hardfork_184 )
       ilog( "match(limit,call) is called before hardfork core-184 at block #${block}", ("block",head_block_num()) );
    if( before_core_hardfork_342 )
