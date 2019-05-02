@@ -94,6 +94,16 @@ namespace fc {
 
 namespace graphene { namespace wallet {
 
+using std::ostream;
+using std::stringstream;
+using std::to_string;
+using std::setprecision;
+using std::fixed;
+using std::ios;
+using std::setiosflags;
+using std::setw;
+using std::endl;
+
 namespace detail {
 
 struct operation_result_printer

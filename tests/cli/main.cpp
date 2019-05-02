@@ -80,6 +80,9 @@ int sockQuit(void)
 
 #include "../common/genesis_file_util.hpp"
 
+using std::exception;
+using std::cerr;
+
 #define INVOKE(test) ((struct test*)this)->test_method();
 
 //////
