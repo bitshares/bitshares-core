@@ -114,31 +114,6 @@ struct reward_database_fixture : database_fixture
 
 BOOST_FIXTURE_TEST_SUITE( fee_sharing_tests, reward_database_fixture )
 
-BOOST_AUTO_TEST_CASE(cannot_create_asset_with_additional_options_before_hf)
-{
-   try
-   {
-      ACTOR(issuer);
-
-      price price(asset(1, asset_id_type(1)), asset(1));
-      uint16_t market_fee_percent = 100;
-
-      additional_asset_options_t options;
-      options.value.reward_percent = 100;
-      options.value.whitelist_market_fee_sharing = flat_set<account_id_type>{issuer_id};
-
-      GRAPHENE_CHECK_THROW(create_user_issued_asset("USD",
-                                                    issuer,
-                                                    charge_market_fee,
-                                                    price,
-                                                    2,
-                                                    market_fee_percent,
-                                                    options),
-                           fc::assert_exception);
-   }
-   FC_LOG_AND_RETHROW()
-}
-
 BOOST_AUTO_TEST_CASE(create_asset_with_additional_options_after_hf)
 {
    try
@@ -189,22 +164,6 @@ BOOST_AUTO_TEST_CASE(create_asset_with_additional_options_after_hf)
       additional_asset_options usd_options = usd_asset.options.extensions.value;
       BOOST_CHECK_EQUAL(reward_percent, *usd_options.reward_percent);
       BOOST_CHECK(whitelist == *usd_options.whitelist_market_fee_sharing);
-   }
-   FC_LOG_AND_RETHROW()
-}
-
-BOOST_AUTO_TEST_CASE(cannot_update_additional_options_before_hf)
-{
-   try
-   {
-      ACTOR(issuer);
-
-      asset_object usd_asset = create_user_issued_asset("USD", issuer, charge_market_fee);
-
-      flat_set<account_id_type> whitelist = {issuer_id};
-      GRAPHENE_CHECK_THROW(
-                  update_asset(issuer_id, issuer_private_key, usd_asset.get_id(), 40, whitelist),
-                  fc::assert_exception );
    }
    FC_LOG_AND_RETHROW()
 }
@@ -608,15 +567,6 @@ BOOST_AUTO_TEST_CASE(create_asset_via_proposal_test)
       prop.expiration_time =  db.head_block_time() + fc::days(1);
       prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
 
-      {
-         signed_transaction tx;
-         tx.operations.push_back( prop );
-         db.current_fee_schedule().set_fee( tx.operations.back() );
-         set_expiration( db, tx );
-         sign( tx, issuer_private_key );
-         GRAPHENE_CHECK_THROW(PUSH_TX( db, tx ), fc::exception);
-      }
-
       generate_blocks_past_hf1268();
 
       {
@@ -657,15 +607,6 @@ BOOST_AUTO_TEST_CASE(update_asset_via_proposal_test)
       prop.proposed_ops.emplace_back( update_op );
       prop.expiration_time =  db.head_block_time() + fc::days(1);
       prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
-
-      {
-         signed_transaction tx;
-         tx.operations.push_back( prop );
-         db.current_fee_schedule().set_fee( tx.operations.back() );
-         set_expiration( db, tx );
-         sign( tx, issuer_private_key );
-         GRAPHENE_CHECK_THROW(PUSH_TX( db, tx ), fc::exception);
-      }
 
       generate_blocks_past_hf1268();
 
@@ -791,29 +732,6 @@ BOOST_AUTO_TEST_CASE(accumulated_fees_with_additional_options_after_hf_test)
    FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE( create_vesting_balance_with_instant_vesting_policy_before_hf1268_test )
-{ try {
-
-   ACTOR(alice);
-   fund(alice);
-
-   const asset_object& core = asset_id_type()(db);
-
-   vesting_balance_create_operation op;
-   op.fee = core.amount( 0 );
-   op.creator = alice_id;
-   op.owner = alice_id;
-   op.amount = core.amount( 100 );
-   op.policy = instant_vesting_policy_initializer{};
-
-   trx.operations.push_back(op);
-   set_expiration( db, trx );
-   sign(trx, alice_private_key);
-
-   GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
-
-} FC_LOG_AND_RETHROW() }
-
 BOOST_AUTO_TEST_CASE( create_vesting_balance_with_instant_vesting_policy_after_hf1268_test )
 { try {
 
@@ -879,15 +797,6 @@ BOOST_AUTO_TEST_CASE( create_vesting_balance_with_instant_vesting_policy_via_pro
    prop.proposed_ops.emplace_back( create_op );
    prop.expiration_time =  db.head_block_time() + fc::days(1);
    prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
-
-   {
-      signed_transaction tx;
-      tx.operations.push_back( prop );
-      db.current_fee_schedule().set_fee( tx.operations.back() );
-      set_expiration( db, tx );
-      sign( tx, actor_private_key );
-      GRAPHENE_CHECK_THROW(PUSH_TX( db, tx ), fc::exception);
-   }
 
    generate_blocks_past_hf1268();
 

@@ -28,11 +28,6 @@
 
 namespace graphene { namespace chain {
 
-namespace detail {
-   void check_asset_options_hf_1268(const fc::time_point_sec& block_time, const asset_options& options);
-   void check_vesting_balance_policy_hf_1268(const fc::time_point_sec& block_time, const vesting_policy_initializer& policy);
-}
-
 struct proposal_operation_hardfork_visitor
 {
    typedef void result_type;
@@ -56,18 +51,6 @@ struct proposal_operation_hardfork_visitor
             || (v.delta_debt.asset_id( db ).bitasset_data_id
             && (*(v.delta_debt.asset_id( db ).bitasset_data_id))( db ).is_prediction_market )
             , "Soft fork - preventing proposal with call_order_update!" );
-   }
-   // hf_1268
-   void operator()(const graphene::chain::asset_create_operation &v) const {
-      detail::check_asset_options_hf_1268(block_time, v.common_options);
-   }
-   // hf_1268
-   void operator()(const graphene::chain::asset_update_operation &v) const {
-      detail::check_asset_options_hf_1268(block_time, v.new_options);
-   }
-   // hf_1268
-   void operator()(const graphene::chain::vesting_balance_create_operation &v) const {
-      detail::check_vesting_balance_policy_hf_1268(block_time, v.policy);
    }
    // hf_588
    // issue #588
