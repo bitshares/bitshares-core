@@ -534,79 +534,79 @@ namespace graphene { namespace app {
 
     // asset_api
     asset_api::asset_api(graphene::app::application& app) :
-         _app(app),
-         _db( *app.chain_database()),
-         database_api( std::ref(*app.chain_database()), &(app.get_options())
-         ) { }
+          _app(app),
+          _db( *app.chain_database()),
+          database_api( std::ref(*app.chain_database()), &(app.get_options())
+          ) { }
     asset_api::~asset_api() { }
 
     vector<account_asset_balance> asset_api::get_asset_holders( std::string asset, uint32_t start, uint32_t limit ) const {
-      uint64_t api_limit_get_asset_holders=_app.get_options().api_limit_get_asset_holders;
-      FC_ASSERT(limit <= api_limit_get_asset_holders);
-      asset_id_type asset_id = database_api.get_asset_id_from_string( asset );
-      const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
-      auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+       uint64_t api_limit_get_asset_holders=_app.get_options().api_limit_get_asset_holders;
+       FC_ASSERT(limit <= api_limit_get_asset_holders);
+       asset_id_type asset_id = database_api.get_asset_id_from_string( asset );
+       const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+       auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
-      vector<account_asset_balance> result;
+       vector<account_asset_balance> result;
 
-      uint32_t index = 0;
-      for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
-      {
-        if( result.size() >= limit )
-            break;
+       uint32_t index = 0;
+       for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
+       {
+          if( result.size() >= limit )
+             break;
 
-        if( bal.balance.value == 0 )
-            continue;
+          if( bal.balance.value == 0 )
+             continue;
 
-        if( index++ < start )
-            continue;
+          if( index++ < start )
+             continue;
 
-        const auto account = _db.find(bal.owner);
+          const auto account = _db.find(bal.owner);
 
-        account_asset_balance aab;
-        aab.name       = account->name;
-        aab.account_id = account->id;
-        aab.amount     = bal.balance.value;
+          account_asset_balance aab;
+          aab.name       = account->name;
+          aab.account_id = account->id;
+          aab.amount     = bal.balance.value;
 
-        result.push_back(aab);
-      }
+          result.push_back(aab);
+       }
 
-      return result;
+       return result;
     }
     // get number of asset holders.
     int asset_api::get_asset_holders_count( std::string asset ) const {
-      const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
-      asset_id_type asset_id = database_api.get_asset_id_from_string( asset );      
-      auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+       const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+       asset_id_type asset_id = database_api.get_asset_id_from_string( asset );
+       auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
-      int count = boost::distance(range) - 1;
+       int count = boost::distance(range) - 1;
 
-      return count;
+       return count;
     }
     // function to get vector of system assets with holders count.
     vector<asset_holders> asset_api::get_all_asset_holders() const {
-      vector<asset_holders> result;
-      vector<asset_id_type> total_assets;
-      for( const asset_object& asset_obj : _db.get_index_type<asset_index>().indices() )
-      {
-        const auto& dasset_obj = asset_obj.dynamic_asset_data_id(_db);
+       vector<asset_holders> result;
+       vector<asset_id_type> total_assets;
+       for( const asset_object& asset_obj : _db.get_index_type<asset_index>().indices() )
+       {
+          const auto& dasset_obj = asset_obj.dynamic_asset_data_id(_db);
 
-        asset_id_type asset_id;
-        asset_id = dasset_obj.id;
+          asset_id_type asset_id;
+          asset_id = dasset_obj.id;
 
-        const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
-        auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+          const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+          auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
-        int count = boost::distance(range) - 1;
+          int count = boost::distance(range) - 1;
 
-        asset_holders ah;
-        ah.asset_id       = asset_id;
-        ah.count     = count;
+          asset_holders ah;
+          ah.asset_id       = asset_id;
+          ah.count     = count;
 
-        result.push_back(ah);
-      }
+          result.push_back(ah);
+       }
 
-      return result;
+       return result;
     }
 
    // orders_api
