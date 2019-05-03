@@ -58,10 +58,10 @@ namespace detail {
          return;
       }
 
-      const auto null_auth = authority::null_authority();
+      const auto empty_auth = authority{};
       const auto no_account = account_id_type{};
 
-      auto get_active = [&account_id, &db, &active, &owner, &null_auth, &no_account]( account_id_type id )
+      auto get_active = [&account_id, &db, &active, &owner, &empty_auth, &no_account]( account_id_type id )
       {
          if ( (no_account == id) || (account_id == id) )
          {
@@ -69,12 +69,12 @@ namespace detail {
             {
                return &(*active);
             }
-            return &null_auth;
+            return &empty_auth;
          }
          return &id(db).active;
       };
 
-      auto get_owner = [&account_id, &db, &active, &owner, &null_auth, &no_account]( account_id_type id )
+      auto get_owner = [&account_id, &db, &active, &owner, &empty_auth, &no_account]( account_id_type id )
       {
          if ( (no_account == id) || (account_id == id) )
          {
@@ -82,7 +82,7 @@ namespace detail {
             {
                return &(*owner);
             }
-            return &null_auth;
+            return &empty_auth;
          }
          return &id(db).owner;
       };

@@ -1226,6 +1226,22 @@ BOOST_AUTO_TEST_CASE( update_account_authority_test )
    FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( disables_update_to_empty_account_authority )
+{
+   try {
+      ACTOR(nathan);
+
+      account_update_operation op;
+      op.account = nathan_id;
+      op.active = authority{};
+      op.owner = op.active;
+      trx.operations.clear();
+      trx.operations.push_back(op);
+      GRAPHENE_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+   }
+   FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_CASE( update_account_make_cycled_authority_before_HARDFORK_CYCLED_ACCOUNTS_TIME_test)
 {
    // make cycle with other accounts in owner auth
@@ -1344,6 +1360,7 @@ BOOST_AUTO_TEST_CASE( update_account_max_authority_depth_after_HARDFORK_CYCLED_A
       account_update_operation op;
       op.account = nathan_id;
       op.active = authority(1, bob_id, 1);
+      op.owner = op.active;
 
       trx.operations.clear();
       trx.operations.push_back(op);
