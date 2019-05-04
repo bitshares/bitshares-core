@@ -53,7 +53,7 @@ add_library( graphene_chain
              worker_evaluator.cpp
              htlc_evaluator.cpp
              confidential_evaluator.cpp
-             special_authority.cpp
+             special_authority_evaluation.cpp
              buyback.cpp
 
              account_object.cpp

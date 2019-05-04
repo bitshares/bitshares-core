@@ -22,7 +22,7 @@
  * THE SOFTWARE.
  */
 
-#include <graphene/chain/special_authority.hpp>
+#include <graphene/chain/special_authority_evaluation.hpp>
 #include <graphene/chain/database.hpp>
 
 namespace graphene { namespace chain {

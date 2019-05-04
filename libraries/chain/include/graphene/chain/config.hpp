@@ -32,13 +32,6 @@
 
 #define GRAPHENE_CURRENT_DB_VERSION                          "20190503"
 
-/**
- * every second, the fraction of burned core asset which cycles is
- * GRAPHENE_CORE_ASSET_CYCLE_RATE / (1 << GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS)
- */
-#define GRAPHENE_CORE_ASSET_CYCLE_RATE                        17
-#define GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS                   32
-
 #define GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT             4
 #define GRAPHENE_RECENTLY_MISSED_COUNT_DECREMENT             3
 

@@ -45,6 +45,13 @@
 #define GRAPHENE_IRREVERSIBLE_THRESHOLD                      (70 * GRAPHENE_1_PERCENT)
 
 /**
+ * every second, the fraction of burned core asset which cycles is
+ * GRAPHENE_CORE_ASSET_CYCLE_RATE / (1 << GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS)
+ */
+#define GRAPHENE_CORE_ASSET_CYCLE_RATE                        17
+#define GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS                   32
+
+/**
  * Don't allow the committee_members to publish a limit that would
  * make the network unable to operate.
  */
@@ -109,7 +116,6 @@
 #define GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO   1750 ///< Call when collateral only pays off 175% the debt
 #define GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO        1500 ///< Stop calling when collateral only pays off 150% of the debt
 ///@}
-#define GRAPHENE_DEFAULT_MARGIN_PERIOD_SEC              (30*60*60*24)
 
 /**
  *  Reserved Account IDs with special meaning

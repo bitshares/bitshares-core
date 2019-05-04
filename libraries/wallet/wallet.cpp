@@ -66,7 +66,6 @@
 #include <graphene/app/util.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/protocol/fee_schedule.hpp>
-#include <graphene/protocol/fee_schedule.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/utilities/git_revision.hpp>
 #include <graphene/utilities/key_conversion.hpp>
