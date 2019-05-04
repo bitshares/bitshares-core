@@ -59,7 +59,7 @@ namespace graphene { namespace chain {
    {
       public:
          static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_asset_dynamic_data_type;
+         static const uint8_t type_id  = impl_asset_dynamic_data_object_type;
 
          /// The number of shares currently in existence
          share_type current_supply;
@@ -176,7 +176,7 @@ namespace graphene { namespace chain {
    {
       public:
          static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_asset_bitasset_data_type;
+         static const uint8_t type_id  = impl_asset_bitasset_data_object_type;
 
          /// The asset this object belong to
          asset_id_type asset_id;

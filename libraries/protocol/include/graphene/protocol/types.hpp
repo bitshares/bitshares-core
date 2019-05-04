@@ -22,6 +22,14 @@
  * THE SOFTWARE.
  */
 #pragma once
+
+#include <boost/preprocessor/seq/for_each.hpp>
+#include <boost/preprocessor/seq/transform.hpp>
+#include <boost/preprocessor/seq/elem.hpp>
+#include <boost/preprocessor/seq/enum.hpp>
+#include <boost/preprocessor/tuple/elem.hpp>
+#include <boost/preprocessor/cat.hpp>
+
 #include <fc/container/flat_fwd.hpp>
 #include <fc/io/varint.hpp>
 #include <fc/io/enum_type.hpp>
@@ -50,6 +58,28 @@
 #include <graphene/protocol/config.hpp>
 
 #include <boost/rational.hpp>
+
+#define GRAPHENE_NAME_TO_OBJECT_TYPE(x, prefix, name) BOOST_PP_CAT(prefix, BOOST_PP_CAT(name, _object_type))
+#define GRAPHENE_NAME_TO_ID_TYPE(x, y, name) BOOST_PP_CAT(name, _id_type)
+#define GRAPHENE_DECLARE_ID(x, space_prefix_seq, name) \
+    using BOOST_PP_CAT(name, _id_type) = object_id<BOOST_PP_TUPLE_ELEM(2, 0, space_prefix_seq), \
+                            GRAPHENE_NAME_TO_OBJECT_TYPE(x, BOOST_PP_TUPLE_ELEM(2, 1, space_prefix_seq), name)>;
+#define GRAPHENE_REFLECT_ID(x, id_namespace, name) FC_REFLECT_TYPENAME(graphene::id_namespace::name)
+
+#define GRAPHENE_DEFINE_IDS(id_namespace, object_space, object_type_prefix, names_seq) \
+   namespace graphene { namespace id_namespace { \
+   \
+   enum BOOST_PP_CAT(object_type_prefix, object_type) { \
+      BOOST_PP_SEQ_ENUM(BOOST_PP_SEQ_TRANSFORM(GRAPHENE_NAME_TO_OBJECT_TYPE, object_type_prefix, names_seq)) \
+   }; \
+   \
+   BOOST_PP_SEQ_FOR_EACH(GRAPHENE_DECLARE_ID, (object_space, object_type_prefix), names_seq) \
+   \
+   } } \
+   \
+   FC_REFLECT_ENUM(graphene::id_namespace::BOOST_PP_CAT(object_type_prefix, object_type), \
+                   BOOST_PP_SEQ_TRANSFORM(GRAPHENE_NAME_TO_OBJECT_TYPE, object_type_prefix, names_seq)) \
+   BOOST_PP_SEQ_FOR_EACH(GRAPHENE_REFLECT_ID, id_namespace, BOOST_PP_SEQ_TRANSFORM(GRAPHENE_NAME_TO_ID_TYPE, , names_seq))
 
 namespace graphene { namespace protocol {
 using namespace graphene::db;
@@ -124,50 +154,6 @@ enum reserved_spaces {
 
 inline bool is_relative(object_id_type o) { return o.space() == 0; }
 
-/**
- *  List all object types from all namespaces here so they can
- *  be easily reflected and displayed in debug output.  If a 3rd party
- *  wants to extend the core code then they will have to change the
- *  packed_object::type field from enum_type to uint16 to avoid
- *  warnings when converting packed_objects to/from json.
- */
-enum object_type {
-    null_object_type,
-    base_object_type,
-    account_object_type,
-    asset_object_type,
-    force_settlement_object_type,
-    committee_member_object_type,
-    witness_object_type,
-    limit_order_object_type,
-    call_order_object_type,
-    custom_object_type,
-    proposal_object_type,
-    operation_history_object_type,
-    withdraw_permission_object_type,
-    vesting_balance_object_type,
-    worker_object_type,
-    balance_object_type,
-    htlc_object_type,
-    OBJECT_TYPE_COUNT ///< Sentry value which contains the number of different object types
-};
-
-using account_id_type = object_id<protocol_ids, account_object_type>;
-using asset_id_type = object_id<protocol_ids, asset_object_type>;
-using force_settlement_id_type = object_id<protocol_ids, force_settlement_object_type>;
-using committee_member_id_type = object_id<protocol_ids, committee_member_object_type>;
-using witness_id_type = object_id<protocol_ids, witness_object_type>;
-using limit_order_id_type = object_id<protocol_ids, limit_order_object_type>;
-using call_order_id_type = object_id<protocol_ids, call_order_object_type>;
-using custom_id_type = object_id<protocol_ids, custom_object_type>;
-using proposal_id_type = object_id<protocol_ids, proposal_object_type>;
-using operation_history_id_type = object_id<protocol_ids, operation_history_object_type>;
-using withdraw_permission_id_type = object_id<protocol_ids, withdraw_permission_object_type>;
-using vesting_balance_id_type = object_id<protocol_ids, vesting_balance_object_type>;
-using worker_id_type = object_id<protocol_ids, worker_object_type>;
-using balance_id_type = object_id<protocol_ids, balance_object_type>;
-using htlc_id_type = object_id<protocol_ids, htlc_object_type>;
-
 using block_id_type = fc::ripemd160;
 using checksum_type = fc::ripemd160;
 using transaction_id_type = fc::ripemd160;
@@ -222,41 +208,24 @@ void from_variant( const fc::variant& var, std::shared_ptr<const graphene::proto
                    uint32_t max_depth = 2 );
 }
 
-FC_REFLECT_ENUM(graphene::protocol::object_type,
-                (null_object_type)
-                (base_object_type)
-                (account_object_type)
-                (force_settlement_object_type)
-                (asset_object_type)
-                (committee_member_object_type)
-                (witness_object_type)
-                (limit_order_object_type)
-                (call_order_object_type)
-                (custom_object_type)
-                (proposal_object_type)
-                (operation_history_object_type)
-                (withdraw_permission_object_type)
-                (vesting_balance_object_type)
-                (worker_object_type)
-                (balance_object_type)
-                (htlc_object_type)
-                (OBJECT_TYPE_COUNT))
-
-FC_REFLECT_TYPENAME(graphene::protocol::account_id_type)
-FC_REFLECT_TYPENAME(graphene::protocol::asset_id_type)
-FC_REFLECT_TYPENAME(graphene::protocol::force_settlement_id_type)
-FC_REFLECT_TYPENAME(graphene::protocol::committee_member_id_type)
-FC_REFLECT_TYPENAME(graphene::protocol::witness_id_type)
-FC_REFLECT_TYPENAME(graphene::protocol::limit_order_id_type)
-FC_REFLECT_TYPENAME(graphene::protocol::call_order_id_type)
-FC_REFLECT_TYPENAME(graphene::protocol::custom_id_type)
-FC_REFLECT_TYPENAME(graphene::protocol::proposal_id_type)
-FC_REFLECT_TYPENAME(graphene::protocol::operation_history_id_type)
-FC_REFLECT_TYPENAME(graphene::protocol::withdraw_permission_id_type)
-FC_REFLECT_TYPENAME(graphene::protocol::vesting_balance_id_type)
-FC_REFLECT_TYPENAME(graphene::protocol::worker_id_type)
-FC_REFLECT_TYPENAME(graphene::protocol::balance_id_type)
-FC_REFLECT_TYPENAME(graphene::protocol::htlc_id_type)
+GRAPHENE_DEFINE_IDS(protocol, protocol_ids, /*protocol objects are not prefixed*/,
+                    (null)
+                    (base)
+                    (account)
+                    (force_settlement)
+                    (asset)
+                    (committee_member)
+                    (witness)
+                    (limit_order)
+                    (call_order)
+                    (custom)
+                    (proposal)
+                    (operation_history)
+                    (withdraw_permission)
+                    (vesting_balance)
+                    (worker)
+                    (balance)
+                    (htlc))
 
 FC_REFLECT(graphene::protocol::public_key_type, (key_data))
 FC_REFLECT(graphene::protocol::public_key_type::binary_key, (data)(check))

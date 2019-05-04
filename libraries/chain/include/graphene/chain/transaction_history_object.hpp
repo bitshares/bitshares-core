@@ -41,14 +41,14 @@ namespace graphene { namespace chain {
    using namespace boost::multi_index;
    /**
     * The purpose of this object is to enable the detection of duplicate transactions. When a transaction is included
-    * in a block a transaction_object is added. At the end of block processing all transaction_objects that have
-    * expired can be removed from the index.
+    * in a block a transaction_history_object is added. At the end of block processing all transaction_history_objects that
+    * have expired can be removed from the index.
     */
-   class transaction_object : public abstract_object<transaction_object>
+   class transaction_history_object : public abstract_object<transaction_history_object>
    {
       public:
          static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_transaction_object_type;
+         static const uint8_t type_id  = impl_transaction_history_object_type;
 
          signed_transaction  trx;
          transaction_id_type trx_id;
@@ -59,17 +59,19 @@ namespace graphene { namespace chain {
    struct by_expiration;
    struct by_trx_id;
    typedef multi_index_container<
-      transaction_object,
+      transaction_history_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-         hashed_unique< tag<by_trx_id>, BOOST_MULTI_INDEX_MEMBER(transaction_object, transaction_id_type, trx_id), std::hash<transaction_id_type> >,
-         ordered_non_unique< tag<by_expiration>, const_mem_fun<transaction_object, time_point_sec, &transaction_object::get_expiration > >
+         hashed_unique< tag<by_trx_id>, BOOST_MULTI_INDEX_MEMBER(transaction_history_object, transaction_id_type, trx_id),
+                        std::hash<transaction_id_type> >,
+         ordered_non_unique< tag<by_expiration>, const_mem_fun< transaction_history_object, time_point_sec,
+                                                                &transaction_history_object::get_expiration > >
       >
    > transaction_multi_index_type;
 
-   typedef generic_index<transaction_object, transaction_multi_index_type> transaction_index;
+   typedef generic_index<transaction_history_object, transaction_multi_index_type> transaction_index;
 } }
 
-MAP_OBJECT_ID_TO_TYPE(graphene::chain::transaction_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::transaction_history_object)
 
-FC_REFLECT_DERIVED( graphene::chain::transaction_object, (graphene::db::object), (trx)(trx_id) )
+FC_REFLECT_DERIVED( graphene::chain::transaction_history_object, (graphene::db::object), (trx)(trx_id) )

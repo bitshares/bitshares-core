@@ -25,82 +25,24 @@
 
 #include <graphene/protocol/types.hpp>
 
-namespace graphene { namespace chain {
+namespace graphene { namespace chain { using namespace protocol; } }
 
-using namespace graphene::protocol;
-
-enum impl_object_type {
-    impl_global_property_object_type,
-    impl_dynamic_global_property_object_type,
-    impl_reserved0_object_type,      // formerly index_meta_object_type, TODO: delete me
-    impl_asset_dynamic_data_type,
-    impl_asset_bitasset_data_type,
-    impl_account_balance_object_type,
-    impl_account_statistics_object_type,
-    impl_transaction_object_type,
-    impl_block_summary_object_type,
-    impl_account_transaction_history_object_type,
-    impl_blinded_balance_object_type,
-    impl_chain_property_object_type,
-    impl_witness_schedule_object_type,
-    impl_budget_record_object_type,
-    impl_special_authority_object_type,
-    impl_buyback_object_type,
-    impl_fba_accumulator_object_type,
-    impl_collateral_bid_object_type
-};
-
-using global_property_id_type = object_id<implementation_ids, impl_global_property_object_type>;
-using dynamic_global_property_id_type = object_id<implementation_ids, impl_dynamic_global_property_object_type>;
-using asset_dynamic_data_id_type = object_id<implementation_ids, impl_asset_dynamic_data_type>;
-using asset_bitasset_data_id_type = object_id<implementation_ids, impl_asset_bitasset_data_type>;
-using account_balance_id_type = object_id<implementation_ids, impl_account_balance_object_type>;
-using account_statistics_id_type = object_id<implementation_ids, impl_account_statistics_object_type>;
-using transaction_obj_id_type = object_id<implementation_ids, impl_transaction_object_type>;
-using block_summary_id_type = object_id<implementation_ids, impl_block_summary_object_type>;
-using account_transaction_history_id_type = object_id<implementation_ids, impl_account_transaction_history_object_type>;
-using chain_property_id_type = object_id<implementation_ids, impl_chain_property_object_type>;
-using witness_schedule_id_type = object_id<implementation_ids, impl_witness_schedule_object_type>;
-using budget_record_id_type = object_id<implementation_ids, impl_budget_record_object_type>;
-using blinded_balance_id_type = object_id<implementation_ids, impl_blinded_balance_object_type>;
-using special_authority_id_type = object_id<implementation_ids, impl_special_authority_object_type>;
-using buyback_id_type = object_id<implementation_ids, impl_buyback_object_type>;
-using fba_accumulator_id_type = object_id<implementation_ids, impl_fba_accumulator_object_type>;
-using collateral_bid_id_type = object_id<implementation_ids, impl_collateral_bid_object_type>;
-
-} }
-
-FC_REFLECT_ENUM(graphene::chain::impl_object_type,
-                (impl_global_property_object_type)
-                (impl_dynamic_global_property_object_type)
-                (impl_reserved0_object_type)
-                (impl_asset_dynamic_data_type)
-                (impl_asset_bitasset_data_type)
-                (impl_account_balance_object_type)
-                (impl_account_statistics_object_type)
-                (impl_transaction_object_type)
-                (impl_block_summary_object_type)
-                (impl_account_transaction_history_object_type)
-                (impl_blinded_balance_object_type)
-                (impl_chain_property_object_type)
-                (impl_witness_schedule_object_type)
-                (impl_budget_record_object_type)
-                (impl_special_authority_object_type)
-                (impl_buyback_object_type)
-                (impl_fba_accumulator_object_type)
-                (impl_collateral_bid_object_type))
-
-FC_REFLECT_TYPENAME(graphene::chain::global_property_id_type)
-FC_REFLECT_TYPENAME(graphene::chain::dynamic_global_property_id_type)
-FC_REFLECT_TYPENAME(graphene::chain::asset_dynamic_data_id_type)
-FC_REFLECT_TYPENAME(graphene::chain::asset_bitasset_data_id_type)
-FC_REFLECT_TYPENAME(graphene::chain::account_balance_id_type)
-FC_REFLECT_TYPENAME(graphene::chain::account_statistics_id_type)
-FC_REFLECT_TYPENAME(graphene::chain::transaction_obj_id_type)
-FC_REFLECT_TYPENAME(graphene::chain::block_summary_id_type)
-FC_REFLECT_TYPENAME(graphene::chain::account_transaction_history_id_type)
-FC_REFLECT_TYPENAME(graphene::chain::budget_record_id_type)
-FC_REFLECT_TYPENAME(graphene::chain::special_authority_id_type)
-FC_REFLECT_TYPENAME(graphene::chain::buyback_id_type)
-FC_REFLECT_TYPENAME(graphene::chain::fba_accumulator_id_type)
-FC_REFLECT_TYPENAME(graphene::chain::collateral_bid_id_type)
+GRAPHENE_DEFINE_IDS(chain, implementation_ids, impl_,
+                    (global_property)
+                    (dynamic_global_property)
+                    (reserved0)
+                    (asset_dynamic_data)
+                    (asset_bitasset_data)
+                    (account_balance)
+                    (account_statistics)
+                    (transaction_history)
+                    (block_summary)
+                    (account_transaction_history)
+                    (blinded_balance)
+                    (chain_property)
+                    (witness_schedule)
+                    (budget_record)
+                    (special_authority)
+                    (buyback)
+                    (fba_accumulator)
+                    (collateral_bid))
