@@ -968,11 +968,18 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
                     });
 
       // get withdraws permissions
-      auto withdraw_range = _db.get_index_type<withdraw_permission_index>().indices().get<by_from>().equal_range(account->id);
-      std::for_each(withdraw_range.first, withdraw_range.second,
-                    [&acnt] (const withdraw_permission_object& withdraw) {
-                       acnt.withdraws.emplace_back(withdraw);
-                    });
+      auto withdraw_indices = _db.get_index_type<withdraw_permission_index>().indices();
+      auto withdraw_from_range = withdraw_indices.get<by_from>().equal_range(account->id);
+      std::for_each(withdraw_from_range.first, withdraw_from_range.second,
+            [&acnt] (const withdraw_permission_object& withdraw) {
+               acnt.withdraws.emplace_back(withdraw);
+            });
+      auto withdraw_authorized_range = withdraw_indices.get<by_authorized>().equal_range(account->id);
+      std::for_each(withdraw_authorized_range.first, withdraw_authorized_range.second,
+            [&acnt] (const withdraw_permission_object& withdraw) {
+               if ( std::find(acnt.withdraws.begin(), acnt.withdraws.end(), withdraw) == acnt.withdraws.end() )
+                  acnt.withdraws.emplace_back(withdraw);
+            });
 
       // get htlcs
       auto htlc_from_range = _db.get_index_type<htlc_index>().indices().get<by_from_id>().equal_range(account->id);
