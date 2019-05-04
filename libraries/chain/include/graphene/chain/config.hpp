@@ -30,7 +30,7 @@
 
 #define GRAPHENE_MAX_NESTED_OBJECTS (200)
 
-#define GRAPHENE_CURRENT_DB_VERSION                          "20190423"
+#define GRAPHENE_CURRENT_DB_VERSION                          "20190503"
 
 /**
  * every second, the fraction of burned core asset which cycles is

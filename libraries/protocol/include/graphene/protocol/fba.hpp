@@ -32,6 +32,7 @@ struct fba_distribute_operation : public base_operation
 
    asset fee;   // always zero
    account_id_type account_id;
+   // We use object_id_type because this is an implementaton object, and therefore is not known to the protocol library
    object_id_type fba_id;
    share_type amount;
 
