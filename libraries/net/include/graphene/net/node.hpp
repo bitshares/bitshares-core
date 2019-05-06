@@ -44,7 +44,7 @@ namespace graphene { namespace net {
     {
       void operator()(node_impl*);
     };
-  }
+  } // namespace detail
 
   // during network development, we need to track message propagation across the network
   // using a structure like this:
@@ -196,15 +196,57 @@ namespace graphene { namespace net {
         node(const std::string& user_agent);
         virtual ~node();
 
+        /*****
+         * Close the peer database, shut down threads
+         */
         void close();
 
+        /*****
+         * Let this object know the delegate
+         * NOTE: The thread upon which this method is called is the
+         * thread that those delegate methods will be called.
+         */
         void      set_node_delegate( node_delegate* del );
+
+        /******
+         * Control what information gets shared when a remote asks
+         * for p2p peers
+         */
         void      set_advertise_algorithm( std::string algo, 
             const fc::optional<std::vector<std::string>>& advertise_list = fc::optional<std::vector<std::string>>() );
 
+        /*****
+         * Load (or create) and parse a configuration file
+         * @param configuration_directory a directory where the p2p configuration exists
+         */
         void      load_configuration( const fc::path& configuration_directory );
 
+        /**
+         * Specifies the network interface and port upon which incoming
+         * connections should be accepted.
+         * NOTE: a simple setter, does not open ports
+         */
+        void      listen_on_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available );
+
+        /**
+         * Specifies the port upon which incoming connections should be accepted.
+         * NOTE: a simple setter, does not open ports
+         * @param port the port to listen on
+         * @param wait_if_not_available if true and the port is not available, enter a
+         *    sleep and retry loop to wait for it to become
+         *    available.  If false and the port is not available,
+         *    just choose a random available port
+         */
+        void listen_on_port(uint16_t port, bool wait_if_not_available);
+
+        /****
+         * Listen for connections
+         */
         virtual void      listen_to_p2p_network();
+
+        /*****
+         * start message loops for different aspects of P2P network
+         */
         virtual void      connect_to_p2p_network();
 
         /**
@@ -221,6 +263,7 @@ namespace graphene { namespace net {
          * @param connect_immediately will start the connection process immediately
          */
         void add_seed_node(const std::string& seed_string, bool connect_immediately);
+
         /*****
          * @brief add a list of nodes to seed the p2p network
          * @param seeds a vector of url strings
@@ -232,12 +275,6 @@ namespace graphene { namespace net {
          *  Attempt to connect to the specified endpoint immediately.
          */
         virtual void connect_to_endpoint( const fc::ip::endpoint& ep );
-
-        /**
-         *  Specifies the network interface and port upon which incoming
-         *  connections should be accepted.
-         */
-        void      listen_on_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available );
 
         /***
          * @brief Helper to convert a string to a collection of endpoints
@@ -256,16 +293,6 @@ namespace graphene { namespace net {
         void accept_incoming_connections(bool accept);
 
         /**
-         *  Specifies the port upon which incoming connections should be accepted.
-         *  @param port the port to listen on
-         *  @param wait_if_not_available if true and the port is not available, enter a
-         *                               sleep and retry loop to wait for it to become
-         *                               available.  If false and the port is not available,
-         *                               just choose a random available port
-         */
-        void      listen_on_port(uint16_t port, bool wait_if_not_available);
-
-        /**
          * Returns the endpoint the node is listening on.  This is usually the same
          * as the value previously passed in to listen_on_endpoint, unless we
          * were unable to bind to that port.
@@ -277,7 +304,9 @@ namespace graphene { namespace net {
          */
         std::vector<peer_status> get_connected_peers() const;
 
-        /** return the number of peers we're actively connected to */
+        /**
+         * @returns the number of peers we're actively connected to 
+         */
         virtual uint32_t get_connection_count() const;
 
         /**
@@ -291,18 +320,43 @@ namespace graphene { namespace net {
         }
 
         /**
-         *  Node starts the process of fetching all items after item_id of the
-         *  given item_type.   During this process messages are not broadcast.
+         * Node starts the process of fetching all items after item_id of the
+         * given item_type.   During this process messages are not broadcast.
+         * @param current_head_block fetch items after this point
+         * @param hard_fork_block_numbers
          */
-        virtual void      sync_from(const item_id& current_head_block, const std::vector<uint32_t>& hard_fork_block_numbers);
+        virtual void sync_from(const item_id& current_head_block, const std::vector<uint32_t>& hard_fork_block_numbers);
 
-        bool      is_connected() const;
+        /***
+         * @returns true if it is actively connected to any node
+         */
+        bool is_connected() const;
 
+        /*****
+         * @param params the parameters to set
+         */
         void set_advanced_node_parameters(const fc::variant_object& params);
+
+        /*********
+         * @returns advanced node parameters
+         */
         fc::variant_object get_advanced_node_parameters();
-        message_propagation_data get_transaction_propagation_data(const graphene::protocol::transaction_id_type& transaction_id);
-        message_propagation_data get_block_propagation_data(const graphene::protocol::block_id_type& block_id);
+
+        /****
+         * @param transaction_id the transaction id
+         * @returns propagation data for that transaction
+         */
+        message_propagation_data get_transaction_propagation_data(const graphene::chain::transaction_id_type& transaction_id);
+        message_propagation_data get_block_propagation_data(const graphene::chain::block_id_type& block_id);
+
+        /******
+         * @returns the node id (public key) for this node
+         */
         node_id_t get_node_id() const;
+
+        /*****
+         * @param allowed_peers peers that we can connect to
+         */
         void set_allowed_peers(const std::vector<node_id_t>& allowed_peers);
 
         /**
@@ -322,8 +376,6 @@ namespace graphene { namespace net {
         fc::variant_object get_call_statistics() const;
       protected:
         std::unique_ptr<detail::node_impl, detail::node_impl_deleter> my;
-        // This should only be used for testing
-        std::shared_ptr<fc::thread> get_thread();
    };
 
     class simulated_network : public node

@@ -40,43 +40,10 @@
 
 #include <fc/crypto/aes.hpp>
 
-#ifdef _WIN32
-   #ifndef _WIN32_WINNT
-      #define _WIN32_WINNT 0x0501
-   #endif
-   #include <winsock2.h>
-   #include <WS2tcpip.h>
-#else
-   #include <sys/socket.h>
-   #include <netinet/ip.h>
-   #include <sys/types.h>
-#endif
-#include <thread>
-
 #include <boost/filesystem/path.hpp>
 
 #define BOOST_TEST_MODULE Test Application
 #include <boost/test/included/unit_test.hpp>
-
-/*****
- * Global Initialization for Windows
- * ( sets up Winsock stuf )
- */
-#ifdef _WIN32
-int sockInit(void)
-{
-   WSADATA wsa_data;
-   return WSAStartup(MAKEWORD(1,1), &wsa_data);
-}
-int sockQuit(void)
-{
-   return WSACleanup();
-}
-#endif
-
-/*********************
- * Helper Methods
- *********************/
 
 #include "../common/genesis_file_util.hpp"
 
@@ -84,32 +51,6 @@ using std::exception;
 using std::cerr;
 
 #define INVOKE(test) ((struct test*)this)->test_method();
-
-//////
-/// @brief attempt to find an available port on localhost
-/// @returns an available port number, or -1 on error
-/////
-int get_available_port()
-{
-   struct sockaddr_in sin;
-   int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
-   if (socket_fd == -1)
-      return -1;
-   sin.sin_family = AF_INET;
-   sin.sin_port = 0;
-   sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-   if (::bind(socket_fd, (struct sockaddr*)&sin, sizeof(struct sockaddr_in)) == -1)
-      return -1;
-   socklen_t len = sizeof(sin);
-   if (getsockname(socket_fd, (struct sockaddr *)&sin, &len) == -1)
-      return -1;
-#ifdef _WIN32
-   closesocket(socket_fd);
-#else
-   close(socket_fd);
-#endif
-   return ntohs(sin.sin_port);
-}
 
 ///////////
 /// @brief Start the application
@@ -129,7 +70,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 #ifdef _WIN32
    sockInit();
 #endif
-   server_port_number = get_available_port();
+   server_port_number = graphene::app::get_available_port();
    cfg.emplace(
       "rpc-endpoint",
       boost::program_options::variable_value(string("127.0.0.1:" + std::to_string(server_port_number)), false)
