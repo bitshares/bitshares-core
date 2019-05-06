@@ -238,11 +238,14 @@ namespace graphene { namespace net { namespace detail {
    class exclude_address_builder : public node_impl::address_builder
    {
       public:
-      exclude_address_builder(fc::optional<std::vector<std::string>> address_list)
+      exclude_address_builder(const fc::optional<std::vector<std::string>>& address_list)
       {
          if (address_list.valid())
          {
-            exclude_list = *address_list;
+            std::for_each(address_list->begin(), address_list->end(), [&exclude_list = exclude_list](std::string input)
+                {
+                  exclude_list.insert(input);
+                });
          }
       }
       void build(node_impl* impl, address_message& reply)
@@ -256,13 +259,12 @@ namespace graphene { namespace net { namespace detail {
          reply.addresses.shrink_to_fit();
       }
       private:
-      std::vector<std::string> exclude_list;
-      bool exists_in_list(const peer_connection_ptr& peer, const std::vector<std::string>& exclude_list) const
+      fc::flat_set<std::string> exclude_list;
+      bool exists_in_list(const peer_connection_ptr& peer, const fc::flat_set<std::string>& exclude_list) const
       {
          std::string remote = *peer->get_remote_endpoint();
-         for( auto list_item : exclude_list )
-            if (list_item == remote )
-               return true;
+         if ( std::find(exclude_list.begin(), exclude_list.end(), remote) != exclude_list.end() )
+           return true;
          return false;
       }
    };
