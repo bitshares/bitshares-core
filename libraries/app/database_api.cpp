@@ -932,8 +932,10 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
          for( auto proposal_id : required_approvals_itr->second )
          {
             acnt.proposals.push_back( proposal_id(_db) );
-            if(acnt.proposals.size() >= api_limit_get_full_accounts)
+            if(acnt.proposals.size() >= api_limit_get_full_accounts) {
+               acnt.more_data_available.proposals = true;
                break;
+            }
          }
       }
 
@@ -942,76 +944,103 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       for( const auto balance : balances )
       {
          acnt.balances.emplace_back( *balance.second );
-         if(acnt.balances.size() >= api_limit_get_full_accounts)
+         if(acnt.balances.size() >= api_limit_get_full_accounts) {
+            acnt.more_data_available.balances = true;
             break;
+         }
       }
 
       // Add the account's vesting balances
       auto vesting_range = _db.get_index_type<vesting_balance_index>().indices().get<by_account>().equal_range(account->id);
-      std::for_each(vesting_range.first, vesting_range.second,
-            [&acnt, api_limit_get_full_accounts](const vesting_balance_object& balance) {
-               if(acnt.vesting_balances.size() < api_limit_get_full_accounts)
-                  acnt.vesting_balances.emplace_back(balance);
-            });
+      for(auto itr = vesting_range.first; itr != vesting_range.second; ++itr)
+      {
+         acnt.vesting_balances.emplace_back(*itr);
+         if(acnt.vesting_balances.size() >= api_limit_get_full_accounts) {
+            acnt.more_data_available.vesting_balances = true;
+            break;
+         }
+      }
 
       // Add the account's orders
       auto order_range = _db.get_index_type<limit_order_index>().indices().get<by_account>().equal_range(account->id);
-      std::for_each(order_range.first, order_range.second,
-            [&acnt, api_limit_get_full_accounts] (const limit_order_object& order) {
-               if(acnt.limit_orders.size() < api_limit_get_full_accounts)
-                  acnt.limit_orders.emplace_back(order);
-            });
+      for(auto itr = order_range.first; itr != order_range.second; ++itr)
+      {
+         acnt.limit_orders.emplace_back(*itr);
+         if(acnt.limit_orders.size() >= api_limit_get_full_accounts) {
+            acnt.more_data_available.limit_orders = true;
+            break;
+         }
+      }
       auto call_range = _db.get_index_type<call_order_index>().indices().get<by_account>().equal_range(account->id);
-      std::for_each(call_range.first, call_range.second,
-            [&acnt, api_limit_get_full_accounts] (const call_order_object& call) {
-               if(acnt.call_orders.size() < api_limit_get_full_accounts)
-                  acnt.call_orders.emplace_back(call);
-            });
+      for(auto itr = call_range.first; itr != call_range.second; ++itr)
+      {
+         acnt.call_orders.emplace_back(*itr);
+         if(acnt.call_orders.size() >= api_limit_get_full_accounts) {
+            acnt.more_data_available.call_orders = true;
+            break;
+         }
+      }
       auto settle_range = _db.get_index_type<force_settlement_index>().indices().get<by_account>().equal_range(account->id);
-      std::for_each(settle_range.first, settle_range.second,
-            [&acnt, api_limit_get_full_accounts] (const force_settlement_object& settle) {
-               if(acnt.settle_orders.size() < api_limit_get_full_accounts)
-                  acnt.settle_orders.emplace_back(settle);
-            });
+      for(auto itr = settle_range.first; itr != settle_range.second; ++itr)
+      {
+         acnt.settle_orders.emplace_back(*itr);
+         if(acnt.settle_orders.size() >= api_limit_get_full_accounts) {
+            acnt.more_data_available.settle_orders = true;
+            break;
+         }
+      }
 
       // get assets issued by user
       auto asset_range = _db.get_index_type<asset_index>().indices().get<by_issuer>().equal_range(account->id);
-      std::for_each(asset_range.first, asset_range.second,
-            [&acnt, api_limit_get_full_accounts] (const asset_object& asset) {
-               if(acnt.assets.size() < api_limit_get_full_accounts)
-                  acnt.assets.emplace_back(asset.id);
-            });
+      for(auto itr = asset_range.first; itr != asset_range.second; ++itr)
+      {
+         acnt.assets.emplace_back(itr->id);
+         if(acnt.assets.size() >= api_limit_get_full_accounts) {
+            acnt.more_data_available.assets = true;
+            break;
+         }
+      }
 
       // get withdraws permissions
       auto withdraw_indices = _db.get_index_type<withdraw_permission_index>().indices();
       auto withdraw_from_range = withdraw_indices.get<by_from>().equal_range(account->id);
-      std::for_each(withdraw_from_range.first, withdraw_from_range.second,
-            [&acnt, api_limit_get_full_accounts] (const withdraw_permission_object& withdraw) {
-               if(acnt.withdraws.size() < api_limit_get_full_accounts)
-                  acnt.withdraws.emplace_back(withdraw);
-            });
+      for(auto itr = withdraw_from_range.first; itr != withdraw_from_range.second; ++itr)
+      {
+         acnt.withdraws.emplace_back(*itr);
+         if(acnt.withdraws.size() >= api_limit_get_full_accounts) {
+            acnt.more_data_available.withdraws = true;
+            break;
+         }
+      }
       auto withdraw_authorized_range = withdraw_indices.get<by_authorized>().equal_range(account->id);
-      std::for_each(withdraw_authorized_range.first, withdraw_authorized_range.second,
-            [&acnt, api_limit_get_full_accounts] (const withdraw_permission_object& withdraw) {
-               if((std::find(acnt.withdraws.begin(), acnt.withdraws.end(), withdraw) == acnt.withdraws.end()) or
-                     (acnt.withdraws.size() < api_limit_get_full_accounts))
-                  acnt.withdraws.emplace_back(withdraw);
-            });
+      for(auto itr = withdraw_authorized_range.first; itr != withdraw_authorized_range.second; ++itr)
+      {
+         acnt.withdraws.emplace_back(*itr);
+         if(acnt.withdraws.size() >= api_limit_get_full_accounts) {
+            acnt.more_data_available.withdraws = true;
+            break;
+         }
+      }
 
       // get htlcs
       auto htlc_from_range = _db.get_index_type<htlc_index>().indices().get<by_from_id>().equal_range(account->id);
-      std::for_each(htlc_from_range.first, htlc_from_range.second,
-            [&acnt, api_limit_get_full_accounts] (const htlc_object& htlc) {
-               if(acnt.htlcs.size() < api_limit_get_full_accounts)
-                  acnt.htlcs.emplace_back(htlc);
-            });
+      for(auto itr = htlc_from_range.first; itr != htlc_from_range.second; ++itr)
+      {
+         acnt.htlcs.emplace_back(*itr);
+         if(acnt.htlcs.size() >= api_limit_get_full_accounts) {
+            acnt.more_data_available.htlcs = true;
+            break;
+         }
+      }
       auto htlc_to_range = _db.get_index_type<htlc_index>().indices().get<by_to_id>().equal_range(account->id);
-      std::for_each(htlc_to_range.first, htlc_to_range.second,
-            [&acnt, api_limit_get_full_accounts] (const htlc_object& htlc) {
-               if ((std::find(acnt.htlcs.begin(), acnt.htlcs.end(), htlc) == acnt.htlcs.end()) or
-                     (acnt.htlcs.size() < api_limit_get_full_accounts))
-                  acnt.htlcs.emplace_back(htlc);
-               });
+      for(auto itr = htlc_to_range.first; itr != htlc_to_range.second; ++itr)
+      {
+         acnt.htlcs.emplace_back(*itr);
+         if(acnt.htlcs.size() >= api_limit_get_full_accounts) {
+            acnt.more_data_available.htlcs = true;
+            break;
+         }
+      }
 
       results[account_name_or_id] = acnt;
    }
