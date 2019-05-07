@@ -405,7 +405,7 @@ namespace graphene { namespace app {
        if( start == 0 )
           start = stats.total_ops;
        else
-          start = min( stats.total_ops, start );
+          start = std::min( stats.total_ops, start );
 
        if( start >= stop && start > stats.removed_ops && limit > 0 )
        {

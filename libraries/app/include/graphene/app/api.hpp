@@ -53,7 +53,9 @@ namespace graphene { namespace app {
    using namespace graphene::market_history;
    using namespace graphene::grouped_orders;
    using namespace fc::ecc;
-   using namespace std;
+   using std::string;
+   using std::vector;
+   using std::map;
 
    class application;
 

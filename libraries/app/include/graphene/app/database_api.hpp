@@ -61,7 +61,9 @@ namespace graphene { namespace app {
 
 using namespace graphene::chain;
 using namespace graphene::market_history;
-using namespace std;
+using std::string;
+using std::vector;
+using std::map;
 
 class database_api_impl;
 

@@ -31,7 +31,8 @@
 using namespace graphene::app;
 using namespace graphene::chain;
 using namespace graphene::utilities;
-using namespace std;
+using std::string;
+using std::vector;
 
 namespace fc
 {
