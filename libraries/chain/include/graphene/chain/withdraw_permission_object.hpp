@@ -77,8 +77,6 @@ namespace graphene { namespace chain {
               ? withdrawal_limit.amount - claimed_this_period
               : 0, withdrawal_limit.asset_id );
         }
-
-        bool operator==(const withdraw_permission_object& in) { return this->id == in.id; }
    };
 
    struct by_from;
