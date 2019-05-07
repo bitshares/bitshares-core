@@ -205,27 +205,6 @@ int main( int argc, char** argv )
 
       fc::api<wallet_api> wapi(wapiptr);
 
-      auto wallet_cli = std::make_shared<fc::rpc::cli>( GRAPHENE_MAX_NESTED_OBJECTS );
-      for( auto& name_formatter : wapiptr->get_result_formatters() )
-         wallet_cli->format_result( name_formatter.first, name_formatter.second );
-
-      boost::signals2::scoped_connection closed_connection(con->closed.connect([wallet_cli]{
-         cerr << "Server has disconnected us.\n";
-         wallet_cli->stop();
-      }));
-      (void)(closed_connection);
-
-      if( wapiptr->is_new() )
-      {
-         std::cout << "Please use the set_password method to initialize a new wallet before continuing\n";
-         wallet_cli->set_prompt( "new >>> " );
-      } else
-         wallet_cli->set_prompt( "locked >>> " );
-
-      boost::signals2::scoped_connection locked_connection(wapiptr->lock_changed.connect([&](bool locked) {
-         wallet_cli->set_prompt(  locked ? "locked >>> " : "unlocked >>> " );
-      }));
-
       auto _websocket_server = std::make_shared<fc::http::websocket_server>();
       if( options.count("rpc-endpoint") )
       {
@@ -251,7 +230,8 @@ int main( int argc, char** argv )
             wsc->register_api(wapi);
             c->set_session_data( wsc );
          });
-         ilog( "Listening for incoming TLS RPC requests on ${p}", ("p", options.at("rpc-tls-endpoint").as<string>() ));
+         ilog( "Listening for incoming TLS RPC requests on ${p}",
+               ("p", options.at("rpc-tls-endpoint").as<string>()) );
          _websocket_tls_server->listen( fc::ip::endpoint::from_string(options.at("rpc-tls-endpoint").as<string>()) );
          _websocket_tls_server->start_accept();
       }
@@ -259,7 +239,8 @@ int main( int argc, char** argv )
       auto _http_server = std::make_shared<fc::http::server>();
       if( options.count("rpc-http-endpoint" ) )
       {
-         ilog( "Listening for incoming HTTP RPC requests on ${p}", ("p", options.at("rpc-http-endpoint").as<string>() ) );
+         ilog( "Listening for incoming HTTP RPC requests on ${p}",
+               ("p", options.at("rpc-http-endpoint").as<string>()) );
          _http_server->listen( fc::ip::endpoint::from_string( options.at( "rpc-http-endpoint" ).as<string>() ) );
          //
          // due to implementation, on_request() must come AFTER listen()
@@ -276,43 +257,81 @@ int main( int argc, char** argv )
 
       if( !options.count( "daemon" ) )
       {
+         auto wallet_cli = std::make_shared<fc::rpc::cli>( GRAPHENE_MAX_NESTED_OBJECTS );
+         for( auto& name_formatter : wapiptr->get_result_formatters() )
+            wallet_cli->format_result( name_formatter.first, name_formatter.second );
+
+         if( wapiptr->is_new() )
+         {
+            std::cout << "Please use the set_password method to initialize a new wallet before continuing\n";
+            wallet_cli->set_prompt( "new >>> " );
+         }
+         else
+            wallet_cli->set_prompt( "locked >>> " );
+
+         boost::signals2::scoped_connection locked_connection( wapiptr->lock_changed.connect(
+            [wallet_cli](bool locked) {
+               wallet_cli->set_prompt( locked ? "locked >>> " : "unlocked >>> " );
+            }));
+
+         auto sig_set = fc::set_signal_handler( [wallet_cli](int signal) {
+            ilog( "Captured SIGINT not in daemon mode, exiting" );
+            fc::set_signal_handler( [](int sig) {}, SIGINT ); // reinstall an empty SIGINT handler
+            fc::usleep( fc::milliseconds(100) ); // sleep a while to cleanup things
+            wallet_cli->cancel();
+         }, SIGINT );
+
+         fc::set_signal_handler( [wallet_cli,sig_set](int signal) {
+            ilog( "Captured SIGTERM not in daemon mode, exiting" );
+            sig_set->cancel();
+            fc::set_signal_handler( [](int sig) {}, SIGINT ); // reinstall an empty SIGINT handler
+            wallet_cli->cancel();
+         }, SIGTERM );
+
+         boost::signals2::scoped_connection closed_connection( con->closed.connect( [wallet_cli,sig_set] {
+            elog( "Server has disconnected us." );
+            sig_set->cancel();
+            fc::set_signal_handler( [](int sig) {}, SIGINT ); // reinstall an empty SIGINT handler
+            wallet_cli->cancel();
+         }));
+
          wallet_cli->register_api( wapi );
          wallet_cli->start();
-
-         fc::set_signal_handler([](int signal) {
-            ilog( "Captured SIGINT not in daemon mode" );
-            fclose(stdin);
-         }, SIGINT);
-
-         fc::set_signal_handler([](int signal) {
-            ilog( "Captured SIGTERM not in daemon mode" );
-            fclose(stdin);
-         }, SIGTERM);
-
          wallet_cli->wait();
+
+         locked_connection.disconnect();
+         closed_connection.disconnect();
       }
       else
       {
-        fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
-        fc::set_signal_handler([&exit_promise](int signal) {
-           exit_promise->set_value(signal);
-        }, SIGINT);
+         fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
 
-        fc::set_signal_handler([&exit_promise](int signal) {
-           exit_promise->set_value(signal);
-        }, SIGTERM);
+         fc::set_signal_handler( [&exit_promise](int signal) {
+            ilog( "Captured SIGINT in daemon mode, exiting" );
+            exit_promise->set_value(signal);
+         }, SIGINT );
 
-        ilog( "Entering Daemon Mode, ^C to exit" );
-        exit_promise->wait();
+         fc::set_signal_handler( [&exit_promise](int signal) {
+            ilog( "Captured SIGTERM in daemon mode, exiting" );
+            exit_promise->set_value(signal);
+         }, SIGTERM );
+
+         boost::signals2::scoped_connection closed_connection( con->closed.connect( [&exit_promise] {
+            elog( "Server has disconnected us." );
+            exit_promise->set_value(0);
+         }));
+
+         ilog( "Entering Daemon Mode, ^C to exit" );
+         exit_promise->wait();
+
+         closed_connection.disconnect();
       }
 
       wapi->save_wallet_file(wallet_file.generic_string());
-      locked_connection.disconnect();
-      closed_connection.disconnect();
    }
    catch ( const fc::exception& e )
    {
-      std::cout << e.to_detail_string() << "\n";
+      std::cerr << e.to_detail_string() << "\n";
       return -1;
    }
    return 0;
