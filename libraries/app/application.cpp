@@ -125,7 +125,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    if( _options->count("seed-node") )
    {
       auto seeds = _options->at("seed-node").as<vector<string>>();
-      _p2p_network->add_seed_nodes(seeds, true);
+      _p2p_network->add_seed_nodes(seeds);
    }
 
    // passed as a collection of URLs in a string
@@ -133,7 +133,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    {
       auto seeds_str = _options->at("seed-nodes").as<string>();
       auto seeds = fc::json::from_string(seeds_str).as<vector<string>>(2);
-      _p2p_network->add_seed_nodes(seeds, false);
+      _p2p_network->add_seed_nodes(seeds);
    }
    else
    {
@@ -159,7 +159,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
          "seed.bts.bangzi.info:55501",        // Bangzi       (Germany)
          "seeds.bitshares.eu:1776"            // pc           (http://seeds.quisquis.de/bitshares.html)
       };
-      _p2p_network->add_seed_nodes(seeds, false);
+      _p2p_network->add_seed_nodes(seeds);
    }
 
    if( _options->count("p2p-endpoint") )
