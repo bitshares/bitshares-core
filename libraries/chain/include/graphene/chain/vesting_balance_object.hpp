@@ -23,7 +23,7 @@
  */
 #pragma once
 
-#include <graphene/chain/protocol/asset.hpp>
+#include <graphene/protocol/asset.hpp>
 #include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
 #include <boost/multi_index/composite_key.hpp>
@@ -39,6 +39,7 @@
 
 namespace graphene { namespace chain {
    using namespace graphene::db;
+   using namespace graphene::protocol;
 
    class vesting_balance_object;
 
@@ -277,6 +278,8 @@ namespace detail {
    typedef generic_index<vesting_balance_object, vesting_balance_multi_index_type> vesting_balance_index;
 
 } } // graphene::chain
+
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::vesting_balance_object)
 
 FC_REFLECT(graphene::chain::linear_vesting_policy,
            (begin_timestamp)

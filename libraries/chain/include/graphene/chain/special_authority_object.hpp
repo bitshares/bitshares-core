@@ -22,7 +22,7 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/types.hpp>
 #include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
 
@@ -62,6 +62,8 @@ typedef multi_index_container<
 typedef generic_index< special_authority_object, special_authority_multi_index_type > special_authority_index;
 
 } } // graphene::chain
+
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::special_authority_object)
 
 FC_REFLECT_DERIVED(
    graphene::chain::special_authority_object,

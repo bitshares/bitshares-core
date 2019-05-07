@@ -40,7 +40,7 @@
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/special_authority_object.hpp>
-#include <graphene/chain/transaction_object.hpp>
+#include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -63,8 +63,6 @@
 #include <graphene/chain/witness_evaluator.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
 #include <graphene/chain/htlc_evaluator.hpp>
-
-#include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <fc/uint128.hpp>
 #include <fc/crypto/digest.hpp>
@@ -112,8 +110,8 @@ const uint8_t operation_history_object::type_id;
 const uint8_t proposal_object::space_id;
 const uint8_t proposal_object::type_id;
 
-const uint8_t transaction_object::space_id;
-const uint8_t transaction_object::type_id;
+const uint8_t transaction_history_object::space_id;
+const uint8_t transaction_history_object::type_id;
 
 const uint8_t vesting_balance_object::space_id;
 const uint8_t vesting_balance_object::type_id;

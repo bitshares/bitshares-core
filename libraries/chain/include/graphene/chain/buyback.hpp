@@ -23,7 +23,7 @@
  */
 #pragma once
 
-#include <graphene/chain/protocol/buyback.hpp>
+#include <graphene/protocol/buyback.hpp>
 
 namespace graphene { namespace chain {
 

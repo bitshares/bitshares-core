@@ -23,7 +23,7 @@
  */
 #pragma once
 
-#include <graphene/chain/protocol/transaction.hpp>
+#include <graphene/protocol/transaction.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 
 #include <graphene/db/generic_index.hpp>
@@ -103,6 +103,8 @@ typedef boost::multi_index_container<
 typedef generic_index<proposal_object, proposal_multi_index_container> proposal_index;
 
 } } // graphene::chain
+
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::proposal_object)
 
 FC_REFLECT_DERIVED( graphene::chain::proposal_object, (graphene::chain::object),
                     (expiration_time)(review_period_time)(proposed_transaction)(required_active_approvals)

@@ -23,6 +23,7 @@
  */
 #pragma once
 #include <graphene/chain/evaluator.hpp>
+#include <graphene/chain/htlc_object.hpp>
 
 namespace graphene { 
    namespace chain {

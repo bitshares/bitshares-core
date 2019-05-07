@@ -23,10 +23,10 @@
  */
 #pragma once
 
-#include <graphene/chain/protocol/asset.hpp>
-#include <graphene/chain/protocol/types.hpp>
 #include <graphene/db/generic_index.hpp>
 #include <graphene/db/object.hpp>
+#include <graphene/protocol/asset.hpp>
+#include <graphene/chain/types.hpp>
 
 #include <boost/multi_index/composite_key.hpp>
 
@@ -68,7 +68,6 @@ class limit_order_object : public abstract_object<limit_order_object>
       asset_id_type receive_asset_id()const { return sell_price.quote.asset_id; }
 };
 
-struct by_id;
 struct by_price;
 struct by_expiration;
 struct by_account;
@@ -271,6 +270,11 @@ typedef generic_index<force_settlement_object, force_settlement_object_multi_ind
 typedef generic_index<collateral_bid_object, collateral_bid_object_multi_index_type>       collateral_bid_index;
 
 } } // graphene::chain
+
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::limit_order_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::call_order_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::force_settlement_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::collateral_bid_object)
 
 FC_REFLECT_DERIVED( graphene::chain::limit_order_object,
                     (graphene::db::object),

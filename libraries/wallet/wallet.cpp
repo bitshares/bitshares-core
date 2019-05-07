@@ -65,8 +65,7 @@
 #include <graphene/app/api.hpp>
 #include <graphene/app/util.hpp>
 #include <graphene/chain/asset_object.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
-#include <graphene/chain/htlc_object.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/utilities/git_revision.hpp>
 #include <graphene/utilities/key_conversion.hpp>
@@ -542,11 +541,11 @@ public:
       return _checksum == fc::sha512();
    }
 
-   template<typename T>
-   T get_object(object_id<T::space_id, T::type_id, T> id)const
+   template<typename ID>
+   graphene::db::object_downcast_t<ID> get_object(ID id)const
    {
       auto ob = _remote_db->get_objects({id}).front();
-      return ob.template as<T>( GRAPHENE_MAX_NESTED_OBJECTS );
+      return ob.template as<graphene::db::object_downcast_t<ID>>( GRAPHENE_MAX_NESTED_OBJECTS );
    }
 
    void set_operation_fees( signed_transaction& tx, const fee_schedule& s  )
@@ -1017,7 +1016,7 @@ public:
             total_fee += gprops.get_current_fees().set_fee( op, fee_asset_obj.options.core_exchange_rate );
 
          FC_ASSERT((total_fee * fee_asset_obj.options.core_exchange_rate).amount <=
-                   get_object<asset_dynamic_data_object>(fee_asset_obj.dynamic_asset_data_id).fee_pool,
+                   get_object(fee_asset_obj.dynamic_asset_data_id).fee_pool,
                    "Cannot pay fees in ${asset}, as this asset's fee pool is insufficiently funded.",
                    ("asset", fee_asset_obj.symbol));
       } else {
@@ -1961,7 +1960,7 @@ public:
 
       if( vbid )
       {
-         result.emplace_back( get_object<vesting_balance_object>(*vbid), now );
+         result.emplace_back( get_object(*vbid), now );
          return result;
       }
       /*
@@ -1998,7 +1997,7 @@ public:
          vbid = wit.pay_vb;
       }
 
-      vesting_balance_object vbo = get_object< vesting_balance_object >( *vbid );
+      vesting_balance_object vbo = get_object( *vbid );
       vesting_balance_withdraw_operation vesting_balance_withdraw_op;
 
       vesting_balance_withdraw_op.vesting_balance = *vbid;
@@ -2343,14 +2342,13 @@ public:
       return sign_transaction(trx, broadcast);
    }
 
-   signed_transaction cancel_order(object_id_type order_id, bool broadcast = false)
+   signed_transaction cancel_order(limit_order_id_type order_id, bool broadcast = false)
    { try {
          FC_ASSERT(!is_locked());
-         FC_ASSERT(order_id.space() == protocol_ids, "Invalid order ID ${id}", ("id", order_id));
          signed_transaction trx;
 
          limit_order_cancel_operation op;
-         op.fee_paying_account = get_object<limit_order_object>(order_id).seller;
+         op.fee_paying_account = get_object(order_id).seller;
          op.order = order_id;
          trx.operations = {op};
          set_operation_fees( trx, _remote_db->get_global_properties().parameters.get_current_fees());
@@ -3655,7 +3653,7 @@ asset_bitasset_data_object wallet_api::get_bitasset_data(string asset_name_or_id
 {
    auto asset = get_asset(asset_name_or_id);
    FC_ASSERT(asset.is_market_issued() && asset.bitasset_data_id);
-   return my->get_object<asset_bitasset_data_object>(*asset.bitasset_data_id);
+   return my->get_object(*asset.bitasset_data_id);
 }
 
 account_id_type wallet_api::get_account_id(string account_name_or_id) const

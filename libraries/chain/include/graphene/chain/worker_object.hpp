@@ -24,8 +24,11 @@
 #pragma once
 #include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
+#include <graphene/protocol/vote.hpp>
+#include <graphene/chain/types.hpp>
 
 namespace graphene { namespace chain {
+class database;
 
 /**
   * @defgroup worker_types Implementations of the various worker types in the system
@@ -156,6 +159,8 @@ typedef multi_index_container<
 using worker_index = generic_index<worker_object, worker_object_multi_index_type>;
 
 } } // graphene::chain
+
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::worker_object)
 
 FC_REFLECT( graphene::chain::refund_worker_type, (total_burned) )
 FC_REFLECT( graphene::chain::vesting_balance_worker_type, (balance) )

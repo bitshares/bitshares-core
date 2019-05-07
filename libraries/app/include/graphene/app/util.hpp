@@ -27,10 +27,10 @@
 
 #include <fc/uint128.hpp>
 
-#include <graphene/chain/protocol/asset.hpp>
+#include <graphene/protocol/asset.hpp>
 
 namespace graphene { namespace app {
-   using namespace graphene::chain;
+   using namespace graphene::protocol;
 
    typedef boost::multiprecision::uint256_t u256;
 

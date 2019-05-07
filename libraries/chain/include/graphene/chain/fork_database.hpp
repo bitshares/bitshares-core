@@ -22,7 +22,9 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/protocol/block.hpp>
+#include <graphene/protocol/block.hpp>
+
+#include <graphene/chain/types.hpp>
 
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/member.hpp>

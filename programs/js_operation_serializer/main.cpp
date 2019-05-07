@@ -21,8 +21,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <graphene/chain/protocol/block.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/protocol/block.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
@@ -125,11 +125,12 @@ template<> struct js_name<fc::unsigned_int>    { static std::string name(){ retu
 template<> struct js_name< vote_id_type >      { static std::string name(){ return "vote_id";    } };
 template<> struct js_name< time_point_sec >    { static std::string name(){ return "time_point_sec"; } };
 
-template<uint8_t S, uint8_t T, typename O>
-struct js_name<graphene::db::object_id<S,T,O> >
+template<uint8_t S, uint8_t T>
+struct js_name<graphene::protocol::object_id<S,T> >
 {
    static std::string name(){
-      return "protocol_id_type(\"" + remove_namespace(fc::get_typename<O>::name()) + "\")";
+      return "protocol_id_type(\"" +
+             remove_namespace(fc::get_typename<object_downcast_t<object_id<S,T>>>::name()) + "\")";
    };
 };
 
@@ -272,8 +273,8 @@ struct serializer<fc::optional<T>,false>
    static void generate(){}
 };
 
-template<uint8_t SpaceID, uint8_t TypeID, typename T>
-struct serializer< graphene::db::object_id<SpaceID,TypeID,T> ,true>
+template<uint8_t SpaceID, uint8_t TypeID>
+struct serializer< graphene::db::object_id<SpaceID,TypeID> ,true>
 {
    static void init() {}
    static void generate() {}

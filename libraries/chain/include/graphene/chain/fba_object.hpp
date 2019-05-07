@@ -23,7 +23,7 @@
  */
 #pragma once
 
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/chain/types.hpp>
 #include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
 
@@ -48,5 +48,7 @@ class fba_accumulator_object : public graphene::db::abstract_object< fba_accumul
 };
 
 } } // graphene::chain
+
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::fba_accumulator_object)
 
 FC_REFLECT_DERIVED( graphene::chain::fba_accumulator_object, (graphene::db::object), (accumulated_fba_fees)(designated_asset) )

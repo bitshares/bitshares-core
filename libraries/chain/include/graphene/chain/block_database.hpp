@@ -23,10 +23,11 @@
  */
 #pragma once
 #include <fstream>
-#include <graphene/chain/protocol/block.hpp>
+#include <graphene/protocol/block.hpp>
 
 namespace graphene { namespace chain {
    struct index_entry;
+   using namespace graphene::protocol;
 
    class block_database 
    {

@@ -26,8 +26,8 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/account_object.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
-#include <graphene/chain/protocol/vote.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
+#include <graphene/protocol/vote.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 
 namespace graphene { namespace chain {
@@ -42,7 +42,7 @@ object_id_type committee_member_create_evaluator::do_apply( const committee_memb
 { try {
    vote_id_type vote_id;
    db().modify(db().get_global_properties(), [&vote_id](global_property_object& p) {
-      vote_id = get_next_vote_id(p, vote_id_type::committee);
+      vote_id = vote_id_type(vote_id_type::committee, p.next_available_vote_id++);
    });
 
    const auto& new_del_object = db().create<committee_member_object>( [&]( committee_member_object& obj ){
