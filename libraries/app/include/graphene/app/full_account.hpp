@@ -31,6 +31,19 @@
 namespace graphene { namespace app {
    using namespace graphene::chain;
 
+   struct more_data
+   {
+      bool balances = false;
+      bool vesting_balances = false;
+      bool limit_orders = false;
+      bool call_orders = false;
+      bool settle_orders = false;
+      bool proposals = false;
+      bool assets = false;
+      bool withdraws = false;
+      bool htlcs = false;
+   };
+
    struct full_account
    {
       account_object                   account;
@@ -49,9 +62,15 @@ namespace graphene { namespace app {
       vector<asset_id_type>            assets;
       vector<withdraw_permission_object> withdraws;
       vector<htlc_object>              htlcs;
+      more_data                        more_data_available;
    };
 
 } }
+
+FC_REFLECT( graphene::app::more_data,
+            (balances) (vesting_balances) (limit_orders) (call_orders)
+            (settle_orders) (proposals) (assets) (withdraws) (htlcs)
+          )
 
 FC_REFLECT( graphene::app::full_account,
             (account)
@@ -70,4 +89,5 @@ FC_REFLECT( graphene::app::full_account,
             (assets)
             (withdraws)
             (htlcs)
+            (more_data_available)
           )
