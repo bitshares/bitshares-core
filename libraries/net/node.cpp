@@ -250,23 +250,17 @@ namespace graphene { namespace net { namespace detail {
       }
       void build(node_impl* impl, address_message& reply)
       {
-         reply.addresses.reserve(impl->_active_connections.size());
-         for(const peer_connection_ptr& active_peer : impl->_active_connections)
-         {
-            if (!exists_in_list(active_peer, exclude_list))
-               reply.addresses.emplace_back(update_address_record(impl, active_peer));
-         }
-         reply.addresses.shrink_to_fit();
+        reply.addresses.reserve(impl->_active_connections.size());
+        // filter out those in the exclude list
+        for(const peer_connection_ptr& active_peer : impl->_active_connections)
+        {
+          if (exclude_list.find( *active_peer->get_remote_endpoint() ) == exclude_list.end())  
+            reply.addresses.emplace_back(update_address_record(impl, active_peer));
+        }
+        reply.addresses.shrink_to_fit();
       }
       private:
       fc::flat_set<std::string> exclude_list;
-      bool exists_in_list(const peer_connection_ptr& peer, const fc::flat_set<std::string>& exclude_list) const
-      {
-         std::string remote = *peer->get_remote_endpoint();
-         if ( std::find(exclude_list.begin(), exclude_list.end(), remote) != exclude_list.end() )
-           return true;
-         return false;
-      }
    };
 
    /***
