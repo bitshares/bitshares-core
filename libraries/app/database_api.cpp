@@ -36,7 +36,6 @@
 
 #include <boost/range/iterator_range.hpp>
 #include <boost/rational.hpp>
-#include <boost/multiprecision/cpp_int.hpp>
 
 #include <cctype>
 
@@ -456,8 +455,8 @@ market_ticker::market_ticker(const market_ticker_object& mto,
    lowest_ask = "0";
    highest_bid = "0";
 
-   fc::uint128 bv;
-   fc::uint128 qv;
+   fc::uint128_t bv;
+   fc::uint128_t qv;
    price latest_price = asset( mto.latest_base, mto.base ) / asset( mto.latest_quote, mto.quote );
    if( mto.base != asset_base.id )
       latest_price = ~latest_price;
@@ -1698,7 +1697,6 @@ order_book database_api::get_order_book( const string& base, const string& quote
 
 order_book database_api_impl::get_order_book( const string& base, const string& quote, unsigned limit )const
 {
-   using boost::multiprecision::uint128_t;
    uint64_t api_limit_get_order_book=_app_options->api_limit_get_order_book;
    FC_ASSERT( limit <= api_limit_get_order_book );
 
@@ -1720,7 +1718,9 @@ order_book database_api_impl::get_order_book( const string& base, const string& 
       {
          order ord;
          ord.price = price_to_string( o.sell_price, *assets[0], *assets[1] );
-         ord.quote = assets[1]->amount_to_string( share_type( ( uint128_t( o.for_sale.value ) * o.sell_price.quote.amount.value ) / o.sell_price.base.amount.value ) );
+         ord.quote = assets[1]->amount_to_string( share_type( fc::uint128_t( o.for_sale.value )
+                                                              * o.sell_price.quote.amount.value
+                                                              / o.sell_price.base.amount.value ) );
          ord.base = assets[0]->amount_to_string( o.for_sale );
          result.bids.push_back( ord );
       }
@@ -1729,7 +1729,9 @@ order_book database_api_impl::get_order_book( const string& base, const string& 
          order ord;
          ord.price = price_to_string( o.sell_price, *assets[0], *assets[1] );
          ord.quote = assets[1]->amount_to_string( o.for_sale );
-         ord.base = assets[0]->amount_to_string( share_type( ( uint128_t( o.for_sale.value ) * o.sell_price.quote.amount.value ) / o.sell_price.base.amount.value ) );
+         ord.base = assets[0]->amount_to_string( share_type( fc::uint128_t( o.for_sale.value )
+                                                             * o.sell_price.quote.amount.value
+                                                             / o.sell_price.base.amount.value ) );
          result.asks.push_back( ord );
       }
    }

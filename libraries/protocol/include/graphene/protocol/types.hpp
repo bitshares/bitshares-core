@@ -54,7 +54,6 @@
 
 #include <fc/io/datastream.hpp>
 #include <fc/io/raw_fwd.hpp>
-#include <fc/uint128.hpp>
 #include <fc/static_variant.hpp>
 
 #include <graphene/protocol/object_id.hpp>
