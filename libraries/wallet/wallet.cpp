@@ -60,6 +60,7 @@
 #include <fc/thread/scoped_lock.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/crypto/base58.hpp>
+#include <fc/popcount.hpp>
 
 #include <graphene/app/api.hpp>
 #include <graphene/app/util.hpp>
@@ -613,7 +614,7 @@ public:
             fc::get_approximate_relative_time_string(dynamic_props.next_maintenance_time);
       result["chain_id"] = chain_props.chain_id;
       stringstream participation;
-      participation << fixed << std::setprecision(2) << (100*dynamic_props.recent_slots_filled.popcount()) / 128.0;
+      participation << fixed << std::setprecision(2) << (100.0*fc::popcount(dynamic_props.recent_slots_filled)) / 128.0;
       result["participation"] = participation.str();
       result["active_witnesses"] = fc::variant(global_props.active_witnesses, GRAPHENE_MAX_NESTED_OBJECTS);
       result["active_committee_members"] =

@@ -37,10 +37,11 @@ share_type asset_bitasset_data_object::max_force_settlement_volume(share_type cu
    if( options.maximum_force_settlement_volume == GRAPHENE_100_PERCENT )
       return current_supply + force_settled_volume;
 
-   fc::uint128 volume = current_supply.value + force_settled_volume.value;
+   fc::uint128_t volume = current_supply.value;
+   volume += force_settled_volume.value;
    volume *= options.maximum_force_settlement_volume;
    volume /= GRAPHENE_100_PERCENT;
-   return volume.to_uint64();
+   return volume.convert_to<uint64_t>();
 }
 
 void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_point_sec current_time,
