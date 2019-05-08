@@ -1,0 +1,82 @@
+#!/bin/sh
+
+# Relevant variables set by travis:
+# TRAVIS_BRANCH:
+# * for push builds, or builds not triggered by a pull request, this is the
+#   name of the branch.
+# * for builds triggered by a pull request this is the name of the branch
+#   targeted by the pull request.
+# * for builds triggered by a tag, this is the same as the name of the tag
+#   (see TRAVIS_TAG).
+# TRAVIS_PULL_REQUEST: The pull request number if the current job is a pull
+#   request, “false” if it’s not a pull request.
+# TRAVIS_TAG: If the current build is for a git tag, this variable is set to
+#   the tag’s name.
+
+if [ "$#" != 1 ]; then
+    echo "Usage: $0 <sonar-properties-file>" 1>&2
+    exit 1
+fi
+
+clear_branch () {
+    sed -i '/sonar\.branch/d' "$1"
+}
+
+TARGET=
+FETCH=
+
+if [ -n "$TRAVIS_PULL_REQUEST" -a "$TRAVIS_PULL_REQUEST" != false ]; then
+    # PRs work per default
+    echo "Detected PR '$TRAVIS_PULL_REQUEST'"
+    clear_branch "$1"
+    FETCH="$TRAVIS_BRANCH"
+elif [ -n "$TRAVIS_TAG" ]; then
+    # Tag build is either master or testnet
+    echo "Detected tag '$TRAVIS_TAG'"
+    clear_branch "$1"
+    case "$TRAVIS_TAG" in
+	*test*) TARGET=testnet; FETCH=testnet; ;;
+	*)	FETCH=master; ;;
+    esac
+else
+    case "$TRAVIS_BRANCH" in
+	master|develop|testnet|next_hardfork)
+	    # Long-lived branches stand for themselves
+	    echo "Detected long-lived branch '$TRAVIS_BRANCH'"
+	    clear_branch "$1"
+	    FETCH="$TRAVIS_BRANCH"
+	    ;;
+	*test*release*)
+	    # Testnet release branch will be merged into testnet
+	    echo "Detected testnet release branch '$TRAVIS_BRANCH'"
+	    clear_branch "$1"
+	    TARGET=testnet
+	    FETCH=testnet
+	    ;;
+	*release*)
+	    # Release branch will be merged into default (master)
+	    echo "Detected release branch '$TRAVIS_BRANCH'"
+	    clear_branch "$1"
+	    FETCH=master
+	    ;;
+	*)
+	    # All other branches should have sonar.branch.target in their
+	    # sonar.properties, leave it unchanged
+	    echo "Detected normal branch '$TRAVIS_BRANCH'"
+	    FETCH="$( grep 'sonar\.branch\.target' "$1" | sed 's=^.*[:=] *==' )"
+    esac
+fi
+
+echo "Branch target '$TARGET', fetch target '$FETCH'"
+
+if [ -n "$TARGET" ]; then
+    echo "sonar.branch.target=$TARGET" >>"$1"
+fi
+#if [ -n "$FETCH" ]; then
+    # Unfortunately this leads to sonar failing. Apparently it needs a full
+    # clone, not a shallow one. Since our repo is somewhat large and this is
+    # only required for blame annotations, disabled for now.
+    #git fetch --depth=50 origin "$FETCH:$FETCH"
+#fi
+
+exit 0
