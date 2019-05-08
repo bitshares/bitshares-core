@@ -445,6 +445,14 @@ class database_api
       vector<call_order_object> get_call_orders(const std::string& a, uint32_t limit)const;
 
       /**
+       * @brief Get call orders from a given account
+       * @param account_name_or_id Account name or ID to get objects from
+       * @param limit Maximum number of objects to retrieve
+       * @return The call orders of the account
+       */
+      vector<call_order_object> get_call_orders_by_account(const std::string& account_name_or_id, uint32_t limit)const;
+
+      /**
        * @brief Get forced settlement orders in a given asset
        * @param a Symbol or ID of asset being settled
        * @param limit Maximum number of orders to retrieve
@@ -843,6 +851,7 @@ FC_API(graphene::app::database_api,
    (get_limit_orders)
    (get_account_limit_orders)
    (get_call_orders)
+   (get_call_orders_by_account)
    (get_settle_orders)
    (get_margin_positions)
    (get_collateral_bids)
