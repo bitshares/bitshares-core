@@ -889,6 +889,8 @@ std::map<string,full_account> database_api::get_full_accounts( const vector<stri
 
 std::map<std::string, full_account> database_api_impl::get_full_accounts( const vector<std::string>& names_or_ids, bool subscribe)
 {
+   FC_ASSERT( names_or_ids.size() <= _app_options->api_limit_get_full_accounts );
+
    const auto& proposal_idx = _db.get_index_type<proposal_index>();
    const auto& pidx = dynamic_cast<const base_primary_index&>(proposal_idx);
    const auto& proposals_by_account = pidx.get_secondary_index<graphene::chain::required_approval_index>();
@@ -922,17 +924,17 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
          acnt.cashback_balance = account->cashback_balance(_db);
       }
 
-      uint64_t api_limit_get_full_accounts = _app_options->api_limit_get_full_accounts;
+      uint64_t api_limit_get_full_accounts_lists = _app_options->api_limit_get_full_accounts_lists;
 
       // Add the account's proposals
       auto  required_approvals_itr = proposals_by_account._account_to_proposals.find( account->id );
       if( required_approvals_itr != proposals_by_account._account_to_proposals.end() )
       {
-         acnt.proposals.reserve( std::min(required_approvals_itr->second.size(), api_limit_get_full_accounts) );
+         acnt.proposals.reserve( std::min(required_approvals_itr->second.size(), api_limit_get_full_accounts_lists) );
          for( auto proposal_id : required_approvals_itr->second )
          {
             acnt.proposals.push_back( proposal_id(_db) );
-            if(acnt.proposals.size() >= api_limit_get_full_accounts) {
+            if(acnt.proposals.size() >= api_limit_get_full_accounts_lists) {
                acnt.more_data_available.proposals = true;
                break;
             }
@@ -944,7 +946,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       for( const auto balance : balances )
       {
          acnt.balances.emplace_back( *balance.second );
-         if(acnt.balances.size() >= api_limit_get_full_accounts) {
+         if(acnt.balances.size() >= api_limit_get_full_accounts_lists) {
             acnt.more_data_available.balances = true;
             break;
          }
@@ -955,7 +957,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       for(auto itr = vesting_range.first; itr != vesting_range.second; ++itr)
       {
          acnt.vesting_balances.emplace_back(*itr);
-         if(acnt.vesting_balances.size() >= api_limit_get_full_accounts) {
+         if(acnt.vesting_balances.size() >= api_limit_get_full_accounts_lists) {
             acnt.more_data_available.vesting_balances = true;
             break;
          }
@@ -966,7 +968,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       for(auto itr = order_range.first; itr != order_range.second; ++itr)
       {
          acnt.limit_orders.emplace_back(*itr);
-         if(acnt.limit_orders.size() >= api_limit_get_full_accounts) {
+         if(acnt.limit_orders.size() >= api_limit_get_full_accounts_lists) {
             acnt.more_data_available.limit_orders = true;
             break;
          }
@@ -975,7 +977,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       for(auto itr = call_range.first; itr != call_range.second; ++itr)
       {
          acnt.call_orders.emplace_back(*itr);
-         if(acnt.call_orders.size() >= api_limit_get_full_accounts) {
+         if(acnt.call_orders.size() >= api_limit_get_full_accounts_lists) {
             acnt.more_data_available.call_orders = true;
             break;
          }
@@ -984,7 +986,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       for(auto itr = settle_range.first; itr != settle_range.second; ++itr)
       {
          acnt.settle_orders.emplace_back(*itr);
-         if(acnt.settle_orders.size() >= api_limit_get_full_accounts) {
+         if(acnt.settle_orders.size() >= api_limit_get_full_accounts_lists) {
             acnt.more_data_available.settle_orders = true;
             break;
          }
@@ -995,7 +997,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       for(auto itr = asset_range.first; itr != asset_range.second; ++itr)
       {
          acnt.assets.emplace_back(itr->id);
-         if(acnt.assets.size() >= api_limit_get_full_accounts) {
+         if(acnt.assets.size() >= api_limit_get_full_accounts_lists) {
             acnt.more_data_available.assets = true;
             break;
          }
@@ -1007,7 +1009,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       for(auto itr = withdraw_from_range.first; itr != withdraw_from_range.second; ++itr)
       {
          acnt.withdraws.emplace_back(*itr);
-         if(acnt.withdraws.size() >= api_limit_get_full_accounts) {
+         if(acnt.withdraws.size() >= api_limit_get_full_accounts_lists) {
             acnt.more_data_available.withdraws = true;
             break;
          }
@@ -1016,7 +1018,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       for(auto itr = withdraw_authorized_range.first; itr != withdraw_authorized_range.second; ++itr)
       {
          acnt.withdraws.emplace_back(*itr);
-         if(acnt.withdraws.size() >= api_limit_get_full_accounts) {
+         if(acnt.withdraws.size() >= api_limit_get_full_accounts_lists) {
             acnt.more_data_available.withdraws = true;
             break;
          }
@@ -1027,7 +1029,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       for(auto itr = htlc_from_range.first; itr != htlc_from_range.second; ++itr)
       {
          acnt.htlcs.emplace_back(*itr);
-         if(acnt.htlcs.size() >= api_limit_get_full_accounts) {
+         if(acnt.htlcs.size() >= api_limit_get_full_accounts_lists) {
             acnt.more_data_available.htlcs = true;
             break;
          }
@@ -1036,7 +1038,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       for(auto itr = htlc_to_range.first; itr != htlc_to_range.second; ++itr)
       {
          acnt.htlcs.emplace_back(*itr);
-         if(acnt.htlcs.size() >= api_limit_get_full_accounts) {
+         if(acnt.htlcs.size() >= api_limit_get_full_accounts_lists) {
             acnt.more_data_available.htlcs = true;
             break;
          }

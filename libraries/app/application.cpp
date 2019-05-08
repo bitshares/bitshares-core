@@ -346,6 +346,9 @@ void application_impl::set_api_limit() {
    if(_options->count("api-limit-get-full-accounts")) {
       _app_options.api_limit_get_full_accounts = _options->at("api-limit-get-full-accounts").as<uint64_t>();
    }
+   if(_options->count("api-limit-get-full-accounts-lists")) {
+      _app_options.api_limit_get_full_accounts_lists = _options->at("api-limit-get-full-accounts-lists").as<uint64_t>();
+   }
 }
 
 void application_impl::startup()
@@ -1025,7 +1028,9 @@ void application::set_program_options(boost::program_options::options_descriptio
 		    "For database_api_impl::get_key_references to set its default limit value as 100")
          ("api-limit-get-htlc-by",boost::program_options::value<uint64_t>()->default_value(100),
           "For database_api_impl::get_htlc_by_from and get_htlc_by_to to set its default limit value as 100")
-         ("api-limit-get-full-accounts",boost::program_options::value<uint64_t>()->default_value(100),
+         ("api-limit-get-full-accounts",boost::program_options::value<uint64_t>()->default_value(10),
+          "For database_api_impl::get_full_accounts to set its account default limit values as 10")
+         ("api-limit-get-full-accounts-lists",boost::program_options::value<uint64_t>()->default_value(100),
           "For database_api_impl::get_full_accounts to set its lists default limit values as 100")
          ;
    command_line_options.add(configuration_file_options);
