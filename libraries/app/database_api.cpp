@@ -931,117 +931,117 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       if( required_approvals_itr != proposals_by_account._account_to_proposals.end() )
       {
          acnt.proposals.reserve( std::min(required_approvals_itr->second.size(), api_limit_get_full_accounts_lists) );
+         if(required_approvals_itr->second.size() > api_limit_get_full_accounts_lists)
+            acnt.more_data_available.proposals = true;
          for( auto proposal_id : required_approvals_itr->second )
          {
             acnt.proposals.push_back( proposal_id(_db) );
-            if(acnt.proposals.size() >= api_limit_get_full_accounts_lists) {
-               acnt.more_data_available.proposals = true;
+            if(acnt.proposals.size() >= api_limit_get_full_accounts_lists)
                break;
-            }
          }
       }
 
       // Add the account's balances
       const auto& balances = _db.get_index_type< primary_index< account_balance_index > >().get_secondary_index< balances_by_account_index >().get_account_balances( account->id );
+      if(balances.size() > api_limit_get_full_accounts_lists)
+         acnt.more_data_available.balances = true;
       for( const auto balance : balances )
       {
          acnt.balances.emplace_back( *balance.second );
-         if(acnt.balances.size() >= api_limit_get_full_accounts_lists) {
-            acnt.more_data_available.balances = true;
+         if(acnt.balances.size() >= api_limit_get_full_accounts_lists)
             break;
-         }
       }
 
       // Add the account's vesting balances
       auto vesting_range = _db.get_index_type<vesting_balance_index>().indices().get<by_account>().equal_range(account->id);
+      if(abs(distance(vesting_range.first, vesting_range.second)) > api_limit_get_full_accounts_lists)
+         acnt.more_data_available.vesting_balances = true;
       for(auto itr = vesting_range.first; itr != vesting_range.second; ++itr)
       {
          acnt.vesting_balances.emplace_back(*itr);
-         if(acnt.vesting_balances.size() >= api_limit_get_full_accounts_lists) {
-            acnt.more_data_available.vesting_balances = true;
+         if(acnt.vesting_balances.size() >= api_limit_get_full_accounts_lists)
             break;
-         }
       }
 
       // Add the account's orders
       auto order_range = _db.get_index_type<limit_order_index>().indices().get<by_account>().equal_range(account->id);
+      if(abs(distance(order_range.first, order_range.second)) > api_limit_get_full_accounts_lists)
+         acnt.more_data_available.limit_orders = true;
       for(auto itr = order_range.first; itr != order_range.second; ++itr)
       {
          acnt.limit_orders.emplace_back(*itr);
-         if(acnt.limit_orders.size() >= api_limit_get_full_accounts_lists) {
-            acnt.more_data_available.limit_orders = true;
+         if(acnt.limit_orders.size() >= api_limit_get_full_accounts_lists)
             break;
-         }
       }
       auto call_range = _db.get_index_type<call_order_index>().indices().get<by_account>().equal_range(account->id);
+      if(abs(distance(call_range.first, call_range.second)) > api_limit_get_full_accounts_lists)
+         acnt.more_data_available.call_orders = true;
       for(auto itr = call_range.first; itr != call_range.second; ++itr)
       {
          acnt.call_orders.emplace_back(*itr);
-         if(acnt.call_orders.size() >= api_limit_get_full_accounts_lists) {
-            acnt.more_data_available.call_orders = true;
+         if(acnt.call_orders.size() >= api_limit_get_full_accounts_lists)
             break;
-         }
       }
       auto settle_range = _db.get_index_type<force_settlement_index>().indices().get<by_account>().equal_range(account->id);
+      if(abs(distance(settle_range.first, settle_range.second)) > api_limit_get_full_accounts_lists)
+         acnt.more_data_available.settle_orders = true;
       for(auto itr = settle_range.first; itr != settle_range.second; ++itr)
       {
          acnt.settle_orders.emplace_back(*itr);
-         if(acnt.settle_orders.size() >= api_limit_get_full_accounts_lists) {
-            acnt.more_data_available.settle_orders = true;
+         if(acnt.settle_orders.size() >= api_limit_get_full_accounts_lists)
             break;
-         }
       }
 
       // get assets issued by user
       auto asset_range = _db.get_index_type<asset_index>().indices().get<by_issuer>().equal_range(account->id);
+      if(abs(distance(asset_range.first, asset_range.second)) > api_limit_get_full_accounts_lists)
+         acnt.more_data_available.assets = true;
       for(auto itr = asset_range.first; itr != asset_range.second; ++itr)
       {
          acnt.assets.emplace_back(itr->id);
-         if(acnt.assets.size() >= api_limit_get_full_accounts_lists) {
-            acnt.more_data_available.assets = true;
+         if(acnt.assets.size() >= api_limit_get_full_accounts_lists)
             break;
-         }
       }
 
       // get withdraws permissions
       auto withdraw_indices = _db.get_index_type<withdraw_permission_index>().indices();
       auto withdraw_from_range = withdraw_indices.get<by_from>().equal_range(account->id);
+      if(abs(distance(withdraw_from_range.first, withdraw_from_range.second)) > api_limit_get_full_accounts_lists)
+         acnt.more_data_available.withdraws_from = true;
       for(auto itr = withdraw_from_range.first; itr != withdraw_from_range.second; ++itr)
       {
          acnt.withdraws_from.emplace_back(*itr);
-         if(acnt.withdraws_from.size() >= api_limit_get_full_accounts_lists) {
-            acnt.more_data_available.withdraws_from = true;
+         if(acnt.withdraws_from.size() >= api_limit_get_full_accounts_lists)
             break;
-         }
       }
       auto withdraw_authorized_range = withdraw_indices.get<by_authorized>().equal_range(account->id);
+      if(abs(distance(withdraw_authorized_range.first, withdraw_authorized_range.second)) > api_limit_get_full_accounts_lists)
+         acnt.more_data_available.withdraws_authorized = true;
       for(auto itr = withdraw_authorized_range.first; itr != withdraw_authorized_range.second; ++itr)
       {
          acnt.withdraws_authorized.emplace_back(*itr);
-         if(acnt.withdraws_authorized.size() >= api_limit_get_full_accounts_lists) {
-            acnt.more_data_available.withdraws_authorized = true;
+         if(acnt.withdraws_authorized.size() >= api_limit_get_full_accounts_lists)
             break;
-         }
       }
 
       // get htlcs
       auto htlc_from_range = _db.get_index_type<htlc_index>().indices().get<by_from_id>().equal_range(account->id);
+      if(abs(distance(htlc_from_range.first, htlc_from_range.second)) > api_limit_get_full_accounts_lists)
+         acnt.more_data_available.htlcs_from = true;
       for(auto itr = htlc_from_range.first; itr != htlc_from_range.second; ++itr)
       {
          acnt.htlcs_from.emplace_back(*itr);
-         if(acnt.htlcs_from.size() >= api_limit_get_full_accounts_lists) {
-            acnt.more_data_available.htlcs_from = true;
+         if(acnt.htlcs_from.size() >= api_limit_get_full_accounts_lists)
             break;
-         }
       }
       auto htlc_to_range = _db.get_index_type<htlc_index>().indices().get<by_to_id>().equal_range(account->id);
+      if(abs(distance(htlc_to_range.first, htlc_to_range.second)) > api_limit_get_full_accounts_lists)
+         acnt.more_data_available.htlcs_to = true;
       for(auto itr = htlc_to_range.first; itr != htlc_to_range.second; ++itr)
       {
          acnt.htlcs_to.emplace_back(*itr);
-         if(acnt.htlcs_to.size() >= api_limit_get_full_accounts_lists) {
-            acnt.more_data_available.htlcs_to = true;
+         if(acnt.htlcs_to.size() >= api_limit_get_full_accounts_lists)
             break;
-         }
       }
 
       results[account_name_or_id] = acnt;
