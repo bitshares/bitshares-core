@@ -955,7 +955,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 
       // Add the account's vesting balances
       auto vesting_range = _db.get_index_type<vesting_balance_index>().indices().get<by_account>().equal_range(account->id);
-      if(abs(distance(vesting_range.first, vesting_range.second)) > api_limit_get_full_accounts_lists)
+      if((unsigned)abs(distance(vesting_range.first, vesting_range.second)) > api_limit_get_full_accounts_lists)
          acnt.more_data_available.vesting_balances = true;
       for(auto itr = vesting_range.first; itr != vesting_range.second; ++itr)
       {
@@ -966,7 +966,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 
       // Add the account's orders
       auto order_range = _db.get_index_type<limit_order_index>().indices().get<by_account>().equal_range(account->id);
-      if(abs(distance(order_range.first, order_range.second)) > api_limit_get_full_accounts_lists)
+      if((unsigned)abs(distance(order_range.first, order_range.second)) > api_limit_get_full_accounts_lists)
          acnt.more_data_available.limit_orders = true;
       for(auto itr = order_range.first; itr != order_range.second; ++itr)
       {
@@ -975,7 +975,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
             break;
       }
       auto call_range = _db.get_index_type<call_order_index>().indices().get<by_account>().equal_range(account->id);
-      if(abs(distance(call_range.first, call_range.second)) > api_limit_get_full_accounts_lists)
+      if((unsigned)abs(distance(call_range.first, call_range.second)) > api_limit_get_full_accounts_lists)
          acnt.more_data_available.call_orders = true;
       for(auto itr = call_range.first; itr != call_range.second; ++itr)
       {
@@ -984,7 +984,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
             break;
       }
       auto settle_range = _db.get_index_type<force_settlement_index>().indices().get<by_account>().equal_range(account->id);
-      if(abs(distance(settle_range.first, settle_range.second)) > api_limit_get_full_accounts_lists)
+      if((unsigned)abs(distance(settle_range.first, settle_range.second)) > api_limit_get_full_accounts_lists)
          acnt.more_data_available.settle_orders = true;
       for(auto itr = settle_range.first; itr != settle_range.second; ++itr)
       {
@@ -995,7 +995,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 
       // get assets issued by user
       auto asset_range = _db.get_index_type<asset_index>().indices().get<by_issuer>().equal_range(account->id);
-      if(abs(distance(asset_range.first, asset_range.second)) > api_limit_get_full_accounts_lists)
+      if((unsigned)abs(distance(asset_range.first, asset_range.second)) > api_limit_get_full_accounts_lists)
          acnt.more_data_available.assets = true;
       for(auto itr = asset_range.first; itr != asset_range.second; ++itr)
       {
@@ -1007,7 +1007,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       // get withdraws permissions
       auto withdraw_indices = _db.get_index_type<withdraw_permission_index>().indices();
       auto withdraw_from_range = withdraw_indices.get<by_from>().equal_range(account->id);
-      if(abs(distance(withdraw_from_range.first, withdraw_from_range.second)) > api_limit_get_full_accounts_lists)
+      if((unsigned)abs(distance(withdraw_from_range.first, withdraw_from_range.second)) > api_limit_get_full_accounts_lists)
          acnt.more_data_available.withdraws_from = true;
       for(auto itr = withdraw_from_range.first; itr != withdraw_from_range.second; ++itr)
       {
@@ -1016,7 +1016,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
             break;
       }
       auto withdraw_authorized_range = withdraw_indices.get<by_authorized>().equal_range(account->id);
-      if(abs(distance(withdraw_authorized_range.first, withdraw_authorized_range.second)) > api_limit_get_full_accounts_lists)
+      if((unsigned)abs(distance(withdraw_authorized_range.first, withdraw_authorized_range.second)) > api_limit_get_full_accounts_lists)
          acnt.more_data_available.withdraws_authorized = true;
       for(auto itr = withdraw_authorized_range.first; itr != withdraw_authorized_range.second; ++itr)
       {
@@ -1027,7 +1027,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 
       // get htlcs
       auto htlc_from_range = _db.get_index_type<htlc_index>().indices().get<by_from_id>().equal_range(account->id);
-      if(abs(distance(htlc_from_range.first, htlc_from_range.second)) > api_limit_get_full_accounts_lists)
+      if((unsigned)abs(distance(htlc_from_range.first, htlc_from_range.second)) > api_limit_get_full_accounts_lists)
          acnt.more_data_available.htlcs_from = true;
       for(auto itr = htlc_from_range.first; itr != htlc_from_range.second; ++itr)
       {
@@ -1036,7 +1036,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
             break;
       }
       auto htlc_to_range = _db.get_index_type<htlc_index>().indices().get<by_to_id>().equal_range(account->id);
-      if(abs(distance(htlc_to_range.first, htlc_to_range.second)) > api_limit_get_full_accounts_lists)
+      if((unsigned)abs(distance(htlc_to_range.first, htlc_to_range.second)) > api_limit_get_full_accounts_lists)
          acnt.more_data_available.htlcs_to = true;
       for(auto itr = htlc_to_range.first; itr != htlc_to_range.second; ++itr)
       {
