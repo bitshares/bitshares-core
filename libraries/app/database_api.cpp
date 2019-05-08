@@ -1008,18 +1008,18 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       auto withdraw_from_range = withdraw_indices.get<by_from>().equal_range(account->id);
       for(auto itr = withdraw_from_range.first; itr != withdraw_from_range.second; ++itr)
       {
-         acnt.withdraws.emplace_back(*itr);
-         if(acnt.withdraws.size() >= api_limit_get_full_accounts_lists) {
-            acnt.more_data_available.withdraws = true;
+         acnt.withdraws_from.emplace_back(*itr);
+         if(acnt.withdraws_from.size() >= api_limit_get_full_accounts_lists) {
+            acnt.more_data_available.withdraws_from = true;
             break;
          }
       }
       auto withdraw_authorized_range = withdraw_indices.get<by_authorized>().equal_range(account->id);
       for(auto itr = withdraw_authorized_range.first; itr != withdraw_authorized_range.second; ++itr)
       {
-         acnt.withdraws.emplace_back(*itr);
-         if(acnt.withdraws.size() >= api_limit_get_full_accounts_lists) {
-            acnt.more_data_available.withdraws = true;
+         acnt.withdraws_authorized.emplace_back(*itr);
+         if(acnt.withdraws_authorized.size() >= api_limit_get_full_accounts_lists) {
+            acnt.more_data_available.withdraws_authorized = true;
             break;
          }
       }
@@ -1028,18 +1028,18 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       auto htlc_from_range = _db.get_index_type<htlc_index>().indices().get<by_from_id>().equal_range(account->id);
       for(auto itr = htlc_from_range.first; itr != htlc_from_range.second; ++itr)
       {
-         acnt.htlcs.emplace_back(*itr);
-         if(acnt.htlcs.size() >= api_limit_get_full_accounts_lists) {
-            acnt.more_data_available.htlcs = true;
+         acnt.htlcs_from.emplace_back(*itr);
+         if(acnt.htlcs_from.size() >= api_limit_get_full_accounts_lists) {
+            acnt.more_data_available.htlcs_from = true;
             break;
          }
       }
       auto htlc_to_range = _db.get_index_type<htlc_index>().indices().get<by_to_id>().equal_range(account->id);
       for(auto itr = htlc_to_range.first; itr != htlc_to_range.second; ++itr)
       {
-         acnt.htlcs.emplace_back(*itr);
-         if(acnt.htlcs.size() >= api_limit_get_full_accounts_lists) {
-            acnt.more_data_available.htlcs = true;
+         acnt.htlcs_to.emplace_back(*itr);
+         if(acnt.htlcs_to.size() >= api_limit_get_full_accounts_lists) {
+            acnt.more_data_available.htlcs_to = true;
             break;
          }
       }
