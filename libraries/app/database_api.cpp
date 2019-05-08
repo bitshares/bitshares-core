@@ -2362,22 +2362,24 @@ vector<proposal_object> database_api::get_proposed_transactions( const std::stri
    return my->get_proposed_transactions( account_id_or_name );
 }
 
-/** TODO: add secondary index that will accelerate this process */
 vector<proposal_object> database_api_impl::get_proposed_transactions( const std::string account_id_or_name )const
 {
-   const auto& idx = _db.get_index_type<proposal_index>();
+   const auto& proposal_idx = _db.get_index_type<proposal_index>();
+   const auto& pidx = dynamic_cast<const base_primary_index&>(proposal_idx);
+   const auto& proposals_by_account = pidx.get_secondary_index<graphene::chain::required_approval_index>();
+
    vector<proposal_object> result;
    const account_id_type id = get_account_from_string(account_id_or_name)->id;
 
-   idx.inspect_all_objects( [&](const object& obj){
-           const proposal_object& p = static_cast<const proposal_object&>(obj);
-           if( p.required_active_approvals.find( id ) != p.required_active_approvals.end() )
-              result.push_back(p);
-           else if ( p.required_owner_approvals.find( id ) != p.required_owner_approvals.end() )
-              result.push_back(p);
-           else if ( p.available_active_approvals.find( id ) != p.available_active_approvals.end() )
-              result.push_back(p);
-   });
+   auto required_approvals_itr = proposals_by_account._account_to_proposals.find( id );
+   if( required_approvals_itr != proposals_by_account._account_to_proposals.end() )
+   {
+      result.reserve( required_approvals_itr->second.size() );
+      for( auto proposal_id : required_approvals_itr->second )
+      {
+         result.push_back( proposal_id(_db) );
+      }
+   }
    return result;
 }
 
