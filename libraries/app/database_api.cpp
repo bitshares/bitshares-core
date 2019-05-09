@@ -892,10 +892,6 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 {
    FC_ASSERT( names_or_ids.size() <= _app_options->api_limit_get_full_accounts );
 
-   const auto& proposal_idx = _db.get_index_type<proposal_index>();
-   const auto& pidx = dynamic_cast<const base_primary_index&>(proposal_idx);
-   const auto& proposals_by_account = pidx.get_secondary_index<graphene::chain::required_approval_index>();
-
    std::map<std::string, full_account> results;
 
    for (const std::string& account_name_or_id : names_or_ids)
@@ -928,6 +924,8 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       uint64_t api_limit_get_full_accounts_lists = _app_options->api_limit_get_full_accounts_lists;
 
       // Add the account's proposals
+      const auto& proposal_idx = _db.get_index_type< primary_index< proposal_index > >();
+      const auto& proposals_by_account = proposal_idx.get_secondary_index<graphene::chain::required_approval_index>();
       auto  required_approvals_itr = proposals_by_account._account_to_proposals.find( account->id );
       if( required_approvals_itr != proposals_by_account._account_to_proposals.end() )
       {
@@ -2388,9 +2386,8 @@ vector<proposal_object> database_api::get_proposed_transactions( const std::stri
 
 vector<proposal_object> database_api_impl::get_proposed_transactions( const std::string account_id_or_name )const
 {
-   const auto& proposal_idx = _db.get_index_type<proposal_index>();
-   const auto& pidx = dynamic_cast<const base_primary_index&>(proposal_idx);
-   const auto& proposals_by_account = pidx.get_secondary_index<graphene::chain::required_approval_index>();
+   const auto& proposal_idx = _db.get_index_type< primary_index< proposal_index > >();
+   const auto& proposals_by_account = proposal_idx.get_secondary_index<graphene::chain::required_approval_index>();
 
    vector<proposal_object> result;
    const account_id_type id = get_account_from_string(account_id_or_name)->id;
