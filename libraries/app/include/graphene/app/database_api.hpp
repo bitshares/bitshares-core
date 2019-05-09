@@ -423,6 +423,16 @@ class database_api
        */
       uint64_t get_asset_count()const;
 
+      /**
+       * @brief Get asset objects issued from a given account
+       * @param account_name_or_id Account name or ID to get objects from
+       * @param start Withdraw permission objects(1.3.X) before this ID will be skipped in results. Pagination purposes.
+       * @param limit Maximum number of orders to retrieve
+       * @return The assets issued by the account
+       */
+      vector<asset_object> get_assets_by_issuer(const std::string& issuer_name_or_id,
+                                                asset_id_type start, uint32_t limit)const;
+
       /////////////////////
       // Markets / feeds //
       /////////////////////
@@ -856,6 +866,7 @@ FC_API(graphene::app::database_api,
    (list_assets)
    (lookup_asset_symbols)
    (get_asset_count)
+   (get_assets_by_issuer)
    (get_asset_id_from_string)
 
    // Markets / feeds

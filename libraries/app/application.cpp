@@ -355,6 +355,9 @@ void application_impl::set_api_limit() {
    if(_options->count("api-limit-get-settle-orders")) {
       _app_options.api_limit_get_settle_orders = _options->at("api-limit-get-settle-orders").as<uint64_t>();
    }
+   if(_options->count("api-limit-get-assets")) {
+      _app_options.api_limit_get_assets = _options->at("api-limit-get-assets").as<uint64_t>();
+   }
 }
 
 void application_impl::startup()
@@ -1042,6 +1045,8 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::get_call_orders and get_call_orders_by_account to set its default limit values as 300")
          ("api-limit-get-settle-orders",boost::program_options::value<uint64_t>()->default_value(300),
           "For database_api_impl::get_settle_orders and get_settle_orders_by_account to set its default limit values as 300")
+         ("api-limit-get-assets",boost::program_options::value<uint64_t>()->default_value(101),
+          "For database_api_impl::list_assets and get_assets_by_issuer to set its default limit values as 101")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()

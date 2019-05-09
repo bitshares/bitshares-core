@@ -52,6 +52,7 @@ namespace graphene { namespace app {
          uint64_t api_limit_get_full_accounts_lists = 100;
          uint64_t api_limit_get_call_orders = 300;
          uint64_t api_limit_get_settle_orders = 300;
+         uint64_t api_limit_get_assets = 101;
    };
 
    class application

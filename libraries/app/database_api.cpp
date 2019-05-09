@@ -103,6 +103,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<asset_object>           list_assets(const string& lower_bound_symbol, uint32_t limit)const;
       vector<optional<asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
       uint64_t                       get_asset_count()const;
+      vector<asset_object>           get_assets_by_issuer(const std::string& issuer_name_or_id,
+                                                          asset_id_type start, uint32_t limit)const;
 
       // Markets / feeds
       vector<limit_order_object>         get_limit_orders(const std::string& a, const std::string& b, uint32_t limit)const;
@@ -929,7 +931,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       // Add the account's proposals
       const auto& proposal_idx = _db.get_index_type< primary_index< proposal_index > >();
       const auto& proposals_by_account = proposal_idx.get_secondary_index<graphene::chain::required_approval_index>();
-      auto  required_approvals_itr = proposals_by_account._account_to_proposals.find( account->id );
+      auto required_approvals_itr = proposals_by_account._account_to_proposals.find( account->id );
       if( required_approvals_itr != proposals_by_account._account_to_proposals.end() )
       {
          acnt.proposals.reserve( std::min(required_approvals_itr->second.size(), api_limit_get_full_accounts_lists) );
@@ -1287,7 +1289,9 @@ vector<asset_object> database_api::list_assets(const string& lower_bound_symbol,
 
 vector<asset_object> database_api_impl::list_assets(const string& lower_bound_symbol, uint32_t limit)const
 {
-   FC_ASSERT( limit <= 101 );
+   uint64_t api_limit_get_assets = _app_options->api_limit_get_assets;
+   FC_ASSERT( limit <= api_limit_get_assets );
+
    const auto& assets_by_symbol = _db.get_index_type<asset_index>().indices().get<by_symbol>();
    vector<asset_object> result;
    result.reserve(limit);
@@ -1311,6 +1315,31 @@ uint64_t database_api::get_asset_count()const
 uint64_t database_api_impl::get_asset_count()const
 {
    return _db.get_index_type<asset_index>().indices().size();
+}
+
+vector<asset_object> database_api::get_assets_by_issuer(const std::string& issuer_name_or_id,
+                                                        asset_id_type start, uint32_t limit)const
+{
+   return my->get_assets_by_issuer(issuer_name_or_id, start, limit);
+}
+
+vector<asset_object> database_api_impl::get_assets_by_issuer(const std::string& issuer_name_or_id,
+                                                             asset_id_type start, uint32_t limit)const
+{
+   uint64_t api_limit_get_assets = _app_options->api_limit_get_assets;
+   FC_ASSERT( limit <= api_limit_get_assets );
+
+   vector<asset_object> result;
+   const account_id_type account = get_account_from_string(issuer_name_or_id)->id;
+   const auto& asset_idx = _db.get_index_type<asset_index>().indices().get<by_issuer_and_id>();
+   auto asset_index_end = asset_idx.end();
+   auto asset_itr = asset_idx.lower_bound(boost::make_tuple(account, start));
+   while(asset_itr != asset_index_end && asset_itr->issuer == account && result.size() < limit)
+   {
+      result.push_back(*asset_itr);
+      ++asset_itr;
+   }
+   return result;
 }
 
 vector<optional<asset_object>> database_api::lookup_asset_symbols(const vector<string>& symbols_or_ids)const
