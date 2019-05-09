@@ -115,6 +115,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<call_order_object>          get_call_orders_by_account(const std::string& account_name_or_id,
                                                                     call_order_id_type start, uint32_t limit)const;
       vector<force_settlement_object>    get_settle_orders(const std::string& a, uint32_t limit)const;
+      vector<force_settlement_object>    get_settle_orders_by_account(const std::string& account_name_or_id,
+                                                                      force_settlement_id_type start, uint32_t limit)const;
       vector<call_order_object>          get_margin_positions( const std::string account_id_or_name )const;
       vector<collateral_bid_object>      get_collateral_bids(const std::string& asset, uint32_t limit, uint32_t start)const;
 
@@ -1415,7 +1417,8 @@ vector<force_settlement_object> database_api::get_settle_orders(const std::strin
 
 vector<force_settlement_object> database_api_impl::get_settle_orders(const std::string& a, uint32_t limit)const
 {
-   FC_ASSERT( limit <= 300 );
+   uint64_t api_limit_get_settle_orders = _app_options->api_limit_get_settle_orders;
+   FC_ASSERT( limit <= api_limit_get_settle_orders );
 
    const asset_id_type asset_a_id = get_asset_from_string(a)->id;
    const auto& settle_index = _db.get_index_type<force_settlement_index>().indices().get<by_expiration>();
@@ -1431,6 +1434,32 @@ vector<force_settlement_object> database_api_impl::get_settle_orders(const std::
    }
    return result;
 }
+
+vector<force_settlement_object> database_api::get_settle_orders_by_account(const std::string& account_name_or_id,
+                                                                           force_settlement_id_type start, uint32_t limit)const
+{
+   return my->get_settle_orders_by_account( account_name_or_id, start, limit);
+}
+
+vector<force_settlement_object> database_api_impl::get_settle_orders_by_account(const std::string& account_name_or_id,
+                                                                                force_settlement_id_type start, uint32_t limit)const
+{
+   uint64_t api_limit_get_settle_orders = _app_options->api_limit_get_settle_orders;
+   FC_ASSERT( limit <= api_limit_get_settle_orders );
+
+   vector<force_settlement_object> result;
+   const account_id_type account = get_account_from_string(account_name_or_id)->id;
+   const auto& settle_idx = _db.get_index_type<force_settlement_index>().indices().get<by_account>();
+   auto settle_index_end = settle_idx.end();
+   auto settle_itr = settle_idx.lower_bound(boost::make_tuple(account, start));
+   while(settle_itr != settle_index_end && settle_itr->owner == account && result.size() < limit)
+   {
+      result.push_back(*settle_itr);
+      ++settle_itr;
+   }
+   return result;
+}
+
 
 vector<call_order_object> database_api::get_margin_positions( const std::string account_id_or_name )const
 {

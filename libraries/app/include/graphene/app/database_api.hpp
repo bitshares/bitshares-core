@@ -463,6 +463,16 @@ class database_api
       vector<force_settlement_object> get_settle_orders(const std::string& a, uint32_t limit)const;
 
       /**
+       * @brief Get forced settlement orders of a given account
+       * @param account_name_or_id Account name or ID to get objects from
+       * @param start Withdraw permission objects(1.4.X) before this ID will be skipped in results. Pagination purposes.
+       * @param limit Maximum number of orders to retrieve
+       * @return The settle orders of the account
+       */
+      vector<force_settlement_object> get_settle_orders_by_account(const std::string& account_name_or_id,
+                                                                   force_settlement_id_type start, uint32_t limit)const;
+
+      /**
        * @brief Get collateral_bid_objects for a given asset
        * @param a Symbol or ID of asset
        * @param limit Maximum number of objects to retrieve
@@ -855,6 +865,7 @@ FC_API(graphene::app::database_api,
    (get_call_orders)
    (get_call_orders_by_account)
    (get_settle_orders)
+   (get_settle_orders_by_account)
    (get_margin_positions)
    (get_collateral_bids)
    (subscribe_to_market)
