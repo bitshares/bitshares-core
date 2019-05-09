@@ -941,7 +941,8 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       }
 
       // Add the account's balances
-      const auto& balances = _db.get_index_type< primary_index< account_balance_index > >().get_secondary_index< balances_by_account_index >().get_account_balances( account->id );
+      const auto& balances = _db.get_index_type< primary_index< account_balance_index > >().
+            get_secondary_index< balances_by_account_index >().get_account_balances( account->id );
       for( const auto balance : balances )
       {
          if(acnt.balances.size() >= api_limit_get_full_accounts_lists) {
@@ -1016,11 +1017,11 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       auto withdraw_authorized_range = withdraw_indices.get<by_authorized>().equal_range(account->id);
       for(auto itr = withdraw_authorized_range.first; itr != withdraw_authorized_range.second; ++itr)
       {
-         if(acnt.withdraws_authorized.size() >= api_limit_get_full_accounts_lists) {
-            acnt.more_data_available.withdraws_authorized = true;
+         if(acnt.withdraws_to.size() >= api_limit_get_full_accounts_lists) {
+            acnt.more_data_available.withdraws_to = true;
             break;
          }
-         acnt.withdraws_authorized.emplace_back(*itr);
+         acnt.withdraws_to.emplace_back(*itr);
       }
 
       // get htlcs
