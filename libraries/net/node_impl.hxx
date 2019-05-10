@@ -255,6 +255,9 @@ class node_impl : public peer_connection_delegate
     public:
 #ifdef P2P_IN_DEDICATED_THREAD
       std::shared_ptr<fc::thread> _thread;
+      // should only be used for testing
+      std::shared_ptr<fc::thread> get_thread() { return _thread; }
+    public:
 #endif // P2P_IN_DEDICATED_THREAD
       std::unique_ptr<statistics_gathering_node_delegate_wrapper> _delegate;
       fc::sha256           _chain_id;

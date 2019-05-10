@@ -201,27 +201,26 @@ namespace graphene { namespace net { namespace detail {
       public:
       list_address_builder(fc::optional<std::vector<std::string>> address_list)
       {
-         if (address_list.valid())
-         {
-            advertise_list.reserve( address_list->size() );
-            auto& list = advertise_list;
-            std::for_each( address_list->begin(), address_list->end(), [&list]( std::string str ) {
-                  // ignore fc exceptions (like poorly formatted endpoints)
-                  try
-                  {
-                     list.emplace_back( graphene::net::address_info(
-                        fc::ip::endpoint::from_string(str),
-                        fc::time_point_sec(),
-                        fc::microseconds(0),
-                        node_id_t(),
-                        peer_connection_direction::unknown,
-                        firewalled_state::unknown ));
-                  }
-                  catch(const fc::exception& ) {
-                     wlog( "Address ${addr} invalid.", ("addr", str) );
-                  } 
-               } );
-         }
+        FC_ASSERT( address_list.valid(), "advertise-peer-list must be included" );
+
+        advertise_list.reserve( address_list->size() );
+        auto& list = advertise_list;
+        std::for_each( address_list->begin(), address_list->end(), [&list]( std::string str ) {
+              // ignore fc exceptions (like poorly formatted endpoints)
+              try
+              {
+                list.emplace_back( graphene::net::address_info(
+                    fc::ip::endpoint::from_string(str),
+                    fc::time_point_sec(),
+                    fc::microseconds(0),
+                    node_id_t(),
+                    peer_connection_direction::unknown,
+                    firewalled_state::unknown ));
+              }
+              catch(const fc::exception& ) {
+                wlog( "Address ${addr} invalid.", ("addr", str) );
+              } 
+          } );
       }
 
       void build(node_impl* impl, address_message& reply)
@@ -240,13 +239,11 @@ namespace graphene { namespace net { namespace detail {
       public:
       exclude_address_builder(const fc::optional<std::vector<std::string>>& address_list)
       {
-         if (address_list.valid())
-         {
-            std::for_each(address_list->begin(), address_list->end(), [&exclude_list = exclude_list](std::string input)
-                {
-                  exclude_list.insert(input);
-                });
-         }
+        FC_ASSERT( address_list.valid(), "advertise-peer-list must be included" );
+        std::for_each(address_list->begin(), address_list->end(), [&exclude_list = exclude_list](std::string input)
+            {
+              exclude_list.insert(input);
+            });
       }
       void build(node_impl* impl, address_message& reply)
       {
@@ -313,7 +310,7 @@ namespace graphene { namespace net { namespace detail {
       _maximum_number_of_sync_blocks_to_prefetch(MAXIMUM_NUMBER_OF_BLOCKS_TO_PREFETCH),
       _maximum_blocks_per_peer_during_syncing(GRAPHENE_NET_MAX_BLOCKS_PER_PEER_DURING_SYNCING)
     {
-       _address_builder = std::make_shared<all_address_builder>();
+      _address_builder = std::make_shared<all_address_builder>();
       _rate_limiter.set_actual_rate_time_constant(fc::seconds(2));
       fc::rand_bytes(&_node_id.data[0], (int)_node_id.size());
     }

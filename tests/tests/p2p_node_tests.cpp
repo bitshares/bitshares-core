@@ -34,6 +34,7 @@
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <graphene/net/peer_connection.hpp>
+#define P2P_IN_DEDICATED_THREAD 1
 #include "../../libraries/net/node_impl.hxx"
 
 #include "../common/genesis_file_util.hpp"
@@ -81,19 +82,21 @@ public:
 
    void on_message(graphene::net::peer_connection_ptr originating_peer, const graphene::net::message& received_message)
    {
-      elog("${name} on_message was called", ("name", node_name));
-      my->call_by_message_type( originating_peer.get(), received_message );
+      my->get_thread()->async([&]() {
+         my->call_by_message_type( originating_peer.get(), received_message );
+      }).wait();
    }
 
-   graphene::net::peer_connection_ptr create_peer_connection(graphene::net::peer_connection_delegate* delegate)
+   std::pair<std::shared_ptr<test_delegate>, graphene::net::peer_connection_ptr> create_peer_connection(std::string url)
    {
-      graphene::net::peer_connection_ptr ret_val = graphene::net::peer_connection::make_shared(delegate);
-      try {
-         //this->my->_active_connections.insert( ret_val );
-      } catch (...)
-      {
-         // TODO: The above always throws. Skipping this step...
-      }
+      std::pair<std::shared_ptr<test_delegate>, graphene::net::peer_connection_ptr> ret_val;
+      ret_val = this->my->get_thread()->async([&, &url = url](){
+            std::shared_ptr<test_delegate> d{};
+            graphene::net::peer_connection_ptr peer = graphene::net::peer_connection::make_shared(d.get());
+            peer->set_remote_endpoint(fc::optional<fc::ip::endpoint>(fc::ip::endpoint::from_string(url)));
+            my->move_peer_to_active_list(peer); 
+            return std::pair<std::shared_ptr<test_delegate>, graphene::net::peer_connection_ptr>(d, peer);
+         }).wait();
       return ret_val;
    }
 
@@ -216,14 +219,13 @@ BOOST_AUTO_TEST_CASE( disable_peer_advertising )
    test_node node1("Node1", node1_dir.path(), node1_port);
    node1.disable_peer_advertising();
 
-   // create a peer_delegate to receive the response
-   test_delegate peer2_delegate{};
-
    // get something in their list of connections
-   graphene::net::peer_connection_ptr node2_conn_ptr = node1.create_peer_connection( &peer2_delegate );
+   std::pair<std::shared_ptr<test_delegate>, graphene::net::peer_connection_ptr> node2_rslts
+    = node1.create_peer_connection( "127.0.0.1:8090" );
 
    // verify that they do not share it with others
-   std::shared_ptr<test_peer> peer3_ptr = std::make_shared<test_peer>(&peer2_delegate);
+   test_delegate peer3_delegate{};
+   std::shared_ptr<test_peer> peer3_ptr = std::make_shared<test_peer>(&peer3_delegate);
    graphene::net::address_request_message req;
    node1.on_message( peer3_ptr, req );
 
@@ -240,14 +242,13 @@ BOOST_AUTO_TEST_CASE( set_nothing_advertise_algorithm )
    test_node node1("Node1", node1_dir.path(), node1_port);
    node1.set_advertise_algorithm( "nothing" );
 
-   // create a peer_delegate to receive the response
-   test_delegate peer2_delegate{};
-
    // get something in their list of connections
-   graphene::net::peer_connection_ptr node2_conn_ptr = node1.create_peer_connection( &peer2_delegate );
+   std::pair<std::shared_ptr<test_delegate>, graphene::net::peer_connection_ptr> node2_rslts 
+         = node1.create_peer_connection( "127.0.0.1:8090" );
 
    // verify that they do not share it with others
-   std::shared_ptr<test_peer> peer3_ptr = std::make_shared<test_peer>(&peer2_delegate);
+   test_delegate peer3_delegate{};
+   std::shared_ptr<test_peer> peer3_ptr = std::make_shared<test_peer>(&peer3_delegate);
    graphene::net::address_request_message req;
    node1.on_message( peer3_ptr, req );
 
@@ -274,6 +275,32 @@ BOOST_AUTO_TEST_CASE( advertise_list )
    // check the results
    std::shared_ptr<graphene::net::message> msg = my_peer->message_received;
    test_address_message( msg, 1 );
+}
+
+BOOST_AUTO_TEST_CASE( exclude_list )
+{
+   std::vector<std::string> ex_list = { "127.0.0.1:8090"};
+   // set up my node
+   int my_node_port = graphene::app::get_available_port();
+   fc::temp_directory my_node_dir;
+   test_node my_node("Hello", my_node_dir.path(), my_node_port);
+   my_node.set_advertise_algorithm( "exclude_list", ex_list );
+   // some peers
+   std::pair<std::shared_ptr<test_delegate>, graphene::net::peer_connection_ptr> node2_rslts 
+         = my_node.create_peer_connection("127.0.0.1:8089");
+   std::pair<std::shared_ptr<test_delegate>, graphene::net::peer_connection_ptr> node3_rslts 
+         = my_node.create_peer_connection("127.0.0.1:8090");
+   std::pair<std::shared_ptr<test_delegate>, graphene::net::peer_connection_ptr> node4_rslts 
+         = my_node.create_peer_connection("127.0.0.1:8091");
+
+   // act like my_node received an address_request message from my_peer
+   test_delegate del_4{};
+   std::shared_ptr<test_peer> peer_4( new test_peer(&del_4) );
+   graphene::net::address_request_message address_request_message_received;
+   my_node.on_message( peer_4, address_request_message_received );
+   // check the results
+   std::shared_ptr<graphene::net::message> msg = peer_4->message_received;
+   test_address_message( msg, 2 );
 }
 
 BOOST_AUTO_TEST_SUITE_END()
