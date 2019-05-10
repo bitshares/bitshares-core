@@ -115,7 +115,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
                                                                    optional<price> ostart_price );
       vector<call_order_object>          get_call_orders(const std::string& a, uint32_t limit)const;
       vector<call_order_object>          get_call_orders_by_account(const std::string& account_name_or_id,
-                                                                    call_order_id_type start, uint32_t limit)const;
+                                                                    asset_id_type start, uint32_t limit)const;
       vector<force_settlement_object>    get_settle_orders(const std::string& a, uint32_t limit)const;
       vector<force_settlement_object>    get_settle_orders_by_account(const std::string& account_name_or_id,
                                                                       force_settlement_id_type start, uint32_t limit)const;
@@ -1416,20 +1416,20 @@ vector<call_order_object> database_api_impl::get_call_orders(const std::string& 
 }
 
 vector<call_order_object> database_api::get_call_orders_by_account(const std::string& account_name_or_id,
-                                                                   call_order_id_type start, uint32_t limit)const
+                                                                   asset_id_type start, uint32_t limit)const
 {
    return my->get_call_orders_by_account( account_name_or_id, start, limit );
 }
 
 vector<call_order_object> database_api_impl::get_call_orders_by_account(const std::string& account_name_or_id,
-                                                                        call_order_id_type start, uint32_t limit)const
+                                                                        asset_id_type start, uint32_t limit)const
 {
    uint64_t api_limit_get_call_orders = _app_options->api_limit_get_call_orders;
    FC_ASSERT( limit <= api_limit_get_call_orders );
 
    vector<call_order_object> result;
    const account_id_type account = get_account_from_string(account_name_or_id)->id;
-   const auto& call_idx = _db.get_index_type<call_order_index>().indices().get<by_account_and_id>();
+   const auto& call_idx = _db.get_index_type<call_order_index>().indices().get<by_account>();
    auto call_index_end = call_idx.end();
    auto call_itr = call_idx.lower_bound(boost::make_tuple(account, start));
    while(call_itr != call_index_end && call_itr->borrower == account && result.size() < limit)

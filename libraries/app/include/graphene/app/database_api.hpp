@@ -457,12 +457,12 @@ class database_api
       /**
        * @brief Get call orders from a given account
        * @param account_name_or_id Account name or ID to get objects from
-       * @param start Call order objects(1.8.X) before this ID will be skipped in results. Pagination purposes.
+       * @param start Asset objects(1.3.X) before this ID will be skipped in results. Pagination purposes.
        * @param limit Maximum number of objects to retrieve
        * @return The call orders of the account
        */
       vector<call_order_object> get_call_orders_by_account(const std::string& account_name_or_id,
-                                                           call_order_id_type start, uint32_t limit)const;
+                                                           asset_id_type start, uint32_t limit)const;
 
       /**
        * @brief Get forced settlement orders in a given asset

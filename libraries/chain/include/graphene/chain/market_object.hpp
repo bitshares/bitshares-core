@@ -196,7 +196,6 @@ class collateral_bid_object : public abstract_object<collateral_bid_object>
 struct by_collateral;
 struct by_account;
 struct by_price;
-struct by_account_and_id;
 typedef multi_index_container<
    call_order_object,
    indexed_by<
@@ -213,12 +212,6 @@ typedef multi_index_container<
          composite_key< call_order_object,
             member< call_order_object, account_id_type, &call_order_object::borrower >,
             const_mem_fun< call_order_object, asset_id_type, &call_order_object::debt_type>
-         >
-      >,
-      ordered_unique< tag<by_account_and_id>,
-         composite_key< call_order_object,
-            member< call_order_object, account_id_type, &call_order_object::borrower >,
-            member< object, object_id_type, &object::id >
          >
       >,
       ordered_unique< tag<by_collateral>,
