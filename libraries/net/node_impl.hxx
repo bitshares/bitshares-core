@@ -619,3 +619,8 @@ class node_impl : public peer_connection_delegate
     }; // end class node_impl
 
 }}} // end of namespace graphene::net::detail
+
+FC_REFLECT(graphene::net::detail::node_configuration, (listen_endpoint)
+                                                 (accept_incoming_connections)
+                                                 (wait_if_endpoint_is_busy)
+                                                 (private_key));

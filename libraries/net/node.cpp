@@ -116,11 +116,6 @@
 
 #include "node_impl.hxx"
 
-FC_REFLECT(graphene::net::detail::node_configuration, (listen_endpoint)
-                                                 (accept_incoming_connections)
-                                                 (wait_if_endpoint_is_busy)
-                                                 (private_key));
-
 namespace graphene { namespace net { namespace detail {
 
     void blockchain_tied_message_cache::block_accepted()
