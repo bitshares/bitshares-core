@@ -2564,9 +2564,12 @@ fc::optional<htlc_object> database_api_impl::get_htlc(htlc_id_type id) const
    return fc::optional<htlc_object>();
 }
 
-vector<htlc_object> database_api::get_htlc_by_from(const std::string account_id_or_name, htlc_id_type start, uint32_t limit)const
+vector<htlc_object> database_api::get_htlc_by_from(const std::string account_id_or_name, optional<htlc_id_type> start, uint32_t limit)const
 {
-   return my->get_htlc_by_from(account_id_or_name, start, limit);
+   if(start.valid())
+      return my->get_htlc_by_from(account_id_or_name, *start, limit);
+   else
+      return my->get_htlc_by_from(account_id_or_name, htlc_id_type(), limit);
 }
 
 vector<htlc_object> database_api_impl::get_htlc_by_from(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const
@@ -2587,9 +2590,13 @@ vector<htlc_object> database_api_impl::get_htlc_by_from(const std::string accoun
    return result;
 }
 
-vector<htlc_object> database_api::get_htlc_by_to(const std::string account_id_or_name, htlc_id_type start, uint32_t limit)const
+vector<htlc_object> database_api::get_htlc_by_to(const std::string account_id_or_name, optional<htlc_id_type> start, uint32_t limit)const
 {
-   return my->get_htlc_by_to(account_id_or_name, start, limit);
+   if(start.valid())
+      return my->get_htlc_by_to(account_id_or_name, *start, limit);
+   else
+      return my->get_htlc_by_to(account_id_or_name, htlc_id_type(), limit);
+
 }
 
 vector<htlc_object> database_api_impl::get_htlc_by_to(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const
