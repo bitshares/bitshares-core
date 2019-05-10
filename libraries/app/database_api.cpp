@@ -1332,7 +1332,7 @@ vector<asset_object> database_api_impl::get_assets_by_issuer(const std::string& 
 
    vector<asset_object> result;
    const account_id_type account = get_account_from_string(issuer_name_or_id)->id;
-   const auto& asset_idx = _db.get_index_type<asset_index>().indices().get<by_issuer_and_id>();
+   const auto& asset_idx = _db.get_index_type<asset_index>().indices().get<by_issuer>();
    auto asset_index_end = asset_idx.end();
    auto asset_itr = asset_idx.lower_bound(boost::make_tuple(account, start));
    while(asset_itr != asset_index_end && asset_itr->issuer == account && result.size() < limit)
