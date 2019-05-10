@@ -308,7 +308,7 @@ void database::update_active_committee_members()
 
    /// accounts that vote for 0 or 1 witness do not get to express an opinion on
    /// the number of witnesses to have (they abstain and are non-voting accounts)
-   uint64_t stake_tally = 0; // _committee_count_histogram_buffer[0];
+   share_type stake_tally = 0;
    size_t committee_member_count = 0;
    if( stake_target > 0 )
    {
