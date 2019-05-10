@@ -897,6 +897,9 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 {
    FC_ASSERT( names_or_ids.size() <= _app_options->api_limit_get_full_accounts );
 
+   const auto& proposal_idx = _db.get_index_type< primary_index< proposal_index > >();
+   const auto& proposals_by_account = proposal_idx.get_secondary_index<graphene::chain::required_approval_index>();
+
    std::map<std::string, full_account> results;
 
    for (const std::string& account_name_or_id : names_or_ids)
@@ -929,8 +932,6 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       uint64_t api_limit_get_full_accounts_lists = _app_options->api_limit_get_full_accounts_lists;
 
       // Add the account's proposals
-      const auto& proposal_idx = _db.get_index_type< primary_index< proposal_index > >();
-      const auto& proposals_by_account = proposal_idx.get_secondary_index<graphene::chain::required_approval_index>();
       auto required_approvals_itr = proposals_by_account._account_to_proposals.find( account->id );
       if( required_approvals_itr != proposals_by_account._account_to_proposals.end() )
       {
