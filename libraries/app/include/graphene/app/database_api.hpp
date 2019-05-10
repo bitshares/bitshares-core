@@ -792,7 +792,7 @@ class database_api
        *  @param limit Maximum number of objects to retrieve
        *  @return HTLC objects for the account
        */
-      vector<htlc_object> get_htlc_by_from(const std::string account_id_or_name, optional<htlc_id_type> start, uint32_t limit) const;
+      vector<htlc_object> get_htlc_by_from(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const;
 
       /**
        *  @brief Get non expired HTLC objects using the receiver account
@@ -801,7 +801,7 @@ class database_api
        *  @param limit Maximum number of objects to retrieve
        *  @return HTLC objects for the account
       */
-      vector<htlc_object> get_htlc_by_to(const std::string account_id_or_name, optional<htlc_id_type> start, uint32_t limit) const;
+      vector<htlc_object> get_htlc_by_to(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const;
 
 private:
       std::shared_ptr< database_api_impl > my;
