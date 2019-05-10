@@ -5,12 +5,19 @@ cache: ccache
 git:
   depth: 1
 
-dist: xenial
+matrix:
+  include:
+    - os: linux
+      dist: xenial
+    - os: osx
+      osx_image: xcode10.1
+      env: CMAKE_EXTRAFLAG="-DOPENSSL_ROOT_DIR=/usr/local/opt/openssl@1.0"
 
 sudo: true
 
 install:
- - sudo apt-get install --allow-unauthenticated libboost-thread-dev libboost-iostreams-dev libboost-date-time-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libboost-chrono-dev libboost-test-dev libboost-context-dev libboost-regex-dev libboost-coroutine-dev cmake parallel
+ - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install ccache parallel ; fi
+ - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get install --allow-unauthenticated libboost-thread-dev libboost-iostreams-dev libboost-date-time-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libboost-chrono-dev libboost-test-dev libboost-context-dev libboost-regex-dev libboost-coroutine-dev cmake parallel ; fi
 
 addons:
   sonarcloud:
@@ -27,8 +34,10 @@ env:
 script:
  - programs/build_helpers/buildstep -s 3500
  - ccache -s
- - programs/build_helpers/buildstep Prepare 1 "sed -i '/tests/d' libraries/fc/CMakeLists.txt"
- - programs/build_helpers/buildstep cmake 5 "cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage -DBoost_USE_STATIC_LIBS=OFF -DCMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON ."
+ - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then programs/build_helpers/buildstep Prepare 1 "sed -i '/tests/d' libraries/fc/CMakeLists.txt" ; fi
+ - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then programs/build_helpers/buildstep Prepare 1 "sed -i '' '/tests/d' libraries/fc/CMakeLists.txt" ; fi
+ - programs/build_helpers/buildstep cmake 5 "cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage -DBoost_USE_STATIC_LIBS=OFF -DCMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON $CMAKE_EXTRAFLAG ."
+ - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then programs/build_helpers/buildstep Prepare 2 "sed -i '' 's/$/-Xlinker -v/g' tests/CMakeFiles/chain_test.dir/link.txt" ; fi
  - programs/build_helpers/buildstep make.cli_wallet 2200 "programs/build_helpers/make_with_sonar bw-output -j 2 cli_wallet witness_node js_operation_serializer get_dev_key network_mapper"
  - programs/build_helpers/buildstep make.chain_test 1000 "make -j 2 chain_test"
  - programs/build_helpers/buildstep make.cli_test 200 "make -j 2 cli_test"
