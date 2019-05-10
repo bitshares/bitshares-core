@@ -426,7 +426,7 @@ class database_api
       /**
        * @brief Get asset objects issued from a given account
        * @param account_name_or_id Account name or ID to get objects from
-       * @param start Withdraw permission objects(1.3.X) before this ID will be skipped in results. Pagination purposes.
+       * @param start Asset objects(1.3.X) before this ID will be skipped in results. Pagination purposes.
        * @param limit Maximum number of orders to retrieve
        * @return The assets issued by the account
        */
@@ -457,7 +457,7 @@ class database_api
       /**
        * @brief Get call orders from a given account
        * @param account_name_or_id Account name or ID to get objects from
-       * @param start Withdraw permission objects(1.8.X) before this ID will be skipped in results. Pagination purposes.
+       * @param start Call order objects(1.8.X) before this ID will be skipped in results. Pagination purposes.
        * @param limit Maximum number of objects to retrieve
        * @return The call orders of the account
        */
@@ -475,7 +475,7 @@ class database_api
       /**
        * @brief Get forced settlement orders of a given account
        * @param account_name_or_id Account name or ID to get objects from
-       * @param start Withdraw permission objects(1.4.X) before this ID will be skipped in results. Pagination purposes.
+       * @param start Force settlement objects(1.4.X) before this ID will be skipped in results. Pagination purposes.
        * @param limit Maximum number of orders to retrieve
        * @return The settle orders of the account
        */
