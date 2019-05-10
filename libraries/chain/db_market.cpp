@@ -30,16 +30,17 @@
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/is_authorized_asset.hpp>
 
-#include <fc/uint128.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
 
 namespace graphene { namespace chain { namespace detail {
 
-   uint64_t calculate_percent(const share_type& value, uint16_t percent)
+   share_type calculate_percent(const share_type& value, uint16_t percent)
    {
-      fc::uint128 a(value.value);
+      boost::multiprecision::uint128_t a(value.value);
       a *= percent;
       a /= GRAPHENE_100_PERCENT;
-      return a.to_uint64();
+      FC_ASSERT( a <= GRAPHENE_MAX_SHARE_SUPPLY, "overflow when calculating percent" );
+      return a.convert_to<int64_t>();
    }
 
 } //detail
@@ -255,13 +256,13 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
             }
             else
             {
-               fc::uint128 fee128( deferred_paid_fee.amount.value );
+               boost::multiprecision::uint128_t fee128( deferred_paid_fee.amount.value );
                fee128 *= core_cancel_fee.amount.value;
                // to round up
                fee128 += order.deferred_fee.value;
                fee128 -= 1;
                fee128 /= order.deferred_fee.value;
-               share_type cancel_fee_amount = fee128.to_uint64();
+               share_type cancel_fee_amount = fee128.convert_to<int64_t>();
                // cancel_fee should be positive, pay it to asset's accumulated_fees
                fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
                modify( *fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {
