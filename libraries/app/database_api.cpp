@@ -28,8 +28,8 @@
 #include <graphene/chain/hardfork.hpp>
 
 #include <fc/bloom_filter.hpp>
-
 #include <fc/crypto/hex.hpp>
+#include <fc/rpc/api_connection.hpp>
 #include <fc/uint128.hpp>
 
 #include <boost/range/iterator_range.hpp>
@@ -44,6 +44,8 @@
 #define GET_REQUIRED_FEES_MAX_RECURSION 4
 
 typedef std::map< std::pair<graphene::chain::asset_id_type, graphene::chain::asset_id_type>, std::vector<fc::variant> > market_queue_type;
+
+template class fc::api<graphene::app::database_api>;
 
 namespace graphene { namespace app {
 
