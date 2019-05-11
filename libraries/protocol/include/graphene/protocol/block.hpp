@@ -70,3 +70,7 @@ namespace graphene { namespace protocol {
 FC_REFLECT( graphene::protocol::block_header, (previous)(timestamp)(witness)(transaction_merkle_root)(extensions) )
 FC_REFLECT_DERIVED( graphene::protocol::signed_block_header, (graphene::protocol::block_header), (witness_signature) )
 FC_REFLECT_DERIVED( graphene::protocol::signed_block, (graphene::protocol::signed_block_header), (transactions) )
+
+GRAPHENE_EXTERNAL_SERIALIZATION(extern, graphene::protocol::block_header)
+GRAPHENE_EXTERNAL_SERIALIZATION(extern, graphene::protocol::signed_block_header)
+GRAPHENE_EXTERNAL_SERIALIZATION(extern, graphene::protocol::signed_block)

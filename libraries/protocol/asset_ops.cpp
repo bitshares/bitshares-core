@@ -23,6 +23,8 @@
  */
 #include <graphene/protocol/asset_ops.hpp>
 
+#include <fc/io/raw.hpp>
+
 #include <locale>
 
 namespace graphene { namespace protocol {

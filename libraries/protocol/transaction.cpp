@@ -439,3 +439,8 @@ void signed_transaction::verify_authority(
 } FC_CAPTURE_AND_RETHROW( (*this) ) }
 
 } } // graphene::protocol
+
+GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::protocol::transaction)
+GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::protocol::signed_transaction)
+GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::protocol::precomputable_transaction)
+GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::protocol::processed_transaction)

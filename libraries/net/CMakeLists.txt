@@ -5,6 +5,7 @@ set(SOURCES node.cpp
             core_messages.cpp
             peer_database.cpp
             peer_connection.cpp
+            message.cpp
             message_oriented_connection.cpp)
 
 add_library( graphene_net ${SOURCES} ${HEADERS} )

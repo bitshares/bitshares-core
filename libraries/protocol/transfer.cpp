@@ -23,6 +23,8 @@
  */
 #include <graphene/protocol/transfer.hpp>
 
+#include <fc/io/raw.hpp>
+
 namespace graphene { namespace protocol {
 
 share_type transfer_operation::calculate_fee( const fee_parameters_type& schedule )const

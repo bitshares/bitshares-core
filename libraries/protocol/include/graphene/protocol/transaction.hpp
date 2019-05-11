@@ -294,3 +294,8 @@ FC_REFLECT( graphene::protocol::transaction, (ref_block_num)(ref_block_prefix)(e
 FC_REFLECT_DERIVED( graphene::protocol::signed_transaction, (graphene::protocol::transaction), (signatures) )
 FC_REFLECT_DERIVED( graphene::protocol::precomputable_transaction, (graphene::protocol::signed_transaction), )
 FC_REFLECT_DERIVED( graphene::protocol::processed_transaction, (graphene::protocol::precomputable_transaction), (operation_results) )
+
+GRAPHENE_EXTERNAL_SERIALIZATION(extern, graphene::protocol::transaction)
+GRAPHENE_EXTERNAL_SERIALIZATION(extern, graphene::protocol::signed_transaction)
+GRAPHENE_EXTERNAL_SERIALIZATION(extern, graphene::protocol::precomputable_transaction)
+GRAPHENE_EXTERNAL_SERIALIZATION(extern, graphene::protocol::processed_transaction)

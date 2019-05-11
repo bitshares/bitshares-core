@@ -23,6 +23,8 @@
  */
 #include <graphene/protocol/account.hpp>
 
+#include <fc/io/raw.hpp>
+
 namespace graphene { namespace protocol {
 
 /**

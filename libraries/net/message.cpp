@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2019 BitShares Blockchain Foundation, and contributors.
  *
  * The MIT License
  *
@@ -21,19 +21,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <graphene/protocol/custom.hpp>
-
 #include <fc/io/raw.hpp>
 
-namespace graphene { namespace protocol {
+#include <graphene/net/message.hpp>
 
-void custom_operation::validate()const
-{
-   FC_ASSERT( fee.amount > 0 );
-}
-share_type custom_operation::calculate_fee(const fee_parameters_type& k)const
-{
-   return k.fee + calculate_data_fee( fc::raw::pack_size(*this), k.price_per_kbyte );
-}
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::net::message_header, BOOST_PP_SEQ_NIL, (size)(msg_type) )
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::net::message, (graphene::net::message_header), (data) )
 
-} }
+GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::net::message_header)
+GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::net::message)
