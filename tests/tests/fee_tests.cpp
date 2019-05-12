@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include <fc/uint128.hpp>
-
 #include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/fba_accumulator_id.hpp>
@@ -37,6 +35,8 @@
 #include <boost/test/unit_test.hpp>
 
 #include "../common/database_fixture.hpp"
+
+#include <fc/uint128.hpp>
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;

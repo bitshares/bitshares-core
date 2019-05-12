@@ -62,12 +62,6 @@ namespace graphene { namespace protocol {
 
        explicit operator std::string()const; ///< converts to base58 + checksum
 
-       friend size_t hash_value( const address& v ) { 
-          const void* tmp = static_cast<const void*>(v.addr._hash+2);
-
-          const size_t* tmp2 = reinterpret_cast<const size_t*>(tmp);
-          return *tmp2;
-       }
        fc::ripemd160 addr;
    };
    inline bool operator == ( const address& a, const address& b ) { return a.addr == b.addr; }
@@ -80,19 +74,6 @@ namespace fc
 {
    void to_variant( const graphene::protocol::address& var,  fc::variant& vo, uint32_t max_depth = 1 );
    void from_variant( const fc::variant& var,  graphene::protocol::address& vo, uint32_t max_depth = 1 );
-}
-
-namespace std
-{
-   template<>
-   struct hash<graphene::protocol::address>
-   {
-       public:
-         size_t operator()(const graphene::protocol::address &a) const
-         {
-            return (uint64_t(a.addr._hash[0])<<32) | uint64_t( a.addr._hash[0] );
-         }
-   };
 }
 
 #include <fc/reflect/reflect.hpp>

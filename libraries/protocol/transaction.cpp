@@ -26,7 +26,6 @@
 #include <graphene/protocol/block.hpp>
 #include <graphene/protocol/exceptions.hpp>
 #include <fc/io/raw.hpp>
-#include <fc/bitutil.hpp>
 #include <algorithm>
 
 namespace graphene { namespace protocol {
@@ -94,8 +93,8 @@ void transaction::set_expiration( fc::time_point_sec expiration_time )
 
 void transaction::set_reference_block( const block_id_type& reference_block )
 {
-   ref_block_num = fc::endian_reverse_u32(reference_block._hash[0]);
-   ref_block_prefix = reference_block._hash[1];
+   ref_block_num = boost::endian::endian_reverse(reference_block._hash[0].value());
+   ref_block_prefix = reference_block._hash[1].value();
 }
 
 void transaction::get_required_authorities( flat_set<account_id_type>& active,
@@ -400,7 +399,7 @@ set<public_key_type> signed_transaction::minimize_required_signatures(
 
 const transaction_id_type& precomputable_transaction::id()const
 {
-   if( !_tx_id_buffer._hash[0] )
+   if( !_tx_id_buffer._hash[0].value() )
       transaction::id();
    return _tx_id_buffer;
 }

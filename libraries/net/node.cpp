@@ -1257,10 +1257,10 @@ namespace graphene { namespace net { namespace detail {
       VERIFY_CORRECT_THREAD();
       message_hash_type message_hash = received_message.id();
       dlog("handling message ${type} ${hash} size ${size} from peer ${endpoint}",
-           ("type", graphene::net::core_message_type_enum(received_message.msg_type))("hash", message_hash)
+           ("type", graphene::net::core_message_type_enum(received_message.msg_type.value()))("hash", message_hash)
            ("size", received_message.size)
            ("endpoint", originating_peer->get_remote_endpoint()));
-      switch ( received_message.msg_type )
+      switch ( received_message.msg_type.value() )
       {
       case core_message_type_enum::hello_message_type:
         on_hello_message(originating_peer, received_message.as<hello_message>());
@@ -1320,8 +1320,8 @@ namespace graphene { namespace net { namespace detail {
       default:
         // ignore any message in between core_message_type_first and _last that we don't handle above
         // to allow us to add messages in the future
-        if (received_message.msg_type < core_message_type_enum::core_message_type_first ||
-            received_message.msg_type > core_message_type_enum::core_message_type_last)
+        if (received_message.msg_type.value() < core_message_type_enum::core_message_type_first ||
+            received_message.msg_type.value() > core_message_type_enum::core_message_type_last)
           process_ordinary_message(originating_peer, received_message, message_hash);
         break;
       }
@@ -2306,7 +2306,7 @@ namespace graphene { namespace net { namespace detail {
 
       for (const message& reply : reply_messages)
       {
-        if (reply.msg_type == block_message_type)
+        if (reply.msg_type.value() == block_message_type)
           originating_peer->send_item(item_id(block_message_type, reply.as<graphene::net::block_message>().block_id));
         else
           originating_peer->send_message(reply);
@@ -3363,7 +3363,7 @@ namespace graphene { namespace net { namespace detail {
       fc::time_point message_receive_time = fc::time_point::now();
 
       // only process it if we asked for it
-      auto iter = originating_peer->items_requested_from_peer.find( item_id(message_to_process.msg_type, message_hash) );
+      auto iter = originating_peer->items_requested_from_peer.find( item_id(message_to_process.msg_type.value(), message_hash) );
       if( iter == originating_peer->items_requested_from_peer.end() )
       {
         wlog( "received a message I didn't ask for from peer ${endpoint}, disconnecting from peer",
@@ -3383,7 +3383,7 @@ namespace graphene { namespace net { namespace detail {
         fc::time_point message_validated_time;
         try
         {
-          if (message_to_process.msg_type == trx_message_type)
+          if (message_to_process.msg_type.value() == trx_message_type)
           {
             trx_message transaction_message_to_process = message_to_process.as<trx_message>();
             dlog("passing message containing transaction ${trx} to client", ("trx", transaction_message_to_process.trx.id()));
@@ -3401,7 +3401,7 @@ namespace graphene { namespace net { namespace detail {
         {
           wlog( "client rejected message sent by peer ${peer}, ${e}", ("peer", originating_peer->get_remote_endpoint() )("e", e) );
           // record it so we don't try to fetch this item again
-          _recently_failed_items.insert(peer_connection::timestamped_item_id(item_id(message_to_process.msg_type, message_hash ), fc::time_point::now()));
+          _recently_failed_items.insert(peer_connection::timestamped_item_id(item_id(message_to_process.msg_type.value(), message_hash ), fc::time_point::now()));
           return;
         }
 
@@ -4434,13 +4434,13 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       fc::uint160_t hash_of_message_contents;
-      if( item_to_broadcast.msg_type == graphene::net::block_message_type )
+      if( item_to_broadcast.msg_type.value() == graphene::net::block_message_type )
       {
         graphene::net::block_message block_message_to_broadcast = item_to_broadcast.as<graphene::net::block_message>();
         hash_of_message_contents = block_message_to_broadcast.block_id; // for debugging
         _most_recent_blocks_accepted.push_back( block_message_to_broadcast.block_id );
       }
-      else if( item_to_broadcast.msg_type == graphene::net::trx_message_type )
+      else if( item_to_broadcast.msg_type.value() == graphene::net::trx_message_type )
       {
         graphene::net::trx_message transaction_message_to_broadcast = item_to_broadcast.as<graphene::net::trx_message>();
         hash_of_message_contents = transaction_message_to_broadcast.trx.id(); // for debugging
@@ -4449,7 +4449,7 @@ namespace graphene { namespace net { namespace detail {
       message_hash_type hash_of_item_to_broadcast = item_to_broadcast.id();
 
       _message_cache.cache_message( item_to_broadcast, hash_of_item_to_broadcast, propagation_data, hash_of_message_contents );
-      _new_inventory.insert( item_id(item_to_broadcast.msg_type, hash_of_item_to_broadcast ) );
+      _new_inventory.insert( item_id(item_to_broadcast.msg_type.value(), hash_of_item_to_broadcast ) );
       trigger_advertise_inventory_loop();
     }
 
@@ -4827,9 +4827,9 @@ namespace graphene { namespace net { namespace detail {
       try
       {
         const message& message_to_deliver = destination_node->messages_to_deliver.front();
-        if (message_to_deliver.msg_type == trx_message_type)
+        if (message_to_deliver.msg_type.value() == trx_message_type)
           destination_node->delegate->handle_transaction(message_to_deliver.as<trx_message>());
-        else if (message_to_deliver.msg_type == block_message_type)
+        else if (message_to_deliver.msg_type.value() == block_message_type)
         {
           std::vector<fc::uint160_t> contained_transaction_message_ids;
           destination_node->delegate->handle_block(message_to_deliver.as<block_message>(), false, contained_transaction_message_ids);
