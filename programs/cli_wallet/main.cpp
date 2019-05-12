@@ -288,6 +288,13 @@ int main( int argc, char** argv )
             wallet_cli->cancel();
          }, SIGTERM );
 
+         fc::set_signal_handler( [wallet_cli,sig_set](int signal) {
+            ilog( "Captured SIGQUIT not in daemon mode, exiting" );
+            sig_set->cancel();
+            fc::set_signal_handler( [](int sig) {}, SIGINT ); // reinstall an empty SIGINT handler
+            wallet_cli->cancel();
+         }, SIGQUIT );
+
          boost::signals2::scoped_connection closed_connection( con->closed.connect( [wallet_cli,sig_set] {
             elog( "Server has disconnected us." );
             sig_set->cancel();
@@ -315,6 +322,11 @@ int main( int argc, char** argv )
             ilog( "Captured SIGTERM in daemon mode, exiting" );
             exit_promise->set_value(signal);
          }, SIGTERM );
+
+         fc::set_signal_handler( [&exit_promise](int signal) {
+            ilog( "Captured SIGQUIT in daemon mode, exiting" );
+            exit_promise->set_value(signal);
+         }, SIGQUIT );
 
          boost::signals2::scoped_connection closed_connection( con->closed.connect( [&exit_promise] {
             elog( "Server has disconnected us." );
