@@ -411,6 +411,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 
    FC_ASSERT( !current_bitasset_data.has_settlement(), "Cannot update a bitasset after a global settlement has executed" );
 
+   // hf 922_931 is a consensus/logic change. This hf cannot be removed.
    bool after_hf_core_922_931 = ( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_922_931_TIME );
 
    // Are we changing the backing asset?

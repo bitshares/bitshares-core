@@ -192,18 +192,9 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    _dynamic_data_obj = &_debt_asset->dynamic_asset_data_id(d);
 
    /***
-    * We have softfork code already in production to prevent exceeding MAX_SUPPLY between 2018-12-21 until HF 1465.
-    * But we must allow this in replays until 2018-12-21. The HF 1465 code will correct the problem.
-    * After HF 1465, we MAY be able to remove the cleanup code IF it never executes. We MAY be able to clean
-    * up the softfork code IF it never executes. We MAY be able to turn the hardfork code into regular code IF
-    * noone ever attempted this before HF 1465.
+    * There are instances of assets exceeding max_supply before hf 1465, therefore this code must remain.
     */
-   if (next_maintenance_time <= SOFTFORK_CORE_1465_TIME)
-   {
-      if ( _dynamic_data_obj->current_supply + o.delta_debt.amount > _debt_asset->options.max_supply )
-         ilog("Issue 1465... Borrowing and exceeding MAX_SUPPLY. Will be corrected at hardfork time.");
-   }
-   else
+   if (next_maintenance_time > HARDFORK_CORE_1465_TIME)
    {
       FC_ASSERT( _dynamic_data_obj->current_supply + o.delta_debt.amount <= _debt_asset->options.max_supply,
             "Borrowing this quantity would exceed MAX_SUPPLY" );
@@ -348,7 +339,7 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
          call_obj = d.find(call_order_id);
          // we know no black swan event has occurred
          FC_ASSERT( call_obj, "no margin call was executed and yet the call object was deleted" );
-         // this HF must remain as-is, as the assert inside the "if" was triggered
+         // this HF must remain as-is, as the assert inside the "if" was triggered during push_proposal()
          if( d.head_block_time() <= HARDFORK_CORE_583_TIME )
          {
             // We didn't fill any call orders.  This may be because we

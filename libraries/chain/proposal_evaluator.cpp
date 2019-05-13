@@ -42,15 +42,12 @@ struct proposal_operation_hardfork_visitor
    void operator()(const T &v) const {}
 
    void operator()(const graphene::chain::call_order_update_operation &v) const {
-
-      // TODO If this never ASSERTs before HF 1465, it can be removed
-      FC_ASSERT( block_time < SOFTFORK_CORE_1465_TIME 
-            || block_time > HARDFORK_CORE_1465_TIME
+      FC_ASSERT( block_time > HARDFORK_CORE_1465_TIME
             || v.delta_debt.asset_id == asset_id_type(113) // CNY
             || v.delta_debt.amount < 0 
             || (v.delta_debt.asset_id( db ).bitasset_data_id
             && (*(v.delta_debt.asset_id( db ).bitasset_data_id))( db ).is_prediction_market )
-            , "Soft fork - preventing proposal with call_order_update!" );
+            , "Preventing proposal with call_order_update!" );
    }
    // hf_588
    // issue #588
