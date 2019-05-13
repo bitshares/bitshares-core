@@ -277,7 +277,6 @@ int main( int argc, char** argv )
          auto sig_set = fc::set_signal_handler( [wallet_cli](int signal) {
             ilog( "Captured SIGINT not in daemon mode, exiting" );
             fc::set_signal_handler( [](int sig) {}, SIGINT ); // reinstall an empty SIGINT handler
-            fc::usleep( fc::milliseconds(100) ); // sleep a while to cleanup things
             wallet_cli->cancel();
          }, SIGINT );
 
