@@ -1121,4 +1121,170 @@ BOOST_AUTO_TEST_CASE( api_limit_get_key_references ){
    throw;
    }
 }
+
+BOOST_AUTO_TEST_CASE( api_limit_get_full_accounts ) {
+
+   try {
+      graphene::app::database_api db_api(db, &(this->app.get_options()));
+
+      const account_object& alice = create_account("alice");
+      const account_object& bob = create_account("bob");
+      const account_object& carl = create_account("carl");
+      const account_object& dan = create_account("dan");
+      const account_object& fred = create_account("fred");
+      const account_object& henry = create_account("henry");
+      const account_object& kevin = create_account("kevin");
+      const account_object& laura = create_account("laura");
+      const account_object& lucy = create_account("lucy");
+      const account_object& martin = create_account("martin");
+      const account_object& patty = create_account("patty");
+
+      vector<string> accounts;
+      accounts.push_back(alice.name);
+      accounts.push_back(bob.name);
+      accounts.push_back(carl.name);
+      accounts.push_back(dan.name);
+      accounts.push_back(fred.name);
+      accounts.push_back(henry.name);
+      accounts.push_back(kevin.name);
+      accounts.push_back(laura.name);
+      accounts.push_back(lucy.name);
+      accounts.push_back(martin.name);
+      accounts.push_back(patty.name);
+
+      GRAPHENE_CHECK_THROW(db_api.get_full_accounts(accounts, false), fc::exception);
+
+      accounts.erase(accounts.begin());
+      auto full_accounts = db_api.get_full_accounts(accounts, false);
+      BOOST_CHECK(full_accounts.size() == 10);
+
+      // not an account
+      accounts.erase(accounts.begin());
+      accounts.push_back("nosuchaccount");
+
+      // request fully fails even if 9 accounts are valid
+      GRAPHENE_CHECK_THROW(db_api.get_full_accounts(accounts, false), fc::exception);
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( get_assets_by_issuer ) {
+   try {
+      graphene::app::database_api db_api(db, &(this->app.get_options()));
+
+      create_bitasset("CNY");
+      create_bitasset("EUR");
+      create_bitasset("USD");
+
+      generate_block();
+
+      auto assets = db_api.get_assets_by_issuer("witness-account", asset_id_type(), 10);
+
+      BOOST_CHECK(assets.size() == 3);
+      BOOST_CHECK(assets[0].symbol == "CNY");
+      BOOST_CHECK(assets[1].symbol == "EUR");
+      BOOST_CHECK(assets[2].symbol == "USD");
+
+      assets = db_api.get_assets_by_issuer("witness-account", asset_id_type(200), 100);
+      BOOST_CHECK(assets.size() == 0);
+
+      GRAPHENE_CHECK_THROW(db_api.get_assets_by_issuer("nosuchaccount", asset_id_type(), 100), fc::exception);
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( get_call_orders_by_account ) {
+
+   try {
+      ACTORS((caller)(feedproducer));
+
+      graphene::app::database_api db_api(db, &(this->app.get_options()));
+
+      const auto &usd = create_bitasset("USD", feedproducer_id);
+      const auto &cny = create_bitasset("CNY", feedproducer_id);
+      const auto &core = asset_id_type()(db);
+
+      int64_t init_balance(1000000);
+      transfer(committee_account, caller_id, asset(init_balance));
+
+      update_feed_producers(usd, {feedproducer.id});
+      update_feed_producers(cny, {feedproducer.id});
+
+      price_feed current_feed;
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      current_feed.settlement_price = usd.amount(1) / core.amount(5);
+      publish_feed(usd, feedproducer, current_feed);
+
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      current_feed.settlement_price = cny.amount(1) / core.amount(5);
+      publish_feed(cny, feedproducer, current_feed);
+
+      auto call1 = borrow(caller, usd.amount(1000), asset(15000));
+      auto call2 = borrow(caller, cny.amount(1000), asset(15000));
+
+      auto calls = db_api.get_call_orders_by_account("caller", asset_id_type(), 100);
+
+      BOOST_CHECK(calls.size() == 2);
+      BOOST_CHECK(calls[0].id == call1->id);
+      BOOST_CHECK(calls[1].id == call2->id);
+
+      GRAPHENE_CHECK_THROW(db_api.get_call_orders_by_account("nosuchaccount", asset_id_type(), 100), fc::exception);
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( get_settle_orders_by_account ) {
+   try {
+      ACTORS((creator)(settler)(caller)(feedproducer));
+
+      graphene::app::database_api db_api(db, &(this->app.get_options()));
+
+      const auto &usd = create_bitasset("USD", creator_id);
+      const auto &core = asset_id_type()(db);
+      asset_id_type usd_id = usd.id;
+
+      int64_t init_balance(1000000);
+      transfer(committee_account, settler_id, asset(init_balance));
+      transfer(committee_account, caller_id, asset(init_balance));
+
+      update_feed_producers(usd, {feedproducer.id});
+
+      price_feed current_feed;
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      current_feed.settlement_price = usd.amount(1) / core.amount(5);
+      publish_feed(usd, feedproducer, current_feed);
+
+      borrow(caller, usd.amount(1000), asset(15000));
+      generate_block();
+
+      transfer(caller.id, settler.id, asset(200, usd_id));
+
+      auto result = force_settle( settler, usd_id(db).amount(4));
+      generate_block();
+
+      auto settlements = db_api.get_settle_orders_by_account("settler", force_settlement_id_type(), 100);
+
+      BOOST_CHECK(settlements.size() == 1);
+      BOOST_CHECK(settlements[0].id == result.get<object_id_type>());
+
+      GRAPHENE_CHECK_THROW(db_api.get_settle_orders_by_account("nosuchaccount", force_settlement_id_type(), 100), fc::exception);
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
