@@ -24,7 +24,6 @@
 #pragma once
 
 #include <graphene/chain/types.hpp>
-#include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
 
 namespace graphene { namespace chain {
@@ -51,4 +50,6 @@ class fba_accumulator_object : public graphene::db::abstract_object< fba_accumul
 
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::fba_accumulator_object)
 
-FC_REFLECT_DERIVED( graphene::chain::fba_accumulator_object, (graphene::db::object), (accumulated_fba_fees)(designated_asset) )
+FC_REFLECT_TYPENAME( graphene::chain::fba_accumulator_object )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::fba_accumulator_object )

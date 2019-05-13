@@ -23,10 +23,9 @@
  */
 #pragma once
 
-#include <graphene/db/generic_index.hpp>
-#include <graphene/db/object.hpp>
-#include <graphene/protocol/asset.hpp>
 #include <graphene/chain/types.hpp>
+#include <graphene/db/generic_index.hpp>
+#include <graphene/protocol/asset.hpp>
 
 #include <boost/multi_index/composite_key.hpp>
 
@@ -276,18 +275,12 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::call_order_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::force_settlement_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::collateral_bid_object)
 
-FC_REFLECT_DERIVED( graphene::chain::limit_order_object,
-                    (graphene::db::object),
-                    (expiration)(seller)(for_sale)(sell_price)(deferred_fee)(deferred_paid_fee)
-                  )
+FC_REFLECT_TYPENAME( graphene::chain::limit_order_object )
+FC_REFLECT_TYPENAME( graphene::chain::call_order_object )
+FC_REFLECT_TYPENAME( graphene::chain::force_settlement_object )
+FC_REFLECT_TYPENAME( graphene::chain::collateral_bid_object )
 
-FC_REFLECT_DERIVED( graphene::chain::call_order_object, (graphene::db::object),
-                    (borrower)(collateral)(debt)(call_price)(target_collateral_ratio) )
-
-FC_REFLECT_DERIVED( graphene::chain::force_settlement_object,
-                    (graphene::db::object),
-                    (owner)(balance)(settlement_date)
-                  )
-
-FC_REFLECT_DERIVED( graphene::chain::collateral_bid_object, (graphene::db::object),
-                    (bidder)(inv_swan_price) )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::limit_order_object )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::call_order_object )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::force_settlement_object )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::collateral_bid_object )

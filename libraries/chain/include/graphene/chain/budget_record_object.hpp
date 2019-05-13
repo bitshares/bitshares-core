@@ -23,7 +23,6 @@
  */
 #pragma once
 #include <graphene/protocol/types.hpp>
-#include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
 
 namespace graphene { namespace chain {
@@ -54,8 +53,6 @@ struct budget_record
    share_type supply_delta = 0;
 };
 
-class budget_record_object;
-
 class budget_record_object : public graphene::db::abstract_object<budget_record_object>
 {
    public:
@@ -70,23 +67,8 @@ class budget_record_object : public graphene::db::abstract_object<budget_record_
 
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::budget_record_object)
 
-FC_REFLECT(
-   graphene::chain::budget_record,
-   (time_since_last_budget)
-   (from_initial_reserve)
-   (from_accumulated_fees)
-   (from_unused_witness_budget)
-   (requested_witness_budget)
-   (total_budget)
-   (witness_budget)
-   (worker_budget)
-   (leftover_worker_funds)
-   (supply_delta)
-)
+FC_REFLECT_TYPENAME( graphene::chain::budget_record )
+FC_REFLECT_TYPENAME( graphene::chain::budget_record_object )
 
-FC_REFLECT_DERIVED(
-   graphene::chain::budget_record_object,
-   (graphene::db::object),
-   (time)
-   (record)
-)
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::budget_record )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::budget_record_object )

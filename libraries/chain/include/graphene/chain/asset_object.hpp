@@ -22,10 +22,11 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/protocol/asset_ops.hpp>
-#include <boost/multi_index/composite_key.hpp>
-#include <graphene/db/generic_index.hpp>
 #include <graphene/chain/types.hpp>
+#include <graphene/db/generic_index.hpp>
+#include <graphene/protocol/asset_ops.hpp>
+
+#include <boost/multi_index/composite_key.hpp>
 
 /**
  * @defgroup prediction_market Prediction Market
@@ -38,7 +39,6 @@
  */
 
 namespace graphene { namespace chain {
-   class account_object;
    class asset_bitasset_data_object;
    class database;
    using namespace graphene::db;
@@ -323,30 +323,10 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_dynamic_data_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_bitasset_data_object)
 
-FC_REFLECT_DERIVED( graphene::chain::asset_dynamic_data_object, (graphene::db::object),
-                    (current_supply)(confidential_supply)(accumulated_fees)(fee_pool) )
+FC_REFLECT_TYPENAME( graphene::chain::asset_object )
+FC_REFLECT_TYPENAME( graphene::chain::asset_bitasset_data_object )
+FC_REFLECT_TYPENAME( graphene::chain::asset_dynamic_data_object )
 
-FC_REFLECT_DERIVED( graphene::chain::asset_bitasset_data_object, (graphene::db::object),
-                    (asset_id)
-                    (feeds)
-                    (current_feed)
-                    (current_feed_publication_time)
-                    (current_maintenance_collateralization)
-                    (options)
-                    (force_settled_volume)
-                    (is_prediction_market)
-                    (settlement_price)
-                    (settlement_fund)
-                    (asset_cer_updated)
-                    (feed_cer_updated)
-                  )
-
-FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
-                    (symbol)
-                    (precision)
-                    (issuer)
-                    (options)
-                    (dynamic_asset_data_id)
-                    (bitasset_data_id)
-                    (buyback_account)
-                  )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::asset_object )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::asset_bitasset_data_object )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::asset_dynamic_data_object )
