@@ -31,7 +31,7 @@
 #include <fc/asio.hpp>
 
 #include <graphene/net/node.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 
 #include <graphene/net/peer_connection.hpp>
 #define P2P_IN_DEDICATED_THREAD 1

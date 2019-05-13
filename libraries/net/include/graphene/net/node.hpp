@@ -346,8 +346,8 @@ namespace graphene { namespace net {
          * @param transaction_id the transaction id
          * @returns propagation data for that transaction
          */
-        message_propagation_data get_transaction_propagation_data(const graphene::chain::transaction_id_type& transaction_id);
-        message_propagation_data get_block_propagation_data(const graphene::chain::block_id_type& block_id);
+        message_propagation_data get_transaction_propagation_data(const graphene::protocol::transaction_id_type& transaction_id);
+        message_propagation_data get_block_propagation_data(const graphene::protocol::block_id_type& block_id);
 
         /******
          * @returns the node id (public key) for this node
