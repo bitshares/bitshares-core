@@ -964,7 +964,6 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For asset_api::get_asset_holders to set its default limit value as 100")
 		   ("api-limit-get-key-references",boost::program_options::value<uint64_t>()->default_value(100),
 		    "For database_api_impl::get_key_references to set its default limit value as 100")
-         ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
          ("accept-incoming-connections", bpo::value<bool>()->implicit_value(true), "Accept incoming connections")
          ("advertise-peer-algorithm", bpo::value<string>()->implicit_value("all"), "Determines which peers are advertised")
          ("advertise-peer-list", bpo::value<vector<string>>()->composing(), 
