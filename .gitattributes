@@ -1,3 +1,2 @@
-# Set the default behavior, in case core.autocrlf is set incorrectly
-# Note: this is mainly to properly canonicalize the input to embed_genesis
-* text eol=lf
+# Set the default behavior of genesis.json, in case core.autocrlf is set incorrectly
+genesis.json eol=lf
