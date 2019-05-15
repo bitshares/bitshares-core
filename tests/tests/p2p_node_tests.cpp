@@ -175,7 +175,7 @@ public:
    std::shared_ptr<graphene::net::message> message_received;
    void send_message(const graphene::net::message& message_to_send, size_t message_send_time_field_offset = (size_t)-1) override
    {
-      if ( message_to_send.msg_type == graphene::net::address_message_type )
+      if ( message_to_send.msg_type == graphene::net::core_message_type_enum::address_message_type )
       {
          // make a copy
          graphene::net::address_message m = message_to_send.as<graphene::net::address_message>();
