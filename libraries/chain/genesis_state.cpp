@@ -24,9 +24,6 @@
 
 #include <graphene/chain/genesis_state.hpp>
 
-// this is required to serialize a genesis_state
-#include <graphene/chain/protocol/fee_schedule.hpp>
-
 namespace graphene { namespace chain {
 
 chain_id_type genesis_state_type::compute_chain_id() const

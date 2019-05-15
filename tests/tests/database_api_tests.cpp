@@ -1090,5 +1090,35 @@ BOOST_AUTO_TEST_CASE( verify_authority_multiple_accounts )
       throw;
    }
 }
-
+BOOST_AUTO_TEST_CASE( api_limit_get_key_references ){
+   try{
+   const int num_keys = 210;
+   const int num_keys1 = 2;
+   vector< private_key_type > numbered_private_keys;
+   vector< public_key_type >  numbered_key_id;
+   numbered_private_keys.reserve( num_keys );
+   graphene::app::database_api db_api( db, &( app.get_options() ));
+   for( int i=0; i<num_keys1; i++ )
+   {
+      private_key_type privkey = generate_private_key(std::string("key_") + std::to_string(i));
+      public_key_type pubkey = privkey.get_public_key();
+      numbered_private_keys.push_back( privkey );
+      numbered_key_id.push_back( pubkey );
+   }
+   vector< vector<account_id_type> > final_result=db_api.get_key_references(numbered_key_id);
+   BOOST_REQUIRE_EQUAL( final_result.size(), 2u );
+   numbered_private_keys.reserve( num_keys );
+   for( int i=num_keys1; i<num_keys; i++ )
+   {
+       private_key_type privkey = generate_private_key(std::string("key_") + std::to_string(i));
+       public_key_type pubkey = privkey.get_public_key();
+       numbered_private_keys.push_back( privkey );
+       numbered_key_id.push_back( pubkey );
+   }
+   GRAPHENE_CHECK_THROW(db_api.get_key_references(numbered_key_id), fc::exception);
+   }catch (fc::exception& e) {
+   edump((e.to_detail_string()));
+   throw;
+   }
+}
 BOOST_AUTO_TEST_SUITE_END()

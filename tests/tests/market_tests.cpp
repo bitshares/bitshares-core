@@ -291,7 +291,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
    // settlement price = 1/10, mssp = 1/11
 
    // This sell order above MSSP will not be matched with a call
-   create_sell_order(seller, bitusd.amount(7), core.amount(78))->id;
+   BOOST_CHECK( create_sell_order(seller, bitusd.amount(7), core.amount(78)) != nullptr );
 
    BOOST_CHECK_EQUAL( 2993, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );

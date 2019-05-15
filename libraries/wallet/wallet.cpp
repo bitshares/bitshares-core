@@ -293,9 +293,10 @@ public:
 private:
    void claim_registered_account(const account_object& account)
    {
+      bool import_keys = false;
       auto it = _wallet.pending_account_registrations.find( account.name );
       FC_ASSERT( it != _wallet.pending_account_registrations.end() );
-      for (const std::string& wif_key : it->second)
+      for (const std::string& wif_key : it->second) {
          if( !import_key( account.name, wif_key ) )
          {
             // somebody else beat our pending registration, there is
@@ -308,8 +309,15 @@ private:
             //    possibility of migrating to a fork where the
             //    name is available, the user can always
             //    manually re-register)
+         } else {
+            import_keys = true;
          }
+      }
       _wallet.pending_account_registrations.erase( it );
+
+      if( import_keys ) {
+         save_wallet_file();
+      }
    }
 
    // after a witness registration succeeds, this saves the private key in the wallet permanently
@@ -550,7 +558,9 @@ public:
                                                                           " old");
       result["next_maintenance_time"] = fc::get_approximate_relative_time_string(dynamic_props.next_maintenance_time);
       result["chain_id"] = chain_props.chain_id;
-      result["participation"] = (100*dynamic_props.recent_slots_filled.popcount()) / 128.0;
+      stringstream participation;
+      participation << fixed << std::setprecision(2) << (100*dynamic_props.recent_slots_filled.popcount()) / 128.0;
+      result["participation"] = participation.str();
       result["active_witnesses"] = fc::variant(global_props.active_witnesses, GRAPHENE_MAX_NESTED_OBJECTS);
       result["active_committee_members"] = fc::variant(global_props.active_committee_members, GRAPHENE_MAX_NESTED_OBJECTS);
       return result;
@@ -821,12 +831,80 @@ public:
       return true;
    }
 
-    void quit()
-    {
-        ilog( "Quitting Cli Wallet ..." );
+   /**
+    * Get the required public keys to sign the transaction which had been
+    * owned by us
+    *
+    * NOTE, if `erase_existing_sigs` set to true, the original trasaction's
+    * signatures will be erased
+    *
+    * @param tx           The transaction to be signed
+    * @param erase_existing_sigs
+    *        The transaction could have been partially signed already,
+    *        if set to false, the corresponding public key of existing
+    *        signatures won't be returned.
+    *        If set to true, the existing signatures will be erased and
+    *        all required keys returned.
+   */
+   set<public_key_type> get_owned_required_keys( signed_transaction &tx,
+                                                    bool erase_existing_sigs = true)
+   {
+      set<public_key_type> pks = _remote_db->get_potential_signatures( tx );
+      flat_set<public_key_type> owned_keys;
+      owned_keys.reserve( pks.size() );
+      std::copy_if( pks.begin(), pks.end(),
+                    std::inserter( owned_keys, owned_keys.end() ),
+                    [this]( const public_key_type &pk ) {
+                       return _keys.find( pk ) != _keys.end();
+                    } );
+
+      if ( erase_existing_sigs )
+         tx.signatures.clear();
+
+      return _remote_db->get_required_signatures( tx, owned_keys );
+   }
+
+   signed_transaction add_transaction_signature( signed_transaction tx,
+                                                 bool broadcast )
+   {
+      set<public_key_type> approving_key_set = get_owned_required_keys(tx, false);
+
+      if ( ( ( tx.ref_block_num == 0 && tx.ref_block_prefix == 0 ) ||
+             tx.expiration == fc::time_point_sec() ) &&
+           tx.signatures.empty() )
+      {
+         auto dyn_props = get_dynamic_global_properties();
+         auto parameters = get_global_properties().parameters;
+         fc::time_point_sec now = dyn_props.time;
+         tx.set_reference_block( dyn_props.head_block_id );
+         tx.set_expiration( now + parameters.maximum_time_until_expiration );
+      }
+      for ( const public_key_type &key : approving_key_set )
+         tx.sign( get_private_key( key ), _chain_id );
+
+      if ( broadcast )
+      {
+         try
+         {
+            _remote_net_broadcast->broadcast_transaction( tx );
+         }
+         catch ( const fc::exception &e )
+         {
+            elog( "Caught exception while broadcasting tx ${id}:  ${e}",
+                  ( "id", tx.id().str() )( "e", e.to_detail_string() ) );
+            FC_THROW( "Caught exception while broadcasting tx" );
+         }
+      }
+
+      return tx;
+   }
+
+   void quit()
+   {
+      ilog( "Quitting Cli Wallet ..." );
         
-        throw fc::canceled_exception();
-    }
+      throw fc::canceled_exception();
+   }
 
    void save_wallet_file(string wallet_filename = "")
    {
@@ -926,7 +1004,7 @@ public:
       if( fee_asset_obj.get_id() != asset_id_type() )
       {
          for( auto& op : _builder_transactions[handle].operations )
-            total_fee += gprops.current_fees->set_fee( op, fee_asset_obj.options.core_exchange_rate );
+            total_fee += gprops.get_current_fees().set_fee( op, fee_asset_obj.options.core_exchange_rate );
 
          FC_ASSERT((total_fee * fee_asset_obj.options.core_exchange_rate).amount <=
                    get_object<asset_dynamic_data_object>(fee_asset_obj.dynamic_asset_data_id).fee_pool,
@@ -934,7 +1012,7 @@ public:
                    ("asset", fee_asset_obj.symbol));
       } else {
          for( auto& op : _builder_transactions[handle].operations )
-            total_fee += gprops.current_fees->set_fee( op );
+            total_fee += gprops.get_current_fees().set_fee( op );
       }
 
       return total_fee;
@@ -977,7 +1055,7 @@ public:
       if( review_period_seconds )
          op.review_period_seconds = review_period_seconds;
       trx.operations = {op};
-      _remote_db->get_global_properties().parameters.current_fees->set_fee( trx.operations.front() );
+      _remote_db->get_global_properties().parameters.get_current_fees().set_fee( trx.operations.front() );
 
       return trx = sign_transaction(trx, broadcast);
    }
@@ -998,7 +1076,7 @@ public:
       if( review_period_seconds )
          op.review_period_seconds = review_period_seconds;
       trx.operations = {op};
-      _remote_db->get_global_properties().parameters.current_fees->set_fee( trx.operations.front() );
+      _remote_db->get_global_properties().parameters.get_current_fees().set_fee( trx.operations.front() );
 
       return trx = sign_transaction(trx, broadcast);
    }
@@ -1007,7 +1085,6 @@ public:
    {
       _builder_transactions.erase(handle);
    }
-
 
    signed_transaction register_account(string name,
                                        public_key_type owner,
@@ -1048,8 +1125,7 @@ public:
 
       tx.operations.push_back( account_create_op );
 
-      auto current_fees = _remote_db->get_global_properties().parameters.current_fees;
-      set_operation_fees( tx, current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
 
       vector<public_key_type> paying_keys = registrar_account_object.active.get_keys();
 
@@ -1077,7 +1153,6 @@ public:
       return tx;
    } FC_CAPTURE_AND_RETHROW( (name)(owner)(active)(registrar_account)(referrer_account)(referrer_percent)(broadcast) ) }
 
-
    signed_transaction upgrade_account(string name, bool broadcast)
    { try {
       FC_ASSERT( !self.is_locked() );
@@ -1089,12 +1164,11 @@ public:
       op.account_to_upgrade = account_obj.get_id();
       op.upgrade_to_lifetime_member = true;
       tx.operations = {op};
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
       tx.validate();
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (name) ) }
-
 
    // This function generates derived keys starting with index 0 and keeps incrementing
    // the index until it finds a key that isn't registered in the block chain.  To be
@@ -1175,7 +1249,7 @@ public:
 
          tx.operations.push_back( account_create_op );
 
-         set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
 
          vector<public_key_type> paying_keys = registrar_account_object.active.get_keys();
 
@@ -1240,7 +1314,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( create_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1257,10 +1331,7 @@ public:
       optional<account_id_type> new_issuer_account_id;
       if (new_issuer)
       {
-        FC_ASSERT( _remote_db->get_dynamic_global_properties().time < HARDFORK_CORE_199_TIME,
-              "The use of 'new_issuer' is no longer supported. Please use `update_asset_issuer' instead!");
-        account_object new_issuer_account = get_account(*new_issuer);
-        new_issuer_account_id = new_issuer_account.id;
+        FC_ASSERT( false, "The use of 'new_issuer' is no longer supported. Please use `update_asset_issuer' instead!");
       }
 
       asset_update_operation update_op;
@@ -1271,7 +1342,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1294,7 +1365,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( update_issuer );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1315,7 +1386,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1339,7 +1410,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1361,7 +1432,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( publish_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1385,7 +1456,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( fund_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1407,7 +1478,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( claim_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1430,7 +1501,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( reserve_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1451,7 +1522,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( settle_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1472,7 +1543,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( settle_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1486,6 +1557,8 @@ public:
       optional<asset_object> debt_asset = find_asset(debt_symbol);
       if (!debt_asset)
         FC_THROW("No asset with that symbol exists!");
+
+      FC_ASSERT(debt_asset->bitasset_data_id.valid(), "Not a bitasset, bidding not possible.");
       const asset_object& collateral = get_asset(get_object(*debt_asset->bitasset_data_id).options.short_backing_asset);
 
       bid_collateral_operation op;
@@ -1495,7 +1568,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1513,7 +1586,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( whitelist_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1539,7 +1612,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( committee_member_create_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1634,7 +1707,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( witness_create_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       _wallet.pending_witness_registrations[owner_account] = key_to_wif(witness_private_key);
@@ -1660,7 +1733,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( witness_update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1711,7 +1784,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1775,7 +1848,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1814,7 +1887,7 @@ public:
 
          signed_transaction tx;
          tx.operations.push_back(create_op);
-         set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
          tx.validate();
 
          return sign_transaction(tx, broadcast);
@@ -1839,7 +1912,7 @@ public:
 
          signed_transaction tx;
          tx.operations.push_back(update_op);
-         set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
          tx.validate();
 
          return sign_transaction(tx, broadcast);
@@ -1863,7 +1936,7 @@ public:
 
          signed_transaction tx;
          tx.operations.push_back(update_op);
-         set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
          tx.validate();
 
          return sign_transaction(tx, broadcast);
@@ -1924,7 +1997,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( vesting_balance_withdraw_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1966,7 +2039,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( account_update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -2007,7 +2080,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( account_update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -2038,7 +2111,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( account_update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -2064,7 +2137,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( account_update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -2072,13 +2145,8 @@ public:
 
    signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false)
    {
-      set<public_key_type> pks = _remote_db->get_potential_signatures( tx );
-      flat_set<public_key_type> owned_keys;
-      owned_keys.reserve( pks.size() );
-      std::copy_if( pks.begin(), pks.end(), std::inserter(owned_keys, owned_keys.end()),
-                    [this](const public_key_type& pk){ return _keys.find(pk) != _keys.end(); } );
-      tx.clear_signatures();
-      set<public_key_type> approving_key_set = _remote_db->get_required_signatures( tx, owned_keys );
+
+      set<public_key_type> approving_key_set = get_owned_required_keys(tx);
 
       auto dyn_props = get_dynamic_global_properties();
       tx.set_reference_block( dyn_props.head_block_id );
@@ -2131,6 +2199,16 @@ public:
       }
 
       return tx;
+   }
+
+   flat_set<public_key_type> get_transaction_signers(const signed_transaction &tx) const
+   {
+      return tx.get_signature_keys(_chain_id);
+   }
+
+   vector<vector<account_id_type>> get_key_references(const vector<public_key_type> &keys) const
+   {
+       return _remote_db->get_key_references(keys);
    }
 
    memo_data sign_memo(string from, string to, string memo)
@@ -2204,7 +2282,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back(op);
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -2225,7 +2303,7 @@ public:
 
       signed_transaction trx;
       trx.operations = {op};
-      set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( trx, _remote_db->get_global_properties().parameters.get_current_fees());
       trx.validate();
 
       return sign_transaction(trx, broadcast);
@@ -2249,7 +2327,7 @@ public:
 
       signed_transaction trx;
       trx.operations = {op};
-      set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( trx, _remote_db->get_global_properties().parameters.get_current_fees());
       trx.validate();
 
       return sign_transaction(trx, broadcast);
@@ -2265,7 +2343,7 @@ public:
          op.fee_paying_account = get_object<limit_order_object>(order_id).seller;
          op.order = order_id;
          trx.operations = {op};
-         set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
+         set_operation_fees( trx, _remote_db->get_global_properties().parameters.get_current_fees());
 
          trx.validate();
          return sign_transaction(trx, broadcast);
@@ -2300,7 +2378,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back(xfer_op);
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction(tx, broadcast);
@@ -2330,7 +2408,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back(issue_op);
-      set_operation_fees(tx,_remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees(tx,_remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction(tx, broadcast);
@@ -2600,11 +2678,11 @@ public:
       prop_op.fee_paying_account = get_account(proposing_account).id;
 
       prop_op.proposed_ops.emplace_back( update_op );
-      current_params.current_fees->set_fee( prop_op.proposed_ops.back().op );
+      current_params.get_current_fees().set_fee( prop_op.proposed_ops.back().op );
 
       signed_transaction tx;
       tx.operations.push_back(prop_op);
-      set_operation_fees(tx, current_params.current_fees);
+      set_operation_fees(tx, current_params.get_current_fees());
       tx.validate();
 
       return sign_transaction(tx, broadcast);
@@ -2617,7 +2695,7 @@ public:
       bool broadcast = false)
    {
       const chain_parameters& current_params = get_global_properties().parameters;
-      const fee_schedule_type& current_fees = *(current_params.current_fees);
+      const fee_schedule_type& current_fees = current_params.get_current_fees();
 
       flat_map< int, fee_parameters > fee_map;
       fee_map.reserve( current_fees.parameters.size() );
@@ -2670,7 +2748,7 @@ public:
       new_fees.scale = scale;
 
       chain_parameters new_params = current_params;
-      new_params.current_fees = new_fees;
+      new_params.get_mutable_fees() = new_fees;
 
       committee_member_update_global_parameters_operation update_op;
       update_op.new_parameters = new_params;
@@ -2682,11 +2760,11 @@ public:
       prop_op.fee_paying_account = get_account(proposing_account).id;
 
       prop_op.proposed_ops.emplace_back( update_op );
-      current_params.current_fees->set_fee( prop_op.proposed_ops.back().op );
+      current_params.get_current_fees().set_fee( prop_op.proposed_ops.back().op );
 
       signed_transaction tx;
       tx.operations.push_back(prop_op);
-      set_operation_fees(tx, current_params.current_fees);
+      set_operation_fees(tx, current_params.get_current_fees());
       tx.validate();
 
       return sign_transaction(tx, broadcast);
@@ -2720,7 +2798,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back(update_op);
-      set_operation_fees(tx, get_global_properties().parameters.current_fees);
+      set_operation_fees(tx, get_global_properties().parameters.get_current_fees());
       tx.validate();
       return sign_transaction(tx, broadcast);
    }
@@ -3988,6 +4066,16 @@ signed_transaction wallet_api::sign_transaction(signed_transaction tx, bool broa
    return my->sign_transaction( tx, broadcast);
 } FC_CAPTURE_AND_RETHROW( (tx) ) }
 
+flat_set<public_key_type> wallet_api::get_transaction_signers(const signed_transaction &tx) const
+{ try {
+   return my->get_transaction_signers(tx);
+} FC_CAPTURE_AND_RETHROW( (tx) ) }
+
+vector<vector<account_id_type>> wallet_api::get_key_references(const vector<public_key_type> &keys) const
+{ try {
+   return my->get_key_references(keys);
+} FC_CAPTURE_AND_RETHROW( (keys) ) }
+
 operation wallet_api::get_prototype_operation(string operation_name)
 {
    return my->get_prototype_operation( operation_name );
@@ -4081,6 +4169,12 @@ dynamic_global_property_object wallet_api::get_dynamic_global_properties() const
    return my->get_dynamic_global_properties();
 }
 
+signed_transaction wallet_api::add_transaction_signature( signed_transaction tx,
+                                                          bool broadcast )
+{
+   return my->add_transaction_signature( tx, broadcast );
+}
+
 string wallet_api::help()const
 {
    std::vector<std::string> method_names = my->method_documentation.get_method_names();
@@ -4164,7 +4258,7 @@ bool wallet_api::load_wallet_file( string wallet_filename )
 
 void wallet_api::quit()
 {
-    my->quit();
+   my->quit();
 }
 
 void wallet_api::save_wallet_file( string wallet_filename )
@@ -4325,7 +4419,7 @@ vector< signed_transaction > wallet_api_impl::import_balance( string name_or_id,
       tx.operations.reserve( ctx.ops.size() );
       for( const balance_claim_operation& op : ctx.ops )
          tx.operations.emplace_back( op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
       tx.validate();
       signed_transaction signed_tx = sign_transaction( tx, false );
       for( const address& addr : ctx.addrs )
@@ -4519,12 +4613,12 @@ blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_ke
    transfer_from_blind_operation from_blind;
 
 
-   auto fees  = my->_remote_db->get_global_properties().parameters.current_fees;
+   auto fees  = my->_remote_db->get_global_properties().parameters.get_current_fees();
    fc::optional<asset_object> asset_obj = get_asset(symbol);
    FC_ASSERT(asset_obj.valid(), "Could not find asset matching ${asset}", ("asset", symbol));
    auto amount = asset_obj->amount_from_string(amount_in);
 
-   from_blind.fee  = fees->calculate_fee( from_blind, asset_obj->options.core_exchange_rate );
+   from_blind.fee  = fees.calculate_fee( from_blind, asset_obj->options.core_exchange_rate );
 
    auto blind_in = asset_obj->amount_to_string( from_blind.fee + amount );
 
@@ -4539,7 +4633,7 @@ blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_ke
    from_blind.amount = amount;
    from_blind.blinding_factor = conf.outputs.back().decrypted_memo.blinding_factor;
    from_blind.inputs.push_back( {conf.outputs.back().decrypted_memo.commitment, authority() } );
-   from_blind.fee  = fees->calculate_fee( from_blind, asset_obj->options.core_exchange_rate );
+   from_blind.fee  = fees.calculate_fee( from_blind, asset_obj->options.core_exchange_rate );
 
    idump( (from_blind) );
    conf.trx.operations.push_back(from_blind);
@@ -4597,7 +4691,7 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
    blind_transfer_operation blind_tr;
    blind_tr.outputs.resize(2);
 
-   auto fees  = my->_remote_db->get_global_properties().parameters.current_fees;
+   auto fees  = my->_remote_db->get_global_properties().parameters.get_current_fees();
 
    auto amount = asset_obj->amount_from_string(amount_in);
 
@@ -4607,7 +4701,7 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
 
    //auto from_priv_key = my->get_private_key( from_key );
 
-   blind_tr.fee  = fees->calculate_fee( blind_tr, asset_obj->options.core_exchange_rate );
+   blind_tr.fee  = fees.calculate_fee( blind_tr, asset_obj->options.core_exchange_rate );
 
    vector<commitment_type> used;
 
@@ -4821,7 +4915,7 @@ blind_confirmation wallet_api::transfer_to_blind( string from_account_id_or_name
               [&]( const blind_output& a, const blind_output& b ){ return a.commitment < b.commitment; } );
 
    confirm.trx.operations.push_back( bop );
-   my->set_operation_fees( confirm.trx, my->_remote_db->get_global_properties().parameters.current_fees);
+   my->set_operation_fees( confirm.trx, my->_remote_db->get_global_properties().parameters.get_current_fees());
    confirm.trx.validate();
    confirm.trx = sign_transaction(confirm.trx, broadcast);
 

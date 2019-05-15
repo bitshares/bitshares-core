@@ -58,7 +58,7 @@ BOOST_FIXTURE_TEST_SUITE( htlc_tests, database_fixture )
 
 void generate_random_preimage(uint16_t key_size, std::vector<char>& vec)
 {
-	std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned char> rbe;
+	std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned int> rbe;
 	std::generate(begin(vec), end(vec), std::ref(rbe));
 	return;
 }
@@ -107,18 +107,18 @@ void set_committee_parameters(database_fixture* db_fixture)
    const chain_parameters& existing_params = db_fixture->db.get_global_properties().parameters;
    const fee_schedule_type& existing_fee_schedule = *(existing_params.current_fees);
    // create a new fee_shedule
-   fee_schedule_type new_fee_schedule;
-   new_fee_schedule.scale = GRAPHENE_100_PERCENT;
+   std::shared_ptr<fee_schedule_type> new_fee_schedule = std::make_shared<fee_schedule_type>();
+   new_fee_schedule->scale = GRAPHENE_100_PERCENT;
    // replace the old with the new
    flat_map<uint64_t, graphene::chain::fee_parameters> params_map = get_htlc_fee_parameters();
    for(auto param : existing_fee_schedule.parameters)
    {
       auto itr = params_map.find(param.which());
       if (itr == params_map.end())
-         new_fee_schedule.parameters.insert(param);
+         new_fee_schedule->parameters.insert(param);
       else
       {
-         new_fee_schedule.parameters.insert( (*itr).second);
+         new_fee_schedule->parameters.insert( (*itr).second);
       }
    }
    // htlc parameters
@@ -450,18 +450,18 @@ BOOST_AUTO_TEST_CASE( htlc_hardfork_test )
          const chain_parameters& existing_params = db.get_global_properties().parameters;
          const fee_schedule_type& existing_fee_schedule = *(existing_params.current_fees);
          // create a new fee_shedule
-         fee_schedule_type new_fee_schedule;
-         new_fee_schedule.scale = existing_fee_schedule.scale;
+         std::shared_ptr<fee_schedule_type> new_fee_schedule = std::make_shared<fee_schedule_type>();
+         new_fee_schedule->scale = existing_fee_schedule.scale;
          // replace the old with the new
          flat_map<uint64_t, graphene::chain::fee_parameters> params_map = get_htlc_fee_parameters();
          for(auto param : existing_fee_schedule.parameters)
          {
             auto itr = params_map.find(param.which());
             if (itr == params_map.end())
-               new_fee_schedule.parameters.insert(param);
+               new_fee_schedule->parameters.insert(param);
             else
             {
-               new_fee_schedule.parameters.insert( (*itr).second);
+               new_fee_schedule->parameters.insert( (*itr).second);
             }
          }
          proposal_create_operation cop = proposal_create_operation::committee_proposal(
@@ -488,18 +488,18 @@ BOOST_AUTO_TEST_CASE( htlc_hardfork_test )
          const chain_parameters& existing_params = db.get_global_properties().parameters;
          const fee_schedule_type& existing_fee_schedule = *(existing_params.current_fees);
          // create a new fee_shedule
-         fee_schedule_type new_fee_schedule;
-         new_fee_schedule.scale = existing_fee_schedule.scale;
+         std::shared_ptr<fee_schedule_type> new_fee_schedule = std::make_shared<fee_schedule_type>();
+         new_fee_schedule->scale = existing_fee_schedule.scale;
          // replace the old with the new
          flat_map<uint64_t, graphene::chain::fee_parameters> params_map = get_htlc_fee_parameters();
          for(auto param : existing_fee_schedule.parameters)
          {
             auto itr = params_map.find(param.which());
             if (itr == params_map.end())
-               new_fee_schedule.parameters.insert(param);
+               new_fee_schedule->parameters.insert(param);
             else
             {
-               new_fee_schedule.parameters.insert( (*itr).second);
+               new_fee_schedule->parameters.insert( (*itr).second);
             }
          }
          proposal_create_operation cop = proposal_create_operation::committee_proposal(db.get_global_properties().parameters, db.head_block_time());
@@ -545,8 +545,12 @@ BOOST_AUTO_TEST_CASE( htlc_hardfork_test )
       generate_block();   // get the maintenance skip slots out of the way
 
       BOOST_TEST_MESSAGE( "Verify that the change has been implemented" );
+      
       BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 2048u);
-      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<htlc_create_operation>().fee, 2 * GRAPHENE_BLOCKCHAIN_PRECISION);
+      const graphene::chain::fee_schedule& current_fee_schedule = *(db.get_global_properties().parameters.current_fees);
+      const htlc_create_operation::fee_parameters_type& htlc_fee 
+            = current_fee_schedule.get<htlc_create_operation>();
+      BOOST_CHECK_EQUAL(htlc_fee.fee, 2 * GRAPHENE_BLOCKCHAIN_PRECISION);
       
 } FC_LOG_AND_RETHROW() }
 
@@ -827,5 +831,159 @@ try {
 
 } FC_LOG_AND_RETHROW()
 }
+
+BOOST_AUTO_TEST_CASE(htlc_database_api) {
+try {
+
+   ACTORS((alice)(bob)(carl)(dan));
+
+   int64_t init_balance(100 * GRAPHENE_BLOCKCHAIN_PRECISION);
+
+   transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
+
+   generate_blocks(HARDFORK_CORE_1468_TIME);
+   set_expiration( db, trx );
+
+   set_committee_parameters(this);
+
+   uint16_t preimage_size = 256;
+   std::vector<char> pre_image(256);
+   std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned char> rbe;
+   std::generate(begin(pre_image), end(pre_image), std::ref(rbe));
+   graphene::chain::htlc_id_type alice_htlc_id_bob;
+   graphene::chain::htlc_id_type alice_htlc_id_carl;
+   graphene::chain::htlc_id_type alice_htlc_id_dan;
+
+   generate_block();
+   set_expiration( db, trx );
+   trx.clear();
+   // alice puts a htlc contract to bob
+   {
+      graphene::chain::htlc_create_operation create_operation;
+      BOOST_TEST_MESSAGE("Alice, who has 100 coins, is transferring 3 coins to Bob");
+      create_operation.amount = graphene::chain::asset( 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
+      create_operation.to = bob_id;
+      create_operation.claim_period_seconds = 60;
+      create_operation.preimage_hash = hash_it<fc::sha256>( pre_image );
+      create_operation.preimage_size = preimage_size;
+      create_operation.from = alice_id;
+      create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
+      trx.operations.push_back(create_operation);
+      sign(trx, alice_private_key);
+      PUSH_TX(db, trx, ~0);
+      trx.clear();
+      set_expiration( db, trx );
+      graphene::chain::signed_block blk = generate_block();
+      processed_transaction alice_trx = blk.transactions[0];
+      alice_htlc_id_bob = alice_trx.operation_results[0].get<object_id_type>();
+      generate_block();
+      set_expiration( db, trx );
+   }
+
+   trx.clear();
+   // alice puts a htlc contract to carl
+   {
+      graphene::chain::htlc_create_operation create_operation;
+      BOOST_TEST_MESSAGE("Alice, who has 100 coins, is transferring 3 coins to Carl");
+      create_operation.amount = graphene::chain::asset( 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
+      create_operation.to = carl_id;
+      create_operation.claim_period_seconds = 60;
+      create_operation.preimage_hash = hash_it<fc::sha256>( pre_image );
+      create_operation.preimage_size = preimage_size;
+      create_operation.from = alice_id;
+      create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
+      trx.operations.push_back(create_operation);
+      sign(trx, alice_private_key);
+      PUSH_TX(db, trx, ~0);
+      trx.clear();
+      set_expiration( db, trx );
+      graphene::chain::signed_block blk = generate_block();
+      processed_transaction alice_trx = blk.transactions[0];
+      alice_htlc_id_carl = alice_trx.operation_results[0].get<object_id_type>();
+      generate_block();
+      set_expiration( db, trx );
+   }
+
+   trx.clear();
+   // alice puts a htlc contract to dan
+   {
+      graphene::chain::htlc_create_operation create_operation;
+      BOOST_TEST_MESSAGE("Alice, who has 100 coins, is transferring 3 coins to Dan");
+      create_operation.amount = graphene::chain::asset( 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
+      create_operation.to = dan_id;
+      create_operation.claim_period_seconds = 60;
+      create_operation.preimage_hash = hash_it<fc::sha256>( pre_image );
+      create_operation.preimage_size = preimage_size;
+      create_operation.from = alice_id;
+      create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
+      trx.operations.push_back(create_operation);
+      sign(trx, alice_private_key);
+      PUSH_TX(db, trx, ~0);
+      trx.clear();
+      set_expiration( db, trx );
+      graphene::chain::signed_block blk = generate_block();
+      processed_transaction alice_trx = blk.transactions[0];
+      alice_htlc_id_dan = alice_trx.operation_results[0].get<object_id_type>();
+      generate_block();
+      set_expiration( db, trx );
+   }
+
+   graphene::app::database_api db_api(db, &(this->app.get_options()) ) ;
+
+   auto htlc = db_api.get_htlc(alice_htlc_id_bob);
+   BOOST_CHECK_EQUAL( htlc->id.instance(), 0);
+   BOOST_CHECK_EQUAL( htlc->transfer.from.instance.value, 16 );
+   BOOST_CHECK_EQUAL( htlc->transfer.to.instance.value, 17 );
+
+   htlc = db_api.get_htlc(alice_htlc_id_carl);
+   BOOST_CHECK_EQUAL( htlc->id.instance(), 1);
+   BOOST_CHECK_EQUAL( htlc->transfer.from.instance.value, 16 );
+   BOOST_CHECK_EQUAL( htlc->transfer.to.instance.value, 18 );
+
+   htlc = db_api.get_htlc(alice_htlc_id_dan);
+   BOOST_CHECK_EQUAL( htlc->id.instance(), 2);
+   BOOST_CHECK_EQUAL( htlc->transfer.from.instance.value, 16 );
+   BOOST_CHECK_EQUAL( htlc->transfer.to.instance.value, 19 );
+
+   auto htlcs_alice = db_api.get_htlc_by_from(alice.name, graphene::chain::htlc_id_type(0), 100);
+   BOOST_CHECK_EQUAL( htlcs_alice.size(), 3 );
+   BOOST_CHECK_EQUAL( htlcs_alice[0].id.instance(), 0 );
+   BOOST_CHECK_EQUAL( htlcs_alice[1].id.instance(), 1 );
+   BOOST_CHECK_EQUAL( htlcs_alice[2].id.instance(), 2 );
+
+   htlcs_alice = db_api.get_htlc_by_from(alice.name, graphene::chain::htlc_id_type(1), 1);
+   BOOST_CHECK_EQUAL( htlcs_alice.size(), 1 );
+   BOOST_CHECK_EQUAL( htlcs_alice[0].id.instance(), 1 );
+
+   htlcs_alice = db_api.get_htlc_by_from(alice.name, graphene::chain::htlc_id_type(1), 2);
+   BOOST_CHECK_EQUAL( htlcs_alice.size(), 2 );
+   BOOST_CHECK_EQUAL( htlcs_alice[0].id.instance(), 1 );
+   BOOST_CHECK_EQUAL( htlcs_alice[1].id.instance(), 2 );
+
+   auto htlcs_bob = db_api.get_htlc_by_to(bob.name, graphene::chain::htlc_id_type(0), 100);
+   BOOST_CHECK_EQUAL( htlcs_bob.size(), 1 );
+   BOOST_CHECK_EQUAL( htlcs_bob[0].id.instance(), 0 );
+
+   auto htlcs_carl = db_api.get_htlc_by_to(carl.name, graphene::chain::htlc_id_type(0), 100);
+   BOOST_CHECK_EQUAL( htlcs_carl.size(), 1 );
+   BOOST_CHECK_EQUAL( htlcs_carl[0].id.instance(), 1 );
+
+   auto htlcs_dan = db_api.get_htlc_by_to(dan.name, graphene::chain::htlc_id_type(0), 100);
+   BOOST_CHECK_EQUAL( htlcs_dan.size(), 1 );
+   BOOST_CHECK_EQUAL( htlcs_dan[0].id.instance(), 2 );
+
+   auto full = db_api.get_full_accounts({alice.name}, false);
+   BOOST_CHECK_EQUAL( full[alice.name].htlcs.size(), 3 );
+
+   full = db_api.get_full_accounts({bob.name}, false);
+   BOOST_CHECK_EQUAL( full[bob.name].htlcs.size(), 1 );
+
+} catch (fc::exception &e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -91,4 +91,44 @@ void required_approval_index::object_removed( const object& obj )
        remove( a, p.id );
 }
 
+void required_approval_index::insert_or_remove_delta( proposal_id_type p,
+                                                      const flat_set<account_id_type>& before,
+                                                      const flat_set<account_id_type>& after )
+{
+    auto b = before.begin();
+    auto a = after.begin();
+    while( b != before.end() || a != after.end() )
+    {
+       if( a == after.end() || (b != before.end() && *b < *a) )
+       {
+           remove( *b, p );
+           ++b;
+       }
+       else if( b == before.end() || (a != after.end() && *a < *b) )
+       {
+           _account_to_proposals[*a].insert( p );
+           ++a;
+       }
+       else // *a == *b
+       {
+           ++a;
+           ++b;
+       }
+    }
+}
+
+void required_approval_index::about_to_modify( const object& before )
+{
+    const proposal_object& p = static_cast<const proposal_object&>(before);
+    available_active_before_modify = p.available_active_approvals;
+    available_owner_before_modify  = p.available_owner_approvals;
+}
+
+void required_approval_index::object_modified( const object& after )
+{
+    const proposal_object& p = static_cast<const proposal_object&>(after);
+    insert_or_remove_delta( p.id, available_active_before_modify, p.available_active_approvals );
+    insert_or_remove_delta( p.id, available_owner_before_modify,  p.available_owner_approvals );
+}
+
 } } // graphene::chain

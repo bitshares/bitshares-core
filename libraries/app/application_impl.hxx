@@ -41,6 +41,7 @@ class application_impl : public net::node_delegate
       }
 
       void set_dbg_init_key( graphene::chain::genesis_state_type& genesis, const std::string& init_key );
+      void set_api_limit();
 
       void startup();
 
@@ -66,7 +67,7 @@ class application_impl : public net::node_delegate
 
       virtual void handle_transaction(const graphene::net::trx_message& transaction_message) override;
 
-      void handle_message(const graphene::net::message& message_to_process);
+      void handle_message(const graphene::net::message& message_to_process) override;
 
       bool is_included_block(const graphene::chain::block_id_type& block_id);
 

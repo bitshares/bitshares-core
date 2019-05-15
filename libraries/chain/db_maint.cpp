@@ -311,7 +311,7 @@ void database::update_active_committee_members()
    if( stake_target > 0 )
    {
       while( (committee_member_count < _committee_count_histogram_buffer.size() - 1)
-             && (stake_tally <= stake_target) )
+             && (stake_tally <= stake_target.value) )
       {
          stake_tally += _committee_count_histogram_buffer[++committee_member_count];
       }
@@ -1232,11 +1232,11 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    update_active_committee_members();
    update_worker_votes();
 
-   const dynamic_global_property_object& dgpo = get_dynamic_global_properties();
-
+   const auto& dgpo = get_dynamic_global_properties();
+   
    modify(gpo, [&dgpo](global_property_object& p) {
       // Remove scaling of account registration fee
-      p.parameters.current_fees->get<account_create_operation>().basic_fee >>= p.parameters.account_fee_scale_bitshifts *
+      p.parameters.get_mutable_fees().get<account_create_operation>().basic_fee >>= p.parameters.account_fee_scale_bitshifts *
             (dgpo.accounts_registered_this_interval / p.parameters.accounts_per_fee_scale);
 
       if( p.pending_parameters )
