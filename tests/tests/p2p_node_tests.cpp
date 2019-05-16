@@ -175,15 +175,14 @@ public:
    std::shared_ptr<graphene::net::message> message_received;
    void send_message(const graphene::net::message& message_to_send, size_t message_send_time_field_offset = (size_t)-1) override
    {
-      if ( message_to_send.msg_type == graphene::net::core_message_type_enum::address_message_type )
-      {
+      try {
          // make a copy
          graphene::net::address_message m = message_to_send.as<graphene::net::address_message>();
          std::shared_ptr<graphene::net::message> msg_ptr = std::make_shared<graphene::net::message>(m);
          // store it for later
          message_received = msg_ptr;
          return;
-      }
+      } catch (...) {}
       message_received = nullptr;
    }
 public:
