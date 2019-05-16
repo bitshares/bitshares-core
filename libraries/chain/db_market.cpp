@@ -821,9 +821,7 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
    const account_object& seller = order.seller(*this);
    const asset_object& recv_asset = receives.asset_id(*this);
 
-   auto issuer_fees = ( head_block_time() < HARDFORK_1268_TIME ) ? 
-      pay_market_fees(recv_asset, receives) : 
-      pay_market_fees(seller, recv_asset, receives);
+   auto issuer_fees = pay_market_fees(seller, recv_asset, receives);
 
    pay_order( seller, receives - issuer_fees, pays );
 
@@ -934,7 +932,7 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
 { try {
    bool filled = false;
 
-   auto issuer_fees = pay_market_fees(get(receives.asset_id), receives);
+   auto issuer_fees = pay_market_fees( account_object(), get(receives.asset_id), receives);
 
    if( pays < settle.balance )
    {
@@ -1206,24 +1204,6 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
    return percent_fee;
 }
 
-asset database::pay_market_fees( const asset_object& recv_asset, const asset& receives )
-{
-   auto issuer_fees = calculate_market_fee( recv_asset, receives );
-   FC_ASSERT( issuer_fees <= receives, "Market fee shouldn't be greater than receives");
-
-   //Don't dirty undo state if not actually collecting any fees
-   if( issuer_fees.amount > 0 )
-   {
-      const auto& recv_dyn_data = recv_asset.dynamic_asset_data_id(*this);
-      modify( recv_dyn_data, [&]( asset_dynamic_data_object& obj ){
-                   //idump((issuer_fees));
-         obj.accumulated_fees += issuer_fees.amount;
-      });
-   }
-
-   return issuer_fees;
-}
-
 asset database::pay_market_fees(const account_object& seller, const asset_object& recv_asset, const asset& receives )
 {
    const auto issuer_fees = calculate_market_fee( recv_asset, receives );
@@ -1235,6 +1215,8 @@ asset database::pay_market_fees(const account_object& seller, const asset_object
       asset reward = recv_asset.amount(0);
 
       auto is_rewards_allowed = [&recv_asset, &seller]() {
+         if (seller.id == account_object().id)
+            return false;
          const auto &white_list = recv_asset.options.extensions.value.whitelist_market_fee_sharing;
          return ( !white_list || (*white_list).empty() || ( (*white_list).find(seller.registrar) != (*white_list).end() ) );
       };
