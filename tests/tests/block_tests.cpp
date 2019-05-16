@@ -780,6 +780,10 @@ BOOST_AUTO_TEST_CASE( tapos )
    }
 }
 
+/*****
+ * Important: The next two tests run for a very long time. They SHOULD NOT be run
+ * as part of the normal test suite
+ * 
 BOOST_AUTO_TEST_CASE( big_block_p2p )
 {
    try
@@ -830,10 +834,6 @@ BOOST_AUTO_TEST_CASE( big_block_p2p )
    
 }
 
-/*****
- * Important: This test runs for a very long time. It SHOULD NOT be run
- * as part of the normal test suite
- * 
 BOOST_AUTO_TEST_CASE( big_transaction_p2p )
 {
    try
