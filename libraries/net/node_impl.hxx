@@ -1,8 +1,12 @@
 #pragma once
 #include <memory>
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics.hpp>
+#include <boost/accumulators/statistics/rolling_mean.hpp>
 #include <fc/thread/thread.hpp>
 #include <fc/log/logger.hpp>
 #include <fc/network/tcp_socket.hpp>
+#include <fc/network/rate_limiting.hpp>
 #include <graphene/chain/config.hpp>
 #include <graphene/protocol/types.hpp>
 #include <graphene/net/node.hpp>
@@ -10,6 +14,81 @@
 #include <graphene/net/peer_connection.hpp>
 
 namespace graphene { namespace net { namespace detail {
+
+namespace bmi = boost::multi_index;
+class blockchain_tied_message_cache
+{
+private:
+  static const uint32_t cache_duration_in_blocks = GRAPHENE_NET_MESSAGE_CACHE_DURATION_IN_BLOCKS;
+
+  struct message_hash_index{};
+  struct message_contents_hash_index{};
+  struct block_clock_index{};
+  struct message_info
+  {
+    message_hash_type message_hash;
+    message           message_body;
+    uint32_t          block_clock_when_received;
+
+    // for network performance stats
+    message_propagation_data propagation_data;
+    fc::uint160_t     message_contents_hash; // hash of whatever the message contains (if it's a transaction, this is the transaction id, if it's a block, it's the block_id)
+
+    message_info( const message_hash_type& message_hash,
+                  const message&           message_body,
+                  uint32_t                 block_clock_when_received,
+                  const message_propagation_data& propagation_data,
+                  fc::uint160_t            message_contents_hash ) :
+      message_hash( message_hash ),
+      message_body( message_body ),
+      block_clock_when_received( block_clock_when_received ),
+      propagation_data( propagation_data ),
+      message_contents_hash( message_contents_hash )
+    {}
+  };
+  typedef boost::multi_index_container
+    < message_info,
+        bmi::indexed_by< bmi::ordered_unique< bmi::tag<message_hash_index>,
+                                              bmi::member<message_info, message_hash_type, &message_info::message_hash> >,
+                          bmi::ordered_non_unique< bmi::tag<message_contents_hash_index>,
+                                                  bmi::member<message_info, fc::uint160_t, &message_info::message_contents_hash> >,
+                          bmi::ordered_non_unique< bmi::tag<block_clock_index>,
+                                                  bmi::member<message_info, uint32_t, &message_info::block_clock_when_received> > >
+    > message_cache_container;
+
+  message_cache_container _message_cache;
+
+  uint32_t block_clock;
+
+public:
+  blockchain_tied_message_cache() :
+    block_clock( 0 )
+  {}
+  void block_accepted();
+  void cache_message( const message& message_to_cache, const message_hash_type& hash_of_message_to_cache,
+                    const message_propagation_data& propagation_data, const fc::uint160_t& message_content_hash );
+  message get_message( const message_hash_type& hash_of_message_to_lookup );
+  message_propagation_data get_message_propagation_data( const fc::uint160_t& hash_of_message_contents_to_lookup ) const;
+  size_t size() const { return _message_cache.size(); }
+};
+
+// This specifies configuration info for the local node.  It's stored as JSON
+// in the configuration directory (application data directory)
+struct node_configuration
+{
+  node_configuration() : accept_incoming_connections(true), wait_if_endpoint_is_busy(true) {}
+
+  fc::ip::endpoint listen_endpoint;
+  bool accept_incoming_connections;
+  bool wait_if_endpoint_is_busy;
+  /**
+   * Originally, our p2p code just had a 'node-id' that was a random number identifying this node
+   * on the network.  This is now a private key/public key pair, where the public key is used
+   * in place of the old random node-id.  The private part is unused, but might be used in
+   * the future to support some notion of trusted peers.
+   */
+  fc::ecc::private_key private_key;
+};
 
 // when requesting items from peers, we want to prioritize any blocks before
 // transactions, but otherwise request items in the order we heard about them
@@ -166,8 +245,16 @@ private:
 class node_impl : public peer_connection_delegate
 {
     public:
+      class address_builder
+      {
+        public:
+          virtual void build( node_impl* impl, address_message& ) = 0;
+        protected:
+          address_info update_address_record( node_impl* impl, const peer_connection_ptr& active_peer);
+      };
 #ifdef P2P_IN_DEDICATED_THREAD
       std::shared_ptr<fc::thread> _thread;
+      std::shared_ptr<fc::thread> get_thread() { return _thread; }
 #endif // P2P_IN_DEDICATED_THREAD
       std::unique_ptr<statistics_gathering_node_delegate_wrapper> _delegate;
       fc::sha256           _chain_id;
@@ -292,8 +379,6 @@ class node_impl : public peer_connection_delegate
 
       uint32_t _last_reported_number_of_connections; // number of connections last reported to the client (to avoid sending duplicate messages)
 
-      bool _peer_advertising_disabled;
-
       fc::future<void> _fetch_updated_peer_lists_loop_done;
 
       boost::circular_buffer<uint32_t> _average_network_read_speed_seconds;
@@ -382,6 +467,9 @@ class node_impl : public peer_connection_delegate
 
       void on_message( peer_connection* originating_peer,
                        const message& received_message ) override;
+      
+      void call_by_message_type( peer_connection* originating_peer,
+          const message& received_message );
 
       void on_hello_message( peer_connection* originating_peer,
                              const hello_message& hello_message_received );
@@ -394,6 +482,8 @@ class node_impl : public peer_connection_delegate
 
       void on_address_request_message( peer_connection* originating_peer,
                                        const address_request_message& address_request_message_received );
+      
+      std::shared_ptr<address_builder> _address_builder = nullptr;
 
       void on_address_message( peer_connection* originating_peer,
                                const address_message& address_message_received );
@@ -482,6 +572,8 @@ class node_impl : public peer_connection_delegate
       void listen_to_p2p_network();
       void connect_to_p2p_network();
       void add_node( const fc::ip::endpoint& ep );
+      void set_advertise_algorithm( std::string algo, const fc::optional<std::vector<std::string>>& advertise_list );
+      void add_seed_node( const std::string& seed_string );
       void initiate_connect_to(const peer_connection_ptr& peer);
       void connect_to_endpoint(const fc::ip::endpoint& ep);
       void listen_on_endpoint(const fc::ip::endpoint& ep , bool wait_if_not_available);
@@ -509,7 +601,7 @@ class node_impl : public peer_connection_delegate
       void                       set_total_bandwidth_limit( uint32_t upload_bytes_per_second, uint32_t download_bytes_per_second );
       void                       disable_peer_advertising();
       fc::variant_object         get_call_statistics() const;
-      message                    get_message_for_item(const item_id& item) override;
+      graphene::net::message     get_message_for_item(const item_id& item) override;
 
       fc::variant_object         network_get_info() const;
       fc::variant_object         network_get_usage_stats() const;
@@ -519,3 +611,8 @@ class node_impl : public peer_connection_delegate
     }; // end class node_impl
 
 }}} // end of namespace graphene::net::detail
+
+FC_REFLECT(graphene::net::detail::node_configuration, (listen_endpoint)
+                                                 (accept_incoming_connections)
+                                                 (wait_if_endpoint_is_busy)
+                                                 (private_key));

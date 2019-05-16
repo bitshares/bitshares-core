@@ -269,7 +269,9 @@ namespace graphene { namespace net
       unsigned _send_message_queue_tasks_running = 0; // temporary debugging
 #endif
       bool _currently_handling_message = false; // true while we're in the middle of handling a message from the remote system
+    protected:
       peer_connection(peer_connection_delegate* delegate);
+    private:
       void destroy();
     public:
       static peer_connection_ptr make_shared(peer_connection_delegate* delegate); // use this instead of the constructor
@@ -283,7 +285,7 @@ namespace graphene { namespace net
       void on_connection_closed(message_oriented_connection* originating_connection) override;
 
       void send_queueable_message(std::unique_ptr<queued_message>&& message_to_send);
-      void send_message(const message& message_to_send, size_t message_send_time_field_offset = (size_t)-1);
+      virtual void send_message(const message& message_to_send, size_t message_send_time_field_offset = (size_t)-1);
       void send_item(const item_id& item_to_send);
       void close_connection();
       void destroy_connection();
