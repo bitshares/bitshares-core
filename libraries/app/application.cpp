@@ -343,6 +343,21 @@ void application_impl::set_api_limit() {
    if(_options->count("api-limit-get-htlc-by")) {
       _app_options.api_limit_get_htlc_by = _options->at("api-limit-get-htlc-by").as<uint64_t>();
    }
+   if(_options->count("api-limit-get-full-accounts")) {
+      _app_options.api_limit_get_full_accounts = _options->at("api-limit-get-full-accounts").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-full-accounts-lists")) {
+      _app_options.api_limit_get_full_accounts_lists = _options->at("api-limit-get-full-accounts-lists").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-call-orders")) {
+      _app_options.api_limit_get_call_orders = _options->at("api-limit-get-call-orders").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-settle-orders")) {
+      _app_options.api_limit_get_settle_orders = _options->at("api-limit-get-settle-orders").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-assets")) {
+      _app_options.api_limit_get_assets = _options->at("api-limit-get-assets").as<uint64_t>();
+   }
 }
 
 void application_impl::startup()
@@ -1020,6 +1035,18 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For asset_api::get_asset_holders to set its default limit value as 100")
 		   ("api-limit-get-key-references",boost::program_options::value<uint64_t>()->default_value(100),
 		    "For database_api_impl::get_key_references to set its default limit value as 100")
+         ("api-limit-get-htlc-by",boost::program_options::value<uint64_t>()->default_value(100),
+          "For database_api_impl::get_htlc_by_from and get_htlc_by_to to set its default limit value as 100")
+         ("api-limit-get-full-accounts",boost::program_options::value<uint64_t>()->default_value(10),
+          "For database_api_impl::get_full_accounts to set its account default limit values as 10")
+         ("api-limit-get-full-accounts-lists",boost::program_options::value<uint64_t>()->default_value(100),
+          "For database_api_impl::get_full_accounts to set its lists default limit values as 100")
+         ("api-limit-get-call-orders",boost::program_options::value<uint64_t>()->default_value(300),
+          "For database_api_impl::get_call_orders and get_call_orders_by_account to set its default limit values as 300")
+         ("api-limit-get-settle-orders",boost::program_options::value<uint64_t>()->default_value(300),
+          "For database_api_impl::get_settle_orders and get_settle_orders_by_account to set its default limit values as 300")
+         ("api-limit-get-assets",boost::program_options::value<uint64_t>()->default_value(101),
+          "For database_api_impl::list_assets and get_assets_by_issuer to set its default limit values as 101")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()

@@ -425,6 +425,16 @@ class database_api
        */
       uint64_t get_asset_count()const;
 
+      /**
+       * @brief Get asset objects issued from a given account
+       * @param account_name_or_id Account name or ID to get objects from
+       * @param start Asset objects(1.3.X) before this ID will be skipped in results. Pagination purposes.
+       * @param limit Maximum number of orders to retrieve
+       * @return The assets issued by the account
+       */
+      vector<asset_object> get_assets_by_issuer(const std::string& issuer_name_or_id,
+                                                asset_id_type start, uint32_t limit)const;
+
       /////////////////////
       // Markets / feeds //
       /////////////////////
@@ -447,12 +457,32 @@ class database_api
       vector<call_order_object> get_call_orders(const std::string& a, uint32_t limit)const;
 
       /**
+       * @brief Get call orders from a given account
+       * @param account_name_or_id Account name or ID to get objects from
+       * @param start Asset objects(1.3.X) before this ID will be skipped in results. Pagination purposes.
+       * @param limit Maximum number of objects to retrieve
+       * @return The call orders of the account
+       */
+      vector<call_order_object> get_call_orders_by_account(const std::string& account_name_or_id,
+                                                           asset_id_type start, uint32_t limit)const;
+
+      /**
        * @brief Get forced settlement orders in a given asset
        * @param a Symbol or ID of asset being settled
        * @param limit Maximum number of orders to retrieve
        * @return The settle orders, ordered from earliest settlement date to latest
        */
       vector<force_settlement_object> get_settle_orders(const std::string& a, uint32_t limit)const;
+
+      /**
+       * @brief Get forced settlement orders of a given account
+       * @param account_name_or_id Account name or ID to get objects from
+       * @param start Force settlement objects(1.4.X) before this ID will be skipped in results. Pagination purposes.
+       * @param limit Maximum number of orders to retrieve
+       * @return The settle orders of the account
+       */
+      vector<force_settlement_object> get_settle_orders_by_account(const std::string& account_name_or_id,
+                                                                   force_settlement_id_type start, uint32_t limit)const;
 
       /**
        * @brief Get collateral_bid_objects for a given asset
@@ -838,6 +868,7 @@ FC_API(graphene::app::database_api,
    (list_assets)
    (lookup_asset_symbols)
    (get_asset_count)
+   (get_assets_by_issuer)
    (get_asset_id_from_string)
 
    // Markets / feeds
@@ -845,7 +876,9 @@ FC_API(graphene::app::database_api,
    (get_limit_orders)
    (get_account_limit_orders)
    (get_call_orders)
+   (get_call_orders_by_account)
    (get_settle_orders)
+   (get_settle_orders_by_account)
    (get_margin_positions)
    (get_collateral_bids)
    (subscribe_to_market)

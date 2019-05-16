@@ -973,10 +973,10 @@ try {
    BOOST_CHECK_EQUAL( htlcs_dan[0].id.instance(), 2 );
 
    auto full = db_api.get_full_accounts({alice.name}, false);
-   BOOST_CHECK_EQUAL( full[alice.name].htlcs.size(), 3 );
+   BOOST_CHECK_EQUAL( full[alice.name].htlcs_from.size(), 3 );
 
    full = db_api.get_full_accounts({bob.name}, false);
-   BOOST_CHECK_EQUAL( full[bob.name].htlcs.size(), 1 );
+   BOOST_CHECK_EQUAL( full[bob.name].htlcs_to.size(), 1 );
 
 } catch (fc::exception &e) {
       edump((e.to_detail_string()));
