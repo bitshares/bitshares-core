@@ -468,9 +468,6 @@ class node_impl : public peer_connection_delegate
       void on_message( peer_connection* originating_peer,
                        const message& received_message ) override;
       
-      void call_by_message_type( peer_connection* originating_peer,
-          const message& received_message );
-
       void on_hello_message( peer_connection* originating_peer,
                              const hello_message& hello_message_received );
 
