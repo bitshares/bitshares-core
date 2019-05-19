@@ -790,14 +790,19 @@ vector<optional<account_object>> database_api_impl::get_accounts(const vector<st
    std::transform(account_names_or_ids.begin(), account_names_or_ids.end(), std::back_inserter(result),
                   [this](std::string id_or_name) -> optional<account_object> {
 
-      const account_object* account = get_account_from_string(id_or_name);
-      account_id_type id = account->id;
-      if(auto o = _db.find(id))
-      {
-         subscribe_to_item( id );
-         return *o;
+      try {
+         const account_object *account = get_account_from_string(id_or_name);
+         account_id_type id = account->id;
+         if(auto o = _db.find(id))
+         {
+            subscribe_to_item( id );
+            return *o;
+         }
+         return {};
       }
-      return {};
+      catch( ... ) {
+         return {};
+      }
    });
    return result;
 }
