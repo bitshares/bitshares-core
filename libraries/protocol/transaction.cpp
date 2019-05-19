@@ -22,11 +22,13 @@
  * THE SOFTWARE.
  */
 
-#include <graphene/protocol/fee_schedule.hpp>
+#include <graphene/protocol/transaction.hpp>
 #include <graphene/protocol/block.hpp>
 #include <graphene/protocol/exceptions.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
+#include <graphene/protocol/pts_address.hpp>
+
 #include <fc/io/raw.hpp>
-#include <algorithm>
 
 namespace graphene { namespace protocol {
 

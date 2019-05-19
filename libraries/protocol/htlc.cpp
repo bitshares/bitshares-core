@@ -23,6 +23,8 @@
  */
 #include <graphene/protocol/htlc.hpp>
 
+#include <fc/io/raw.hpp>
+
 #define SECONDS_PER_DAY (60 * 60 * 24)
 
 namespace graphene { namespace protocol {
@@ -65,3 +67,12 @@ namespace graphene { namespace protocol {
       return fee_params.fee + per_day_fee;
    }
 } }
+
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_create_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_redeem_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_extend_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_create_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_redeem_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_redeemed_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_extend_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_refund_operation )

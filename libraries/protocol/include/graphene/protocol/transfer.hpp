@@ -23,6 +23,7 @@
  */
 #pragma once
 #include <graphene/protocol/base.hpp>
+#include <graphene/protocol/asset.hpp>
 #include <graphene/protocol/memo.hpp>
 
 namespace graphene { namespace protocol {
@@ -105,3 +106,8 @@ FC_REFLECT( graphene::protocol::override_transfer_operation::fee_parameters_type
 
 FC_REFLECT( graphene::protocol::override_transfer_operation, (fee)(issuer)(from)(to)(amount)(memo)(extensions) )
 FC_REFLECT( graphene::protocol::transfer_operation, (fee)(from)(to)(amount)(memo)(extensions) )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::transfer_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::override_transfer_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::transfer_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::override_transfer_operation )

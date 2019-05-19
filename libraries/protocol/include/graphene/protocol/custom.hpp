@@ -24,6 +24,7 @@
 
 #pragma once
 #include <graphene/protocol/base.hpp>
+#include <graphene/protocol/asset.hpp>
 
 namespace graphene { namespace protocol { 
 
@@ -56,3 +57,6 @@ namespace graphene { namespace protocol {
 
 FC_REFLECT( graphene::protocol::custom_operation::fee_parameters_type, (fee)(price_per_kbyte) )
 FC_REFLECT( graphene::protocol::custom_operation, (fee)(payer)(required_auths)(id)(data) )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::custom_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::custom_operation )

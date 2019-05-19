@@ -24,6 +24,8 @@
 
 #pragma once
 #include <graphene/protocol/base.hpp>
+#include <graphene/protocol/asset.hpp>
+#include <graphene/protocol/authority.hpp>
 
 namespace graphene { namespace protocol {
 
@@ -281,3 +283,10 @@ FC_REFLECT( graphene::protocol::blind_transfer_operation,
 FC_REFLECT( graphene::protocol::transfer_to_blind_operation::fee_parameters_type, (fee)(price_per_output) )
 FC_REFLECT( graphene::protocol::transfer_from_blind_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::protocol::blind_transfer_operation::fee_parameters_type, (fee)(price_per_output) )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::transfer_to_blind_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::transfer_from_blind_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::blind_transfer_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::transfer_to_blind_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::transfer_from_blind_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::blind_transfer_operation )

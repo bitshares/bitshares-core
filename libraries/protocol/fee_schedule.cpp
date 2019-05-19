@@ -24,6 +24,8 @@
 #include <algorithm>
 #include <graphene/protocol/fee_schedule.hpp>
 
+#include <fc/io/raw.hpp>
+
 #define MAX_FEE_STABILIZATION_ITERATION 4
 
 namespace graphene { namespace protocol {
@@ -182,3 +184,5 @@ namespace graphene { namespace protocol {
    }
 
 } } // graphene::protocol
+
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::fee_schedule )

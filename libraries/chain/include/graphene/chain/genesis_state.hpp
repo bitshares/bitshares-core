@@ -23,6 +23,7 @@
  */
 #pragma once
 
+#include <graphene/protocol/address.hpp>
 #include <graphene/protocol/chain_parameters.hpp>
 #include <graphene/chain/types.hpp>
 #include <graphene/chain/immutable_chain_parameters.hpp>

@@ -21,6 +21,7 @@ list(APPEND SOURCES account.cpp
                     market.cpp
                     operations.cpp
                     pts_address.cpp
+                    small_ops.cpp
                     transaction.cpp
                     types.cpp
                     withdraw_permission.cpp

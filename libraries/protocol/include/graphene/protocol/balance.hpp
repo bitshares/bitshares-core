@@ -23,6 +23,8 @@
  */
 #pragma once
 #include <graphene/protocol/base.hpp>
+#include <graphene/protocol/asset.hpp>
+#include <graphene/protocol/authority.hpp>
 
 namespace graphene { namespace protocol { 
 
@@ -57,3 +59,5 @@ namespace graphene { namespace protocol {
 FC_REFLECT( graphene::protocol::balance_claim_operation::fee_parameters_type,  )
 FC_REFLECT( graphene::protocol::balance_claim_operation,
             (fee)(deposit_to_account)(balance_to_claim)(balance_owner_key)(total_claimed) )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::balance_claim_operation )

@@ -25,7 +25,6 @@
 
 #include <memory>
 #include <graphene/protocol/base.hpp>
-#include <graphene/protocol/types.hpp>
 
 namespace graphene { namespace protocol {
    struct fee_schedule;
@@ -94,12 +93,12 @@ namespace graphene { namespace protocol {
 
 } }  // graphene::protocol
 
-FC_REFLECT( graphene::protocol::htlc_options, 
-      (max_timeout_secs) 
-      (max_preimage_size) 
+FC_REFLECT( graphene::protocol::htlc_options,
+      (max_timeout_secs)
+      (max_preimage_size)
 )
 
-FC_REFLECT( graphene::protocol::chain_parameters::ext, 
+FC_REFLECT( graphene::protocol::chain_parameters::ext,
       (updatable_htlc_options)
 )
 
@@ -134,3 +133,5 @@ FC_REFLECT( graphene::protocol::chain_parameters,
             (max_authority_depth)
             (extensions)
           )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::chain_parameters )

@@ -23,6 +23,7 @@
  */
 #pragma once
 #include <graphene/protocol/base.hpp>
+#include <graphene/protocol/asset.hpp>
 
 namespace graphene { namespace protocol { 
    /**
@@ -179,3 +180,10 @@ FC_REFLECT( graphene::protocol::proposal_update_operation, (fee)(fee_paying_acco
             (active_approvals_to_add)(active_approvals_to_remove)(owner_approvals_to_add)(owner_approvals_to_remove)
             (key_approvals_to_add)(key_approvals_to_remove)(extensions) )
 FC_REFLECT( graphene::protocol::proposal_delete_operation, (fee)(fee_paying_account)(using_owner_authority)(proposal)(extensions) )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::proposal_create_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::proposal_update_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::proposal_delete_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::proposal_create_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::proposal_update_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::proposal_delete_operation )

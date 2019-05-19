@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 #include <graphene/chain/balance_evaluator.hpp>
+#include <graphene/protocol/pts_address.hpp>
 
 namespace graphene { namespace chain {
 

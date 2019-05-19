@@ -23,9 +23,6 @@
  */
 #pragma once
 #include <graphene/protocol/operations.hpp>
-#include <graphene/protocol/types.hpp>
-
-#include <numeric>
 
 namespace graphene { namespace protocol {
 

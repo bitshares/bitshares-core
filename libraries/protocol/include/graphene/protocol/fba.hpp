@@ -23,6 +23,7 @@
  */
 #pragma once
 #include <graphene/protocol/base.hpp>
+#include <graphene/protocol/asset.hpp>
 
 namespace graphene { namespace protocol {
 
@@ -46,3 +47,5 @@ struct fba_distribute_operation : public base_operation
 FC_REFLECT( graphene::protocol::fba_distribute_operation::fee_parameters_type,  )
 
 FC_REFLECT( graphene::protocol::fba_distribute_operation, (fee)(account_id)(fba_id)(amount) )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::fba_distribute_operation )

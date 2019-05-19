@@ -50,3 +50,5 @@ struct buyback_account_options
 } }
 
 FC_REFLECT( graphene::protocol::buyback_account_options, (asset_to_buy)(asset_to_buy_issuer)(markets) );
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::buyback_account_options )

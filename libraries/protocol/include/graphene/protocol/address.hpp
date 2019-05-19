@@ -23,20 +23,13 @@
  */
 #pragma once
 
-#include <graphene/protocol/config.hpp>
-#include <graphene/protocol/pts_address.hpp>
+#include <graphene/protocol/types.hpp>
 
-#include <fc/array.hpp>
 #include <fc/crypto/ripemd160.hpp>
-
-namespace fc { namespace ecc {
-    class public_key;
-    typedef fc::array<char,33>  public_key_data;
-} } // fc::ecc
+#include <fc/reflect/typename.hpp>
 
 namespace graphene { namespace protocol {
-
-   struct public_key_type;
+   struct pts_address;
 
    /**
     *  @brief a 160 bit hash of a public key
@@ -51,7 +44,7 @@ namespace graphene { namespace protocol {
    class address
    {
       public:
-       address(); ///< constructs empty / null address
+       address(){} ///< constructs empty / null address
        explicit address( const std::string& base58str );   ///< converts to binary, validates checksum
        address( const fc::ecc::public_key& pub ); ///< converts to binary
        explicit address( const fc::ecc::public_key_data& pub ); ///< converts to binary
@@ -76,5 +69,6 @@ namespace fc
    void from_variant( const fc::variant& var,  graphene::protocol::address& vo, uint32_t max_depth = 1 );
 }
 
-#include <fc/reflect/reflect.hpp>
 FC_REFLECT( graphene::protocol::address, (addr) )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::address )

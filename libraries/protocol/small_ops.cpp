@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2019 BitShares Blockchain Foundation, and contributors.
  *
  * The MIT License
  *
@@ -22,21 +22,18 @@
  * THE SOFTWARE.
  */
 
-#include <graphene/protocol/vote.hpp>
+#include <graphene/protocol/balance.hpp>
+#include <graphene/protocol/buyback.hpp>
+#include <graphene/protocol/fba.hpp>
+#include <graphene/protocol/vesting.hpp>
 
-namespace fc
-{
+#include <fc/io/raw.hpp>
 
-void to_variant( const graphene::protocol::vote_id_type& var, variant& vo, uint32_t max_depth )
-{
-   vo = string(var);
-}
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::balance_claim_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::buyback_account_options )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::fba_distribute_operation )
 
-void from_variant( const variant& var, graphene::protocol::vote_id_type& vo, uint32_t max_depth )
-{
-   vo = graphene::protocol::vote_id_type(var.as_string());
-}
-
-} // fc
-
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::vote_id_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::vesting_balance_create_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::vesting_balance_withdraw_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::vesting_balance_create_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::vesting_balance_withdraw_operation )

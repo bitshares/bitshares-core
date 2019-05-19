@@ -23,6 +23,11 @@
  */
 #pragma once
 
+#include <memory>
+#include <vector>
+#include <deque>
+#include <cstdint>
+
 #include <boost/preprocessor/seq/for_each.hpp>
 #include <boost/preprocessor/seq/transform.hpp>
 #include <boost/preprocessor/seq/elem.hpp>
@@ -30,11 +35,15 @@
 #include <boost/preprocessor/tuple/elem.hpp>
 #include <boost/preprocessor/cat.hpp>
 
+#include <boost/rational.hpp>
+
 #include <fc/container/flat_fwd.hpp>
 #include <fc/io/varint.hpp>
 #include <fc/io/enum_type.hpp>
+#include <fc/crypto/ripemd160.hpp>
 #include <fc/crypto/sha1.hpp>
 #include <fc/crypto/sha224.hpp>
+#include <fc/crypto/sha256.hpp>
 #include <fc/crypto/elliptic.hpp>
 #include <fc/reflect/reflect.hpp>
 #include <fc/reflect/variant.hpp>
@@ -43,22 +52,13 @@
 #include <fc/container/flat.hpp>
 #include <fc/string.hpp>
 
-#include <graphene/protocol/ext.hpp>
-
 #include <fc/io/datastream.hpp>
 #include <fc/io/raw_fwd.hpp>
 #include <fc/uint128.hpp>
 #include <fc/static_variant.hpp>
 
-#include <memory>
-#include <vector>
-#include <deque>
-#include <cstdint>
-#include <graphene/protocol/address.hpp>
 #include <graphene/protocol/object_id.hpp>
 #include <graphene/protocol/config.hpp>
-
-#include <boost/rational.hpp>
 
 #define GRAPHENE_EXTERNAL_SERIALIZATION(ext, type) \
 namespace fc { \
@@ -66,6 +66,7 @@ namespace fc { \
    ext template void to_variant( const type& v, variant& vo, uint32_t max_depth ); \
 namespace raw { \
    ext template void pack< datastream<size_t>, type >( datastream<size_t>& s, const type& tx, uint32_t _max_depth=FC_PACK_MAX_DEPTH ); \
+   ext template void pack< sha256::encoder, type >( sha256::encoder& s, const type& tx, uint32_t _max_depth=FC_PACK_MAX_DEPTH ); \
    ext template void pack< datastream<char*>, type >( datastream<char*>& s, const type& tx, uint32_t _max_depth=FC_PACK_MAX_DEPTH ); \
    ext template void unpack< datastream<const char*>, type >( datastream<const char*>& s, type& tx, uint32_t _max_depth=FC_PACK_MAX_DEPTH ); \
 } } // fc::raw
@@ -231,7 +232,8 @@ struct get_typename<std::shared_ptr<graphene::protocol::fee_schedule>> { static 
 } };
 void from_variant( const fc::variant& var, std::shared_ptr<const graphene::protocol::fee_schedule>& vo,
                    uint32_t max_depth = 2 );
-}
+
+} // fc::raw
 
 GRAPHENE_DEFINE_IDS(protocol, protocol_ids, /*protocol objects are not prefixed*/,
                     (null)
@@ -268,3 +270,12 @@ FC_REFLECT_ENUM(graphene::protocol::asset_issuer_permission_flags,
                 (disable_confidential)
                 (witness_fed_asset)
                 (committee_fed_asset))
+
+namespace fc { namespace raw {
+   extern template void pack( datastream<size_t>& s, const graphene::protocol::public_key_type& tx,
+                              uint32_t _max_depth=FC_PACK_MAX_DEPTH );
+   extern template void pack( datastream<char*>& s, const graphene::protocol::public_key_type& tx,
+                              uint32_t _max_depth=FC_PACK_MAX_DEPTH );
+   extern template void unpack( datastream<const char*>& s, graphene::protocol::public_key_type& tx,
+                                uint32_t _max_depth=FC_PACK_MAX_DEPTH );
+} } // fc::raw

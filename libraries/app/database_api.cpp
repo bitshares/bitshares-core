@@ -26,6 +26,8 @@
 #include <graphene/app/util.hpp>
 #include <graphene/chain/get_config.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/protocol/address.hpp>
+#include <graphene/protocol/pts_address.hpp>
 
 #include <fc/bloom_filter.hpp>
 #include <fc/crypto/hex.hpp>

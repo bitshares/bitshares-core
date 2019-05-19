@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <graphene/protocol/config.hpp>
+
 #include <graphene/protocol/types.hpp>
 #include <graphene/protocol/fee_schedule.hpp>
 
@@ -112,4 +112,11 @@ namespace fc
         from_variant(var, const_cast<graphene::protocol::fee_schedule&>(*vo), max_depth);
     }
 
-} // fc
+namespace raw {
+   template void pack( datastream<size_t>& s, const graphene::protocol::public_key_type& tx,
+                       uint32_t _max_depth=FC_PACK_MAX_DEPTH );
+   template void pack( datastream<char*>& s, const graphene::protocol::public_key_type& tx,
+                       uint32_t _max_depth=FC_PACK_MAX_DEPTH );
+   template void unpack( datastream<const char*>& s, graphene::protocol::public_key_type& tx,
+                         uint32_t _max_depth=FC_PACK_MAX_DEPTH );
+} } // fc::raw
