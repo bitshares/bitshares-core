@@ -221,7 +221,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          return tmp;
       }
 
-      const account_object* get_account_from_string( const std::string& name_or_id ) const
+      const account_object* get_account_from_string( const std::string& name_or_id, bool should_throw = true) const
       {
          // TODO cache the result to avoid repeatly fetching from db
          FC_ASSERT( name_or_id.size() > 0);
@@ -235,7 +235,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             if (itr != idx.end())
                account = &*itr;
          }
-         FC_ASSERT( account, "no such account" );
+         if(should_throw)
+            FC_ASSERT( account, "no such account" );
          return account;
       }
 
@@ -790,19 +791,12 @@ vector<optional<account_object>> database_api_impl::get_accounts(const vector<st
    std::transform(account_names_or_ids.begin(), account_names_or_ids.end(), std::back_inserter(result),
                   [this](std::string id_or_name) -> optional<account_object> {
 
-      try {
-         const account_object *account = get_account_from_string(id_or_name);
-         account_id_type id = account->id;
-         if(auto o = _db.find(id))
-         {
-            subscribe_to_item( id );
-            return *o;
-         }
+      const account_object *account = get_account_from_string(id_or_name, false);
+      if(account == nullptr)
          return {};
-      }
-      catch( ... ) {
-         return {};
-      }
+      account_id_type id = account->id;
+      subscribe_to_item( id );
+      return *account;
    });
    return result;
 }
