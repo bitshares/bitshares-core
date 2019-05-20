@@ -155,11 +155,11 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       {
          std::string algo = _options->at("advertise-peer-algorithm").as<string>();
          fc::optional<std::vector<std::string>> list;
-         if ( algo == "list" && _options->count("advertise-list") )
-            list = _options->at("advertise-list").as<std::vector<std::string>>();
-         else if ( algo == "exclude-list" && _options->count("exclude-list") )
-            list = _options->at("exclude-list").as<std::vector<std::string>>();
-         _p2p_network->set_advertise_algorithm( _options->at("advertise-peer-algorithm").as<string>(), list);
+         if ( algo == "list" && _options->count("advertise-peer-list") )
+            list = _options->at("advertise-peer-list").as<std::vector<std::string>>();
+         else if ( algo == "exclude_list" && _options->count("exclude-peer-list") )
+            list = _options->at("exclude-peer-list").as<std::vector<std::string>>();
+         _p2p_network->set_advertise_algorithm( algo, list);
       }
    }
 

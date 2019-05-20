@@ -231,7 +231,7 @@ namespace graphene { namespace net { namespace detail {
         public:
         exclude_address_builder(const fc::optional<std::vector<std::string>>& address_list)
         {
-          FC_ASSERT( address_list.valid(), "advertise-peer-list must be included" );
+          FC_ASSERT( address_list.valid(), "exclude-peer-list must be included" );
           std::for_each(address_list->begin(), address_list->end(), [&exclude_list = exclude_list](std::string input)
               {
                 exclude_list.insert(input);
