@@ -221,7 +221,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          return tmp;
       }
 
-      const account_object* get_account_from_string( const std::string& name_or_id, bool should_throw = true) const
+      const account_object* get_account_from_string( const std::string& name_or_id, bool throw_if_not_found = true ) const
       {
          // TODO cache the result to avoid repeatly fetching from db
          FC_ASSERT( name_or_id.size() > 0);
@@ -235,12 +235,12 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             if (itr != idx.end())
                account = &*itr;
          }
-         if(should_throw)
+         if(throw_if_not_found)
             FC_ASSERT( account, "no such account" );
          return account;
       }
 
-      const asset_object* get_asset_from_string( const std::string& symbol_or_id ) const
+      const asset_object* get_asset_from_string( const std::string& symbol_or_id, bool throw_if_not_found = true ) const
       {
          // TODO cache the result to avoid repeatly fetching from db
          FC_ASSERT( symbol_or_id.size() > 0);
@@ -254,7 +254,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             if (itr != idx.end())
                asset = &*itr;
          }
-         FC_ASSERT( asset, "no such asset" );
+         if(throw_if_not_found)
+            FC_ASSERT( asset, "no such asset" );
          return asset;
       }
       vector<optional<asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const
@@ -903,7 +904,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 
    for (const std::string& account_name_or_id : names_or_ids)
    {
-      const account_object* account = get_account_from_string(account_name_or_id);
+      const account_object* account = get_account_from_string(account_name_or_id, false);
       if (account == nullptr)
          continue;
 
@@ -1270,14 +1271,14 @@ vector<optional<asset_object>> database_api_impl::get_assets(const vector<std::s
    vector<optional<asset_object>> result; result.reserve(asset_symbols_or_ids.size());
    std::transform(asset_symbols_or_ids.begin(), asset_symbols_or_ids.end(), std::back_inserter(result),
                   [this](std::string id_or_name) -> optional<asset_object> {
-      const asset_object* asset = get_asset_from_string(id_or_name);
+
+      const asset_object* asset = get_asset_from_string(id_or_name, false);
+      if(asset == nullptr)
+         return {};
       asset_id_type id = asset->id;
-      if(auto o = _db.find(id))
-      {
-         subscribe_to_item( id );
-         return *o;
-      }
-      return {};
+      subscribe_to_item( id );
+      return *asset;
+
    });
    return result;
 }
