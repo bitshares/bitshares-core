@@ -1697,9 +1697,11 @@ namespace graphene { namespace net { namespace detail {
       std::vector<graphene::net::address_info> updated_addresses = address_message_received.addresses;
       for (address_info& address : updated_addresses)
         address.last_seen_time = fc::time_point_sec(fc::time_point::now());
-      bool new_information_received = merge_address_info_with_potential_peer_database(updated_addresses);
-      if (new_information_received)
-        trigger_p2p_network_connect_loop();
+      if ( _node_configuration.accept_incoming_connections )
+      {
+        if ( merge_address_info_with_potential_peer_database(updated_addresses))
+          trigger_p2p_network_connect_loop();
+      }
 
       if (_handshaking_connections.find(originating_peer->shared_from_this()) != _handshaking_connections.end())
       {
