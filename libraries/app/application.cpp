@@ -142,6 +142,27 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       _p2p_network->add_seed_nodes(seeds);
    }
 
+   if ( _options->count( "disable-peer-advertising" ) )
+   {
+      if ( _options->at( "disable-peer-advertisng").as<bool>() )
+      {
+         _p2p_network->disable_peer_advertising();
+      }
+   } 
+   else
+   {
+      if( _options->count( "advertise-peer-algorithm" ) )
+      {
+         std::string algo = _options->at("advertise-peer-algorithm").as<string>();
+         fc::optional<std::vector<std::string>> list;
+         if ( algo == "list" && _options->count("advertise-list") )
+            list = _options->at("advertise-list").as<std::vector<std::string>>();
+         else if ( algo == "exclude-list" && _options->count("exclude-list") )
+            list = _options->at("exclude-list").as<std::vector<std::string>>();
+         _p2p_network->set_advertise_algorithm( _options->at("advertise-peer-algorithm").as<string>(), list);
+      }
+   }
+
    if( _options->count("p2p-endpoint") )
       _p2p_network->listen_on_endpoint(fc::ip::endpoint::from_string(_options->at("p2p-endpoint").as<string>()), true);
    else
@@ -1034,9 +1055,14 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::get_withdraw_permissions_by_recipient to set max limit value")
           "For database_api_impl::get_order_book to set its default limit value as 50")
          ("accept-incoming-connections", bpo::value<bool>()->implicit_value(true), "Accept incoming connections")
-         ("advertise-peer-algorithm", bpo::value<string>()->implicit_value("all"), "Determines which peers are advertised")
+         ("advertise-peer-algorithm", bpo::value<string>()->implicit_value("all"),
+            "Determines which peers are advertised. Algorithms: 'all', 'nothing', 'list', exclude_list'")
          ("advertise-peer-list", bpo::value<vector<string>>()->composing(), 
             "P2P nodes to advertise (may specify multiple times")
+         ("exclude-peer-list", bpo::value<vector<string>>()->composing(), 
+            "P2P nodes to not advertise (may specify multiple times")
+         ("disable-peer-advertising", bpo::value<bool>()->implicit_value(false), 
+            "Disable advertising your peers. Note: Overrides any advertise-peer-algorithm settings")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
