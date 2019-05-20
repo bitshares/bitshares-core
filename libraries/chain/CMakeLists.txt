@@ -37,6 +37,7 @@ add_library( graphene_chain
 
              genesis_state.cpp
              get_config.cpp
+             exceptions.cpp
 
              evaluator.cpp
              balance_evaluator.cpp
