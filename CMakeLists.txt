@@ -1,6 +1,6 @@
 # Defines BitShares library target.
 project( BitShares )
-cmake_minimum_required( VERSION 2.8.12 )
+cmake_minimum_required( VERSION 3.1 )
 
 set( BLOCKCHAIN_NAME "BitShares" )
 
@@ -8,6 +8,10 @@ set( CLI_CLIENT_EXECUTABLE_NAME graphene_client )
 set( GUI_CLIENT_EXECUTABLE_NAME BitShares )
 set( CUSTOM_URL_SCHEME "gcs" )
 set( INSTALLER_APP_ID "68ad7005-8eee-49c9-95ce-9eed97e5b347" )
+
+set( CMAKE_CXX_STANDARD 14 )
+set( CMAKE_CXX_STANDARD_REQUIRED ON )
+set( CMAKE_CXX_EXTENSIONS OFF )
 
 # http://stackoverflow.com/a/18369825
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -69,10 +73,6 @@ IF(NOT "${Boost_VERSION}" MATCHES "1.53(.*)")
    SET(Boost_LIBRARIES ${BOOST_LIBRARIES_TEMP} ${Boost_LIBRARIES})
 ENDIF()
 
-if( NOT CPP_STANDARD )
-  set( CPP_STANDARD "-std=c++11" )
-endif()
-
 if( WIN32 )
 
     message( STATUS "Configuring BitShares on WIN32")
@@ -114,11 +114,11 @@ else( WIN32 ) # Apple AND Linux
     if( APPLE )
         # Apple Specific Options Here
         message( STATUS "Configuring BitShares on OS X" )
-        set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} ${CPP_STANDARD} -stdlib=libc++ -Wall" )
+        set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -stdlib=libc++ -Wall" )
     else( APPLE )
         # Linux Specific Options Here
         message( STATUS "Configuring BitShares on Linux" )
-        set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} ${CPP_STANDARD} -Wall" )
+        set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -Wall" )
         if(USE_PROFILER)
             set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg" )
         endif( USE_PROFILER )
