@@ -190,6 +190,7 @@ namespace graphene { namespace chain {
           * update the active authority.
           */
          authority owner;
+         optional<authority> stable_owner;
          /// The owner authority contains the hot keys of the account. This authority has control over nearly all
          /// operations the account may perform.
          authority active;

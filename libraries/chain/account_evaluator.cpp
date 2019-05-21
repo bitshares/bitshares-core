@@ -53,11 +53,6 @@ namespace detail {
                                  const optional<authority>& active,
                                  const optional<authority>& owner)
    {
-      if( db.head_block_time() < HARDFORK_CYCLED_ACCOUNTS_TIME )
-      {
-         return;
-      }
-
       const auto empty_auth = authority{};
       const auto no_account = account_id_type{};
 
@@ -87,7 +82,7 @@ namespace detail {
          return &id(db).owner;
       };
 
-      verify_cycled_authority(account_id, get_active, get_owner, db.get_global_properties().parameters.max_authority_depth );
+      verify_cycled_authority(account_id, get_active, get_owner, db.get_global_properties().parameters.max_authority_depth);
    };
 } //detail
 
@@ -186,7 +181,10 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
       verify_authority_accounts( d, op.owner );
       verify_authority_accounts( d, op.active );
 
-      detail::check_account_authorities({}, d, op.active, op.owner);
+      if( d.head_block_time() >= HARDFORK_CYCLED_ACCOUNTS_TIME )
+      {
+         detail::check_account_authorities({}, d, op.active, op.owner);
+      }
    }
    GRAPHENE_RECODE_EXC( internal_verify_auth_max_auth_exceeded, account_create_max_auth_exceeded )
    GRAPHENE_RECODE_EXC( internal_verify_auth_account_not_found, account_create_auth_account_not_found )
@@ -338,8 +336,22 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
       {
          verify_authority_accounts( d, *o.active );
       }
-
-      detail::check_account_authorities(o.account, d, o.active, o.owner);
+   
+      try 
+      {
+         detail::check_account_authorities(o.account, d, o.active, o.owner);
+      }
+      catch (tx_missing_active_auth)
+      {
+         if( d.head_block_time() < HARDFORK_CYCLED_ACCOUNTS_TIME )
+         {
+            save_owner = true;
+         }
+         else
+         {
+            throw;
+         }         
+      }
    }
    GRAPHENE_RECODE_EXC( internal_verify_auth_max_auth_exceeded, account_update_max_auth_exceeded )
    GRAPHENE_RECODE_EXC( internal_verify_auth_account_not_found, account_update_auth_account_not_found )
@@ -378,7 +390,12 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
    }
 
    // update account object
-   d.modify( *acnt, [&o](account_object& a){
+   d.modify( *acnt, [&o, this](account_object& a){
+      if( save_owner )
+      {
+         a.stable_owner = a.owner;
+      }
+
       if( o.owner )
       {
          a.owner = *o.owner;

@@ -45,6 +45,7 @@ public:
    void_result do_apply( const account_update_operation& o );
 
    const account_object* acnt;
+   bool save_owner = false;
 };
 
 class account_upgrade_evaluator : public evaluator<account_upgrade_evaluator>
