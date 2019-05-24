@@ -1162,8 +1162,9 @@ BOOST_AUTO_TEST_CASE( api_limit_get_full_accounts ) {
       accounts.erase(accounts.begin());
       accounts.push_back("nosuchaccount");
 
-      // request fully fails even if 9 accounts are valid
-      GRAPHENE_CHECK_THROW(db_api.get_full_accounts(accounts, false), fc::exception);
+      // non existing accounts will be ignored in the results
+      full_accounts = db_api.get_full_accounts(accounts, false);
+      BOOST_CHECK(full_accounts.size() == 9);
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
