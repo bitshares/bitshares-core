@@ -1152,7 +1152,7 @@ map<string,account_id_type> database_api_impl::lookup_accounts(const string& low
    {
       result.insert(make_pair(itr->name, itr->get_id()));
       if( to_subscribe )
-         subscribe_to_item( itr->get_id() );
+         subscribe_to_item( itr->id );
    }
 
    return result;
