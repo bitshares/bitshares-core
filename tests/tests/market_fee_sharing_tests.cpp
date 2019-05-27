@@ -147,7 +147,7 @@ BOOST_AUTO_TEST_CASE(create_asset_with_additional_options_after_hf)
 
       generate_blocks_past_hf1268();
 
-      uint16_t reward_percent = 100;
+      uint16_t reward_percent = GRAPHENE_100_PERCENT + 1; // 100.01%
       flat_set<account_id_type> whitelist = {issuer_id};
       price price(asset(1, asset_id_type(1)), asset(1));
       uint16_t market_fee_percent = 100;
@@ -156,6 +156,28 @@ BOOST_AUTO_TEST_CASE(create_asset_with_additional_options_after_hf)
       options.value.reward_percent = reward_percent;
       options.value.whitelist_market_fee_sharing = whitelist;
 
+      GRAPHENE_CHECK_THROW(create_user_issued_asset("USD",
+                                                    issuer,
+                                                    charge_market_fee,
+                                                    price,
+                                                    2,
+                                                    market_fee_percent,
+                                                    options),
+                           fc::assert_exception);
+
+      reward_percent = GRAPHENE_100_PERCENT; // 100%
+      options.value.reward_percent = reward_percent;
+      GRAPHENE_CHECK_THROW(create_user_issued_asset("USD",
+                                                    issuer,
+                                                    charge_market_fee,
+                                                    price,
+                                                    2,
+                                                    market_fee_percent,
+                                                    options),
+                           fc::assert_exception);
+
+      reward_percent = GRAPHENE_100_PERCENT - 1; // 99.99%
+      options.value.reward_percent = reward_percent;
       asset_object usd_asset = create_user_issued_asset("USD",
                                                         issuer,
                                                         charge_market_fee,
@@ -197,8 +219,18 @@ BOOST_AUTO_TEST_CASE(update_additional_options_after_hf)
 
       generate_blocks_past_hf1268();
 
-      uint16_t reward_percent = 40;
+      uint16_t reward_percent = GRAPHENE_100_PERCENT + 1; // 100.01%
       flat_set<account_id_type> whitelist = {issuer_id};
+      GRAPHENE_CHECK_THROW(
+                  update_asset(issuer_id, issuer_private_key, usd_asset.get_id(), reward_percent, whitelist),
+                  fc::assert_exception );
+
+      reward_percent = GRAPHENE_100_PERCENT; // 100%
+      GRAPHENE_CHECK_THROW(
+                  update_asset(issuer_id, issuer_private_key, usd_asset.get_id(), reward_percent, whitelist),
+                  fc::assert_exception );
+
+      reward_percent = GRAPHENE_100_PERCENT - 1; // 99.99%
       update_asset(issuer_id, issuer_private_key, usd_asset.get_id(), reward_percent, whitelist);
 
       asset_object updated_asset = usd_asset.get_id()(db);
