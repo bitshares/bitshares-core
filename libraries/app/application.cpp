@@ -246,7 +246,7 @@ std::vector<fc::ip::endpoint> application_impl::resolve_string_to_ip_endpoints(c
 
 void application_impl::new_connection( const fc::http::websocket_connection_ptr& c )
 {
-   auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c, GRAPHENE_NET_MAX_NESTED_OBJECTS);
+   auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(c, GRAPHENE_NET_MAX_NESTED_OBJECTS);
    auto login = std::make_shared<graphene::app::login_api>( std::ref(*_self) );
    login->enable_api("database_api");
 

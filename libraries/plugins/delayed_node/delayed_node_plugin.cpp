@@ -63,7 +63,9 @@ void delayed_node_plugin::plugin_set_program_options(bpo::options_description& c
 
 void delayed_node_plugin::connect()
 {
-   my->client_connection = std::make_shared<fc::rpc::websocket_api_connection>(*my->client.connect(my->remote_endpoint), GRAPHENE_NET_MAX_NESTED_OBJECTS);
+   my->client_connection = std::make_shared<fc::rpc::websocket_api_connection>(
+                              my->client.connect(my->remote_endpoint),
+                              GRAPHENE_NET_MAX_NESTED_OBJECTS );
    my->database_api = my->client_connection->get_remote_api<graphene::app::database_api>(0);
    my->client_connection_closed = my->client_connection->closed.connect([this] {
       connection_failed();

@@ -83,7 +83,7 @@
 
 // explicit instantiation for later use
 namespace fc {
-	template class api<graphene::wallet::wallet_api, identity_member>;
+	template class api<graphene::wallet::wallet_api, identity_member_with_optionals>;
 }
 
 #define BRAIN_KEY_WORD_COUNT 16

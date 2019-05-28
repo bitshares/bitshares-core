@@ -217,7 +217,8 @@ public:
       wallet_data.ws_password = "";
       websocket_connection  = websocket_client.connect( wallet_data.ws_server );
 
-      api_connection = std::make_shared<fc::rpc::websocket_api_connection>(*websocket_connection, GRAPHENE_MAX_NESTED_OBJECTS);
+      api_connection = std::make_shared<fc::rpc::websocket_api_connection>( websocket_connection,
+                                                                            GRAPHENE_MAX_NESTED_OBJECTS );
 
       remote_login_api = api_connection->get_remote_api< graphene::app::login_api >(1);
       BOOST_CHECK(remote_login_api->login( wallet_data.ws_user, wallet_data.ws_password ) );
