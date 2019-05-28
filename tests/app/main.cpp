@@ -32,7 +32,6 @@
 #include <graphene/account_history/account_history_plugin.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
 #include <graphene/witness/witness.hpp>
-#include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 
 #include <fc/thread/thread.hpp>
 #include <fc/smart_ref_impl.hpp>
@@ -224,7 +223,6 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app1.register_plugin< graphene::account_history::account_history_plugin>();
       app1.register_plugin< graphene::market_history::market_history_plugin >();
       app1.register_plugin< graphene::witness_plugin::witness_plugin >();
-      app1.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
       app1.startup_plugins();
       boost::program_options::variables_map cfg;
       cfg.emplace("p2p-endpoint", boost::program_options::variable_value(string("127.0.0.1:3939"), false));
@@ -242,7 +240,6 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app2.register_plugin<account_history::account_history_plugin>();
       app2.register_plugin< graphene::market_history::market_history_plugin >();
       app2.register_plugin< graphene::witness_plugin::witness_plugin >();
-      app2.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
       app2.startup_plugins();
       auto cfg2 = cfg;
       cfg2.erase("p2p-endpoint");
