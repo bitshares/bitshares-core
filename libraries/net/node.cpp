@@ -321,7 +321,7 @@ namespace graphene { namespace net { namespace detail {
       _maximum_blocks_per_peer_during_syncing(GRAPHENE_NET_MAX_BLOCKS_PER_PEER_DURING_SYNCING)
     {
       _rate_limiter.set_actual_rate_time_constant(fc::seconds(2));
-      fc::rand_bytes(&_node_id.data[0], (int)_node_id.size());
+      fc::rand_bytes((char*) _node_id.data(), (int)_node_id.size());
     }
 
     node_impl::~node_impl()
