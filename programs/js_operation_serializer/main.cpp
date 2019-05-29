@@ -103,12 +103,13 @@ bool register_serializer( const string& name, std::function<void()> sr )
 template<typename T> struct js_name { static std::string name(){ return  remove_namespace(fc::get_typename<T>::name()); }; };
 
 template<typename T, size_t N>
-struct js_name<fc::array<T,N>>
+struct js_name<std::array<T,N>>
 {
-   static std::string name(){ return  "fixed_array "+ fc::to_string(N) + ", "  + remove_namespace(fc::get_typename<T>::name()); };
+   static std::string name(){ return  "fixed_array "+ fc::to_string(N) + ", " 
+                                      + remove_namespace(fc::get_typename<T>::name()); };
 };
-template<size_t N>   struct js_name<fc::array<char,N>>    { static std::string name(){ return  "bytes("+ fc::to_string(N) + ")"; }; };
-template<size_t N>   struct js_name<fc::array<uint8_t,N>> { static std::string name(){ return  "bytes("+ fc::to_string(N) + ")"; }; };
+template<size_t N>   struct js_name<std::array<char,N>>   { static std::string name(){ return  "bytes("+ fc::to_string(N) + ")"; }; };
+template<size_t N>   struct js_name<std::array<uint8_t,N>>{ static std::string name(){ return  "bytes("+ fc::to_string(N) + ")"; }; };
 template<typename T> struct js_name< fc::optional<T> >    { static std::string name(){ return "optional(" + js_name<T>::name() + ")"; } };
 template<>           struct js_name< object_id_type >     { static std::string name(){ return "object_id_type"; } };
 template<typename T> struct js_name< fc::flat_set<T> >    { static std::string name(){ return "set(" + js_name<T>::name() + ")"; } };
@@ -226,7 +227,7 @@ struct serializer<T,false>
 };
 
 template<typename T, size_t N>
-struct serializer<fc::array<T,N>,false>
+struct serializer<std::array<T,N>,false>
 {
    static void init() { serializer<T>::init(); }
    static void generate() {}

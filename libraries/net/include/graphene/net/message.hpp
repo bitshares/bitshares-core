@@ -26,7 +26,6 @@
 
 #include <graphene/protocol/types.hpp>
 
-#include <fc/array.hpp>
 #include <fc/io/varint.hpp>
 #include <fc/network/ip.hpp>
 #include <fc/io/raw_fwd.hpp>
