@@ -160,23 +160,31 @@ database_fixture::database_fixture()
    }
    if(current_test_name =="api_limit_get_limit_orders")
    {
-    options.insert(std::make_pair("api-limit-get-limit-orders", boost::program_options::variable_value((uint64_t)350, false)));
-    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+    options.insert(std::make_pair("api-limit-get-limit-orders", boost::program_options::variable_value(
+       (uint64_t)350, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(
+       string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_call_orders")
    {
-    options.insert(std::make_pair("api-limit-get-call-orders", boost::program_options::variable_value((uint64_t)350, false)));
-    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+    options.insert(std::make_pair("api-limit-get-call-orders", boost::program_options::variable_value(
+       (uint64_t)350, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(
+       string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_settle_orders")
    {
-    options.insert(std::make_pair("api-limit-get-settle-orders", boost::program_options::variable_value((uint64_t)350, false)));
-    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+    options.insert(std::make_pair("api-limit-get-settle-orders", boost::program_options::variable_value(
+       (uint64_t)350, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(
+       string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_order_book")
    {
-    options.insert(std::make_pair("api-limit-get-order-book", boost::program_options::variable_value((uint64_t)80, false)));
-    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+    options.insert(std::make_pair("api-limit-get-order-book", boost::program_options::variable_value(
+       (uint64_t)80, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(
+       string("account_history"), false)));
    }
 
    // add account tracking for ahplugin for special test case with track-account enabled
