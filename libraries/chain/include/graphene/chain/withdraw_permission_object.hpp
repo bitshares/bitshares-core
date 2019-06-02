@@ -22,8 +22,9 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/protocol/authority.hpp>
+#include <graphene/protocol/authority.hpp>
 #include <graphene/db/generic_index.hpp>
+#include <graphene/chain/types.hpp>
 #include <boost/multi_index/composite_key.hpp>
 
 namespace graphene { namespace chain {
@@ -112,6 +113,8 @@ namespace graphene { namespace chain {
 
 
 } } // graphene::chain
+
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::withdraw_permission_object)
 
 FC_REFLECT_DERIVED( graphene::chain::withdraw_permission_object, (graphene::db::object),
                     (withdraw_from_account)

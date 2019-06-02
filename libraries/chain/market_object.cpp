@@ -25,6 +25,8 @@
 
 #include <boost/multiprecision/cpp_int.hpp>
 
+#include <functional>
+
 using namespace graphene::chain;
 
 /*
@@ -56,7 +58,8 @@ max_debt_to_cover = max_amount_to_sell * match_price
 */
 share_type call_order_object::get_max_debt_to_cover( price match_price,
                                                      price feed_price,
-                                                     const uint16_t maintenance_collateral_ratio )const
+                                                     const uint16_t maintenance_collateral_ratio,
+                                                     const optional<price>& maintenance_collateralization )const
 { try {
    // be defensive here, make sure feed_price is in collateral / debt format
    if( feed_price.base.asset_id != call_price.base.asset_id )
@@ -65,13 +68,33 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
    FC_ASSERT( feed_price.base.asset_id == call_price.base.asset_id
               && feed_price.quote.asset_id == call_price.quote.asset_id );
 
-   if( call_price > feed_price ) // feed protected. be defensive here, although this should be guaranteed by caller
+   bool after_core_hardfork_1270 = maintenance_collateralization.valid();
+
+   // be defensive here, make sure maintenance_collateralization is in collateral / debt format
+   if( after_core_hardfork_1270 )
+   {
+      FC_ASSERT( maintenance_collateralization->base.asset_id == call_price.base.asset_id
+                 && maintenance_collateralization->quote.asset_id == call_price.quote.asset_id );
+   }
+
+   // According to the feed protection rule (https://github.com/cryptonomex/graphene/issues/436),
+   // a call order should only be called when its collateral ratio is not higher than required maintenance collateral ratio.
+   // Although this should be guaranteed by the caller of this function, we still check here to be defensive.
+   // Theoretically this check can be skipped for better performance.
+   //
+   // Before core-1270 hard fork, we check with call_price; afterwards, we check with collateralization().
+   if( ( !after_core_hardfork_1270 && call_price > feed_price )
+       || ( after_core_hardfork_1270 && collateralization() > *maintenance_collateralization ) )
       return 0;
 
    if( !target_collateral_ratio.valid() ) // target cr is not set
       return debt;
 
    uint16_t tcr = std::max( *target_collateral_ratio, maintenance_collateral_ratio ); // use mcr if target cr is too small
+
+   price target_collateralization = ( after_core_hardfork_1270 ?
+                                      feed_price * ratio_type( tcr, GRAPHENE_COLLATERAL_RATIO_DENOM ) :
+                                      price() );
 
    // be defensive here, make sure match_price is in collateral / debt format
    if( match_price.base.asset_id != call_price.base.asset_id )
@@ -113,9 +136,22 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
       return debt;
    FC_ASSERT( to_pay.amount < collateral && to_cover.amount < debt );
 
-   // check collateral ratio after filled, if it's OK, we return
-   price new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
-   if( new_call_price > feed_price )
+   // Check whether the collateral ratio after filled is high enough
+   // Before core-1270 hard fork, we check with call_price; afterwards, we check with collateralization().
+   std::function<bool()> result_is_good = after_core_hardfork_1270 ?
+      std::function<bool()>( [this,&to_cover,&to_pay,target_collateralization]() -> bool
+      {
+         price new_collateralization = ( get_collateral() - to_pay ) / ( get_debt() - to_cover );
+         return ( new_collateralization > target_collateralization );
+      }) :
+      std::function<bool()>( [this,&to_cover,&to_pay,tcr,feed_price]() -> bool
+      {
+         price new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
+         return ( new_call_price > feed_price );
+      });
+
+   // if the result is good, we return.
+   if( result_is_good() )
       return to_cover.amount;
 
    // be here, to_cover is too small due to rounding. deal with the fraction
@@ -209,8 +245,8 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
          return to_cover.amount;
       FC_ASSERT( to_pay.amount < collateral && to_cover.amount < debt );
 
-      new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
-      if( new_call_price > feed_price ) // good
+      // Check whether the result is good
+      if( result_is_good() ) // good
       {
          if( to_pay.amount == max_to_pay.amount )
             return to_cover.amount;
@@ -255,11 +291,11 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
             return debt;
       }
 
-      // check
+      // defensive check
       FC_ASSERT( to_pay.amount < collateral && to_cover.amount < debt );
 
-      new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
-      if( new_call_price > feed_price ) // good
+      // Check whether the result is good
+      if( result_is_good() ) // good
          return to_cover.amount;
    }
 

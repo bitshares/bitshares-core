@@ -47,6 +47,12 @@ namespace graphene { namespace app {
          uint64_t api_limit_get_account_history_by_operations = 100;
          uint64_t api_limit_get_asset_holders = 100;
          uint64_t api_limit_get_key_references = 100;
+         uint64_t api_limit_get_htlc_by = 100;
+         uint64_t api_limit_get_full_accounts = 10;
+         uint64_t api_limit_get_full_accounts_lists = 100;
+         uint64_t api_limit_get_call_orders = 300;
+         uint64_t api_limit_get_settle_orders = 300;
+         uint64_t api_limit_get_assets = 101;
          uint64_t api_limit_get_limit_orders = 300;
          uint64_t api_limit_get_call_orders = 300;
          uint64_t api_limit_get_settle_orders = 300;

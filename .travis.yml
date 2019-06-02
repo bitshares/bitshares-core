@@ -29,17 +29,14 @@ script:
  - ccache -s
  - programs/build_helpers/buildstep Prepare 1 "sed -i '/tests/d' libraries/fc/CMakeLists.txt"
  - programs/build_helpers/buildstep cmake 5 "cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage -DBoost_USE_STATIC_LIBS=OFF -DCMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON ."
- - programs/build_helpers/buildstep make.cli_wallet 1600 "programs/build_helpers/make_with_sonar bw-output -j 2 cli_wallet"
- - programs/build_helpers/buildstep make.witness_node 300 "programs/build_helpers/make_with_sonar bw-output -j 2 witness_node"
- - programs/build_helpers/buildstep make.serializer 45 "programs/build_helpers/make_with_sonar bw-output -j 2 js_operation_serializer"
- - programs/build_helpers/buildstep make.get_dev_key 10 "programs/build_helpers/make_with_sonar bw-output -j 2 get_dev_key"
- - programs/build_helpers/buildstep make.chain_test 900 "programs/build_helpers/make_with_sonar bw-output -j 2 chain_test"
- - programs/build_helpers/buildstep make.cli_test 200 "programs/build_helpers/make_with_sonar bw-output -j 2 cli_test"
- - programs/build_helpers/buildstep make.perf_test 120 "programs/build_helpers/make_with_sonar bw-output -j 2 performance_test"
+ - programs/build_helpers/buildstep make.cli_wallet 2200 "programs/build_helpers/make_with_sonar bw-output -j 2 cli_wallet witness_node js_operation_serializer get_dev_key network_mapper"
+ - programs/build_helpers/buildstep make.chain_test 1000 "make -j 2 chain_test"
+ - programs/build_helpers/buildstep make.cli_test 200 "make -j 2 cli_test"
+ - programs/build_helpers/buildstep make.perf_test 120 "make -j 2 performance_test"
  - set -o pipefail
  - programs/build_helpers/buildstep run.chain_test 240 "libraries/fc/tests/run-parallel-tests.sh tests/chain_test"
- - programs/build_helpers/buildstep run.cli_test 30 "libraries/fc/tests/run-parallel-tests.sh tests/cli_test"
- - programs/build_helpers/buildstep prepare.sonar 20 'find libraries/[acdenptuw]*/CMakeFiles/*.dir programs/[cdgjsw]*/CMakeFiles/*.dir -type d | while read d; do gcov -o "$d" "${d/CMakeFiles*.dir//}"/*.cpp; done >/dev/null'
- - programs/build_helpers/buildstep run.sonar 400 "which sonar-scanner && sonar-scanner || true"
+ - programs/build_helpers/buildstep run.cli_test 60 "libraries/fc/tests/run-parallel-tests.sh tests/cli_test"
+ - 'programs/build_helpers/buildstep prepare.sonar 20 "find libraries/[acdenptuw]*/CMakeFiles/*.dir programs/[cdgjsw]*/CMakeFiles/*.dir -type d | while read d; do gcov -o \"\$d\" \"\${d/CMakeFiles*.dir//}\"/*.cpp; done >/dev/null; programs/build_helpers/set_sonar_branch sonar-project.properties" || true'
+ - 'programs/build_helpers/buildstep run.sonar 1200 "which sonar-scanner && sonar-scanner" || true'
  - programs/build_helpers/buildstep end 0
  - ccache -s

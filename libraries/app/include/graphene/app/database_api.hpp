@@ -25,7 +25,7 @@
 
 #include <graphene/app/full_account.hpp>
 
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/types.hpp>
 
 #include <graphene/chain/database.hpp>
 
@@ -40,6 +40,7 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/witness_object.hpp>
+#include <graphene/chain/htlc_object.hpp>
 
 #include <graphene/market_history/market_history_plugin.hpp>
 
@@ -60,7 +61,9 @@ namespace graphene { namespace app {
 
 using namespace graphene::chain;
 using namespace graphene::market_history;
-using namespace std;
+using std::string;
+using std::vector;
+using std::map;
 
 class database_api_impl;
 
@@ -422,6 +425,16 @@ class database_api
        */
       uint64_t get_asset_count()const;
 
+      /**
+       * @brief Get asset objects issued from a given account
+       * @param account_name_or_id Account name or ID to get objects from
+       * @param start Asset objects(1.3.X) before this ID will be skipped in results. Pagination purposes.
+       * @param limit Maximum number of orders to retrieve
+       * @return The assets issued by the account
+       */
+      vector<asset_object> get_assets_by_issuer(const std::string& issuer_name_or_id,
+                                                asset_id_type start, uint32_t limit)const;
+
       /////////////////////
       // Markets / feeds //
       /////////////////////
@@ -444,12 +457,32 @@ class database_api
       vector<call_order_object> get_call_orders(const std::string& a, uint32_t limit)const;
 
       /**
+       * @brief Get call orders from a given account
+       * @param account_name_or_id Account name or ID to get objects from
+       * @param start Asset objects(1.3.X) before this ID will be skipped in results. Pagination purposes.
+       * @param limit Maximum number of objects to retrieve
+       * @return The call orders of the account
+       */
+      vector<call_order_object> get_call_orders_by_account(const std::string& account_name_or_id,
+                                                           asset_id_type start, uint32_t limit)const;
+
+      /**
        * @brief Get forced settlement orders in a given asset
        * @param a Symbol or ID of asset being settled
        * @param limit Maximum number of orders to retrieve
        * @return The settle orders, ordered from earliest settlement date to latest
        */
       vector<force_settlement_object> get_settle_orders(const std::string& a, uint32_t limit)const;
+
+      /**
+       * @brief Get forced settlement orders of a given account
+       * @param account_name_or_id Account name or ID to get objects from
+       * @param start Force settlement objects(1.4.X) before this ID will be skipped in results. Pagination purposes.
+       * @param limit Maximum number of orders to retrieve
+       * @return The settle orders of the account
+       */
+      vector<force_settlement_object> get_settle_orders_by_account(const std::string& account_name_or_id,
+                                                                   force_settlement_id_type start, uint32_t limit)const;
 
       /**
        * @brief Get collateral_bid_objects for a given asset
@@ -743,7 +776,36 @@ class database_api
        */
       vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
 
-   private:
+      //////////
+      // HTLC //
+      //////////
+
+      /**
+       *  @brief Get HTLC object
+       *  @param id HTLC contract id
+       *  @return HTLC object for the id
+       */
+      optional<htlc_object> get_htlc(htlc_id_type id) const;
+
+      /**
+       *  @brief Get non expired HTLC objects using the sender account
+       *  @param account_id_or_name Account ID or name to get objects from
+       *  @param start htlc objects before this ID will be skipped in results. Pagination purposes.
+       *  @param limit Maximum number of objects to retrieve
+       *  @return HTLC objects for the account
+       */
+      vector<htlc_object> get_htlc_by_from(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const;
+
+      /**
+       *  @brief Get non expired HTLC objects using the receiver account
+       *  @param account_id_or_name Account ID or name to get objects from
+       *  @param start htlc objects before this ID will be skipped in results. Pagination purposes.
+       *  @param limit Maximum number of objects to retrieve
+       *  @return HTLC objects for the account
+      */
+      vector<htlc_object> get_htlc_by_to(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const;
+
+private:
       std::shared_ptr< database_api_impl > my;
 };
 
@@ -806,6 +868,7 @@ FC_API(graphene::app::database_api,
    (list_assets)
    (lookup_asset_symbols)
    (get_asset_count)
+   (get_assets_by_issuer)
    (get_asset_id_from_string)
 
    // Markets / feeds
@@ -813,7 +876,9 @@ FC_API(graphene::app::database_api,
    (get_limit_orders)
    (get_account_limit_orders)
    (get_call_orders)
+   (get_call_orders_by_account)
    (get_settle_orders)
+   (get_settle_orders_by_account)
    (get_margin_positions)
    (get_collateral_bids)
    (subscribe_to_market)
@@ -865,4 +930,8 @@ FC_API(graphene::app::database_api,
    (get_withdraw_permissions_by_giver)
    (get_withdraw_permissions_by_recipient)
 
+   // HTLC
+   (get_htlc)
+   (get_htlc_by_from)
+   (get_htlc_by_to)
 )

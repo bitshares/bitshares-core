@@ -23,8 +23,8 @@
  */
 #pragma once
 
-#include <graphene/chain/protocol/authority.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/authority.hpp>
+#include <graphene/protocol/types.hpp>
 
 #include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
@@ -67,5 +67,7 @@ typedef multi_index_container<
 typedef generic_index<blinded_balance_object, blinded_balance_object_multi_index_type> blinded_balance_index;
 
 } } // graphene::chain
+
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::blinded_balance_object)
 
 FC_REFLECT_DERIVED( graphene::chain::blinded_balance_object, (graphene::db::object), (commitment)(asset_id)(owner) )

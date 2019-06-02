@@ -25,8 +25,8 @@
 
 #include <graphene/app/database_api.hpp>
 
-#include <graphene/chain/protocol/types.hpp>
-#include <graphene/chain/protocol/confidential.hpp>
+#include <graphene/protocol/types.hpp>
+#include <graphene/protocol/confidential.hpp>
 
 #include <graphene/market_history/market_history_plugin.hpp>
 
@@ -53,7 +53,9 @@ namespace graphene { namespace app {
    using namespace graphene::market_history;
    using namespace graphene::grouped_orders;
    using namespace fc::ecc;
-   using namespace std;
+   using std::string;
+   using std::vector;
+   using std::map;
 
    class application;
 

@@ -55,15 +55,16 @@
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/cli.hpp>
 #include <fc/rpc/websocket_api.hpp>
-#include <fc/crypto/aes.hpp>
 #include <fc/crypto/hex.hpp>
 #include <fc/thread/mutex.hpp>
 #include <fc/thread/scoped_lock.hpp>
 #include <fc/rpc/api_connection.hpp>
+#include <fc/crypto/base58.hpp>
 
 #include <graphene/app/api.hpp>
+#include <graphene/app/util.hpp>
 #include <graphene/chain/asset_object.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/utilities/git_revision.hpp>
 #include <graphene/utilities/key_conversion.hpp>
@@ -73,6 +74,8 @@
 #include <graphene/wallet/reflect_util.hpp>
 #include <graphene/debug_witness/debug_api.hpp>
 
+#include <fc/crypto/aes.hpp>
+
 #ifndef WIN32
 # include <sys/types.h>
 # include <sys/stat.h>
@@ -80,7 +83,7 @@
 
 // explicit instantiation for later use
 namespace fc {
-	template class api<graphene::wallet::wallet_api, identity_member>;
+	template class api<graphene::wallet::wallet_api, identity_member_with_optionals>;
 }
 
 #define BRAIN_KEY_WORD_COUNT 16
@@ -90,6 +93,16 @@ namespace fc {
                                 // strongly at the value amount that is being hidden.
 
 namespace graphene { namespace wallet {
+
+using std::ostream;
+using std::stringstream;
+using std::to_string;
+using std::setprecision;
+using std::fixed;
+using std::ios;
+using std::setiosflags;
+using std::setw;
+using std::endl;
 
 namespace detail {
 
@@ -113,14 +126,16 @@ private:
    ostream& out;
    const wallet_api_impl& wallet;
    operation_result result;
+   operation_history_object hist;
 
    std::string fee(const asset& a) const;
 
 public:
-   operation_printer( ostream& out, const wallet_api_impl& wallet, const operation_result& r = operation_result() )
+   operation_printer( ostream& out, const wallet_api_impl& wallet, const operation_history_object& obj )
       : out(out),
         wallet(wallet),
-        result(r)
+        result(obj.result),
+        hist(obj)
    {}
    typedef std::string result_type;
 
@@ -133,6 +148,8 @@ public:
    std::string operator()(const account_create_operation& op)const;
    std::string operator()(const account_update_operation& op)const;
    std::string operator()(const asset_create_operation& op)const;
+   std::string operator()(const htlc_create_operation& op)const;
+   std::string operator()(const htlc_redeem_operation& op)const;
 };
 
 template<class T>
@@ -153,7 +170,7 @@ optional<T> maybe_id( const string& name_or_id )
 
 string address_to_shorthash( const address& addr )
 {
-   uint32_t x = addr.addr._hash[0];
+   uint32_t x = addr.addr._hash[0].value();
    static const char hd[] = "0123456789abcdef";
    string result;
 
@@ -255,6 +272,27 @@ struct op_prototype_visitor
       if( p != string::npos )
          name = name.substr( p+1 );
       name2op[ name ] = Type();
+   }
+};
+
+class htlc_hash_to_string_visitor
+{
+public:
+   typedef std::string result_type;
+
+   result_type operator()( const fc::ripemd160& hash )const
+   {
+      return "RIPEMD160 " + hash.str();
+   }
+
+   result_type operator()( const fc::sha1& hash )const
+   {
+      return "SHA1 " + hash.str();
+   }
+
+   result_type operator()( const fc::sha256& hash )const
+   {
+      return "SHA256 " + hash.str();
    }
 };
 
@@ -504,17 +542,17 @@ public:
       return _checksum == fc::sha512();
    }
 
-   template<typename T>
-   T get_object(object_id<T::space_id, T::type_id, T> id)const
+   template<typename ID>
+   graphene::db::object_downcast_t<ID> get_object(ID id)const
    {
       auto ob = _remote_db->get_objects({id}).front();
-      return ob.template as<T>( GRAPHENE_MAX_NESTED_OBJECTS );
+      return ob.template as<graphene::db::object_downcast_t<ID>>( GRAPHENE_MAX_NESTED_OBJECTS );
    }
 
-   void set_operation_fees( signed_transaction& tx, const std::shared_ptr<fee_schedule> s  )
+   void set_operation_fees( signed_transaction& tx, const fee_schedule& s  )
    {
       for( auto& op : tx.operations )
-         s->set_fee(op);
+         s.set_fee(op);
    }
 
    variant info() const
@@ -530,7 +568,9 @@ public:
                                                                           " old");
       result["next_maintenance_time"] = fc::get_approximate_relative_time_string(dynamic_props.next_maintenance_time);
       result["chain_id"] = chain_props.chain_id;
-      result["participation"] = (100*dynamic_props.recent_slots_filled.popcount()) / 128.0;
+      stringstream participation;
+      participation << fixed << std::setprecision(2) << (100*dynamic_props.recent_slots_filled.popcount()) / 128.0;
+      result["participation"] = participation.str();
       result["active_witnesses"] = fc::variant(global_props.active_witnesses, GRAPHENE_MAX_NESTED_OBJECTS);
       result["active_committee_members"] = fc::variant(global_props.active_committee_members, GRAPHENE_MAX_NESTED_OBJECTS);
       return result;
@@ -657,6 +697,18 @@ public:
       auto opt = find_asset(asset_symbol_or_id);
       FC_ASSERT(opt);
       return *opt;
+   }
+
+   fc::optional<htlc_object> get_htlc(string htlc_id) const
+   {
+      htlc_id_type id;
+      fc::from_variant(htlc_id, id);
+      auto obj = _remote_db->get_objects( { id }).front();
+      if ( !obj.is_null() )
+      {
+         return fc::optional<htlc_object>(obj.template as<htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS));
+      }
+      return fc::optional<htlc_object>();
    }
 
    asset_id_type get_asset_id(string asset_symbol_or_id) const
@@ -857,12 +909,12 @@ public:
       return tx;
    }
 
-    void quit()
-    {
-        ilog( "Quitting Cli Wallet ..." );
+   void quit()
+   {
+      ilog( "Quitting Cli Wallet ..." );
         
-        throw fc::canceled_exception();
-    }
+      throw fc::canceled_exception();
+   }
 
    void save_wallet_file(string wallet_filename = "")
    {
@@ -962,15 +1014,15 @@ public:
       if( fee_asset_obj.get_id() != asset_id_type() )
       {
          for( auto& op : _builder_transactions[handle].operations )
-            total_fee += gprops.current_fees->set_fee( op, fee_asset_obj.options.core_exchange_rate );
+            total_fee += gprops.get_current_fees().set_fee( op, fee_asset_obj.options.core_exchange_rate );
 
          FC_ASSERT((total_fee * fee_asset_obj.options.core_exchange_rate).amount <=
-                   get_object<asset_dynamic_data_object>(fee_asset_obj.dynamic_asset_data_id).fee_pool,
+                   get_object(fee_asset_obj.dynamic_asset_data_id).fee_pool,
                    "Cannot pay fees in ${asset}, as this asset's fee pool is insufficiently funded.",
                    ("asset", fee_asset_obj.symbol));
       } else {
          for( auto& op : _builder_transactions[handle].operations )
-            total_fee += gprops.current_fees->set_fee( op );
+            total_fee += gprops.get_current_fees().set_fee( op );
       }
 
       return total_fee;
@@ -1013,7 +1065,7 @@ public:
       if( review_period_seconds )
          op.review_period_seconds = review_period_seconds;
       trx.operations = {op};
-      _remote_db->get_global_properties().parameters.current_fees->set_fee( trx.operations.front() );
+      _remote_db->get_global_properties().parameters.get_current_fees().set_fee( trx.operations.front() );
 
       return trx = sign_transaction(trx, broadcast);
    }
@@ -1034,7 +1086,7 @@ public:
       if( review_period_seconds )
          op.review_period_seconds = review_period_seconds;
       trx.operations = {op};
-      _remote_db->get_global_properties().parameters.current_fees->set_fee( trx.operations.front() );
+      _remote_db->get_global_properties().parameters.get_current_fees().set_fee( trx.operations.front() );
 
       return trx = sign_transaction(trx, broadcast);
    }
@@ -1083,7 +1135,7 @@ public:
 
       tx.operations.push_back( account_create_op );
 
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
 
       vector<public_key_type> paying_keys = registrar_account_object.active.get_keys();
 
@@ -1122,7 +1174,7 @@ public:
       op.account_to_upgrade = account_obj.get_id();
       op.upgrade_to_lifetime_member = true;
       tx.operations = {op};
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1207,7 +1259,7 @@ public:
 
          tx.operations.push_back( account_create_op );
 
-         set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
 
          vector<public_key_type> paying_keys = registrar_account_object.active.get_keys();
 
@@ -1272,7 +1324,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( create_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1289,10 +1341,7 @@ public:
       optional<account_id_type> new_issuer_account_id;
       if (new_issuer)
       {
-        FC_ASSERT( _remote_db->get_dynamic_global_properties().time < HARDFORK_CORE_199_TIME,
-              "The use of 'new_issuer' is no longer supported. Please use `update_asset_issuer' instead!");
-        account_object new_issuer_account = get_account(*new_issuer);
-        new_issuer_account_id = new_issuer_account.id;
+        FC_ASSERT( false, "The use of 'new_issuer' is no longer supported. Please use `update_asset_issuer' instead!");
       }
 
       asset_update_operation update_op;
@@ -1303,7 +1352,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1326,7 +1375,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( update_issuer );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1347,7 +1396,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1371,7 +1420,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1393,7 +1442,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( publish_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1417,7 +1466,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( fund_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1439,7 +1488,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( claim_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1462,7 +1511,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( reserve_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1483,7 +1532,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( settle_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1504,7 +1553,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( settle_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1529,7 +1578,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1547,7 +1596,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( whitelist_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1573,7 +1622,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( committee_member_create_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1668,7 +1717,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( witness_create_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       _wallet.pending_witness_registrations[owner_account] = key_to_wif(witness_private_key);
@@ -1694,7 +1743,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( witness_update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1745,7 +1794,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1809,10 +1858,99 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
       tx.validate();
 
       return sign_transaction( tx, broadcast );
+   }
+
+   static htlc_hash do_hash( const string& algorithm, const std::string& hash )
+   {
+      string name_upper;
+      std::transform( algorithm.begin(), algorithm.end(), std::back_inserter(name_upper), ::toupper);
+      if( name_upper == "RIPEMD160" )
+         return fc::ripemd160( hash );
+      if( name_upper == "SHA256" )
+         return fc::sha256( hash );
+      if( name_upper == "SHA1" )
+         return fc::sha1( hash );
+      FC_THROW_EXCEPTION( fc::invalid_arg_exception, "Unknown algorithm '${a}'", ("a",algorithm) );
+   }
+
+   signed_transaction htlc_create( string source, string destination, string amount, string asset_symbol,
+         string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
+         const uint32_t claim_period_seconds, bool broadcast = false )
+   {
+      try 
+      {
+         FC_ASSERT( !self.is_locked() );
+         fc::optional<asset_object> asset_obj = get_asset(asset_symbol);
+         FC_ASSERT(asset_obj, "Could not find asset matching ${asset}", ("asset", asset_symbol));
+
+         htlc_create_operation create_op;
+         create_op.from = get_account(source).id;
+         create_op.to = get_account(destination).id;
+         create_op.amount = asset_obj->amount_from_string(amount);
+         create_op.claim_period_seconds = claim_period_seconds;
+         create_op.preimage_hash = do_hash( hash_algorithm, preimage_hash );
+         create_op.preimage_size = preimage_size;
+
+         signed_transaction tx;
+         tx.operations.push_back(create_op);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+         tx.validate();
+
+         return sign_transaction(tx, broadcast);
+      } FC_CAPTURE_AND_RETHROW( (source)(destination)(amount)(asset_symbol)(hash_algorithm)
+            (preimage_hash)(preimage_size)(claim_period_seconds)(broadcast) ) 
+   }
+
+   signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<char>& preimage, bool broadcast )
+   {
+      try 
+      {
+         FC_ASSERT( !self.is_locked() );
+         fc::optional<htlc_object> htlc_obj = get_htlc(htlc_id);
+         FC_ASSERT(htlc_obj, "Could not find HTLC matching ${htlc}", ("htlc", htlc_id));
+
+         account_object issuer_obj = get_account(issuer);
+
+         htlc_redeem_operation update_op;
+         update_op.htlc_id = htlc_obj->id;
+         update_op.redeemer = issuer_obj.id;
+         update_op.preimage = preimage;
+
+         signed_transaction tx;
+         tx.operations.push_back(update_op);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+         tx.validate();
+
+         return sign_transaction(tx, broadcast);
+      } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(preimage)(broadcast) ) 
+   }
+
+   signed_transaction htlc_extend ( string htlc_id, string issuer, const uint32_t seconds_to_add, bool broadcast)
+   {
+      try 
+      {
+         FC_ASSERT( !self.is_locked() );
+         fc::optional<htlc_object> htlc_obj = get_htlc(htlc_id);
+         FC_ASSERT(htlc_obj, "Could not find HTLC matching ${htlc}", ("htlc", htlc_id));
+
+         account_object issuer_obj = get_account(issuer);
+
+         htlc_extend_operation update_op;
+         update_op.htlc_id = htlc_obj->id;
+         update_op.update_issuer = issuer_obj.id;
+         update_op.seconds_to_add = seconds_to_add;
+
+         signed_transaction tx;
+         tx.operations.push_back(update_op);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+         tx.validate();
+
+         return sign_transaction(tx, broadcast);
+      } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(seconds_to_add)(broadcast) ) 
    }
 
    vector< vesting_balance_object_with_info > get_vesting_balances( string account_name )
@@ -1823,7 +1961,7 @@ public:
 
       if( vbid )
       {
-         result.emplace_back( get_object<vesting_balance_object>(*vbid), now );
+         result.emplace_back( get_object(*vbid), now );
          return result;
       }
       /*
@@ -1860,7 +1998,7 @@ public:
          vbid = wit.pay_vb;
       }
 
-      vesting_balance_object vbo = get_object< vesting_balance_object >( *vbid );
+      vesting_balance_object vbo = get_object( *vbid );
       vesting_balance_withdraw_operation vesting_balance_withdraw_op;
 
       vesting_balance_withdraw_op.vesting_balance = *vbid;
@@ -1869,7 +2007,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( vesting_balance_withdraw_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1911,7 +2049,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( account_update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1952,7 +2090,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( account_update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1983,7 +2121,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( account_update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -2009,7 +2147,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( account_update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -2071,6 +2209,16 @@ public:
       }
 
       return tx;
+   }
+
+   flat_set<public_key_type> get_transaction_signers(const signed_transaction &tx) const
+   {
+      return tx.get_signature_keys(_chain_id);
+   }
+
+   vector<vector<account_id_type>> get_key_references(const vector<public_key_type> &keys) const
+   {
+       return _remote_db->get_key_references(keys);
    }
 
    memo_data sign_memo(string from, string to, string memo)
@@ -2144,7 +2292,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back(op);
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -2165,7 +2313,7 @@ public:
 
       signed_transaction trx;
       trx.operations = {op};
-      set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( trx, _remote_db->get_global_properties().parameters.get_current_fees());
       trx.validate();
 
       return sign_transaction(trx, broadcast);
@@ -2189,23 +2337,22 @@ public:
 
       signed_transaction trx;
       trx.operations = {op};
-      set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( trx, _remote_db->get_global_properties().parameters.get_current_fees());
       trx.validate();
 
       return sign_transaction(trx, broadcast);
    }
 
-   signed_transaction cancel_order(object_id_type order_id, bool broadcast = false)
+   signed_transaction cancel_order(limit_order_id_type order_id, bool broadcast = false)
    { try {
          FC_ASSERT(!is_locked());
-         FC_ASSERT(order_id.space() == protocol_ids, "Invalid order ID ${id}", ("id", order_id));
          signed_transaction trx;
 
          limit_order_cancel_operation op;
-         op.fee_paying_account = get_object<limit_order_object>(order_id).seller;
+         op.fee_paying_account = get_object(order_id).seller;
          op.order = order_id;
          trx.operations = {op};
-         set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
+         set_operation_fees( trx, _remote_db->get_global_properties().parameters.get_current_fees());
 
          trx.validate();
          return sign_transaction(trx, broadcast);
@@ -2240,7 +2387,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back(xfer_op);
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction(tx, broadcast);
@@ -2270,7 +2417,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back(issue_op);
-      set_operation_fees(tx,_remote_db->get_global_properties().parameters.current_fees);
+      set_operation_fees(tx,_remote_db->get_global_properties().parameters.get_current_fees());
       tx.validate();
 
       return sign_transaction(tx, broadcast);
@@ -2300,7 +2447,7 @@ public:
             auto b = _remote_db->get_block_header(i.block_num);
             FC_ASSERT(b);
             ss << b->timestamp.to_iso_string() << " ";
-            i.op.visit(operation_printer(ss, *this, i.result));
+            i.op.visit(operation_printer(ss, *this, i));
             ss << " \n";
          }
 
@@ -2317,7 +2464,7 @@ public:
             auto b = _remote_db->get_block_header(i.block_num);
             FC_ASSERT(b);
             ss << b->timestamp.to_iso_string() << " ";
-            i.op.visit(operation_printer(ss, *this, i.result));
+            i.op.visit(operation_printer(ss, *this, i));
             ss << " \n";
          }
 
@@ -2338,7 +2485,7 @@ public:
               auto b = _remote_db->get_block_header(i.block_num);
               FC_ASSERT(b);
               ss << b->timestamp.to_iso_string() << " ";
-              i.op.visit(operation_printer(ss, *this, i.result));
+              i.op.visit(operation_printer(ss, *this, i));
               ss << " transaction_id : ";
               ss << d.transaction_id.str();
               ss << " \n";
@@ -2380,7 +2527,7 @@ public:
       {
          auto r = result.as<blind_confirmation>( GRAPHENE_MAX_NESTED_OBJECTS );
          std::stringstream ss;
-         r.trx.operations[0].visit( operation_printer( ss, *this, operation_result() ) );
+         r.trx.operations[0].visit( operation_printer( ss, *this, operation_history_object() ) );
          ss << "\n";
          for( const auto& out : r.outputs )
          {
@@ -2393,7 +2540,7 @@ public:
       {
          auto r = result.as<blind_confirmation>( GRAPHENE_MAX_NESTED_OBJECTS );
          std::stringstream ss;
-         r.trx.operations[0].visit( operation_printer( ss, *this, operation_result() ) );
+         r.trx.operations[0].visit( operation_printer( ss, *this, operation_history_object() ) );
          ss << "\n";
          for( const auto& out : r.outputs )
          {
@@ -2540,11 +2687,11 @@ public:
       prop_op.fee_paying_account = get_account(proposing_account).id;
 
       prop_op.proposed_ops.emplace_back( update_op );
-      current_params.current_fees->set_fee( prop_op.proposed_ops.back().op );
+      current_params.get_current_fees().set_fee( prop_op.proposed_ops.back().op );
 
       signed_transaction tx;
       tx.operations.push_back(prop_op);
-      set_operation_fees(tx, current_params.current_fees);
+      set_operation_fees(tx, current_params.get_current_fees());
       tx.validate();
 
       return sign_transaction(tx, broadcast);
@@ -2557,7 +2704,7 @@ public:
       bool broadcast = false)
    {
       const chain_parameters& current_params = get_global_properties().parameters;
-      const fee_schedule_type& current_fees = *(current_params.current_fees);
+      const fee_schedule_type& current_fees = current_params.get_current_fees();
 
       flat_map< int, fee_parameters > fee_map;
       fee_map.reserve( current_fees.parameters.size() );
@@ -2610,7 +2757,7 @@ public:
       new_fees.scale = scale;
 
       chain_parameters new_params = current_params;
-      new_params.current_fees = std::make_shared<fee_schedule>(new_fees);
+      new_params.get_mutable_fees() = new_fees;
 
       committee_member_update_global_parameters_operation update_op;
       update_op.new_parameters = new_params;
@@ -2622,11 +2769,11 @@ public:
       prop_op.fee_paying_account = get_account(proposing_account).id;
 
       prop_op.proposed_ops.emplace_back( update_op );
-      current_params.current_fees->set_fee( prop_op.proposed_ops.back().op );
+      current_params.get_current_fees().set_fee( prop_op.proposed_ops.back().op );
 
       signed_transaction tx;
       tx.operations.push_back(prop_op);
-      set_operation_fees(tx, current_params.current_fees);
+      set_operation_fees(tx, current_params.get_current_fees());
       tx.validate();
 
       return sign_transaction(tx, broadcast);
@@ -2660,7 +2807,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back(update_op);
-      set_operation_fees(tx, get_global_properties().parameters.current_fees);
+      set_operation_fees(tx, get_global_properties().parameters.get_current_fees());
       tx.validate();
       return sign_transaction(tx, broadcast);
    }
@@ -2957,6 +3104,41 @@ std::string operation_printer::operator()(const asset_create_operation& op) cons
    return fee(op.fee);
 }
 
+std::string operation_printer::operator()(const htlc_redeem_operation& op) const
+{
+   out << "Redeem HTLC with database id " 
+         << std::to_string(op.htlc_id.space_id) 
+         << "." << std::to_string(op.htlc_id.type_id) 
+         << "." << std::to_string((uint64_t)op.htlc_id.instance)
+         << " with preimage \"";
+   for (unsigned char c : op.preimage)
+      out << c;
+   out << "\"";
+   return fee(op.fee);
+}
+
+std::string operation_printer::operator()(const htlc_create_operation& op) const
+{
+   static htlc_hash_to_string_visitor vtor;
+
+   auto fee_asset = wallet.get_asset( op.fee.asset_id );
+   auto to = wallet.get_account( op.to );
+   operation_result_printer rprinter(wallet);
+   std::string database_id = result.visit(rprinter);
+
+   out << "Create HTLC to " << to.name
+         << " with id " << database_id
+         << " preimage hash: ["
+         << op.preimage_hash.visit( vtor )
+         << "] (Fee: " << fee_asset.amount_to_pretty_string( op.fee ) << ")";
+   // determine if the block that the HTLC is in is before or after LIB
+   int32_t pending_blocks = hist.block_num - wallet.get_dynamic_global_properties().last_irreversible_block_num;
+   if (pending_blocks > 0)
+      out << " (pending " << std::to_string(pending_blocks) << " blocks)";
+
+   return "";
+}
+
 std::string operation_result_printer::operator()(const void_result& x) const
 {
    return "";
@@ -3087,6 +3269,79 @@ uint64_t wallet_api::get_asset_count()const
    return my->_remote_db->get_asset_count();
 }
 
+signed_transaction wallet_api::htlc_create( string source, string destination, string amount, string asset_symbol,
+         string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size, 
+         const uint32_t claim_period_seconds, bool broadcast)
+{
+   return my->htlc_create(source, destination, amount, asset_symbol, hash_algorithm, preimage_hash, preimage_size,
+         claim_period_seconds, broadcast);
+}
+
+fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
+{
+   fc::optional<htlc_object> optional_obj = my->get_htlc(htlc_id);
+   if ( optional_obj.valid() )
+   {
+      const htlc_object& obj = *optional_obj;
+      // convert to formatted variant
+      fc::mutable_variant_object transfer;
+      const auto& from = my->get_account( obj.transfer.from );
+      transfer["from"] = from.name;
+      const auto& to = my->get_account( obj.transfer.to );
+      transfer["to"] = to.name;
+      const auto& asset = my->get_asset( obj.transfer.asset_id );
+      transfer["asset"] = asset.symbol;
+      transfer["amount"] = graphene::app::uint128_amount_to_string( obj.transfer.amount.value, asset.precision );
+      class htlc_hash_to_variant_visitor
+      {
+         public:
+         typedef fc::mutable_variant_object result_type;
+
+         result_type operator()(const fc::ripemd160& obj)const 
+         { return convert("RIPEMD160", obj.str()); }
+         result_type operator()(const fc::sha1& obj)const 
+         { return convert("SHA1", obj.str()); }
+         result_type operator()(const fc::sha256& obj)const 
+         { return convert("SHA256", obj.str()); }
+         private:
+         result_type convert(const std::string& type, const std::string& hash)const
+         {
+            fc::mutable_variant_object ret_val; 
+            ret_val["hash_algo"] = type; 
+            ret_val["preimage_hash"] = hash; 
+            return ret_val;
+         }
+      };
+      static htlc_hash_to_variant_visitor hash_visitor;
+      fc::mutable_variant_object htlc_lock = obj.conditions.hash_lock.preimage_hash.visit(hash_visitor);
+      htlc_lock["preimage_size"] = obj.conditions.hash_lock.preimage_size;
+      fc::mutable_variant_object time_lock;
+      time_lock["expiration"] = obj.conditions.time_lock.expiration;
+      time_lock["time_left"] = fc::get_approximate_relative_time_string(obj.conditions.time_lock.expiration);
+      fc::mutable_variant_object conditions;
+      conditions["htlc_lock"] = htlc_lock;
+      conditions["time_lock"] = time_lock;
+      fc::mutable_variant_object result;
+      result["transfer"] = transfer;
+      result["conditions"] = conditions;
+      return fc::optional<fc::variant>(result);
+   }
+   return fc::optional<fc::variant>();
+}
+
+signed_transaction wallet_api::htlc_redeem( std::string htlc_id, std::string issuer, const std::string& preimage,
+      bool broadcast)
+{
+
+   return my->htlc_redeem(htlc_id, issuer, std::vector<char>(preimage.begin(), preimage.end()), broadcast);
+}
+
+signed_transaction wallet_api::htlc_extend ( std::string htlc_id, std::string issuer, const uint32_t seconds_to_add,
+      bool broadcast)
+{
+   return my->htlc_extend(htlc_id, issuer, seconds_to_add, broadcast);
+}
+
 vector<operation_detail> wallet_api::get_account_history(string name, int limit)const
 {
    vector<operation_detail> result;
@@ -3135,7 +3390,7 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
             }
          }
          std::stringstream ss;
-         auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
+         auto memo = o.op.visit(detail::operation_printer(ss, *my, o));
          result.push_back( operation_detail{ memo, ss.str(), o } );
       }
 
@@ -3183,7 +3438,7 @@ vector<operation_detail> wallet_api::get_relative_account_history(
             start);
       for (auto &o : current) {
          std::stringstream ss;
-         auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
+         auto memo = o.op.visit(detail::operation_printer(ss, *my, o));
          result.push_back(operation_detail{memo, ss.str(), o});
       }
       if (current.size() < std::min<uint32_t>(100, limit))
@@ -3227,7 +3482,7 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(
         auto current = my->_remote_hist->get_account_history_by_operations(always_id, operation_types, start, min_limit);
         for (auto& obj : current.operation_history_objs) {
             std::stringstream ss;
-            auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj.result));
+            auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj));
 
             transaction_id_type transaction_id;
             auto block = get_block(obj.block_num);
@@ -3399,7 +3654,7 @@ asset_bitasset_data_object wallet_api::get_bitasset_data(string asset_name_or_id
 {
    auto asset = get_asset(asset_name_or_id);
    FC_ASSERT(asset.is_market_issued() && asset.bitasset_data_id);
-   return my->get_object<asset_bitasset_data_object>(*asset.bitasset_data_id);
+   return my->get_object(*asset.bitasset_data_id);
 }
 
 account_id_type wallet_api::get_account_id(string account_name_or_id) const
@@ -3820,6 +4075,16 @@ signed_transaction wallet_api::sign_transaction(signed_transaction tx, bool broa
    return my->sign_transaction( tx, broadcast);
 } FC_CAPTURE_AND_RETHROW( (tx) ) }
 
+flat_set<public_key_type> wallet_api::get_transaction_signers(const signed_transaction &tx) const
+{ try {
+   return my->get_transaction_signers(tx);
+} FC_CAPTURE_AND_RETHROW( (tx) ) }
+
+vector<vector<account_id_type>> wallet_api::get_key_references(const vector<public_key_type> &keys) const
+{ try {
+   return my->get_key_references(keys);
+} FC_CAPTURE_AND_RETHROW( (keys) ) }
+
 operation wallet_api::get_prototype_operation(string operation_name)
 {
    return my->get_prototype_operation( operation_name );
@@ -4002,7 +4267,7 @@ bool wallet_api::load_wallet_file( string wallet_filename )
 
 void wallet_api::quit()
 {
-    my->quit();
+   my->quit();
 }
 
 void wallet_api::save_wallet_file( string wallet_filename )
@@ -4163,7 +4428,7 @@ vector< signed_transaction > wallet_api_impl::import_balance( string name_or_id,
       tx.operations.reserve( ctx.ops.size() );
       for( const balance_claim_operation& op : ctx.ops )
          tx.operations.emplace_back( op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
       tx.validate();
       signed_transaction signed_tx = sign_transaction( tx, false );
       for( const address& addr : ctx.addrs )
@@ -4357,12 +4622,12 @@ blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_ke
    transfer_from_blind_operation from_blind;
 
 
-   auto fees  = my->_remote_db->get_global_properties().parameters.current_fees;
+   auto fees  = my->_remote_db->get_global_properties().parameters.get_current_fees();
    fc::optional<asset_object> asset_obj = get_asset(symbol);
    FC_ASSERT(asset_obj.valid(), "Could not find asset matching ${asset}", ("asset", symbol));
    auto amount = asset_obj->amount_from_string(amount_in);
 
-   from_blind.fee  = fees->calculate_fee( from_blind, asset_obj->options.core_exchange_rate );
+   from_blind.fee  = fees.calculate_fee( from_blind, asset_obj->options.core_exchange_rate );
 
    auto blind_in = asset_obj->amount_to_string( from_blind.fee + amount );
 
@@ -4377,7 +4642,7 @@ blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_ke
    from_blind.amount = amount;
    from_blind.blinding_factor = conf.outputs.back().decrypted_memo.blinding_factor;
    from_blind.inputs.push_back( {conf.outputs.back().decrypted_memo.commitment, authority() } );
-   from_blind.fee  = fees->calculate_fee( from_blind, asset_obj->options.core_exchange_rate );
+   from_blind.fee  = fees.calculate_fee( from_blind, asset_obj->options.core_exchange_rate );
 
    idump( (from_blind) );
    conf.trx.operations.push_back(from_blind);
@@ -4435,7 +4700,7 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
    blind_transfer_operation blind_tr;
    blind_tr.outputs.resize(2);
 
-   auto fees  = my->_remote_db->get_global_properties().parameters.current_fees;
+   auto fees  = my->_remote_db->get_global_properties().parameters.get_current_fees();
 
    auto amount = asset_obj->amount_from_string(amount_in);
 
@@ -4445,7 +4710,7 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
 
    //auto from_priv_key = my->get_private_key( from_key );
 
-   blind_tr.fee  = fees->calculate_fee( blind_tr, asset_obj->options.core_exchange_rate );
+   blind_tr.fee  = fees.calculate_fee( blind_tr, asset_obj->options.core_exchange_rate );
 
    vector<commitment_type> used;
 
@@ -4535,7 +4800,7 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
       conf_output.decrypted_memo.amount = change;
       conf_output.decrypted_memo.blinding_factor = change_blind_factor;
       conf_output.decrypted_memo.commitment = change_out.commitment;
-      conf_output.decrypted_memo.check   = from_secret._hash[0];
+      conf_output.decrypted_memo.check   = from_secret._hash[0].value();
       conf_output.confirmation.one_time_key = one_time_key.get_public_key();
       conf_output.confirmation.to = from_key;
       conf_output.confirmation.encrypted_memo = fc::aes_encrypt( from_secret, fc::raw::pack( conf_output.decrypted_memo ) );
@@ -4553,7 +4818,7 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
    conf_output.decrypted_memo.amount = amount;
    conf_output.decrypted_memo.blinding_factor = blind_factor;
    conf_output.decrypted_memo.commitment = to_out.commitment;
-   conf_output.decrypted_memo.check   = secret._hash[0];
+   conf_output.decrypted_memo.check   = secret._hash[0].value();
    conf_output.confirmation.one_time_key = one_time_key.get_public_key();
    conf_output.confirmation.to = to_key;
    conf_output.confirmation.encrypted_memo = fc::aes_encrypt( secret, fc::raw::pack( conf_output.decrypted_memo ) );
@@ -4641,7 +4906,7 @@ blind_confirmation wallet_api::transfer_to_blind( string from_account_id_or_name
       conf_output.decrypted_memo.amount = amount;
       conf_output.decrypted_memo.blinding_factor = blind_factor;
       conf_output.decrypted_memo.commitment = out.commitment;
-      conf_output.decrypted_memo.check   = secret._hash[0];
+      conf_output.decrypted_memo.check   = secret._hash[0].value();
       conf_output.confirmation.one_time_key = one_time_key.get_public_key();
       conf_output.confirmation.to = to_key;
       conf_output.confirmation.encrypted_memo = fc::aes_encrypt( secret, fc::raw::pack( conf_output.decrypted_memo ) );
@@ -4659,7 +4924,7 @@ blind_confirmation wallet_api::transfer_to_blind( string from_account_id_or_name
               [&]( const blind_output& a, const blind_output& b ){ return a.commitment < b.commitment; } );
 
    confirm.trx.operations.push_back( bop );
-   my->set_operation_fees( confirm.trx, my->_remote_db->get_global_properties().parameters.current_fees);
+   my->set_operation_fees( confirm.trx, my->_remote_db->get_global_properties().parameters.get_current_fees());
    confirm.trx.validate();
    confirm.trx = sign_transaction(confirm.trx, broadcast);
 

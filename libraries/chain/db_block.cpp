@@ -31,12 +31,14 @@
 #include <graphene/chain/operation_history_object.hpp>
 
 #include <graphene/chain/proposal_object.hpp>
-#include <graphene/chain/transaction_object.hpp>
+#include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/witness_object.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/evaluator.hpp>
 
+#include <graphene/protocol/fee_schedule.hpp>
+
+#include <fc/io/raw.hpp>
 #include <fc/thread/parallel.hpp>
 
 namespace graphene { namespace chain {
@@ -552,6 +554,12 @@ void database::_apply_block( const signed_block& next_block )
    const auto& dynamic_global_props = get_dynamic_global_properties();
    bool maint_needed = (dynamic_global_props.next_maintenance_time <= next_block.timestamp);
 
+   // trx_in_block starts from 0.
+   // For real operations which are explicitly included in a transaction, op_in_trx starts from 0, virtual_op is 0.
+   // For virtual operations that are derived directly from a real operation,
+   //     use the real operation's (block_num,trx_in_block,op_in_trx), virtual_op starts from 1.
+   // For virtual operations created after processed all transactions,
+   //     trx_in_block = the_block.trsanctions.size(), op_in_trx is 0, virtual_op starts from 0.
    _current_block_num    = next_block_num;
    _current_trx_in_block = 0;
 
@@ -569,6 +577,9 @@ void database::_apply_block( const signed_block& next_block )
       ++_current_trx_in_block;
    }
 
+   _current_op_in_trx    = 0;
+   _current_virtual_op   = 0;
+
    const uint32_t missed = update_witness_missed_blocks( next_block );
    update_global_dynamic_data( next_block, missed );
    update_signing_witness(signing_witness, next_block);
@@ -582,6 +593,7 @@ void database::_apply_block( const signed_block& next_block )
    clear_expired_transactions();
    clear_expired_proposals();
    clear_expired_orders();
+   clear_expired_htlcs();
    update_expired_feeds();       // this will update expired feeds and some core exchange rates
    update_core_exchange_rates(); // this will update remaining core exchange rates
    update_withdraw_permissions();
@@ -631,9 +643,14 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
 
    if( !(skip & skip_transaction_signatures) )
    {
+      bool allow_non_immediate_owner = ( head_block_time() >= HARDFORK_CORE_584_TIME );
       auto get_active = [&]( account_id_type id ) { return &id(*this).active; };
       auto get_owner  = [&]( account_id_type id ) { return &id(*this).owner;  };
-      trx.verify_authority( chain_id, get_active, get_owner, get_global_properties().parameters.max_authority_depth );
+      trx.verify_authority( chain_id,
+                            get_active,
+                            get_owner,
+                            allow_non_immediate_owner,
+                            get_global_properties().parameters.max_authority_depth );
    }
 
    //Skip all manner of expiration and TaPoS checking if we're on block 1; It's impossible that the transaction is
@@ -645,7 +662,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
          const auto& tapos_block_summary = block_summary_id_type( trx.ref_block_num )(*this);
 
          //Verify TaPoS block summary has correct ID prefix, and that this block's time is not past the expiration
-         FC_ASSERT( trx.ref_block_prefix == tapos_block_summary.block_id._hash[1] );
+         FC_ASSERT( trx.ref_block_prefix == tapos_block_summary.block_id._hash[1].value() );
       }
 
       fc::time_point_sec now = head_block_time();
@@ -653,12 +670,16 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
       FC_ASSERT( trx.expiration <= now + chain_parameters.maximum_time_until_expiration, "",
                  ("trx.expiration",trx.expiration)("now",now)("max_til_exp",chain_parameters.maximum_time_until_expiration));
       FC_ASSERT( now <= trx.expiration, "", ("now",now)("trx.exp",trx.expiration) );
+      if ( !(skip & skip_block_size_check ) ) // don't waste time on replay
+         FC_ASSERT( head_block_time() <= HARDFORK_CORE_1573_TIME
+               || trx.get_packed_size() <= chain_parameters.maximum_transaction_size,
+               "Transaction exceeds maximum transaction size." );
    }
 
    //Insert transaction into unique transactions database.
    if( !(skip & skip_transaction_dupe_check) )
    {
-      create<transaction_object>([&trx](transaction_object& transaction) {
+      create<transaction_history_object>([&trx](transaction_history_object& transaction) {
          transaction.trx_id = trx.id();
          transaction.trx = trx;
       });
@@ -671,6 +692,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    _current_op_in_trx = 0;
    for( const auto& op : ptrx.operations )
    {
+      _current_virtual_op = 0;
       eval_state.operation_results.emplace_back(apply_operation(eval_state, op));
       ++_current_op_in_trx;
    }
@@ -745,6 +767,8 @@ void database::_precompute_parallel( const Trx* trx, const size_t count, const u
    for( size_t i = 0; i < count; ++i, ++trx )
    {
       trx->validate(); // TODO - parallelize wrt confidential operations
+      if ( !(skip & skip_block_size_check) )
+         trx->get_packed_size();
       if( !(skip&skip_transaction_dupe_check) )
          trx->id();
       if( !(skip&skip_transaction_signatures) )

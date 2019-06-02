@@ -22,12 +22,15 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/protocol/operations.hpp>
+#include <graphene/protocol/operations.hpp>
 #include <graphene/db/generic_index.hpp>
+#include <graphene/chain/types.hpp>
 #include <boost/multi_index/composite_key.hpp>
 
 namespace graphene { namespace chain {
    class database;
+   class account_object;
+   class vesting_balance_object;
 
    /**
     * @class account_statistics_object
@@ -437,6 +440,10 @@ namespace graphene { namespace chain {
    typedef generic_index<account_statistics_object, account_stats_multi_index_type> account_stats_index;
 
 }}
+
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::account_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::account_balance_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::account_statistics_object)
 
 FC_REFLECT_DERIVED( graphene::chain::account_object,
                     (graphene::db::object),

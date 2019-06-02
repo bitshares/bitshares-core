@@ -29,7 +29,6 @@
 
 #include <fc/io/json.hpp>
 #include <fc/io/stdio.hpp>
-#include <fc/network/http/server.hpp>
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/cli.hpp>
 #include <fc/rpc/http_api.hpp>
@@ -77,10 +76,12 @@ int main( int argc, char** argv )
          ("server-rpc-endpoint,s", bpo::value<string>()->implicit_value("ws://127.0.0.1:8090"), "Server websocket RPC endpoint")
          ("server-rpc-user,u", bpo::value<string>(), "Server Username")
          ("server-rpc-password,p", bpo::value<string>(), "Server Password")
-         ("rpc-endpoint,r", bpo::value<string>()->implicit_value("127.0.0.1:8091"), "Endpoint for wallet websocket RPC to listen on")
+         ("rpc-endpoint,r", bpo::value<string>()->implicit_value("127.0.0.1:8091"),
+            "Endpoint for wallet websocket RPC to listen on (DEPRECATED, use rpc-http-endpoint instead)")
          ("rpc-tls-endpoint,t", bpo::value<string>()->implicit_value("127.0.0.1:8092"), "Endpoint for wallet websocket TLS RPC to listen on")
          ("rpc-tls-certificate,c", bpo::value<string>()->implicit_value("server.pem"), "PEM certificate for wallet websocket TLS RPC")
-         ("rpc-http-endpoint,H", bpo::value<string>()->implicit_value("127.0.0.1:8093"), "Endpoint for wallet HTTP RPC to listen on")
+         ("rpc-http-endpoint,H", bpo::value<string>()->implicit_value("127.0.0.1:8093"),
+            "Endpoint for wallet HTTP and websocket RPC to listen on")
          ("daemon,d", "Run the wallet in daemon mode" )
          ("wallet-file,w", bpo::value<string>()->implicit_value("wallet.json"), "wallet to load")
          ("chain-id", bpo::value<string>(), "chain ID to connect to")
@@ -193,7 +194,7 @@ int main( int argc, char** argv )
       fc::http::websocket_client client;
       idump((wdata.ws_server));
       auto con  = client.connect( wdata.ws_server );
-      auto apic = std::make_shared<fc::rpc::websocket_api_connection>(*con, GRAPHENE_MAX_NESTED_OBJECTS);
+      auto apic = std::make_shared<fc::rpc::websocket_api_connection>(con, GRAPHENE_MAX_NESTED_OBJECTS);
 
       auto remote_api = apic->get_remote_api< login_api >(1);
       edump((wdata.ws_user)(wdata.ws_password) );
@@ -205,36 +206,16 @@ int main( int argc, char** argv )
 
       fc::api<wallet_api> wapi(wapiptr);
 
-      auto wallet_cli = std::make_shared<fc::rpc::cli>( GRAPHENE_MAX_NESTED_OBJECTS );
-      for( auto& name_formatter : wapiptr->get_result_formatters() )
-         wallet_cli->format_result( name_formatter.first, name_formatter.second );
-
-      boost::signals2::scoped_connection closed_connection(con->closed.connect([wallet_cli]{
-         cerr << "Server has disconnected us.\n";
-         wallet_cli->stop();
-      }));
-      (void)(closed_connection);
-
-      if( wapiptr->is_new() )
-      {
-         std::cout << "Please use the set_password method to initialize a new wallet before continuing\n";
-         wallet_cli->set_prompt( "new >>> " );
-      } else
-         wallet_cli->set_prompt( "locked >>> " );
-
-      boost::signals2::scoped_connection locked_connection(wapiptr->lock_changed.connect([&](bool locked) {
-         wallet_cli->set_prompt(  locked ? "locked >>> " : "unlocked >>> " );
-      }));
-
-      auto _websocket_server = std::make_shared<fc::http::websocket_server>();
+      std::shared_ptr<fc::http::websocket_server> _websocket_server;
       if( options.count("rpc-endpoint") )
       {
+         _websocket_server = std::make_shared<fc::http::websocket_server>();
          _websocket_server->on_connection([&wapi]( const fc::http::websocket_connection_ptr& c ){
-            auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c, GRAPHENE_MAX_NESTED_OBJECTS);
+            auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(c, GRAPHENE_MAX_NESTED_OBJECTS);
             wsc->register_api(wapi);
             c->set_session_data( wsc );
          });
-         ilog( "Listening for incoming RPC requests on ${p}", ("p", options.at("rpc-endpoint").as<string>() ));
+         ilog( "Listening for incoming HTTP and WS RPC requests on ${p}", ("p", options.at("rpc-endpoint").as<string>() ));
          _websocket_server->listen( fc::ip::endpoint::from_string(options.at("rpc-endpoint").as<string>()) );
          _websocket_server->start_accept();
       }
@@ -243,76 +224,124 @@ int main( int argc, char** argv )
       if( options.count( "rpc-tls-certificate" ) )
          cert_pem = options.at("rpc-tls-certificate").as<string>();
 
-      auto _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>(cert_pem);
+      std::shared_ptr<fc::http::websocket_tls_server> _websocket_tls_server;
       if( options.count("rpc-tls-endpoint") )
       {
+         _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>(cert_pem);
          _websocket_tls_server->on_connection([&wapi]( const fc::http::websocket_connection_ptr& c ){
-            auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c, GRAPHENE_MAX_NESTED_OBJECTS);
+            auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(c, GRAPHENE_MAX_NESTED_OBJECTS);
             wsc->register_api(wapi);
             c->set_session_data( wsc );
          });
-         ilog( "Listening for incoming TLS RPC requests on ${p}", ("p", options.at("rpc-tls-endpoint").as<string>() ));
+         ilog( "Listening for incoming HTTPS and WSS RPC requests on ${p}",
+               ("p", options.at("rpc-tls-endpoint").as<string>()) );
          _websocket_tls_server->listen( fc::ip::endpoint::from_string(options.at("rpc-tls-endpoint").as<string>()) );
          _websocket_tls_server->start_accept();
       }
 
-      auto _http_server = std::make_shared<fc::http::server>();
+      std::shared_ptr<fc::http::websocket_server> _http_ws_server;
       if( options.count("rpc-http-endpoint" ) )
       {
-         ilog( "Listening for incoming HTTP RPC requests on ${p}", ("p", options.at("rpc-http-endpoint").as<string>() ) );
-         _http_server->listen( fc::ip::endpoint::from_string( options.at( "rpc-http-endpoint" ).as<string>() ) );
-         //
-         // due to implementation, on_request() must come AFTER listen()
-         //
-         _http_server->on_request(
-            [&wapi]( const fc::http::request& req, const fc::http::server::response& resp )
-            {
-               std::shared_ptr< fc::rpc::http_api_connection > conn =
-                  std::make_shared< fc::rpc::http_api_connection >( GRAPHENE_MAX_NESTED_OBJECTS );
-               conn->register_api( wapi );
-               conn->on_request( req, resp );
-            } );
+         _http_ws_server = std::make_shared<fc::http::websocket_server>();
+         ilog( "Listening for incoming HTTP and WS RPC requests on ${p}",
+               ("p", options.at("rpc-http-endpoint").as<string>()) );
+         _http_ws_server->on_connection([&wapi]( const fc::http::websocket_connection_ptr& c ){
+            auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(c, GRAPHENE_MAX_NESTED_OBJECTS);
+            wsc->register_api(wapi);
+            c->set_session_data( wsc );
+         });
+         _http_ws_server->listen( fc::ip::endpoint::from_string(options.at("rpc-http-endpoint").as<string>()) );
+         _http_ws_server->start_accept();
       }
 
       if( !options.count( "daemon" ) )
       {
+         auto wallet_cli = std::make_shared<fc::rpc::cli>( GRAPHENE_MAX_NESTED_OBJECTS );
+         for( auto& name_formatter : wapiptr->get_result_formatters() )
+            wallet_cli->format_result( name_formatter.first, name_formatter.second );
+
+         if( wapiptr->is_new() )
+         {
+            std::cout << "Please use the set_password method to initialize a new wallet before continuing\n";
+            wallet_cli->set_prompt( "new >>> " );
+         }
+         else
+            wallet_cli->set_prompt( "locked >>> " );
+
+         boost::signals2::scoped_connection locked_connection( wapiptr->lock_changed.connect(
+            [wallet_cli](bool locked) {
+               wallet_cli->set_prompt( locked ? "locked >>> " : "unlocked >>> " );
+            }));
+
+         auto sig_set = fc::set_signal_handler( [wallet_cli](int signal) {
+            ilog( "Captured SIGINT not in daemon mode, exiting" );
+            fc::set_signal_handler( [](int sig) {}, SIGINT ); // reinstall an empty SIGINT handler
+            wallet_cli->cancel();
+         }, SIGINT );
+
+         fc::set_signal_handler( [wallet_cli,sig_set](int signal) {
+            ilog( "Captured SIGTERM not in daemon mode, exiting" );
+            sig_set->cancel();
+            fc::set_signal_handler( [](int sig) {}, SIGINT ); // reinstall an empty SIGINT handler
+            wallet_cli->cancel();
+         }, SIGTERM );
+
+         fc::set_signal_handler( [wallet_cli,sig_set](int signal) {
+            ilog( "Captured SIGQUIT not in daemon mode, exiting" );
+            sig_set->cancel();
+            fc::set_signal_handler( [](int sig) {}, SIGINT ); // reinstall an empty SIGINT handler
+            wallet_cli->cancel();
+         }, SIGQUIT );
+
+         boost::signals2::scoped_connection closed_connection( con->closed.connect( [wallet_cli,sig_set] {
+            elog( "Server has disconnected us." );
+            sig_set->cancel();
+            fc::set_signal_handler( [](int sig) {}, SIGINT ); // reinstall an empty SIGINT handler
+            wallet_cli->cancel();
+         }));
+
          wallet_cli->register_api( wapi );
          wallet_cli->start();
-
-         fc::set_signal_handler([](int signal) {
-            ilog( "Captured SIGINT not in daemon mode" );
-            fclose(stdin);
-         }, SIGINT);
-
-         fc::set_signal_handler([](int signal) {
-            ilog( "Captured SIGTERM not in daemon mode" );
-            fclose(stdin);
-         }, SIGTERM);
-
          wallet_cli->wait();
+
+         locked_connection.disconnect();
+         closed_connection.disconnect();
       }
       else
       {
-        fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
-        fc::set_signal_handler([&exit_promise](int signal) {
-           exit_promise->set_value(signal);
-        }, SIGINT);
+         fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
 
-        fc::set_signal_handler([&exit_promise](int signal) {
-           exit_promise->set_value(signal);
-        }, SIGTERM);
+         fc::set_signal_handler( [&exit_promise](int signal) {
+            ilog( "Captured SIGINT in daemon mode, exiting" );
+            exit_promise->set_value(signal);
+         }, SIGINT );
 
-        ilog( "Entering Daemon Mode, ^C to exit" );
-        exit_promise->wait();
+         fc::set_signal_handler( [&exit_promise](int signal) {
+            ilog( "Captured SIGTERM in daemon mode, exiting" );
+            exit_promise->set_value(signal);
+         }, SIGTERM );
+
+         fc::set_signal_handler( [&exit_promise](int signal) {
+            ilog( "Captured SIGQUIT in daemon mode, exiting" );
+            exit_promise->set_value(signal);
+         }, SIGQUIT );
+
+         boost::signals2::scoped_connection closed_connection( con->closed.connect( [&exit_promise] {
+            elog( "Server has disconnected us." );
+            exit_promise->set_value(0);
+         }));
+
+         ilog( "Entering Daemon Mode, ^C to exit" );
+         exit_promise->wait();
+
+         closed_connection.disconnect();
       }
 
       wapi->save_wallet_file(wallet_file.generic_string());
-      locked_connection.disconnect();
-      closed_connection.disconnect();
    }
    catch ( const fc::exception& e )
    {
-      std::cout << e.to_detail_string() << "\n";
+      std::cerr << e.to_detail_string() << "\n";
       return -1;
    }
    return 0;
