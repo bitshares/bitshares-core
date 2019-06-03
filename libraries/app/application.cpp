@@ -337,9 +337,9 @@ void application_impl::set_api_limit() {
    if(_options->count("api-limit-get-asset-holders")){
        _app_options.api_limit_get_asset_holders = _options->at("api-limit-get-asset-holders").as<uint64_t>();
    }
-	 if(_options->count("api-limit-get-key-references")){
-		  _app_options.api_limit_get_key_references = _options->at("api-limit-get-key-references").as<uint64_t>();
-	 }
+	if(_options->count("api-limit-get-key-references")){
+		 _app_options.api_limit_get_key_references = _options->at("api-limit-get-key-references").as<uint64_t>();
+	}
    if(_options->count("api-limit-get-htlc-by")) {
       _app_options.api_limit_get_htlc_by = _options->at("api-limit-get-htlc-by").as<uint64_t>();
    }
@@ -360,12 +360,6 @@ void application_impl::set_api_limit() {
    }
    if(_options->count("api-limit-get-limit-orders")){
       _app_options.api_limit_get_limit_orders = _options->at("api-limit-get-limit-orders").as<uint64_t>();
-   }
-   if(_options->count("api-limit-get-call-orders")){
-      _app_options.api_limit_get_call_orders = _options->at("api-limit-get-call-orders").as<uint64_t>();
-   }
-   if(_options->count("api-limit-get-settle-orders")){
-      _app_options.api_limit_get_settle_orders = _options->at("api-limit-get-settle-orders").as<uint64_t>();
    }
    if(_options->count("api-limit-get-order-book")){
       _app_options.api_limit_get_order_book = _options->at("api-limit-get-order-book").as<uint64_t>();
@@ -1061,10 +1055,6 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::list_assets and get_assets_by_issuer to set its default limit values as 101")
          ("api-limit-get-limit-orders",boost::program_options::value<uint64_t>()->default_value(300),
           "For database_api_impl::get_limit_orders to set its default limit value as 300")
-         ("api-limit-get-call-orders",boost::program_options::value<uint64_t>()->default_value(300),
-          "For database_api_impl::get_call_orders to set its default limit value as 300")
-         ("api-limit-get-settle-orders",boost::program_options::value<uint64_t>()->default_value(300),
-          "For database_api_impl::get_settle_orders to set its default limit value as 300")
          ("api-limit-get-order-book",boost::program_options::value<uint64_t>()->default_value(50),
           "For database_api_impl::get_order_book to set its default limit value as 50")
          ;
