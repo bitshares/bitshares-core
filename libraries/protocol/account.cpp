@@ -23,6 +23,8 @@
  */
 #include <graphene/protocol/account.hpp>
 
+#include <fc/io/raw.hpp>
+
 namespace graphene { namespace protocol {
 
 /**
@@ -276,3 +278,15 @@ void account_transfer_operation::validate()const
 
 
 } } // graphene::protocol
+
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::account_options )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::account_create_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::account_whitelist_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::account_update_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::account_upgrade_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::account_transfer_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::account_create_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::account_whitelist_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::account_update_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::account_upgrade_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::account_transfer_operation )

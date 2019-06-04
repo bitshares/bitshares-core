@@ -66,6 +66,7 @@
 #include <fc/log/logger.hpp>
 #include <fc/io/json.hpp>
 #include <fc/io/enum_type.hpp>
+#include <fc/io/raw.hpp>
 #include <fc/crypto/rand.hpp>
 #include <fc/network/rate_limiting.hpp>
 #include <fc/network/ip.hpp>

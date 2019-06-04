@@ -22,11 +22,12 @@
  * THE SOFTWARE.
  */
 #pragma once
+
 #include <graphene/protocol/base.hpp>
+#include <graphene/protocol/asset.hpp>
+#include <graphene/protocol/authority.hpp>
 #include <graphene/protocol/buyback.hpp>
-#include <graphene/protocol/ext.hpp>
 #include <graphene/protocol/special_authority.hpp>
-#include <graphene/protocol/types.hpp>
 #include <graphene/protocol/vote.hpp>
 
 namespace graphene { namespace protocol {
@@ -299,3 +300,15 @@ FC_REFLECT( graphene::protocol::account_upgrade_operation::fee_parameters_type, 
 FC_REFLECT( graphene::protocol::account_transfer_operation::fee_parameters_type, (fee) )
 
 FC_REFLECT( graphene::protocol::account_transfer_operation, (fee)(account_id)(new_owner)(extensions) )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::account_options )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::account_create_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::account_whitelist_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::account_update_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::account_upgrade_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::account_transfer_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::account_create_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::account_whitelist_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::account_update_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::account_upgrade_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::account_transfer_operation )

@@ -73,5 +73,6 @@ namespace graphene { namespace chain {
 
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::balance_object)
 
-FC_REFLECT_DERIVED( graphene::chain::balance_object, (graphene::db::object),
-                    (owner)(balance)(vesting_policy)(last_claim_date) )
+FC_REFLECT_TYPENAME( graphene::chain::balance_object )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::balance_object )

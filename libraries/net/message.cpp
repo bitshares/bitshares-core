@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2019 BitShares Blockchain Foundation, and contributors.
  *
  * The MIT License
  *
@@ -21,29 +21,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#pragma once
+#include <fc/io/raw.hpp>
 
-#include <graphene/chain/immutable_chain_parameters.hpp>
+#include <graphene/net/message.hpp>
 
-namespace graphene { namespace chain {
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::net::message_header, BOOST_PP_SEQ_NIL, (size)(msg_type) )
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::net::message, (graphene::net::message_header), (data) )
 
-/**
- * Contains invariants which are set at genesis and never changed.
- */
-class chain_property_object : public abstract_object<chain_property_object>
-{
-   public:
-      static const uint8_t space_id = implementation_ids;
-      static const uint8_t type_id  = impl_chain_property_object_type;
-
-      chain_id_type chain_id;
-      immutable_chain_parameters immutable_parameters;
-};
-
-} }
-
-MAP_OBJECT_ID_TO_TYPE(graphene::chain::chain_property_object)
-
-FC_REFLECT_TYPENAME( graphene::chain::chain_property_object )
-
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::chain_property_object )
+GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::net::message_header)
+GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::net::message)

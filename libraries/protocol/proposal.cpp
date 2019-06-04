@@ -24,6 +24,8 @@
 #include <graphene/protocol/operations.hpp>
 #include <graphene/protocol/fee_schedule.hpp>
 
+#include <fc/io/raw.hpp>
+
 namespace graphene { namespace protocol {
 
 proposal_create_operation proposal_create_operation::committee_proposal(const chain_parameters& global_params, fc::time_point_sec head_block_time )
@@ -105,3 +107,10 @@ void proposal_update_operation::get_required_owner_authorities( flat_set<account
 }
 
 } } // graphene::protocol
+
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::proposal_create_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::proposal_update_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::proposal_delete_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::proposal_create_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::proposal_update_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::proposal_delete_operation )

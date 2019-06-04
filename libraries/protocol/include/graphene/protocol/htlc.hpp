@@ -23,13 +23,9 @@
  */
 #pragma once
 
-#include <fc/crypto/ripemd160.hpp>
-#include <fc/crypto/sha1.hpp>
-#include <fc/crypto/sha256.hpp>
 #include <fc/time.hpp>
-#include <boost/container/flat_set.hpp>
 #include <graphene/protocol/base.hpp>
-#include <graphene/protocol/types.hpp>
+#include <graphene/protocol/asset.hpp>
 #include <algorithm> // std::max
 
 namespace graphene { namespace protocol {
@@ -201,9 +197,18 @@ FC_REFLECT( graphene::protocol::htlc_redeemed_operation::fee_parameters_type, ) 
 FC_REFLECT( graphene::protocol::htlc_extend_operation::fee_parameters_type, (fee) (fee_per_day))
 FC_REFLECT( graphene::protocol::htlc_refund_operation::fee_parameters_type, ) // VIRTUAL
 
-FC_REFLECT( graphene::protocol::htlc_create_operation, 
+FC_REFLECT( graphene::protocol::htlc_create_operation,
       (fee)(from)(to)(amount)(preimage_hash)(preimage_size)(claim_period_seconds)(extensions))
 FC_REFLECT( graphene::protocol::htlc_redeem_operation, (fee)(htlc_id)(redeemer)(preimage)(extensions))
 FC_REFLECT( graphene::protocol::htlc_redeemed_operation, (fee)(htlc_id)(from)(to)(redeemer)(amount) )
 FC_REFLECT( graphene::protocol::htlc_extend_operation, (fee)(htlc_id)(update_issuer)(seconds_to_add)(extensions))
 FC_REFLECT( graphene::protocol::htlc_refund_operation, (fee)(htlc_id)(to))
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::htlc_create_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::htlc_redeem_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::htlc_extend_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::htlc_create_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::htlc_redeem_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::htlc_redeemed_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::htlc_extend_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::htlc_refund_operation )

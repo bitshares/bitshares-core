@@ -24,7 +24,6 @@
 #pragma once
 
 #include <graphene/protocol/types.hpp>
-#include <fc/reflect/reflect.hpp>
 
 namespace graphene { namespace protocol {
 
@@ -48,3 +47,5 @@ void validate_special_authority( const special_authority& auth );
 FC_REFLECT( graphene::protocol::no_special_authority, )
 FC_REFLECT( graphene::protocol::top_holders_special_authority, (asset)(num_top_holders) )
 FC_REFLECT_TYPENAME( graphene::protocol::special_authority )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::top_holders_special_authority )

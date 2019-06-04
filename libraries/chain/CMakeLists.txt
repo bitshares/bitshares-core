@@ -37,6 +37,7 @@ add_library( graphene_chain
 
              genesis_state.cpp
              get_config.cpp
+             exceptions.cpp
 
              evaluator.cpp
              balance_evaluator.cpp
@@ -62,6 +63,7 @@ add_library( graphene_chain
              market_object.cpp
              proposal_object.cpp
              vesting_balance_object.cpp
+             small_objects.cpp
 
              block_database.cpp
 

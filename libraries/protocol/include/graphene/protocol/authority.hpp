@@ -23,6 +23,7 @@
  */
 #pragma once
 #include <graphene/protocol/types.hpp>
+#include <graphene/protocol/address.hpp>
 
 namespace graphene { namespace protocol {
 
@@ -133,3 +134,5 @@ void add_authority_accounts(
 
 FC_REFLECT( graphene::protocol::authority, (weight_threshold)(account_auths)(key_auths)(address_auths) )
 FC_REFLECT_ENUM( graphene::protocol::authority::classification, (owner)(active)(key) )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::authority )

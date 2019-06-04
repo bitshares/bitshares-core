@@ -27,6 +27,8 @@
 
 #include <functional>
 
+#include <fc/io/raw.hpp>
+
 using namespace graphene::chain;
 
 /*
@@ -300,3 +302,24 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
    }
 
 } FC_CAPTURE_AND_RETHROW( (*this)(feed_price)(match_price)(maintenance_collateral_ratio) ) }
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::limit_order_object,
+                    (graphene::db::object),
+                    (expiration)(seller)(for_sale)(sell_price)(deferred_fee)(deferred_paid_fee)
+                  )
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::call_order_object, (graphene::db::object),
+                    (borrower)(collateral)(debt)(call_price)(target_collateral_ratio) )
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::force_settlement_object,
+                    (graphene::db::object),
+                    (owner)(balance)(settlement_date)
+                  )
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::collateral_bid_object, (graphene::db::object),
+                    (bidder)(inv_swan_price) )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::limit_order_object )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::call_order_object )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::force_settlement_object )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::collateral_bid_object )

@@ -23,13 +23,14 @@
  */
 #pragma once
 
+#include <graphene/protocol/ext.hpp>
 #include <graphene/protocol/types.hpp>
-#include <graphene/protocol/asset.hpp>
-#include <graphene/protocol/authority.hpp>
 
 #include <fc/thread/future.hpp>
 
 namespace graphene { namespace protocol {
+   struct asset;
+   struct authority;
 
    /**
     *  @defgroup operations Operations

@@ -22,14 +22,12 @@
  * THE SOFTWARE.
  */
 #pragma once
+
 #include <graphene/protocol/asset.hpp>
-#include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
 
 namespace graphene { namespace chain {
    using namespace graphene::db;
-
-   class witness_object;
 
    class witness_object : public abstract_object<witness_object>
    {
@@ -72,14 +70,6 @@ namespace graphene { namespace chain {
 
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::witness_object)
 
-FC_REFLECT_DERIVED( graphene::chain::witness_object, (graphene::db::object),
-                    (witness_account)
-                    (last_aslot)
-                    (signing_key)
-                    (pay_vb)
-                    (vote_id)
-                    (total_votes)
-                    (url) 
-                    (total_missed)
-                    (last_confirmed_block_num)
-                  )
+FC_REFLECT_TYPENAME( graphene::chain::witness_object )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::witness_object )

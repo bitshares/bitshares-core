@@ -24,6 +24,8 @@
 
 #include <graphene/chain/vesting_balance_object.hpp>
 
+#include <fc/io/raw.hpp>
+
 namespace graphene { namespace chain {
 
 inline bool sum_below_max_shares(const asset& a, const asset& b)
@@ -268,3 +270,7 @@ asset vesting_balance_object::get_allowed_withdraw(const time_point_sec& now)con
 }
 
 } } // graphene::chain
+
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::linear_vesting_policy )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::cdd_vesting_policy )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::vesting_balance_object )

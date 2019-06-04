@@ -24,6 +24,7 @@
 #include <graphene/protocol/memo.hpp>
 #include <boost/endian/conversion.hpp>
 #include <fc/crypto/aes.hpp>
+#include <fc/io/raw.hpp>
 
 namespace graphene { namespace protocol {
 
@@ -89,3 +90,6 @@ memo_message memo_message::deserialize(const string& serial)
 }
 
 } } // graphene::protocol
+
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::memo_message )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::memo_data )

@@ -25,6 +25,8 @@
 #include <boost/rational.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 
+#include <fc/io/raw.hpp>
+
 namespace graphene { namespace protocol {
       typedef boost::multiprecision::uint128_t uint128_t;
       typedef boost::multiprecision::int128_t  int128_t;
@@ -315,3 +317,7 @@ const int64_t scaled_precision_lut[19] =
 };
 
 } } // graphene::protocol
+
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::asset )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::price )
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::price_feed )

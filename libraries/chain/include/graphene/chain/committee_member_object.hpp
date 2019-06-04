@@ -22,15 +22,12 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/db/object.hpp>
+#include <graphene/chain/types.hpp>
 #include <graphene/db/generic_index.hpp>
 #include <graphene/protocol/vote.hpp>
-#include <graphene/chain/types.hpp>
 
 namespace graphene { namespace chain {
    using namespace graphene::db;
-
-   class account_object;
 
    /**
     *  @brief tracks information about a committee_member account.
@@ -76,5 +73,6 @@ namespace graphene { namespace chain {
 
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::committee_member_object)
 
-FC_REFLECT_DERIVED( graphene::chain::committee_member_object, (graphene::db::object),
-                    (committee_member_account)(vote_id)(total_votes)(url) )
+FC_REFLECT_TYPENAME( graphene::chain::committee_member_object )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::committee_member_object )

@@ -23,7 +23,7 @@
  */
 #pragma once
 #include <graphene/protocol/base.hpp>
-#include <graphene/protocol/ext.hpp>
+#include <graphene/protocol/asset.hpp>
 
 namespace graphene { namespace protocol { 
 
@@ -232,3 +232,15 @@ FC_REFLECT( graphene::protocol::call_order_update_operation, (fee)(funding_accou
 FC_REFLECT( graphene::protocol::fill_order_operation, (fee)(order_id)(account_id)(pays)(receives)(fill_price)(is_maker) )
 FC_REFLECT( graphene::protocol::bid_collateral_operation, (fee)(bidder)(additional_collateral)(debt_covered)(extensions) )
 FC_REFLECT( graphene::protocol::execute_bid_operation, (fee)(bidder)(debt)(collateral) )
+
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::call_order_update_operation::options_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::limit_order_create_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::limit_order_cancel_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::call_order_update_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::bid_collateral_operation::fee_parameters_type )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::limit_order_create_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::limit_order_cancel_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::call_order_update_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::bid_collateral_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::fill_order_operation )
+GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::execute_bid_operation )

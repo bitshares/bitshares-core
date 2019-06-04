@@ -24,6 +24,8 @@
 
 #include <graphene/protocol/special_authority.hpp>
 
+#include <fc/io/raw.hpp>
+
 namespace graphene { namespace protocol {
 
 struct special_authority_validate_visitor
@@ -45,3 +47,5 @@ void validate_special_authority( const special_authority& a )
 }
 
 } } // graphene::protocol
+
+GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::top_holders_special_authority )
