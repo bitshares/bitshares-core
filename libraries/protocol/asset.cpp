@@ -29,8 +29,8 @@
 #include <fc/uint128.hpp>
 
 namespace graphene { namespace protocol {
-      typedef fc::uint128_t                    uint128_t;
-      typedef boost::multiprecision::int128_t  int128_t;
+      using fc::uint128_t;
+      using fc::int128_t;
 
       bool operator == ( const price& a, const price& b )
       {
