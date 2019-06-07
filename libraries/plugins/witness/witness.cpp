@@ -64,7 +64,7 @@ void witness_plugin::plugin_set_program_options(
    string witness_id_example = fc::json::to_string(chain::witness_id_type(5));
    command_line_options.add_options()
          ("enable-stale-production", bpo::bool_switch()->notifier([this](bool e){_production_enabled = e;}), "Enable block production, even if the chain is stale.")
-         ("required-participation", bpo::bool_switch()->notifier([this](int e){_required_witness_participation = uint32_t(e*GRAPHENE_1_PERCENT);}), "Percent of witnesses (0-99) that must be participating in order to produce blocks")
+         ("required-participation", bpo::value<uint32_t>()->default_value(33), "Percent of witnesses (0-99) that must be participating in order to produce blocks")
          ("witness-id,w", bpo::value<vector<string>>()->composing()->multitoken(),
           ("ID of witness controlled by this node (e.g. " + witness_id_example + ", quotes are required, may specify multiple times)").c_str())
          ("private-key", bpo::value<vector<string>>()->composing()->multitoken()->
@@ -108,6 +108,10 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
          }
          _private_keys[key_id_to_wif_pair.first] = *private_key;
       }
+   }
+   if(options.count("required-participation"))
+   {
+       _required_witness_participation = options["required-participation"].as<uint32_t>()*GRAPHENE_1_PERCENT;
    }
    ilog("witness plugin:  plugin_initialize() end");
 } FC_LOG_AND_RETHROW() }
