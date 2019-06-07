@@ -1188,10 +1188,12 @@ public:
    { try {
       FC_ASSERT( !self.is_locked() );
       account_object account_obj = get_account(name);
+      FC_ASSERT( account_obj.stable_owner, "Account is not unlockable" );
 
       signed_transaction tx;
       account_unlock_operation op;
       op.account_to_unlock = account_obj.get_id();
+      op.previous_authority = *account_obj.stable_owner;
       tx.operations = {op};
       set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
       tx.validate();

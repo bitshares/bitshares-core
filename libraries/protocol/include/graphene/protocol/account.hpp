@@ -181,14 +181,25 @@ namespace graphene { namespace protocol {
 
       asset fee;
       account_id_type account_to_unlock;
+      authority       previous_authority;
       extensions_type extensions;
 
       account_id_type fee_payer() const { return account_to_unlock; }
       void       validate() const;
       share_type calculate_fee( const fee_parameters_type& k ) const;
 
-      void get_required_owner_authorities( flat_set<account_id_type>& a )const
-      { a.insert( account_to_unlock ); }
+      void get_required_active_authorities( flat_set<account_id_type>& active) const 
+      {
+         // a little bit tricky, see operations.cpp : operation_get_required_auth
+         //      active.insert( v.fee_payer() );  - fee_payer added explicitly as active authority
+         //      but we needn't it to authorize because it is locked
+         active.erase( account_to_unlock );
+      }      
+
+      void get_required_authorities( vector<authority>& a ) const
+      { 
+         a.push_back( previous_authority ); 
+      }
    };
 
    /**
@@ -313,8 +324,9 @@ FC_REFLECT( graphene::protocol::account_update_operation,
             (fee)(account)(owner)(active)(new_options)(extensions)
           )
 
+
 FC_REFLECT( graphene::protocol::account_unlock_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::protocol::account_unlock_operation, (fee)(account_to_unlock)(extensions) )
+FC_REFLECT( graphene::protocol::account_unlock_operation, (fee)(account_to_unlock)(previous_authority)(extensions) )
 
 
 FC_REFLECT( graphene::protocol::account_upgrade_operation,
