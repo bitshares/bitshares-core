@@ -42,7 +42,7 @@ namespace detail {
       a *= percent;
       a /= GRAPHENE_100_PERCENT;
       FC_ASSERT( a <= GRAPHENE_MAX_SHARE_SUPPLY, "overflow when calculating percent" );
-      return a.convert_to<int64_t>();
+      return static_cast<int64_t>(a);
    }
 
 } //detail
@@ -264,7 +264,7 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
                fee128 += order.deferred_fee.value;
                fee128 -= 1;
                fee128 /= order.deferred_fee.value;
-               share_type cancel_fee_amount = fee128.convert_to<int64_t>();
+               share_type cancel_fee_amount = static_cast<int64_t>(fee128);
                // cancel_fee should be positive, pay it to asset's accumulated_fees
                fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
                modify( *fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {

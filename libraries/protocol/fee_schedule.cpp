@@ -127,7 +127,7 @@ namespace graphene { namespace protocol {
          scaled /= GRAPHENE_100_PERCENT;
          FC_ASSERT( scaled <= GRAPHENE_MAX_SHARE_SUPPLY,
                     "Required fee after scaling would exceed maximum possible supply" );
-         required_fee = scaled.convert_to<uint64_t>();
+         required_fee = static_cast<uint64_t>(scaled);
       }
       return asset( required_fee );
    }
