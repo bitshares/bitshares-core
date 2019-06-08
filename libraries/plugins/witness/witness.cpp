@@ -111,7 +111,13 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
    }
    if(options.count("required-participation"))
    {
+       auto required_participation = options["required-participation"].as<uint32_t>();
+       FC_ASSERT(required_participation < 100);
        _required_witness_participation = options["required-participation"].as<uint32_t>()*GRAPHENE_1_PERCENT;
+       if(required_participation < 10)
+           ilog("witness plugin: Warning - Low required participation");
+       else if(_required_witness_participation > 90)
+           ilog("witness plugin: Warning - High required participation");
    }
    ilog("witness plugin:  plugin_initialize() end");
 } FC_LOG_AND_RETHROW() }
