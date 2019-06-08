@@ -11,7 +11,12 @@ set( INSTALLER_APP_ID "68ad7005-8eee-49c9-95ce-9eed97e5b347" )
 
 set( CMAKE_CXX_STANDARD 14 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
-set( CMAKE_CXX_EXTENSIONS OFF )
+
+if( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
+  set( CMAKE_CXX_EXTENSIONS ON ) # for __int128 support
+else( GNU )
+  set( CMAKE_CXX_EXTENSIONS OFF )
+endif( GNU )
 
 # http://stackoverflow.com/a/18369825
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
