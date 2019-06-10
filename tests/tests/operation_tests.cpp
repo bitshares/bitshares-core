@@ -1173,6 +1173,80 @@ BOOST_AUTO_TEST_CASE( restore_point_not_created_if_account_not_locked_test )
    FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( unlock_cycled_account_test )
+{
+   try {
+      ACTORS( (bob) (alice) );
+      fund(bob);
+      generate_block();
+
+      auto update_auth = [&](const account_update_operation& op){
+         trx.operations.clear();
+         trx.operations.push_back(op);
+         PUSH_TX( db, trx, ~0 );
+         generate_block();
+         set_expiration(db, trx);
+      };
+
+      // Alice sets Bob to her active and owner authority
+      {
+         account_update_operation op;
+         op.account = alice_id;
+         op.active = authority(1, bob_id, 1);
+         op.owner = op.active;
+         update_auth(op);
+      }
+
+      // Bob sets Alice to his active and owner authority
+      {
+         account_update_operation op;
+         op.account = bob_id;
+         op.active = authority(1, alice_id, 1);
+         op.owner = op.active;
+         update_auth(op);
+      }
+
+      generate_blocks(HARDFORK_CYCLED_ACCOUNTS_TIME, true);
+         
+      // account locked and can't transfer money
+      transfer_operation t_op;
+      t_op.from = bob_id;
+      t_op.to   = alice_id;
+      t_op.amount = asset(1000);
+      trx.operations = {t_op};
+      GRAPHENE_CHECK_THROW( PUSH_TX( db, trx ), graphene::chain::tx_missing_active_auth );
+
+      // unlock
+      {
+         account_unlock_operation op;
+         op.account_to_unlock = bob_id;
+         trx.operations = {op};
+         set_expiration(db, trx);
+         
+         // TODO sign(trx, bob_private_key);
+         // TODO remove ~0 and check prev authority
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // account unlocked and can transfer money
+      trx.operations = {t_op};
+      sign(trx, bob_private_key);
+      PUSH_TX( db, trx );
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE( cant_execute_unlock_operation_before_HARDFORK_CYCLED_ACCOUNTS_TIME_test )
+{
+   ACTORS( (alice) );
+
+   account_unlock_operation op;
+   op.account_to_unlock = alice_id;
+   trx.operations = {op};         
+   sign(trx, alice_private_key);
+   GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::assert_exception);
+}
+
 BOOST_AUTO_TEST_CASE( create_account_with_cycled_authority_before_HARDFORK_CYCLED_ACCOUNTS_TIME_test )
 {
    try {

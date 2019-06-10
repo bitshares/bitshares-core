@@ -45,7 +45,7 @@ public:
    void_result do_apply( const account_update_operation& o );
 
    const account_object* acnt;
-   bool save_owner = false;
+   bool cycle_detected = false;
 };
 
 class account_upgrade_evaluator : public evaluator<account_upgrade_evaluator>
@@ -57,6 +57,17 @@ public:
    void_result do_apply(const operation_type& o);
 
    const account_object* account;
+};
+
+class account_unlock_evaluator : public evaluator<account_unlock_evaluator>
+{
+public:
+   typedef account_unlock_operation operation_type;
+
+   void_result do_evaluate( const account_unlock_operation& o );
+   void_result do_apply( const account_unlock_operation& o );
+
+   const account_object* acnt;
 };
 
 class account_whitelist_evaluator : public evaluator<account_whitelist_evaluator>

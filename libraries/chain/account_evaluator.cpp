@@ -345,7 +345,7 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
       {
          if( d.head_block_time() < HARDFORK_CYCLED_ACCOUNTS_TIME )
          {
-            save_owner = true;
+            cycle_detected = true;
          }
          else
          {
@@ -391,7 +391,7 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
 
    // update account object
    d.modify( *acnt, [&o, this](account_object& a){
-      if( save_owner )
+      if( cycle_detected && !a.stable_owner.valid())
       {
          a.stable_owner = a.owner;
       }
@@ -435,6 +435,32 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
          sa.account = o.account;
       } );
    }
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+void_result account_unlock_evaluator::do_evaluate( const account_unlock_operation& o )
+{ try {
+   database& d = db();
+   FC_ASSERT(d.head_block_time() >= HARDFORK_CYCLED_ACCOUNTS_TIME,
+             "Unlocking account is available after HARDFORK_CYCLED_ACCOUNTS_TIME only!"
+   );
+
+   acnt = &o.account_to_unlock(d);
+   FC_ASSERT( acnt->stable_owner.valid(), "Account ${a} is not unlockable.", ("a", o.account_to_unlock) );
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+void_result account_unlock_evaluator::do_apply( const account_unlock_operation& o )
+{ try {
+   database& d = db();
+
+   // update account object
+   d.modify( *acnt, [&o, this](account_object& a){
+      a.owner = *a.stable_owner;
+      a.stable_owner.reset();
+   });
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

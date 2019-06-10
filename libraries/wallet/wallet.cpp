@@ -1184,6 +1184,21 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (name) ) }
 
+   signed_transaction fix_locked_account(string name, bool broadcast)
+   { try {
+      FC_ASSERT( !self.is_locked() );
+      account_object account_obj = get_account(name);
+
+      signed_transaction tx;
+      account_unlock_operation op;
+      op.account_to_unlock = account_obj.get_id();
+      tx.operations = {op};
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (name) ) }
+
    // This function generates derived keys starting with index 0 and keeps incrementing
    // the index until it finds a key that isn't registered in the block chain.  To be
    // safer, it continues checking for a few more keys to make sure there wasn't a short gap
@@ -4432,6 +4447,11 @@ map<public_key_type, string> wallet_api::dump_private_keys()
 signed_transaction wallet_api::upgrade_account( string name, bool broadcast )
 {
    return my->upgrade_account(name,broadcast);
+}
+
+signed_transaction wallet_api::fix_locked_account(string name, bool broadcast )
+{
+   return my->fix_locked_account(name, broadcast);
 }
 
 signed_transaction wallet_api::sell_asset(string seller_account,

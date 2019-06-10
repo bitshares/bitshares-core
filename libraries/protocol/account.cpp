@@ -258,6 +258,17 @@ void account_update_operation::validate()const
       validate_special_authority( *extensions.value.active_special_authority );
 }
 
+share_type account_unlock_operation::calculate_fee( const fee_parameters_type& k ) const
+{
+   auto core_fee_required = k.fee;
+   return core_fee_required;
+}
+
+void account_unlock_operation::validate() const
+{
+   FC_ASSERT( fee.amount >= 0 );
+}
+
 share_type account_upgrade_operation::calculate_fee(const fee_parameters_type& k) const
 {
    if( upgrade_to_lifetime_member )

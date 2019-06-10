@@ -110,6 +110,10 @@ struct proposal_operation_hardfork_visitor
    void operator()(const graphene::chain::htlc_extend_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
    }
+   // hf_cycled_accounts
+   void operator()(const graphene::chain::account_unlock_operation &op) const {
+      FC_ASSERT( block_time >= HARDFORK_CYCLED_ACCOUNTS_TIME, "Not allowed until hardfork CYCLED_ACCOUNTS" );
+   }
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {
       bool already_contains_proposal_update = false;
