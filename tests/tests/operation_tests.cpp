@@ -1088,6 +1088,91 @@ BOOST_AUTO_TEST_CASE( get_restore_point_of_cycled_account_test )
    FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( get_restore_point_if_exceed_depth_limit_test )
+{
+   try {
+      // Delegation chain with exceeded authority depth limit
+      // Steps:
+      //   1. bob->charlie
+      //   2. alice->bob
+      // Expected:
+      //   db saves restore point for alice account (alice_public_key)
+
+      ACTORS( (alice) (bob) (charlie) );
+
+      db.modify( db.get_global_properties(), [&]( global_property_object& gpo ) {
+         gpo.parameters.max_authority_depth = 1;
+      });
+
+      auto update_auth = [&](const account_update_operation& op){
+         trx.operations.clear();
+         trx.operations.push_back(op);
+         PUSH_TX( db, trx, ~0 );
+      };
+
+      {
+         account_update_operation op;
+         op.account = bob_id;
+         op.active = authority(1, charlie_id, 1);
+         op.owner = op.active;
+         update_auth(op);
+      }
+
+      {
+         account_update_operation op;
+         op.account = alice_id;
+         op.active = authority(1, bob_id, 1);
+         op.owner = op.active;
+         update_auth(op);
+      }
+
+      const auto alice_stable_owner = alice_id(db).stable_owner;
+      BOOST_REQUIRE(alice_stable_owner.valid());
+      const auto expected = authority(123, alice_public_key, 123);
+      BOOST_CHECK(*alice_stable_owner == expected);
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE( restore_point_not_created_if_account_not_locked_test )
+{
+   try {
+      // Delegation chain
+      // Steps:
+      //   1. bob->charlie
+      //   2. alice->bob
+      // Expected:
+      //   no restore point for alice account saved
+
+      ACTORS( (alice) (bob) (charlie) );
+
+      auto update_auth = [&](const account_update_operation& op){
+         trx.operations.clear();
+         trx.operations.push_back(op);
+         PUSH_TX( db, trx, ~0 );
+      };
+
+      {
+         account_update_operation op;
+         op.account = bob_id;
+         op.active = authority(1, charlie_id, 1);
+         op.owner = op.active;
+         update_auth(op);
+      }
+
+      {
+         account_update_operation op;
+         op.account = alice_id;
+         op.active = authority(1, bob_id, 1);
+         op.owner = op.active;
+         update_auth(op);
+      }
+
+      BOOST_REQUIRE(!alice_id(db).stable_owner.valid());
+   }
+   FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_CASE( create_account_with_cycled_authority_before_HARDFORK_CYCLED_ACCOUNTS_TIME_test )
 {
    try {
@@ -1396,7 +1481,7 @@ BOOST_AUTO_TEST_CASE( update_account_max_authority_depth_before_HARDFORK_CYCLED_
       GET_ACTOR(bob);
 
       db.modify( db.get_global_properties(), [&]( global_property_object& gpo ) {
-         gpo.parameters.maximum_authority_membership = 1;
+         gpo.parameters.max_authority_depth = 1;
       });
 
       account_update_operation op;
@@ -1432,7 +1517,10 @@ BOOST_AUTO_TEST_CASE( update_account_max_authority_depth_after_HARDFORK_CYCLED_A
 
       trx.operations.clear();
       trx.operations.push_back(op);
-      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+
+      GRAPHENE_CHECK_THROW(
+         PUSH_TX( db, trx, ~0 ), 
+         graphene::chain::tx_missing_active_auth );
    }
    FC_LOG_AND_RETHROW()
 }
