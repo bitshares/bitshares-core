@@ -63,13 +63,17 @@ void witness_plugin::plugin_set_program_options(
    auto default_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(std::string("nathan")));
    string witness_id_example = fc::json::to_string(chain::witness_id_type(5));
    command_line_options.add_options()
-         ("enable-stale-production", bpo::bool_switch()->notifier([this](bool e){_production_enabled = e;}), "Enable block production, even if the chain is stale.")
-         ("required-participation", bpo::value<uint32_t>()->default_value(33), "Percent of witnesses (0-100) that must be participating in order to produce blocks")
+         ("enable-stale-production", bpo::bool_switch()->notifier([this](bool e){_production_enabled = e;}),
+               "Enable block production, even if the chain is stale.")
+         ("required-participation", bpo::value<uint32_t>()->default_value(33),
+               "Percent of witnesses (0-100) that must be participating in order to produce blocks")
          ("witness-id,w", bpo::value<vector<string>>()->composing()->multitoken(),
-          ("ID of witness controlled by this node (e.g. " + witness_id_example + ", quotes are required, may specify multiple times)").c_str())
+               ("ID of witness controlled by this node (e.g. " + witness_id_example +
+               ", quotes are required, may specify multiple times)").c_str())
          ("private-key", bpo::value<vector<string>>()->composing()->multitoken()->
-          DEFAULT_VALUE_VECTOR(std::make_pair(chain::public_key_type(default_priv_key.get_public_key()), graphene::utilities::key_to_wif(default_priv_key))),
-          "Tuple of [PublicKey, WIF private key] (may specify multiple times)")
+          DEFAULT_VALUE_VECTOR(std::make_pair(chain::public_key_type(default_priv_key.get_public_key()),
+                graphene::utilities::key_to_wif(default_priv_key))),
+                "Tuple of [PublicKey, WIF private key] (may specify multiple times)")
          ;
    config_file_options.add(command_line_options);
 }
@@ -90,7 +94,8 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
       const std::vector<std::string> key_id_to_wif_pair_strings = options["private-key"].as<std::vector<std::string>>();
       for (const std::string& key_id_to_wif_pair_string : key_id_to_wif_pair_strings)
       {
-         auto key_id_to_wif_pair = graphene::app::dejsonify<std::pair<chain::public_key_type, std::string> >(key_id_to_wif_pair_string, 5);
+         auto key_id_to_wif_pair = graphene::app::dejsonify<std::pair<chain::public_key_type, std::string> >
+               (key_id_to_wif_pair_string, 5);
          ilog("Public Key: ${public}", ("public", key_id_to_wif_pair.first));
          fc::optional<fc::ecc::private_key> private_key = graphene::utilities::wif_to_key(key_id_to_wif_pair.second);
          if (!private_key)
@@ -232,7 +237,8 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
          ilog("Generated block #${n} with ${x} transaction(s) and timestamp ${t} at time ${c}", (capture));
          break;
       case block_production_condition::not_synced:
-         ilog("Not producing block because production is disabled until we receive a recent block (see: --enable-stale-production)");
+         ilog("Not producing block because production is disabled until we receive a recent block "
+              "(see: --enable-stale-production)");
          break;
       case block_production_condition::not_my_turn:
          break;
@@ -242,7 +248,8 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
          ilog("Not producing block because I don't have the private key for ${scheduled_key}", (capture) );
          break;
       case block_production_condition::low_participation:
-         elog("Not producing block because node appears to be on a minority fork with only ${pct}% witness participation", (capture) );
+         elog("Not producing block because node appears to be on a minority fork with only ${pct}% witness participation",
+               (capture) );
          break;
       case block_production_condition::lag:
          elog("Not producing block because node didn't wake up within 2500ms of the slot time.");
@@ -262,7 +269,8 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
    return result;
 }
 
-block_production_condition::block_production_condition_enum witness_plugin::maybe_produce_block( fc::limited_mutable_variant_object& capture )
+block_production_condition::block_production_condition_enum witness_plugin::maybe_produce_block(
+      fc::limited_mutable_variant_object& capture )
 {
    chain::database& db = database();
    fc::time_point now_fine = fc::time_point::now();
