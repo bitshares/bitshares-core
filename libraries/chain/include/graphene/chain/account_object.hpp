@@ -257,8 +257,8 @@ namespace graphene { namespace chain {
 
          bool has_special_authority()const
          {
-            return (owner_special_authority.which() != special_authority::tag< no_special_authority >::value)
-                || (active_special_authority.which() != special_authority::tag< no_special_authority >::value);
+            return (!owner_special_authority.is_type< no_special_authority >())
+                || (!active_special_authority.is_type< no_special_authority >());
          }
 
          template<typename DB>

@@ -35,7 +35,7 @@ namespace detail {
    {
       if( block_time < HARDFORK_1268_TIME )
       {
-         FC_ASSERT( policy.which() != vesting_policy_initializer::tag<instant_vesting_policy_initializer>::value,
+         FC_ASSERT( !policy.is_type<instant_vesting_policy_initializer>(),
            "Instant vesting policy is only available after HARDFORK_1268_TIME!");
       }
    }

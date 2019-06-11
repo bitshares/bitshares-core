@@ -555,11 +555,11 @@ void visit_special_authorities( const database& db, Visitor visit )
    for( const special_authority_object& sao : sa_idx )
    {
       const account_object& acct = sao.account(db);
-      if( acct.owner_special_authority.which() != special_authority::tag< no_special_authority >::value )
+      if( !acct.owner_special_authority.is_type< no_special_authority >() )
       {
          visit( acct, true, acct.owner_special_authority );
       }
-      if( acct.active_special_authority.which() != special_authority::tag< no_special_authority >::value )
+      if( !acct.active_special_authority.is_type< no_special_authority >() )
       {
          visit( acct, false, acct.active_special_authority );
       }
@@ -571,7 +571,7 @@ void update_top_n_authorities( database& db )
    visit_special_authorities( db,
    [&]( const account_object& acct, bool is_owner, const special_authority& auth )
    {
-      if( auth.which() == special_authority::tag< top_holders_special_authority >::value )
+      if( auth.is_type< top_holders_special_authority >() )
       {
          // use index to grab the top N holders of the asset and vote_counter to obtain the weights
 
