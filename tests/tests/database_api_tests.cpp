@@ -1288,4 +1288,94 @@ BOOST_AUTO_TEST_CASE( get_settle_orders_by_account ) {
    }
 }
 
+BOOST_AUTO_TEST_CASE( api_limit_get_limit_orders ){
+   try{
+   graphene::app::database_api db_api( db, &( app.get_options() ));
+   //account_id_type() do 3 ops
+   create_bitasset("USD", account_id_type());
+   create_account("dan");
+   create_account("bob");
+   asset_id_type bit_jmj_id = create_bitasset("JMJBIT").id;
+   generate_block();
+   fc::usleep(fc::milliseconds(100));
+   GRAPHENE_CHECK_THROW(db_api.get_limit_orders(std::string(static_cast<object_id_type>(asset_id_type())),
+      std::string(static_cast<object_id_type>(bit_jmj_id)), 370), fc::exception);
+   vector<limit_order_object>  limit_orders =db_api.get_limit_orders(std::string(
+      static_cast<object_id_type>(asset_id_type())),
+      std::string(static_cast<object_id_type>(bit_jmj_id)), 340);
+   BOOST_REQUIRE_EQUAL( limit_orders.size(), 0u);
+
+   }catch (fc::exception& e) {
+   edump((e.to_detail_string()));
+   throw;
+   }
+}
+BOOST_AUTO_TEST_CASE( api_limit_get_call_orders ){
+   try{
+   graphene::app::database_api db_api( db, &( app.get_options() ));
+   //account_id_type() do 3 ops
+   auto nathan_private_key = generate_private_key("nathan");
+   account_id_type nathan_id = create_account("nathan", nathan_private_key.get_public_key()).id;
+   transfer(account_id_type(), nathan_id, asset(100));
+   asset_id_type bitusd_id = create_bitasset(
+	   "USDBIT", nathan_id, 100, disable_force_settle).id;
+   generate_block();
+   fc::usleep(fc::milliseconds(100));
+   BOOST_CHECK( bitusd_id(db).is_market_issued() );
+   GRAPHENE_CHECK_THROW(db_api.get_call_orders(std::string(static_cast<object_id_type>(bitusd_id)),
+	   370), fc::exception);
+   vector< call_order_object>  call_order =db_api.get_call_orders(std::string(
+	   static_cast<object_id_type>(bitusd_id)), 340);
+   BOOST_REQUIRE_EQUAL( call_order.size(), 0u);
+   }catch (fc::exception& e) {
+   edump((e.to_detail_string()));
+   throw;
+   }
+}
+BOOST_AUTO_TEST_CASE( api_limit_get_settle_orders ){
+   try{
+   graphene::app::database_api db_api( db, &( app.get_options() ));
+   //account_id_type() do 3 ops
+   auto nathan_private_key = generate_private_key("nathan");
+   account_id_type nathan_id = create_account("nathan", nathan_private_key.get_public_key()).id;
+   transfer(account_id_type(), nathan_id, asset(100));
+   asset_id_type bitusd_id = create_bitasset(
+	   "USDBIT", nathan_id, 100, disable_force_settle).id;
+   generate_block();
+   fc::usleep(fc::milliseconds(100));
+   GRAPHENE_CHECK_THROW(db_api.get_settle_orders(
+   	std::string(static_cast<object_id_type>(bitusd_id)), 370), fc::exception);
+   vector<force_settlement_object> result =db_api.get_settle_orders(
+   	std::string(static_cast<object_id_type>(bitusd_id)), 340);
+   BOOST_REQUIRE_EQUAL( result.size(), 0u);
+   }catch (fc::exception& e) {
+   edump((e.to_detail_string()));
+   throw;
+   }
+}
+BOOST_AUTO_TEST_CASE( api_limit_get_order_book ){
+   try{
+   graphene::app::database_api db_api( db, &( app.get_options() ));
+   auto nathan_private_key = generate_private_key("nathan");
+   auto dan_private_key = generate_private_key("dan");
+   account_id_type nathan_id = create_account("nathan", nathan_private_key.get_public_key()).id;
+   account_id_type dan_id = create_account("dan", dan_private_key.get_public_key()).id;
+   transfer(account_id_type(), nathan_id, asset(100));
+   transfer(account_id_type(), dan_id, asset(100));
+   asset_id_type bitusd_id = create_bitasset(
+	   "USDBIT", nathan_id, 100, disable_force_settle).id;
+   asset_id_type bitdan_id = create_bitasset(
+	   "DANBIT", dan_id, 100, disable_force_settle).id;
+   generate_block();
+   fc::usleep(fc::milliseconds(100));
+   GRAPHENE_CHECK_THROW(db_api.get_order_book(std::string(static_cast<object_id_type>(bitusd_id)),
+   	std::string(static_cast<object_id_type>(bitdan_id)),89), fc::exception);
+   graphene::app::order_book result =db_api.get_order_book(std::string(
+   	static_cast<object_id_type>(bitusd_id)), std::string(static_cast<object_id_type>(bitdan_id)),78);
+	BOOST_REQUIRE_EQUAL( result.bids.size(), 0u);
+   }catch (fc::exception& e) {
+   edump((e.to_detail_string()));
+   throw;
+   }
+}
 BOOST_AUTO_TEST_SUITE_END()
