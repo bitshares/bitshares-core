@@ -306,8 +306,8 @@ void database::update_active_committee_members()
    assert( _committee_count_histogram_buffer.size() > 0 );
    share_type stake_target = (_total_voting_stake-_committee_count_histogram_buffer[0]) / 2;
 
-   /// accounts that vote for 0 or 1 witness do not get to express an opinion on
-   /// the number of witnesses to have (they abstain and are non-voting accounts)
+   /// accounts that vote for 0 or 1 committee member do not get to express an opinion on
+   /// the number of committee members to have (they abstain and are non-voting accounts)
    share_type stake_tally = 0;
    size_t committee_member_count = 0;
    if( stake_target > 0 )
