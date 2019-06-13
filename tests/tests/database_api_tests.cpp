@@ -1105,7 +1105,7 @@ BOOST_AUTO_TEST_CASE( api_limit_get_key_references ){
       numbered_private_keys.push_back( privkey );
       numbered_key_id.push_back( pubkey );
    }
-   vector< vector<account_id_type> > final_result=db_api.get_key_references(numbered_key_id);
+   vector< flat_set<account_id_type> > final_result=db_api.get_key_references(numbered_key_id);
    BOOST_REQUIRE_EQUAL( final_result.size(), 2u );
    numbered_private_keys.reserve( num_keys );
    for( int i=num_keys1; i<num_keys; i++ )

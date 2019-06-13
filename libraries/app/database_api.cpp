@@ -77,7 +77,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       dynamic_global_property_object get_dynamic_global_properties()const;
 
       // Keys
-      vector<vector<account_id_type>> get_key_references( vector<public_key_type> key )const;
+      vector<flat_set<account_id_type>> get_key_references( vector<public_key_type> key )const;
       bool is_public_key_registered(string public_key) const;
 
       // Accounts
@@ -679,7 +679,7 @@ dynamic_global_property_object database_api_impl::get_dynamic_global_properties(
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<vector<account_id_type>> database_api::get_key_references( vector<public_key_type> key )const
+vector<flat_set<account_id_type>> database_api::get_key_references( vector<public_key_type> key )const
 {
    return my->get_key_references( key );
 }
@@ -687,7 +687,7 @@ vector<vector<account_id_type>> database_api::get_key_references( vector<public_
 /**
  *  @return all accounts that referr to the key or account id in their owner or active authorities.
  */
-vector<vector<account_id_type>> database_api_impl::get_key_references( vector<public_key_type> keys )const
+vector<flat_set<account_id_type>> database_api_impl::get_key_references( vector<public_key_type> keys )const
 {
    uint64_t api_limit_get_key_references=_app_options->api_limit_get_key_references;
    FC_ASSERT(keys.size() <= api_limit_get_key_references);
@@ -695,12 +695,11 @@ vector<vector<account_id_type>> database_api_impl::get_key_references( vector<pu
    const auto& aidx = dynamic_cast<const base_primary_index&>(idx);
    const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
 
-   vector< vector<account_id_type> > final_result;
+   vector< flat_set<account_id_type> > final_result;
    final_result.reserve(keys.size());
 
    for( auto& key : keys )
    {
-
       address a1( pts_address(key, false, 56) );
       address a2( pts_address(key, true, 56) );
       address a3( pts_address(key, false, 0)  );
@@ -714,7 +713,7 @@ vector<vector<account_id_type>> database_api_impl::get_key_references( vector<pu
       subscribe_to_item( a4 );
       subscribe_to_item( a5 );
 
-      vector<account_id_type> result;
+      flat_set<account_id_type> result;
 
       for( auto& a : {a1,a2,a3,a4,a5} )
       {
@@ -724,7 +723,7 @@ vector<vector<account_id_type>> database_api_impl::get_key_references( vector<pu
              result.reserve( result.size() + itr->second.size() );
              for( auto item : itr->second )
              {
-                result.push_back(item);
+                result.insert(item);
              }
           }
       }
@@ -733,7 +732,7 @@ vector<vector<account_id_type>> database_api_impl::get_key_references( vector<pu
       if( itr != refs.account_to_key_memberships.end() )
       {
          result.reserve( result.size() + itr->second.size() );
-         for( auto item : itr->second ) result.push_back(item);
+         for( auto item : itr->second ) result.insert(item);
       }
       final_result.emplace_back( std::move(result) );
    }

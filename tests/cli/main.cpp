@@ -473,7 +473,7 @@ BOOST_FIXTURE_TEST_CASE( cli_get_signed_transaction_signers, cli_fixture )
 
       const auto &test_acc = con.wallet_api_ptr->get_account("test");
       flat_set<public_key_type> expected_signers = {test_bki.pub_key};
-      vector<vector<account_id_type> > expected_key_refs{{test_acc.id, test_acc.id}};
+      vector<flat_set<account_id_type> > expected_key_refs{{test_acc.id, test_acc.id}};
 
       auto signers = con.wallet_api_ptr->get_transaction_signers(signed_trx);
       BOOST_CHECK(signers == expected_signers);
@@ -526,7 +526,10 @@ BOOST_FIXTURE_TEST_CASE( cli_get_available_transaction_signers, cli_fixture )
 
       // blockchain has no references to unknown accounts (privkey_1, privkey_2)
       // only test account available
-      vector<vector<account_id_type> > expected_key_refs{{}, {}, {test_acc.id, test_acc.id}};
+      vector<flat_set<account_id_type> > expected_key_refs;
+      expected_key_refs.push_back(flat_set<account_id_type>());
+      expected_key_refs.push_back(flat_set<account_id_type>());
+      expected_key_refs.push_back({test_acc.id});
 
       auto key_refs = con.wallet_api_ptr->get_key_references({expected_signers.begin(), expected_signers.end()});
       std::sort(key_refs.begin(), key_refs.end());

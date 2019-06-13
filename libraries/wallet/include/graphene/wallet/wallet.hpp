@@ -1634,7 +1634,7 @@ class wallet_api
        * @param keys public keys to search for related accounts
        * @return the set of related accounts
        */
-      vector<vector<account_id_type>> get_key_references(const vector<public_key_type> &keys) const;
+      vector<flat_set<account_id_type>> get_key_references(const vector<public_key_type> &keys) const;
 
       /** Returns an uninitialized object representing a given blockchain operation.
        *
