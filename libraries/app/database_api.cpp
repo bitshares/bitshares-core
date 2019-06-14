@@ -2384,7 +2384,7 @@ struct get_required_fees_helper
 
    fc::variant set_op_fees( operation& op )
    {
-      if( op.which() == operation::tag<proposal_create_operation>::value )
+      if( op.is_type<proposal_create_operation>() )
       {
          return set_proposal_create_op_fees( op );
       }
