@@ -257,7 +257,7 @@ class database_api
       // Keys //
       //////////
 
-      vector<vector<account_id_type>> get_key_references( vector<public_key_type> key )const;
+      vector<flat_set<account_id_type>> get_key_references( vector<public_key_type> key )const;
 
      /**
       * Determine whether a textual representation of a public key

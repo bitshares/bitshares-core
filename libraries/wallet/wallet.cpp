@@ -2217,7 +2217,7 @@ public:
       return tx.get_signature_keys(_chain_id);
    }
 
-   vector<vector<account_id_type>> get_key_references(const vector<public_key_type> &keys) const
+   vector<flat_set<account_id_type>> get_key_references(const vector<public_key_type> &keys) const
    {
        return _remote_db->get_key_references(keys);
    }
@@ -4081,7 +4081,7 @@ flat_set<public_key_type> wallet_api::get_transaction_signers(const signed_trans
    return my->get_transaction_signers(tx);
 } FC_CAPTURE_AND_RETHROW( (tx) ) }
 
-vector<vector<account_id_type>> wallet_api::get_key_references(const vector<public_key_type> &keys) const
+vector<flat_set<account_id_type>> wallet_api::get_key_references(const vector<public_key_type> &keys) const
 { try {
    return my->get_key_references(keys);
 } FC_CAPTURE_AND_RETHROW( (keys) ) }
