@@ -370,7 +370,7 @@ database_api::~database_api() {}
 database_api_impl::database_api_impl( graphene::chain::database& db, const application_options* app_options )
 :_db(db), _app_options(app_options)
 {
-   wlog("creating database api ${x}", ("x",int64_t(this)) );
+   dlog("creating database api ${x}", ("x",int64_t(this)) );
    _new_connection = _db.new_objects.connect([this](const vector<object_id_type>& ids, const flat_set<account_id_type>& impacted_accounts) {
                                 on_objects_new(ids, impacted_accounts);
                                 });
@@ -389,7 +389,7 @@ database_api_impl::database_api_impl( graphene::chain::database& db, const appli
 
 database_api_impl::~database_api_impl()
 {
-   elog("freeing database api ${x}", ("x",int64_t(this)) );
+   dlog("freeing database api ${x}", ("x",int64_t(this)) );
 }
 
 //////////////////////////////////////////////////////////////////////
