@@ -1248,16 +1248,20 @@ asset database::pay_market_fees(const account_object& seller, const asset_object
                reward = recv_asset.amount(reward_value);
                FC_ASSERT( reward < issuer_fees, "Market reward should be less than issuer fees");
                // cut referrer percent from reward
-               const auto referrer_rewards_percentage = seller.referrer_rewards_percentage;
-               const auto referrer_rewards_value = detail::calculate_percent(reward.amount, referrer_rewards_percentage);
                auto registrar_reward = reward;
-
-               if ( referrer_rewards_value > 0 && is_authorized_asset(*this, seller.referrer(*this), recv_asset))
+               if( seller.referrer != seller.registrar )
                {
-                  FC_ASSERT ( referrer_rewards_value <= reward.amount.value, "Referrer reward shouldn't be greater than total reward" );
-                  const asset referrer_reward = recv_asset.amount(referrer_rewards_value);
-                  registrar_reward -= referrer_reward;
-                  deposit_market_fee_vesting_balance(seller.referrer, referrer_reward);
+                  const auto referrer_rewards_value = detail::calculate_percent( reward.amount,
+                                                                                 seller.referrer_rewards_percentage );
+
+                  if ( referrer_rewards_value > 0 && is_authorized_asset(*this, seller.referrer(*this), recv_asset) )
+                  {
+                     FC_ASSERT ( referrer_rewards_value <= reward.amount.value,
+                                 "Referrer reward shouldn't be greater than total reward" );
+                     const asset referrer_reward = recv_asset.amount(referrer_rewards_value);
+                     registrar_reward -= referrer_reward;
+                     deposit_market_fee_vesting_balance(seller.referrer, referrer_reward);
+                  }
                }
                deposit_market_fee_vesting_balance(seller.registrar, registrar_reward);
             }
