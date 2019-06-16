@@ -58,3 +58,6 @@ object_database/*
 .vscode/*
 .idea/*
 *.cnf
+*.vcxproj
+*.filters
+*.sln
