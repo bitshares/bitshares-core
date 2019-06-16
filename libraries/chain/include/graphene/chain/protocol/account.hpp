@@ -274,6 +274,7 @@ FC_REFLECT_ENUM( graphene::chain::account_whitelist_operation::account_listing,
                 (no_listing)(white_listed)(black_listed)(white_and_black_listed))
 
 FC_REFLECT(graphene::chain::account_create_operation::ext, (null_ext)(owner_special_authority)(active_special_authority)(buyback_options) )
+FC_REFLECT_TYPENAME(graphene::chain::extension<graphene::chain::account_create_operation::ext>)
 FC_REFLECT( graphene::chain::account_create_operation,
             (fee)(registrar)
             (referrer)(referrer_percent)
@@ -281,6 +282,7 @@ FC_REFLECT( graphene::chain::account_create_operation,
           )
 
 FC_REFLECT(graphene::chain::account_update_operation::ext, (null_ext)(owner_special_authority)(active_special_authority) )
+FC_REFLECT_TYPENAME(graphene::chain::extension<graphene::chain::account_update_operation::ext>)
 FC_REFLECT( graphene::chain::account_update_operation,
             (fee)(account)(owner)(active)(new_options)(extensions)
           )

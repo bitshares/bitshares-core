@@ -23,11 +23,14 @@
  */
 #pragma once
 #include <graphene/db/object.hpp>
+
 #include <fc/interprocess/file_mapping.hpp>
 #include <fc/io/raw.hpp>
 #include <fc/io/json.hpp>
 #include <fc/crypto/sha256.hpp>
+
 #include <fstream>
+#include <stack>
 
 namespace graphene { namespace db {
    class object_database;
@@ -190,6 +193,111 @@ namespace graphene { namespace db {
          object_database& _db;
    };
 
+   /** @class direct_index
+    *  @brief A secondary index that tracks objects in vectors indexed by object
+    *  id. It is meant for fully (or almost fully) populated indexes only (will
+    *  fail when loading an object_database with large gaps).
+    *
+    *  WARNING! If any of the methods called on insertion, removal or
+    *  modification throws, subsequent behaviour is undefined! Such exceptions
+    *  indicate that this index type is not appropriate for the use-case.
+    */
+   template<typename Object, uint8_t chunkbits>
+   class direct_index : public secondary_index
+   {
+      static_assert( chunkbits < 64, "Do you really want arrays with more than 2^63 elements???" );
+
+      // private
+         static const size_t MAX_HOLE = 100;
+         static const size_t _mask = ((1 << chunkbits) - 1);
+         uint64_t next = 0;
+         vector< vector< const Object* > > content;
+         std::stack< object_id_type > ids_being_modified;
+
+      public:
+         direct_index() {
+            FC_ASSERT( (1ULL << chunkbits) > MAX_HOLE, "Small chunkbits is inefficient." );
+         }
+
+         virtual ~direct_index(){}
+
+         virtual void object_inserted( const object& obj )
+         {
+            uint64_t instance = obj.id.instance();
+            if( instance == next )
+            {
+               if( !(next & _mask) )
+               {
+                  content.resize((next >> chunkbits) + 1);
+                  content[next >> chunkbits].resize( 1 << chunkbits, nullptr );
+               }
+               next++;
+            }
+            else if( instance < next )
+               FC_ASSERT( !content[instance >> chunkbits][instance & _mask], "Overwriting insert at {id}!", ("id",obj.id) );
+            else // instance > next, allow small "holes"
+            {
+               FC_ASSERT( instance <= next + MAX_HOLE, "Out-of-order insert: {id} > {next}!", ("id",obj.id)("next",next) );
+               if( !(next & _mask) || (next & (~_mask)) != (instance & (~_mask)) )
+               {
+                  content.resize((instance >> chunkbits) + 1);
+                  content[instance >> chunkbits].resize( 1 << chunkbits, nullptr );
+               }
+               while( next <= instance )
+               {
+                  content[next >> chunkbits][next & _mask] = nullptr;
+                  next++;
+               }
+            }
+            FC_ASSERT( nullptr != dynamic_cast<const Object*>(&obj), "Wrong object type!" );
+            content[instance >> chunkbits][instance & _mask] = static_cast<const Object*>( &obj );
+         }
+
+         virtual void object_removed( const object& obj )
+         {
+            FC_ASSERT( nullptr != dynamic_cast<const Object*>(&obj), "Wrong object type!" );
+            uint64_t instance = obj.id.instance();
+            FC_ASSERT( instance < next, "Removing out-of-range object: {id} > {next}!", ("id",obj.id)("next",next) );
+            FC_ASSERT( content[instance >> chunkbits][instance & _mask], "Removing non-existent object {id}!", ("id",obj.id) );
+            content[instance >> chunkbits][instance & _mask] = nullptr;
+         }
+
+         virtual void about_to_modify( const object& before )
+         {
+            ids_being_modified.emplace( before.id );
+         }
+
+         virtual void object_modified( const object& after  )
+         {
+            FC_ASSERT( ids_being_modified.top() == after.id, "Modification of ID is not supported!");
+            ids_being_modified.pop();
+         }
+
+         template< typename object_id >
+         const Object* find( const object_id& id )const
+         {
+            static_assert( object_id::space_id == Object::space_id, "Space ID mismatch!" );
+            static_assert( object_id::type_id == Object::type_id, "Type_ID mismatch!" );
+            if( id.instance >= next ) return nullptr;
+            return content[id.instance.value >> chunkbits][id.instance.value & _mask];
+         };
+
+         template< typename object_id >
+         const Object& get( const object_id& id )const
+         {
+            const Object* ptr = find( id );
+            FC_ASSERT( ptr != nullptr, "Object not found!" );
+            return *ptr;
+         };
+
+         const Object* find( const object_id_type& id )const
+         {
+            FC_ASSERT( id.space() == Object::space_id, "Space ID mismatch!" );
+            FC_ASSERT( id.type() == Object::type_id, "Type_ID mismatch!" );
+            if( id.instance() >= next ) return nullptr;
+            return content[id.instance() >> chunkbits][id.instance() & ((1 << chunkbits) - 1)];
+         };
+   };
 
    /**
     * @class primary_index
@@ -198,14 +306,18 @@ namespace graphene { namespace db {
     *
     *  @see http://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
     */
-   template<typename DerivedIndex>
+   template<typename DerivedIndex, uint8_t DirectBits = 0>
    class primary_index  : public DerivedIndex, public base_primary_index
    {
       public:
          typedef typename DerivedIndex::object_type object_type;
 
          primary_index( object_database& db )
-         :base_primary_index(db),_next_id(object_type::space_id,object_type::type_id,0) {}
+         :base_primary_index(db),_next_id(object_type::space_id,object_type::type_id,0)
+         {
+            if( DirectBits > 0 )
+               _direct_by_id = add_secondary_index< direct_index< object_type, DirectBits > >();
+         }
 
          virtual uint8_t object_space_id()const override
          { return object_type::space_id; }
@@ -216,6 +328,14 @@ namespace graphene { namespace db {
          virtual object_id_type get_next_id()const override              { return _next_id;    }
          virtual void           use_next_id()override                    { ++_next_id.number;  }
          virtual void           set_next_id( object_id_type id )override { _next_id = id;      }
+
+         /** @return the object with id or nullptr if not found */
+         virtual const object*  find( object_id_type id )const override
+         {
+            if( DirectBits > 0 )
+               return _direct_by_id->find( id );
+            return DerivedIndex::find( id );
+         }
 
          fc::sha256 get_object_version()const
          {
@@ -234,14 +354,12 @@ namespace graphene { namespace db {
             fc::raw::unpack(ds, _next_id);
             fc::raw::unpack(ds, open_ver);
             FC_ASSERT( open_ver == get_object_version(), "Incompatible Version, the serialization of objects in this index has changed" );
-            try {
-               vector<char> tmp;
-               while( true ) 
-               {
-                  fc::raw::unpack( ds, tmp );
-                  load( tmp );
-               }
-            } catch ( const fc::exception&  ){}
+            vector<char> tmp;
+            while( ds.remaining() > 0 )
+            {
+               fc::raw::unpack( ds, tmp );
+               load( tmp );
+            }
          }
 
          virtual void save( const path& db ) override 
@@ -329,7 +447,8 @@ namespace graphene { namespace db {
          }
 
       private:
-         object_id_type _next_id;
+         object_id_type                                 _next_id;
+         const direct_index< object_type, DirectBits >* _direct_by_id = nullptr;
    };
 
 } } // graphene::db

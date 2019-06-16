@@ -32,6 +32,12 @@ uint64_t base_operation::calculate_data_fee( uint64_t bytes, uint64_t price_per_
    return result.to_uint64();
 }
 
+fc::optional< fc::future<void> > base_operation::validate_parallel( uint32_t skip )const
+{
+   validate();
+   return fc::optional< fc::future<void> >();
+}
+
 void balance_claim_operation::validate()const
 {
    FC_ASSERT( fee == asset() );

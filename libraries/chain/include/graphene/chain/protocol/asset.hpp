@@ -193,15 +193,6 @@ namespace graphene { namespace chain {
       /** Fixed point between 1.000 and 10.000, implied fixed point denominator is GRAPHENE_COLLATERAL_RATIO_DENOM */
       uint16_t maximum_short_squeeze_ratio = GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO;
 
-      /**
-       *  When updating a call order the following condition must be maintained:
-       *
-       *  debt * maintenance_price() < collateral
-       *  debt * settlement_price    < debt * maintenance
-       *  debt * maintenance_price() < debt * max_short_squeeze_price()
-      price maintenance_price()const;
-       */
-
       /** When selling collateral to pay off debt, the least amount of debt to receive should be
        *  min_usd = max_short_squeeze_price() * collateral
        *
@@ -209,6 +200,13 @@ namespace graphene { namespace chain {
        *  must be confirmed by having the max_short_squeeze_price() move below the black swan price.
        */
       price max_short_squeeze_price()const;
+      /// Another implementation of max_short_squeeze_price() before the core-1270 hard fork
+      price max_short_squeeze_price_before_hf_1270()const;
+
+      /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call territory.
+      /// Calculation: ~settlement_price * maintenance_collateral_ratio / GRAPHENE_COLLATERAL_RATIO_DENOM
+      price maintenance_collateralization()const;
+
       ///@}
 
       friend bool operator == ( const price_feed& a, const price_feed& b )

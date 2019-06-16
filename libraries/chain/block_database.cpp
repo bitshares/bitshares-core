@@ -24,7 +24,6 @@
 #include <graphene/chain/block_database.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <fc/io/raw.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 namespace graphene { namespace chain {
 

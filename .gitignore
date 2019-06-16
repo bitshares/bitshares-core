@@ -56,3 +56,5 @@ object_database/*
 *.pyo
 
 .vscode/*
+.idea/*
+*.cnf

@@ -39,6 +39,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/container/flat_set.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include <graphene/utilities/git_revision.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -63,11 +64,21 @@ int main(int argc, char** argv) {
       bpo::options_description cfg_options("Graphene Witness Node");
       app_options.add_options()
             ("help,h", "Print this help message and exit.")
-            ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("witness_node_data_dir"), "Directory containing databases, configuration file, etc.")
+            ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("witness_node_data_dir"),
+                    "Directory containing databases, configuration file, etc.")
             ("version,v", "Display version information")
-            ;
+            ("plugins", bpo::value<std::string>()->default_value("witness account_history market_history grouped_orders"),
+                    "Space-separated list of plugins to activate");
 
       bpo::variables_map options;
+
+      bpo::options_description cli, cfg;
+      node->set_program_options(cli, cfg);
+      cfg_options.add(cfg);
+
+      cfg_options.add_options()
+              ("plugins", bpo::value<std::string>()->default_value("witness account_history market_history grouped_orders"),
+               "Space-separated list of plugins to activate");
 
       auto witness_plug = node->register_plugin<witness_plugin::witness_plugin>();
       auto debug_witness_plug = node->register_plugin<debug_witness_plugin::debug_witness_plugin>();
@@ -78,6 +89,7 @@ int main(int argc, char** argv) {
       auto snapshot_plug = node->register_plugin<snapshot_plugin::snapshot_plugin>();
       auto es_objects_plug = node->register_plugin<es_objects::es_objects_plugin>();
 
+      // add plugin options to config
       try
       {
          bpo::options_description cli, cfg;
@@ -88,15 +100,10 @@ int main(int argc, char** argv) {
       }
       catch (const boost::program_options::error& e)
       {
-        std::cerr << "Error parsing command line: " << e.what() << "\n";
-        return 1;
+         std::cerr << "Error parsing command line: " << e.what() << "\n";
+         return 1;
       }
 
-      if( options.count("help") )
-      {
-         std::cout << app_options << "\n";
-         return 0;
-      }
       if( options.count("version") )
       {
          std::cout << "Version: " << graphene::utilities::git_revision_description << "\n";
@@ -105,6 +112,11 @@ int main(int argc, char** argv) {
          std::cout << "SSL: " << OPENSSL_VERSION_TEXT << "\n";
          std::cout << "Boost: " << boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".") << "\n";
          std::cout << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version << "\n";
+         return 0;
+      }
+      if( options.count("help") )
+      {
+         std::cout << app_options << "\n";
          return 0;
       }
 
@@ -117,7 +129,22 @@ int main(int argc, char** argv) {
       }
       app::load_configuration_options(data_dir, cfg_options, options);
 
+      std::set<std::string> plugins;
+      boost::split(plugins, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
+
+      if(plugins.count("account_history") && plugins.count("elasticsearch")) {
+         std::cerr << "Plugin conflict: Cannot load both account_history plugin and elasticsearch plugin\n";
+         return 1;
+      }
+
+      std::for_each(plugins.begin(), plugins.end(), [node](const std::string& plug) mutable {
+         if (!plug.empty()) {
+            node->enable_plugin(plug);
+         }
+      });
+
       bpo::notify(options);
+
       node->initialize(data_dir, options);
       node->initialize_plugins( options );
 
@@ -144,7 +171,7 @@ int main(int argc, char** argv) {
       node->shutdown_plugins();
       node->shutdown();
       delete node;
-      return 0;
+      return EXIT_SUCCESS;
    } catch( const fc::exception& e ) {
       // deleting the node can yield, so do this outside the exception handler
       unhandled_exception = e;
@@ -155,7 +182,7 @@ int main(int argc, char** argv) {
       elog("Exiting with error:\n${e}", ("e", unhandled_exception->to_detail_string()));
       node->shutdown();
       delete node;
-      return 1;
+      return EXIT_FAILURE;
    }
 }
 

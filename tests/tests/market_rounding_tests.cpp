@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
       fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
 
       auto result = get_market_order_history(core_id, test_id);
-      BOOST_CHECK_EQUAL(result.size(), 4);
+      BOOST_CHECK_EQUAL(result.size(), 4u);
       BOOST_CHECK(result[0].op.pays == core_id(db).amount(0));
       BOOST_CHECK(result[0].op.receives == test_id(db).amount(1));
       BOOST_CHECK(result[1].op.pays == test_id(db).amount(1));
@@ -132,7 +132,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_after_hf_184 )
       fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
 
       auto result = get_market_order_history(core_id, test_id);
-      BOOST_CHECK_EQUAL(result.size(), 2);
+      BOOST_CHECK_EQUAL(result.size(), 2u);
       BOOST_CHECK(result[0].op.pays == core_id(db).amount(1));
       BOOST_CHECK(result[0].op.receives == test_id(db).amount(2));
       BOOST_CHECK(result[1].op.pays == test_id(db).amount(2));

@@ -40,6 +40,7 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/witness_object.hpp>
+#include <graphene/chain/htlc_object.hpp>
 
 #include <graphene/market_history/market_history_plugin.hpp>
 
@@ -90,6 +91,16 @@ struct market_ticker
    string                     percent_change;
    string                     base_volume;
    string                     quote_volume;
+
+   market_ticker() {}
+   market_ticker(const market_ticker_object& mto,
+                 const fc::time_point_sec& now,
+                 const asset_object& asset_base,
+                 const asset_object& asset_quote,
+                 const order_book& orders);
+   market_ticker(const fc::time_point_sec& now,
+                 const asset_object& asset_base,
+                 const asset_object& asset_quote);
 };
 
 struct market_volume
@@ -344,14 +355,21 @@ class database_api
       // Assets //
       ////////////
 
+     /**
+      * @brief Get asset id from a symbol or ID
+      * @param symbol_or_id ID or symbol of the asset
+      * @return asset id
+      */
+      asset_id_type get_asset_id_from_string(const std::string& symbol_or_id) const;
+
       /**
        * @brief Get a list of assets by ID
-       * @param asset_ids IDs of the assets to retrieve
+       * @param asset_symbols_or_ids Symbol names or IDs of the assets to retrieve
        * @return The assets corresponding to the provided IDs
        *
        * This function has semantics identical to @ref get_objects
        */
-      vector<optional<asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const;
+      vector<optional<asset_object>> get_assets(const vector<std::string>& asset_symbols_or_ids)const;
 
       /**
        * @brief Get assets alphabetically by symbol name
@@ -513,9 +531,12 @@ class database_api
       bool           verify_authority( const signed_transaction& trx )const;
 
       /**
-       * @return true if the signers have enough authority to authorize an account
+       * @brief Verify that the public keys have enough authority to approve an operation for this account
+       * @param account_name_or_id the account to check
+       * @param signers the public keys
+       * @return true if the passed in keys have enough authority to approve an operation for this account
        */
-      bool           verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )const;
+      bool verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )const;
 
       /**
        *  Validates a transaction against the current state without broadcasting it on the network.
@@ -523,10 +544,9 @@ class database_api
       processed_transaction validate_transaction( const signed_transaction& trx )const;
 
       /**
-       *  For each operation calculate the required fee in the specified asset type.  If the asset type does
-       *  not have a valid core_exchange_rate
+       *  For each operation calculate the required fee in the specified asset type.
        */
-      vector< fc::variant > get_required_fees( const vector<operation>& ops, asset_id_type id )const;
+      vector< fc::variant > get_required_fees( const vector<operation>& ops, const std::string& asset_id_or_symbol )const;
 
       ///////////////////////////
       // Proposed transactions //
@@ -568,7 +588,36 @@ class database_api
        */
       vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
 
-   private:
+      //////////
+      // HTLC //
+      //////////
+
+      /**
+       *  @brief Get HTLC object
+       *  @param id HTLC contract id
+       *  @return HTLC object for the id
+       */
+      optional<htlc_object> get_htlc(htlc_id_type id) const;
+
+      /**
+       *  @brief Get non expired HTLC objects using the sender account
+       *  @param account_id_or_name Account ID or name to get objects from
+       *  @param start htlc objects before this ID will be skipped in results. Pagination purposes.
+       *  @param limit Maximum number of objects to retrieve
+       *  @return HTLC objects for the account
+       */
+      vector<htlc_object> get_htlc_by_from(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const;
+
+      /**
+       *  @brief Get non expired HTLC objects using the receiver account
+       *  @param account_id_or_name Account ID or name to get objects from
+       *  @param start htlc objects before this ID will be skipped in results. Pagination purposes.
+       *  @param limit Maximum number of objects to retrieve
+       *  @return HTLC objects for the account
+      */
+      vector<htlc_object> get_htlc_by_to(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const;
+
+private:
       std::shared_ptr< database_api_impl > my;
 };
 
@@ -631,6 +680,7 @@ FC_API(graphene::app::database_api,
    (list_assets)
    (lookup_asset_symbols)
    (get_asset_count)
+   (get_asset_id_from_string)
 
    // Witnesses
    (get_witnesses)
@@ -673,4 +723,8 @@ FC_API(graphene::app::database_api,
    (get_withdraw_permissions_by_giver)
    (get_withdraw_permissions_by_recipient)
 
+   // HTLC
+   (get_htlc)
+   (get_htlc_by_from)
+   (get_htlc_by_to)
 )

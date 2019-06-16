@@ -1,6 +1,8 @@
 #pragma once
 
 #include <fc/network/http/websocket.hpp>
+#include <fc/thread/parallel.hpp>
+
 #include <graphene/app/application.hpp>
 #include <graphene/app/api_access.hpp>
 #include <graphene/chain/genesis_state.hpp>
@@ -34,11 +36,12 @@ class application_impl : public net::node_delegate
       {
       }
 
-      ~application_impl()
+      virtual ~application_impl()
       {
       }
 
       void set_dbg_init_key( graphene::chain::genesis_state_type& genesis, const std::string& init_key );
+      void set_api_limit();
 
       void startup();
 
@@ -64,7 +67,7 @@ class application_impl : public net::node_delegate
 
       virtual void handle_transaction(const graphene::net::trx_message& transaction_message) override;
 
-      void handle_message(const graphene::net::message& message_to_process);
+      void handle_message(const graphene::net::message& message_to_process) override;
 
       bool is_included_block(const graphene::chain::block_id_type& block_id);
 
@@ -194,6 +197,8 @@ class application_impl : public net::node_delegate
       std::map<string, std::shared_ptr<abstract_plugin>> _available_plugins;
 
       bool _is_finished_syncing = false;
+   private:
+      fc::serial_valve valve;
    };
 
 }}} // namespace graphene namespace app namespace detail
