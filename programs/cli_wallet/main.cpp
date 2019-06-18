@@ -257,6 +257,9 @@ int main( int argc, char** argv )
       if( !options.count( "daemon" ) )
       {
          auto wallet_cli = std::make_shared<fc::rpc::cli>( GRAPHENE_MAX_NESTED_OBJECTS );
+         
+         wallet_cli->set_regex_secret("\\s*(unlock|set_password)\\s*");
+
          for( auto& name_formatter : wapiptr->get_result_formatters() )
             wallet_cli->format_result( name_formatter.first, name_formatter.second );
 
