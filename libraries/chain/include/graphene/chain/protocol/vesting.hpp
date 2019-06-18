@@ -111,6 +111,7 @@ namespace graphene { namespace chain {
       {
          FC_ASSERT( fee.amount >= 0 );
          FC_ASSERT( amount.amount > 0 );
+         FC_ASSERT( owner != GRAPHENE_TEMP_ACCOUNT );
       }
    };
 
