@@ -1285,6 +1285,27 @@ BOOST_AUTO_TEST_CASE( cant_execute_unlock_operation_before_HARDFORK_CYCLED_ACCOU
    FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( cant_unlock_not_locked_account_test )
+{
+   try {
+      ACTORS( (alice) );
+
+      generate_blocks(HARDFORK_CYCLED_ACCOUNTS_TIME, true);
+
+      account_unlock_operation op;
+      op.account_to_unlock = alice_id;
+      auto auth = authority(111, alice_public_key, 111);
+      op.previous_authority = auth;
+      trx.operations = {op};   
+      sign(trx, alice_private_key);
+
+      GRAPHENE_CHECK_THROW( 
+         PUSH_TX( db, trx ), 
+         fc::assert_exception );
+   }
+   FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_CASE( create_account_with_cycled_authority_before_HARDFORK_CYCLED_ACCOUNTS_TIME_test )
 {
    try {
@@ -1333,7 +1354,36 @@ BOOST_AUTO_TEST_CASE( create_account_with_cycled_authority_after_HARDFORK_CYCLED
       create_op.owner = authority(1, bob_id, 1);
       create_op.active = authority(1, alice_id, 1);
       trx.operations.push_back(create_op);
-      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+
+      GRAPHENE_CHECK_THROW(
+         PUSH_TX( db, trx, ~0 ), 
+         graphene::chain::tx_missing_active_auth );
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE( cant_unlock_account_that_created_locked_test )
+{
+   try {
+      INVOKE(create_account_with_cycled_authority_before_HARDFORK_CYCLED_ACCOUNTS_TIME_test);
+
+      generate_blocks(HARDFORK_CYCLED_ACCOUNTS_TIME);
+      set_expiration( db, trx );
+
+      const auto &locked_account = get_account("allowed");
+      auto priv = generate_private_key("allowed");
+      auto pub = public_key_type(priv.get_public_key());
+
+      account_unlock_operation op;
+      op.account_to_unlock = locked_account.get_id();
+      auto auth = authority(111, pub, 111);
+      op.previous_authority = auth;
+      trx.operations = {op};   
+      sign(trx, priv);
+
+      GRAPHENE_CHECK_THROW( 
+         PUSH_TX( db, trx ),
+         fc::assert_exception );
    }
    FC_LOG_AND_RETHROW()
 }
@@ -1736,6 +1786,27 @@ BOOST_AUTO_TEST_CASE( cant_create_auth_chain_longer_than_max_authority_depth_lim
       GRAPHENE_CHECK_THROW(
          delegate_authorities(alice_id, alice_private_key, bob_id), 
          graphene::chain::tx_missing_active_auth);
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE( cant_create_proposal_with_unlock_account_before_HARDFORK_CYCLED_ACCOUNTS_TIME_test )
+{
+   try {
+      ACTORS( (alice)(bob) )
+
+      proposal_create_operation pco;
+      pco.expiration_time = db.head_block_time() + fc::minutes(1);
+      pco.fee_paying_account = alice_id;
+
+      account_unlock_operation op;
+      op.account_to_unlock = bob_id;
+      op.previous_authority = authority(111, bob_public_key, 111);
+
+      pco.proposed_ops.emplace_back( op );
+      trx.operations = {pco};
+
+      GRAPHENE_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::assert_exception );
    }
    FC_LOG_AND_RETHROW()
 }
