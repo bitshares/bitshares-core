@@ -913,7 +913,7 @@ public:
    void quit()
    {
       ilog( "Quitting Cli Wallet ..." );
-        
+
       throw fc::canceled_exception();
    }
 
@@ -961,8 +961,8 @@ public:
             fc::rename( tmp_wallet_filename, wallet_filename );
 
             wlog( "renamed successfully tmp wallet file ${fn}", ("fn", tmp_wallet_filename) );
-         } 
-         else 
+         }
+         else
          {
             FC_THROW("tmp wallet file cannot be validated ${fn}", ("fn", tmp_wallet_filename) );
          }
@@ -1874,7 +1874,7 @@ public:
          string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
          const uint32_t claim_period_seconds, bool broadcast = false )
    {
-      try 
+      try
       {
          FC_ASSERT( !self.is_locked() );
          fc::optional<asset_object> asset_obj = get_asset(asset_symbol);
@@ -1895,12 +1895,12 @@ public:
 
          return sign_transaction(tx, broadcast);
       } FC_CAPTURE_AND_RETHROW( (source)(destination)(amount)(asset_symbol)(hash_algorithm)
-            (preimage_hash)(preimage_size)(claim_period_seconds)(broadcast) ) 
+            (preimage_hash)(preimage_size)(claim_period_seconds)(broadcast) )
    }
 
    signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<char>& preimage, bool broadcast )
    {
-      try 
+      try
       {
          FC_ASSERT( !self.is_locked() );
          fc::optional<htlc_object> htlc_obj = get_htlc(htlc_id);
@@ -1919,12 +1919,12 @@ public:
          tx.validate();
 
          return sign_transaction(tx, broadcast);
-      } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(preimage)(broadcast) ) 
+      } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(preimage)(broadcast) )
    }
 
    signed_transaction htlc_extend ( string htlc_id, string issuer, const uint32_t seconds_to_add, bool broadcast)
    {
-      try 
+      try
       {
          FC_ASSERT( !self.is_locked() );
          fc::optional<htlc_object> htlc_obj = get_htlc(htlc_id);
@@ -1943,7 +1943,7 @@ public:
          tx.validate();
 
          return sign_transaction(tx, broadcast);
-      } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(seconds_to_add)(broadcast) ) 
+      } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(seconds_to_add)(broadcast) )
    }
 
    vector< vesting_balance_object_with_info > get_vesting_balances( string account_name )
@@ -2006,20 +2006,24 @@ public:
                                         bool broadcast /* = false */)
    { try {
       account_object voting_account_object = get_account(voting_account);
-      fc::optional<committee_member_object> committee_member_obj = _remote_db->get_committee_member_by_account(committee_member);
+      fc::optional<committee_member_object> committee_member_obj =
+            _remote_db->get_committee_member_by_account(committee_member);
       if (!committee_member_obj)
-         FC_THROW("Account ${committee_member} is not registered as a committee_member", ("committee_member", committee_member));
+         FC_THROW("Account ${committee_member} is not registered as a committee_member",
+                  ("committee_member", committee_member));
       if (approve)
       {
          auto insert_result = voting_account_object.options.votes.insert(committee_member_obj->vote_id);
          if (!insert_result.second)
-            FC_THROW("Account ${account} was already voting for committee_member ${committee_member}", ("account", voting_account)("committee_member", committee_member));
+            FC_THROW("Account ${account} was already voting for committee_member ${committee_member}",
+                     ("account", voting_account)("committee_member", committee_member));
       }
       else
       {
          unsigned votes_removed = voting_account_object.options.votes.erase(committee_member_obj->vote_id);
          if (!votes_removed)
-            FC_THROW("Account ${account} is already not voting for committee_member ${committee_member}", ("account", voting_account)("committee_member", committee_member));
+            FC_THROW("Account ${account} is already not voting for committee_member ${committee_member}",
+                     ("account", voting_account)("committee_member", committee_member));
       }
       account_update_operation account_update_op;
       account_update_op.account = voting_account_object.id;
@@ -2047,13 +2051,15 @@ public:
       {
          auto insert_result = voting_account_object.options.votes.insert(witness_obj->vote_id);
          if (!insert_result.second)
-            FC_THROW("Account ${account} was already voting for witness ${witness}", ("account", voting_account)("witness", witness));
+            FC_THROW("Account ${account} was already voting for witness ${witness}",
+                     ("account", voting_account)("witness", witness));
       }
       else
       {
          unsigned votes_removed = voting_account_object.options.votes.erase(witness_obj->vote_id);
          if (!votes_removed)
-            FC_THROW("Account ${account} is already not voting for witness ${witness}", ("account", voting_account)("witness", witness));
+            FC_THROW("Account ${account} is already not voting for witness ${witness}",
+                     ("account", voting_account)("witness", witness));
       }
       account_update_operation account_update_op;
       account_update_op.account = voting_account_object.id;
@@ -2076,7 +2082,8 @@ public:
       {
          account_id_type new_voting_account_id = get_account_id(*voting_account);
          if (account_object_to_modify.options.voting_account == new_voting_account_id)
-            FC_THROW("Voting proxy for ${account} is already set to ${voter}", ("account", account_to_modify)("voter", *voting_account));
+            FC_THROW("Voting proxy for ${account} is already set to ${voter}",
+                     ("account", account_to_modify)("voter", *voting_account));
          account_object_to_modify.options.voting_account = new_voting_account_id;
       }
       else
@@ -2107,8 +2114,10 @@ public:
 
       if (account_object_to_modify.options.num_witness == desired_number_of_witnesses &&
           account_object_to_modify.options.num_committee == desired_number_of_committee_members)
-         FC_THROW("Account ${account} is already voting for ${witnesses} witnesses and ${committee_members} committee_members",
-                  ("account", account_to_modify)("witnesses", desired_number_of_witnesses)("committee_members",desired_number_of_witnesses));
+         FC_THROW("Account ${account} is already voting for ${witnesses} witnesses"
+                  " and ${committee_members} committee_members",
+                  ("account", account_to_modify)("witnesses", desired_number_of_witnesses)
+                  ("committee_members",desired_number_of_witnesses));
       account_object_to_modify.options.num_witness = desired_number_of_witnesses;
       account_object_to_modify.options.num_committee = desired_number_of_committee_members;
 
@@ -2122,7 +2131,8 @@ public:
       tx.validate();
 
       return sign_transaction( tx, broadcast );
-   } FC_CAPTURE_AND_RETHROW( (account_to_modify)(desired_number_of_witnesses)(desired_number_of_committee_members)(broadcast) ) }
+   } FC_CAPTURE_AND_RETHROW( (account_to_modify)(desired_number_of_witnesses)
+                             (desired_number_of_committee_members)(broadcast) ) }
 
    signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false)
    {
@@ -3077,9 +3087,9 @@ std::string operation_printer::operator()(const asset_create_operation& op) cons
 
 std::string operation_printer::operator()(const htlc_redeem_operation& op) const
 {
-   out << "Redeem HTLC with database id " 
-         << std::to_string(op.htlc_id.space_id) 
-         << "." << std::to_string(op.htlc_id.type_id) 
+   out << "Redeem HTLC with database id "
+         << std::to_string(op.htlc_id.space_id)
+         << "." << std::to_string(op.htlc_id.type_id)
          << "." << std::to_string((uint64_t)op.htlc_id.instance)
          << " with preimage \"";
    for (unsigned char c : op.preimage)
@@ -3233,7 +3243,7 @@ uint64_t wallet_api::get_asset_count()const
 }
 
 signed_transaction wallet_api::htlc_create( string source, string destination, string amount, string asset_symbol,
-         string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size, 
+         string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
          const uint32_t claim_period_seconds, bool broadcast)
 {
    return my->htlc_create(source, destination, amount, asset_symbol, hash_algorithm, preimage_hash, preimage_size,
@@ -3260,18 +3270,18 @@ fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
          public:
          typedef fc::mutable_variant_object result_type;
 
-         result_type operator()(const fc::ripemd160& obj)const 
+         result_type operator()(const fc::ripemd160& obj)const
          { return convert("RIPEMD160", obj.str()); }
-         result_type operator()(const fc::sha1& obj)const 
+         result_type operator()(const fc::sha1& obj)const
          { return convert("SHA1", obj.str()); }
-         result_type operator()(const fc::sha256& obj)const 
+         result_type operator()(const fc::sha256& obj)const
          { return convert("SHA256", obj.str()); }
          private:
          result_type convert(const std::string& type, const std::string& hash)const
          {
-            fc::mutable_variant_object ret_val; 
-            ret_val["hash_algo"] = type; 
-            ret_val["preimage_hash"] = hash; 
+            fc::mutable_variant_object ret_val;
+            ret_val["hash_algo"] = type;
+            ret_val["preimage_hash"] = hash;
             return ret_val;
          }
       };
@@ -3328,8 +3338,11 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
 
       int page_limit = skip_first_row ? std::min( 100, limit + 1 ) : std::min( 100, limit );
 
-      vector<operation_history_object> current = my->_remote_hist->get_account_history( name, operation_history_id_type(),
-                                                                                        page_limit, start );
+      vector<operation_history_object> current = my->_remote_hist->get_account_history(
+            name,
+            operation_history_id_type(),
+            page_limit,
+            start );
       bool first_row = true;
       for( auto& o : current )
       {
@@ -3357,7 +3370,11 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
    return result;
 }
 
-vector<operation_detail> wallet_api::get_relative_account_history(string name, uint32_t stop, int limit, uint32_t start)const
+vector<operation_detail> wallet_api::get_relative_account_history(
+      string name,
+      uint32_t stop,
+      int limit,
+      uint32_t start)const
 {
    vector<operation_detail> result;
    auto account_id = get_account(name).get_id();
@@ -3372,7 +3389,11 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
 
    while( limit > 0 )
    {
-      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(name, stop, std::min<uint32_t>(100, limit), start);
+      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(
+            name,
+            stop,
+            std::min<uint32_t>(100, limit),
+            start);
       for (auto &o : current) {
          std::stringstream ss;
          auto memo = o.op.visit(detail::operation_printer(ss, *my, o));
@@ -3387,7 +3408,11 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
    return result;
 }
 
-account_history_operation_detail wallet_api::get_account_history_by_operations(string name, vector<uint16_t> operation_types, uint32_t start, int limit)
+account_history_operation_detail wallet_api::get_account_history_by_operations(
+      string name,
+      vector<uint16_t> operation_types,
+      uint32_t start,
+      int limit)
 {
     account_history_operation_detail result;
     auto account_id = get_account(name).get_id();
@@ -3432,17 +3457,23 @@ full_account wallet_api::get_full_account( const string& name_or_id)
     return my->_remote_db->get_full_accounts({name_or_id}, false)[name_or_id];
 }
 
-vector<bucket_object> wallet_api::get_market_history( string symbol1, string symbol2, uint32_t bucket , fc::time_point_sec start, fc::time_point_sec end )const
+vector<bucket_object> wallet_api::get_market_history(
+      string symbol1,
+      string symbol2,
+      uint32_t bucket,
+      fc::time_point_sec start,
+      fc::time_point_sec end )const
 {
    return my->_remote_hist->get_market_history( symbol1, symbol2, bucket, start, end );
 }
 
-vector<limit_order_object> wallet_api::get_account_limit_orders( const string& name_or_id,
-                                                                const string &base,
-                                                                const string &quote,
-                                                                uint32_t limit,
-                                                                optional<limit_order_id_type> ostart_id,
-                                                                optional<price> ostart_price)
+vector<limit_order_object> wallet_api::get_account_limit_orders(
+      const string& name_or_id,
+      const string &base,
+      const string &quote,
+      uint32_t limit,
+      optional<limit_order_id_type> ostart_id,
+      optional<price> ostart_price)
 {
    return my->_remote_db->get_account_limit_orders(name_or_id, base, quote, limit, ostart_id, ostart_price);
 }
