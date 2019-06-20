@@ -190,7 +190,12 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       // Note:
       //   Different type of object_id<T> objects could become identical after packed.
       //   For example, both `account_id_type a=1.2.0` and `asset_id_type b=1.3.0` will become `0` after packed.
-      //   In order to avoid collision, here we explicitly list a few types, rather than using a template.
+      //   In order to avoid collision, we don't use a template function here, instead, we implicitly convert all
+      //   object IDs to `object_id_type` when subscribing.
+      //
+      //   If need to subscribe to other data types, override this function with the types as parameter.
+      //   For example, we had a `get_subscription_key( const public_key_type& item )` function here, which was
+      //   removed lately since we no longer subscribe to public keys.
       vector<char> get_subscription_key( const object_id_type& item )const
       {
          return fc::raw::pack(item);
