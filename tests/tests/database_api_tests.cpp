@@ -751,6 +751,39 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not )
    } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( subscription_key_collision_test )
+{
+   object_id_type uia_object_id = create_user_issued_asset( "UIATEST" ).get_id();
+
+   uint32_t objects_changed = 0;
+   auto callback = [&]( const variant& v )
+   {
+      ++objects_changed;
+   };
+
+   graphene::app::database_api db_api(db);
+   db_api.set_subscribe_callback( callback, false );
+
+   // subscribe to an account which has same instance ID as UIATEST
+   vector<string> collision_ids;
+   collision_ids.push_back( string( object_id_type( account_id_type( uia_object_id ) ) ) );
+   db_api.get_accounts( collision_ids );
+
+   generate_block();
+   fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+   BOOST_CHECK_EQUAL( objects_changed, 0 ); // did not subscribe to UIATEST, so no notification
+
+   vector<string> asset_names;
+   asset_names.push_back( "UIATEST" );
+   db_api.get_assets( asset_names );
+
+   generate_block();
+   fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+   BOOST_CHECK_EQUAL( objects_changed, 0 ); // UIATEST did not change in this block, so no notification
+}
+
 BOOST_AUTO_TEST_CASE( subscription_notification_test )
 {
    try {
