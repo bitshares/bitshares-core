@@ -66,6 +66,63 @@ using namespace graphene::wallet;
 using namespace std;
 namespace bpo = boost::program_options;
 
+fc::log_level string_to_level(string level)
+{
+   fc::log_level result;
+   if(level == "info")
+      result = fc::log_level::info;
+   else if(level == "debug")
+      result = fc::log_level::debug;
+   else if(level == "warn")
+      result = fc::log_level::warn;
+   else if(level == "error")
+      result = fc::log_level::error;
+   else if(level == "all")
+      result = fc::log_level::all;
+   else
+      FC_THROW("Log level not allowed. Allowed levels are info, debug, warn, error and all.");
+
+   return result;
+}
+
+void setup_logging(string console_level, bool file_logger, string file_level, string file_name)
+{
+   fc::logging_config cfg;
+
+   // console logger
+   fc::console_appender::config console_appender_config;
+   console_appender_config.level_colors.emplace_back(
+         fc::console_appender::level_color(fc::log_level::debug,
+         fc::console_appender::color::green));
+   console_appender_config.level_colors.emplace_back(
+         fc::console_appender::level_color(fc::log_level::warn,
+         fc::console_appender::color::brown));
+   console_appender_config.level_colors.emplace_back(
+         fc::console_appender::level_color(fc::log_level::error,
+         fc::console_appender::color::red));
+   cfg.appenders.push_back(fc::appender_config( "default", "console", fc::variant(console_appender_config, 20)));
+   cfg.loggers = { fc::logger_config("default"), fc::logger_config( "rpc") };
+   cfg.loggers.front().level = string_to_level(console_level);
+   cfg.loggers.front().appenders = {"default"};
+
+   // file logger
+   if(file_logger) {
+      fc::path data_dir;
+      fc::path log_dir = data_dir / "cli_wallet_logs";
+      fc::file_appender::config ac;
+      ac.filename             = log_dir / file_name;
+      ac.flush                = true;
+      ac.rotate               = true;
+      ac.rotation_interval    = fc::hours( 1 );
+      ac.rotation_limit       = fc::days( 1 );
+      cfg.appenders.push_back(fc::appender_config( "rpc", "file", fc::variant(ac, 5)));
+      cfg.loggers.back().level = string_to_level(file_level);
+      cfg.loggers.back().appenders = {"rpc"};
+      fc::configure_logging( cfg );
+      ilog ("Logging RPC to file: " + (ac.filename).preferred_string());
+   }
+}
+
 int main( int argc, char** argv )
 {
    try {
@@ -77,17 +134,24 @@ int main( int argc, char** argv )
          ("server-rpc-user,u", bpo::value<string>(), "Server Username")
          ("server-rpc-password,p", bpo::value<string>(), "Server Password")
          ("rpc-endpoint,r", bpo::value<string>()->implicit_value("127.0.0.1:8091"),
-            "Endpoint for wallet websocket RPC to listen on (DEPRECATED, use rpc-http-endpoint instead)")
-         ("rpc-tls-endpoint,t", bpo::value<string>()->implicit_value("127.0.0.1:8092"), "Endpoint for wallet websocket TLS RPC to listen on")
-         ("rpc-tls-certificate,c", bpo::value<string>()->implicit_value("server.pem"), "PEM certificate for wallet websocket TLS RPC")
+               "Endpoint for wallet websocket RPC to listen on (DEPRECATED, use rpc-http-endpoint instead)")
+         ("rpc-tls-endpoint,t", bpo::value<string>()->implicit_value("127.0.0.1:8092"),
+               "Endpoint for wallet websocket TLS RPC to listen on")
+         ("rpc-tls-certificate,c", bpo::value<string>()->implicit_value("server.pem"),
+               "PEM certificate for wallet websocket TLS RPC")
          ("rpc-http-endpoint,H", bpo::value<string>()->implicit_value("127.0.0.1:8093"),
-            "Endpoint for wallet HTTP and websocket RPC to listen on")
+               "Endpoint for wallet HTTP and websocket RPC to listen on")
          ("daemon,d", "Run the wallet in daemon mode" )
          ("wallet-file,w", bpo::value<string>()->implicit_value("wallet.json"), "wallet to load")
          ("chain-id", bpo::value<string>(), "chain ID to connect to")
          ("suggest-brain-key", "Suggest a safe brain key to use for creating your account")
+         ("logs-rpc-console-level", bpo::value<string>()->default_value("info"),
+               "Level of console logging. Allowed levels: info, debug, warn, error, all")
+         ("logs-rpc-file", bpo::value<bool>()->default_value(false), "Turn on/off file logging")
+         ("logs-rpc-file-level", bpo::value<string>()->default_value("debug"),
+               "Level of file logging. Allowed levels: info, debug, warn, error, all")
+         ("logs-rpc-file-name", bpo::value<string>()->default_value("rpc.log"), "File name for file rpc logs")
          ("version,v", "Display version information");
-
 
       bpo::variables_map options;
 
@@ -116,28 +180,10 @@ int main( int argc, char** argv )
          return 0;
       }
 
-      fc::path data_dir;
-      fc::logging_config cfg;
-      fc::path log_dir = data_dir / "logs";
+      setup_logging(options.at("logs-rpc-console-level").as<string>(),options.at("logs-rpc-file").as<bool>(),
+            options.at("logs-rpc-file-level").as<string>(), options.at("logs-rpc-file-name").as<string>());
 
-      fc::file_appender::config ac;
-      ac.filename             = log_dir / "rpc" / "rpc.log";
-      ac.flush                = true;
-      ac.rotate               = true;
-      ac.rotation_interval    = fc::hours( 1 );
-      ac.rotation_limit       = fc::days( 1 );
-
-      std::cout << "Logging RPC to file: " << (data_dir / ac.filename).preferred_string() << "\n";
-
-      cfg.appenders.push_back(fc::appender_config( "default", "console", fc::variant(fc::console_appender::config(), 20)));
-      cfg.appenders.push_back(fc::appender_config( "rpc", "file", fc::variant(ac, 5)));
-
-      cfg.loggers = { fc::logger_config("default"), fc::logger_config( "rpc") };
-      cfg.loggers.front().level = fc::log_level::info;
-      cfg.loggers.front().appenders = {"default"};
-      cfg.loggers.back().level = fc::log_level::debug;
-      cfg.loggers.back().appenders = {"rpc"};
-
+      // key generation
       fc::ecc::private_key committee_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
 
       idump( (key_to_wif( committee_private_key ) ) );
