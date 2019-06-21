@@ -933,7 +933,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
          acnt.cashback_balance = account->cashback_balance(_db);
       }
 
-      uint64_t api_limit_get_full_accounts_lists = _app_options->api_limit_get_full_accounts_lists;
+      size_t api_limit_get_full_accounts_lists = static_cast<size_t>(_app_options->api_limit_get_full_accounts_lists);
 
       // Add the account's proposals
       auto required_approvals_itr = proposals_by_account._account_to_proposals.find( account->id );
