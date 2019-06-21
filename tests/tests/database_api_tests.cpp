@@ -751,30 +751,75 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not )
    } FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE( set_subscribe_callback_disable_notify_all_test )
+BOOST_AUTO_TEST_CASE( subscription_key_collision_test )
+{
+   object_id_type uia_object_id = create_user_issued_asset( "UIATEST" ).get_id();
+
+   uint32_t objects_changed = 0;
+   auto callback = [&]( const variant& v )
+   {
+      ++objects_changed;
+   };
+
+   graphene::app::database_api db_api(db);
+   db_api.set_subscribe_callback( callback, false );
+
+   // subscribe to an account which has same instance ID as UIATEST
+   vector<string> collision_ids;
+   collision_ids.push_back( string( object_id_type( account_id_type( uia_object_id ) ) ) );
+   db_api.get_accounts( collision_ids );
+
+   generate_block();
+   fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+   BOOST_CHECK_EQUAL( objects_changed, 0 ); // did not subscribe to UIATEST, so no notification
+
+   vector<string> asset_names;
+   asset_names.push_back( "UIATEST" );
+   db_api.get_assets( asset_names );
+
+   generate_block();
+   fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+   BOOST_CHECK_EQUAL( objects_changed, 0 ); // UIATEST did not change in this block, so no notification
+}
+
+BOOST_AUTO_TEST_CASE( subscription_notification_test )
 {
    try {
-      ACTORS( (alice) );
+      ACTORS( (alice)(bob) );
 
-      uint32_t objects_changed1 = 0;
-      uint32_t objects_changed2 = 0;
-      uint32_t objects_changed3 = 0;
-      auto callback1 = [&]( const variant& v )
+      create_user_issued_asset( "UIATEST" );
+
+#define SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE 8
+
+#define SUB_NOTIF_TEST_INIT_CALLBACKS(z, i, data) \
+      uint32_t objects_changed ## i = 0; \
+      auto callback ## i = [&]( const variant& v ) \
+      { \
+         idump((i)(v)); \
+         ++objects_changed ## i; \
+      }; \
+      uint32_t expected_objects_changed ## i = 0;
+
+#define SUB_NOTIF_TEST_CHECK(z, i, data) \
+      if( expected_objects_changed ## i > 0 ) { \
+         BOOST_CHECK_LE( expected_objects_changed ## i, objects_changed ## i ); \
+      } else { \
+         BOOST_CHECK_EQUAL( expected_objects_changed ## i, objects_changed ## i ); \
+      } \
+      expected_objects_changed ## i = 0; \
+      objects_changed ## i = 0;
+
+      BOOST_PP_REPEAT_FROM_TO( 1, SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE, SUB_NOTIF_TEST_INIT_CALLBACKS, unused );
+
+      auto check_results = [&]()
       {
-         ++objects_changed1;
-      };
-      auto callback2 = [&]( const variant& v )
-      {
-         ++objects_changed2;
-      };
-      auto callback3 = [&]( const variant& v )
-      {
-         ++objects_changed3;
+         BOOST_PP_REPEAT_FROM_TO( 1, SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE, SUB_NOTIF_TEST_CHECK, unused );
       };
 
-      uint32_t expected_objects_changed1 = 0;
-      uint32_t expected_objects_changed2 = 0;
-      uint32_t expected_objects_changed3 = 0;
+#undef SUB_NOTIF_TEST_CHECK
+#undef SUB_NOTIF_TEST_INIT_CALLBACKS
 
       graphene::app::database_api db_api1(db);
 
@@ -787,30 +832,149 @@ BOOST_AUTO_TEST_CASE( set_subscribe_callback_disable_notify_all_test )
       opt.enable_subscribe_to_all = true;
 
       graphene::app::database_api db_api2( db, &opt );
-      db_api2.set_subscribe_callback( callback2, true );
+      db_api2.set_subscribe_callback( callback2, true ); // subscribing to all should succeed
 
-      graphene::app::database_api db_api3( db, &opt );
-      db_api3.set_subscribe_callback( callback3, false );
+#define SUB_NOTIF_TEST_INIT_APIS(z, i, data) \
+      graphene::app::database_api db_api ## i( db, &opt ); \
+      db_api ## i.set_subscribe_callback( callback ## i, false );
 
-      vector<object_id_type> ids;
-      ids.push_back( alice_id );
+      BOOST_PP_REPEAT_FROM_TO( 3, SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE, SUB_NOTIF_TEST_INIT_APIS, unused );
 
-      db_api1.get_objects( ids ); // db_api1 subscribe to Alice
-      db_api2.get_objects( ids ); // db_api2 subscribe to Alice
+#undef SUB_NOTIF_TEST_INIT_APIS
+#undef SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE
+
+      vector<object_id_type> account_ids;
+      account_ids.push_back( alice_id );
+      db_api1.get_objects( account_ids ); // db_api1 subscribe to Alice
+
+      vector<string> account_names;
+      account_names.push_back( "alice" );
+      db_api4.get_accounts( account_names ); // db_api4 subscribe to Alice
+
+      db_api5.lookup_accounts( "ali", 1 ); // db_api5 subscribe to Alice
+
+      db_api6.lookup_accounts( "alice", 3 ); // db_api6 does not subscribe to Alice
+
+      vector<string> asset_names;
+      asset_names.push_back( "UIATEST" );
+      db_api7.get_assets( asset_names ); // db_api7 subscribe to UIA
 
       generate_block();
-      ++expected_objects_changed2; // subscribed to all, notify block changes
+      ++expected_objects_changed1; // db_api1 subscribed to Alice, notify Alice account creation
+      ++expected_objects_changed2; // db_api2 subscribed to all, notify new objects
+      // db_api3 didn't subscribe to anything, nothing would be notified
+      ++expected_objects_changed4; // db_api4 subscribed to Alice, notify Alice account creation
+      ++expected_objects_changed5; // db_api5 subscribed to Alice, notify Alice account creation
+      // db_api6 didn't subscribe to anything, nothing would be notified
+      ++expected_objects_changed7; // db_api7 subscribed to UIA, notify asset creation
+
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      check_results();
 
       transfer( account_id_type(), alice_id, asset(1) );
       generate_block();
-      ++expected_objects_changed1; // subscribed to Alice, notify Alice balance change
-      ++expected_objects_changed2; // subscribed to all, notify block changes
+      // db_api1 didn't subscribe to Alice with get_full_accounts but only subscribed to the account object,
+      //   nothing would be notified
+      ++expected_objects_changed2; // db_api2 subscribed to all, notify new balance object and etc
+      // db_api3 didn't subscribe to anything, nothing would be notified
+      // db_api4 only subscribed to the account object of Alice, nothing notified
+      // db_api5 only subscribed to the account object of Alice, nothing notified
+      // db_api6 didn't subscribe to anything, nothing would be notified
+      // db_api7: no change on UIA, nothing would be notified
 
       fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      check_results();
 
-      BOOST_CHECK_EQUAL( expected_objects_changed1, objects_changed1 );
-      BOOST_CHECK_EQUAL( expected_objects_changed2, objects_changed2 );
-      BOOST_CHECK_EQUAL( expected_objects_changed3, objects_changed3 );
+      vector<object_id_type> obj_ids;
+      obj_ids.push_back( db.get_dynamic_global_properties().id );
+      db_api3.get_objects( obj_ids ); // db_api3 subscribe to dynamic global properties
+
+      db_api4.get_full_accounts( account_names, true );  // db_api4 subscribe to Alice with get_full_accounts
+      db_api5.get_full_accounts( account_names, false ); // db_api5 doesn't subscribe
+
+      transfer( account_id_type(), alice_id, asset(1) );
+      generate_block();
+      // db_api1 didn't subscribe to Alice with get_full_accounts but only subscribed to the account object,
+      //   nothing would be notified
+      ++expected_objects_changed2; // db_api2 subscribed to all, notify new history records and etc
+      ++expected_objects_changed3; // db_api3 subscribed to dynamic global properties, would be notified
+      ++expected_objects_changed4; // db_api4 subscribed to full account data of Alice, would be notified
+      // db_api5 only subscribed to the account object of Alice, nothing notified
+      // db_api6 didn't subscribe to anything, nothing would be notified
+      // db_api7: no change on UIA, nothing would be notified
+
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      check_results();
+
+      db_api6.set_auto_subscription( false );
+      db_api6.get_objects( obj_ids ); // db_api6 doesn't auto-subscribe to dynamic global properties
+
+      generate_block();
+      // db_api1 only subscribed to the account object of Alice, nothing notified
+      // db_api2 subscribed to all, but no object is created or removed in this block, so nothing notified
+      ++expected_objects_changed3; // db_api3 subscribed to dynamic global properties, would be notified
+      // db_api4 subscribed to full account data of Alice, nothing would be notified
+      // db_api5 only subscribed to the account object of Alice, nothing notified
+      // db_api6 didn't subscribe to anything, nothing would be notified
+      // db_api7: no change on UIA, nothing would be notified
+
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      check_results();
+
+      account_names.clear();
+      account_names.push_back( "bob" );
+      db_api5.set_auto_subscription( false );
+      db_api5.get_full_accounts( account_names, true ); // db_api5 subscribe to full account data of Bob
+
+      db_api6.get_full_accounts( account_names, false ); // db_api6 doesn't subscribe
+
+      transfer( account_id_type(), bob_id, asset(1) );
+
+      generate_block();
+      // db_api1 only subscribed to the account object of Alice, nothing notified
+      ++expected_objects_changed2; // db_api2 subscribed to all, notify new history records and etc
+      ++expected_objects_changed3; // db_api3 subscribed to dynamic global properties, would be notified
+      // db_api4 subscribed to full account data of Alice, nothing would be notified
+      ++expected_objects_changed5; // db_api5 subscribed to full account data of Bob, would be notified
+      // db_api6 didn't subscribe to anything, nothing would be notified
+      // db_api7: no change on UIA, nothing would be notified
+
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      check_results();
+
+      db_api6.set_auto_subscription( true );
+      db_api6.get_objects( obj_ids ); // db_api6 auto-subscribe to dynamic global properties
+
+      generate_block();
+      // db_api1 only subscribed to the account object of Alice, nothing notified
+      // db_api2 subscribed to all, but no object is created or removed in this block, so nothing notified
+      ++expected_objects_changed3; // db_api3 subscribed to dynamic global properties, would be notified
+      // db_api4 subscribed to full account data of Alice, nothing would be notified
+      // db_api5 subscribed to full account data of Bob, nothing notified
+      ++expected_objects_changed6; // db_api6 subscribed to dynamic global properties, would be notified
+      // db_api7: no change on UIA, nothing would be notified
+
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      check_results();
+
+      db_api5.set_subscribe_callback( callback5, false ); // reset subscription
+
+      db_api6.cancel_all_subscriptions();
+      db_api6.get_objects( obj_ids ); // db_api6 doesn't auto-subscribe to dynamic global properties
+
+      transfer( alice_id, bob_id, asset(1) );
+
+      generate_block();
+      // db_api1 only subscribed to the account object of Alice, nothing notified
+      ++expected_objects_changed2; // db_api2 subscribed to all, notify new history records and etc
+      ++expected_objects_changed3; // db_api3 subscribed to dynamic global properties, would be notified
+      ++expected_objects_changed4; // db_api4 subscribed to full account data of Alice, would be notified
+      // db_api5 subscribed to anything, nothing notified
+      // db_api6 subscribed to anything, nothing notified
+      // db_api7: no change on UIA, nothing would be notified
+
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      check_results();
 
    } FC_LOG_AND_RETHROW()
 }
@@ -981,10 +1145,10 @@ BOOST_AUTO_TEST_CASE( get_transaction_hex )
 
 } FC_LOG_AND_RETHROW() }
 
-BOOST_AUTO_TEST_CASE(verify_account_authority) 
+BOOST_AUTO_TEST_CASE(verify_account_authority)
 {
       try {
-         
+
          ACTORS( (nathan) );
          graphene::app::database_api db_api(db);
 
@@ -1014,7 +1178,7 @@ BOOST_AUTO_TEST_CASE( any_two_of_three )
       try {
          account_update_operation op;
          op.account = nathan.id;
-         op.active = authority(2, public_key_type(nathan_key1.get_public_key()), 1, 
+         op.active = authority(2, public_key_type(nathan_key1.get_public_key()), 1,
                public_key_type(nathan_key2.get_public_key()), 1, public_key_type(nathan_key3.get_public_key()), 1);
          op.owner = *op.active;
          trx.operations.push_back(op);

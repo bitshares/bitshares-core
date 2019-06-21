@@ -63,6 +63,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Subscriptions
       void set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_remove_create );
+      void set_auto_subscription( bool enable );
       void set_pending_transaction_callback( std::function<void(const variant&)> cb );
       void set_block_applied_callback( std::function<void(const variant& block_id)> cb );
       void cancel_all_subscriptions(bool reset_callback, bool reset_market_subscriptions);
@@ -186,24 +187,41 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
    //private:
       static string price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote );
 
-      template<typename T>
-      void subscribe_to_item( const T& i )const
+      // Note:
+      //   Different type of object_id<T> objects could become identical after packed.
+      //   For example, both `account_id_type a=1.2.0` and `asset_id_type b=1.3.0` will become `0` after packed.
+      //   In order to avoid collision, we don't use a template function here, instead, we implicitly convert all
+      //   object IDs to `object_id_type` when subscribing.
+      //
+      //   If need to subscribe to other data types, override this function with the types as parameter.
+      //   For example, we had a `get_subscription_key( const public_key_type& item )` function here, which was
+      //   removed lately since we no longer subscribe to public keys.
+      vector<char> get_subscription_key( const object_id_type& item )const
       {
-         auto vec = fc::raw::pack(i);
-         if( !_subscribe_callback )
-            return;
-
-         if( !is_subscribed_to_item(i) )
-            _subscribe_filter.insert( vec.data(), vec.size() );
+         return fc::raw::pack(item);
       }
 
       template<typename T>
-      bool is_subscribed_to_item( const T& i )const
+      void subscribe_to_item( const T& item )const
+      {
+         if( !_subscribe_callback )
+            return;
+
+         vector<char> key = get_subscription_key( item );
+         if( !_subscribe_filter.contains( key.data(), key.size() ) )
+         {
+            _subscribe_filter.insert( key.data(), key.size() );
+         }
+      }
+
+      template<typename T>
+      bool is_subscribed_to_item( const T& item )const
       {
          if( !_subscribe_callback )
             return false;
 
-         return _subscribe_filter.contains( i );
+         vector<char> key = get_subscription_key( item );
+         return _subscribe_filter.contains( key.data(), key.size() );
       }
 
       bool is_impacted_account( const flat_set<account_id_type>& accounts)
@@ -269,7 +287,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
                  [this](asset_id_type id) -> optional<asset_object> {
             if(auto o = _db.find(id))
             {
-               subscribe_to_item( id );
+               if( _enabled_auto_subscription )
+                  subscribe_to_item( id );
                return *o;
             }
             return {};
@@ -345,6 +364,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       std::function<void(const fc::variant&)> _subscribe_callback;
       std::function<void(const fc::variant&)> _pending_trx_callback;
       std::function<void(const fc::variant&)> _block_applied_callback;
+      bool _enabled_auto_subscription = true;
 
       boost::signals2::scoped_connection                                                                                           _new_connection;
       boost::signals2::scoped_connection                                                                                           _change_connection;
@@ -470,12 +490,12 @@ fc::variants database_api::get_objects(const vector<object_id_type>& ids)const
 
 fc::variants database_api_impl::get_objects(const vector<object_id_type>& ids)const
 {
-   if( _subscribe_callback )  {
+   if( _subscribe_callback && _enabled_auto_subscription )
+   {
       for( auto id : ids )
       {
          if( id.type() == operation_history_object_type && id.space() == protocol_ids ) continue;
          if( id.type() == impl_account_transaction_history_object_type && id.space() == implementation_ids ) continue;
-
          this->subscribe_to_item( id );
       }
    }
@@ -516,6 +536,16 @@ void database_api_impl::set_subscribe_callback( std::function<void(const variant
 
    _subscribe_callback = cb;
    _notify_remove_create = notify_remove_create;
+}
+
+void database_api::set_auto_subscription( bool enable )
+{
+   my->set_auto_subscription( enable );
+}
+
+void database_api_impl::set_auto_subscription( bool enable )
+{
+   _enabled_auto_subscription = enable;
 }
 
 void database_api::set_pending_transaction_callback( std::function<void(const variant&)> cb )
@@ -711,13 +741,6 @@ vector<flat_set<account_id_type>> database_api_impl::get_key_references( vector<
       address a4( pts_address(key, true, 0)  );
       address a5( key );
 
-      subscribe_to_item( key );
-      subscribe_to_item( a1 );
-      subscribe_to_item( a2 );
-      subscribe_to_item( a3 );
-      subscribe_to_item( a4 );
-      subscribe_to_item( a5 );
-
       flat_set<account_id_type> result;
 
       for( auto& a : {a1,a2,a3,a4,a5} )
@@ -799,8 +822,8 @@ vector<optional<account_object>> database_api_impl::get_accounts(const vector<st
       const account_object *account = get_account_from_string(id_or_name, false);
       if(account == nullptr)
          return {};
-      account_id_type id = account->id;
-      subscribe_to_item( id );
+      if( _enabled_auto_subscription )
+         subscribe_to_item( account->id );
       return *account;
    });
    return result;
@@ -1124,13 +1147,17 @@ map<string,account_id_type> database_api_impl::lookup_accounts(const string& low
    const auto& accounts_by_name = _db.get_index_type<account_index>().indices().get<by_name>();
    map<string,account_id_type> result;
 
+   if( limit == 0 ) // shortcut to save a database query
+      return result;
+
+   bool to_subscribe = (limit == 1 && _enabled_auto_subscription); // auto-subscribe if only look for one account
    for( auto itr = accounts_by_name.lower_bound(lower_bound_name);
         limit-- && itr != accounts_by_name.end();
         ++itr )
    {
       result.insert(make_pair(itr->name, itr->get_id()));
-      if( limit == 1 )
-         subscribe_to_item( itr->get_id() );
+      if( to_subscribe )
+         subscribe_to_item( itr->id );
    }
 
    return result;
@@ -1202,7 +1229,6 @@ vector<balance_object> database_api_impl::get_balance_objects( const vector<addr
 
       for( const auto& owner : addrs )
       {
-         subscribe_to_item( owner );
          auto itr = by_owner_idx.lower_bound( boost::make_tuple( owner, asset_id_type(0) ) );
          while( itr != by_owner_idx.end() && itr->owner == owner )
          {
@@ -1276,13 +1302,12 @@ vector<optional<asset_object>> database_api_impl::get_assets(const vector<std::s
    std::transform(asset_symbols_or_ids.begin(), asset_symbols_or_ids.end(), std::back_inserter(result),
                   [this](std::string id_or_name) -> optional<asset_object> {
 
-      const asset_object* asset = get_asset_from_string(id_or_name, false);
-      if(asset == nullptr)
+      const asset_object* asset_obj = get_asset_from_string( id_or_name, false );
+      if( asset_obj == nullptr )
          return {};
-      asset_id_type id = asset->id;
-      subscribe_to_item( id );
-      return *asset;
-
+      if( _enabled_auto_subscription )
+         subscribe_to_item( asset_obj->id );
+      return *asset_obj;
    });
    return result;
 }
