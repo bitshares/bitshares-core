@@ -121,4 +121,4 @@ namespace graphene { namespace net {
 
 FC_REFLECT_TYPENAME( graphene::net::potential_peer_record )
 
-GRAPHENE_EXTERNAL_SERIALIZATION(extern, graphene::net::potential_peer_record)
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::net::potential_peer_record)

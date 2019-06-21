@@ -38,5 +38,5 @@ share_type custom_operation::calculate_fee(const fee_parameters_type& k)const
 
 } }
 
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::custom_operation::fee_parameters_type )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::custom_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::custom_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::custom_operation )

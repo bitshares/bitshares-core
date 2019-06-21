@@ -167,4 +167,4 @@ FC_REFLECT_TYPENAME( graphene::chain::burn_worker_type )
 FC_REFLECT_TYPENAME( graphene::chain::worker_type )
 FC_REFLECT_TYPENAME( graphene::chain::worker_object )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::worker_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::worker_object )

@@ -69,11 +69,11 @@ void withdraw_permission_delete_operation::validate() const
 
 } } // graphene::protocol
 
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::withdraw_permission_create_operation::fee_parameters_type )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::withdraw_permission_update_operation::fee_parameters_type )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::withdraw_permission_claim_operation::fee_parameters_type )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::withdraw_permission_delete_operation::fee_parameters_type )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::withdraw_permission_create_operation )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::withdraw_permission_update_operation )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::withdraw_permission_claim_operation )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::withdraw_permission_delete_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_create_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_update_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_claim_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_delete_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_create_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_update_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_claim_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_delete_operation )

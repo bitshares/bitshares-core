@@ -134,4 +134,4 @@ FC_REFLECT( graphene::protocol::chain_parameters,
             (extensions)
           )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::chain_parameters )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::chain_parameters )

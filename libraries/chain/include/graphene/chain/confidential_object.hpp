@@ -69,4 +69,4 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::blinded_balance_object)
 
 FC_REFLECT_TYPENAME( graphene::chain::blinded_balance_object )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::blinded_balance_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::blinded_balance_object )

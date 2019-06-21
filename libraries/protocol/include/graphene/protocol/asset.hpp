@@ -228,6 +228,6 @@ FC_REFLECT( graphene::protocol::price, (base)(quote) )
 
 FC_REFLECT( graphene::protocol::price_feed, GRAPHENE_PRICE_FEED_FIELDS )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::asset )
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::price )
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::price_feed )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::price )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::price_feed )

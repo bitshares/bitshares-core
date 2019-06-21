@@ -110,4 +110,4 @@ namespace fc
     }
 }
 
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::address )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::address )

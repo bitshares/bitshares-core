@@ -108,4 +108,4 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::proposal_object)
 
 FC_REFLECT_TYPENAME( graphene::chain::proposal_object )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::proposal_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::proposal_object )

@@ -121,4 +121,4 @@ FC_REFLECT_TYPENAME( graphene::chain::htlc_object::condition_info::time_lock_inf
 FC_REFLECT_TYPENAME( graphene::chain::htlc_object::condition_info )
 FC_REFLECT_TYPENAME( graphene::chain::htlc_object )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::htlc_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::htlc_object )

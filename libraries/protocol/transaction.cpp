@@ -442,7 +442,7 @@ void signed_transaction::verify_authority(
 
 } } // graphene::protocol
 
-GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::protocol::transaction)
-GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::protocol::signed_transaction)
-GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::protocol::precomputable_transaction)
-GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::protocol::processed_transaction)
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transaction)
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::signed_transaction)
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::precomputable_transaction)
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::processed_transaction)

@@ -302,6 +302,6 @@ FC_REFLECT_DERIVED(graphene::chain::vesting_balance_object, (graphene::db::objec
 
 FC_REFLECT_ENUM( graphene::chain::vesting_balance_type, (unspecified)(cashback)(worker)(witness)(market_fee_sharing) )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::linear_vesting_policy )
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::cdd_vesting_policy )
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::vesting_balance_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::linear_vesting_policy )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::cdd_vesting_policy )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::vesting_balance_object )

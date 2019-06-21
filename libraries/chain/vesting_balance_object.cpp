@@ -271,6 +271,6 @@ asset vesting_balance_object::get_allowed_withdraw(const time_point_sec& now)con
 
 } } // graphene::chain
 
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::linear_vesting_policy )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::cdd_vesting_policy )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::vesting_balance_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::linear_vesting_policy )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::cdd_vesting_policy )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::vesting_balance_object )

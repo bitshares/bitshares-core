@@ -68,11 +68,11 @@ namespace graphene { namespace protocol {
    }
 } }
 
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_create_operation::fee_parameters_type )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_redeem_operation::fee_parameters_type )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_extend_operation::fee_parameters_type )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_create_operation )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_redeem_operation )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_redeemed_operation )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_extend_operation )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::htlc_refund_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_create_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_redeem_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_extend_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_create_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_redeem_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_redeemed_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_extend_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_refund_operation )

@@ -156,9 +156,9 @@ stealth_confirmation::stealth_confirmation( const std::string& base58 )
 
 } } // graphene::protocol
 
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::transfer_to_blind_operation::fee_parameters_type )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::transfer_from_blind_operation::fee_parameters_type )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::blind_transfer_operation::fee_parameters_type )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::transfer_to_blind_operation )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::transfer_from_blind_operation )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::blind_transfer_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_to_blind_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_from_blind_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::blind_transfer_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_to_blind_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::transfer_from_blind_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::blind_transfer_operation )

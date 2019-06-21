@@ -60,16 +60,19 @@
 #include <graphene/protocol/object_id.hpp>
 #include <graphene/protocol/config.hpp>
 
-#define GRAPHENE_EXTERNAL_SERIALIZATION(ext, type) \
+#define GRAPHENE_EXTERNAL_SERIALIZATION(ext, type, deflt) \
 namespace fc { \
    ext template void from_variant( const variant& v, type& vo, uint32_t max_depth ); \
    ext template void to_variant( const type& v, variant& vo, uint32_t max_depth ); \
 namespace raw { \
-   ext template void pack< datastream<size_t>, type >( datastream<size_t>& s, const type& tx, uint32_t _max_depth=FC_PACK_MAX_DEPTH ); \
-   ext template void pack< sha256::encoder, type >( sha256::encoder& s, const type& tx, uint32_t _max_depth=FC_PACK_MAX_DEPTH ); \
-   ext template void pack< datastream<char*>, type >( datastream<char*>& s, const type& tx, uint32_t _max_depth=FC_PACK_MAX_DEPTH ); \
-   ext template void unpack< datastream<const char*>, type >( datastream<const char*>& s, type& tx, uint32_t _max_depth=FC_PACK_MAX_DEPTH ); \
+   ext template void pack< datastream<size_t>, type >( datastream<size_t>& s, const type& tx, uint32_t _max_depth deflt ); \
+   ext template void pack< sha256::encoder, type >( sha256::encoder& s, const type& tx, uint32_t _max_depth deflt ); \
+   ext template void pack< datastream<char*>, type >( datastream<char*>& s, const type& tx, uint32_t _max_depth deflt ); \
+   ext template void unpack< datastream<const char*>, type >( datastream<const char*>& s, type& tx, uint32_t _max_depth deflt ); \
 } } // fc::raw
+#define GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION(type) GRAPHENE_EXTERNAL_SERIALIZATION(extern, type, =FC_PACK_MAX_DEPTH)
+#define GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION(type) \
+            GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, type, /*=FC_PACK_MAX_DEPTH*/)
 
 #define FC_REFLECT_DERIVED_NO_TYPENAME( TYPE, INHERITS, MEMBERS ) \
 namespace fc { \

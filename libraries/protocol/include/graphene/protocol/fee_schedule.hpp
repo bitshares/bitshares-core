@@ -212,4 +212,4 @@ namespace graphene { namespace protocol {
 FC_REFLECT_TYPENAME( graphene::protocol::fee_parameters )
 FC_REFLECT( graphene::protocol::fee_schedule, (parameters)(scale) )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::fee_schedule )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::fee_schedule )
