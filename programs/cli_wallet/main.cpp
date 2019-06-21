@@ -81,6 +81,8 @@ fc::log_level string_to_level(string level)
       result = fc::log_level::error;
    else if(level == "all")
       result = fc::log_level::all;
+   else
+      FC_THROW("Log level not allowed. Allowed levels are info, debug, warn, error and all.");
 
    return result;
 }
@@ -145,9 +147,11 @@ int main( int argc, char** argv )
          ("wallet-file,w", bpo::value<string>()->implicit_value("wallet.json"), "wallet to load")
          ("chain-id", bpo::value<string>(), "chain ID to connect to")
          ("suggest-brain-key", "Suggest a safe brain key to use for creating your account")
-         ("logs-rpc-console-level", bpo::value<string>()->default_value("info"), "Level of console logging")
-         ("logs-rpc-file", bpo::value<bool>()->default_value(true), "Turn on/off file logging")
-         ("logs-rpc-file-level", bpo::value<string>()->default_value("debug"), "Level of file logging")
+         ("logs-rpc-console-level", bpo::value<string>()->default_value("info"),
+               "Level of console logging. Allowed levels: info, debug, warn, error, all")
+         ("logs-rpc-file", bpo::value<bool>()->default_value(false), "Turn on/off file logging")
+         ("logs-rpc-file-level", bpo::value<string>()->default_value("debug"),
+               "Level of file logging. Allowed levels: info, debug, warn, error, all")
          ("logs-rpc-file-name", bpo::value<string>()->default_value("rpc.log"), "File name for file rpc logs")
          ("version,v", "Display version information");
 
