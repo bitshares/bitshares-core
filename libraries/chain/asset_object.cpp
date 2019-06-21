@@ -204,6 +204,6 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_object, (graphene::db::ob
                     (buyback_account)
                   )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::asset_object )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::asset_bitasset_data_object )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::asset_dynamic_data_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_bitasset_data_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_dynamic_data_object )

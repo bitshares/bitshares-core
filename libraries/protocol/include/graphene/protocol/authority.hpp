@@ -135,4 +135,4 @@ void add_authority_accounts(
 FC_REFLECT( graphene::protocol::authority, (weight_threshold)(account_auths)(key_auths)(address_auths) )
 FC_REFLECT_ENUM( graphene::protocol::authority::classification, (owner)(active)(key) )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::authority )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::authority )

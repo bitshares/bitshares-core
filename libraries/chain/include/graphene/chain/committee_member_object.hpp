@@ -75,4 +75,4 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::committee_member_object)
 
 FC_REFLECT_TYPENAME( graphene::chain::committee_member_object )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::committee_member_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::committee_member_object )

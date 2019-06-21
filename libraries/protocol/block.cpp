@@ -100,6 +100,6 @@ namespace graphene { namespace protocol {
    }
 } }
 
-GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::protocol::block_header)
-GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::protocol::signed_block_header)
-GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::protocol::signed_block)
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::block_header)
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::signed_block_header)
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::signed_block)

@@ -46,4 +46,4 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::chain_property_object)
 
 FC_REFLECT_TYPENAME( graphene::chain::chain_property_object )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::chain_property_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::chain_property_object )

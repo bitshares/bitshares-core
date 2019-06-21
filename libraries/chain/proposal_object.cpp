@@ -139,4 +139,4 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::proposal_object, (graphene::cha
                     (available_active_approvals)(required_owner_approvals)(available_owner_approvals)
                     (available_key_approvals)(proposer)(fail_reason) )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::proposal_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::proposal_object )

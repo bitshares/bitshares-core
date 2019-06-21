@@ -40,4 +40,4 @@ struct immutable_chain_parameters
 
 FC_REFLECT_TYPENAME( graphene::chain::immutable_chain_parameters )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::immutable_chain_parameters )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::immutable_chain_parameters )

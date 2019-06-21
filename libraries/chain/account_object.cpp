@@ -351,6 +351,6 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_statistics_object,
                     (pending_fees)(pending_vested_fees)
                   )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::account_object )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::account_balance_object )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::chain::account_statistics_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_balance_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_statistics_object )

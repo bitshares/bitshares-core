@@ -70,5 +70,5 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::budget_record_object)
 FC_REFLECT_TYPENAME( graphene::chain::budget_record )
 FC_REFLECT_TYPENAME( graphene::chain::budget_record_object )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::budget_record )
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::chain::budget_record_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::budget_record )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::budget_record_object )

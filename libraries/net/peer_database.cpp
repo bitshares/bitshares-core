@@ -284,4 +284,4 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::net::potential_peer_record, BOOST_PP_S
                                 (last_connection_attempt_time)(number_of_successful_connection_attempts)
                                 (number_of_failed_connection_attempts)(last_error) )
 
-GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, graphene::net::potential_peer_record)
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::net::potential_peer_record)

@@ -134,4 +134,4 @@ namespace graphene { namespace protocol {
 FC_REFLECT_TYPENAME( graphene::protocol::operation )
 FC_REFLECT( graphene::protocol::op_wrapper, (op) )
 
-GRAPHENE_EXTERNAL_SERIALIZATION( extern, graphene::protocol::op_wrapper )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::op_wrapper )

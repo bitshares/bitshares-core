@@ -80,4 +80,4 @@ namespace graphene { namespace protocol {
 
 }}
 
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::chain_parameters )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::chain_parameters )

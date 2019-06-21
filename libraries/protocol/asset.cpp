@@ -318,6 +318,6 @@ const int64_t scaled_precision_lut[19] =
 
 } } // graphene::protocol
 
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::asset )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::price )
-GRAPHENE_EXTERNAL_SERIALIZATION( /*not extern*/, graphene::protocol::price_feed )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::price )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::price_feed )

@@ -65,11 +65,13 @@ namespace fc { \
    ext template void from_variant( const variant& v, type& vo, uint32_t max_depth ); \
    ext template void to_variant( const type& v, variant& vo, uint32_t max_depth ); \
 namespace raw { \
-   ext template void pack< datastream<size_t>, type >( datastream<size_t>& s, const type& tx, uint32_t _max_depth=FC_PACK_MAX_DEPTH ); \
-   ext template void pack< sha256::encoder, type >( sha256::encoder& s, const type& tx, uint32_t _max_depth=FC_PACK_MAX_DEPTH ); \
-   ext template void pack< datastream<char*>, type >( datastream<char*>& s, const type& tx, uint32_t _max_depth=FC_PACK_MAX_DEPTH ); \
-   ext template void unpack< datastream<const char*>, type >( datastream<const char*>& s, type& tx, uint32_t _max_depth=FC_PACK_MAX_DEPTH ); \
+   ext template void pack< datastream<size_t>, type >( datastream<size_t>& s, const type& tx, uint32_t _max_depth ); \
+   ext template void pack< sha256::encoder, type >( sha256::encoder& s, const type& tx, uint32_t _max_depth ); \
+   ext template void pack< datastream<char*>, type >( datastream<char*>& s, const type& tx, uint32_t _max_depth ); \
+   ext template void unpack< datastream<const char*>, type >( datastream<const char*>& s, type& tx, uint32_t _max_depth ); \
 } } // fc::raw
+#define GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION(type) GRAPHENE_EXTERNAL_SERIALIZATION(extern, type)
+#define GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION(type) GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, type)
 
 #define FC_REFLECT_DERIVED_NO_TYPENAME( TYPE, INHERITS, MEMBERS ) \
 namespace fc { \
@@ -273,9 +275,9 @@ FC_REFLECT_ENUM(graphene::protocol::asset_issuer_permission_flags,
 
 namespace fc { namespace raw {
    extern template void pack( datastream<size_t>& s, const graphene::protocol::public_key_type& tx,
-                              uint32_t _max_depth=FC_PACK_MAX_DEPTH );
+                              uint32_t _max_depth );
    extern template void pack( datastream<char*>& s, const graphene::protocol::public_key_type& tx,
-                              uint32_t _max_depth=FC_PACK_MAX_DEPTH );
+                              uint32_t _max_depth );
    extern template void unpack( datastream<const char*>& s, graphene::protocol::public_key_type& tx,
-                                uint32_t _max_depth=FC_PACK_MAX_DEPTH );
+                                uint32_t _max_depth );
 } } // fc::raw
