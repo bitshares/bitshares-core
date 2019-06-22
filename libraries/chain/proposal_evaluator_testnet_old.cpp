@@ -25,6 +25,8 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 
+#include <graphene/protocol/pts_address.hpp>
+
 /** This file is mostly a copy from proposal_object.cpp and protocol/transaction.cpp
  *  It reverts this harmless little change:
  *  https://github.com/bitshares/bitshares-core/commit/23b8843d2f4e23280e3a5e1db480297758c8c872
