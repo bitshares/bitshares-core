@@ -22,16 +22,21 @@
  * THE SOFTWARE.
  */
 #include <graphene/chain/block_database.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 #include <fc/io/raw.hpp>
+#include <boost/endian/buffers.hpp>
 
 namespace graphene { namespace chain {
 
 struct index_entry
 {
-   uint64_t      block_pos = 0;
-   uint32_t      block_size = 0;
-   block_id_type block_id;
+   index_entry() {
+      block_pos = 0;
+      block_size = 0;
+   };
+   boost::endian::little_uint64_buf_t block_pos;
+   boost::endian::little_uint32_buf_t block_size;
+   block_id_type                      block_id;
 };
  }}
 FC_REFLECT( graphene::chain::index_entry, (block_pos)(block_size)(block_id) );
@@ -125,7 +130,7 @@ bool block_database::contains( const block_id_type& id )const
    _block_num_to_pos.seekg( index_pos );
    _block_num_to_pos.read( (char*)&e, sizeof(e) );
 
-   return e.block_id == id && e.block_size > 0;
+   return e.block_id == id && e.block_size.value() > 0;
 }
 
 block_id_type block_database::fetch_block_id( uint32_t block_num )const
@@ -159,10 +164,10 @@ optional<signed_block> block_database::fetch_optional( const block_id_type& id )
 
       if( e.block_id != id ) return optional<signed_block>();
 
-      vector<char> data( e.block_size );
-      _blocks.seekg( e.block_pos );
-      if (e.block_size)
-         _blocks.read( data.data(), e.block_size );
+      vector<char> data( e.block_size.value() );
+      _blocks.seekg( e.block_pos.value() );
+      if (e.block_size.value())
+         _blocks.read( data.data(), e.block_size.value() );
       auto result = fc::raw::unpack<signed_block>(data);
       FC_ASSERT( result.id() == e.block_id );
       return result;
@@ -189,9 +194,9 @@ optional<signed_block> block_database::fetch_by_number( uint32_t block_num )cons
       _block_num_to_pos.seekg( index_pos, _block_num_to_pos.beg );
       _block_num_to_pos.read( (char*)&e, sizeof(e) );
 
-      vector<char> data( e.block_size );
-      _blocks.seekg( e.block_pos );
-      _blocks.read( data.data(), e.block_size );
+      vector<char> data( e.block_size.value() );
+      _blocks.seekg( e.block_pos.value() );
+      _blocks.read( data.data(), e.block_size.value() );
       auto result = fc::raw::unpack<signed_block>(data);
       FC_ASSERT( result.id() == e.block_id );
       return result;
@@ -224,14 +229,14 @@ optional<index_entry> block_database::last_index_entry()const {
          pos -= sizeof(index_entry);
          _block_num_to_pos.seekg( pos );
          _block_num_to_pos.read( (char*)&e, sizeof(e) );
-         if( _block_num_to_pos.gcount() == sizeof(e) && e.block_size > 0
-                && int64_t(e.block_pos + e.block_size) <= blocks_size )
+         if( _block_num_to_pos.gcount() == sizeof(e) && e.block_size.value() > 0
+                && int64_t(e.block_pos.value() + e.block_size.value()) <= blocks_size )
             try
             {
-               vector<char> data( e.block_size );
-               _blocks.seekg( e.block_pos );
-               _blocks.read( data.data(), e.block_size );
-               if( _blocks.gcount() == long(e.block_size) )
+               vector<char> data( e.block_size.value() );
+               _blocks.seekg( e.block_pos.value() );
+               _blocks.read( data.data(), e.block_size.value() );
+               if( _blocks.gcount() == long(e.block_size.value()) )
                {
                   const signed_block block = fc::raw::unpack<signed_block>(data);
                   if( block.id() == e.block_id )

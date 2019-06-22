@@ -22,12 +22,16 @@
  * THE SOFTWARE.
  */
 #pragma once
+#include <boost/endian/buffers.hpp>
+
+#include <graphene/protocol/types.hpp>
+
 #include <fc/array.hpp>
 #include <fc/io/varint.hpp>
 #include <fc/network/ip.hpp>
-#include <fc/io/raw.hpp>
+#include <fc/io/raw_fwd.hpp>
 #include <fc/crypto/ripemd160.hpp>
-#include <fc/reflect/variant.hpp>
+#include <fc/reflect/typename.hpp>
 
 namespace graphene { namespace net {
 
@@ -39,8 +43,8 @@ namespace graphene { namespace net {
    */
   struct message_header
   {
-     uint32_t  size;   // number of bytes in message, capped at MAX_MESSAGE_SIZE
-     uint32_t  msg_type;  // every channel gets a 16 bit message type specifier
+     boost::endian::little_uint32_buf_t size;   // number of bytes in message, capped at MAX_MESSAGE_SIZE
+     boost::endian::little_uint32_buf_t msg_type;  // every channel gets a 16 bit message type specifier
   };
 
   typedef fc::uint160_t message_hash_type;
@@ -85,7 +89,7 @@ namespace graphene { namespace net {
      T as()const 
      {
          try {
-          FC_ASSERT( msg_type == T::type );
+          FC_ASSERT( msg_type.value() == T::type );
           T tmp;
           if( data.size() )
           {
@@ -103,15 +107,15 @@ namespace graphene { namespace net {
               "error unpacking network message as a '${type}'  ${x} !=? ${msg_type}", 
               ("type", fc::get_typename<T>::name() )
               ("x", T::type)
-              ("msg_type", msg_type)
+              ("msg_type", msg_type.value())
               );
      }
   };
 
-
-
-
 } } // graphene::net
 
-FC_REFLECT( graphene::net::message_header, (size)(msg_type) )
-FC_REFLECT_DERIVED( graphene::net::message, (graphene::net::message_header), (data) )
+FC_REFLECT_TYPENAME( graphene::net::message_header )
+FC_REFLECT_TYPENAME( graphene::net::message )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::net::message_header)
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::net::message)

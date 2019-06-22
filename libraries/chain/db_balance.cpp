@@ -172,7 +172,7 @@ optional< vesting_balance_id_type > database::deposit_lazy_vesting(
       const vesting_balance_object& vbo = (*ovbid)(*this);
       if( vbo.owner != req_owner )
          break;
-      if( vbo.policy.which() != vesting_policy::tag< cdd_vesting_policy >::value )
+      if( !vbo.policy.is_type< cdd_vesting_policy >() )
          break;
       if( vbo.policy.get< cdd_vesting_policy >().vesting_seconds != req_vesting_seconds )
          break;

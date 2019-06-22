@@ -6,7 +6,7 @@
 #include <graphene/app/application.hpp>
 #include <graphene/app/api_access.hpp>
 #include <graphene/chain/genesis_state.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/types.hpp>
 #include <graphene/net/message.hpp>
 
 namespace graphene { namespace app { namespace detail {

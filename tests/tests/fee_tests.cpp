@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include <fc/uint128.hpp>
-
 #include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/fba_accumulator_id.hpp>
@@ -37,6 +35,8 @@
 #include <boost/test/unit_test.hpp>
 
 #include "../common/database_fixture.hpp"
+
+#include <fc/uint128.hpp>
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
@@ -273,8 +273,6 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
             PUSH_TX( db, tx );
 
         };
-
-        const asset_object& core_asset = asset_id_type()(db);
 
         // deposit 100 BTS to the fee pool of ALICEUSD asset
         fund_fee_pool( alice_id(db), aliceusd_id(db), _core(100).amount );

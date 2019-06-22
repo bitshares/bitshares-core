@@ -23,6 +23,7 @@
  */
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/transaction_evaluation_state.hpp>
 #include <graphene/chain/proposal_object.hpp>
 
 namespace graphene { namespace chain {
@@ -39,7 +40,7 @@ bool proposal_object::is_authorized_to_execute(database& db) const
                         [&]( account_id_type id ){ return &id(db).owner;  },
                         allow_non_immediate_owner,
                         db.get_global_properties().parameters.max_authority_depth,
-                        true, /* allow committeee */
+                        true, /* allow committee */
                         available_active_approvals,
                         available_owner_approvals );
    } 
@@ -132,3 +133,10 @@ void required_approval_index::object_modified( const object& after )
 }
 
 } } // graphene::chain
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::proposal_object, (graphene::chain::object),
+                    (expiration_time)(review_period_time)(proposed_transaction)(required_active_approvals)
+                    (available_active_approvals)(required_owner_approvals)(available_owner_approvals)
+                    (available_key_approvals)(proposer)(fail_reason) )
+
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::proposal_object )
