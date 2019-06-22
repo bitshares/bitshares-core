@@ -26,10 +26,28 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/market_evaluator.hpp>
+#include <graphene/chain/market_object.hpp>
+#include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
+#include <graphene/chain/htlc_object.hpp>
 
 namespace graphene { namespace app {
    using namespace graphene::chain;
+
+   struct more_data
+   {
+      bool balances = false;
+      bool vesting_balances = false;
+      bool limit_orders = false;
+      bool call_orders = false;
+      bool settle_orders = false;
+      bool proposals = false;
+      bool assets = false;
+      bool withdraws_from = false;
+      bool withdraws_to = false;
+      bool htlcs_from = false;
+      bool htlcs_to = false;
+   };
 
    struct full_account
    {
@@ -47,11 +65,19 @@ namespace graphene { namespace app {
       vector<force_settlement_object>  settle_orders;
       vector<proposal_object>          proposals;
       vector<asset_id_type>            assets;
-      vector<withdraw_permission_object> withdraws;
-      vector<htlc_object>              htlcs;
+      vector<withdraw_permission_object> withdraws_from;
+      vector<withdraw_permission_object> withdraws_to;
+      vector<htlc_object>              htlcs_from;
+      vector<htlc_object>              htlcs_to;
+      more_data                        more_data_available;
    };
 
 } }
+
+FC_REFLECT( graphene::app::more_data,
+            (balances) (vesting_balances) (limit_orders) (call_orders)
+            (settle_orders) (proposals) (assets) (withdraws_from) (withdraws_to) (htlcs_from) (htlcs_to)
+          )
 
 FC_REFLECT( graphene::app::full_account,
             (account)
@@ -68,6 +94,9 @@ FC_REFLECT( graphene::app::full_account,
             (settle_orders)
             (proposals)
             (assets)
-            (withdraws)
-            (htlcs)
+            (withdraws_from)
+            (withdraws_to)
+            (htlcs_from)
+            (htlcs_to)
+            (more_data_available)
           )
