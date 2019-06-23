@@ -274,7 +274,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
 
         };
 
-        const asset_object& core_asset = asset_id_type()(db);
+        //const asset_object& core_asset = asset_id_type()(db);
 
         // deposit 100 TUSC to the fee pool of ALICEUSD asset
         fund_fee_pool( alice_id(db), aliceusd_id(db), _core(100).amount );
@@ -472,7 +472,7 @@ BOOST_AUTO_TEST_CASE( cashback_test )
    }
    change_fees( new_fees );
 
-   const auto& fees = db.get_global_properties().parameters.current_fees;
+   const auto& fees = db.get_global_properties().parameters.get_current_fees();
 
 #define CustomRegisterActor(actor_name, registrar_name, referrer_name, referrer_rate) \
    { \

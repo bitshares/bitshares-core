@@ -382,13 +382,6 @@ BOOST_AUTO_TEST_CASE(revive_recovered_hf1270)
 
 } FC_LOG_AND_RETHROW() }
 
-BOOST_AUTO_TEST_CASE(recollateralize_hf1270)
-{ try {
-   hf1270 = true;
-   INVOKE(recollateralize);
-
-} FC_LOG_AND_RETHROW() }
-
 BOOST_AUTO_TEST_CASE(revive_empty_recovered_hf1270)
 { try {
    hf1270 = true;
@@ -400,13 +393,6 @@ BOOST_AUTO_TEST_CASE(revive_empty_hf1270)
 { try {
    hf1270 = true;
    INVOKE(revive_empty);
-
-} FC_LOG_AND_RETHROW() }
-
-BOOST_AUTO_TEST_CASE(revive_empty_with_bid_hf1270)
-{ try {
-   hf1270 = true;
-   INVOKE(revive_empty_with_bid);
 
 } FC_LOG_AND_RETHROW() }
 
