@@ -1,4 +1,4 @@
-FROM ubuntu:bionic
+FROM phusion/baseimage:0.11
 MAINTAINER The bitshares decentralized organisation
 
 ENV LANG=en_US.UTF-8
