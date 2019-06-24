@@ -1,6 +1,6 @@
 # Defines BitShares library target.
-project( BitShares )
-cmake_minimum_required( VERSION 3.1 )
+cmake_minimum_required( VERSION 3.2 FATAL_ERROR )
+project( BitShares LANGUAGES CXX C)
 
 set( BLOCKCHAIN_NAME "BitShares" )
 
@@ -25,6 +25,74 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 endif()
 
 list( APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules" )
+
+include(CheckCCompilerFlag)
+include(Utils)
+
+# Fortify source
+if (CMAKE_COMPILER_IS_GNUCXX)
+	if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+		message ("-- Setting optimizations for clang++")
+		set(CMAKE_CXX_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2 -O3 -DNDEBUG=1")
+		set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-D_FORTIFY_SOURCE=2 -O3 -DNDEBUG=1 -g")
+
+		# check and add data execution prevention
+		message ("-- Enabling data execution prevention")
+		add_linker_flag("-fsanitize=safe-stack")
+
+		# check and add Stack-based buffer overrun detection
+		set(CMAKE_REQUIRED_FLAGS "-fstack-protector")
+		check_c_compiler_flag("" HAVE_STACKPROTECTOR)
+		if(HAVE_STACKPROTECTOR)
+			message ("-- Enabling stack-based buffer overrun detection")
+			add_flag_append(CMAKE_C_FLAGS "-fstack-protector")
+			add_flag_append(CMAKE_CXX_FLAGS "-fstack-protector")
+		endif()
+	else ()
+		message ("-- Setting optimizations for g++")
+		set(CMAKE_CXX_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2 -O3 -DNDEBUG=1")
+		set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-D_FORTIFY_SOURCE=2 -O3 -DNDEBUG=1 -g")
+
+		# check and add data execution prevention
+		set(CMAKE_REQUIRED_FLAGS "-Wl,-znoexecstack")
+		check_c_compiler_flag("" HAVE_NOEXECSTACK)
+		if(HAVE_NOEXECSTACK)
+			message ("-- Enabling data execution prevention")
+			add_linker_flag("-znoexecstack")
+		endif()
+
+		# check and add Stack-based buffer overrun detection
+		set(CMAKE_REQUIRED_FLAGS "-fstack-protector-strong")
+		check_c_compiler_flag("" HAVE_STACKPROTECTOR)
+		if(HAVE_STACKPROTECTOR)
+			message ("-- Enabling stack-based buffer overrun detection")
+			add_flag_append(CMAKE_C_FLAGS "-fstack-protector-strong")
+			add_flag_append(CMAKE_CXX_FLAGS "-fstack-protector-strong")
+		endif()
+
+	endif ()
+endif ()
+
+# check for Data relocation and Protection (RELRO)
+set(CMAKE_REQUIRED_FLAGS "-Wl,-zrelro,-znow")
+check_c_compiler_flag("" HAVE_RELROFULL)
+if(HAVE_RELROFULL)
+	message ("-- Enabling full data relocation and protection")
+	add_linker_flag("-zrelro")
+	add_linker_flag("-znow")
+else()
+	#if full relro is not available, try partial relro
+	set(CMAKE_REQUIRED_FLAGS "-Wl,-zrelro")
+	check_c_compiler_flag("" HAVE_RELROPARTIAL)
+	if(HAVE_RELROPARTIAL)
+		message ("-- Enabling partial data relocation and protection")
+		add_linker_flag("-zrelro")
+	endif()
+endif()
+
+# position independent executetable (PIE)
+# position independent code (PIC)
+add_definitions (-fPIC)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS "ON")
 set(GRAPHENE_EGENESIS_JSON "${CMAKE_CURRENT_SOURCE_DIR}/libraries/egenesis/genesis.json" )
