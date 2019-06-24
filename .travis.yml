@@ -39,11 +39,11 @@ script:
 - programs/build_helpers/buildstep make.get_dev_key 10 "programs/build_helpers/make_with_sonar bw-output -j 2 get_dev_key"
 - programs/build_helpers/buildstep make.chain_test 900 "programs/build_helpers/make_with_sonar bw-output -j 2 chain_test"
 - programs/build_helpers/buildstep make.cli_test 200 "programs/build_helpers/make_with_sonar bw-output -j 2 cli_test"
-- programs/build_helpers/buildstep make.perf_test 120 "programs/build_helpers/make_with_sonar bw-output -j 2 performance_test"
+# - programs/build_helpers/buildstep make.perf_test 120 "programs/build_helpers/make_with_sonar bw-output -j 2 performance_test"
 - set -o pipefail
 #   - stage: test
-- programs/build_helpers/buildstep run.chain_test 240 "libraries/fc/tests/run-parallel-tests.sh tests/chain_test"
-- programs/build_helpers/buildstep run.cli_test 30 "libraries/fc/tests/run-parallel-tests.sh tests/cli_test"
+#- programs/build_helpers/buildstep run.chain_test 240 "libraries/fc/tests/run-parallel-tests.sh tests/chain_test"
+#- programs/build_helpers/buildstep run.cli_test 30 "libraries/fc/tests/run-parallel-tests.sh tests/cli_test"
 # Commenting out Sonar Cloud since it's for BitShares
 #- programs/build_helpers/buildstep prepare.sonar 20 'find libraries/[acdenptuw]*/CMakeFiles/*.dir programs/[cdgjsw]*/CMakeFiles/*.dir -type d | while read d; do gcov -o "$d" "${d/CMakeFiles*.dir//}"/*.cpp; done >/dev/null'
 #- programs/build_helpers/buildstep run.sonar 400 "which sonar-scanner && sonar-scanner || true"
