@@ -37,8 +37,8 @@ script:
 - programs/build_helpers/buildstep make.witness_node 300 "programs/build_helpers/make_with_sonar bw-output -j 2 witness_node"
 - programs/build_helpers/buildstep make.serializer 45 "programs/build_helpers/make_with_sonar bw-output -j 2 js_operation_serializer"
 - programs/build_helpers/buildstep make.get_dev_key 10 "programs/build_helpers/make_with_sonar bw-output -j 2 get_dev_key"
-- programs/build_helpers/buildstep make.chain_test 900 "programs/build_helpers/make_with_sonar bw-output -j 2 chain_test"
-- programs/build_helpers/buildstep make.cli_test 200 "programs/build_helpers/make_with_sonar bw-output -j 2 cli_test"
+#- programs/build_helpers/buildstep make.chain_test 900 "programs/build_helpers/make_with_sonar bw-output -j 2 chain_test"
+#- programs/build_helpers/buildstep make.cli_test 200 "programs/build_helpers/make_with_sonar bw-output -j 2 cli_test"
 # - programs/build_helpers/buildstep make.perf_test 120 "programs/build_helpers/make_with_sonar bw-output -j 2 performance_test"
 - set -o pipefail
 #   - stage: test
