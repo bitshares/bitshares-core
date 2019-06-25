@@ -32,7 +32,7 @@ using namespace graphene::chain;
 using namespace graphene::chain::test;
 using namespace graphene::app;
 
-BOOST_FIXTURE_TEST_SUITE(app_util_tests, database_fixture)
+BOOST_AUTO_TEST_SUITE(app_util_tests)
 
 BOOST_AUTO_TEST_CASE(uint128_amount_to_string_test) {
 
@@ -179,7 +179,7 @@ BOOST_AUTO_TEST_CASE(uint128_amount_to_string_test) {
 
 }
 
-BOOST_AUTO_TEST_CASE(price_to_string_test) {
+BOOST_AUTO_TEST_CASE(price_to_string_throws) {
 
    int64_t m = std::numeric_limits<int64_t>::max();
    int64_t n = -1;
@@ -194,8 +194,10 @@ BOOST_AUTO_TEST_CASE(price_to_string_test) {
          p[i][j] = price( asset( a[i] ), asset( a[j] ) );
 
    for( int i = 0; i < 11; ++i )
+   {
       for( int j = 0; j < 11; ++j )
       {
+         price pr = p[i][j];
          if( i == 0 )
          {
             GRAPHENE_REQUIRE_THROW( price_to_string( p[i][j], 0, 0 ), fc::exception );
@@ -214,32 +216,65 @@ BOOST_AUTO_TEST_CASE(price_to_string_test) {
             GRAPHENE_REQUIRE_THROW( price_to_string( p[i][j], 0, 20 ), fc::exception );
          }
          try {
-            idump( (i) (j) (p[i][j]) );
-            idump(
-                (price_to_string(p[i][j],0,0))
-                (price_to_string(p[i][j],0,1))
-                (price_to_string(p[i][j],0,2))
-                (price_to_string(p[i][j],0,8))
-                (price_to_string(p[i][j],0,19))
-                (price_to_string(p[i][j],1,0))
-                (price_to_string(p[i][j],1,15))
-                (price_to_string(p[i][j],2,6))
-                (price_to_string(p[i][j],2,10))
-                (price_to_string(p[i][j],5,0))
-                (price_to_string(p[i][j],9,1))
-                (price_to_string(p[i][j],9,9))
-                (price_to_string(p[i][j],9,19))
-                (price_to_string(p[i][j],18,10))
-                (price_to_string(p[i][j],18,13))
-                (price_to_string(p[i][j],18,19))
-                (price_to_string(p[i][j],19,0))
-                (price_to_string(p[i][j],19,7))
-                (price_to_string(p[i][j],19,19))
-                (price_diff_percent_string(p[i][j],p[j][i]))
-              );
-         } catch(...) {}
+            if ( pr.base.amount == 0 || (pr.base.amount > 0 && pr.quote.amount >= 0 ) )
+            {
+               // idump( (i) (j) (pr) ); // for debugging
+               // These should not throw
+               // TODO: Verify results
+               BOOST_CHECK( !price_to_string( pr ,0,0).empty() );
+               BOOST_CHECK( !price_to_string( pr ,0,1).empty() );
+               BOOST_CHECK( !price_to_string( pr ,0,2).empty() );
+               BOOST_CHECK( !price_to_string( pr ,0,8).empty() );
+               BOOST_CHECK( !price_to_string( pr ,0,19).empty() );
+               BOOST_CHECK( !price_to_string( pr ,1,0).empty() );
+               BOOST_CHECK( !price_to_string( pr ,1,15).empty() );
+               BOOST_CHECK( !price_to_string( pr ,2,6).empty() );
+               BOOST_CHECK( !price_to_string( pr ,2,10).empty() );
+               BOOST_CHECK( !price_to_string( pr ,5,0).empty() );
+               BOOST_CHECK( !price_to_string( pr ,9,1).empty() );
+               BOOST_CHECK( !price_to_string( pr ,9,9).empty() );
+               BOOST_CHECK( !price_to_string( pr ,9,19).empty() );
+               BOOST_CHECK( !price_to_string( pr ,18,10).empty() );
+               BOOST_CHECK( !price_to_string( pr ,18,13).empty() );
+               BOOST_CHECK( !price_to_string( pr ,18,19).empty() );
+               BOOST_CHECK( !price_to_string( pr ,19,0).empty() );
+               BOOST_CHECK( !price_to_string( pr ,19,7).empty() );
+               BOOST_CHECK( !price_to_string( pr ,19,19).empty() );
+               price new_price = p[j][i];
+               if (pr.quote.amount >= 0)
+                  BOOST_CHECK( !price_diff_percent_string( pr, new_price ).empty() );
+               else
+                  GRAPHENE_REQUIRE_THROW( price_diff_percent_string( pr, new_price ), fc::exception );
+            } else {
+               GRAPHENE_REQUIRE_THROW( price_to_string( pr, 0, 0 ), fc::exception );
+            }
+         } catch(fc::exception& fcx) {
+            BOOST_FAIL( "FC Exception logging price_to_string: " + fcx.to_detail_string() );
+         } catch(...) {
+            BOOST_FAIL( "Uncaught exception in price_to_string. i=" + std::to_string(i) + " j=" + std::to_string(j));
+         }
       }
+   }
+}
 
+/**
+ * Verify that price_to_string comes back with the correct results. Put edge cases here.
+ */
+BOOST_AUTO_TEST_CASE(price_to_string_verify)
+{
+   try
+   {
+      BOOST_CHECK_EQUAL( price_to_string( price{ asset(1), asset(1) }, 0, 0 ), "1" );
+      BOOST_CHECK_EQUAL( price_to_string( price{ asset(10), asset(10) }, 0, 0), "1" );
+      int64_t mx = std::numeric_limits<int64_t>::max();
+      BOOST_CHECK_EQUAL( price_to_string( price{ asset(mx), asset(mx) }, 0, 0), "1" );
+      BOOST_CHECK_EQUAL( price_to_string( price{ asset(1), asset(mx) }, 0, 0), "0.0000000000000000001" );
+      BOOST_CHECK_EQUAL( price_to_string( price{ asset(mx), asset(1) }, 0, 0), "9223372036854775807" );
+   } 
+   catch (fc::exception& fx)
+   {
+      BOOST_FAIL( "FC Exception: " + fx.to_detail_string() );
+   }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

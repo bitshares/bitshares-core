@@ -47,6 +47,7 @@ namespace graphene { namespace chain {
    class transaction_evaluation_state;
 
    struct budget_record;
+   enum class vesting_balance_type;
 
    /**
     *   @class database
@@ -66,15 +67,13 @@ namespace graphene { namespace chain {
             skip_witness_signature      = 1 << 0,  ///< used while reindexing
             skip_transaction_signatures = 1 << 1,  ///< used by non-witness nodes
             skip_transaction_dupe_check = 1 << 2,  ///< used while reindexing
-            skip_fork_db                = 1 << 3,  ///< used while reindexing
             skip_block_size_check       = 1 << 4,  ///< used when applying locally generated transactions
             skip_tapos_check            = 1 << 5,  ///< used while reindexing -- note this skips expiration check as well
-            skip_authority_check        = 1 << 6,  ///< used while reindexing -- disables any checking of authority on transactions
+            // skip_authority_check        = 1 << 6,  ///< removed because effectively identical to skip_transaction_signatures
             skip_merkle_check           = 1 << 7,  ///< used while reindexing
             skip_assert_evaluation      = 1 << 8,  ///< used while reindexing
             skip_undo_history_check     = 1 << 9,  ///< used while reindexing
-            skip_witness_schedule_check = 1 << 10, ///< used while reindexing
-            skip_validate               = 1 << 11  ///< used prior to checkpoint, skips validate() call on transaction
+            skip_witness_schedule_check = 1 << 10 ///< used while reindexing
          };
 
          /**
@@ -136,9 +135,9 @@ namespace graphene { namespace chain {
          bool before_last_checkpoint()const;
 
          bool push_block( const signed_block& b, uint32_t skip = skip_nothing );
-         processed_transaction push_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
+         processed_transaction push_transaction( const precomputable_transaction& trx, uint32_t skip = skip_nothing );
          bool _push_block( const signed_block& b );
-         processed_transaction _push_transaction( const signed_transaction& trx );
+         processed_transaction _push_transaction( const precomputable_transaction& trx );
 
          ///@throws fc::exception if the proposed transaction fails to apply.
          processed_transaction push_proposal( const proposal_object& proposal );
@@ -303,6 +302,15 @@ namespace graphene { namespace chain {
           */
          void adjust_balance(account_id_type account, asset delta);
 
+         void deposit_market_fee_vesting_balance(const account_id_type &account_id, const asset &delta);
+        /**
+          * @brief Retrieve a particular account's market fee vesting balance in a given asset
+          * @param owner Account whose balance should be retrieved
+          * @param asset_id ID of the asset to get balance in
+          * @return owner's balance in asset
+          */
+         asset get_market_fee_vesting_balance(const account_id_type &account_id, const asset_id_type &asset_id);
+
          /**
           * @brief Helper to make lazy deposit to CDD VBO.
           *
@@ -320,6 +328,7 @@ namespace graphene { namespace chain {
             const optional< vesting_balance_id_type >& ovbid,
             share_type amount,
             uint32_t req_vesting_seconds,
+            vesting_balance_type balance_type,
             account_id_type req_owner,
             bool require_vesting );
 
@@ -352,8 +361,10 @@ namespace graphene { namespace chain {
           * This function takes a new limit order, and runs the markets attempting to match it with existing orders
           * already on the books.
           */
+         ///@{
          bool apply_order_before_hardfork_625(const limit_order_object& new_order_object, bool allow_black_swan = true);
          bool apply_order(const limit_order_object& new_order_object, bool allow_black_swan = true);
+         ///@}
 
          /**
           * Matches the two orders, the first parameter is taker, the second is maker.
@@ -368,14 +379,17 @@ namespace graphene { namespace chain {
          ///@{
          int match( const limit_order_object& taker, const limit_order_object& maker, const price& trade_price );
          int match( const limit_order_object& taker, const call_order_object& maker, const price& trade_price,
-                    const price& feed_price, const uint16_t maintenance_collateral_ratio );
+                    const price& feed_price, const uint16_t maintenance_collateral_ratio,
+                    const optional<price>& maintenance_collateralization );
+         ///@}
+
+         /// Matches the two orders, the first parameter is taker, the second is maker.
          /// @return the amount of asset settled
          asset match(const call_order_object& call,
                    const force_settlement_object& settle,
                    const price& match_price,
                    asset max_settlement,
                    const price& fill_price);
-         ///@}
 
          /**
           * @return true if the order was completely filled and thus freed.
@@ -395,6 +409,8 @@ namespace graphene { namespace chain {
 
          asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
          asset pay_market_fees( const asset_object& recv_asset, const asset& receives );
+         asset pay_market_fees( const account_object& seller, const asset_object& recv_asset, const asset& receives );
+         ///@}
 
 
          ///@{
@@ -407,7 +423,7 @@ namespace graphene { namespace chain {
 
          /** when popping a block, the transactions that were removed get cached here so they
           * can be reapplied at the proper time */
-         std::deque< signed_transaction >       _popped_tx;
+         std::deque< precomputable_transaction > _popped_tx;
 
          /**
           * @}
@@ -415,6 +431,29 @@ namespace graphene { namespace chain {
 
          /// Enable or disable tracking of votes of standby witnesses and committee members
          inline void enable_standby_votes_tracking(bool enable)  { _track_standby_votes = enable; }
+
+         /** Precomputes digests, signatures and operation validations depending
+          *  on skip flags. "Expensive" computations may be done in a parallel
+          *  thread.
+          *
+          * @param block the block to preprocess
+          * @param skip indicates which computations can be skipped
+          * @return a future that will resolve to the input block with
+          *         precomputations applied
+          */
+         fc::future<void> precompute_parallel( const signed_block& block, const uint32_t skip = skip_nothing )const;
+
+         /** Precomputes digests, signatures and operation validations.
+          *  "Expensive" computations may be done in a parallel thread.
+          *
+          * @param trx the transaction to preprocess
+          * @return a future that will resolve to the input transaction with
+          *         precomputations applied
+          */
+         fc::future<void> precompute_parallel( const precomputable_transaction& trx )const;
+   private:
+         template<typename Trx>
+         void _precompute_parallel( const Trx* trx, const size_t count, const uint32_t skip )const;
 
    protected:
          //Mark pop_undo() as protected -- we do not want outside calling pop_undo(); it should call pop_block() instead
@@ -437,6 +476,7 @@ namespace graphene { namespace chain {
          void                  apply_block( const signed_block& next_block, uint32_t skip = skip_nothing );
          processed_transaction apply_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
          operation_result      apply_operation( transaction_evaluation_state& eval_state, const operation& op );
+
       private:
          void                  _apply_block( const signed_block& next_block );
          processed_transaction _apply_transaction( const signed_transaction& trx );
@@ -466,6 +506,7 @@ namespace graphene { namespace chain {
          void update_withdraw_permissions();
          bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
                                    const asset_bitasset_data_object* bitasset_ptr = nullptr );
+         void clear_expired_htlcs();
 
          ///Steps performed only at maintenance intervals
          ///@{
@@ -513,7 +554,7 @@ namespace graphene { namespace chain {
          uint32_t                          _current_block_num    = 0;
          uint16_t                          _current_trx_in_block = 0;
          uint16_t                          _current_op_in_trx    = 0;
-         uint16_t                          _current_virtual_op   = 0;
+         uint32_t                          _current_virtual_op   = 0;
 
          vector<uint64_t>                  _vote_tally_buffer;
          vector<uint64_t>                  _witness_count_histogram_buffer;

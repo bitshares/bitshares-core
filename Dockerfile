@@ -10,16 +10,25 @@ RUN \
       cmake \
       git \
       libbz2-dev \
-      libreadline-dev \
-      libboost-all-dev \
       libcurl4-openssl-dev \
       libssl-dev \
       libncurses-dev \
+      libboost-thread-dev \
+      libboost-iostreams-dev \
+      libboost-date-time-dev \
+      libboost-system-dev \
+      libboost-filesystem-dev \
+      libboost-program-options-dev \
+      libboost-chrono-dev \
+      libboost-test-dev \
+      libboost-context-dev \
+      libboost-regex-dev \
+      libboost-coroutine-dev \
+      libtool \
       doxygen \
       ca-certificates \
+      fish \
     && \
-    apt-get update -y && \
-    apt-get install -y fish && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -38,9 +47,10 @@ RUN \
     git submodule update --init --recursive && \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
+	-DGRAPHENE_DISABLE_UNITY_BUILD=ON \
         . && \
-    make witness_node cli_wallet && \
-    install -s programs/witness_node/witness_node programs/cli_wallet/cli_wallet /usr/local/bin && \
+    make witness_node cli_wallet get_dev_key && \
+    install -s programs/witness_node/witness_node programs/genesis_util/get_dev_key programs/cli_wallet/cli_wallet /usr/local/bin && \
     #
     # Obtain version
     mkdir /etc/bitshares && \

@@ -95,9 +95,9 @@ namespace graphene { namespace net {
    {
       static const core_message_type_enum type;
 
-      signed_transaction trx;
+      graphene::chain::precomputable_transaction trx;
       trx_message() {}
-      trx_message(signed_transaction transaction) :
+      trx_message(graphene::chain::signed_transaction transaction) :
         trx(std::move(transaction))
       {}
    };

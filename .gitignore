@@ -56,3 +56,14 @@ object_database/*
 *.pyo
 
 .vscode/*
+.idea/*
+*.cnf
+*.vcxproj
+*.filters
+*.sln
+*.obj
+.vs/*
+*.log
+*.tlog
+*.lib
+*.exe

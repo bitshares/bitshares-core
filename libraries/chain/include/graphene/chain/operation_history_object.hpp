@@ -61,7 +61,7 @@ namespace graphene { namespace chain {
          /** the operation within the transaction */
          uint16_t          op_in_trx = 0;
          /** any virtual operations implied by operation in block */
-         uint16_t          virtual_op = 0;
+         uint32_t          virtual_op = 0;
    };
 
    /**

@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include <fc/smart_ref_impl.hpp>
-
 #include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/buyback.hpp>
 #include <graphene/chain/buyback_object.hpp>
@@ -119,7 +117,6 @@ void verify_account_votes( const database& db, const account_options& options )
    }
 }
 
-
 void_result account_create_evaluator::do_evaluate( const account_create_operation& op )
 { try {
    database& d = db();
@@ -127,13 +124,6 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
    {
       FC_ASSERT( !op.extensions.value.owner_special_authority.valid() );
       FC_ASSERT( !op.extensions.value.active_special_authority.valid() );
-   }
-   if( d.head_block_time() < HARDFORK_599_TIME )
-   {
-      FC_ASSERT( !op.extensions.value.null_ext.valid() );
-      FC_ASSERT( !op.extensions.value.owner_special_authority.valid() );
-      FC_ASSERT( !op.extensions.value.active_special_authority.valid() );
-      FC_ASSERT( !op.extensions.value.buyback_options.valid() );
    }
 
    FC_ASSERT( fee_paying_account->is_lifetime_member(), "Only Lifetime members may register an account." );
@@ -244,7 +234,7 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          && global_properties.parameters.account_fee_scale_bitshifts != 0 )
    {
       d.modify(global_properties, [](global_property_object& p) {
-         p.parameters.current_fees->get<account_create_operation>().basic_fee <<= p.parameters.account_fee_scale_bitshifts;
+         p.parameters.get_mutable_fees().get<account_create_operation>().basic_fee <<= p.parameters.account_fee_scale_bitshifts;
       });
    }
 
@@ -284,12 +274,6 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
       FC_ASSERT( !o.extensions.value.owner_special_authority.valid() );
       FC_ASSERT( !o.extensions.value.active_special_authority.valid() );
    }
-   if( d.head_block_time() < HARDFORK_599_TIME )
-   {
-      FC_ASSERT( !o.extensions.value.null_ext.valid() );
-      FC_ASSERT( !o.extensions.value.owner_special_authority.valid() );
-      FC_ASSERT( !o.extensions.value.active_special_authority.valid() );
-   }
 
    try
    {
@@ -319,11 +303,16 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
    bool sa_before = acnt->has_special_authority();
 
    // update account statistics
-   if( o.new_options.valid() && o.new_options->is_voting() != acnt->options.is_voting() )
+   if( o.new_options.valid() )
    {
-      d.modify( acnt->statistics( d ), []( account_statistics_object& aso )
+      d.modify( acnt->statistics( d ), [&]( account_statistics_object& aso )
       {
-         aso.is_voting = !aso.is_voting;
+         if(o.new_options->is_voting() != acnt->options.is_voting())
+            aso.is_voting = !aso.is_voting;
+
+         if((o.new_options->votes != acnt->options.votes ||
+               o.new_options->voting_account != acnt->options.voting_account))
+            aso.last_vote_time = d.head_block_time();
       } );
    }
 

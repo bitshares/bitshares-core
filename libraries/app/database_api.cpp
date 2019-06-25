@@ -25,9 +25,9 @@
 #include <graphene/app/database_api.hpp>
 #include <graphene/app/util.hpp>
 #include <graphene/chain/get_config.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <fc/bloom_filter.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 #include <fc/crypto/hex.hpp>
 #include <fc/uint128.hpp>
@@ -98,7 +98,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<vesting_balance_object> get_vesting_balances( const std::string account_id_or_name )const;
 
       // Assets
-      vector<optional<asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const;
+      asset_id_type get_asset_id_from_string(const std::string& symbol_or_id)const;
+      vector<optional<asset_object>> get_assets(const vector<std::string>& asset_symbols_or_ids)const;
       vector<asset_object>           list_assets(const string& lower_bound_symbol, uint32_t limit)const;
       vector<optional<asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
       uint64_t                       get_asset_count()const;
@@ -133,7 +134,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       bool verify_authority( const signed_transaction& trx )const;
       bool verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )const;
       processed_transaction validate_transaction( const signed_transaction& trx )const;
-      vector< fc::variant > get_required_fees( const vector<operation>& ops, asset_id_type id )const;
+      vector< fc::variant > get_required_fees( const vector<operation>& ops, const std::string& asset_id_or_symbol )const;
 
       // Proposed transactions
       vector<proposal_object> get_proposed_transactions( const std::string account_id_or_name )const;
@@ -144,6 +145,11 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       // Withdrawals
       vector<withdraw_permission_object> get_withdraw_permissions_by_giver(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
       vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
+
+      // HTLC
+      optional<htlc_object> get_htlc(htlc_id_type id) const;
+      vector<htlc_object> get_htlc_by_from(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const;
+      vector<htlc_object> get_htlc_by_to(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const;
 
    //private:
       static string price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote );
@@ -205,6 +211,69 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          return account;
       }
 
+      const asset_object* get_asset_from_string( const std::string& symbol_or_id ) const
+      {
+         // TODO cache the result to avoid repeatly fetching from db
+         FC_ASSERT( symbol_or_id.size() > 0);
+         const asset_object* asset = nullptr;
+         if (std::isdigit(symbol_or_id[0]))
+            asset = _db.find(fc::variant(symbol_or_id, 1).as<asset_id_type>(1));
+         else
+         {
+            const auto& idx = _db.get_index_type<asset_index>().indices().get<by_symbol>();
+            auto itr = idx.find(symbol_or_id);
+            if (itr != idx.end())
+               asset = &*itr;
+         }
+         FC_ASSERT( asset, "no such asset" );
+         return asset;
+      }
+      vector<optional<asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const
+      {
+         vector<optional<asset_object>> result; result.reserve(asset_ids.size());
+         std::transform(asset_ids.begin(), asset_ids.end(), std::back_inserter(result),
+                 [this](asset_id_type id) -> optional<asset_object> {
+            if(auto o = _db.find(id))
+            {
+               subscribe_to_item( id );
+               return *o;
+            }
+            return {};
+         });
+         return result;
+      }
+      vector<limit_order_object> get_limit_orders(const asset_id_type a, const asset_id_type b, const uint32_t limit)const
+      {
+         FC_ASSERT( limit <= 300 );
+
+         const auto& limit_order_idx = _db.get_index_type<limit_order_index>();
+         const auto& limit_price_idx = limit_order_idx.indices().get<by_price>();
+
+         vector<limit_order_object> result;
+         result.reserve(limit*2);
+
+         uint32_t count = 0;
+         auto limit_itr = limit_price_idx.lower_bound(price::max(a,b));
+         auto limit_end = limit_price_idx.upper_bound(price::min(a,b));
+         while(limit_itr != limit_end && count < limit)
+         {
+            result.push_back(*limit_itr);
+            ++limit_itr;
+            ++count;
+         }
+         count = 0;
+         limit_itr = limit_price_idx.lower_bound(price::max(b,a));
+         limit_end = limit_price_idx.upper_bound(price::min(b,a));
+         while(limit_itr != limit_end && count < limit)
+         {
+            result.push_back(*limit_itr);
+            ++limit_itr;
+            ++count;
+         }
+
+         return result;
+      }
+
       template<typename T>
       const std::pair<asset_id_type,asset_id_type> get_order_market( const T& order )
       {
@@ -250,7 +319,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       map< pair<asset_id_type,asset_id_type>, std::function<void(const variant&)> >      _market_subscriptions;
       graphene::chain::database&                                                                                                            _db;
       const application_options* _app_options = nullptr;
-
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -526,6 +594,12 @@ vector<vector<account_id_type>> database_api::get_key_references( vector<public_
  */
 vector<vector<account_id_type>> database_api_impl::get_key_references( vector<public_key_type> keys )const
 {
+   uint64_t api_limit_get_key_references=_app_options->api_limit_get_key_references;
+   FC_ASSERT(keys.size() <= api_limit_get_key_references);
+   const auto& idx = _db.get_index_type<account_index>();
+   const auto& aidx = dynamic_cast<const base_primary_index&>(idx);
+   const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
+
    vector< vector<account_id_type> > final_result;
    final_result.reserve(keys.size());
 
@@ -545,10 +619,6 @@ vector<vector<account_id_type>> database_api_impl::get_key_references( vector<pu
       subscribe_to_item( a4 );
       subscribe_to_item( a5 );
 
-      const auto& idx = _db.get_index_type<account_index>();
-      const auto& aidx = dynamic_cast<const primary_index<account_index>&>(idx);
-      const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
-      auto itr = refs.account_to_key_memberships.find(key);
       vector<account_id_type> result;
 
       for( auto& a : {a1,a2,a3,a4,a5} )
@@ -556,7 +626,7 @@ vector<vector<account_id_type>> database_api_impl::get_key_references( vector<pu
           auto itr = refs.account_to_address_memberships.find(a);
           if( itr != refs.account_to_address_memberships.end() )
           {
-             result.reserve( itr->second.size() );
+             result.reserve( result.size() + itr->second.size() );
              for( auto item : itr->second )
              {
                 result.push_back(item);
@@ -564,16 +634,14 @@ vector<vector<account_id_type>> database_api_impl::get_key_references( vector<pu
           }
       }
 
+      auto itr = refs.account_to_key_memberships.find(key);
       if( itr != refs.account_to_key_memberships.end() )
       {
-         result.reserve( itr->second.size() );
+         result.reserve( result.size() + itr->second.size() );
          for( auto item : itr->second ) result.push_back(item);
       }
       final_result.emplace_back( std::move(result) );
    }
-
-   for( auto i : final_result )
-      subscribe_to_item(i);
 
    return final_result;
 }
@@ -599,7 +667,7 @@ bool database_api_impl::is_public_key_registered(string public_key) const
         return false;
     }
     const auto& idx = _db.get_index_type<account_index>();
-    const auto& aidx = dynamic_cast<const primary_index<account_index>&>(idx);
+    const auto& aidx = dynamic_cast<const base_primary_index&>(idx);
     const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
     auto itr = refs.account_to_key_memberships.find(key);
     bool is_known = itr != refs.account_to_key_memberships.end();
@@ -615,7 +683,7 @@ bool database_api_impl::is_public_key_registered(string public_key) const
 
 account_id_type database_api::get_account_id_from_string(const std::string& name_or_id)const
 {
-   return my->get_account_from_string( name_or_id )->id; // safe?
+   return my->get_account_from_string( name_or_id )->id;
 }
 
 vector<optional<account_object>> database_api::get_accounts(const vector<std::string>& account_names_or_ids)const
@@ -648,6 +716,10 @@ std::map<string,full_account> database_api::get_full_accounts( const vector<stri
 
 std::map<std::string, full_account> database_api_impl::get_full_accounts( const vector<std::string>& names_or_ids, bool subscribe)
 {
+   const auto& proposal_idx = _db.get_index_type<proposal_index>();
+   const auto& pidx = dynamic_cast<const base_primary_index&>(proposal_idx);
+   const auto& proposals_by_account = pidx.get_secondary_index<graphene::chain::required_approval_index>();
+
    std::map<std::string, full_account> results;
 
    for (const std::string& account_name_or_id : names_or_ids)
@@ -677,9 +749,6 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
          acnt.cashback_balance = account->cashback_balance(_db);
       }
       // Add the account's proposals
-      const auto& proposal_idx = _db.get_index_type<proposal_index>();
-      const auto& pidx = dynamic_cast<const primary_index<proposal_index>&>(proposal_idx);
-      const auto& proposals_by_account = pidx.get_secondary_index<graphene::chain::required_approval_index>();
       auto  required_approvals_itr = proposals_by_account._account_to_proposals.find( account->id );
       if( required_approvals_itr != proposals_by_account._account_to_proposals.end() )
       {
@@ -690,11 +759,9 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 
 
       // Add the account's balances
-      auto balance_range = _db.get_index_type<account_balance_index>().indices().get<by_account_asset>().equal_range(boost::make_tuple(account->id));
-      std::for_each(balance_range.first, balance_range.second,
-                    [&acnt](const account_balance_object& balance) {
-                       acnt.balances.emplace_back(balance);
-                    });
+      const auto& balances = _db.get_index_type< primary_index< account_balance_index > >().get_secondary_index< balances_by_account_index >().get_account_balances( account->id );
+      for( const auto balance : balances )
+         acnt.balances.emplace_back( *balance.second );
 
       // Add the account's vesting balances
       auto vesting_range = _db.get_index_type<vesting_balance_index>().indices().get<by_account>().equal_range(account->id);
@@ -702,7 +769,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
                     [&acnt](const vesting_balance_object& balance) {
                        acnt.vesting_balances.emplace_back(balance);
                     });
-                    
+
       // Add the account's orders
       auto order_range = _db.get_index_type<limit_order_index>().indices().get<by_account>().equal_range(account->id);
       std::for_each(order_range.first, order_range.second,
@@ -734,7 +801,18 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
                        acnt.withdraws.emplace_back(withdraw);
                     });
 
-
+      // get htlcs
+      auto htlc_from_range = _db.get_index_type<htlc_index>().indices().get<by_from_id>().equal_range(account->id);
+      std::for_each(htlc_from_range.first, htlc_from_range.second,
+            [&acnt] (const htlc_object& htlc) {
+               acnt.htlcs.emplace_back(htlc);
+            });
+      auto htlc_to_range = _db.get_index_type<htlc_index>().indices().get<by_to_id>().equal_range(account->id);
+      std::for_each(htlc_to_range.first, htlc_to_range.second,
+            [&acnt] (const htlc_object& htlc) {
+               if ( std::find(acnt.htlcs.begin(), acnt.htlcs.end(), htlc) == acnt.htlcs.end() )
+                  acnt.htlcs.emplace_back(htlc);
+               });
       results[account_name_or_id] = acnt;
    }
    return results;
@@ -762,7 +840,7 @@ vector<account_id_type> database_api::get_account_references( const std::string 
 vector<account_id_type> database_api_impl::get_account_references( const std::string account_id_or_name )const
 {
    const auto& idx = _db.get_index_type<account_index>();
-   const auto& aidx = dynamic_cast<const primary_index<account_index>&>(idx);
+   const auto& aidx = dynamic_cast<const base_primary_index&>(idx);
    const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
    const account_id_type account_id = get_account_from_string(account_id_or_name)->id;
    auto itr = refs.account_to_account_memberships.find(account_id);
@@ -846,10 +924,10 @@ vector<asset> database_api_impl::get_account_balances(const std::string& account
    if (assets.empty())
    {
       // if the caller passes in an empty list of assets, return balances for all assets the account owns
-      const account_balance_index& balance_index = _db.get_index_type<account_balance_index>();
-      auto range = balance_index.indices().get<by_account_asset>().equal_range(boost::make_tuple(acnt));
-      for (const account_balance_object& balance : boost::make_iterator_range(range.first, range.second))
-         result.push_back(asset(balance.get_balance()));
+      const auto& balance_index = _db.get_index_type< primary_index< account_balance_index > >();
+      const auto& balances = balance_index.get_secondary_index< balances_by_account_index >().get_account_balances( acnt );
+      for( const auto balance : balances )
+         result.push_back( balance.second->get_balance() );
    }
    else
    {
@@ -941,16 +1019,23 @@ vector<vesting_balance_object> database_api_impl::get_vesting_balances( const st
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<optional<asset_object>> database_api::get_assets(const vector<asset_id_type>& asset_ids)const
+asset_id_type database_api::get_asset_id_from_string(const std::string& symbol_or_id)const
 {
-   return my->get_assets( asset_ids );
+   return my->get_asset_from_string( symbol_or_id )->id;
 }
 
-vector<optional<asset_object>> database_api_impl::get_assets(const vector<asset_id_type>& asset_ids)const
+vector<optional<asset_object>> database_api::get_assets(const vector<std::string>& asset_symbols_or_ids)const
 {
-   vector<optional<asset_object>> result; result.reserve(asset_ids.size());
-   std::transform(asset_ids.begin(), asset_ids.end(), std::back_inserter(result),
-                  [this](asset_id_type id) -> optional<asset_object> {
+   return my->get_assets( asset_symbols_or_ids );
+}
+
+vector<optional<asset_object>> database_api_impl::get_assets(const vector<std::string>& asset_symbols_or_ids)const
+{
+   vector<optional<asset_object>> result; result.reserve(asset_symbols_or_ids.size());
+   std::transform(asset_symbols_or_ids.begin(), asset_symbols_or_ids.end(), std::back_inserter(result),
+                  [this](std::string id_or_name) -> optional<asset_object> {
+      const asset_object* asset = get_asset_from_string(id_or_name);
+      asset_id_type id = asset->id;
       if(auto o = _db.find(id))
       {
          subscribe_to_item( id );
@@ -1340,10 +1425,12 @@ set<public_key_type> database_api::get_required_signatures( const signed_transac
 
 set<public_key_type> database_api_impl::get_required_signatures( const signed_transaction& trx, const flat_set<public_key_type>& available_keys )const
 {
+   bool allow_non_immediate_owner = ( _db.head_block_time() >= HARDFORK_CORE_584_TIME );
    auto result = trx.get_required_signatures( _db.get_chain_id(),
                                        available_keys,
                                        [&]( account_id_type id ){ return &id(_db).active; },
                                        [&]( account_id_type id ){ return &id(_db).owner; },
+                                       allow_non_immediate_owner,
                                        _db.get_global_properties().parameters.max_authority_depth );
    return result;
 }
@@ -1359,6 +1446,7 @@ set<address> database_api::get_potential_address_signatures( const signed_transa
 
 set<public_key_type> database_api_impl::get_potential_signatures( const signed_transaction& trx )const
 {
+   bool allow_non_immediate_owner = ( _db.head_block_time() >= HARDFORK_CORE_584_TIME );
    set<public_key_type> result;
    trx.get_required_signatures(
       _db.get_chain_id(),
@@ -1377,6 +1465,7 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
             result.insert(k);
          return &auth;
       },
+      allow_non_immediate_owner,
       _db.get_global_properties().parameters.max_authority_depth
    );
 
@@ -1424,10 +1513,12 @@ bool database_api::verify_authority( const signed_transaction& trx )const
 
 bool database_api_impl::verify_authority( const signed_transaction& trx )const
 {
+   bool allow_non_immediate_owner = ( _db.head_block_time() >= HARDFORK_CORE_584_TIME );
    trx.verify_authority( _db.get_chain_id(),
                          [this]( account_id_type id ){ return &id(_db).active; },
                          [this]( account_id_type id ){ return &id(_db).owner; },
-                          _db.get_global_properties().parameters.max_authority_depth );
+                         allow_non_immediate_owner,
+                         _db.get_global_properties().parameters.max_authority_depth );
    return true;
 }
 
@@ -1436,17 +1527,28 @@ bool database_api::verify_account_authority( const string& account_name_or_id, c
    return my->verify_account_authority( account_name_or_id, signers );
 }
 
-bool database_api_impl::verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& keys )const
+bool database_api_impl::verify_account_authority( const string& account_name_or_id,
+      const flat_set<public_key_type>& keys )const
 {
-   const account_object* account = get_account_from_string(account_name_or_id);
-
-   /// reuse trx.verify_authority by creating a dummy transfer
-   signed_transaction trx;
+   // create a dummy transfer
    transfer_operation op;
-   op.from = account->id;
-   trx.operations.emplace_back(op);
+   op.from = get_account_from_string(account_name_or_id)->id;
+   std::vector<operation> ops;
+   ops.emplace_back(op);
 
-   return verify_authority( trx );
+   try
+   {
+      graphene::chain::verify_authority(ops, keys,
+            [this]( account_id_type id ){ return &id(_db).active; },
+            [this]( account_id_type id ){ return &id(_db).owner; },
+            true );
+   }
+   catch (fc::exception& ex)
+   {
+      return false;
+   }
+
+   return true;
 }
 
 processed_transaction database_api::validate_transaction( const signed_transaction& trx )const
@@ -1459,9 +1561,9 @@ processed_transaction database_api_impl::validate_transaction( const signed_tran
    return _db.validate_transaction(trx);
 }
 
-vector< fc::variant > database_api::get_required_fees( const vector<operation>& ops, asset_id_type id )const
+vector< fc::variant > database_api::get_required_fees( const vector<operation>& ops, const std::string& asset_id_or_symbol )const
 {
-   return my->get_required_fees( ops, id );
+   return my->get_required_fees( ops, asset_id_or_symbol );
 }
 
 /**
@@ -1520,7 +1622,7 @@ struct get_required_fees_helper
    uint32_t current_recursion = 0;
 };
 
-vector< fc::variant > database_api_impl::get_required_fees( const vector<operation>& ops, asset_id_type id )const
+vector< fc::variant > database_api_impl::get_required_fees( const vector<operation>& ops, const std::string& asset_id_or_symbol )const
 {
    vector< operation > _ops = ops;
    //
@@ -1530,7 +1632,7 @@ vector< fc::variant > database_api_impl::get_required_fees( const vector<operati
 
    vector< fc::variant > result;
    result.reserve(ops.size());
-   const asset_object& a = id(_db);
+   const asset_object& a = *get_asset_from_string(asset_id_or_symbol);
    get_required_fees_helper helper(
       _db.current_fee_schedule(),
       a.options.core_exchange_rate,
@@ -1643,6 +1745,74 @@ vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_b
    {
       result.push_back(*withdraw_itr);
       ++withdraw_itr;
+   }
+   return result;
+}
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
+//  HTLC                                                            //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+optional<htlc_object> database_api::get_htlc(htlc_id_type id)const
+{
+   return my->get_htlc(id);
+}
+
+fc::optional<htlc_object> database_api_impl::get_htlc(htlc_id_type id) const
+{
+   auto obj = get_objects( { id }).front();
+   if ( !obj.is_null() )
+   {
+      return fc::optional<htlc_object>(obj.template as<htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS));
+   }
+   return fc::optional<htlc_object>();
+}
+
+vector<htlc_object> database_api::get_htlc_by_from(const std::string account_id_or_name, htlc_id_type start, uint32_t limit)const
+{
+   return my->get_htlc_by_from(account_id_or_name, start, limit);
+}
+
+vector<htlc_object> database_api_impl::get_htlc_by_from(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const
+{
+   FC_ASSERT( limit <= _app_options->api_limit_get_htlc_by );
+   vector<htlc_object> result;
+
+   const auto& htlc_idx = _db.get_index_type< htlc_index >().indices().get< by_from_id >();
+   auto htlc_index_end = htlc_idx.end();
+   const account_id_type account = get_account_from_string(account_id_or_name)->id;
+   auto htlc_itr = htlc_idx.lower_bound(boost::make_tuple(account, start));
+
+   while(htlc_itr != htlc_index_end && htlc_itr->transfer.from == account && result.size() < limit)
+   {
+      result.push_back(*htlc_itr);
+      ++htlc_itr;
+   }
+   return result;
+}
+
+vector<htlc_object> database_api::get_htlc_by_to(const std::string account_id_or_name, htlc_id_type start, uint32_t limit)const
+{
+   return my->get_htlc_by_to(account_id_or_name, start, limit);
+}
+
+vector<htlc_object> database_api_impl::get_htlc_by_to(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const
+{
+
+   FC_ASSERT( limit <= _app_options->api_limit_get_htlc_by );
+   vector<htlc_object> result;
+
+   const auto& htlc_idx = _db.get_index_type< htlc_index >().indices().get< by_to_id >();
+   auto htlc_index_end = htlc_idx.end();
+   const account_id_type account = get_account_from_string(account_id_or_name)->id;
+   auto htlc_itr = htlc_idx.lower_bound(boost::make_tuple(account, start));
+
+   while(htlc_itr != htlc_index_end && htlc_itr->transfer.to == account && result.size() < limit)
+   {
+      result.push_back(*htlc_itr);
+      ++htlc_itr;
    }
    return result;
 }
@@ -1807,7 +1977,7 @@ void database_api_impl::on_applied_block()
       }
       if( market.valid() && _market_subscriptions.count(*market) )
          // FIXME this may cause fill_order_operation be pushed before order creation
-         subscribed_markets_ops[*market].emplace_back( std::move( std::make_pair( op.op, op.result ) ) );
+         subscribed_markets_ops[*market].emplace_back(std::make_pair(op.op, op.result));
    }
    /// we need to ensure the database_api is not deleted for the life of the async operation
    auto capture_this = shared_from_this();

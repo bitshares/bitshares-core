@@ -30,6 +30,19 @@ namespace graphene { namespace db {
 void undo_database::enable()  { _disabled = false; }
 void undo_database::disable() { _disabled = true; }
 
+undo_database::session::~session()
+{
+   try {
+      if( _apply_undo ) _db.undo();
+   }
+   catch ( const fc::exception& e )
+   {
+      elog( "${e}", ("e",e.to_detail_string() ) );
+      std::terminate();
+   }
+   if( _disable_on_exit ) _db.disable();
+}
+
 undo_database::session undo_database::start_undo_session( bool force_enable )
 {
    if( _disabled && !force_enable ) return session(*this);

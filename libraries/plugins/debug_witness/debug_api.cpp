@@ -2,7 +2,6 @@
 #include <fc/filesystem.hpp>
 #include <fc/optional.hpp>
 #include <fc/variant_object.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 #include <graphene/app/application.hpp>
 

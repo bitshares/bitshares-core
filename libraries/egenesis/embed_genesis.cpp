@@ -30,7 +30,6 @@
 #include <boost/algorithm/string.hpp>
 
 #include <fc/filesystem.hpp>
-#include <fc/smart_ref_impl.hpp>   // required for gcc in release mode
 #include <fc/string.hpp>
 #include <fc/io/fstream.hpp>
 #include <fc/io/json.hpp>
@@ -218,7 +217,7 @@ void load_genesis(
 }
 
 int main( int argc, char** argv )
-{
+{ try {
    int main_return = 0;
    boost::program_options::options_description cli_options("Graphene Chain Identifier");
    cli_options.add_options()
@@ -286,4 +285,4 @@ int main( int argc, char** argv )
    }
 
    return main_return;
-}
+} FC_LOG_AND_RETHROW() }
