@@ -684,12 +684,12 @@ public:
                              "." + fc::to_string(id.instance.value);
       return asset_id;
    }
-   optional<asset_object> find_asset(asset_id_type id)const
+   optional<extended_asset_object> find_asset(asset_id_type id)const
    {
       auto rec = _remote_db->get_assets({asset_id_to_string(id)}).front();
       return rec;
    }
-   optional<asset_object> find_asset(string asset_symbol_or_id)const
+   optional<extended_asset_object> find_asset(string asset_symbol_or_id)const
    {
       FC_ASSERT( asset_symbol_or_id.size() > 0 );
 
@@ -708,13 +708,13 @@ public:
          return rec;
       }
    }
-   asset_object get_asset(asset_id_type id)const
+   extended_asset_object get_asset(asset_id_type id)const
    {
       auto opt = find_asset(id);
       FC_ASSERT(opt);
       return *opt;
    }
-   asset_object get_asset(string asset_symbol_or_id)const
+   extended_asset_object get_asset(string asset_symbol_or_id)const
    {
       auto opt = find_asset(asset_symbol_or_id);
       FC_ASSERT(opt);
@@ -736,7 +736,7 @@ public:
    asset_id_type get_asset_id(string asset_symbol_or_id) const
    {
       FC_ASSERT( asset_symbol_or_id.size() > 0 );
-      vector<optional<asset_object>> opt_asset;
+      vector<optional<extended_asset_object>> opt_asset;
       if( std::isdigit( asset_symbol_or_id.front() ) )
          return fc::variant(asset_symbol_or_id, 1).as<asset_id_type>( 1 );
       opt_asset = _remote_db->lookup_asset_symbols( {asset_symbol_or_id} );
@@ -3230,7 +3230,7 @@ vector<asset> wallet_api::list_account_balances(const string& id)
    return my->_remote_db->get_account_balances(id, flat_set<asset_id_type>());
 }
 
-vector<asset_object> wallet_api::list_assets(const string& lowerbound, uint32_t limit)const
+vector<extended_asset_object> wallet_api::list_assets(const string& lowerbound, uint32_t limit)const
 {
    return my->_remote_db->list_assets( lowerbound, limit );
 }
@@ -3600,7 +3600,7 @@ account_object wallet_api::get_account(string account_name_or_id) const
    return my->get_account(account_name_or_id);
 }
 
-asset_object wallet_api::get_asset(string asset_name_or_id) const
+extended_asset_object wallet_api::get_asset(string asset_name_or_id) const
 {
    auto a = my->find_asset(asset_name_or_id);
    FC_ASSERT(a);
