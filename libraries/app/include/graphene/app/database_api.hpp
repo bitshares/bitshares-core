@@ -133,6 +133,7 @@ struct extended_asset_object : asset_object
    explicit extended_asset_object( ASSET&& a ) : asset_object( std::forward<ASSET>(a) ) {}
 
    optional<share_type> total_in_collateral;
+   optional<share_type> total_backing_collateral;
 };
 
 /**
@@ -947,7 +948,8 @@ FC_REFLECT( graphene::app::market_ticker,
 FC_REFLECT( graphene::app::market_volume, (time)(base)(quote)(base_volume)(quote_volume) );
 FC_REFLECT( graphene::app::market_trade, (sequence)(date)(price)(amount)(value)(side1_account_id)(side2_account_id) );
 
-FC_REFLECT_DERIVED( graphene::app::extended_asset_object, (graphene::chain::asset_object), (total_in_collateral) );
+FC_REFLECT_DERIVED( graphene::app::extended_asset_object, (graphene::chain::asset_object),
+                    (total_in_collateral)(total_backing_collateral) );
 
 FC_API(graphene::app::database_api,
    // Objects
