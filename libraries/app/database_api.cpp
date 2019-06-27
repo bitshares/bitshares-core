@@ -271,6 +271,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          }
          catch( fc::assert_exception& e )
          {
+            wlog( "amount_in_collateral_index not found - please enable api_helper_indexes plugin!" );
             return nullptr;
          }
       }
