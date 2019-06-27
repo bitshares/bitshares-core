@@ -282,7 +282,11 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          asset_id_type id = a.id;
          extended_asset_object result = extended_asset_object( std::forward<ASSET>( a ) );
          if( helper )
+         {
             result.total_in_collateral = helper->get_amount_in_collateral( id );
+            if( result.bitasset_data_id.valid() )
+               result.total_backing_collateral = helper->get_backing_collateral( id );
+         }
          return result;
       }
 

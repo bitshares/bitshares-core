@@ -30,19 +30,41 @@ namespace graphene { namespace api_helper_indexes {
 void amount_in_collateral_index::object_inserted( const object& objct )
 { try {
    const call_order_object& o = static_cast<const call_order_object&>( objct );
-   auto itr = amounts.find( o.collateral_type() );
-   if( itr == amounts.end() )
-      amounts[o.collateral_type()] = o.collateral;
-   else
-      itr->second += o.collateral;
+
+   {
+      auto itr = in_collateral.find( o.collateral_type() );
+      if( itr == in_collateral.end() )
+         in_collateral[o.collateral_type()] = o.collateral;
+      else
+         itr->second += o.collateral;
+   }
+
+   {
+      auto itr = backing_collateral.find( o.debt_type() );
+      if( itr == backing_collateral.end() )
+         backing_collateral[o.debt_type()] = o.collateral;
+      else
+         itr->second += o.collateral;
+   }
+
 } FC_CAPTURE_AND_RETHROW( (objct) ); }
 
 void amount_in_collateral_index::object_removed( const object& objct )
 { try {
    const call_order_object& o = static_cast<const call_order_object&>( objct );
-   auto itr = amounts.find( o.collateral_type() );
-   if( itr == amounts.end() ) return; // should never happen
-   itr->second -= o.collateral;
+
+   {
+      auto itr = in_collateral.find( o.collateral_type() );
+      if( itr != in_collateral.end() ) // should always be true
+         itr->second -= o.collateral;
+   }
+
+   {
+      auto itr = backing_collateral.find( o.debt_type() );
+      if( itr != backing_collateral.end() ) // should always be true
+         itr->second -= o.collateral;
+   }
+
 } FC_CAPTURE_AND_RETHROW( (objct) ); }
 
 void amount_in_collateral_index::about_to_modify( const object& objct )
@@ -57,8 +79,15 @@ void amount_in_collateral_index::object_modified( const object& objct )
 
 share_type amount_in_collateral_index::get_amount_in_collateral( const asset_id_type& asset )const
 { try {
-   auto itr = amounts.find( asset );
-   if( itr == amounts.end() ) return 0;
+   auto itr = in_collateral.find( asset );
+   if( itr == in_collateral.end() ) return 0;
+   return itr->second;
+} FC_CAPTURE_AND_RETHROW( (asset) ); }
+
+share_type amount_in_collateral_index::get_backing_collateral( const asset_id_type& asset )const
+{ try {
+   auto itr = backing_collateral.find( asset );
+   if( itr == backing_collateral.end() ) return 0;
    return itr->second;
 } FC_CAPTURE_AND_RETHROW( (asset) ); }
 
