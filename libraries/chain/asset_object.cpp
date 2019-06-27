@@ -194,16 +194,6 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_bitasset_data_object, (gr
                     (feed_cer_updated)
                   )
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_object, (graphene::db::object),
-                    (symbol)
-                    (precision)
-                    (issuer)
-                    (options)
-                    (dynamic_asset_data_id)
-                    (bitasset_data_id)
-                    (buyback_account)
-                  )
-
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_bitasset_data_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_dynamic_data_object )
