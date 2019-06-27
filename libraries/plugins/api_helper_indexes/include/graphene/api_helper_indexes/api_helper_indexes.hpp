@@ -30,7 +30,8 @@ namespace graphene { namespace api_helper_indexes {
 using namespace chain;
 
 /**
- *  @brief This secondary index tracks how much of each asset is locked up as collateral for MPAs.
+ *  @brief This secondary index tracks how much of each asset is locked up as collateral for MPAs, and how much
+ *         collateral is backing an MPA in total.
  */
 class amount_in_collateral_index : public secondary_index
 {
@@ -41,9 +42,11 @@ class amount_in_collateral_index : public secondary_index
       virtual void object_modified( const object& after ) override;
 
       share_type get_amount_in_collateral( const asset_id_type& asset )const;
+      share_type get_backing_collateral( const asset_id_type& asset )const;
 
    private:
-      flat_map<asset_id_type, share_type> amounts;
+      flat_map<asset_id_type, share_type> in_collateral;
+      flat_map<asset_id_type, share_type> backing_collateral;
 };
 
 namespace detail
