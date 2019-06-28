@@ -96,6 +96,12 @@ struct reward_database_fixture : database_fixture
       database_fixture::generate_block();
    }
 
+   void generate_blocks_past_hf1774()
+   {
+      database_fixture::generate_blocks( HARDFORK_1774_TIME );
+      database_fixture::generate_block();
+   }
+
    asset core_asset(int64_t x )
    {
        return asset( x*core_precision );
@@ -1001,5 +1007,89 @@ BOOST_AUTO_TEST_CASE( create_vesting_balance_object_test )
       GRAPHENE_CHECK_THROW(create_vesting_balance_object(actor_id, vesting_balance_type::market_fee_sharing), fc::exception);
 
 } FC_LOG_AND_RETHROW() }
+
+
+BOOST_AUTO_TEST_CASE(possibility_to_set_100_reward_percent_before_hf1774)
+{
+   try
+   {
+      INVOKE(create_actors);
+
+      generate_blocks_past_hf1268();
+      GET_ACTOR(jill);
+
+      constexpr auto jillcoin_reward_percent = 100*GRAPHENE_1_PERCENT;
+      const asset_object &jillcoin = get_asset("JCOIN");
+
+      update_asset(jill_id, jill_private_key, jillcoin.get_id(), jillcoin_reward_percent);
+
+      GET_ACTOR(izzyregistrar);
+      GET_ACTOR(izzyreferrer);
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyregistrar, jillcoin ), 0 );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyreferrer, jillcoin ), 0 );
+
+      GET_ACTOR(alice);
+      GET_ACTOR(bob);
+      // Alice and Bob place orders which match
+      create_sell_order( alice, jillcoin.amount(200000), core_asset(1) );
+      GRAPHENE_REQUIRE_THROW( create_sell_order( bob, core_asset(1), jillcoin.amount(100000) );, fc::exception );
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+
+BOOST_AUTO_TEST_CASE( possibility_to_set_100_reward_percent_after_hf1774 )
+{
+   try
+   {
+      INVOKE(create_actors);
+
+      generate_blocks_past_hf1268();
+      GET_ACTOR(jill);
+
+      constexpr auto jillcoin_reward_percent = 100*GRAPHENE_1_PERCENT;
+      const asset_object &jillcoin = get_asset("JCOIN");
+
+      update_asset(jill_id, jill_private_key, jillcoin.get_id(), jillcoin_reward_percent);
+
+      GET_ACTOR(izzyregistrar);
+      GET_ACTOR(izzyreferrer);
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyregistrar, jillcoin ), 0 );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyreferrer, jillcoin ), 0 );
+
+      GET_ACTOR(alice);
+      GET_ACTOR(bob);
+
+      generate_blocks_past_hf1774();
+
+      const share_type sell_amount = 100000;
+
+      // Alice and Bob place orders which match
+      create_sell_order( alice, jillcoin.amount(sell_amount), core_asset(1) );
+      create_sell_order( bob, core_asset(1), jillcoin.amount(sell_amount) );
+
+      const auto izzyregistrar_reward = get_market_fee_reward( izzyregistrar, jillcoin );
+      const auto izzyreferrer_reward = get_market_fee_reward( izzyreferrer, jillcoin );
+
+      BOOST_CHECK_GT(izzyregistrar_reward , 0);
+      BOOST_CHECK_GT(izzyreferrer_reward , 0);
+
+      auto calculate_percent = [](const share_type& value, uint16_t percent)
+      {
+         auto a(value.value);
+         a *= percent;
+         a /= GRAPHENE_100_PERCENT;
+         return a;
+      };
+      //jillcoin has 20% market fee percent, see create_actors
+      //all market fees are distributed between registrar and referrer
+      auto acc_rewards = izzyregistrar_reward + izzyreferrer_reward;
+      BOOST_CHECK_EQUAL( calculate_percent(sell_amount, 20*GRAPHENE_1_PERCENT), acc_rewards);
+
+      //check referrer reward
+      BOOST_CHECK_EQUAL( calculate_percent(acc_rewards, alice.referrer_rewards_percentage), izzyreferrer_reward);
+   }
+   FC_LOG_AND_RETHROW()
+}
 
 BOOST_AUTO_TEST_SUITE_END()
