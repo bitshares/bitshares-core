@@ -192,7 +192,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
    std::vector<account_id_type> active_witnesses;
    for(const witness_id_type& wit_id : global_props.active_witnesses)
       active_witnesses.push_back(wit_id(db).witness_account);
-   BOOST_REQUIRE_EQUAL(active_witnesses.size(), 10lu);
+   BOOST_REQUIRE_EQUAL(active_witnesses.size(), INITIAL_WITNESS_COUNT);
 
    {
       BOOST_TEST_MESSAGE("Adding price feed 1");
