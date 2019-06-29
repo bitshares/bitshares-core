@@ -262,31 +262,16 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          return account;
       }
 
-      const graphene::api_helper_indexes::amount_in_collateral_index* get_helper_index()const
-      {
-         try
-         {
-            return &_db.get_index_type< primary_index< call_order_index > >()
-                       .get_secondary_index<graphene::api_helper_indexes::amount_in_collateral_index>();
-         }
-         catch( fc::assert_exception& e )
-         {
-            wlog( "amount_in_collateral_index not found - please enable api_helper_indexes plugin!" );
-            return nullptr;
-         }
-      }
-
       template<class ASSET>
       extended_asset_object extend_asset( ASSET&& a )const
       {
-         static const graphene::api_helper_indexes::amount_in_collateral_index* helper = get_helper_index();
          asset_id_type id = a.id;
          extended_asset_object result = extended_asset_object( std::forward<ASSET>( a ) );
-         if( helper )
+         if( amount_in_collateral_index )
          {
-            result.total_in_collateral = helper->get_amount_in_collateral( id );
+            result.total_in_collateral = amount_in_collateral_index->get_amount_in_collateral( id );
             if( result.bitasset_data_id.valid() )
-               result.total_backing_collateral = helper->get_backing_collateral( id );
+               result.total_backing_collateral = amount_in_collateral_index->get_backing_collateral( id );
          }
          return result;
       }
@@ -403,6 +388,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       map< pair<asset_id_type,asset_id_type>, std::function<void(const variant&)> >      _market_subscriptions;
       graphene::chain::database&                                                                                                            _db;
       const application_options* _app_options = nullptr;
+      const graphene::api_helper_indexes::amount_in_collateral_index* amount_in_collateral_index;
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -434,6 +420,16 @@ database_api_impl::database_api_impl( graphene::chain::database& db, const appli
    _pending_trx_connection = _db.on_pending_transaction.connect([this](const signed_transaction& trx ){
                          if( _pending_trx_callback ) _pending_trx_callback( fc::variant(trx, GRAPHENE_MAX_NESTED_OBJECTS) );
                       });
+   try
+   {
+      amount_in_collateral_index = &_db.get_index_type< primary_index< call_order_index > >()
+                                     .get_secondary_index<graphene::api_helper_indexes::amount_in_collateral_index>();
+   }
+   catch( fc::assert_exception& e )
+   {
+      wlog( "amount_in_collateral_index not found - please enable api_helper_indexes plugin!" );
+      amount_in_collateral_index = nullptr;
+   }
 }
 
 database_api_impl::~database_api_impl()
