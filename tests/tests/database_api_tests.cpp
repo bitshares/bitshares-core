@@ -1588,6 +1588,7 @@ BOOST_AUTO_TEST_CASE( asset_in_collateral )
    BOOST_CHECK_EQUAL( 0, oassets[3]->total_backing_collateral->value );
 
    generate_block();
+   fc::usleep(fc::milliseconds(100));
 
    const auto& bitusd = bitusd_id( db );
    const auto& bitdan = bitdan_id( db );
@@ -1658,6 +1659,7 @@ BOOST_AUTO_TEST_CASE( asset_in_collateral )
 
    force_settle( dan_id(db), bitusd.amount(100) ); // settles against nathan, receives 500 CORE collateral
    generate_blocks( db.head_block_time() + fc::days(2) );
+   fc::usleep(fc::milliseconds(100));
 
    auto assets = db_api.list_assets( GRAPHENE_SYMBOL, 1 );
    BOOST_REQUIRE( !assets.empty() );
