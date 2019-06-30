@@ -129,8 +129,8 @@ struct market_trade
 struct extended_asset_object : asset_object
 {
    extended_asset_object() {}
-   template<class ASSET>
-   explicit extended_asset_object( ASSET&& a ) : asset_object( std::forward<ASSET>(a) ) {}
+   explicit extended_asset_object( const asset_object& a ) : asset_object( a ) {}
+   explicit extended_asset_object( asset_object&& a ) : asset_object( std::move(a) ) {}
 
    optional<share_type> total_in_collateral;
    optional<share_type> total_backing_collateral;
