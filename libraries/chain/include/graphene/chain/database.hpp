@@ -523,6 +523,7 @@ namespace graphene { namespace chain {
          void process_bids( const asset_bitasset_data_object& bad );
          void process_bitassets();
          void handle_marketing_fees();
+         void handle_charity_fees();
 
          template<class Type>
          void perform_account_maintenance( Type tally_helper );

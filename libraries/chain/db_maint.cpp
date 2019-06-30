@@ -91,6 +91,26 @@ void database::handle_marketing_fees()
    }
 }
 
+void database::handle_charity_fees()
+{
+   const global_property_object& gpo = get_global_properties();
+   if (gpo.charity_account_name != "" ) 
+   {
+      auto& acnt_indx = get_index_type<account_index>();
+      auto charity_itr = acnt_indx.indices().get<by_name>().find( gpo.charity_account_name );
+      if ( charity_itr != acnt_indx.indices().get<by_name>().end() )
+      {
+         // Found current charity account.
+         // Now give the charity all the accumulated fees for them and zero it out on the db
+         const asset_dynamic_data_object& core_dd = get_core_dynamic_data();
+         adjust_balance(charity_itr->id,  asset(core_dd.accumulated_fees_for_charity, asset_id_type()));
+         modify( core_dd, [](asset_dynamic_data_object& addo) {
+            addo.accumulated_fees_for_charity = 0;
+         });
+      }
+   }
+}
+
 template<class Type>
 void database::perform_account_maintenance(Type tally_helper)
 {
@@ -1237,6 +1257,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
 
    perform_account_maintenance( tally_helper );
    handle_marketing_fees();
+   handle_charity_fees();
    
 
    struct clear_canary {
