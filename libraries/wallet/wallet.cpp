@@ -1159,35 +1159,11 @@ public:
       account_create_op.options.memo_key = active;
 
       signed_transaction tx;
-
       tx.operations.push_back( account_create_op );
-
       set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
-
-      vector<public_key_type> paying_keys = registrar_account_object.active.get_keys();
-
-      auto dyn_props = get_dynamic_global_properties();
-      tx.set_reference_block( dyn_props.head_block_id );
-      tx.set_expiration( dyn_props.time + fc::seconds(30) );
       tx.validate();
 
-      for( public_key_type& key : paying_keys )
-      {
-         auto it = _keys.find(key);
-         if( it != _keys.end() )
-         {
-            fc::optional< fc::ecc::private_key > privkey = wif_to_key( it->second );
-            if( !privkey.valid() )
-            {
-               FC_ASSERT( false, "Malformed private key in _keys" );
-            }
-            tx.sign( *privkey, _chain_id );
-         }
-      }
-
-      if( broadcast )
-         _remote_net_broadcast->broadcast_transaction( tx );
-      return tx;
+      return sign_transaction(tx, broadcast);
    } FC_CAPTURE_AND_RETHROW( (name)(owner)(active)(registrar_account)
                              (referrer_account)(referrer_percent)(broadcast) ) }
 
@@ -1284,28 +1260,9 @@ public:
          // account_create_op.fee = account_create_op.calculate_fee(db.current_fee_schedule());
 
          signed_transaction tx;
-
          tx.operations.push_back( account_create_op );
-
          set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
-
-         vector<public_key_type> paying_keys = registrar_account_object.active.get_keys();
-
-         auto dyn_props = get_dynamic_global_properties();
-         tx.set_reference_block( dyn_props.head_block_id );
-         tx.set_expiration( dyn_props.time + fc::seconds(30) );
          tx.validate();
-
-         for( public_key_type& key : paying_keys )
-         {
-            auto it = _keys.find(key);
-            if( it != _keys.end() )
-            {
-               fc::optional< fc::ecc::private_key > privkey = wif_to_key( it->second );
-               FC_ASSERT( privkey.valid(), "Malformed private key in _keys" );
-               tx.sign( *privkey, _chain_id );
-            }
-         }
 
          // we do not insert owner_privkey here because
          //    it is intended to only be used for key recovery
@@ -1313,9 +1270,7 @@ public:
          _wallet.pending_account_registrations[account_name].push_back(key_to_wif( memo_privkey ));
          if( save_wallet )
             save_wallet_file();
-         if( broadcast )
-            _remote_net_broadcast->broadcast_transaction( tx );
-         return tx;
+         return sign_transaction(tx, broadcast);
    } FC_CAPTURE_AND_RETHROW( (account_name)(registrar_account)(referrer_account)(broadcast) ) }
 
    signed_transaction create_account_with_brain_key(string brain_key,
