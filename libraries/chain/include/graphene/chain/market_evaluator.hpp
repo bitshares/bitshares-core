@@ -87,6 +87,7 @@ namespace graphene { namespace chain {
          const account_object* _paying_account = nullptr;
          const call_order_object* _order = nullptr;
          const asset_bitasset_data_object* _bitasset_data = nullptr;
+         const asset_dynamic_data_object*  _dynamic_data_obj = nullptr;
    };
 
    class bid_collateral_evaluator : public evaluator<bid_collateral_evaluator>

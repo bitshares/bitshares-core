@@ -78,6 +78,9 @@
 #include <graphene/net/exceptions.hpp>
 
 #include <graphene/chain/config.hpp>
+// Nasty hack: A circular dependency around fee_schedule is resolved by fwd-declaring it and using a shared_ptr
+// to it in chain_parameters, which is used in an operation and thus must be serialized by the net library.
+// Resolving that forward declaration doesn't happen until now:
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <fc/git_revision.hpp>
@@ -4909,7 +4912,8 @@ namespace graphene { namespace net { namespace detail {
 #  define INVOKE_AND_COLLECT_STATISTICS(method_name, ...) \
     try \
     { \
-      call_statistics_collector statistics_collector(#method_name, \
+      std::shared_ptr<call_statistics_collector> statistics_collector = std::make_shared<call_statistics_collector>( \
+                                                     #method_name, \
                                                      &_ ## method_name ## _execution_accumulator, \
                                                      &_ ## method_name ## _delay_before_accumulator, \
                                                      &_ ## method_name ## _delay_after_accumulator); \
@@ -4919,7 +4923,7 @@ namespace graphene { namespace net { namespace detail {
         return _node_delegate->method_name(__VA_ARGS__); \
       } \
       else \
-        return _thread->async([&](){ \
+        return _thread->async([&, statistics_collector](){ \
           call_statistics_collector::actual_execution_measurement_helper helper(statistics_collector); \
           return _node_delegate->method_name(__VA_ARGS__); \
         }, "invoke " BOOST_STRINGIZE(method_name)).wait(); \
@@ -4941,7 +4945,8 @@ namespace graphene { namespace net { namespace detail {
     }
 #else
 #  define INVOKE_AND_COLLECT_STATISTICS(method_name, ...) \
-    call_statistics_collector statistics_collector(#method_name, \
+    std::shared_ptr<call_statistics_collector> statistics_collector = std::make_shared<call_statistics_collector>( \
+                                                   #method_name, \
                                                    &_ ## method_name ## _execution_accumulator, \
                                                    &_ ## method_name ## _delay_before_accumulator, \
                                                    &_ ## method_name ## _delay_after_accumulator); \
@@ -4951,7 +4956,7 @@ namespace graphene { namespace net { namespace detail {
       return _node_delegate->method_name(__VA_ARGS__); \
     } \
     else \
-      return _thread->async([&](){ \
+      return _thread->async([&, statistics_collector](){ \
         call_statistics_collector::actual_execution_measurement_helper helper(statistics_collector); \
         return _node_delegate->method_name(__VA_ARGS__); \
       }, "invoke " BOOST_STRINGIZE(method_name)).wait()

@@ -1,0 +1,5 @@
+// bitshares-core issue #1465 check max_supply before processing call_order_update
+#ifndef HARDFORK_CORE_1465_TIME
+#define HARDFORK_CORE_1465_TIME (fc::time_point_sec( 1556028120 ) ) // 2019-04-23T14:02:00Z
+#define SOFTFORK_CORE_1465_TIME (fc::time_point_sec( 1545350400 )) // 2018-12-21 00:00:00
+#endif

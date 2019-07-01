@@ -28,14 +28,19 @@
 
 namespace graphene { namespace chain {
 
-   typedef static_variant<>  parameter_extension; 
-
-   struct fee_schedule;
+   struct htlc_options
+   {
+      uint32_t max_timeout_secs;
+      uint32_t max_preimage_size;
+   };
 
    struct chain_parameters
    {
       /** using a shared_ptr breaks the circular dependency created between operations and the fee schedule */
-      std::shared_ptr<fee_schedule> current_fees;                  ///< current schedule of fees
+      std::shared_ptr<const fee_schedule> current_fees;                  ///< current schedule of fees
+      const fee_schedule& get_current_fees() const { FC_ASSERT(current_fees); return *current_fees; }
+      fee_schedule& get_mutable_fees() { FC_ASSERT(current_fees); return const_cast<fee_schedule&>(*current_fees); }
+
       uint8_t                 block_interval                      = GRAPHENE_DEFAULT_BLOCK_INTERVAL; ///< interval in seconds between blocks
       uint32_t                maintenance_interval                = GRAPHENE_DEFAULT_MAINTENANCE_INTERVAL; ///< interval in sections between blockchain maintenance events
       uint8_t                 maintenance_skip_slots              = GRAPHENE_DEFAULT_MAINTENANCE_SKIP_SLOTS; ///< number of block_intervals to skip at maintenance time
@@ -64,7 +69,13 @@ namespace graphene { namespace chain {
       uint16_t                accounts_per_fee_scale              = GRAPHENE_DEFAULT_ACCOUNTS_PER_FEE_SCALE; ///< number of accounts between fee scalings
       uint8_t                 account_fee_scale_bitshifts         = GRAPHENE_DEFAULT_ACCOUNT_FEE_SCALE_BITSHIFTS; ///< number of times to left bitshift account registration fee at each scaling
       uint8_t                 max_authority_depth                 = GRAPHENE_MAX_SIG_CHECK_DEPTH;
-      extensions_type         extensions;
+
+      struct ext
+      {
+         optional< htlc_options > updatable_htlc_options;
+      };
+
+      extension<ext> extensions;
 
       /** defined in fee_schedule.cpp */
       void validate()const;
@@ -80,6 +91,15 @@ namespace graphene { namespace chain {
    };
 
 } }  // graphene::chain
+
+FC_REFLECT( graphene::chain::htlc_options, 
+      (max_timeout_secs) 
+      (max_preimage_size) 
+)
+
+FC_REFLECT( graphene::chain::chain_parameters::ext, 
+      (updatable_htlc_options)
+)
 
 FC_REFLECT( graphene::chain::chain_parameters,
             (current_fees)

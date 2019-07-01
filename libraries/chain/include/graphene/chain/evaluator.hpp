@@ -29,7 +29,7 @@
 namespace graphene { namespace chain {
 
    class database;
-   struct signed_transaction;
+   class signed_transaction;
    class generic_evaluator;
    class transaction_evaluation_state;
 

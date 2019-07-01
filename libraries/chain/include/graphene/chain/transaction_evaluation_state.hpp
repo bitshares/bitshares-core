@@ -26,7 +26,7 @@
 
 namespace graphene { namespace chain {
    class database;
-   struct signed_transaction;
+   class signed_transaction;
 
    /**
     *  Place holder for state tracked while processing a transaction. This class provides helper methods that are

@@ -123,12 +123,16 @@ void database::reindex( fc::path data_dir )
 
          if( i % 10000 == 0 )
          {
+            std::stringstream bysize;
+            std::stringstream bynum;
+            bysize << std::fixed << std::setprecision(5) << double(std::get<0>(blocks.front())) / total_block_size * 100;
+            bynum << std::fixed << std::setprecision(5) << double(i*100)/last_block_num;
             ilog(
                "   [by size: ${size}%   ${processed} of ${total}]   [by num: ${num}%   ${i} of ${last}]",
-               ("size", double(std::get<0>(blocks.front())) / total_block_size * 100)
+               ("size", bysize.str())
                ("processed", std::get<0>(blocks.front()))
                ("total", total_block_size)
-               ("num", double(i*100)/last_block_num)
+               ("num", bynum.str())
                ("i", i)
                ("last", last_block_num)
             );

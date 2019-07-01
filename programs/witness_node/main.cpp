@@ -74,6 +74,14 @@ int main(int argc, char** argv) {
 
       bpo::variables_map options;
 
+      bpo::options_description cli, cfg;
+      node->set_program_options(cli, cfg);
+      cfg_options.add(cfg);
+
+      cfg_options.add_options()
+              ("plugins", bpo::value<std::string>()->default_value("witness account_history market_history grouped_orders"),
+               "Space-separated list of plugins to activate");
+
       auto witness_plug = node->register_plugin<witness_plugin::witness_plugin>();
       auto debug_witness_plug = node->register_plugin<debug_witness_plugin::debug_witness_plugin>();
       auto history_plug = node->register_plugin<account_history::account_history_plugin>();
@@ -85,6 +93,8 @@ int main(int argc, char** argv) {
       auto grouped_orders_plug = node->register_plugin<grouped_orders::grouped_orders_plugin>();
       auto voting_stat_plug = node->register_plugin<voting_stat::voting_stat_plugin>();
       
+
+      // add plugin options to config
       try
       {
          bpo::options_description cli, cfg;
@@ -99,6 +109,31 @@ int main(int argc, char** argv) {
          return 1;
       }
 
+      if( options.count("version") )
+      {
+         std::cout << "Version: " << graphene::utilities::git_revision_description << "\n";
+         std::cout << "SHA: " << graphene::utilities::git_revision_sha << "\n";
+         std::cout << "Timestamp: " << fc::get_approximate_relative_time_string(fc::time_point_sec(graphene::utilities::git_revision_unix_timestamp)) << "\n";
+         std::cout << "SSL: " << OPENSSL_VERSION_TEXT << "\n";
+         std::cout << "Boost: " << boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".") << "\n";
+         std::cout << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version << "\n";
+         return 0;
+      }
+      if( options.count("help") )
+      {
+         std::cout << app_options << "\n";
+         return 0;
+      }
+
+      fc::path data_dir;
+      if( options.count("data-dir") )
+      {
+         data_dir = options["data-dir"].as<boost::filesystem::path>();
+         if( data_dir.is_relative() )
+            data_dir = fc::current_path() / data_dir;
+      }
+      app::load_configuration_options(data_dir, cfg_options, options);
+
       std::set<std::string> plugins;
       boost::split(plugins, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
 
@@ -112,31 +147,6 @@ int main(int argc, char** argv) {
             node->enable_plugin(plug);
          }
       });
-      
-      if( options.count("help") )
-      {
-         std::cout << app_options << "\n";
-         return 0;
-      }
-      if( options.count("version") )
-      {
-         std::cout << "Version: " << graphene::utilities::git_revision_description << "\n";
-         std::cout << "SHA: " << graphene::utilities::git_revision_sha << "\n";
-         std::cout << "Timestamp: " << fc::get_approximate_relative_time_string(fc::time_point_sec(graphene::utilities::git_revision_unix_timestamp)) << "\n";
-         std::cout << "SSL: " << OPENSSL_VERSION_TEXT << "\n";
-         std::cout << "Boost: " << boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".") << "\n";
-         std::cout << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version << "\n";
-         return 0;
-      }
-
-      fc::path data_dir;
-      if( options.count("data-dir") )
-      {
-         data_dir = options["data-dir"].as<boost::filesystem::path>();
-         if( data_dir.is_relative() )
-            data_dir = fc::current_path() / data_dir;
-      }
-      app::load_configuration_options(data_dir, cfg_options, options);
 
       bpo::notify(options);
 

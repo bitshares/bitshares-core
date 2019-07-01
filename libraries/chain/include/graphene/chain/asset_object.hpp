@@ -191,6 +191,9 @@ namespace graphene { namespace chain {
          price_feed current_feed;
          /// This is the publication time of the oldest feed which was factored into current_feed.
          time_point_sec current_feed_publication_time;
+         /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call territory.
+         /// This value is derived from @ref current_feed for better performance and should be kept consistent.
+         price current_maintenance_collateralization;
 
          /// True if this asset implements a @ref prediction_market
          bool is_prediction_market = false;
@@ -241,7 +244,19 @@ namespace graphene { namespace chain {
          { return feed_expiration_time() >= current_time; }
          bool feed_is_expired(time_point_sec current_time)const
          { return feed_expiration_time() <= current_time; }
-         void update_median_feeds(time_point_sec current_time);
+
+         /******
+          * @brief calculate the median feed
+          *
+          * This calculates the median feed from @ref feeds, feed_lifetime_sec
+          * in @ref options, and the given parameters.
+          * It may update the current_feed_publication_time, current_feed and
+          * current_maintenance_collateralization member variables.
+          *
+          * @param current_time the current time to use in the calculations
+          * @param next_maintenance_time the next chain maintenance time
+          */
+         void update_median_feeds(time_point_sec current_time, time_point_sec next_maintenance_time);
    };
 
    // key extractor for short backing asset
@@ -305,6 +320,7 @@ FC_REFLECT_DERIVED( graphene::chain::asset_bitasset_data_object, (graphene::db::
                     (feeds)
                     (current_feed)
                     (current_feed_publication_time)
+                    (current_maintenance_collateralization)
                     (options)
                     (force_settled_volume)
                     (is_prediction_market)

@@ -369,7 +369,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test )
       GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
 
       BOOST_TEST_MESSAGE( "alice borrow using 4x collateral at 1:1 price" );
-      borrow( alice, bitusd.amount(100000), core.amount(400000) )->id;
+      BOOST_CHECK( borrow( alice, bitusd.amount(100000), core.amount(400000) ) != nullptr );
       BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
 
@@ -476,7 +476,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
       GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
 
       BOOST_TEST_MESSAGE( "alice borrow using 4x collateral at 1:1 price" );
-      borrow( alice, bitusd.amount(100000), core.amount(400000) )->id;
+      BOOST_CHECK( borrow( alice, bitusd.amount(100000), core.amount(400000) ) != nullptr );
       BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
 
@@ -592,7 +592,6 @@ BOOST_AUTO_TEST_CASE( call_order_update_validation_test )
 
    op.extensions.value.target_collateral_ratio = 65535;
    op.validate(); // still valid
-
 }
 
 // Tests that target_cr option can't be set before hard fork core-834
@@ -600,9 +599,6 @@ BOOST_AUTO_TEST_CASE( call_order_update_validation_test )
 BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
 {
    try {
-      auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_834_TIME - mi);
-
       set_expiration( db, trx );
 
       ACTORS((sam)(alice)(bob));
@@ -623,15 +619,6 @@ BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
 
       FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
 
-      BOOST_TEST_MESSAGE( "alice tries to borrow using 4x collateral at 1:1 price with target_cr set, "
-                          "will fail before hard fork time" );
-      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 0 ), fc::assert_exception );
-      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1 ), fc::assert_exception );
-      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1749 ), fc::assert_exception );
-      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1750 ), fc::assert_exception );
-      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1751 ), fc::assert_exception );
-      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 65535 ), fc::assert_exception );
-
       auto call_update_proposal = [this]( const account_object& proposer,
                                        const account_object& updater,
                                        const asset& delta_collateral,
@@ -644,7 +631,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
          op.delta_debt = delta_debt;
          op.extensions.value.target_collateral_ratio = target_cr;
 
-         const auto& curfees = *db.get_global_properties().parameters.current_fees;
+         const auto& curfees = db.get_global_properties().parameters.get_current_fees();
          const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
          proposal_create_operation prop;
          prop.fee_paying_account = proposer.id;
@@ -659,13 +646,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
          PUSH_TX( db, tx, ~0 );
       };
 
-      BOOST_TEST_MESSAGE( "bob tries to propose a proposal with target_cr set, "
-                          "will fail before hard fork time" );
-      GRAPHENE_REQUIRE_THROW( call_update_proposal( bob, alice, bitusd.amount(10), core.amount(40), 0 ), fc::assert_exception );
-      GRAPHENE_REQUIRE_THROW( call_update_proposal( bob, alice, bitusd.amount(10), core.amount(40), 1750 ), fc::assert_exception );
-      GRAPHENE_REQUIRE_THROW( call_update_proposal( bob, alice, bitusd.amount(10), core.amount(40), 65535 ), fc::assert_exception );
-
-      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      generate_blocks(HARDFORK_CORE_834_TIME);
       set_expiration( db, trx );
 
       BOOST_TEST_MESSAGE( "bob tries to propose a proposal with target_cr set, "
@@ -969,7 +950,7 @@ BOOST_AUTO_TEST_CASE( update_account )
          account_upgrade_operation op;
          op.account_to_upgrade = nathan.id;
          op.upgrade_to_lifetime_member = true;
-         op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
+         op.fee = db.get_global_properties().parameters.get_current_fees().calculate_fee(op);
          trx.operations = {op};
          PUSH_TX( db, trx, ~0 );
       }
@@ -1317,7 +1298,7 @@ BOOST_AUTO_TEST_CASE( update_uia_issuer )
           op.new_issuer = new_issuer.id;
           op.asset_to_update = asset_id;
 
-          const auto& curfees = *db.get_global_properties().parameters.current_fees;
+          const auto& curfees = db.get_global_properties().parameters.get_current_fees();
           const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
           proposal_create_operation prop;
           prop.fee_paying_account = issuer.id;
@@ -1350,16 +1331,9 @@ BOOST_AUTO_TEST_CASE( update_uia_issuer )
       const auto& test = create_user_issued_asset("UPDATEISSUER", alice_id(db), 0);
       const asset_id_type test_id = test.id;
 
-      BOOST_TEST_MESSAGE( "can't use this operation before the hardfork" );
-      GRAPHENE_REQUIRE_THROW( update_issuer( test_id, alice_id(db), bob_id(db), alice_owner), fc::exception );
-
-      BOOST_TEST_MESSAGE( "can't use this operation before the hardfork (even if wrapped into a proposal)" );
-      GRAPHENE_REQUIRE_THROW( update_issuer_proposal( test_id, alice_id(db), bob_id(db), alice_owner), fc::exception );
-
       // Fast Forward to Hardfork time
       generate_blocks( HARDFORK_CORE_199_TIME );
 
-      BOOST_TEST_MESSAGE( "After hardfork time, proposal goes through (but doesn't execute yet)" );
       update_issuer_proposal( test_id, alice_id(db), bob_id(db), alice_owner);
 
       BOOST_TEST_MESSAGE( "Can't change issuer if not my asset" );
@@ -2002,6 +1976,113 @@ BOOST_AUTO_TEST_CASE( reserve_asset_test )
       edump((e.to_detail_string()));
       throw;
    }
+}
+
+BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
+{
+   try
+   {
+      ACTORS( (alice) (bob) );
+      transfer(committee_account, alice_id, asset(10000000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+
+      const auto& core   = asset_id_type()(db);
+
+      // attempt to increase current supply beyond max_supply
+      const auto& bitjmj = create_bitasset( "JMJBIT", alice_id, 100, charge_market_fee, 2U, 
+            asset_id_type{}, GRAPHENE_MAX_SHARE_SUPPLY / 2 );
+      auto bitjmj_id = bitjmj.get_id();
+      share_type original_max_supply = bitjmj.options.max_supply;
+
+      {
+         BOOST_TEST_MESSAGE( "Setting price feed to $100000 / 1" );
+         update_feed_producers( bitjmj, {alice_id} );
+         price_feed current_feed;
+         current_feed.settlement_price = bitjmj.amount( 100000 ) / core.amount(1);
+         publish_feed( bitjmj, alice, current_feed );
+      }
+
+      {
+         BOOST_TEST_MESSAGE( "Attempting a call_order_update that exceeds max_supply" );
+         call_order_update_operation op;
+         op.funding_account = alice_id;
+         op.delta_collateral = asset( 1000000 * GRAPHENE_BLOCKCHAIN_PRECISION );
+         op.delta_debt = asset( bitjmj.options.max_supply + 1, bitjmj.id );
+         transaction tx;
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
+         generate_block();
+      }
+
+      // advance past hardfork
+      generate_blocks( HARDFORK_CORE_1465_TIME );
+      set_expiration( db, trx );
+
+      // bitjmj should have its problem corrected
+      auto newbitjmj = bitjmj_id(db);
+      BOOST_REQUIRE_GT(newbitjmj.options.max_supply.value, original_max_supply.value);
+
+      // now try with an asset after the hardfork
+      const auto& bitusd = create_bitasset( "USDBIT", alice_id, 100, charge_market_fee, 2U, 
+            asset_id_type{}, GRAPHENE_MAX_SHARE_SUPPLY / 2 );
+
+      {
+         BOOST_TEST_MESSAGE( "Setting price feed to $100000 / 1" );
+         update_feed_producers( bitusd, {alice_id} );
+         price_feed current_feed;
+         current_feed.settlement_price = bitusd.amount( 100000 ) / core.amount(1);
+         publish_feed( bitusd, alice_id(db), current_feed );
+      }
+
+      {
+         BOOST_TEST_MESSAGE( "Attempting a call_order_update that exceeds max_supply" );
+         call_order_update_operation op;
+         op.funding_account = alice_id;
+         op.delta_collateral = asset( 1000000 * GRAPHENE_BLOCKCHAIN_PRECISION );
+         op.delta_debt = asset( bitusd.options.max_supply + 1, bitusd.id );
+         transaction tx;
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         GRAPHENE_REQUIRE_THROW(PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures ), fc::exception );
+      }
+
+      {
+         BOOST_TEST_MESSAGE( "Creating 2 bitusd and transferring to bob (increases current supply)" );
+         call_order_update_operation op;
+         op.funding_account = alice_id;
+         op.delta_collateral = asset( 100 * GRAPHENE_BLOCKCHAIN_PRECISION );
+         op.delta_debt = asset( 2, bitusd.id );
+         transaction tx;
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
+         transfer( alice_id(db), bob_id(db), asset( 2, bitusd.id ) );
+      }
+
+      {
+         BOOST_TEST_MESSAGE( "Again attempting a call_order_update_operation that is max_supply - 1 (should throw)" );
+         call_order_update_operation op;
+         op.funding_account = alice_id;
+         op.delta_collateral = asset( 100000 * GRAPHENE_BLOCKCHAIN_PRECISION );
+         op.delta_debt = asset( bitusd.options.max_supply - 1, bitusd.id );
+         transaction tx;
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         GRAPHENE_REQUIRE_THROW(PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures ), fc::exception);
+      }
+
+      {
+         BOOST_TEST_MESSAGE( "Again attempting a call_order_update_operation that equals max_supply (should work)" );
+         call_order_update_operation op;
+         op.funding_account = alice_id;
+         op.delta_collateral = asset( 100000 * GRAPHENE_BLOCKCHAIN_PRECISION );
+         op.delta_debt = asset( bitusd.options.max_supply - 2, bitusd.id );
+         transaction tx;
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
+      }
+   } FC_LOG_AND_RETHROW()
 }
 
 /**
