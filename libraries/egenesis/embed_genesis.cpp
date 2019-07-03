@@ -34,10 +34,10 @@
 #include <fc/io/fstream.hpp>
 #include <fc/io/json.hpp>
 #include <graphene/chain/genesis_state.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/types.hpp>
 
 // we need to include the world in order to serialize fee_parameters
-#include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 
 using namespace graphene::chain;
 
@@ -217,7 +217,7 @@ void load_genesis(
 }
 
 int main( int argc, char** argv )
-{
+{ try {
    int main_return = 0;
    boost::program_options::options_description cli_options("Graphene Chain Identifier");
    cli_options.add_options()
@@ -285,4 +285,4 @@ int main( int argc, char** argv )
    }
 
    return main_return;
-}
+} FC_LOG_AND_RETHROW() }

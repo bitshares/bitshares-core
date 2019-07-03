@@ -369,7 +369,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test )
       GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
 
       BOOST_TEST_MESSAGE( "alice borrow using 4x collateral at 1:1 price" );
-      borrow( alice, bitusd.amount(100000), core.amount(400000) )->id;
+      BOOST_CHECK( borrow( alice, bitusd.amount(100000), core.amount(400000) ) != nullptr );
       BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
 
@@ -476,7 +476,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
       GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
 
       BOOST_TEST_MESSAGE( "alice borrow using 4x collateral at 1:1 price" );
-      borrow( alice, bitusd.amount(100000), core.amount(400000) )->id;
+      BOOST_CHECK( borrow( alice, bitusd.amount(100000), core.amount(400000) ) != nullptr );
       BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 );
       BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
 
@@ -599,9 +599,6 @@ BOOST_AUTO_TEST_CASE( call_order_update_validation_test )
 BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
 {
    try {
-      auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_834_TIME - mi);
-
       set_expiration( db, trx );
 
       ACTORS((sam)(alice)(bob));
@@ -622,15 +619,6 @@ BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
 
       FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
 
-      BOOST_TEST_MESSAGE( "alice tries to borrow using 4x collateral at 1:1 price with target_cr set, "
-                          "will fail before hard fork time" );
-      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 0 ), fc::assert_exception );
-      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1 ), fc::assert_exception );
-      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1749 ), fc::assert_exception );
-      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1750 ), fc::assert_exception );
-      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1751 ), fc::assert_exception );
-      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 65535 ), fc::assert_exception );
-
       auto call_update_proposal = [this]( const account_object& proposer,
                                        const account_object& updater,
                                        const asset& delta_collateral,
@@ -643,7 +631,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
          op.delta_debt = delta_debt;
          op.extensions.value.target_collateral_ratio = target_cr;
 
-         const auto& curfees = *db.get_global_properties().parameters.current_fees;
+         const auto& curfees = db.get_global_properties().parameters.get_current_fees();
          const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
          proposal_create_operation prop;
          prop.fee_paying_account = proposer.id;
@@ -658,13 +646,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
          PUSH_TX( db, tx, ~0 );
       };
 
-      BOOST_TEST_MESSAGE( "bob tries to propose a proposal with target_cr set, "
-                          "will fail before hard fork time" );
-      GRAPHENE_REQUIRE_THROW( call_update_proposal( bob, alice, bitusd.amount(10), core.amount(40), 0 ), fc::assert_exception );
-      GRAPHENE_REQUIRE_THROW( call_update_proposal( bob, alice, bitusd.amount(10), core.amount(40), 1750 ), fc::assert_exception );
-      GRAPHENE_REQUIRE_THROW( call_update_proposal( bob, alice, bitusd.amount(10), core.amount(40), 65535 ), fc::assert_exception );
-
-      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      generate_blocks(HARDFORK_CORE_834_TIME);
       set_expiration( db, trx );
 
       BOOST_TEST_MESSAGE( "bob tries to propose a proposal with target_cr set, "
@@ -968,7 +950,7 @@ BOOST_AUTO_TEST_CASE( update_account )
          account_upgrade_operation op;
          op.account_to_upgrade = nathan.id;
          op.upgrade_to_lifetime_member = true;
-         op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
+         op.fee = db.get_global_properties().parameters.get_current_fees().calculate_fee(op);
          trx.operations = {op};
          PUSH_TX( db, trx, ~0 );
       }
@@ -1316,7 +1298,7 @@ BOOST_AUTO_TEST_CASE( update_uia_issuer )
           op.new_issuer = new_issuer.id;
           op.asset_to_update = asset_id;
 
-          const auto& curfees = *db.get_global_properties().parameters.current_fees;
+          const auto& curfees = db.get_global_properties().parameters.get_current_fees();
           const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
           proposal_create_operation prop;
           prop.fee_paying_account = issuer.id;
@@ -1349,16 +1331,9 @@ BOOST_AUTO_TEST_CASE( update_uia_issuer )
       const auto& test = create_user_issued_asset("UPDATEISSUER", alice_id(db), 0);
       const asset_id_type test_id = test.id;
 
-      BOOST_TEST_MESSAGE( "can't use this operation before the hardfork" );
-      GRAPHENE_REQUIRE_THROW( update_issuer( test_id, alice_id(db), bob_id(db), alice_owner), fc::exception );
-
-      BOOST_TEST_MESSAGE( "can't use this operation before the hardfork (even if wrapped into a proposal)" );
-      GRAPHENE_REQUIRE_THROW( update_issuer_proposal( test_id, alice_id(db), bob_id(db), alice_owner), fc::exception );
-
       // Fast Forward to Hardfork time
       generate_blocks( HARDFORK_CORE_199_TIME );
 
-      BOOST_TEST_MESSAGE( "After hardfork time, proposal goes through (but doesn't execute yet)" );
       update_issuer_proposal( test_id, alice_id(db), bob_id(db), alice_owner);
 
       BOOST_TEST_MESSAGE( "Can't change issuer if not my asset" );

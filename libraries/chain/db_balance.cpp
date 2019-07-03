@@ -139,7 +139,7 @@ void database::deposit_market_fee_vesting_balance(const account_id_type &account
 
    if( vbo_it == vesting_balances.end() )
    {
-      create<vesting_balance_object>([&account_id, &delta, &block_time](vesting_balance_object &vbo) {
+      create<vesting_balance_object>([&account_id, &delta](vesting_balance_object &vbo) {
          vbo.owner = account_id;
          vbo.balance = delta;
          vbo.balance_type = vesting_balance_type::market_fee_sharing;
@@ -172,7 +172,7 @@ optional< vesting_balance_id_type > database::deposit_lazy_vesting(
       const vesting_balance_object& vbo = (*ovbid)(*this);
       if( vbo.owner != req_owner )
          break;
-      if( vbo.policy.which() != vesting_policy::tag< cdd_vesting_policy >::value )
+      if( !vbo.policy.is_type< cdd_vesting_policy >() )
          break;
       if( vbo.policy.get< cdd_vesting_policy >().vesting_seconds != req_vesting_seconds )
          break;

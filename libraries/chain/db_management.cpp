@@ -28,7 +28,8 @@
 #include <graphene/chain/witness_schedule_object.hpp>
 #include <graphene/chain/special_authority_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
+
+#include <graphene/protocol/fee_schedule.hpp>
 
 #include <fc/io/fstream.hpp>
 
@@ -64,8 +65,7 @@ void database::reindex( fc::path data_dir )
    ilog( "reindexing blockchain" );
    auto start = fc::time_point::now();
    const auto last_block_num = last_block->block_num();
-   uint32_t flush_point = last_block_num < 10000 ? 0 : last_block_num - 10000;
-   uint32_t undo_point = last_block_num < 50 ? 0 : last_block_num - 50;
+   uint32_t undo_point = last_block_num < GRAPHENE_MAX_UNDO_HISTORY ? 0 : last_block_num - GRAPHENE_MAX_UNDO_HISTORY;
 
    ilog( "Replaying blocks, starting at ${next}...", ("next",head_block_num() + 1) );
    if( head_block_num() >= undo_point )
@@ -123,17 +123,21 @@ void database::reindex( fc::path data_dir )
 
          if( i % 10000 == 0 )
          {
+            std::stringstream bysize;
+            std::stringstream bynum;
+            bysize << std::fixed << std::setprecision(5) << double(std::get<0>(blocks.front())) / total_block_size * 100;
+            bynum << std::fixed << std::setprecision(5) << double(i*100)/last_block_num;
             ilog(
                "   [by size: ${size}%   ${processed} of ${total}]   [by num: ${num}%   ${i} of ${last}]",
-               ("size", double(std::get<0>(blocks.front())) / total_block_size * 100)
+               ("size", bysize.str())
                ("processed", std::get<0>(blocks.front()))
                ("total", total_block_size)
-               ("num", double(i*100)/last_block_num)
+               ("num", bynum.str())
                ("i", i)
                ("last", last_block_num)
             );
          }
-         if( i == flush_point )
+         if( i == undo_point )
          {
             ilog( "Writing database to disk at block ${i}", ("i",i) );
             flush();

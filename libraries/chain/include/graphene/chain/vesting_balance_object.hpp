@@ -23,9 +23,9 @@
  */
 #pragma once
 
-#include <graphene/chain/protocol/asset.hpp>
-#include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
+#include <graphene/protocol/asset.hpp>
+
 #include <boost/multi_index/composite_key.hpp>
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/identity.hpp>
@@ -33,14 +33,9 @@
 #include <fc/static_variant.hpp>
 #include <fc/uint128.hpp>
 
-#include <algorithm>
-
-
-
 namespace graphene { namespace chain {
    using namespace graphene::db;
-
-   class vesting_balance_object;
+   using namespace graphene::protocol;
 
    struct vesting_policy_context
    {
@@ -278,6 +273,8 @@ namespace detail {
 
 } } // graphene::chain
 
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::vesting_balance_object)
+
 FC_REFLECT(graphene::chain::linear_vesting_policy,
            (begin_timestamp)
            (vesting_cliff_seconds)
@@ -305,3 +302,6 @@ FC_REFLECT_DERIVED(graphene::chain::vesting_balance_object, (graphene::db::objec
 
 FC_REFLECT_ENUM( graphene::chain::vesting_balance_type, (unspecified)(cashback)(worker)(witness)(market_fee_sharing) )
 
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::linear_vesting_policy )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::cdd_vesting_policy )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::vesting_balance_object )

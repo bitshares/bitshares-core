@@ -40,7 +40,7 @@
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/special_authority_object.hpp>
-#include <graphene/chain/transaction_object.hpp>
+#include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -63,8 +63,6 @@
 #include <graphene/chain/witness_evaluator.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
 #include <graphene/chain/htlc_evaluator.hpp>
-
-#include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <fc/uint128.hpp>
 #include <fc/crypto/digest.hpp>
@@ -112,8 +110,8 @@ const uint8_t operation_history_object::type_id;
 const uint8_t proposal_object::space_id;
 const uint8_t proposal_object::type_id;
 
-const uint8_t transaction_object::space_id;
-const uint8_t transaction_object::type_id;
+const uint8_t transaction_history_object::space_id;
+const uint8_t transaction_history_object::type_id;
 
 const uint8_t vesting_balance_object::space_id;
 const uint8_t vesting_balance_object::type_id;
@@ -422,7 +420,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
        p.parameters = genesis_state.initial_parameters;
        // Set fees to zero initially, so that genesis initialization needs not pay them
        // We'll fix it at the end of the function
-       p.parameters.current_fees->zero_all_fees();
+       p.parameters.get_mutable_fees().zero_all_fees();
 
    });
    _p_dyn_global_prop_obj = & create<dynamic_global_property_object>([&genesis_state](dynamic_global_property_object& p) {
@@ -692,7 +690,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    // Enable fees
    modify(get_global_properties(), [&genesis_state](global_property_object& p) {
-      p.parameters.current_fees = genesis_state.initial_parameters.current_fees;
+      p.parameters.get_mutable_fees() = genesis_state.initial_parameters.get_current_fees();
    });
 
    // Create witness scheduler

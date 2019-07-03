@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include <graphene/chain/protocol/authority.hpp>
+#include <graphene/protocol/authority.hpp>
 
 namespace graphene { namespace chain {
 

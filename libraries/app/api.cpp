@@ -29,15 +29,27 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/get_config.hpp>
 #include <graphene/utilities/key_conversion.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 #include <graphene/chain/confidential_object.hpp>
 #include <graphene/chain/market_object.hpp>
-#include <graphene/chain/transaction_object.hpp>
+#include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 
 #include <fc/crypto/hex.hpp>
+#include <fc/rpc/api_connection.hpp>
 #include <fc/thread/future.hpp>
+
+template class fc::api<graphene::app::block_api>;
+template class fc::api<graphene::app::network_broadcast_api>;
+template class fc::api<graphene::app::network_node_api>;
+template class fc::api<graphene::app::history_api>;
+template class fc::api<graphene::app::crypto_api>;
+template class fc::api<graphene::app::asset_api>;
+template class fc::api<graphene::app::orders_api>;
+template class fc::api<graphene::debug_witness::debug_api>;
+template class fc::api<graphene::app::login_api>;
+
 
 namespace graphene { namespace app {
 
@@ -317,7 +329,8 @@ namespace graphene { namespace app {
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
-       FC_ASSERT( limit <= 100 );
+       uint64_t api_limit_get_account_history=_app.get_options().api_limit_get_account_history;
+       FC_ASSERT( limit <= api_limit_get_account_history );
        vector<operation_history_object> result;
        account_id_type account;
        try {
@@ -353,7 +366,8 @@ namespace graphene { namespace app {
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
-       FC_ASSERT( limit <= 100 );
+       uint64_t api_limit_get_account_history_operations=_app.get_options().api_limit_get_account_history_operations;
+       FC_ASSERT(limit <= api_limit_get_account_history_operations);
        vector<operation_history_object> result;
        account_id_type account;
        try {
@@ -392,7 +406,8 @@ namespace graphene { namespace app {
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
-       FC_ASSERT(limit <= 100);
+       uint64_t api_limit_get_relative_account_history=_app.get_options().api_limit_get_relative_account_history;
+       FC_ASSERT(limit <= api_limit_get_relative_account_history);
        vector<operation_history_object> result;
        account_id_type account;
        try {
@@ -402,7 +417,7 @@ namespace graphene { namespace app {
        if( start == 0 )
           start = stats.total_ops;
        else
-          start = min( stats.total_ops, start );
+          start = std::min( stats.total_ops, start );
 
        if( start >= stop && start > stats.removed_ops && limit > 0 )
        {
@@ -431,7 +446,8 @@ namespace graphene { namespace app {
 
     history_operation_detail history_api::get_account_history_by_operations(const std::string account_id_or_name, vector<uint16_t> operation_types, uint32_t start, unsigned limit)
     {
-       FC_ASSERT(limit <= 100);
+       uint64_t api_limit_get_account_history_by_operations=_app.get_options().api_limit_get_account_history_by_operations;
+       FC_ASSERT(limit <= api_limit_get_account_history_by_operations);
        history_operation_detail result;
        vector<operation_history_object> objs = get_relative_account_history(account_id_or_name, start, limit, limit + start - 1);
        std::for_each(objs.begin(), objs.end(), [&](const operation_history_object &o) {
@@ -530,82 +546,79 @@ namespace graphene { namespace app {
 
     // asset_api
     asset_api::asset_api(graphene::app::application& app) :
-         _db( *app.chain_database()), 
-         database_api( std::ref(*app.chain_database()), &(app.get_options()) 
-         ) { }
+          _app(app),
+          _db( *app.chain_database()),
+          database_api( std::ref(*app.chain_database()), &(app.get_options())
+          ) { }
     asset_api::~asset_api() { }
 
     vector<account_asset_balance> asset_api::get_asset_holders( std::string asset, uint32_t start, uint32_t limit ) const {
-      FC_ASSERT(limit <= 100);
+       uint64_t api_limit_get_asset_holders=_app.get_options().api_limit_get_asset_holders;
+       FC_ASSERT(limit <= api_limit_get_asset_holders);
+       asset_id_type asset_id = database_api.get_asset_id_from_string( asset );
+       const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+       auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
-      asset_id_type asset_id = database_api.get_asset_id_from_string( asset );
+       vector<account_asset_balance> result;
 
-      const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
-      auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+       uint32_t index = 0;
+       for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
+       {
+          if( result.size() >= limit )
+             break;
 
-      vector<account_asset_balance> result;
+          if( bal.balance.value == 0 )
+             continue;
 
-      uint32_t index = 0;
-      for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
-      {
-        if( result.size() >= limit )
-            break;
+          if( index++ < start )
+             continue;
 
-        if( bal.balance.value == 0 )
-            continue;
+          const auto account = _db.find(bal.owner);
 
-        if( index++ < start )
-            continue;
+          account_asset_balance aab;
+          aab.name       = account->name;
+          aab.account_id = account->id;
+          aab.amount     = bal.balance.value;
 
-        const auto account = _db.find(bal.owner);
+          result.push_back(aab);
+       }
 
-        account_asset_balance aab;
-        aab.name       = account->name;
-        aab.account_id = account->id;
-        aab.amount     = bal.balance.value;
-
-        result.push_back(aab);
-      }
-
-      return result;
+       return result;
     }
     // get number of asset holders.
     int asset_api::get_asset_holders_count( std::string asset ) const {
+       const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+       asset_id_type asset_id = database_api.get_asset_id_from_string( asset );
+       auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
-      const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
-      asset_id_type asset_id = database_api.get_asset_id_from_string( asset );      
-      auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+       int count = boost::distance(range) - 1;
 
-      int count = boost::distance(range) - 1;
-
-      return count;
+       return count;
     }
     // function to get vector of system assets with holders count.
     vector<asset_holders> asset_api::get_all_asset_holders() const {
+       vector<asset_holders> result;
+       vector<asset_id_type> total_assets;
+       for( const asset_object& asset_obj : _db.get_index_type<asset_index>().indices() )
+       {
+          const auto& dasset_obj = asset_obj.dynamic_asset_data_id(_db);
 
-      vector<asset_holders> result;
+          asset_id_type asset_id;
+          asset_id = dasset_obj.id;
 
-      vector<asset_id_type> total_assets;
-      for( const asset_object& asset_obj : _db.get_index_type<asset_index>().indices() )
-      {
-        const auto& dasset_obj = asset_obj.dynamic_asset_data_id(_db);
+          const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+          auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
-        asset_id_type asset_id;
-        asset_id = dasset_obj.id;
+          int count = boost::distance(range) - 1;
 
-        const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
-        auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+          asset_holders ah;
+          ah.asset_id       = asset_id;
+          ah.count     = count;
 
-        int count = boost::distance(range) - 1;
+          result.push_back(ah);
+       }
 
-        asset_holders ah;
-        ah.asset_id       = asset_id;
-        ah.count     = count;
-
-        result.push_back(ah);
-      }
-
-      return result;
+       return result;
     }
 
    // orders_api
@@ -622,8 +635,9 @@ namespace graphene { namespace app {
                                                                optional<price> start,
                                                                uint32_t limit )const
    {
-      FC_ASSERT( limit <= 101 );
-      auto plugin = _app.get_plugin<grouped_orders_plugin>( "grouped_orders" );
+      uint64_t api_limit_get_grouped_limit_orders=_app.get_options().api_limit_get_grouped_limit_orders;
+      FC_ASSERT( limit <= api_limit_get_grouped_limit_orders );
+      auto plugin = _app.get_plugin<graphene::grouped_orders::grouped_orders_plugin>( "grouped_orders" );
       FC_ASSERT( plugin );
       const auto& limit_groups = plugin->limit_order_groups();
       vector< limit_order_group > result;

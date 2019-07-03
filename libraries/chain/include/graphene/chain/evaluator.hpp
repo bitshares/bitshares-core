@@ -24,14 +24,17 @@
 #pragma once
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
-#include <graphene/chain/protocol/operations.hpp>
+#include <graphene/protocol/operations.hpp>
 
 namespace graphene { namespace chain {
 
    class database;
-   struct signed_transaction;
    class generic_evaluator;
    class transaction_evaluation_state;
+   class account_object;
+   class account_statistics_object;
+   class asset_object;
+   class asset_dynamic_data_object;
 
    class generic_evaluator
    {

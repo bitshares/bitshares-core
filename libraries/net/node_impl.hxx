@@ -4,7 +4,7 @@
 #include <fc/log/logger.hpp>
 #include <fc/network/tcp_socket.hpp>
 #include <graphene/chain/config.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/types.hpp>
 #include <graphene/net/node.hpp>
 #include <graphene/net/core_messages.hpp>
 #include <graphene/net/peer_connection.hpp>
@@ -84,16 +84,16 @@ private:
       public:
         class actual_execution_measurement_helper
         {
-          call_statistics_collector &_collector;
+          std::shared_ptr<call_statistics_collector> _collector;
         public:
-          actual_execution_measurement_helper(call_statistics_collector& collector) :
+          actual_execution_measurement_helper(std::shared_ptr<call_statistics_collector> collector) :
             _collector(collector)
           {
-            _collector.starting_execution();
+            _collector->starting_execution();
           }
           ~actual_execution_measurement_helper()
           {
-            _collector.execution_completed();
+            _collector->execution_completed();
           }
         };
         call_statistics_collector(const char* method_name,
@@ -150,7 +150,7 @@ private:
                                              uint32_t& remaining_item_count,
                                              uint32_t limit = 2000) override;
       message get_item( const item_id& id ) override;
-      graphene::chain::chain_id_type get_chain_id() const override;
+      graphene::protocol::chain_id_type get_chain_id() const override;
       std::vector<item_hash_t> get_blockchain_synopsis(const item_hash_t& reference_point,
                                                        uint32_t number_of_blocks_after_reference_point) override;
       void     sync_status( uint32_t item_type, uint32_t item_count ) override;

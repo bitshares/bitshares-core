@@ -39,9 +39,9 @@ namespace impl {
 
 std::string clean_name( const std::string& name )
 {
-   const static std::string prefix = "graphene::chain::";
+   const static std::string prefix = "graphene::protocol::";
    const static std::string suffix = "_operation";
-   // graphene::chain::.*_operation
+   // graphene::protocol::.*_operation
    if(    (name.size() >= prefix.size() + suffix.size())
        && (name.substr( 0, prefix.size() ) == prefix)
        && (name.substr( name.size()-suffix.size(), suffix.size() ) == suffix )

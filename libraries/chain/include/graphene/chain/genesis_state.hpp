@@ -23,8 +23,9 @@
  */
 #pragma once
 
-#include <graphene/chain/protocol/chain_parameters.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/address.hpp>
+#include <graphene/protocol/chain_parameters.hpp>
+#include <graphene/chain/types.hpp>
 #include <graphene/chain/immutable_chain_parameters.hpp>
 
 #include <fc/crypto/sha256.hpp>
@@ -127,29 +128,22 @@ struct genesis_state_type {
 
 } } // namespace graphene::chain
 
-FC_REFLECT(graphene::chain::genesis_state_type::initial_account_type, (name)(owner_key)(active_key)(is_lifetime_member))
+FC_REFLECT_TYPENAME( graphene::chain::genesis_state_type::initial_account_type )
+FC_REFLECT_TYPENAME( graphene::chain::genesis_state_type::initial_asset_type )
+FC_REFLECT_TYPENAME( graphene::chain::genesis_state_type::initial_asset_type::initial_collateral_position )
+FC_REFLECT_TYPENAME( graphene::chain::genesis_state_type::initial_balance_type )
+FC_REFLECT_TYPENAME( graphene::chain::genesis_state_type::initial_vesting_balance_type )
+FC_REFLECT_TYPENAME( graphene::chain::genesis_state_type::initial_witness_type )
+FC_REFLECT_TYPENAME( graphene::chain::genesis_state_type::initial_committee_member_type )
+FC_REFLECT_TYPENAME( graphene::chain::genesis_state_type::initial_worker_type )
+FC_REFLECT_TYPENAME( graphene::chain::genesis_state_type )
 
-FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type,
-           (symbol)(issuer_name)(description)(precision)(max_supply)(accumulated_fees)(is_bitasset)(collateral_records))
-
-FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type::initial_collateral_position,
-           (owner)(collateral)(debt))
-
-FC_REFLECT(graphene::chain::genesis_state_type::initial_balance_type,
-           (owner)(asset_symbol)(amount))
-
-FC_REFLECT(graphene::chain::genesis_state_type::initial_vesting_balance_type,
-           (owner)(asset_symbol)(amount)(begin_timestamp)(vesting_duration_seconds)(begin_balance))
-
-FC_REFLECT(graphene::chain::genesis_state_type::initial_witness_type, (owner_name)(block_signing_key))
-
-FC_REFLECT(graphene::chain::genesis_state_type::initial_committee_member_type, (owner_name))
-
-FC_REFLECT(graphene::chain::genesis_state_type::initial_worker_type, (owner_name)(daily_pay))
-
-FC_REFLECT(graphene::chain::genesis_state_type,
-           (initial_timestamp)(max_core_supply)(initial_parameters)(initial_accounts)(initial_assets)(initial_balances)
-           (initial_vesting_balances)(initial_active_witnesses)(initial_witness_candidates)
-           (initial_committee_candidates)(initial_worker_candidates)
-           (initial_chain_id)
-           (immutable_parameters))
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::genesis_state_type::initial_account_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::genesis_state_type::initial_asset_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::genesis_state_type::initial_asset_type::initial_collateral_position )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::genesis_state_type::initial_balance_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::genesis_state_type::initial_vesting_balance_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::genesis_state_type::initial_witness_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::genesis_state_type::initial_committee_member_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::genesis_state_type::initial_worker_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::genesis_state_type )

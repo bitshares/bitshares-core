@@ -23,12 +23,9 @@
  */
 #pragma once
 #include <graphene/chain/evaluator.hpp>
+#include <graphene/chain/types.hpp>
 
 namespace graphene { namespace chain {
-
-struct transfer_to_blind_operation;
-struct transfer_from_blind_operation;
-struct blind_transfer_operation;
 
 class transfer_to_blind_evaluator : public evaluator<transfer_to_blind_evaluator>
 {
