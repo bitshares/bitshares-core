@@ -59,8 +59,9 @@ namespace graphene { namespace chain {
          static const uint8_t space_id = implementation_ids;
          static const uint8_t type_id  = impl_asset_dynamic_data_type;
 
-         /// The number of shares currently in existence
-         share_type current_supply;
+         
+         share_type current_supply; /// The number of shares currently in existence
+         share_type current_max_supply; /// The current maximum number of shares
          share_type confidential_supply; ///< total asset held in confidential balances
          share_type accumulated_fees; ///< fees accumulate to be paid out over time
          share_type accumulated_fees_for_marketing_partner; ///< fees accumulate to be paid out to marketing partner
@@ -162,7 +163,7 @@ namespace graphene { namespace chain {
           */
          template<class DB>
          share_type reserved( const DB& db )const
-         { return options.max_supply - dynamic_data(db).current_supply; }
+         { return dynamic_data(db).current_max_supply - dynamic_data(db).current_supply; }
    };
 
    /**
@@ -314,7 +315,7 @@ namespace graphene { namespace chain {
 } } // graphene::chain
 
 FC_REFLECT_DERIVED( graphene::chain::asset_dynamic_data_object, (graphene::db::object),
-                    (current_supply)(confidential_supply)(accumulated_fees)(accumulated_fees_for_marketing_partner)(fee_pool) )
+                    (current_supply)(current_max_supply)(confidential_supply)(accumulated_fees)(accumulated_fees_for_marketing_partner)(fee_pool) )
 
 FC_REFLECT_DERIVED( graphene::chain::asset_bitasset_data_object, (graphene::db::object),
                     (asset_id)

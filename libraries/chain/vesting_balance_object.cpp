@@ -28,10 +28,10 @@ namespace graphene { namespace chain {
 
 inline bool sum_below_max_shares(const asset& a, const asset& b)
 {
-   assert(GRAPHENE_MAX_SHARE_SUPPLY + GRAPHENE_MAX_SHARE_SUPPLY > GRAPHENE_MAX_SHARE_SUPPLY);
-   return (a.amount              <= GRAPHENE_MAX_SHARE_SUPPLY)
-       && (            b.amount  <= GRAPHENE_MAX_SHARE_SUPPLY)
-       && ((a.amount + b.amount) <= GRAPHENE_MAX_SHARE_SUPPLY);
+   assert(GRAPHENE_INITIAL_MAX_SHARE_SUPPLY + GRAPHENE_INITIAL_MAX_SHARE_SUPPLY > GRAPHENE_INITIAL_MAX_SHARE_SUPPLY);
+   return (a.amount              <= GRAPHENE_INITIAL_MAX_SHARE_SUPPLY)
+       && (            b.amount  <= GRAPHENE_INITIAL_MAX_SHARE_SUPPLY)
+       && ((a.amount + b.amount) <= GRAPHENE_INITIAL_MAX_SHARE_SUPPLY);
 }
 
 asset linear_vesting_policy::get_allowed_withdraw( const vesting_policy_context& ctx )const

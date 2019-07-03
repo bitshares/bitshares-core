@@ -70,7 +70,7 @@ BOOST_AUTO_TEST_CASE( genesis_and_persistence_bench )
          db.open(data_dir.path(), [&]{return genesis_state;}, "test");
 
          for( int i = 11; i < account_count + 11; ++i)
-            BOOST_CHECK(db.get_balance(account_id_type(i), asset_id_type()).amount == GRAPHENE_MAX_SHARE_SUPPLY / account_count);
+            BOOST_CHECK(db.get_balance(account_id_type(i), asset_id_type()).amount == GRAPHENE_INITIAL_MAX_SHARE_SUPPLY / account_count);
 
          fc::time_point start_time = fc::time_point::now();
          db.close();
@@ -84,7 +84,7 @@ BOOST_AUTO_TEST_CASE( genesis_and_persistence_bench )
          ilog("Opened database in ${t} milliseconds.", ("t", (fc::time_point::now() - start_time).count() / 1000));
 
          for( int i = 11; i < account_count + 11; ++i)
-            BOOST_CHECK(db.get_balance(account_id_type(i), asset_id_type()).amount == GRAPHENE_MAX_SHARE_SUPPLY / account_count);
+            BOOST_CHECK(db.get_balance(account_id_type(i), asset_id_type()).amount == GRAPHENE_INITIAL_MAX_SHARE_SUPPLY / account_count);
 
          int blocks_out = 0;
          auto witness_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
@@ -119,7 +119,7 @@ BOOST_AUTO_TEST_CASE( genesis_and_persistence_bench )
          ilog("Replayed database in ${t} milliseconds.", ("t", (fc::time_point::now() - start_time).count() / 1000));
 
          for( int i = 0; i < blocks_to_produce; ++i )
-            BOOST_CHECK(db.get_balance(account_id_type(i + 11), asset_id_type()).amount == GRAPHENE_MAX_SHARE_SUPPLY / account_count - 2);
+            BOOST_CHECK(db.get_balance(account_id_type(i + 11), asset_id_type()).amount == GRAPHENE_INITIAL_MAX_SHARE_SUPPLY / account_count - 2);
       }
 
    } catch(fc::exception& e) {

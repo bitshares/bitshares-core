@@ -51,7 +51,7 @@ BOOST_AUTO_TEST_CASE( create_advanced_uia )
       creator.issuer = account_id_type();
       creator.fee = asset();
       creator.symbol = "ADVANCED";
-      creator.common_options.max_supply = 100000000;
+      creator.common_options.initial_max_supply = 100000000;
       creator.precision = 2;
       creator.common_options.market_fee_percent = GRAPHENE_MAX_MARKET_FEE_PERCENT/100; /*1%*/
       creator.common_options.issuer_permissions = charge_market_fee|white_list|override_authority|transfer_restricted|disable_confidential;
@@ -66,7 +66,7 @@ BOOST_AUTO_TEST_CASE( create_advanced_uia )
       BOOST_CHECK(test_asset.symbol == "ADVANCED");
       BOOST_CHECK(asset(1, test_asset_id) * test_asset.options.core_exchange_rate == asset(2));
       BOOST_CHECK(test_asset.options.flags & white_list);
-      BOOST_CHECK(test_asset.options.max_supply == 100000000);
+      BOOST_CHECK(test_asset.options.initial_max_supply == 100000000);
       BOOST_CHECK(!test_asset.bitasset_data_id.valid());
       BOOST_CHECK(test_asset.options.market_fee_percent == GRAPHENE_MAX_MARKET_FEE_PERCENT/100);
 

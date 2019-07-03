@@ -1388,7 +1388,7 @@ BOOST_AUTO_TEST_CASE( genesis_reserve_ids )
          usd.issuer_name = "init0";
          usd.description = "federally floated";
          usd.precision = 4;
-         usd.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+         usd.initial_max_supply = GRAPHENE_INITIAL_MAX_SHARE_SUPPLY;
          usd.accumulated_fees = 0;
          usd.is_bitasset = true;
          

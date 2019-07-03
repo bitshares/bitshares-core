@@ -50,7 +50,7 @@ struct proposal_operation_hardfork_visitor
 
       // TODO If this never ASSERTs before HF 1465, it can be removed
       FC_ASSERT( block_time < SOFTFORK_CORE_1465_TIME 
-            || block_time > HARDFORK_CORE_1465_TIME
+            //|| block_time > HARDFORK_CORE_1465_TIME
             || v.delta_debt.asset_id == asset_id_type(113) // CNY
             || v.delta_debt.amount < 0 
             || (v.delta_debt.asset_id( db ).bitasset_data_id
@@ -256,7 +256,7 @@ object_id_type proposal_create_evaluator::do_apply(const proposal_create_operati
          transfer_operation top;
          top.from = GRAPHENE_NULL_ACCOUNT;
          top.to = GRAPHENE_RELAXED_COMMITTEE_ACCOUNT;
-         top.amount = asset( GRAPHENE_MAX_SHARE_SUPPLY );
+         top.amount = asset( GRAPHENE_INITIAL_MAX_SHARE_SUPPLY );
          proposal.proposed_transaction.operations.emplace_back( top );
          wlog( "Issue 1479: ${p}", ("p",proposal) );
       }

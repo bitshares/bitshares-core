@@ -58,7 +58,7 @@ void transfer_to_blind_operation::validate()const
       for( auto out : outputs )
       {
          auto info = fc::ecc::range_get_info( out.range_proof );
-         FC_ASSERT( info.max_value <= GRAPHENE_MAX_SHARE_SUPPLY );
+         FC_ASSERT( info.max_value <= GRAPHENE_INITIAL_MAX_SHARE_SUPPLY );
       }
    }
 }
@@ -130,7 +130,7 @@ void blind_transfer_operation::validate()const
       for( auto out : outputs )
       {
          auto info = fc::ecc::range_get_info( out.range_proof );
-         FC_ASSERT( info.max_value <= GRAPHENE_MAX_SHARE_SUPPLY );
+         FC_ASSERT( info.max_value <= GRAPHENE_INITIAL_MAX_SHARE_SUPPLY );
       }
    }
    FC_ASSERT( fc::ecc::verify_sum( in, out, net_public ), "", ("net_public", net_public) );

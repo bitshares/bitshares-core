@@ -133,6 +133,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
    const asset_dynamic_data_object& dyn_asset =
       d.create<asset_dynamic_data_object>( [hf_429,this]( asset_dynamic_data_object& a ) {
          a.current_supply = 0;
+         a.current_max_supply = GRAPHENE_INITIAL_MAX_SHARE_SUPPLY;
          a.fee_pool = core_fee_paid - (hf_429 ? 1 : 0);
       });
 
@@ -185,7 +186,7 @@ void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
    FC_ASSERT( is_authorized_asset( d, *to_account, a ) );
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
-   FC_ASSERT( (asset_dyn_data->current_supply + o.asset_to_issue.amount) <= a.options.max_supply );
+   FC_ASSERT( (asset_dyn_data->current_supply + o.asset_to_issue.amount) <= asset_dyn_data->current_max_supply );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

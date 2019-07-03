@@ -404,7 +404,7 @@ BOOST_AUTO_TEST_CASE( overflow )
 
    wait_for_hf_core_216();
 
-   bid_collateral( borrower(),  back().amount(2200), swan().amount(GRAPHENE_MAX_SHARE_SUPPLY - 1) );
+   bid_collateral( borrower(),  back().amount(2200), swan().amount(GRAPHENE_INITIAL_MAX_SHARE_SUPPLY - 1) );
    bid_collateral( borrower2(), back().amount(2100), swan().amount(1399) );
    set_feed(1, 2);
    wait_for_maintenance();
