@@ -285,7 +285,7 @@ namespace graphene { namespace net
       void on_connection_closed(message_oriented_connection* originating_connection) override;
 
       void send_queueable_message(std::unique_ptr<queued_message>&& message_to_send);
-      virtual void send_message(const message& message_to_send, size_t message_send_time_field_offset = (size_t)-1);
+      virtual void send_message( const message& message_to_send, size_t message_send_time_field_offset = (size_t)-1 );
       void send_item(const item_id& item_to_send);
       void close_connection();
       void destroy_connection();

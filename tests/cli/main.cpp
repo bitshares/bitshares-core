@@ -63,6 +63,7 @@
 #include <boost/test/included/unit_test.hpp>
 
 #include "../common/genesis_file_util.hpp"
+#include "../common/node_util.hpp"
 
 using std::exception;
 using std::cerr;

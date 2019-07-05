@@ -133,13 +133,13 @@ namespace graphene { namespace net { namespace detail {
         const fc::uint160_t& message_content_hash )
     {
       _message_cache.insert( message_info(hash_of_message_to_cache,
-          message_to_cache, block_clock, propagation_data, message_content_hash ) );
+         message_to_cache, block_clock, propagation_data, message_content_hash ) );
     }
 
     message blockchain_tied_message_cache::get_message( const message_hash_type& hash_of_message_to_lookup )
     {
       message_cache_container::index<message_hash_index>::type::const_iterator iter =
-          _message_cache.get<message_hash_index>().find(hash_of_message_to_lookup );
+         _message_cache.get<message_hash_index>().find(hash_of_message_to_lookup );
       if( iter != _message_cache.get<message_hash_index>().end() )
         return iter->message_body;
       FC_THROW_EXCEPTION(  fc::key_not_found_exception, "Requested message not in cache" );
@@ -148,10 +148,10 @@ namespace graphene { namespace net { namespace detail {
     {
       if( hash_of_message_contents_to_lookup != fc::uint160_t() )
       {
-        message_cache_container::index<message_contents_hash_index>::type::const_iterator iter =
+         message_cache_container::index<message_contents_hash_index>::type::const_iterator iter =
             _message_cache.get<message_contents_hash_index>().find(hash_of_message_contents_to_lookup );
-        if( iter != _message_cache.get<message_contents_hash_index>().end() )
-          return iter->propagation_data;
+         if( iter != _message_cache.get<message_contents_hash_index>().end() )
+            return iter->propagation_data;
       }
       FC_THROW_EXCEPTION(  fc::key_not_found_exception, "Requested message not in cache" );
     }
@@ -185,87 +185,88 @@ namespace graphene { namespace net { namespace detail {
 #define MAXIMUM_NUMBER_OF_BLOCKS_TO_HANDLE_AT_ONE_TIME 200
 #define MAXIMUM_NUMBER_OF_BLOCKS_TO_PREFETCH (10 * MAXIMUM_NUMBER_OF_BLOCKS_TO_HANDLE_AT_ONE_TIME)
 
-    /******
-      * Use information passed from command line or config file to advertise nodes
-      */
-    class list_address_builder : public node_impl::address_builder
-    {
-        public:
-        list_address_builder(fc::optional<std::vector<std::string>> address_list)
-        {
-          FC_ASSERT( address_list.valid(), "advertise-peer-list must be included" );
+   /******
+    * Use information passed from command line or config file to advertise nodes
+   */
+   class list_address_builder : public node_impl::address_builder
+   {
+      public:
+      list_address_builder(fc::optional<std::vector<std::string>> address_list)
+      {
+         FC_ASSERT( address_list.valid(), "advertise-peer-list must be included" );
 
-          advertise_list.reserve( address_list->size() );
-          auto& list = advertise_list;
-          std::for_each( address_list->begin(), address_list->end(), [&list]( std::string str ) {
-                // ignore fc exceptions (like poorly formatted endpoints)
-                try
-                {
+         advertise_list.reserve( address_list->size() );
+         auto& list = advertise_list;
+         std::for_each( address_list->begin(), address_list->end(), [&list]( std::string str ) {
+               // ignore fc exceptions (like poorly formatted endpoints)
+               try
+               {
                   list.emplace_back( graphene::net::address_info(
-                      fc::ip::endpoint::from_string(str),
-                      fc::time_point_sec(),
-                      fc::microseconds(0),
-                      node_id_t(),
-                      peer_connection_direction::unknown,
-                      firewalled_state::unknown ));
-                }
-                catch(const fc::exception& ) {
+                     fc::ip::endpoint::from_string(str),
+                     fc::time_point_sec(),
+                     fc::microseconds(0),
+                     node_id_t(),
+                     peer_connection_direction::unknown,
+                     firewalled_state::unknown ));
+               }
+               catch(const fc::exception& ) 
+               {
                   wlog( "Address ${addr} invalid.", ("addr", str) );
-                } 
+               } 
             } );
-        }
+      }
 
-        void build(node_impl* impl, address_message& reply)
-        {
-          reply.addresses = advertise_list;
-        }
-        private:
-        std::vector<graphene::net::address_info> advertise_list;
-    };
+      void build(node_impl* impl, address_message& reply)
+      {
+         reply.addresses = advertise_list;
+      }
+      private:
+      std::vector<graphene::net::address_info> advertise_list;
+   };
 
-    /****
-      * Advertise all nodes except a predefined list
-      */
-    class exclude_address_builder : public node_impl::address_builder
-    {
-        public:
-        exclude_address_builder(const fc::optional<std::vector<std::string>>& address_list)
-        {
-          FC_ASSERT( address_list.valid(), "exclude-peer-list must be included" );
-          std::for_each(address_list->begin(), address_list->end(), [&exclude_list = exclude_list](std::string input)
-              {
-                exclude_list.insert(input);
-              });
-        }
-        void build(node_impl* impl, address_message& reply)
-        {
-          reply.addresses.reserve(impl->_active_connections.size());
-          // filter out those in the exclude list
-          for(const peer_connection_ptr& active_peer : impl->_active_connections)
-          {
+   /****
+    * Advertise all nodes except a predefined list
+    */
+   class exclude_address_builder : public node_impl::address_builder
+   {
+      public:
+      exclude_address_builder(const fc::optional<std::vector<std::string>>& address_list)
+      {
+         FC_ASSERT( address_list.valid(), "exclude-peer-list must be included" );
+         std::for_each(address_list->begin(), address_list->end(), [&exclude_list = exclude_list](std::string input)
+            {
+               exclude_list.insert(input);
+            });
+      }
+      void build(node_impl* impl, address_message& reply)
+      {
+         reply.addresses.reserve(impl->_active_connections.size());
+         // filter out those in the exclude list
+         for(const peer_connection_ptr& active_peer : impl->_active_connections)
+         {
             if (exclude_list.find( *active_peer->get_remote_endpoint() ) == exclude_list.end())  
-              reply.addresses.emplace_back(update_address_record(impl, active_peer));
-          }
-          reply.addresses.shrink_to_fit();
-        }
-        private:
-        fc::flat_set<std::string> exclude_list;
-    };
+               reply.addresses.emplace_back(update_address_record(impl, active_peer));
+         }
+         reply.addresses.shrink_to_fit();
+      }
+      private:
+      fc::flat_set<std::string> exclude_list;
+   };
 
-    /***
-      * Return all peers when node asks
-      */
-    class all_address_builder : public node_impl::address_builder
-    {
-        void build( node_impl* impl, address_message& reply )
-        {
-          reply.addresses.reserve(impl->_active_connections.size());
-          for (const peer_connection_ptr& active_peer : impl->_active_connections)
-          {
-              reply.addresses.emplace_back(update_address_record(impl, active_peer));
-          }
-        }
-    };
+   /***
+    * Return all peers when node asks
+    */
+   class all_address_builder : public node_impl::address_builder
+   {
+      void build( node_impl* impl, address_message& reply )
+      {
+         reply.addresses.reserve(impl->_active_connections.size());
+         for (const peer_connection_ptr& active_peer : impl->_active_connections)
+         {
+            reply.addresses.emplace_back(update_address_record(impl, active_peer));
+         }
+      }
+   };
 
     node_impl::node_impl(const std::string& user_agent) :
 #ifdef P2P_IN_DEDICATED_THREAD
@@ -1641,20 +1642,20 @@ namespace graphene { namespace net { namespace detail {
         FC_THROW( "unexpected connection_rejected_message from peer" );
     }
 
-    address_info node_impl::address_builder::update_address_record( node_impl* impl, const peer_connection_ptr& active_peer)
-    {
+   address_info node_impl::address_builder::update_address_record( node_impl* impl, const peer_connection_ptr& active_peer)
+   {
       fc::optional<potential_peer_record> updated_peer_record =
-          impl->_potential_peer_db.lookup_entry_for_endpoint(*active_peer->get_remote_endpoint());
+         impl->_potential_peer_db.lookup_entry_for_endpoint(*active_peer->get_remote_endpoint());
 
       if (updated_peer_record)
       {
-        updated_peer_record->last_seen_time = fc::time_point::now();
-        impl->_potential_peer_db.update_entry(*updated_peer_record);
+         updated_peer_record->last_seen_time = fc::time_point::now();
+         impl->_potential_peer_db.update_entry(*updated_peer_record);
       }
 
       return address_info(*active_peer->get_remote_endpoint(), fc::time_point::now(), active_peer->round_trip_delay,
-          active_peer->node_id, active_peer->direction, active_peer->is_firewalled);
-    }
+         active_peer->node_id, active_peer->direction, active_peer->is_firewalled);
+   }
 
     void node_impl::on_address_request_message(peer_connection* originating_peer, const address_request_message& address_request_message_received)
     {
@@ -1663,28 +1664,28 @@ namespace graphene { namespace net { namespace detail {
 
       address_message reply;
       if (_address_builder != nullptr )
-        _address_builder->build( this, reply );
+         _address_builder->build( this, reply );
       originating_peer->send_message(reply);
     }
 
-    void node_impl::set_advertise_algorithm( std::string algo, 
+   void node_impl::set_advertise_algorithm( std::string algo, 
          const fc::optional<std::vector<std::string>>& advertise_list )
-    {
-       if (algo == "exclude_list")
-       {
-          _address_builder = std::make_shared<exclude_address_builder>(advertise_list);
-       }
-       else if (algo == "list")
-       {
-          _address_builder = std::make_shared<list_address_builder>(advertise_list);
-       }
-       else if (algo == "nothing")
-       {
-          _address_builder = nullptr;
-       }
-       else
-          _address_builder = std::make_shared<all_address_builder>();
-    }
+   {
+      if (algo == "exclude_list")
+      {
+         _address_builder = std::make_shared<exclude_address_builder>(advertise_list);
+      }
+      else if (algo == "list")
+      {
+         _address_builder = std::make_shared<list_address_builder>(advertise_list);
+      }
+      else if (algo == "nothing")
+      {
+         _address_builder = nullptr;
+      }
+      else
+         _address_builder = std::make_shared<all_address_builder>();
+   }
 
     void node_impl::on_address_message(peer_connection* originating_peer, const address_message& address_message_received)
     {
@@ -1699,8 +1700,8 @@ namespace graphene { namespace net { namespace detail {
         address.last_seen_time = fc::time_point_sec(fc::time_point::now());
       if ( _node_configuration.accept_incoming_connections )
       {
-        if ( merge_address_info_with_potential_peer_database(updated_addresses))
-          trigger_p2p_network_connect_loop();
+         if ( merge_address_info_with_potential_peer_database(updated_addresses))
+            trigger_p2p_network_connect_loop();
       }
 
       if (_handshaking_connections.find(originating_peer->shared_from_this()) != _handshaking_connections.end())
@@ -4200,16 +4201,16 @@ namespace graphene { namespace net { namespace detail {
       trigger_p2p_network_connect_loop();
     }
 
-    void node_impl::add_seed_node(const std::string& endpoint_string)
-    {
-       VERIFY_CORRECT_THREAD();
-       std::vector<fc::ip::endpoint> endpoints = graphene::net::node::resolve_string_to_ip_endpoints(endpoint_string);
-       for (const fc::ip::endpoint& endpoint : endpoints)
-       {
-          ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-          add_node(endpoint);
-       }
-    }
+   void node_impl::add_seed_node(const std::string& endpoint_string)
+   {
+      VERIFY_CORRECT_THREAD();
+      std::vector<fc::ip::endpoint> endpoints = graphene::net::node::resolve_string_to_ip_endpoints(endpoint_string);
+      for (const fc::ip::endpoint& endpoint : endpoints)
+      {
+         ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
+         add_node(endpoint);
+      }
+   }
 
     void node_impl::initiate_connect_to(const peer_connection_ptr& new_peer)
     {
@@ -5117,72 +5118,70 @@ namespace graphene { namespace net { namespace detail {
 
   } // end namespace detail
 
-  /***
-   * @brief Helper to convert a string to a collection of endpoints
-   *
-   * This converts a string (i.e. "bitshares.eu:665535" to a collection of endpoints.
-   * NOTE: Throws an exception if not in correct format or was unable to resolve URL.
-   *
-   * @param in the incoming string
-   * @returns a vector of endpoints
+   /***
+    * @brief Helper to convert a string to a collection of endpoints
+    *
+    * This converts a string (i.e. "bitshares.eu:665535" to a collection of endpoints.
+    * NOTE: Throws an exception if not in correct format or was unable to resolve URL.
+    *
+    * @param in the incoming string
+    * @returns a vector of endpoints
    */
-  std::vector<fc::ip::endpoint> node::resolve_string_to_ip_endpoints(const std::string& in)
+   std::vector<fc::ip::endpoint> node::resolve_string_to_ip_endpoints(const std::string& in)
   {
-     try
-     {
-        std::string::size_type colon_pos = in.find(':');
-        if (colon_pos == std::string::npos)
-           FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
-                    ("endpoint_string", in));
-        std::string port_string = in.substr(colon_pos + 1);
-        try
-        {
-           uint16_t port = boost::lexical_cast<uint16_t>(port_string);
+      try
+      {
+         std::string::size_type colon_pos = in.find(':');
+         if (colon_pos == std::string::npos)
+            FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
+                  ("endpoint_string", in));
+         std::string port_string = in.substr(colon_pos + 1);
+         try
+         {
+            uint16_t port = boost::lexical_cast<uint16_t>(port_string);
 
-           std::string hostname = in.substr(0, colon_pos);
-           std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
-           if (endpoints.empty())
-              FC_THROW_EXCEPTION( fc::unknown_host_exception,
-                                  "The host name can not be resolved: ${hostname}",
-                                  ("hostname", hostname) );
-           return endpoints;
-        }
-        catch (const boost::bad_lexical_cast&)
-        {
-           FC_THROW("Bad port: ${port}", ("port", port_string));
-        }
-     }
-     FC_CAPTURE_AND_RETHROW((in))
-  }
+            std::string hostname = in.substr(0, colon_pos);
+            std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
+            if (endpoints.empty())
+               FC_THROW_EXCEPTION( fc::unknown_host_exception,
+                     "The host name can not be resolved: ${hostname}",
+                     ("hostname", hostname) );
+            return endpoints;
+         }
+         catch (const boost::bad_lexical_cast&)
+         {
+            FC_THROW("Bad port: ${port}", ("port", port_string));
+         }
+      }
+      FC_CAPTURE_AND_RETHROW((in))
+   }
 
-  void node::add_seed_node(const std::string& endpoint_string)
-  {
-    INVOKE_IN_IMPL(add_seed_node, endpoint_string);
-  }
+   void node::add_seed_node(const std::string& endpoint_string)
+   {
+      INVOKE_IN_IMPL(add_seed_node, endpoint_string);
+   }
 
-  /*****
-   * @brief add a list of nodes to seed the p2p network
-   * @param seeds a vector of url strings
-   * @param connect_immediately attempt a connection immediately
-   */
-  void node::add_seed_nodes(std::vector<std::string> seeds)
-  {
-     for(const std::string& endpoint_string : seeds )
-     {
-        try {
-          INVOKE_IN_IMPL(add_seed_node, endpoint_string);
-        } catch( const fc::exception& e ) {
-          wlog( "caught exception ${e} while adding seed node ${endpoint}",
-              ("e", e.to_detail_string())("endpoint", endpoint_string) );
-        }
-     }
+   /*****
+    * @brief add a list of nodes to seed the p2p network
+    * @param seeds a vector of url strings
+    * @param connect_immediately attempt a connection immediately
+    */
+   void node::add_seed_nodes(std::vector<std::string> seeds)
+   {
+      for(const std::string& endpoint_string : seeds )
+      {
+         try {
+            INVOKE_IN_IMPL(add_seed_node, endpoint_string);
+         } catch( const fc::exception& e ) {
+            wlog( "caught exception ${e} while adding seed node ${endpoint}",
+                  ("e", e.to_detail_string())("endpoint", endpoint_string) );
+         }
+      }
+   }
 
-  }
-
-  void node::set_advertise_algorithm( std::string algo, const fc::optional<std::vector<std::string>>& advertise_list )
-  {
-     my->set_advertise_algorithm( algo, advertise_list );
-  }
-
+   void node::set_advertise_algorithm( std::string algo, const fc::optional<std::vector<std::string>>& advertise_list )
+   {
+      my->set_advertise_algorithm( algo, advertise_list );
+   }
 
 } } // end namespace graphene::net
