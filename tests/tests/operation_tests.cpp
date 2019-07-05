@@ -1778,9 +1778,10 @@ BOOST_AUTO_TEST_CASE( fill_order )
 BOOST_AUTO_TEST_CASE( inflation_test )
 { try {
    const asset_object* core = &asset_id_type()(db);
-   BOOST_CHECK_EQUAL( core->reserved(db).value, (core->options.initial_max_supply.value) - core->dynamic_data(db).current_supply.value ) ;
+   BOOST_CHECK_EQUAL( core->reserved(db).value, 
+   (core->options.initial_max_supply.value) - core->dynamic_data(db).current_supply.value ) ;
 
-   int64_t inflation_amount = 23782344;
+   const int64_t inflation_amount = 23782344;
 
    db.modify( db.get_global_properties(), [&]( global_property_object& _gpo )
    {
