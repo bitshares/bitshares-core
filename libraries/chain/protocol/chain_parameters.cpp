@@ -56,6 +56,7 @@ namespace graphene { namespace chain {
       to.account_fee_scale_bitshifts = from.account_fee_scale_bitshifts;
       to.max_authority_depth = from.max_authority_depth;
       to.extensions = from.extensions;
+      to.core_inflation_amount = from.core_inflation_amount;
    }
 
    // move constructor

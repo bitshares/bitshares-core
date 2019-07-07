@@ -557,10 +557,10 @@ BOOST_AUTO_TEST_CASE(create_asset_via_proposal_test)
       create_op.issuer = issuer.id;
       create_op.fee = asset();
       create_op.symbol = "ASSET";
-      create_op.common_options.max_supply = 0;
+      create_op.common_options.initial_max_supply = 0;
       create_op.precision = 2;
       create_op.common_options.core_exchange_rate = core_exchange_rate;
-      create_op.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      create_op.common_options.initial_max_supply = GRAPHENE_INITIAL_MAX_SHARE_SUPPLY;
       create_op.common_options.flags = charge_market_fee;
 
       additional_asset_options_t options;

@@ -71,6 +71,19 @@ vector<std::reference_wrapper<const typename Index::object_type>> database::sort
    return refs;
 }
 
+void database::handle_core_inflation()
+{
+   const global_property_object& gpo = get_global_properties();
+   
+   if (gpo.parameters.core_inflation_amount > 0) 
+   {
+      const asset_dynamic_data_object& core_dd = get_core_dynamic_data();
+      modify( core_dd, [gpo](asset_dynamic_data_object& addo) {
+         addo.current_max_supply += gpo.parameters.core_inflation_amount;
+      });
+   }
+}
+
 void database::handle_marketing_fees()
 {
    const global_property_object& gpo = get_global_properties();
@@ -513,10 +526,10 @@ void database::process_budget()
       //
       assert( gpo.parameters.block_interval > 0 );
       uint64_t blocks_to_maint = (uint64_t(time_to_maint) + gpo.parameters.block_interval - 1) / gpo.parameters.block_interval;
-
+      // blocks_to_maint = number of blocks in previous maintenance cycle
       // blocks_to_maint > 0 because time_to_maint > 0,
       // which means numerator is at least equal to block_interval
-
+      
       budget_record rec;
       initialize_budget_record( now, rec );
       share_type available_funds = rec.total_budget;
@@ -984,7 +997,7 @@ void database::process_bitassets()
 }
 
 /****
- * @brief a one-time data process to correct max_supply
+ * @brief a one-time data process to correct initial_max_supply
  */
 void process_hf_1465( database& db )
 {
@@ -996,15 +1009,15 @@ void process_hf_1465( database& db )
    {
       const auto& current_asset = *asset_itr;
       graphene::chain::share_type current_supply = current_asset.dynamic_data(db).current_supply;
-      graphene::chain::share_type max_supply = current_asset.options.max_supply;
-      if (current_supply > max_supply && max_supply != GRAPHENE_MAX_SHARE_SUPPLY)
+      graphene::chain::share_type max_supply = current_asset.options.initial_max_supply;
+      if (current_supply > max_supply && max_supply != GRAPHENE_INITIAL_MAX_SHARE_SUPPLY)
       {
          wlog( "Adjusting max_supply of ${asset} because current_supply (${current_supply}) is greater than ${old}.", 
                ("asset", current_asset.symbol) 
                ("current_supply", current_supply.value)
                ("old", max_supply));
          db.modify<asset_object>( current_asset, [current_supply](asset_object& obj) {
-            obj.options.max_supply = graphene::chain::share_type(std::min(current_supply.value, GRAPHENE_MAX_SHARE_SUPPLY));
+            obj.options.initial_max_supply = graphene::chain::share_type(std::min(current_supply.value, GRAPHENE_INITIAL_MAX_SHARE_SUPPLY));
          });
       }
    }
@@ -1319,6 +1332,9 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
       }
    }
 
+   // Handle hard forks here
+   // TODO: remove BitShares specific hardforks.
+
    if( (dgpo.next_maintenance_time < HARDFORK_613_TIME) && (next_maintenance_time >= HARDFORK_613_TIME) )
       deprecate_annual_members(*this);
 
@@ -1340,10 +1356,6 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    bool to_update_and_match_call_orders_for_hf_1270 = false;
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_1270_TIME) && (next_maintenance_time > HARDFORK_CORE_1270_TIME) )
       to_update_and_match_call_orders_for_hf_1270 = true;
-
-   // make sure current_supply is less than or equal to max_supply
-   if ( dgpo.next_maintenance_time <= HARDFORK_CORE_1465_TIME && next_maintenance_time > HARDFORK_CORE_1465_TIME )
-      process_hf_1465(*this);
 
    modify(dgpo, [next_maintenance_time](dynamic_global_property_object& d) {
       d.next_maintenance_time = next_maintenance_time;

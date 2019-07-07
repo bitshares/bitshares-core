@@ -32,7 +32,13 @@
 #define GRAPHENE_MIN_ASSET_SYMBOL_LENGTH 3
 #define GRAPHENE_MAX_ASSET_SYMBOL_LENGTH 16
 
-#define GRAPHENE_MAX_SHARE_SUPPLY int64_t(1000000000000000ll)
+#define GRAPHENE_INITIAL_MAX_SHARE_SUPPLY int64_t(1000000000000000ll)
+// Assuming a 3 second block interval, and an initial supply of 5 billion, 
+// this will cause a 5% inflation of supply per year
+#define GRAPHENE_INITIAL_INFLATION_AMOUNT int64_t(0) // int64_t(23782344) 
+#define GRAPHENE_MIN_INFLATION_AMOUNT int64_t(0) 
+
+#define GRAPHENE_MAX_INFLATION_AMOUNT int64_t(100000000)
 #define GRAPHENE_MAX_SIG_CHECK_DEPTH 2
 /**
  * Don't allow the committee_members to publish a limit that would
@@ -114,7 +120,7 @@
 #define GRAPHENE_CORE_ASSET_CYCLE_RATE                        17
 #define GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS                   32
 
-#define GRAPHENE_DEFAULT_WITNESS_PAY_PER_BLOCK            (GRAPHENE_BLOCKCHAIN_PRECISION * int64_t( 10) )
+#define GRAPHENE_DEFAULT_WITNESS_PAY_PER_BLOCK            (GRAPHENE_BLOCKCHAIN_PRECISION * int64_t( 10) ) // int64_t(23782344) 
 #define GRAPHENE_DEFAULT_WITNESS_PAY_VESTING_SECONDS      (60*60*24)
 #define GRAPHENE_DEFAULT_WORKER_BUDGET_PER_DAY            (GRAPHENE_BLOCKCHAIN_PRECISION * int64_t(500) * 1000 )
 
