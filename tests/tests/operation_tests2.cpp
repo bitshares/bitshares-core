@@ -1786,6 +1786,39 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, 901);
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE(sale) {
+   try {
+      ACTOR(alice);
+      ACTOR(bob);
+      transfer(account_id_type(), alice_id, asset(500000)); // 500000 is really 5 TUSC
+      BOOST_CHECK_EQUAL(get_balance(alice_id, asset_id_type()), 500000);
+
+      enable_fees();
+      sale_operation op;
+
+      // Alice buys a product from Bob for 500000.
+      op.from = alice_id;
+      op.to = bob_id;
+      op.amount = asset(500000);
+
+      op.fee = db.get_global_properties().parameters.get_current_fees().calculate_fee(op);
+
+      // Sale fee should be 0.05% of amount
+      fc::uint128 expected_fee(500000);
+      expected_fee *= 5 * GRAPHENE_10TH_OF_1_PERCENT;
+      expected_fee /= GRAPHENE_100_PERCENT;
+
+      BOOST_CHECK_EQUAL(op.fee.amount.value, 2500);
+
+      trx.operations = {op};
+      trx.sign(alice_private_key, db.get_chain_id());
+      PUSH_TX(db, trx);
+
+      BOOST_CHECK_EQUAL(get_balance(alice_id, asset_id_type()), 0);
+      BOOST_CHECK_EQUAL(get_balance(bob_id, asset_id_type()), 497500); // Bob paid the fee for the sale
+   } FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_CASE(transfer_with_memo) {
    try {
       ACTOR(alice);

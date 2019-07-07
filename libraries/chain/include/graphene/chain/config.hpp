@@ -59,7 +59,7 @@
 /** percentage fields are fixed point with a denominator of 10,000 */
 #define GRAPHENE_100_PERCENT                                    10000
 #define GRAPHENE_1_PERCENT                                      (GRAPHENE_100_PERCENT/100)
-#define GRAPHENE_10TH_OF_1_PERCENT                              (GRAPHENE_100_PERCENT/10)
+#define GRAPHENE_10TH_OF_1_PERCENT                              (GRAPHENE_100_PERCENT/1000)
 /** NOTE: making this a power of 2 (say 2^15) would greatly accelerate fee calcs */
 #define GRAPHENE_MAX_MARKET_FEE_PERCENT                         GRAPHENE_100_PERCENT
 #define GRAPHENE_DEFAULT_FORCE_SETTLEMENT_DELAY                 (60*60*24) ///< 1 day

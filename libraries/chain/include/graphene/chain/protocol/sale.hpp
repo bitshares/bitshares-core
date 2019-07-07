@@ -49,9 +49,9 @@ namespace graphene { namespace chain {
       };
 
       asset            fee;
-      /// Account to transfer asset from
+      /// (Buyer) Account to transfer asset from
       account_id_type  from;
-      /// Account to transfer asset to
+      /// (Seller) Account to transfer asset to 
       account_id_type  to;
       /// The amount of asset to transfer from @ref from to @ref to
       asset            amount;
@@ -60,9 +60,17 @@ namespace graphene { namespace chain {
       optional<memo_data> memo;
       extensions_type   extensions;
 
-      account_id_type fee_payer()const { return to; }
+      account_id_type fee_payer()const { return to; } // Seller pays the transaction fee
       void            validate()const;
       share_type      calculate_fee(const fee_parameters_type& schedule)const;
+
+      void get_required_active_authorities( flat_set<account_id_type>& a )const
+      { 
+         // "to" (the seller) should be in there as it is the fee_payer(), but we need to remove it and
+         // instead add "from" (the buyer)
+         a.clear();
+         a.insert( from );
+      }
    };
 
 }} // graphene::chain

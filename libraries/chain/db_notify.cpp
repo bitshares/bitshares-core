@@ -282,7 +282,8 @@ struct get_impacted_account_visitor
    }
    void operator()( const sale_operation& op )
    {
-      _impacted.insert( op.fee_payer() ); // seller
+      _impacted.insert( op.from ); // Buyer (from)
+      _impacted.insert( op.fee_payer() ); // seller (to)
    }
 };
 
