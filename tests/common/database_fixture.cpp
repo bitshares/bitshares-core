@@ -101,6 +101,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    }
    genesis_state.initial_parameters.get_mutable_fees().zero_all_fees();
    genesis_state.initial_marketing_partner_account_name = "nathan";
+   genesis_state.initial_charity_account_name = "nathan";
 
    genesis_state_type::initial_asset_type init_mpa1;
    init_mpa1.symbol = "INITMPA";
