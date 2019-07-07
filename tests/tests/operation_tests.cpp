@@ -1111,7 +1111,7 @@ BOOST_AUTO_TEST_CASE( create_uia )
       creator.issuer = account_id_type();
       creator.fee = asset();
       creator.symbol = UIA_TEST_SYMBOL;
-      creator.common_options.max_supply = 100000000;
+      creator.common_options.initial_max_supply = 100000000;
       creator.precision = 2;
       creator.common_options.market_fee_percent = GRAPHENE_MAX_MARKET_FEE_PERCENT/100; /*1%*/
       creator.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK;
@@ -1124,7 +1124,7 @@ BOOST_AUTO_TEST_CASE( create_uia )
       BOOST_CHECK(test_asset.symbol == UIA_TEST_SYMBOL);
       BOOST_CHECK(asset(1, test_asset_id) * test_asset.options.core_exchange_rate == asset(2));
       BOOST_CHECK((test_asset.options.flags & white_list) == 0);
-      BOOST_CHECK(test_asset.options.max_supply == 100000000);
+      BOOST_CHECK(test_asset.options.initial_max_supply == 100000000);
       BOOST_CHECK(!test_asset.bitasset_data_id.valid());
       BOOST_CHECK(test_asset.options.market_fee_percent == GRAPHENE_MAX_MARKET_FEE_PERCENT/100);
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
@@ -1137,8 +1137,8 @@ BOOST_AUTO_TEST_CASE( create_uia )
       auto op = trx.operations.back().get<asset_create_operation>();
       op.symbol = "TESTFAIL";
       REQUIRE_THROW_WITH_VALUE(op, issuer, account_id_type(99999999));
-      REQUIRE_THROW_WITH_VALUE(op, common_options.max_supply, -1);
-      REQUIRE_THROW_WITH_VALUE(op, common_options.max_supply, 0);
+      REQUIRE_THROW_WITH_VALUE(op, common_options.initial_max_supply, -1);
+      REQUIRE_THROW_WITH_VALUE(op, common_options.initial_max_supply, 0);
       REQUIRE_THROW_WITH_VALUE(op, symbol, "A");
       REQUIRE_THROW_WITH_VALUE(op, symbol, "qqq");
       REQUIRE_THROW_WITH_VALUE(op, symbol, "11");
@@ -1775,15 +1775,78 @@ BOOST_AUTO_TEST_CASE( fill_order )
    //o.calculate_fee(db.current_fee_schedule());
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE( inflation_test )
+{ try {
+   const asset_object* core = &asset_id_type()(db);
+   BOOST_CHECK_EQUAL( core->reserved(db).value, 
+   (core->options.initial_max_supply.value) - core->dynamic_data(db).current_supply.value ) ;
+
+   const int64_t inflation_amount = 23782344;
+
+   db.modify( db.get_global_properties(), [&]( global_property_object& _gpo )
+   {
+      // Set both the witness pay and inflation amount to the same value
+      // so that every maintenance interval, the budget is increased
+      // by the inflation amount
+      _gpo.parameters.witness_pay_per_block = inflation_amount;
+      _gpo.parameters.core_inflation_amount = inflation_amount;
+   } );
+
+   int64_t blocks_generated = 0;
+
+   auto schedule_maint = [&]()
+   {
+      // now we do maintenance
+      db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& _dpo )
+      {
+         _dpo.next_maintenance_time = db.head_block_time() + 1;
+      } );
+   };
+
+   generate_block();
+   blocks_generated ++;
+
+   BOOST_CHECK_EQUAL( core->reserved(db).value, 
+    (core->options.initial_max_supply.value) + 
+    (inflation_amount * blocks_generated) - core->dynamic_data(db).current_supply.value ) ;
+
+   generate_block();
+   blocks_generated ++;
+   generate_block();
+   blocks_generated ++;
+   generate_block();
+   blocks_generated ++;
+
+   BOOST_CHECK_EQUAL( core->reserved(db).value, 
+    (core->options.initial_max_supply.value) + 
+    (inflation_amount * blocks_generated) - core->dynamic_data(db).current_supply.value ) ;
+
+   schedule_maint();
+   generate_block();
+   blocks_generated ++;
+
+   BOOST_CHECK_EQUAL( core->reserved(db).value, 
+    (core->options.initial_max_supply.value) + 
+    (inflation_amount * blocks_generated) - core->dynamic_data(db).current_supply.value ) ;
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE( witness_pay_test )
 { try {
-
+   const asset_object* core = &asset_id_type()(db);
+   BOOST_TEST_MESSAGE( printf("current_max_supply = %lu. current_supply = %lu, reserved = %lu", 
+   core->dynamic_data(db).current_max_supply.value, 
+   core->dynamic_data(db).current_supply.value, 
+   core->reserved(db).value) );
    const share_type prec = asset::scaled_precision( asset_id_type()(db).precision );
 
    // there is an immediate maintenance interval in the first block
    //   which will initialize last_budget_time
    generate_block();
-
+   BOOST_TEST_MESSAGE( printf("current_max_supply = %lu. current_supply = %lu, reserved = %lu", 
+   core->dynamic_data(db).current_max_supply.value, 
+   core->dynamic_data(db).current_supply.value, 
+   core->reserved(db).value) );
+   
    // Make an account and upgrade it to prime, so that witnesses get some pay
    create_account("nathan", init_account_pub_key);
    transfer(account_id_type()(db), get_account("nathan"), asset(20000*prec));
@@ -1799,7 +1862,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    };
 
    const auto block_interval = db.get_global_properties().parameters.block_interval;
-   const asset_object* core = &asset_id_type()(db);
+   //const asset_object* core = &asset_id_type()(db);
    const account_object* nathan = &get_account("nathan");
    enable_fees();
 
@@ -1828,7 +1891,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    {
       _gpo.parameters.witness_pay_per_block = witness_ppb;
    } );
-
+   
    BOOST_CHECK_EQUAL(core->dynamic_asset_data_id(db).accumulated_fees.value, 0);
    BOOST_TEST_MESSAGE( "Upgrading account" );
    account_upgrade_operation uop;
@@ -1859,14 +1922,13 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    };
    BOOST_TEST_MESSAGE( "Generating some blocks" );
 
-   // generate some blocks
+   // generate 23 blocks
    while( db.head_block_time().sec_since_epoch() - pay_fee_time < 24 * block_interval )
    {
       generate_block();
       BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
    }
    BOOST_CHECK_EQUAL( db.head_block_time().sec_since_epoch() - pay_fee_time, 24u * block_interval );
-
    schedule_maint();
    // The 50% lifetime referral fee went to the committee account, which burned it. Check that it's here.
    BOOST_CHECK( core->reserved(db).value == 5000*prec );
@@ -1892,7 +1954,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    generate_block();
    BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
-   BOOST_CHECK_EQUAL(core->reserved(db).value, 699999584 );
+      BOOST_CHECK_EQUAL(core->reserved(db).value, 699999584 );
 
 } FC_LOG_AND_RETHROW() }
 
@@ -1991,11 +2053,11 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
 
       const auto& core   = asset_id_type()(db);
 
-      // attempt to increase current supply beyond max_supply
+      // attempt to increase current supply beyond initial_max_supply
       const auto& bitjmj = create_bitasset( "JMJBIT", alice_id, 100, charge_market_fee, 2U,
-            asset_id_type{}, GRAPHENE_MAX_SHARE_SUPPLY / 2 );
-      auto bitjmj_id = bitjmj.get_id();
-      share_type original_max_supply = bitjmj.options.max_supply;
+            asset_id_type{}, GRAPHENE_INITIAL_MAX_SHARE_SUPPLY / 2 );
+      //auto bitjmj_id = bitjmj.get_id();
+      //share_type original_max_supply = bitjmj.options.initial_max_supply;
 
       {
          BOOST_TEST_MESSAGE( "Setting price feed to $100000 / 1" );
@@ -2006,11 +2068,11 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
       }
 
       {
-         BOOST_TEST_MESSAGE( "Attempting a call_order_update that exceeds max_supply" );
+         BOOST_TEST_MESSAGE( "Attempting a call_order_update that exceeds initial_max_supply" );
          call_order_update_operation op;
          op.funding_account = alice_id;
          op.delta_collateral = asset( 1000000 * GRAPHENE_BLOCKCHAIN_PRECISION );
-         op.delta_debt = asset( bitjmj.options.max_supply + 1, bitjmj.id );
+         op.delta_debt = asset( bitjmj.options.initial_max_supply + 1, bitjmj.id );
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
@@ -2023,12 +2085,12 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
       set_expiration( db, trx );
 
       // bitjmj should have its problem corrected
-      auto newbitjmj = bitjmj_id(db);
-      BOOST_REQUIRE_GT(newbitjmj.options.max_supply.value, original_max_supply.value);
+      //auto newbitjmj = bitjmj_id(db);
+      //BOOST_REQUIRE_GT(newbitjmj.options.initial_max_supply.value, original_max_supply.value);
 
       // now try with an asset after the hardfork
       const auto& bitusd = create_bitasset( "USDBIT", alice_id, 100, charge_market_fee, 2U,
-            asset_id_type{}, GRAPHENE_MAX_SHARE_SUPPLY / 2 );
+            asset_id_type{}, GRAPHENE_INITIAL_MAX_SHARE_SUPPLY / 2 );
 
       {
          BOOST_TEST_MESSAGE( "Setting price feed to $100000 / 1" );
@@ -2039,11 +2101,11 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
       }
 
       {
-         BOOST_TEST_MESSAGE( "Attempting a call_order_update that exceeds max_supply" );
+         BOOST_TEST_MESSAGE( "Attempting a call_order_update that exceeds initial_max_supply" );
          call_order_update_operation op;
          op.funding_account = alice_id;
          op.delta_collateral = asset( 1000000 * GRAPHENE_BLOCKCHAIN_PRECISION );
-         op.delta_debt = asset( bitusd.options.max_supply + 1, bitusd.id );
+         op.delta_debt = asset( bitusd.options.initial_max_supply + 1, bitusd.id );
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
@@ -2064,11 +2126,11 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
       }
 
       {
-         BOOST_TEST_MESSAGE( "Again attempting a call_order_update_operation that is max_supply - 1 (should throw)" );
+         BOOST_TEST_MESSAGE( "Again attempting a call_order_update_operation that is initial_max_supply - 1 (should throw)" );
          call_order_update_operation op;
          op.funding_account = alice_id;
          op.delta_collateral = asset( 100000 * GRAPHENE_BLOCKCHAIN_PRECISION );
-         op.delta_debt = asset( bitusd.options.max_supply - 1, bitusd.id );
+         op.delta_debt = asset( bitusd.options.initial_max_supply - 1, bitusd.id );
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
@@ -2076,11 +2138,11 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
       }
 
       {
-         BOOST_TEST_MESSAGE( "Again attempting a call_order_update_operation that equals max_supply (should work)" );
+         BOOST_TEST_MESSAGE( "Again attempting a call_order_update_operation that equals initial_max_supply (should work)" );
          call_order_update_operation op;
          op.funding_account = alice_id;
          op.delta_collateral = asset( 100000 * GRAPHENE_BLOCKCHAIN_PRECISION );
-         op.delta_debt = asset( bitusd.options.max_supply - 2, bitusd.id );
+         op.delta_debt = asset( bitusd.options.initial_max_supply - 2, bitusd.id );
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );

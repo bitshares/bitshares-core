@@ -65,7 +65,7 @@ struct genesis_state_type {
       string description;
       uint8_t precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
 
-      share_type max_supply;
+      share_type initial_max_supply;
       share_type accumulated_fees;
       share_type accumulated_fees_for_marketing_partner;
 
@@ -101,7 +101,7 @@ struct genesis_state_type {
    };
 
    time_point_sec                           initial_timestamp;
-   share_type                               max_core_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+   share_type                               initial_max_core_supply = GRAPHENE_INITIAL_MAX_SHARE_SUPPLY;
    chain_parameters                         initial_parameters;
    immutable_chain_parameters               immutable_parameters;
    vector<initial_account_type>             initial_accounts;
@@ -132,7 +132,7 @@ struct genesis_state_type {
 FC_REFLECT(graphene::chain::genesis_state_type::initial_account_type, (name)(owner_key)(active_key)(is_lifetime_member))
 
 FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type,
-           (symbol)(issuer_name)(description)(precision)(max_supply)(accumulated_fees)(accumulated_fees_for_marketing_partner)(is_bitasset)(collateral_records))
+           (symbol)(issuer_name)(description)(precision)(initial_max_supply)(accumulated_fees)(accumulated_fees_for_marketing_partner)(is_bitasset)(collateral_records))
 
 FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type::initial_collateral_position,
            (owner)(collateral)(debt))
@@ -150,7 +150,7 @@ FC_REFLECT(graphene::chain::genesis_state_type::initial_committee_member_type, (
 FC_REFLECT(graphene::chain::genesis_state_type::initial_worker_type, (owner_name)(daily_pay))
 
 FC_REFLECT(graphene::chain::genesis_state_type,
-           (initial_timestamp)(max_core_supply)(initial_parameters)(initial_accounts)(initial_assets)(initial_balances)
+           (initial_timestamp)(initial_max_core_supply)(initial_parameters)(initial_accounts)(initial_assets)(initial_balances)
            (initial_vesting_balances)(initial_active_witnesses)(initial_witness_candidates)
            (initial_committee_candidates)(initial_worker_candidates)
            (initial_chain_id)

@@ -580,6 +580,11 @@ void database::_apply_block( const signed_block& next_block )
 
    const uint32_t missed = update_witness_missed_blocks( next_block );
    update_global_dynamic_data( next_block, missed );
+
+   // Handle increasing the core amount due to inflation prior to
+   // Any sort of fee/block producer/worker payment
+   handle_core_inflation();
+   
    update_signing_witness(signing_witness, next_block);
    update_last_irreversible_block();
 

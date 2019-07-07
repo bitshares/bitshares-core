@@ -122,7 +122,7 @@ namespace graphene { namespace chain {
       {
          auto scaled = fc::uint128(required_fee) * scale;
          scaled /= GRAPHENE_100_PERCENT;
-         FC_ASSERT( scaled <= GRAPHENE_MAX_SHARE_SUPPLY,
+         FC_ASSERT( scaled <= GRAPHENE_INITIAL_MAX_SHARE_SUPPLY,
                     "Required fee after scaling would exceed maximum possible supply" );
          required_fee = scaled.to_uint64();
       }
@@ -166,6 +166,10 @@ namespace graphene { namespace chain {
 
       FC_ASSERT( block_interval >= GRAPHENE_MIN_BLOCK_INTERVAL );
       FC_ASSERT( block_interval <= GRAPHENE_MAX_BLOCK_INTERVAL );
+
+      FC_ASSERT( core_inflation_amount >= GRAPHENE_MIN_INFLATION_AMOUNT );
+      FC_ASSERT( core_inflation_amount <= GRAPHENE_MAX_INFLATION_AMOUNT );
+
       FC_ASSERT( block_interval > 0 );
       FC_ASSERT( maintenance_interval > block_interval,
                  "Maintenance interval must be longer than block interval" );
