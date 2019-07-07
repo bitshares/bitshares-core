@@ -174,7 +174,7 @@ namespace graphene { namespace chain {
          /// Percentage of fee which should go to marketing partner.
          uint16_t marketing_partner_fee_percentage = GRAPHENE_DEFAULT_MARKETING_PARTNER_PERCENT_OF_FEE;
          /// Percentage of fee which should go to charity
-         uint16_t marketing_partner_fee_percentage = GRAPHENE_DEFAULT_CHARITY_PERCENT_OF_FEE;
+         uint16_t charity_fee_percentage = GRAPHENE_DEFAULT_CHARITY_PERCENT_OF_FEE;
          /// Percentage of referral rewards (leftover fee after paying network and lifetime referrer) which should go
          /// to referrer. The remainder of referral rewards goes to the registrar.
          uint16_t referrer_rewards_percentage = 0;
