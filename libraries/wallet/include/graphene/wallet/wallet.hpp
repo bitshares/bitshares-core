@@ -873,6 +873,24 @@ class wallet_api
          return std::make_pair(trx.id(),trx);
       }
 
+      /** Sale of an amount from one account to another.
+       * @param buyer the name or id of the account sending the funds
+       * @param seller the name or id of the account receiving the funds
+       * @param amount the amount paid by the buyer (in nominal units -- to send half of a TUSC, specify 0.5)
+       * @param asset_symbol the symbol or id of the asset to send
+       * @param memo a memo to attach to the transaction.  The memo will be encrypted in the 
+       *             transaction and readable for the receiver.  There is no length limit
+       *             other than the limit imposed by maximum transaction size, but transaction
+       *             increase with transaction size
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction transferring funds
+       */
+      signed_transaction sale(string buyer,
+                              string seller,
+                              string amount,
+                              string asset_symbol,
+                              string memo,
+                              bool broadcast = false);
 
       /**
        *  This method is used to convert a JSON transaction to its transactin ID.
@@ -1940,6 +1958,7 @@ FC_API( graphene::wallet::wallet_api,
         (blind_transfer)
         (blind_history)
         (receive_blind_transfer)
+        (sale)
       //   (get_order_book)
         (quit)
       )

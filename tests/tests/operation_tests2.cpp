@@ -1792,6 +1792,7 @@ BOOST_AUTO_TEST_CASE(sale) {
       ACTOR(bob);
       transfer(account_id_type(), alice_id, asset(500000)); // 500000 is really 5 TUSC
       BOOST_CHECK_EQUAL(get_balance(alice_id, asset_id_type()), 500000);
+      BOOST_CHECK_EQUAL(get_balance(bob_id, asset_id_type()), 0);
 
       enable_fees();
       sale_operation op;
