@@ -90,6 +90,7 @@ void database::debug_dump()
    {
       total_balances[asset_obj.id] += asset_obj.dynamic_asset_data_id(db).accumulated_fees;
       total_balances[asset_obj.id] += asset_obj.dynamic_asset_data_id(db).accumulated_fees_for_marketing_partner;
+      total_balances[asset_obj.id] += asset_obj.dynamic_asset_data_id(db).accumulated_fees_for_charity;
 
       total_balances[asset_id_type()] += asset_obj.dynamic_asset_data_id(db).fee_pool;
 //      edump((total_balances[asset_obj.id])(asset_obj.dynamic_asset_data_id(db).current_supply ) );
