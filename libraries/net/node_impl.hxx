@@ -84,6 +84,7 @@ struct node_configuration
 
    fc::ip::endpoint listen_endpoint;
    bool accept_incoming_connections;
+   bool connect_to_new_peers;
    bool wait_if_endpoint_is_busy;
    /**
     * Originally, our p2p code just had a 'node-id' that was a random number identifying this node
@@ -590,6 +591,7 @@ class node_impl : public peer_connection_delegate
       void connect_to_endpoint(const fc::ip::endpoint& ep);
       void listen_on_endpoint(const fc::ip::endpoint& ep , bool wait_if_not_available);
       void accept_incoming_connections(bool accept);
+      void connect_to_new_peers( bool connect );
       void listen_on_port( uint16_t port, bool wait_if_not_available );
 
       fc::ip::endpoint         get_actual_listening_endpoint() const;

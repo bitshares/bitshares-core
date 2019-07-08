@@ -1708,12 +1708,11 @@ namespace graphene { namespace net { namespace detail {
       std::vector<graphene::net::address_info> updated_addresses = address_message_received.addresses;
       for (address_info& address : updated_addresses)
         address.last_seen_time = fc::time_point_sec(fc::time_point::now());
-      if ( _node_configuration.accept_incoming_connections )
+      if ( _node_configuration.connect_to_new_peers )
       {
-         if ( merge_address_info_with_potential_peer_database(updated_addresses))
+         if ( merge_address_info_with_potential_peer_database(updated_addresses) )
             trigger_p2p_network_connect_loop();
       }
-
       if (_handshaking_connections.find(originating_peer->shared_from_this()) != _handshaking_connections.end())
       {
         // if we were handshaking, we need to continue with the next step in handshaking (which is either
@@ -4426,6 +4425,13 @@ namespace graphene { namespace net { namespace detail {
       save_node_configuration();
     }
 
+   void node_impl::connect_to_new_peers( bool connect )
+   {
+      VERIFY_CORRECT_THREAD();
+      _node_configuration.connect_to_new_peers = connect;
+      save_node_configuration();
+   }
+
     void node_impl::listen_on_port( uint16_t port, bool wait_if_not_available )
     {
       VERIFY_CORRECT_THREAD();
@@ -4782,6 +4788,11 @@ namespace graphene { namespace net { namespace detail {
   void node::accept_incoming_connections(bool accept)
   {
     INVOKE_IN_IMPL(accept_incoming_connections, accept);
+  }
+
+  void node::connect_to_new_peers( bool connect )
+  {
+     INVOKE_IN_IMPL( connect_to_new_peers, connect );
   }
 
   void node::listen_on_port( uint16_t port, bool wait_if_not_available )

@@ -250,10 +250,17 @@ namespace graphene { namespace net {
          */
         static std::vector<fc::ip::endpoint> resolve_string_to_ip_endpoints( const std::string& in );
 
-        /**
-         *  Call with true to enable listening for incoming connections
+         /**
+          * listen for incoming connections
+          * @param accept set to true to listen for incoming connections, false otherwise
          */
-        void accept_incoming_connections( bool accept );
+         void accept_incoming_connections( bool accept );
+
+         /***
+          * When new connections are advertised, attempt a connection
+          * @param connect true to attempt new connections, false otherwise
+          */
+         void connect_to_new_peers( bool connect );
 
         /**
          *  Specifies the port upon which incoming connections should be accepted.

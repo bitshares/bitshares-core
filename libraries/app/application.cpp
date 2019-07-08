@@ -173,6 +173,9 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    if ( _options->count("accept_incoming_connections") )
       _p2p_network->accept_incoming_connections( _options->at("accept_incoming_connections").as<bool>() );
 
+   if ( _options->count("connect-to-new-peers") )
+      _p2p_network->connect_to_new_peers( _options->at( "connect_to_new_peers" ).as<bool>() );
+
    _p2p_network->connect_to_p2p_network();
    _p2p_network->sync_from(net::item_id(net::core_message_type_enum::block_message_type,
                                         _chain_db->head_block_id()),
@@ -1055,6 +1058,7 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::get_withdraw_permissions_by_recipient to set max limit value")
           "For database_api_impl::get_order_book to set its default limit value as 50")
          ("accept-incoming-connections", bpo::value<bool>()->implicit_value(true), "Accept incoming connections")
+         ("connect-to-new-peers", bpo::value<bool>()->implicit_value(true), "Connect to new peers")
          ("advertise-peer-algorithm", bpo::value<string>()->implicit_value("all"),
             "Determines which peers are advertised. Algorithms: 'all', 'nothing', 'list', exclude_list'")
          ("advertise-peer-list", bpo::value<vector<string>>()->composing(), 
