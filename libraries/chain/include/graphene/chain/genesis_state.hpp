@@ -68,6 +68,7 @@ struct genesis_state_type {
       share_type initial_max_supply;
       share_type accumulated_fees;
       share_type accumulated_fees_for_marketing_partner;
+      share_type accumulated_fees_for_charity;
 
       bool is_bitasset = false;
       vector<initial_collateral_position> collateral_records;
@@ -113,6 +114,7 @@ struct genesis_state_type {
    vector<initial_committee_member_type>    initial_committee_candidates;
    vector<initial_worker_type>              initial_worker_candidates;
    string                                   initial_marketing_partner_account_name;
+   string                                   initial_charity_account_name;
 
    /**
     * Temporary, will be moved elsewhere.
@@ -132,7 +134,8 @@ struct genesis_state_type {
 FC_REFLECT(graphene::chain::genesis_state_type::initial_account_type, (name)(owner_key)(active_key)(is_lifetime_member))
 
 FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type,
-           (symbol)(issuer_name)(description)(precision)(initial_max_supply)(accumulated_fees)(accumulated_fees_for_marketing_partner)(is_bitasset)(collateral_records))
+           (symbol)(issuer_name)(description)(precision)(initial_max_supply)(accumulated_fees)(accumulated_fees_for_marketing_partner)(accumulated_fees_for_charity)(is_bitasset)(collateral_records))
+
 
 FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type::initial_collateral_position,
            (owner)(collateral)(debt))
@@ -155,4 +158,5 @@ FC_REFLECT(graphene::chain::genesis_state_type,
            (initial_committee_candidates)(initial_worker_candidates)
            (initial_chain_id)
            (immutable_parameters)
-           (initial_marketing_partner_account_name))
+           (initial_marketing_partner_account_name)
+           (initial_charity_account_name))
