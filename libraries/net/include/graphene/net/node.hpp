@@ -199,12 +199,24 @@ namespace graphene { namespace net {
         void close();
 
         void      set_node_delegate( node_delegate* del );
+        /***
+         * Allows the caller to determine how to respond to requests for peers
+         * @param algo the algorithm to use ("exclude_list", "list", "nothing", "all")
+         * @param advertise_or_exclude_list a list of nodes to 
+         *     advertise (if algo = "list") or exclude (if algo is "exclude")
+         */
         void set_advertise_algorithm( std::string algo,
             const fc::optional<std::vector<std::string>>& advertise_or_exclude_list = fc::optional<std::vector<std::string>>() );
 
         void      load_configuration( const fc::path& configuration_directory );
         
-        void      listen_on_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available );
+        /**
+         * Specifies the network interface and port upon which incoming
+         *  connections should be accepted.
+         * @param ep the endpoint (network interface and port)
+         * @param wait_if_not_available keep retrying if port is not available
+         */
+        void listen_on_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available );
 
         virtual void      listen_to_p2p_network();
         virtual void      connect_to_p2p_network();
@@ -220,14 +232,12 @@ namespace graphene { namespace net {
          * @brief Add an endpoint as a seed to the p2p network
          *
          * @param seed_string the url
-         * @param connect_immediately will start the connection process immediately
          */
         void add_seed_node( const std::string& seed_string );
 
         /*****
          * @brief add a list of nodes to seed the p2p network
          * @param seeds a vector of url strings
-         * @param connect_immediately attempt a connection immediately
          */
         void add_seed_nodes( std::vector<std::string> seeds );
 

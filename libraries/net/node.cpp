@@ -5118,17 +5118,8 @@ namespace graphene { namespace net { namespace detail {
 
   } // end namespace detail
 
-   /***
-    * @brief Helper to convert a string to a collection of endpoints
-    *
-    * This converts a string (i.e. "bitshares.eu:665535" to a collection of endpoints.
-    * NOTE: Throws an exception if not in correct format or was unable to resolve URL.
-    *
-    * @param in the incoming string
-    * @returns a vector of endpoints
-   */
    std::vector<fc::ip::endpoint> node::resolve_string_to_ip_endpoints(const std::string& in)
-  {
+   {
       try
       {
          std::string::size_type colon_pos = in.find(':');
@@ -5161,11 +5152,6 @@ namespace graphene { namespace net { namespace detail {
       INVOKE_IN_IMPL(add_seed_node, endpoint_string);
    }
 
-   /*****
-    * @brief add a list of nodes to seed the p2p network
-    * @param seeds a vector of url strings
-    * @param connect_immediately attempt a connection immediately
-    */
    void node::add_seed_nodes(std::vector<std::string> seeds)
    {
       for(const std::string& endpoint_string : seeds )
