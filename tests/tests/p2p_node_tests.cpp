@@ -278,9 +278,16 @@ BOOST_AUTO_TEST_CASE( advertise_or_exclude_list )
    fc::temp_directory my_node_dir;
    test_node my_node( "Hello", my_node_dir.path(), my_node_port );
    my_node.set_advertise_algorithm( "list", advert_list );
-   test_delegate del{};
+
    // a fake peer
+   test_delegate del{};
    std::shared_ptr<test_peer> my_peer( new test_peer{&del} );
+
+   // add 2 connections, 1 of which appears on the advertise_list
+   std::pair<std::shared_ptr<test_delegate>, graphene::net::peer_connection_ptr> node1_rslts
+         = my_node.create_peer_connection("127.0.0.1:8089");
+   std::pair<std::shared_ptr<test_delegate>, graphene::net::peer_connection_ptr> node2_reslts
+         = my_node.create_peer_connection("127.0.0.1:8090");
 
    // act like my_node received an address_request message from my_peer
    graphene::net::address_request_message address_request_message_received;

@@ -218,7 +218,17 @@ namespace graphene { namespace net { namespace detail {
 
       void build(node_impl* impl, address_message& reply)
       {
-         reply.addresses = advertise_or_exclude_list;
+         std::vector<graphene::net::address_info> ret_val;
+         // only pass those that are in the list AND we are connected to
+         std::for_each(advertise_or_exclude_list.begin(), advertise_or_exclude_list.end(), 
+               [&impl = impl, reply=reply, &ret_val=ret_val]
+               (const graphene::net::address_info& addr)
+               {
+                  graphene::net::peer_connection_ptr peer_conn = impl->get_active_connection_to_endpoint(addr.remote_endpoint);
+                  if ( peer_conn != peer_connection_ptr() )
+                     ret_val.push_back(addr);
+               });
+         reply.addresses = ret_val;
       }
       private:
       std::vector<graphene::net::address_info> advertise_or_exclude_list;
@@ -4246,15 +4256,24 @@ namespace graphene { namespace net { namespace detail {
       initiate_connect_to(new_peer);
     }
 
-    peer_connection_ptr node_impl::get_connection_to_endpoint( const fc::ip::endpoint& remote_endpoint )
-    {
+   peer_connection_ptr node_impl::get_active_connection_to_endpoint( const fc::ip::endpoint& remote_endpoint)
+   {
       VERIFY_CORRECT_THREAD();
       for( const peer_connection_ptr& active_peer : _active_connections )
       {
-        fc::optional<fc::ip::endpoint> endpoint_for_this_peer( active_peer->get_remote_endpoint() );
-        if( endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
-          return active_peer;
+         fc::optional<fc::ip::endpoint> endpoint_for_this_peer( active_peer->get_remote_endpoint() );
+         if( endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
+            return active_peer;
       }
+      return peer_connection_ptr();
+   }
+
+    peer_connection_ptr node_impl::get_connection_to_endpoint( const fc::ip::endpoint& remote_endpoint )
+    {
+      VERIFY_CORRECT_THREAD();
+      peer_connection_ptr active_ptr = get_active_connection_to_endpoint( remote_endpoint );
+      if ( active_ptr != peer_connection_ptr() )
+         return active_ptr;
       for( const peer_connection_ptr& handshaking_peer : _handshaking_connections )
       {
         fc::optional<fc::ip::endpoint> endpoint_for_this_peer( handshaking_peer->get_remote_endpoint() );
@@ -5145,11 +5164,6 @@ namespace graphene { namespace net { namespace detail {
          }
       }
       FC_CAPTURE_AND_RETHROW((in))
-   }
-
-   void node::add_seed_node(const std::string& endpoint_string)
-   {
-      INVOKE_IN_IMPL(add_seed_node, endpoint_string);
    }
 
    void node::add_seed_nodes(std::vector<std::string> seeds)

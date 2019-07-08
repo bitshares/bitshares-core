@@ -555,6 +555,17 @@ class node_impl : public peer_connection_delegate
       void move_peer_to_closing_list(const peer_connection_ptr& peer);
       void move_peer_to_terminating_list(const peer_connection_ptr& peer);
 
+      /***
+       * Look for an active connection at the given address
+       * @param remote_endpoint the address we are interested in
+       * @returns the connection, or peer_connection_ptr() if not found
+       */
+      peer_connection_ptr get_active_connection_to_endpoint( const fc::ip::endpoint& remote_endpoint );
+      /***
+       * Look for a connection that is either active or currently in the handshaking process
+       * @param remote_endpoint the address we are interested in
+       * @returns the connection, or peer_connection_ptr() if not found
+       */
       peer_connection_ptr get_connection_to_endpoint( const fc::ip::endpoint& remote_endpoint );
 
       void dump_node_status();
