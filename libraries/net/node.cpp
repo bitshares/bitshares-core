@@ -195,24 +195,29 @@ namespace graphene { namespace net { namespace detail {
       {
          FC_ASSERT( address_list.valid(), "advertise-peer-list must be included" );
 
-         advertise_or_exclude_list.reserve( address_list->size() );
-         auto& list = advertise_or_exclude_list;
-         std::for_each( address_list->begin(), address_list->end(), [&list]( std::string str ) {
-               // ignore fc exceptions (like poorly formatted endpoints)
-               try
+         advertise_list.reserve( address_list->size() );
+         std::for_each( address_list->begin(), address_list->end(), [&list = advertise_list]( std::string str )
+            {
+               // filter out duplicates
+               if ( list.find(str) == list.end() )
                {
-                  list.emplace_back( graphene::net::address_info(
-                     fc::ip::endpoint::from_string(str),
-                     fc::time_point_sec(),
-                     fc::microseconds(0),
-                     node_id_t(),
-                     peer_connection_direction::unknown,
-                     firewalled_state::unknown ));
+                  // ignore fc exceptions (like poorly formatted endpoints)
+                  try
+                  {
+                     graphene::net::address_info tmp(
+                        fc::ip::endpoint::from_string(str),
+                        fc::time_point_sec(),
+                        fc::microseconds(0),
+                        node_id_t(),
+                        peer_connection_direction::unknown,
+                        firewalled_state::unknown );
+                     list[str] = tmp;
+                  }
+                  catch(const fc::exception& ) 
+                  {
+                     wlog( "Address ${addr} invalid.", ("addr", str) );
+                  } 
                }
-               catch(const fc::exception& ) 
-               {
-                  wlog( "Address ${addr} invalid.", ("addr", str) );
-               } 
             } );
       }
 
@@ -220,18 +225,17 @@ namespace graphene { namespace net { namespace detail {
       {
          std::vector<graphene::net::address_info> ret_val;
          // only pass those that are in the list AND we are connected to
-         std::for_each(advertise_or_exclude_list.begin(), advertise_or_exclude_list.end(), 
-               [&impl = impl, reply=reply, &ret_val=ret_val]
-               (const graphene::net::address_info& addr)
-               {
-                  graphene::net::peer_connection_ptr peer_conn = impl->get_active_connection_to_endpoint(addr.remote_endpoint);
-                  if ( peer_conn != peer_connection_ptr() )
-                     ret_val.push_back(addr);
-               });
+         for(auto& it : advertise_list)
+         {
+            graphene::net::peer_connection_ptr peer_conn 
+               = impl->get_active_connection_for_endpoint(it.second.remote_endpoint);
+            if ( peer_conn != peer_connection_ptr() )
+               ret_val.push_back(it.second);
+         }
          reply.addresses = ret_val;
       }
       private:
-      std::vector<graphene::net::address_info> advertise_or_exclude_list;
+      std::unordered_map<std::string, graphene::net::address_info> advertise_list;
    };
 
    /****
@@ -396,7 +400,7 @@ namespace graphene { namespace net { namespace detail {
             {
               // see if we have an existing connection to that peer.  If we do, disconnect them and
               // then try to connect the next time through the loop
-              peer_connection_ptr existing_connection_ptr = get_connection_to_endpoint( add_once_peer.endpoint );
+              peer_connection_ptr existing_connection_ptr = get_connection_for_endpoint( add_once_peer.endpoint );
               if(!existing_connection_ptr)
                 connect_to_endpoint(add_once_peer.endpoint);
             }
@@ -4256,7 +4260,7 @@ namespace graphene { namespace net { namespace detail {
       initiate_connect_to(new_peer);
     }
 
-   peer_connection_ptr node_impl::get_active_connection_to_endpoint( const fc::ip::endpoint& remote_endpoint)
+   peer_connection_ptr node_impl::get_active_connection_for_endpoint( const fc::ip::endpoint& remote_endpoint)
    {
       VERIFY_CORRECT_THREAD();
       for( const peer_connection_ptr& active_peer : _active_connections )
@@ -4268,10 +4272,10 @@ namespace graphene { namespace net { namespace detail {
       return peer_connection_ptr();
    }
 
-    peer_connection_ptr node_impl::get_connection_to_endpoint( const fc::ip::endpoint& remote_endpoint )
+    peer_connection_ptr node_impl::get_connection_for_endpoint( const fc::ip::endpoint& remote_endpoint )
     {
       VERIFY_CORRECT_THREAD();
-      peer_connection_ptr active_ptr = get_active_connection_to_endpoint( remote_endpoint );
+      peer_connection_ptr active_ptr = get_active_connection_for_endpoint( remote_endpoint );
       if ( active_ptr != peer_connection_ptr() )
          return active_ptr;
       for( const peer_connection_ptr& handshaking_peer : _handshaking_connections )
@@ -4286,7 +4290,7 @@ namespace graphene { namespace net { namespace detail {
     bool node_impl::is_connection_to_endpoint_in_progress( const fc::ip::endpoint& remote_endpoint )
     {
       VERIFY_CORRECT_THREAD();
-      return get_connection_to_endpoint( remote_endpoint ) != peer_connection_ptr();
+      return get_connection_for_endpoint( remote_endpoint ) != peer_connection_ptr();
     }
 
     void node_impl::move_peer_to_active_list(const peer_connection_ptr& peer)

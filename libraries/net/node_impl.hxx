@@ -561,13 +561,13 @@ class node_impl : public peer_connection_delegate
        * @param remote_endpoint the address we are interested in
        * @returns the connection, or peer_connection_ptr() if not found
        */
-      peer_connection_ptr get_active_connection_to_endpoint( const fc::ip::endpoint& remote_endpoint );
+      peer_connection_ptr get_active_connection_for_endpoint( const fc::ip::endpoint& remote_endpoint );
       /***
        * Look for a connection that is either active or currently in the handshaking process
        * @param remote_endpoint the address we are interested in
        * @returns the connection, or peer_connection_ptr() if not found
        */
-      peer_connection_ptr get_connection_to_endpoint( const fc::ip::endpoint& remote_endpoint );
+      peer_connection_ptr get_connection_for_endpoint( const fc::ip::endpoint& remote_endpoint );
 
       void dump_node_status();
 

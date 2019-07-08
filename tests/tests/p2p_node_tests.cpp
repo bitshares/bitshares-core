@@ -270,9 +270,9 @@ BOOST_AUTO_TEST_CASE( set_nothing_advertise_algorithm )
    test_address_message( msg, 0 );
 }
 
-BOOST_AUTO_TEST_CASE( advertise_or_exclude_list )
+BOOST_AUTO_TEST_CASE( advertise_list_test )
 {
-   std::vector<std::string> advert_list = { "127.0.0.1:8090"};
+   std::vector<std::string> advert_list = { "127.0.0.1:8090" };
    // set up my node
    int my_node_port = graphene::app::get_available_port();
    fc::temp_directory my_node_dir;
