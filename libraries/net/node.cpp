@@ -195,8 +195,8 @@ namespace graphene { namespace net { namespace detail {
       {
          FC_ASSERT( address_list.valid(), "advertise-peer-list must be included" );
 
-         advertise_list.reserve( address_list->size() );
-         auto& list = advertise_list;
+         advertise_or_exclude_list.reserve( address_list->size() );
+         auto& list = advertise_or_exclude_list;
          std::for_each( address_list->begin(), address_list->end(), [&list]( std::string str ) {
                // ignore fc exceptions (like poorly formatted endpoints)
                try
@@ -218,10 +218,10 @@ namespace graphene { namespace net { namespace detail {
 
       void build(node_impl* impl, address_message& reply)
       {
-         reply.addresses = advertise_list;
+         reply.addresses = advertise_or_exclude_list;
       }
       private:
-      std::vector<graphene::net::address_info> advertise_list;
+      std::vector<graphene::net::address_info> advertise_or_exclude_list;
    };
 
    /****
@@ -1669,15 +1669,15 @@ namespace graphene { namespace net { namespace detail {
     }
 
    void node_impl::set_advertise_algorithm( std::string algo, 
-         const fc::optional<std::vector<std::string>>& advertise_list )
+         const fc::optional<std::vector<std::string>>& advertise_or_exclude_list )
    {
       if (algo == "exclude_list")
       {
-         _address_builder = std::make_shared<exclude_address_builder>(advertise_list);
+         _address_builder = std::make_shared<exclude_address_builder>(advertise_or_exclude_list);
       }
       else if (algo == "list")
       {
-         _address_builder = std::make_shared<list_address_builder>(advertise_list);
+         _address_builder = std::make_shared<list_address_builder>(advertise_or_exclude_list);
       }
       else if (algo == "nothing")
       {
@@ -5179,9 +5179,9 @@ namespace graphene { namespace net { namespace detail {
       }
    }
 
-   void node::set_advertise_algorithm( std::string algo, const fc::optional<std::vector<std::string>>& advertise_list )
+   void node::set_advertise_algorithm( std::string algo, const fc::optional<std::vector<std::string>>& advertise_or_exclude_list )
    {
-      my->set_advertise_algorithm( algo, advertise_list );
+      my->set_advertise_algorithm( algo, advertise_or_exclude_list );
    }
 
 } } // end namespace graphene::net

@@ -573,7 +573,7 @@ class node_impl : public peer_connection_delegate
       void listen_to_p2p_network();
       void connect_to_p2p_network();
       void add_node( const fc::ip::endpoint& ep );
-      void set_advertise_algorithm( std::string algo, const fc::optional<std::vector<std::string>>& advertise_list );
+      void set_advertise_algorithm( std::string algo, const fc::optional<std::vector<std::string>>& advertise_or_exclude_list );
       void add_seed_node( const std::string& seed_string );
       void initiate_connect_to(const peer_connection_ptr& peer);
       void connect_to_endpoint(const fc::ip::endpoint& ep);

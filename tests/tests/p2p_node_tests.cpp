@@ -270,7 +270,7 @@ BOOST_AUTO_TEST_CASE( set_nothing_advertise_algorithm )
    test_address_message( msg, 0 );
 }
 
-BOOST_AUTO_TEST_CASE( advertise_list )
+BOOST_AUTO_TEST_CASE( advertise_or_exclude_list )
 {
    std::vector<std::string> advert_list = { "127.0.0.1:8090"};
    // set up my node
