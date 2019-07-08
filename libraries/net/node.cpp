@@ -3219,8 +3219,9 @@ namespace graphene { namespace net { namespace detail {
         // we're being asked to check another node
         // first, find out if we're currently connected to that node.  If we are, we
         // can't perform the test
-        if (is_already_connected_to_id(check_firewall_message_received.node_id) ||
-            is_connection_to_endpoint_in_progress(check_firewall_message_received.endpoint_to_check))
+        if ( !_node_configuration.connect_to_new_peers || 
+           ( is_already_connected_to_id(check_firewall_message_received.node_id) ||
+            is_connection_to_endpoint_in_progress(check_firewall_message_received.endpoint_to_check )))
         {
           check_firewall_reply_message reply;
           reply.node_id = check_firewall_message_received.node_id;
