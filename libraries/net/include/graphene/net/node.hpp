@@ -206,7 +206,8 @@ namespace graphene { namespace net {
          *     advertise (if algo = "list") or exclude (if algo is "exclude")
          */
         void set_advertise_algorithm( std::string algo,
-            const fc::optional<std::vector<std::string>>& advertise_or_exclude_list = fc::optional<std::vector<std::string>>() );
+            const fc::optional<std::vector<std::string>>& advertise_or_exclude_list 
+            = fc::optional<std::vector<std::string>>() );
 
         void      load_configuration( const fc::path& configuration_directory );
         
@@ -216,7 +217,7 @@ namespace graphene { namespace net {
          * @param ep the endpoint (network interface and port)
          * @param wait_if_not_available keep retrying if port is not available
          */
-        void listen_on_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available );
+        void set_listen_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available );
 
         virtual void      listen_to_p2p_network();
         virtual void      connect_to_p2p_network();
@@ -251,16 +252,16 @@ namespace graphene { namespace net {
         static std::vector<fc::ip::endpoint> resolve_string_to_ip_endpoints( const std::string& in );
 
          /**
-          * listen for incoming connections
+          * enable/disable listening for incoming connections
           * @param accept set to true to listen for incoming connections, false otherwise
          */
-         void accept_incoming_connections( bool accept );
+         void set_accept_incoming_connections( bool accept );
 
          /***
-          * When new connections are advertised, attempt a connection
+          * enable/disable connection attempts when new connections are advertised
           * @param connect true to attempt new connections, false otherwise
           */
-         void connect_to_new_peers( bool connect );
+         void set_connect_to_new_peers( bool connect );
 
         /**
          *  Specifies the port upon which incoming connections should be accepted.
@@ -270,11 +271,11 @@ namespace graphene { namespace net {
          *                               available.  If false and the port is not available,
          *                               just choose a random available port
          */
-        void      listen_on_port(uint16_t port, bool wait_if_not_available);
+        void set_listen_port( uint16_t port, bool wait_if_not_available );
 
         /**
          * Returns the endpoint the node is listening on.  This is usually the same
-         * as the value previously passed in to listen_on_endpoint, unless we
+         * as the value previously passed in to set_listen_endpoint, unless we
          * were unable to bind to that port.
          */
         virtual fc::ip::endpoint get_actual_listening_endpoint() const;

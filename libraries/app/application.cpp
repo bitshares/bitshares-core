@@ -164,17 +164,17 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    }
 
    if( _options->count("p2p-endpoint") )
-      _p2p_network->listen_on_endpoint(fc::ip::endpoint::from_string(_options->at("p2p-endpoint").as<string>()), true);
+      _p2p_network->set_listen_endpoint(fc::ip::endpoint::from_string(_options->at("p2p-endpoint").as<string>()), true);
    else
-      _p2p_network->listen_on_port(0, false);
+      _p2p_network->set_listen_port(0, false);
    _p2p_network->listen_to_p2p_network();
    ilog("Configured p2p node to listen on ${ip}", ("ip", _p2p_network->get_actual_listening_endpoint()));
 
-   if ( _options->count("accept_incoming_connections") )
-      _p2p_network->accept_incoming_connections( _options->at("accept_incoming_connections").as<bool>() );
+   if ( _options->count("accept-incoming-connections") )
+      _p2p_network->set_accept_incoming_connections( _options->at("accept-incoming-connections").as<bool>() );
 
    if ( _options->count("connect-to-new-peers") )
-      _p2p_network->connect_to_new_peers( _options->at( "connect_to_new_peers" ).as<bool>() );
+      _p2p_network->set_connect_to_new_peers( _options->at( "connect-to-new-peers" ).as<bool>() );
 
    _p2p_network->connect_to_p2p_network();
    _p2p_network->sync_from(net::item_id(net::core_message_type_enum::block_message_type,

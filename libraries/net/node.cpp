@@ -4411,7 +4411,7 @@ namespace graphene { namespace net { namespace detail {
         dlog("Disconnecting from ${peer} for ${reason}", ("peer",peer_to_disconnect->get_remote_endpoint()) ("reason",reason_for_disconnect));
     }
 
-    void node_impl::listen_on_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available )
+    void node_impl::set_listen_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available )
     {
       VERIFY_CORRECT_THREAD();
       _node_configuration.listen_endpoint = ep;
@@ -4419,21 +4419,21 @@ namespace graphene { namespace net { namespace detail {
       save_node_configuration();
     }
 
-    void node_impl::accept_incoming_connections(bool accept)
+    void node_impl::set_accept_incoming_connections(bool accept)
     {
       VERIFY_CORRECT_THREAD();
       _node_configuration.accept_incoming_connections = accept;
       save_node_configuration();
     }
 
-   void node_impl::connect_to_new_peers( bool connect )
+   void node_impl::set_connect_to_new_peers( bool connect )
    {
       VERIFY_CORRECT_THREAD();
       _node_configuration.connect_to_new_peers = connect;
       save_node_configuration();
    }
 
-    void node_impl::listen_on_port( uint16_t port, bool wait_if_not_available )
+    void node_impl::set_listen_port( uint16_t port, bool wait_if_not_available )
     {
       VERIFY_CORRECT_THREAD();
       _node_configuration.listen_endpoint = fc::ip::endpoint( fc::ip::address(), port );
@@ -4781,24 +4781,24 @@ namespace graphene { namespace net { namespace detail {
     INVOKE_IN_IMPL(connect_to_endpoint, remote_endpoint);
   }
 
-  void node::listen_on_endpoint(const fc::ip::endpoint& ep , bool wait_if_not_available)
+  void node::set_listen_endpoint(const fc::ip::endpoint& ep , bool wait_if_not_available)
   {
-    INVOKE_IN_IMPL(listen_on_endpoint, ep, wait_if_not_available);
+    INVOKE_IN_IMPL(set_listen_endpoint, ep, wait_if_not_available);
   }
 
-  void node::accept_incoming_connections(bool accept)
+  void node::set_accept_incoming_connections(bool accept)
   {
-    INVOKE_IN_IMPL(accept_incoming_connections, accept);
+    INVOKE_IN_IMPL(set_accept_incoming_connections, accept);
   }
 
-  void node::connect_to_new_peers( bool connect )
+  void node::set_connect_to_new_peers( bool connect )
   {
-     INVOKE_IN_IMPL( connect_to_new_peers, connect );
+     INVOKE_IN_IMPL( set_connect_to_new_peers, connect );
   }
 
-  void node::listen_on_port( uint16_t port, bool wait_if_not_available )
+  void node::set_listen_port( uint16_t port, bool wait_if_not_available )
   {
-    INVOKE_IN_IMPL(listen_on_port, port, wait_if_not_available);
+    INVOKE_IN_IMPL(set_listen_port, port, wait_if_not_available);
   }
 
   fc::ip::endpoint node::get_actual_listening_endpoint() const

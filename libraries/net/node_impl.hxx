@@ -585,14 +585,15 @@ class node_impl : public peer_connection_delegate
       void listen_to_p2p_network();
       void connect_to_p2p_network();
       void add_node( const fc::ip::endpoint& ep );
-      void set_advertise_algorithm( std::string algo, const fc::optional<std::vector<std::string>>& advertise_or_exclude_list );
+      void set_advertise_algorithm( std::string algo, 
+            const fc::optional<std::vector<std::string>>& advertise_or_exclude_list );
       void add_seed_node( const std::string& seed_string );
       void initiate_connect_to(const peer_connection_ptr& peer);
       void connect_to_endpoint(const fc::ip::endpoint& ep);
-      void listen_on_endpoint(const fc::ip::endpoint& ep , bool wait_if_not_available);
-      void accept_incoming_connections(bool accept);
-      void connect_to_new_peers( bool connect );
-      void listen_on_port( uint16_t port, bool wait_if_not_available );
+      void set_listen_endpoint(const fc::ip::endpoint& ep , bool wait_if_not_available);
+      void set_accept_incoming_connections(bool accept);
+      void set_connect_to_new_peers( bool connect );
+      void set_listen_port( uint16_t port, bool wait_if_not_available );
 
       fc::ip::endpoint         get_actual_listening_endpoint() const;
       std::vector<peer_status> get_connected_peers() const;
