@@ -1459,7 +1459,8 @@ BOOST_FIXTURE_TEST_CASE( miss_many_blocks, database_fixture )
       generate_block();
       auto missed_before = get_misses( db );
       // miss 9 maintenance intervals
-      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time + db.get_global_properties().parameters.maintenance_interval * 9, true );
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time + 
+                       db.get_global_properties().parameters.maintenance_interval * 9, true );
       generate_block();
       generate_block();
       generate_block();
