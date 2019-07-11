@@ -39,6 +39,7 @@
 #include <graphene/chain/protocol/witness.hpp>
 #include <graphene/chain/protocol/worker.hpp>
 #include <graphene/chain/protocol/htlc.hpp>
+#include <graphene/chain/protocol/sale.hpp>
 
 namespace graphene { namespace chain {
 
@@ -101,7 +102,8 @@ namespace graphene { namespace chain {
             htlc_redeem_operation,
             htlc_redeemed_operation,         // VIRTUAL
             htlc_extend_operation,
-            htlc_refund_operation            // VIRTUAL
+            htlc_refund_operation,            // VIRTUAL
+            sale_operation
          > operation;
 
    /// @} // operations group

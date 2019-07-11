@@ -63,6 +63,7 @@
 #include <graphene/chain/witness_evaluator.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
 #include <graphene/chain/htlc_evaluator.hpp>
+#include <graphene/chain/sale_evaluator.hpp>
 
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
@@ -181,6 +182,7 @@ void database::initialize_evaluators()
    register_evaluator<htlc_create_evaluator>();
    register_evaluator<htlc_redeem_evaluator>();
    register_evaluator<htlc_extend_evaluator>();
+   register_evaluator<sale_evaluator>();
 }
 
 void database::initialize_indexes()

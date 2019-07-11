@@ -140,6 +140,7 @@ public:
    std::string operator()(const asset_create_operation& op)const;
    std::string operator()(const htlc_create_operation& op)const;
    std::string operator()(const htlc_redeem_operation& op)const;
+   std::string operator()(const sale_operation& op)const;
 };
 
 template<class T>
@@ -2384,6 +2385,41 @@ public:
       return sign_transaction(tx, broadcast);
    } FC_CAPTURE_AND_RETHROW( (from)(to)(amount)(asset_symbol)(memo)(broadcast) ) }
 
+   signed_transaction sale(string buyer, string seller, string amount,
+                               string asset_symbol, string memo, bool broadcast = false)
+   { try {
+      FC_ASSERT( !self.is_locked() );
+      fc::optional<asset_object> asset_obj = get_asset(asset_symbol);
+      FC_ASSERT(asset_obj, "Could not find asset matching ${asset}", ("asset", asset_symbol));
+
+      account_object from_account = get_account(buyer);
+      account_object to_account = get_account(seller);
+      account_id_type from_id = from_account.id;
+      account_id_type to_id = to_account.id;
+
+      sale_operation sale_op;
+
+      sale_op.from = from_id;
+      sale_op.to = to_id;
+      sale_op.amount = asset_obj->amount_from_string(amount);
+
+      if( memo.size() )
+         {
+            sale_op.memo = memo_data();
+            sale_op.memo->from = from_account.options.memo_key;
+            sale_op.memo->to = to_account.options.memo_key;
+            sale_op.memo->set_message(get_private_key(from_account.options.memo_key),
+                                      to_account.options.memo_key, memo);
+         }
+
+      signed_transaction tx;
+      tx.operations.push_back(sale_op);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+      tx.validate();
+
+      return sign_transaction(tx, broadcast);
+   } FC_CAPTURE_AND_RETHROW( (buyer)(seller)(amount)(asset_symbol)(memo)(broadcast) ) }
+
    signed_transaction issue_asset(string to_account, string amount, string symbol,
                                   string memo, bool broadcast = false)
    {
@@ -3041,6 +3077,39 @@ std::string operation_printer::operator()(const htlc_create_operation& op) const
       out << " (pending " << std::to_string(pending_blocks) << " blocks)";
 
    return "";
+}
+
+string operation_printer::operator()(const sale_operation& op) const
+{
+   out << "Sale " << wallet.get_asset(op.amount.asset_id).amount_to_pretty_string(op.amount)
+       << " buyer " << wallet.get_account(op.from).name << " seller " << wallet.get_account(op.to).name;
+   std::string memo;
+   if( op.memo )
+   {
+      if( wallet.is_locked() )
+      {
+         out << " -- Unlock wallet to see memo.";
+      } else {
+         try {
+            FC_ASSERT(wallet._keys.count(op.memo->to) || wallet._keys.count(op.memo->from), "Memo is encrypted to a key ${seller} or ${buyer} not in this wallet.", ("seller", op.memo->to)("buyer",op.memo->from));
+            if( wallet._keys.count(op.memo->to) ) {
+               auto my_key = wif_to_key(wallet._keys.at(op.memo->to));
+               FC_ASSERT(my_key, "Unable to recover private key to decrypt memo. Wallet may be corrupted.");
+               memo = op.memo->get_message(*my_key, op.memo->from);
+               out << " -- Memo: " << memo;
+            } else {
+               auto my_key = wif_to_key(wallet._keys.at(op.memo->from));
+               FC_ASSERT(my_key, "Unable to recover private key to decrypt memo. Wallet may be corrupted.");
+               memo = op.memo->get_message(*my_key, op.memo->to);
+               out << " -- Memo: " << memo;
+            }
+         } catch (const fc::exception& e) {
+            out << " -- could not decrypt memo";
+         }
+      }
+   }
+   fee(op.fee);
+   return memo;
 }
 
 std::string operation_result_printer::operator()(const void_result& x) const
@@ -3716,6 +3785,13 @@ signed_transaction wallet_api::transfer(string from, string to, string amount,
 {
    return my->transfer(from, to, amount, asset_symbol, memo, broadcast);
 }
+
+signed_transaction wallet_api::sale(string buyer, string seller, string amount,
+                                        string asset_symbol, string memo, bool broadcast /* = false */)
+{
+   return my->sale(buyer, seller, amount, asset_symbol, memo, broadcast);
+}
+
 signed_transaction wallet_api::create_asset(string issuer,
                                             string symbol,
                                             uint8_t precision,
