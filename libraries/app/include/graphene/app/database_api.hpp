@@ -828,6 +828,15 @@ class database_api
       */
       vector<htlc_object> get_htlc_by_to(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const;
 
+      /**
+       * @brief Get all HTLCs
+       * @param start Lower bound of htlc id to start getting results
+       * @param limit Maximum number of htlc objects to fetch
+       * @return The htlc object list
+      */
+      vector<htlc_object> list_htlcs(const htlc_id_type start, uint32_t limit) const;
+
+
 private:
       std::shared_ptr< database_api_impl > my;
 };
@@ -960,4 +969,5 @@ FC_API(graphene::app::database_api,
    (get_htlc)
    (get_htlc_by_from)
    (get_htlc_by_to)
+   (list_htlcs)
 )

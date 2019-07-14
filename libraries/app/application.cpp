@@ -364,6 +364,9 @@ void application_impl::set_api_limit() {
    if(_options->count("api-limit-get-order-book")){
       _app_options.api_limit_get_order_book = _options->at("api-limit-get-order-book").as<uint64_t>();
    }
+   if(_options->count("api-limit-list-htlcs")){
+      _app_options.api_limit_list_htlcs = _options->at("api-limit-list-htlcs").as<uint64_t>();
+   }
 }
 
 void application_impl::startup()
