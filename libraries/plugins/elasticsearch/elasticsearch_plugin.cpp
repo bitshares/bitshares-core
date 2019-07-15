@@ -59,6 +59,7 @@ class elasticsearch_plugin_impl
       bool _elasticsearch_operation_object = false;
       uint32_t _elasticsearch_start_es_after_block = 0;
       bool _elasticsearch_operation_string = true;
+      std::string _elasticsearch_mode = "only_save";
       CURL *curl; // curl handler
       vector <string> bulk_lines; //  vector of op lines
       vector<std::string> prepare;
@@ -436,17 +437,13 @@ void elasticsearch_plugin::plugin_set_program_options(
          ("elasticsearch-operation-object", boost::program_options::value<bool>(), "Save operation as object(false)")
          ("elasticsearch-start-es-after-block", boost::program_options::value<uint32_t>(), "Start doing ES job after block(0)")
          ("elasticsearch-operation-string", boost::program_options::value<bool>(), "Save operation as string. Needed to serve history api calls(true)")
+         ("elasticsearch-mode", boost::program_options::value<std::string>(), "Mode of operation: only_save, only_query, all(only_save)")
          ;
    cfg.add(cli);
 }
 
 void elasticsearch_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
-   database().applied_block.connect( [&]( const signed_block& b) {
-      if (!my->update_account_histories(b))
-         FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error populating ES database, we are going to keep trying.");
-   } );
-
    my->_oho_index = database().add_index< primary_index< operation_history_index > >();
    database().add_index< primary_index< account_transaction_history_index > >();
 
@@ -476,6 +473,19 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
    }
    if (options.count("elasticsearch-operation-string")) {
       my->_elasticsearch_operation_string = options["elasticsearch-operation-string"].as<bool>();
+   }
+   if (options.count("elasticsearch-mode")) {
+      my->_elasticsearch_mode = options["elasticsearch-mode"].as<std::string>();
+   }
+
+   if(my->_elasticsearch_mode != "only_query") {
+      if (my->_elasticsearch_mode == "all")
+         my->_elasticsearch_operation_string = true;
+
+      database().applied_block.connect([&](const signed_block &b) {
+         if (!my->update_account_histories(b))
+            FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error populating ES database, we are going to keep trying.");
+      });
    }
 }
 
