@@ -22,12 +22,17 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/protocol/operations.hpp>
+
+#include <graphene/chain/types.hpp>
 #include <graphene/db/generic_index.hpp>
+#include <graphene/protocol/account.hpp>
+
 #include <boost/multi_index/composite_key.hpp>
 
 namespace graphene { namespace chain {
    class database;
+   class account_object;
+   class vesting_balance_object;
 
    /**
     * @class account_statistics_object
@@ -252,8 +257,8 @@ namespace graphene { namespace chain {
 
          bool has_special_authority()const
          {
-            return (owner_special_authority.which() != special_authority::tag< no_special_authority >::value)
-                || (active_special_authority.which() != special_authority::tag< no_special_authority >::value);
+            return (!owner_special_authority.is_type< no_special_authority >())
+                || (!active_special_authority.is_type< no_special_authority >());
          }
 
          template<typename DB>
@@ -391,7 +396,7 @@ namespace graphene { namespace chain {
     */
    typedef generic_index<account_balance_object, account_balance_object_multi_index_type> account_balance_index;
 
-   struct by_name{};
+   struct by_name;
 
    /**
     * @ingroup object_index
@@ -438,33 +443,14 @@ namespace graphene { namespace chain {
 
 }}
 
-FC_REFLECT_DERIVED( graphene::chain::account_object,
-                    (graphene::db::object),
-                    (membership_expiration_date)(registrar)(referrer)(lifetime_referrer)
-                    (network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)
-                    (name)(owner)(active)(options)(statistics)(whitelisting_accounts)(blacklisting_accounts)
-                    (whitelisted_accounts)(blacklisted_accounts)
-                    (cashback_vb)
-                    (owner_special_authority)(active_special_authority)
-                    (top_n_control_flags)
-                    (allowed_assets)
-                    )
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::account_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::account_balance_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::account_statistics_object)
 
-FC_REFLECT_DERIVED( graphene::chain::account_balance_object,
-                    (graphene::db::object),
-                    (owner)(asset_type)(balance)(maintenance_flag) )
+FC_REFLECT_TYPENAME( graphene::chain::account_object )
+FC_REFLECT_TYPENAME( graphene::chain::account_balance_object )
+FC_REFLECT_TYPENAME( graphene::chain::account_statistics_object )
 
-FC_REFLECT_DERIVED( graphene::chain::account_statistics_object,
-                    (graphene::chain::object),
-                    (owner)(name)
-                    (most_recent_op)
-                    (total_ops)(removed_ops)
-                    (total_core_in_orders)
-                    (core_in_balance)
-                    (has_cashback_vb)
-                    (is_voting)
-                    (last_vote_time)
-                    (lifetime_fees_paid)
-                    (pending_fees)(pending_vested_fees)
-                  )
-
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::account_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::account_balance_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::account_statistics_object )

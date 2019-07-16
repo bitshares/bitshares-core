@@ -118,7 +118,7 @@ struct proposal_operation_hardfork_visitor
       {
          op.op.visit(*this);
          // Do not allow more than 1 proposal_update in a proposal
-         if ( op.op.which() == operation::tag<proposal_update_operation>().value )
+         if ( op.op.is_type<proposal_update_operation>() )
          {
             FC_ASSERT( !already_contains_proposal_update, "At most one proposal update can be nested in a proposal!" );
             already_contains_proposal_update = true;

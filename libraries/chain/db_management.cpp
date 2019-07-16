@@ -28,7 +28,8 @@
 #include <graphene/chain/witness_schedule_object.hpp>
 #include <graphene/chain/special_authority_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
+
+#include <graphene/protocol/fee_schedule.hpp>
 
 #include <fc/io/fstream.hpp>
 

@@ -3,14 +3,16 @@ file(GLOB HEADERS "include/graphene/net/*.hpp")
 set(SOURCES node.cpp
             stcp_socket.cpp
             core_messages.cpp
+            exceptions.cpp
             peer_database.cpp
             peer_connection.cpp
+            message.cpp
             message_oriented_connection.cpp)
 
 add_library( graphene_net ${SOURCES} ${HEADERS} )
 
 target_link_libraries( graphene_net 
-  PUBLIC fc graphene_db )
+  PUBLIC fc graphene_db graphene_protocol )
 target_include_directories( graphene_net 
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
   PRIVATE "${CMAKE_SOURCE_DIR}/libraries/chain/include"

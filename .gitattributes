@@ -1,0 +1,2 @@
+# Set the default behavior of genesis.json, in case core.autocrlf is set incorrectly
+genesis.json eol=lf

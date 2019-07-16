@@ -25,9 +25,8 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/hardfork.hpp>
 
+#include <fc/io/raw.hpp>
 #include <fc/uint128.hpp>
-
-#include <cmath>
 
 using namespace graphene::chain;
 
@@ -176,3 +175,35 @@ string asset_object::amount_to_string(share_type amount) const
    }
    return result;
 }
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_dynamic_data_object, (graphene::db::object),
+                    (current_supply)(confidential_supply)(accumulated_fees)(fee_pool) )
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_bitasset_data_object, (graphene::db::object),
+                    (asset_id)
+                    (feeds)
+                    (current_feed)
+                    (current_feed_publication_time)
+                    (current_maintenance_collateralization)
+                    (options)
+                    (force_settled_volume)
+                    (is_prediction_market)
+                    (settlement_price)
+                    (settlement_fund)
+                    (asset_cer_updated)
+                    (feed_cer_updated)
+                  )
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_object, (graphene::db::object),
+                    (symbol)
+                    (precision)
+                    (issuer)
+                    (options)
+                    (dynamic_asset_data_id)
+                    (bitasset_data_id)
+                    (buyback_account)
+                  )
+
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_bitasset_data_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_dynamic_data_object )

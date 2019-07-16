@@ -153,16 +153,15 @@ namespace graphene { namespace net {
       try
       {
         message m;
+        char buffer[BUFFER_SIZE];
         while( true )
         {
-          char buffer[BUFFER_SIZE];
           _sock.read(buffer, BUFFER_SIZE);
           _bytes_received += BUFFER_SIZE;
           memcpy((char*)&m, buffer, sizeof(message_header));
+          FC_ASSERT( m.size.value() <= MAX_MESSAGE_SIZE, "", ("m.size",m.size.value())("MAX_MESSAGE_SIZE",MAX_MESSAGE_SIZE) );
 
-          FC_ASSERT( m.size <= MAX_MESSAGE_SIZE, "", ("m.size",m.size)("MAX_MESSAGE_SIZE",MAX_MESSAGE_SIZE) );
-
-          size_t remaining_bytes_with_padding = 16 * ((m.size - LEFTOVER + 15) / 16);
+          size_t remaining_bytes_with_padding = 16 * ((m.size.value() - LEFTOVER + 15) / 16);
           m.data.resize(LEFTOVER + remaining_bytes_with_padding); //give extra 16 bytes to allow for padding added in send call
           std::copy(buffer + sizeof(message_header), buffer + sizeof(buffer), m.data.begin());
           if (remaining_bytes_with_padding)
@@ -170,7 +169,7 @@ namespace graphene { namespace net {
             _sock.read(&m.data[LEFTOVER], remaining_bytes_with_padding);
             _bytes_received += remaining_bytes_with_padding;
           }
-          m.data.resize(m.size); // truncate off the padding bytes
+          m.data.resize(m.size.value()); // truncate off the padding bytes
 
           _last_message_received_time = fc::time_point::now();
 
@@ -255,14 +254,14 @@ namespace graphene { namespace net {
 
       try
       {
-        size_t size_of_message_and_header = sizeof(message_header) + message_to_send.size;
-        if( message_to_send.size > MAX_MESSAGE_SIZE )
+        size_t size_of_message_and_header = sizeof(message_header) + message_to_send.size.value();
+        if( message_to_send.size.value() > MAX_MESSAGE_SIZE )
            elog("Trying to send a message larger than MAX_MESSAGE_SIZE. This probably won't work...");
         //pad the message we send to a multiple of 16 bytes
         size_t size_with_padding = 16 * ((size_of_message_and_header + 15) / 16);
         std::unique_ptr<char[]> padded_message(new char[size_with_padding]);
         memcpy(padded_message.get(), (char*)&message_to_send, sizeof(message_header));
-        memcpy(padded_message.get() + sizeof(message_header), message_to_send.data.data(), message_to_send.size );
+        memcpy(padded_message.get() + sizeof(message_header), message_to_send.data.data(), message_to_send.size.value() );
         _sock.write(padded_message.get(), size_with_padding);
         _sock.flush();
         _bytes_sent += size_with_padding;

@@ -31,7 +31,8 @@
 using namespace graphene::app;
 using namespace graphene::chain;
 using namespace graphene::utilities;
-using namespace std;
+using std::string;
+using std::vector;
 
 namespace fc
 {
@@ -1633,7 +1634,7 @@ class wallet_api
        * @param keys public keys to search for related accounts
        * @return the set of related accounts
        */
-      vector<vector<account_id_type>> get_key_references(const vector<public_key_type> &keys) const;
+      vector<flat_set<account_id_type>> get_key_references(const vector<public_key_type> &keys) const;
 
       /** Returns an uninitialized object representing a given blockchain operation.
        *
@@ -1747,6 +1748,8 @@ class wallet_api
 };
 
 } }
+
+extern template class fc::api<graphene::wallet::wallet_api>;
 
 FC_REFLECT( graphene::wallet::key_label, (label)(key) )
 FC_REFLECT( graphene::wallet::blind_balance, (amount)(from)(to)(one_time_key)(blinding_factor)(commitment)(used) )

@@ -22,7 +22,7 @@
  * THE SOFTWARE.
  */
 
-#include <graphene/chain/protocol/buyback.hpp>
+#include <graphene/protocol/buyback.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
