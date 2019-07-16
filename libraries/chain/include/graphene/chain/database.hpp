@@ -343,75 +343,7 @@ namespace graphene { namespace chain {
          void apply_debug_updates();
          void debug_update( const fc::variant_object& update );
 
-         //////////////////// db_market.cpp ////////////////////
-
-         /// @{ @group Market Helpers
-         void globally_settle_asset( const asset_object& bitasset, const price& settle_price );
-         void cancel_settle_order(const force_settlement_object& order, bool create_virtual_op = true);
-         void cancel_limit_order(const limit_order_object& order, bool create_virtual_op = true, bool skip_cancel_fee = false);
-         void revive_bitasset( const asset_object& bitasset );
-         void cancel_bid(const collateral_bid_object& bid, bool create_virtual_op = true);
-         void execute_bid( const collateral_bid_object& bid, share_type debt_covered, share_type collateral_from_fund, const price_feed& current_feed );
-
-         /**
-          * @brief Process a new limit order through the markets
-          * @param order The new order to process
-          * @return true if order was completely filled; false otherwise
-          *
-          * This function takes a new limit order, and runs the markets attempting to match it with existing orders
-          * already on the books.
-          */
-         ///@{
-         bool apply_order_before_hardfork_625(const limit_order_object& new_order_object, bool allow_black_swan = true);
-         bool apply_order(const limit_order_object& new_order_object, bool allow_black_swan = true);
          ///@}
-
-         /**
-          * Matches the two orders, the first parameter is taker, the second is maker.
-          *
-          * @return a bit field indicating which orders were filled (and thus removed)
-          *
-          * 0 - no orders were matched
-          * 1 - taker was filled
-          * 2 - maker was filled
-          * 3 - both were filled
-          */
-         ///@{
-         int match( const limit_order_object& taker, const limit_order_object& maker, const price& trade_price );
-         int match( const limit_order_object& taker, const call_order_object& maker, const price& trade_price,
-                    const price& feed_price, const uint16_t maintenance_collateral_ratio,
-                    const optional<price>& maintenance_collateralization );
-         ///@}
-
-         /// Matches the two orders, the first parameter is taker, the second is maker.
-         /// @return the amount of asset settled
-         asset match(const call_order_object& call,
-                   const force_settlement_object& settle,
-                   const price& match_price,
-                   asset max_settlement,
-                   const price& fill_price);
-
-         /**
-          * @return true if the order was completely filled and thus freed.
-          */
-         bool fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small,
-                                const price& fill_price, const bool is_maker );
-         bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
-                               const price& fill_price, const bool is_maker );
-         bool fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
-                                 const price& fill_price, const bool is_maker );
-
-         bool check_call_orders( const asset_object& mia, bool enable_black_swan = true, bool for_new_limit_order = false,
-                                 const asset_bitasset_data_object* bitasset_ptr = nullptr );
-
-         // helpers to fill_order
-         void pay_order( const account_object& receiver, const asset& receives, const asset& pays );
-
-         asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
-         asset pay_market_fees( const asset_object& recv_asset, const asset& receives );
-         asset pay_market_fees( const account_object& seller, const asset_object& recv_asset, const asset& receives );
-         ///@}
-
 
          ///@{
          /**
@@ -500,8 +432,6 @@ namespace graphene { namespace chain {
          void clear_expired_transactions();
          void clear_expired_proposals();
          void clear_expired_orders();
-         void update_expired_feeds();
-         void update_core_exchange_rates();
          void update_maintenance_flag( bool new_maintenance_flag );
          void update_withdraw_permissions();
          bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
@@ -520,8 +450,6 @@ namespace graphene { namespace chain {
          void update_active_witnesses();
          void update_active_committee_members();
          void update_worker_votes();
-         void process_bids( const asset_bitasset_data_object& bad );
-         void process_bitassets();
          void handle_core_inflation();
          void handle_marketing_fees();
          void handle_charity_fees();

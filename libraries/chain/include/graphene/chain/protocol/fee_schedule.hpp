@@ -63,36 +63,6 @@ namespace graphene { namespace chain {
    };
 
    template<>
-   class fee_helper<bid_collateral_operation> {
-     public:
-      const bid_collateral_operation::fee_parameters_type& cget(const flat_set<fee_parameters>& parameters)const
-      {
-         auto itr = parameters.find( bid_collateral_operation::fee_parameters_type() );
-         if ( itr != parameters.end() )
-            return itr->get<bid_collateral_operation::fee_parameters_type>();
-
-         static bid_collateral_operation::fee_parameters_type bid_collateral_dummy;
-         bid_collateral_dummy.fee = fee_helper<call_order_update_operation>().cget(parameters).fee;
-         return bid_collateral_dummy;
-      }
-   };
-
-   template<>
-   class fee_helper<asset_update_issuer_operation> {
-     public:
-      const asset_update_issuer_operation::fee_parameters_type& cget(const flat_set<fee_parameters>& parameters)const
-      {
-         auto itr = parameters.find( asset_update_issuer_operation::fee_parameters_type() );
-         if ( itr != parameters.end() )
-            return itr->get<asset_update_issuer_operation::fee_parameters_type>();
-
-         static asset_update_issuer_operation::fee_parameters_type dummy;
-         dummy.fee = fee_helper<asset_update_operation>().cget(parameters).fee;
-         return dummy;
-      }
-   };
-
-   template<>
    class fee_helper<asset_claim_pool_operation> {
      public:
       const asset_claim_pool_operation::fee_parameters_type& cget(const flat_set<fee_parameters>& parameters)const

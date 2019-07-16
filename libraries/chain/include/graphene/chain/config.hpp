@@ -68,9 +68,7 @@
 #define GRAPHENE_10TH_OF_1_PERCENT                              (GRAPHENE_100_PERCENT/1000)
 /** NOTE: making this a power of 2 (say 2^15) would greatly accelerate fee calcs */
 #define GRAPHENE_MAX_MARKET_FEE_PERCENT                         GRAPHENE_100_PERCENT
-#define GRAPHENE_DEFAULT_FORCE_SETTLEMENT_DELAY                 (60*60*24) ///< 1 day
-#define GRAPHENE_DEFAULT_FORCE_SETTLEMENT_OFFSET                0 ///< 1%
-#define GRAPHENE_DEFAULT_FORCE_SETTLEMENT_MAX_VOLUME            (20* GRAPHENE_1_PERCENT) ///< 20%
+
 #define GRAPHENE_DEFAULT_PRICE_FEED_LIFETIME                    (60*60*24) ///< 1 day
 #define GRAPHENE_DEFAULT_MAX_AUTHORITY_MEMBERSHIP               10
 #define GRAPHENE_DEFAULT_MAX_ASSET_WHITELIST_AUTHORITIES        10
@@ -153,7 +151,5 @@
 /// Sentinel value used in the scheduler.
 #define GRAPHENE_NULL_WITNESS (graphene::chain::witness_id_type(0))
 ///@}
-
-#define GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET (asset_id_type(743))
 
 #define GRAPHENE_MAX_NESTED_OBJECTS (200)

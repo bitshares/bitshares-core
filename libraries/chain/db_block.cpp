@@ -597,8 +597,6 @@ void database::_apply_block( const signed_block& next_block )
    clear_expired_proposals();
    clear_expired_orders();
    clear_expired_htlcs();
-   update_expired_feeds();       // this will update expired feeds and some core exchange rates
-   update_core_exchange_rates(); // this will update remaining core exchange rates
    update_withdraw_permissions();
 
    // n.b., update_maintenance_flag() happens this late

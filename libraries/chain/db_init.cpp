@@ -23,7 +23,6 @@
  */
 
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/fba_accumulator_id.hpp>
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
@@ -34,9 +33,7 @@
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/confidential_object.hpp>
-#include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
-#include <graphene/chain/market_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/special_authority_object.hpp>
@@ -55,7 +52,6 @@
 #include <graphene/chain/committee_member_evaluator.hpp>
 #include <graphene/chain/confidential_evaluator.hpp>
 #include <graphene/chain/custom_evaluator.hpp>
-#include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/proposal_evaluator.hpp>
 #include <graphene/chain/transfer_evaluator.hpp>
 #include <graphene/chain/vesting_balance_evaluator.hpp>
@@ -92,20 +88,11 @@ const uint8_t asset_object::type_id;
 const uint8_t block_summary_object::space_id;
 const uint8_t block_summary_object::type_id;
 
-const uint8_t call_order_object::space_id;
-const uint8_t call_order_object::type_id;
-
 const uint8_t committee_member_object::space_id;
 const uint8_t committee_member_object::type_id;
 
-const uint8_t force_settlement_object::space_id;
-const uint8_t force_settlement_object::type_id;
-
 const uint8_t global_property_object::space_id;
 const uint8_t global_property_object::type_id;
-
-const uint8_t limit_order_object::space_id;
-const uint8_t limit_order_object::type_id;
 
 const uint8_t operation_history_object::space_id;
 const uint8_t operation_history_object::type_id;
@@ -143,23 +130,12 @@ void database::initialize_evaluators()
    register_evaluator<committee_member_update_evaluator>();
    register_evaluator<committee_member_update_global_parameters_evaluator>();
    register_evaluator<custom_evaluator>();
-   register_evaluator<asset_create_evaluator>();
-   register_evaluator<asset_issue_evaluator>();
    register_evaluator<asset_reserve_evaluator>();
    register_evaluator<asset_update_evaluator>();
-   register_evaluator<asset_update_bitasset_evaluator>();
-   register_evaluator<asset_update_feed_producers_evaluator>();
-   register_evaluator<asset_settle_evaluator>();
-   register_evaluator<asset_global_settle_evaluator>();
    register_evaluator<assert_evaluator>();
-   register_evaluator<limit_order_create_evaluator>();
-   register_evaluator<limit_order_cancel_evaluator>();
-   register_evaluator<call_order_update_evaluator>();
-   register_evaluator<bid_collateral_evaluator>();
    register_evaluator<transfer_evaluator>();
    register_evaluator<override_transfer_evaluator>();
    register_evaluator<asset_fund_fee_pool_evaluator>();
-   register_evaluator<asset_publish_feeds_evaluator>();
    register_evaluator<proposal_create_evaluator>();
    register_evaluator<proposal_update_evaluator>();
    register_evaluator<proposal_delete_evaluator>();
@@ -177,7 +153,6 @@ void database::initialize_evaluators()
    register_evaluator<transfer_from_blind_evaluator>();
    register_evaluator<blind_transfer_evaluator>();
    register_evaluator<asset_claim_fees_evaluator>();
-   register_evaluator<asset_update_issuer_evaluator>();
    register_evaluator<asset_claim_pool_evaluator>();
    register_evaluator<htlc_create_evaluator>();
    register_evaluator<htlc_redeem_evaluator>();
@@ -192,7 +167,6 @@ void database::initialize_indexes()
 
    //Protocol object indexes
    add_index< primary_index<asset_index, 13> >(); // 8192 assets per chunk
-   add_index< primary_index<force_settlement_index> >();
 
    auto acnt_index = add_index< primary_index<account_index, 20> >(); // ~1 million accounts per chunk
    acnt_index->add_secondary_index<account_member_index>();
@@ -200,8 +174,6 @@ void database::initialize_indexes()
 
    add_index< primary_index<committee_member_index, 8> >(); // 256 members per chunk
    add_index< primary_index<witness_index, 10> >(); // 1024 witnesses per chunk
-   add_index< primary_index<limit_order_index > >();
-   add_index< primary_index<call_order_index > >();
 
    auto prop_index = add_index< primary_index<proposal_index > >();
    prop_index->add_secondary_index<required_approval_index>();
@@ -219,7 +191,6 @@ void database::initialize_indexes()
    auto bal_idx = add_index< primary_index<account_balance_index          > >();
    bal_idx->add_secondary_index<balances_by_account_index>();
 
-   add_index< primary_index<asset_bitasset_data_index,                 13 > >(); // 8192
    add_index< primary_index<simple_index<global_property_object          >> >();
    add_index< primary_index<simple_index<dynamic_global_property_object  >> >();
    add_index< primary_index<account_stats_index,                       20 > >(); // 1 Mi
@@ -230,8 +201,6 @@ void database::initialize_indexes()
    add_index< primary_index<simple_index<budget_record_object           > > >();
    add_index< primary_index< special_authority_index                      > >();
    add_index< primary_index< buyback_index                                > >();
-   add_index< primary_index<collateral_bid_index                          > >();
-   add_index< primary_index< simple_index< fba_accumulator_object       > > >();
 }
 
 void database::init_genesis(const genesis_state_type& genesis_state)
@@ -536,25 +505,10 @@ void database::init_genesis(const genesis_state_type& genesis_state)
                o.total_core_in_orders = collateral_rec.collateral;
             });
 
-            create<call_order_object>([&](call_order_object& c) {
-               c.borrower = owner_account_id;
-               c.collateral = collateral_rec.collateral;
-               c.debt = collateral_rec.debt;
-               c.call_price = price::call_price(chain::asset(c.debt, new_asset_id),
-                                                chain::asset(c.collateral, core_asset.id),
-                                                GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
-            });
-
             total_supplies[ asset_id_type(0) ] += collateral_rec.collateral;
             total_debts[ new_asset_id ] += collateral_rec.debt;
             ++collateral_holder_number;
          }
-
-         bitasset_data_id = create<asset_bitasset_data_object>([&core_asset,new_asset_id](asset_bitasset_data_object& b) {
-            b.options.short_backing_asset = core_asset.id;
-            b.options.minimum_feeds = GRAPHENE_DEFAULT_MINIMUM_FEEDS;
-            b.asset_id = new_asset_id;
-         }).id;
       }
 
       dynamic_data_id = create<asset_dynamic_data_object>([&asset](asset_dynamic_data_object& d) {
@@ -717,36 +671,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       for( const witness_id_type& wid : get_global_properties().active_witnesses )
          wso.current_shuffled_witnesses.push_back( wid );
    });
-
-   // Create FBA counters
-   create<fba_accumulator_object>([&]( fba_accumulator_object& acc )
-   {
-      FC_ASSERT( acc.id == fba_accumulator_id_type( fba_accumulator_id_transfer_to_blind ) );
-      acc.accumulated_fba_fees = 0;
-#ifdef GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET
-      acc.designated_asset = GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET;
-#endif
-   });
-
-   create<fba_accumulator_object>([&]( fba_accumulator_object& acc )
-   {
-      FC_ASSERT( acc.id == fba_accumulator_id_type( fba_accumulator_id_blind_transfer ) );
-      acc.accumulated_fba_fees = 0;
-#ifdef GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET
-      acc.designated_asset = GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET;
-#endif
-   });
-
-   create<fba_accumulator_object>([&]( fba_accumulator_object& acc )
-   {
-      FC_ASSERT( acc.id == fba_accumulator_id_type( fba_accumulator_id_transfer_from_blind ) );
-      acc.accumulated_fba_fees = 0;
-#ifdef GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET
-      acc.designated_asset = GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET;
-#endif
-   });
-
-   FC_ASSERT( get_index<fba_accumulator_object>().get_next_id() == fba_accumulator_id_type( fba_accumulator_id_count ) );
 
    //debug_dump();
 
