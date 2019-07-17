@@ -16,6 +16,9 @@ list(APPEND SOURCES account.cpp
                     asset.cpp
                     authority.cpp
                     special_authority.cpp
+                    custom_authority.cpp
+                    restriction.cpp
+                    restriction_predicate.cpp
                     committee_member.cpp
                     custom.cpp
                     market.cpp

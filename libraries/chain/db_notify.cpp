@@ -289,6 +289,19 @@ struct get_impacted_account_visitor
    { 
       _impacted.insert( op.fee_payer() );
    }
+   void operator()( const custom_authority_create_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+      add_authority_accounts( _impacted, op.auth );
+   }
+   void operator()( const custom_authority_update_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+   }
+   void operator()( const custom_authority_delete_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+   }
 };
 
 void graphene::chain::operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result, bool ignore_custom_operation_required_auths ) {
@@ -364,7 +377,7 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
            break;
         } case vesting_balance_object_type:{
            const auto& aobj = dynamic_cast<const vesting_balance_object*>(obj);
-           FC_ASSERT( aobj != nullptr );
+           FC_ASSERT(aobj != nullptr );
            accounts.insert( aobj->owner );
            break;
         } case worker_object_type:{
@@ -443,7 +456,7 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               const auto& aobj = dynamic_cast<const collateral_bid_object*>(obj);
               FC_ASSERT( aobj != nullptr );
               accounts.insert( aobj->bidder );
-              break;
+              break; 
            }
       }
    }
