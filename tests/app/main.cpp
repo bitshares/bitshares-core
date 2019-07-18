@@ -37,6 +37,7 @@
 #include <fc/thread/thread.hpp>
 #include <fc/log/appender.hpp>
 #include <fc/log/logger.hpp>
+#include <thread>
 
 #include <boost/filesystem/path.hpp>
 
@@ -44,6 +45,53 @@
 #include <boost/test/included/unit_test.hpp>
 
 #include "../common/genesis_file_util.hpp"
+
+#ifdef _WIN32
+   #ifndef _WIN32_WINNT
+      #define _WIN32_WINNT 0x0501
+   #endif
+   #include <winsock2.h>
+   #include <WS2tcpip.h>
+   int sockInit(void)
+   {
+      WSADATA wsa_data;
+      return WSAStartup(MAKEWORD(1,1), &wsa_data);
+   }
+   int sockQuit(void)
+   {
+      return WSACleanup();
+   }
+#else
+   #include <sys/socket.h>
+   #include <netinet/ip.h>
+   #include <sys/types.h>
+#endif
+
+/********
+ * @brief attempt to find an available port on localhost
+ * @returns an available port number, or -1 on error
+ */
+int get_available_port()
+{
+   struct sockaddr_in sin;
+   int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+   if (socket_fd == -1)
+      return -1;
+   sin.sin_family = AF_INET;
+   sin.sin_port = 0;
+   sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+   if (::bind(socket_fd, (struct sockaddr*)&sin, sizeof(struct sockaddr_in)) == -1)
+      return -1;
+   socklen_t len = sizeof(sin);
+   if (getsockname(socket_fd, (struct sockaddr *)&sin, &len) == -1)
+      return -1;
+#ifdef _WIN32
+   closesocket(socket_fd);
+#else
+   close(socket_fd);
+#endif
+   return ntohs(sin.sin_port);
+}
 
 using namespace graphene;
 namespace bpo = boost::program_options;
@@ -220,17 +268,18 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
 
       graphene::app::application app1;
+      std::string app1_ip_and_port = std::string("127.0.0.1:") + std::to_string(get_available_port());
       app1.register_plugin< graphene::account_history::account_history_plugin>();
       app1.register_plugin< graphene::market_history::market_history_plugin >();
       app1.register_plugin< graphene::witness_plugin::witness_plugin >();
       app1.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
       app1.startup_plugins();
       boost::program_options::variables_map cfg;
-      cfg.emplace("p2p-endpoint", boost::program_options::variable_value(string("127.0.0.1:3939"), false));
+      cfg.emplace("p2p-endpoint", boost::program_options::variable_value(app1_ip_and_port, false));
       cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
       cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
       app1.initialize(app_dir.path(), cfg);
-      BOOST_TEST_MESSAGE( "Starting app1 and waiting 500 ms" );
+      BOOST_TEST_MESSAGE( std::string("Starting app1 at ") + app1_ip_and_port + " and waiting 500 ms" );
       app1.startup();
       fc::usleep(fc::milliseconds(500));
 
@@ -238,6 +287,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
 
       fc::temp_directory app2_dir( graphene::utilities::temp_directory_path() );
       graphene::app::application app2;
+      std::string app2_ip_and_port = std::string("127.0.0.1:") + std::to_string(get_available_port());
       app2.register_plugin<account_history::account_history_plugin>();
       app2.register_plugin< graphene::market_history::market_history_plugin >();
       app2.register_plugin< graphene::witness_plugin::witness_plugin >();
@@ -245,13 +295,13 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app2.startup_plugins();
       auto cfg2 = cfg;
       cfg2.erase("p2p-endpoint");
-      cfg2.emplace("p2p-endpoint", boost::program_options::variable_value(string("127.0.0.1:4040"), false));
-      cfg2.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
-      cfg2.emplace("seed-node", boost::program_options::variable_value(vector<string>{"127.0.0.1:3939"}, false));
+      cfg2.emplace("p2p-endpoint", boost::program_options::variable_value(app2_ip_and_port, false));
+      cfg2.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app2_dir), false));
+      cfg2.emplace("seed-node", boost::program_options::variable_value(vector<string>{app1_ip_and_port}, false));
       cfg2.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
       app2.initialize(app2_dir.path(), cfg2);
 
-      BOOST_TEST_MESSAGE( "Starting app2 and waiting 500 ms" );
+      BOOST_TEST_MESSAGE( std::string("Starting app2 on port ") + app2_ip_and_port + " and waiting 500 ms" );
       app2.startup();
       fc::usleep(fc::milliseconds(500));
 
@@ -323,7 +373,59 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_CHECK_EQUAL(app1.p2p_node()->get_connection_count(), 1u);
       BOOST_CHECK_EQUAL(app1.chain_database()->head_block_num(), 1u);
 
-      BOOST_TEST_MESSAGE( "Checking GRAPHENE_NULL_ACCOUNT has balance" );
+      BOOST_TEST_MESSAGE( "Node 2 sends an unexpected hello message, which should have node1 disconnect him.");
+      app2.p2p_node()->broadcast(graphene::net::hello_message() );
+      BOOST_TEST_MESSAGE( "Hello message was broadcast. Giving the node some time.");
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      BOOST_TEST_MESSAGE("Checking to assure that node 2 is not connected to node 1 any longer");
+      BOOST_CHECK_EQUAL(app1.p2p_node()->get_connection_count(), 0u);
+      BOOST_TEST_MESSAGE("Creating a bunch of connections");
+
+      // a bunch of nodes connect to node 1
+      std::vector<graphene::app::application*> test_peers;
+      size_t num_nodes = 100;
+      for( size_t i = 0; i < num_nodes; ++i )
+      {
+         BOOST_TEST_MESSAGE( std::string("Starting up test peer ") + std::to_string(i) );
+         int new_port = get_available_port();
+         fc::temp_directory new_dir( graphene::utilities::temp_directory_path() );
+         graphene::app::application* new_app = new graphene::app::application();
+         test_peers.push_back(new_app);
+         new_app->register_plugin< account_history::account_history_plugin>();
+         new_app->register_plugin< graphene::market_history::market_history_plugin >();
+         new_app->register_plugin< graphene::witness_plugin::witness_plugin >();
+         new_app->register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
+         new_app->startup_plugins();
+         auto cfg2 = cfg;
+         cfg2.erase("p2p-endpoint");
+         cfg2.emplace("p2p-endpoint", boost::program_options::variable_value(
+               string("127.0.0.1:")+std::to_string(new_port), false));
+         cfg2.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(new_dir), false));
+         cfg2.emplace("seed-node", boost::program_options::variable_value(vector<string>{app1_ip_and_port}, false));
+         cfg2.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
+         new_app->initialize(new_dir.path(), cfg2);
+         new_app->startup();
+         std::this_thread::sleep_for( std::chrono::milliseconds(50) );
+      }
+
+      std::this_thread::sleep_for(std::chrono::milliseconds(100) );
+      BOOST_CHECK_EQUAL(app1.p2p_node()->get_connection_count(), num_nodes);
+
+      // now they all send an extra hello message, which should disconnect them
+      for(size_t i = 0; i < num_nodes; ++i )
+      {
+         BOOST_TEST_MESSAGE( std::string("Sending hello_message from peer ") + std::to_string(i) );
+         graphene::app::application* new_app = test_peers[i];
+         new_app->p2p_node()->broadcast(graphene::net::hello_message() );
+         std::this_thread::sleep_for( std::chrono::milliseconds(500) );
+      }
+
+      // wait for the dust to settle
+      std::this_thread::sleep_for( std::chrono::milliseconds(500) );
+      BOOST_CHECK_EQUAL(app1.p2p_node()->get_connection_count(), 0u);
+
+      while(!test_peers.empty() ) delete test_peers.back(), test_peers.pop_back();
+
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
