@@ -44,10 +44,6 @@ template<typename T, typename U>
 constexpr static bool comparable_types = !std::is_same<T, void_t>::value &&
                                          (std::is_same<T, U>::value || (is_integral<T> && is_integral<U>));
 
-// Metafunction to check if type is an optional type
-template<typename> constexpr static bool is_optional = false;
-template<typename T> constexpr static bool is_optional<fc::optional<T>> = true;
-
 // Metafunction to check if type is a container
 template<typename, typename = size_t> constexpr static bool is_container = false;
 template<typename T> constexpr static bool is_container<T, decltype(declval<T>().size())> = true;
@@ -56,32 +52,42 @@ template<typename T> constexpr static bool is_container<T, decltype(declval<T>()
 // *** Restriction Predicate Logic ***
 
 // This file is where the magic happens for BSIP 40, aka Custom Active Authorities. This gets fairly complicated, so
-// let me break it down for you: we're given a restriction object and an operation type. The restriction contains one
-// or more assertions that will eventually be made on operation instances, and this file creates a predicate function
-// that takes those operation instances, evaluates all of the assertions, and returns whether they all pass or not.
+// let me break it down: we're given a restriction object and an operation type. The restriction contains one or more
+// assertions that will eventually be made on operation instances, and this file creates a predicate function that
+// takes such an operation instance, evaluates all of the assertions, and returns whether they all pass or not.
 //
 // So this file works on restriction instances, but only operation *types* -- the actual operation instance won't
-// show up until the predicate function this file returns is eventually called! But in here, we need to dig into the
-// operation types based on the specifications in the restrictions, make sure all the assertions are valid, then
-// create a predicate that runs very quickly, digging into the operation and checking all the assertions.
+// show up until the predicate function this file returns is eventually called. But first, we need to dig into the
+// operation/fields based on the specifications in the restrictions, make sure all the assertions are valid, then
+// create a predicate that runs quickly, looking through the operation and checking all the assertions.
 //
 // It kicks off at the bottom of this file, in get_restriction_predicate(), which gets a vector of restrictions and
 // an operation type tag. So first, we've got to enter into a template context that knows the actual operation type,
 // not just the type tag. And we do a lot of entering into deeper and deeper template contexts, resolving tags to
 // actual types so that we know all the type information when we create the predicate, and it can execute quickly
-// once it has an operation instance, knowing exactly what types and fields it needs, how to cast things, how to
-// execute the assertions, etc.
+// on an operation instance, knowing exactly what types and fields it needs, how to cast things, how to execute the
+// assertions, etc.
 //
-// So to give an overview of the logic, the layers stack up like so, from beginning (bottom of file) to end:
+// To give an overview of the logic, the layers stack up like so, from beginning (bottom of file) to end:
 //  - get_restriction_predicate() -- gets vector<restriction> and operation::tag_type, visits operation with the tag
 //    type to get an actual operation type as a template parameter
-//  - predicate_creator_visitor -- gets vector<restriction> and particular operation type, creates predicate that
-//    wraps predicate from deeper layers, converting the generic operation to a specific operation. This is the last
-//    layer that can assume the type is an operation; all subsequent layers work on any object or field
-//  - restrictions_to_predicate<Field>() -- converts vector<restriction> to vector<predicate> then wraps that in a
-//    single predicate that returns the logical and of all predicates
-//  - restriction_to_predicate<Field>() -- switches on restriction type to determine legal argument types, creates a
-//    predicate for that argument type
+//  - operation_type_resolver -- gets vector<restriction> and operation type tag, resolves tag to operation type
+//    template argument. This is the last layer that can assume the type being restricted is an operation; all
+//    subsequent layers work on any object or field
+//  - restrictions_to_predicate<Object>() -- takes a vector<restriction> and creates a predicate for each of them,
+//    but returns a single predicate that returns true only if all sub-predicates return true
+//    - object_field_predicator<Object> -- visits the object being restricted to resolve which specific field is the
+//      subject of the restriction
+//    - create_logical_or_predicate<Object>() -- If the predicate is a logical OR function, instead of using the
+//      object_field_predicator, we recurse into restrictions_to_predicate for each branch of the OR, returning a
+//      predicate which returns true if any branch of the OR passes
+//  - create_predicate_function<Field>() -- switches on restriction type to determine which predicate template to use
+//    going forward
+//    - restriction_argument_visitor<Field> -- Determines what type the restriction argument is and creates a
+//      predicate functor for that type
+//    - attribute_assertion<Field> -- If the restriction is an attribute assertion, instead of using the
+//      restriction_argument_visitor, we recurse into restrictions_to_predicate with the current Field as the Object
+//  - predicate_xyz<Argument> -- These are functors implementing the various predicate function types
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // These typelists contain the argument types legal for various function types:
@@ -104,6 +110,35 @@ using equality_types_list =
 using attr_types_list = fc::typelist<vector<restriction>>;
 // Valid for logical or assertions
 using or_types_list = fc::typelist<vector<vector<restriction>>>;
+
+// slimmer_visitor and static_variant_slimmer accelerate build times by reducing the number of elements in the
+// argument static variant to only those supported for a given function type. This reduces build time because it
+// eliminates many options the compiler has to explore when visiting the argument variant to create a predicate
+template<typename List>
+struct slimmer_visitor {
+   using result_type = typename List::template apply<static_variant>;
+   template<typename T> constexpr static bool type_in_list = List::template contains<T>;
+
+   template<typename T, typename = std::enable_if_t<type_in_list<T>>>
+   result_type do_cast(const T& content, short) { return result_type(content); }
+   template<typename T>
+   result_type do_cast(const T&, long) {
+      FC_THROW_EXCEPTION(fc::assert_exception, "Invalid argument type for restriction function type");
+   }
+
+   template<typename T> result_type operator()(const T& content) {
+      return do_cast(content, short());
+   }
+};
+template<typename List>
+struct static_variant_slimmer {
+   using result_type = typename slimmer_visitor<List>::result_type;
+   template<typename SV>
+   static result_type slim(SV& variant) {
+      slimmer_visitor<List> visitor;
+      return variant.visit(visitor);
+   }
+};
 
 // Final implementations of predicate functors
 template<typename Argument> struct predicate_eq {
@@ -130,6 +165,7 @@ template<typename Argument> struct predicate_eq {
    template<typename Field, typename Arg = Argument, typename = std::enable_if_t<std::is_same<Arg, void_t>::value>>
    bool operator()(const fc::optional<Field>& f) const { return !f.valid(); }
    // Compare containers of different types
+// TODO: Figure out how to actually make this compile... x(
 //   template<typename Field, typename Arg = Argument, typename =
 //            std::enable_if_t<is_container<Field> && is_container<Arg> && !std::is_same<Field, Arg>::value
 //                             && comparable_types<typename Arg::value_type, typename Field::value_type>>>
@@ -300,21 +336,8 @@ struct restriction_argument_visitor {
    result_type operator()(const Argument& a) { return make_predicate(a, short()); }
 };
 
-// Forward declarations of predicate making functions so we can recurse into them
+// Forward declaration of restrictions_to_predicate, because attribute assertions and logical ORs recurse into it
 template<typename Field> object_restriction_predicate<Field> restrictions_to_predicate(vector<restriction>);
-template<typename Field>
-object_restriction_predicate<Field> create_predicate_function(restriction_function, restriction_argument);
-
-template<typename Field>
-object_restriction_predicate<Field> create_logical_or_predicate(vector<vector<restriction>> rs) {
-   vector<object_restriction_predicate<Field>> predicates;
-   std::transform(std::make_move_iterator(rs.begin()), std::make_move_iterator(rs.end()),
-                  std::back_inserter(predicates), restrictions_to_predicate<Field>);
-
-   return [predicates=std::move(predicates)](const Field& field) {
-      return std::any_of(predicates.begin(), predicates.end(), [&f=field](const auto& p) { return p(f); });
-   };
-}
 
 template<typename Field>
 struct attribute_assertion {
@@ -341,58 +364,53 @@ struct attribute_assertion<extension<Extension>> {
 };
 
 template<typename Field>
-object_restriction_predicate<Field> create_predicate_function(restriction_function func,
-                                                                 restriction_argument arg) {
+object_restriction_predicate<Field> create_predicate_function(restriction_function func, restriction_argument arg) {
    try {
       switch(func) {
       case restriction::func_eq: {
          restriction_argument_visitor<predicate_eq, Field> visitor;
-         return arg.visit(visitor);
+         return static_variant_slimmer<equality_types_list>::slim(arg).visit(visitor);
       }
       case restriction::func_ne: {
          restriction_argument_visitor<predicate_ne, Field> visitor;
-         return arg.visit(visitor);
+         return static_variant_slimmer<equality_types_list>::slim(arg).visit(visitor);
       }
       case restriction::func_lt: {
          restriction_argument_visitor<predicate_lt, Field> visitor;
-         return arg.visit(visitor);
+         return static_variant_slimmer<comparable_types_list>::slim(arg).visit(visitor);
       }
       case restriction::func_le: {
          restriction_argument_visitor<predicate_le, Field> visitor;
-         return arg.visit(visitor);
+         return static_variant_slimmer<comparable_types_list>::slim(arg).visit(visitor);
       }
       case restriction::func_gt: {
          restriction_argument_visitor<predicate_gt, Field> visitor;
-         return arg.visit(visitor);
+         return static_variant_slimmer<comparable_types_list>::slim(arg).visit(visitor);
       }
       case restriction::func_ge: {
          restriction_argument_visitor<predicate_ge, Field> visitor;
-         return arg.visit(visitor);
+         return static_variant_slimmer<comparable_types_list>::slim(arg).visit(visitor);
       }
       case restriction::func_in: {
          restriction_argument_visitor<predicate_in, Field> visitor;
-         return arg.visit(visitor);
+         return static_variant_slimmer<list_types_list>::slim(arg).visit(visitor);
       }
       case restriction::func_not_in: {
          restriction_argument_visitor<predicate_not_in, Field> visitor;
-         return arg.visit(visitor);
+         return static_variant_slimmer<list_types_list>::slim(arg).visit(visitor);
       }
       case restriction::func_has_all: {
          restriction_argument_visitor<predicate_has_all, Field> visitor;
-         return arg.visit(visitor);
+         return static_variant_slimmer<list_types_list>::slim(arg).visit(visitor);
       }
       case restriction::func_has_none: {
          restriction_argument_visitor<predicate_has_none, Field> visitor;
-         return arg.visit(visitor);
+         return static_variant_slimmer<list_types_list>::slim(arg).visit(visitor);
       }
       case restriction::func_attr:
          FC_ASSERT(arg.which() == restriction_argument::tag<vector<restriction>>::value,
                    "Argument type for attribute assertion must be restriction list");
          return attribute_assertion<Field>::create(std::move(arg.get<vector<restriction>>()));
-      case restriction::func_logical_or:
-         FC_ASSERT(arg.which() == restriction_argument::tag<vector<vector<restriction>>>::value,
-                   "Argument type for logical or restriction must be list of restriction lists");
-         return create_logical_or_predicate<Field>(std::move(arg.get<vector<vector<restriction>>>()));
       default:
           FC_THROW_EXCEPTION(fc::assert_exception, "Invalid function type on restriction");
       }
@@ -439,11 +457,28 @@ object_restriction_predicate<Object> create_field_predicate(restriction&& r, lon
 }
 
 template<typename Object>
+object_restriction_predicate<Object> create_logical_or_predicate(vector<vector<restriction>> rs) {
+   vector<object_restriction_predicate<Object>> predicates;
+   std::transform(std::make_move_iterator(rs.begin()), std::make_move_iterator(rs.end()),
+                  std::back_inserter(predicates), restrictions_to_predicate<Object>);
+
+   return [predicates=std::move(predicates)](const Object& object) {
+      return std::any_of(predicates.begin(), predicates.end(), [&o=object](const auto& p) { return p(o); });
+   };
+}
+
+template<typename Object>
 object_restriction_predicate<Object> restrictions_to_predicate(vector<restriction> rs) {
    vector<object_restriction_predicate<Object>> predicates;
    std::transform(std::make_move_iterator(rs.begin()), std::make_move_iterator(rs.end()),
-                  std::back_inserter(predicates),
-                  [](auto&& r) { return create_field_predicate<Object>(std::move(r), short()); });
+                  std::back_inserter(predicates), [](restriction&& r) {
+      if (r.restriction_type.value == restriction::func_logical_or) {
+          FC_ASSERT(r.argument.which() == restriction_argument::tag<vector<vector<restriction>>>::value,
+                    "Restriction argument for logical OR function type must be list of restriction lists.");
+          return create_logical_or_predicate<Object>(std::move(r.argument.get<vector<vector<restriction>>>()));
+      }
+      return create_field_predicate<Object>(std::move(r), short());
+   });
 
    return [predicates=std::move(predicates)](const Object& field) {
       return std::all_of(predicates.begin(), predicates.end(), [&f=field](const auto& p) { return p(f); });
@@ -457,12 +492,12 @@ object_restriction_predicate<Object> restrictions_to_predicate(vector<restrictio
  * particular operation type as a template argument, and this method constructs a restriction predicate which accepts
  * an operation wrapping the visited type and returns whether the operation complies with all restrictions or not.
  */
-struct predicate_creator_visitor {
+struct operation_type_resolver {
    using result_type = restriction_predicate_function;
 
    const vector<restriction>& restrictions;
 
-   predicate_creator_visitor(const vector<restriction>& restrictions) : restrictions(restrictions) {}
+   operation_type_resolver(const vector<restriction>& restrictions) : restrictions(restrictions) {}
 
    template<typename Op>
    result_type operator()(const Op&) {
@@ -476,15 +511,12 @@ struct predicate_creator_visitor {
 };
 
 restriction_predicate_function get_restriction_predicate(const vector<restriction> &r, operation::tag_type op_type) {
-   predicate_creator_visitor visitor(r);
+   operation_type_resolver visitor(r);
    return operation::visit(op_type, visitor, static_cast<void*>(nullptr));
 }
 
 // Now for some compile-time tests of the metafunctions we use in here...
 #ifndef NDEBUG
-static_assert(!is_optional<int>, "");
-static_assert(is_optional<fc::optional<int>>, "");
-
 static_assert(!is_container<int>, "");
 static_assert(is_container<vector<int>>, "");
 
