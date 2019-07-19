@@ -232,10 +232,10 @@ template<typename Element> struct predicate_in<flat_set<Element>> {
 
    // Simple inclusion check
    template<typename Field, typename = std::enable_if_t<comparable_types<Field, Element>>>
-   auto operator()(const Field& f) const { return a.count(f) != 0; }
+   bool operator()(const Field& f) const { return a.count(f) != 0; }
    // Check for optional value
    template<typename Field, typename = std::enable_if_t<comparable_types<Field, Element>>>
-   auto operator()(const fc::optional<Field>& f) const {
+   bool operator()(const fc::optional<Field>& f) const {
        FC_ASSERT(f.valid(), "Cannot compute whether null optional is in list");
        return (*this)(*f);
    }
@@ -258,14 +258,14 @@ template<typename Element> struct predicate_has_all<flat_set<Element>> {
 
    // Field is already flat_set
    template<typename Field, typename = std::enable_if_t<comparable_types<Field, Element>>>
-   auto operator()(const flat_set<Field>& f) const {
+   bool operator()(const flat_set<Field>& f) const {
       if (f.size() < a.size()) return false;
       return std::includes(f.begin(), f.end(), a.begin(), a.end());
    }
    // Field is other container; convert to flat_set
    template<typename Field, typename = std::enable_if_t<is_container<Field> &&
                                                         comparable_types<typename Field::value_type, Element>>>
-   auto operator()(const Field& f) const {
+   bool operator()(const Field& f) const {
       if (f.size() < a.size()) return false;
       flat_set<typename Field::value_type> fs(f.begin(), f.end());
       return (*this)(fs);
@@ -273,7 +273,7 @@ template<typename Element> struct predicate_has_all<flat_set<Element>> {
    // Field is optional container
    template<typename Field, typename = std::enable_if_t<is_container<Field> &&
                                                         comparable_types<typename Field::value_type, Element>>>
-   auto operator()(const fc::optional<Field>& f) const {
+   bool operator()(const fc::optional<Field>& f) const {
       FC_ASSERT(f.valid(), "Cannot compute whether all elements of null optional container are in other container");
       return (*this)(*f);
    }
@@ -291,7 +291,7 @@ template<typename Element> struct predicate_has_none<flat_set<Element>> {
 
    // Field is already flat_set
    template<typename Field, typename = std::enable_if_t<comparable_types<Field, Element>>>
-   auto operator()(const flat_set<Field>& f) const {
+   bool operator()(const flat_set<Field>& f) const {
       flat_set<Field> intersection;
       std::set_intersection(f.begin(), f.end(), a.begin(), a.end(),
                             std::inserter(intersection, intersection.begin()));
@@ -300,14 +300,14 @@ template<typename Element> struct predicate_has_none<flat_set<Element>> {
    // Field is other container; convert to flat_set
    template<typename Field, typename = std::enable_if_t<is_container<Field> &&
                                                         comparable_types<typename Field::value_type, Element>>>
-   auto operator()(const Field& f) const {
+   bool operator()(const Field& f) const {
       flat_set<typename Field::value_type> fs(f.begin(), f.end());
       return (*this)(fs);
    }
    // Field is optional container
    template<typename Field, typename = std::enable_if_t<is_container<Field> &&
                                                         comparable_types<typename Field::value_type, Element>>>
-   auto operator()(const fc::optional<Field>& f) const {
+   bool operator()(const fc::optional<Field>& f) const {
       FC_ASSERT(f.valid(), "Cannot compute whether no elements of null optional container are in other container");
       return (*this)(*f);
    }
@@ -337,18 +337,18 @@ struct restriction_argument_visitor {
 };
 
 // Forward declaration of restrictions_to_predicate, because attribute assertions and logical ORs recurse into it
-template<typename Field> object_restriction_predicate<Field> restrictions_to_predicate(vector<restriction>);
+template<typename Field> object_restriction_predicate<Field> restrictions_to_predicate(vector<restriction>, bool);
 
 template<typename Field>
 struct attribute_assertion {
    static object_restriction_predicate<Field> create(vector<restriction>&& rs) {
-      return restrictions_to_predicate<Field>(std::move(rs));
+      return restrictions_to_predicate<Field>(std::move(rs), false);
    }
 };
 template<typename Field>
 struct attribute_assertion<fc::optional<Field>> {
    static object_restriction_predicate<fc::optional<Field>> create(vector<restriction>&& rs) {
-      return [p=restrictions_to_predicate<Field>(std::move(rs))](const fc::optional<Field>& f) {
+      return [p=restrictions_to_predicate<Field>(std::move(rs), false)](const fc::optional<Field>& f) {
          FC_ASSERT(f.valid(), "Cannot evaluate attribute assertion on null optional field");
          return p(*f);
       };
@@ -357,7 +357,7 @@ struct attribute_assertion<fc::optional<Field>> {
 template<typename Extension>
 struct attribute_assertion<extension<Extension>> {
    static object_restriction_predicate<extension<Extension>> create(vector<restriction>&& rs) {
-      return [p=restrictions_to_predicate<Extension>(std::move(rs))](const extension<Extension>& x) {
+      return [p=restrictions_to_predicate<Extension>(std::move(rs), false)](const extension<Extension>& x) {
          return p(x.value);
       };
    }
@@ -458,9 +458,12 @@ object_restriction_predicate<Object> create_field_predicate(restriction&& r, lon
 
 template<typename Object>
 object_restriction_predicate<Object> create_logical_or_predicate(vector<vector<restriction>> rs) {
+   FC_ASSERT(rs.size() > 1, "Logical OR must have at least two branches");
+   auto to_predicate = std::bind(restrictions_to_predicate<Object>, std::placeholders::_1, false);
+
    vector<object_restriction_predicate<Object>> predicates;
    std::transform(std::make_move_iterator(rs.begin()), std::make_move_iterator(rs.end()),
-                  std::back_inserter(predicates), restrictions_to_predicate<Object>);
+                  std::back_inserter(predicates), to_predicate);
 
    return [predicates=std::move(predicates)](const Object& object) {
       return std::any_of(predicates.begin(), predicates.end(), [&o=object](const auto& p) { return p(o); });
@@ -468,7 +471,10 @@ object_restriction_predicate<Object> create_logical_or_predicate(vector<vector<r
 }
 
 template<typename Object>
-object_restriction_predicate<Object> restrictions_to_predicate(vector<restriction> rs) {
+object_restriction_predicate<Object> restrictions_to_predicate(vector<restriction> rs, bool allow_empty) {
+   if (!allow_empty)
+      FC_ASSERT(!rs.empty(), "Empty attribute assertions and logical OR branches are not permitted");
+
    vector<object_restriction_predicate<Object>> predicates;
    std::transform(std::make_move_iterator(rs.begin()), std::make_move_iterator(rs.end()),
                   std::back_inserter(predicates), [](restriction&& r) {
@@ -501,7 +507,7 @@ struct operation_type_resolver {
 
    template<typename Op>
    result_type operator()(const Op&) {
-      auto predicate = restrictions_to_predicate<Op>(restrictions);
+      auto predicate = restrictions_to_predicate<Op>(restrictions, true);
       return [predicate=std::move(predicate)](const operation& op) {
          FC_ASSERT(op.which() == operation::tag<Op>::value,
                    "Supplied operation is incorrect type for restriction predicate");

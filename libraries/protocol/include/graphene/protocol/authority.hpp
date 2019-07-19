@@ -108,7 +108,7 @@ namespace graphene { namespace protocol {
                 (a.address_auths == b.address_auths); 
       }
       uint32_t num_auths()const { return account_auths.size() + key_auths.size() + address_auths.size(); }
-      void     clear() { account_auths.clear(); key_auths.clear(); }
+      void     clear() { account_auths.clear(); key_auths.clear(); address_auths.clear(); weight_threshold = 0; }
 
       static authority null_authority()
       {

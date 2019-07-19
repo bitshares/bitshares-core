@@ -101,11 +101,6 @@ struct restriction {
     restriction() = default;
     restriction(const string& member_name, function_type type, const argument_type& argument)
         : member_name(member_name), restriction_type(type), argument(argument) {}
-
-    uint64_t get_units()const;
-
-    /// Validates the restriction with given operation type, to be called by an operation validator
-    void validate( unsigned_int op_type )const;
 };
 
 } } // graphene::protocol
