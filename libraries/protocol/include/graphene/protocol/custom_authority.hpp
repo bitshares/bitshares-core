@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Abit More, and contributors.
+ * Copyright (c) 2019 Contributors.
  *
  * The MIT License
  *

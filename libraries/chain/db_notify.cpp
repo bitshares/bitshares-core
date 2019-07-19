@@ -16,6 +16,7 @@
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/transaction_history_object.hpp>
+#include <graphene/chain/custom_authority_object.hpp>
 #include <graphene/chain/impacted.hpp>
 #include <graphene/chain/hardfork.hpp>
 
@@ -394,6 +395,11 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               accounts.insert( htlc_obj->transfer.from );
               accounts.insert( htlc_obj->transfer.to );
               break;
+        } case custom_authority_object_type:{
+           const auto* cust_auth_obj = dynamic_cast<const custom_authority_object*>( obj );
+           FC_ASSERT( cust_auth_obj != nullptr );
+           accounts.insert( cust_auth_obj->account );
+           add_authority_accounts( accounts, cust_auth_obj->auth );
         }
       }
    }

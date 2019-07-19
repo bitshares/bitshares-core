@@ -105,27 +105,25 @@ struct restriction {
 
 } } // graphene::protocol
 
-FC_REFLECT_ENUM( graphene::protocol::restriction::function_type,
-                 (func_eq)
-                 (func_ne)
-                 (func_lt)
-                 (func_le)
-                 (func_gt)
-                 (func_ge)
-                 (func_in)
-                 (func_not_in)
-                 (func_has_all)
-                 (func_has_none)
-                 (func_attr)
-                 (func_logical_or)
-                 (FUNCTION_TYPE_COUNT)
-               )
+FC_REFLECT_ENUM(graphene::protocol::restriction::function_type,
+                (func_eq)
+                (func_ne)
+                (func_lt)
+                (func_le)
+                (func_gt)
+                (func_ge)
+                (func_in)
+                (func_not_in)
+                (func_has_all)
+                (func_has_none)
+                (func_attr)
+                (func_logical_or)
+                (FUNCTION_TYPE_COUNT))
 
-FC_REFLECT( graphene::protocol::restriction,
-            (member_name)
-            (restriction_type)
-            (argument)
-            (extensions)
-          )
+FC_REFLECT(graphene::protocol::restriction,
+           (member_name)
+           (restriction_type)
+           (argument)
+           (extensions))
 
 
