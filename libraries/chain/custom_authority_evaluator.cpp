@@ -39,7 +39,7 @@ void_result custom_authority_create_evaluator::do_evaluate(const custom_authorit
 
    op.account(d);
 
-   const auto& config = global_property_id_type()(d).parameters.extensions.value.custom_authority_options;
+   const auto& config = d.get_global_properties().parameters.extensions.value.custom_authority_options;
    FC_ASSERT(config.valid(), "Cannot use custom authorities yet: global configuration not set");
    FC_ASSERT(op.valid_to > now, "Custom authority expiration must be in the future");
    FC_ASSERT((op.valid_to - now).to_seconds() <= config->max_custom_authority_lifetime_seconds,
@@ -73,7 +73,8 @@ object_id_type custom_authority_create_evaluator::do_apply(const custom_authorit
       obj.auth = op.auth;
       obj.restrictions = op.restrictions;
 
-      obj.predicate_cache = std::move(p);
+      // Update the predicate cache
+      obj.update_predicate_cache();
    }).id;
 } FC_CAPTURE_AND_RETHROW((op)) }
 
@@ -82,37 +83,44 @@ void_result custom_authority_update_evaluator::do_evaluate(const custom_authorit
    const database& d = db();
    auto now = d.head_block_time();
    FC_ASSERT(HARDFORK_BSIP_40_PASSED(now), "Custom active authorities are not yet enabled");
-   const auto& old_object = op.authority_to_update(d);
+   old_object = &op.authority_to_update(d);
+   FC_ASSERT(old_object->account == op.account, "Cannot update a different account's custom authority");
 
    op.account(d);
    if (op.new_enabled)
-      FC_ASSERT(*op.new_enabled != old_object.enabled,
+      FC_ASSERT(*op.new_enabled != old_object->enabled,
                 "Custom authority update specifies an enabled flag, but flag is not changed");
 
-   const auto& config = global_property_id_type()(d).parameters.extensions.value.custom_authority_options;
-   if (op.new_valid_from)
-      FC_ASSERT(*op.new_valid_from != old_object.valid_from,
+   const auto& config = d.get_global_properties().parameters.extensions.value.custom_authority_options;
+   auto valid_from = old_object->valid_from;
+   auto valid_to = old_object->valid_to;
+   if (op.new_valid_from) {
+      FC_ASSERT(*op.new_valid_from != old_object->valid_from,
                 "Custom authority update specifies a new valid from date, but date is not changed");
+      valid_from = *op.new_valid_from;
+   }
    if (op.new_valid_to) {
-      FC_ASSERT(*op.new_valid_to != old_object.valid_to,
+      FC_ASSERT(*op.new_valid_to != old_object->valid_to,
                 "Custom authority update specifies a new valid to date, but date is not changed");
       FC_ASSERT(*op.new_valid_to > now, "Custom authority expiration must be in the future");
       FC_ASSERT((*op.new_valid_to - now).to_seconds() <= config->max_custom_authority_lifetime_seconds,
                 "Custom authority lifetime exceeds maximum limit");
+      valid_to = *op.new_valid_to;
    }
+   FC_ASSERT(valid_from < valid_to, "Custom authority validity begin date must be before expiration date");
 
    if (op.new_auth) {
-      FC_ASSERT(*op.new_auth != old_object.auth,
+      FC_ASSERT(*op.new_auth != old_object->auth,
                 "Custom authority update specifies a new authentication authority, but authority is not changed");
       for (const auto& account_weight_pair : op.new_auth->account_auths)
          account_weight_pair.first(d);
    }
 
    auto largest_index = *(--op.restrictions_to_remove.end());
-   FC_ASSERT(largest_index < old_object.restrictions.size(),
+   FC_ASSERT(largest_index < old_object->restrictions.size(),
              "Index of custom authority restriction to remove is out of bounds");
 
-   predicate = get_restriction_predicate(op.restrictions_to_add, old_object.operation_type);
+   get_restriction_predicate(op.restrictions_to_add, old_object->operation_type);
    return void_result();
 } FC_CAPTURE_AND_RETHROW((op)) }
 
@@ -120,7 +128,7 @@ void_result custom_authority_update_evaluator::do_apply(const custom_authority_u
 { try {
    database& d = db();
 
-   d.modify(op.authority_to_update(d), [&op, p=std::move(predicate)](custom_authority_object& obj) {
+   d.modify(*old_object, [&op](custom_authority_object& obj) {
       if (op.new_enabled) obj.enabled = *op.new_enabled;
       if (op.new_valid_from) obj.valid_from = *op.new_valid_from;
       if (op.new_valid_to) obj.valid_to = *op.new_valid_to;
@@ -137,7 +145,8 @@ void_result custom_authority_update_evaluator::do_apply(const custom_authority_u
 
       obj.restrictions.insert(obj.restrictions.end(), op.restrictions_to_add.begin(), op.restrictions_to_add.end());
 
-      obj.predicate_cache = std::move(p);
+      // Update the predicate cache
+      obj.update_predicate_cache();
    });
 
    return void_result();
@@ -149,7 +158,8 @@ void_result custom_authority_delete_evaluator::do_evaluate(const custom_authorit
    FC_ASSERT(HARDFORK_BSIP_40_PASSED(d.head_block_time()), "Custom active authorities are not yet enabled");
 
    op.account(d);
-   op.authority_to_delete(d);
+   old_object = &op.authority_to_delete(d);
+   FC_ASSERT(old_object->account == op.account, "Cannot delete a different account's custom authority");
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((op)) }
@@ -158,7 +168,7 @@ void_result custom_authority_delete_evaluator::do_apply(const custom_authority_d
 { try {
    database& d = db();
 
-   d.remove(op.authority_to_delete(d));
+   d.remove(*old_object);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((op)) }

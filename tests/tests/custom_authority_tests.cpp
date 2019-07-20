@@ -92,7 +92,6 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    fund(alice, asset(1000*GRAPHENE_BLOCKCHAIN_PRECISION));
    fund(bob, asset(1000*GRAPHENE_BLOCKCHAIN_PRECISION));
 
-
    custom_authority_create_operation op;
    op.account = alice.get_id();
    op.auth.add_authority(bob.get_id(), 1);
@@ -110,45 +109,55 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    top.amount.amount = 99 * GRAPHENE_BLOCKCHAIN_PRECISION;
    trx.operations = {top};
    sign(trx, bob_private_key);
+   // No custom auth yet; bob's transfer should fail
    BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
 
    trx.clear();
    trx.operations = {op};
    sign(trx, alice_private_key);
+   // Alice publishes the custom authority
    PUSH_TX(db, trx);
 
-   const auto& auth = *db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(alice_id);
+   custom_authority_id_type auth_id =
+           db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(alice_id)->id;
 
    trx.clear();
    trx.operations = {top};
    sign(trx, bob_private_key);
+   // Now bob's transfer should succeed due to the custom authority
    PUSH_TX(db, trx);
 
    trx.operations.front().get<transfer_operation>().amount.amount = 100*GRAPHENE_BLOCKCHAIN_PRECISION;
    trx.clear_signatures();
    sign(trx, bob_private_key);
+   // If bob tries to transfer 100, it fails because the restriction is strictly less than 100
    BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
 
    op.restrictions.front().argument.get<vector<restriction>>().front().restriction_type = restriction::func_eq;
    custom_authority_update_operation uop;
    uop.account = alice.get_id();
-   uop.authority_to_update = auth.id;
+   uop.authority_to_update = auth_id;
    uop.restrictions_to_remove = {0};
    uop.restrictions_to_add = {op.restrictions.front()};
    trx.clear();
    trx.operations = {uop};
    sign(trx, alice_private_key);
+   // Alice publishes an update to the custom authority, making the restriction require exactly 100
    PUSH_TX(db, trx);
+
+   BOOST_CHECK(auth_id(db).restrictions == uop.restrictions_to_add);
 
    trx.clear();
    trx.operations = {top};
    trx.expiration += 5;
    sign(trx, bob_private_key);
+   // The transfer of 99 should fail now becaues the requirement is for exactly 100
    BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
 
    trx.operations.front().get<transfer_operation>().amount.amount = 100*GRAPHENE_BLOCKCHAIN_PRECISION;
    trx.clear_signatures();
    sign(trx, bob_private_key);
+   // A transfer of 100 should succeed
    PUSH_TX(db, trx);
    auto transfer = trx;
 
@@ -157,20 +166,22 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    trx.expiration += 5;
    trx.clear_signatures();
    sign(trx, bob_private_key);
+   // Another one should succeed
    PUSH_TX(db, trx);
 
    custom_authority_delete_operation dop;
-   auto id = db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(alice_id)->id;
    dop.account = alice.get_id();
-   dop.authority_to_delete = id;
+   dop.authority_to_delete = auth_id;
    trx.clear();
    trx.operations = {dop};
    sign(trx, alice_private_key);
+   // Alice deletes the custom authority
    PUSH_TX(db, trx);
 
    transfer.expiration += 10;
    transfer.clear_signatures();
    sign(transfer, bob_private_key);
+   // The transfer should no longer work
    BOOST_CHECK_THROW(PUSH_TX(db, transfer), tx_missing_active_auth);
 } FC_LOG_AND_RETHROW() }
 

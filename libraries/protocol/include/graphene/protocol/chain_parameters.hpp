@@ -108,6 +108,7 @@ FC_REFLECT( graphene::protocol::htlc_options,
 
 FC_REFLECT( graphene::protocol::custom_authority_options_type,
       (max_custom_authority_lifetime_seconds)
+      (max_custom_authorities_per_account)
       (max_operation_tag)
 )
 

@@ -71,7 +71,7 @@ void custom_authority_update_operation::validate()const {
              && account != GRAPHENE_RELAXED_COMMITTEE_ACCOUNT,
              "Can not create custom authority for special accounts");
    if (new_valid_from && new_valid_to)
-      FC_ASSERT(*new_valid_from < new_valid_to, "valid_from must be earlier than valid_to");
+      FC_ASSERT(*new_valid_from < *new_valid_to, "valid_from must be earlier than valid_to");
    if (new_auth) {
       FC_ASSERT(!new_auth->is_impossible(), "Cannot use an impossible authority threshold");
       FC_ASSERT(new_auth->address_auths.size() == 0, "Address auth is not supported");

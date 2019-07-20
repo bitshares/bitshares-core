@@ -28,6 +28,7 @@
 #include <graphene/chain/evaluator.hpp>
 
 namespace graphene { namespace chain {
+class custom_authority_object;
 
 class custom_authority_create_evaluator : public evaluator<custom_authority_create_evaluator> {
 public:
@@ -41,7 +42,7 @@ public:
 class custom_authority_update_evaluator : public evaluator<custom_authority_update_evaluator> {
 public:
    using operation_type = custom_authority_update_operation;
-   restriction_predicate_function predicate;
+   const custom_authority_object* old_object = nullptr;
 
    void_result do_evaluate(const operation_type& op);
    void_result do_apply(const operation_type& op);
@@ -50,6 +51,7 @@ public:
 class custom_authority_delete_evaluator : public evaluator<custom_authority_delete_evaluator> {
 public:
    using operation_type = custom_authority_delete_operation;
+   const custom_authority_object* old_object = nullptr;
 
    void_result do_evaluate(const operation_type& op);
    void_result do_apply(const operation_type& op);

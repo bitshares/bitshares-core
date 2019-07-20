@@ -101,6 +101,11 @@ struct restriction {
     restriction() = default;
     restriction(const string& member_name, function_type type, const argument_type& argument)
         : member_name(member_name), restriction_type(type), argument(argument) {}
+
+    friend bool operator==(const restriction& a, const restriction& b) {
+       return std::tie(a.member_name, a.restriction_type, a.argument, a.extensions) ==
+               std::tie(b.member_name, b.restriction_type, b.argument, b.extensions);
+    }
 };
 
 } } // graphene::protocol

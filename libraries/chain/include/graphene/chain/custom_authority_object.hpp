@@ -37,29 +37,31 @@ namespace graphene { namespace chain {
     *
     */
    class custom_authority_object : public abstract_object<custom_authority_object> {
-      public:
-         static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id = custom_authority_object_type;
+      /// Unreflected field to store a cache of the predicate function
+      mutable optional<restriction_predicate_function> predicate_cache;
 
-         account_id_type account;
-         bool enabled;
-         time_point_sec valid_from;
-         time_point_sec valid_to;
-         unsigned_int operation_type;
-         authority auth;
-         vector<restriction> restrictions;
+   public:
+      static const uint8_t space_id = protocol_ids;
+      static const uint8_t type_id = custom_authority_object_type;
 
-         /// Check whether the custom authority is valid
-         bool is_valid(time_point_sec now) const { return enabled && now >= valid_from && now < valid_to; }
+      account_id_type account;
+      bool enabled;
+      time_point_sec valid_from;
+      time_point_sec valid_to;
+      unsigned_int operation_type;
+      authority auth;
+      vector<restriction> restrictions;
 
-         /// Unreflected field to store a cache of the predicate function
-         mutable optional<restriction_predicate_function> predicate_cache;
+      /// Check whether the custom authority is valid
+      bool is_valid(time_point_sec now) const { return enabled && now >= valid_from && now < valid_to; }
 
-         /// Get predicate, from cache if possible, and update cache if not (modifies const object!)
-         restriction_predicate_function get_predicate() const {
-            if (!predicate_cache.valid()) predicate_cache = get_restriction_predicate(restrictions, operation_type);
-            return *predicate_cache;
-         }
+      /// Get predicate, from cache if possible, and update cache if not (modifies const object!)
+      restriction_predicate_function get_predicate() const {
+         if (!predicate_cache.valid()) predicate_cache = get_restriction_predicate(restrictions, operation_type);
+         return *predicate_cache;
+      }
+      /// Regenerate predicate function and update predicate cache
+      void update_predicate_cache() { predicate_cache = get_restriction_predicate(restrictions, operation_type); }
    };
 
    struct by_account_custom;
