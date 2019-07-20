@@ -279,6 +279,7 @@ namespace graphene { namespace chain {
 
          node_property_object& node_properties();
 
+         vector<authority> get_viable_custom_authorities( account_id_type account, const operation& op )const;
 
          uint32_t last_non_undoable_block_num() const;
          //////////////////// db_init.cpp ////////////////////

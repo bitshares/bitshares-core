@@ -107,6 +107,7 @@ namespace graphene { namespace protocol {
                 (a.key_auths == b.key_auths) &&
                 (a.address_auths == b.address_auths); 
       }
+      friend bool operator!= ( const authority& a, const authority& b ) { return !(a==b); }
       uint32_t num_auths()const { return account_auths.size() + key_auths.size() + address_auths.size(); }
       void     clear() { account_auths.clear(); key_auths.clear(); address_auths.clear(); weight_threshold = 0; }
 

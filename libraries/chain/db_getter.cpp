@@ -27,6 +27,7 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
+#include <graphene/chain/custom_authority_object.hpp>
 
 namespace graphene { namespace chain {
 
@@ -93,6 +94,21 @@ const node_property_object& database::get_node_properties()const
 node_property_object& database::node_properties()
 {
    return _node_property_object;
+}
+
+vector<authority> database::get_viable_custom_authorities(account_id_type account, const operation &op) const
+{
+   const auto& index = get_index_type<custom_authority_index>().indices().get<by_account_custom>();
+   auto range = index.equal_range(boost::make_tuple(account, unsigned_int(op.which()), true));
+   vector<authority> results;
+
+   std::for_each(range.first, range.second,
+                 [&results, &op, now=head_block_time()](const custom_authority_object& cust_auth) {
+      if (cust_auth.is_valid(now) && cust_auth.get_predicate()(op))
+         results.insert(results.end(), cust_auth.auth);
+   });
+
+   return results;
 }
 
 uint32_t database::last_non_undoable_block_num() const

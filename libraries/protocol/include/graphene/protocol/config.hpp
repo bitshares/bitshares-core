@@ -138,3 +138,12 @@
 ///@}
 
 #define GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET (asset_id_type(743))
+
+/// Maximum duration before a custom authority can expire
+#define GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS (60*60*24*365)
+/// Maximum number of custom authorities a particular account can set
+#define GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITIES_PER_ACCOUNT 10
+
+/// Maximum operation tag which has been forked in so far. Defaults to 56 because that's what it was when we first
+/// began keeping track
+#define GRAPHENE_DEFAULT_MAX_OPERATION_TAG 56

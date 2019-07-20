@@ -22,12 +22,19 @@
  * THE SOFTWARE.
  */
 
-#include <boost/test/unit_test.hpp>
 #include <string>
+#include <boost/test/unit_test.hpp>
 #include <fc/exception/exception.hpp>
 #include <graphene/protocol/restriction_predicate.hpp>
+#include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/custom_authority_object.hpp>
 
-BOOST_AUTO_TEST_SUITE(custom_authority_tests)
+#include "../common/database_fixture.hpp"
+
+using namespace graphene::chain;
+using namespace graphene::chain::test;
+
+BOOST_FIXTURE_TEST_SUITE(custom_authority_tests, database_fixture)
 
 #define FUNC(TYPE) BOOST_PP_CAT(restriction::func_, TYPE)
 
@@ -72,6 +79,99 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    restrictions.front().argument.get<vector<restriction>>().front().restriction_type = FUNC(ne);
    predicate = get_restriction_predicate(restrictions, operation::tag<account_update_operation>::value);
    BOOST_CHECK(predicate(update) == true);
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(custom_auths) { try {
+   generate_blocks(HARDFORK_BSIP_40_TIME);
+   generate_blocks(5);
+   db.modify(global_property_id_type()(db), [](global_property_object& gpo) {
+      gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+   });
+   set_expiration(db, trx);
+   ACTORS((alice)(bob))
+   fund(alice, asset(1000*GRAPHENE_BLOCKCHAIN_PRECISION));
+   fund(bob, asset(1000*GRAPHENE_BLOCKCHAIN_PRECISION));
+
+
+   custom_authority_create_operation op;
+   op.account = alice.get_id();
+   op.auth.add_authority(bob.get_id(), 1);
+   op.auth.weight_threshold = 1;
+   op.enabled = true;
+   op.valid_to = db.head_block_time() + 1000;
+   op.operation_type = operation::tag<transfer_operation>::value;
+   op.restrictions = {restriction("amount", restriction::func_attr, vector<restriction>{
+                          restriction("amount", restriction::func_lt, int64_t(100*GRAPHENE_BLOCKCHAIN_PRECISION)),
+                          restriction("asset_id", restriction::func_eq, asset_id_type(0))})};
+
+   transfer_operation top;
+   top.to = bob.get_id();
+   top.from = alice.get_id();
+   top.amount.amount = 99 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   trx.operations = {top};
+   sign(trx, bob_private_key);
+   BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+   trx.clear();
+   trx.operations = {op};
+   sign(trx, alice_private_key);
+   PUSH_TX(db, trx);
+
+   const auto& auth = *db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(alice_id);
+
+   trx.clear();
+   trx.operations = {top};
+   sign(trx, bob_private_key);
+   PUSH_TX(db, trx);
+
+   trx.operations.front().get<transfer_operation>().amount.amount = 100*GRAPHENE_BLOCKCHAIN_PRECISION;
+   trx.clear_signatures();
+   sign(trx, bob_private_key);
+   BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+   op.restrictions.front().argument.get<vector<restriction>>().front().restriction_type = restriction::func_eq;
+   custom_authority_update_operation uop;
+   uop.account = alice.get_id();
+   uop.authority_to_update = auth.id;
+   uop.restrictions_to_remove = {0};
+   uop.restrictions_to_add = {op.restrictions.front()};
+   trx.clear();
+   trx.operations = {uop};
+   sign(trx, alice_private_key);
+   PUSH_TX(db, trx);
+
+   trx.clear();
+   trx.operations = {top};
+   trx.expiration += 5;
+   sign(trx, bob_private_key);
+   BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+   trx.operations.front().get<transfer_operation>().amount.amount = 100*GRAPHENE_BLOCKCHAIN_PRECISION;
+   trx.clear_signatures();
+   sign(trx, bob_private_key);
+   PUSH_TX(db, trx);
+   auto transfer = trx;
+
+   generate_block();
+
+   trx.expiration += 5;
+   trx.clear_signatures();
+   sign(trx, bob_private_key);
+   PUSH_TX(db, trx);
+
+   custom_authority_delete_operation dop;
+   auto id = db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(alice_id)->id;
+   dop.account = alice.get_id();
+   dop.authority_to_delete = id;
+   trx.clear();
+   trx.operations = {dop};
+   sign(trx, alice_private_key);
+   PUSH_TX(db, trx);
+
+   transfer.expiration += 10;
+   transfer.clear_signatures();
+   sign(transfer, bob_private_key);
+   BOOST_CHECK_THROW(PUSH_TX(db, transfer), tx_missing_active_auth);
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

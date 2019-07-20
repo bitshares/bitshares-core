@@ -1,0 +1,166 @@
+/*
+ * Copyright (c) 2019 Contributors.
+ *
+ * The MIT License
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+#include <graphene/chain/custom_authority_evaluator.hpp>
+#include <graphene/chain/custom_authority_object.hpp>
+#include <graphene/chain/account_object.hpp>
+#include <graphene/chain/database.hpp>
+#include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/hardfork.hpp>
+
+namespace graphene { namespace chain {
+
+void_result custom_authority_create_evaluator::do_evaluate(const custom_authority_create_operation& op)
+{ try {
+   const database& d = db();
+   auto now = d.head_block_time();
+   FC_ASSERT(HARDFORK_BSIP_40_PASSED(now), "Custom active authorities are not yet enabled");
+
+   op.account(d);
+
+   const auto& config = global_property_id_type()(d).parameters.extensions.value.custom_authority_options;
+   FC_ASSERT(config.valid(), "Cannot use custom authorities yet: global configuration not set");
+   FC_ASSERT(op.valid_to > now, "Custom authority expiration must be in the future");
+   FC_ASSERT((op.valid_to - now).to_seconds() <= config->max_custom_authority_lifetime_seconds,
+             "Custom authority lifetime exceeds maximum limit");
+
+   FC_ASSERT(op.operation_type.value <= config->max_operation_tag,
+             "Cannot create custom authority for operation type which is not yet active");
+
+   for (const auto& account_weight_pair : op.auth.account_auths)
+      account_weight_pair.first(d);
+
+   const auto& index = d.get_index_type<custom_authority_index>().indices().get<by_account_custom>();
+   auto range = index.equal_range(op.account);
+   FC_ASSERT(std::distance(range.first, range.second) < config->max_custom_authorities_per_account,
+             "Cannot create custom authority for account: account already has maximum number");
+
+   predicate = get_restriction_predicate(op.restrictions, op.operation_type);
+   return void_result();
+} FC_CAPTURE_AND_RETHROW((op)) }
+
+object_id_type custom_authority_create_evaluator::do_apply(const custom_authority_create_operation& op)
+{ try {
+   database& d = db();
+
+   return d.create<custom_authority_object>([&op, p=std::move(predicate)] (custom_authority_object& obj) mutable {
+      obj.account = op.account;
+      obj.enabled = op.enabled;
+      obj.valid_from = op.valid_from;
+      obj.valid_to = op.valid_to;
+      obj.operation_type = op.operation_type;
+      obj.auth = op.auth;
+      obj.restrictions = op.restrictions;
+
+      obj.predicate_cache = std::move(p);
+   }).id;
+} FC_CAPTURE_AND_RETHROW((op)) }
+
+void_result custom_authority_update_evaluator::do_evaluate(const custom_authority_update_operation& op)
+{ try {
+   const database& d = db();
+   auto now = d.head_block_time();
+   FC_ASSERT(HARDFORK_BSIP_40_PASSED(now), "Custom active authorities are not yet enabled");
+   const auto& old_object = op.authority_to_update(d);
+
+   op.account(d);
+   if (op.new_enabled)
+      FC_ASSERT(*op.new_enabled != old_object.enabled,
+                "Custom authority update specifies an enabled flag, but flag is not changed");
+
+   const auto& config = global_property_id_type()(d).parameters.extensions.value.custom_authority_options;
+   if (op.new_valid_from)
+      FC_ASSERT(*op.new_valid_from != old_object.valid_from,
+                "Custom authority update specifies a new valid from date, but date is not changed");
+   if (op.new_valid_to) {
+      FC_ASSERT(*op.new_valid_to != old_object.valid_to,
+                "Custom authority update specifies a new valid to date, but date is not changed");
+      FC_ASSERT(*op.new_valid_to > now, "Custom authority expiration must be in the future");
+      FC_ASSERT((*op.new_valid_to - now).to_seconds() <= config->max_custom_authority_lifetime_seconds,
+                "Custom authority lifetime exceeds maximum limit");
+   }
+
+   if (op.new_auth) {
+      FC_ASSERT(*op.new_auth != old_object.auth,
+                "Custom authority update specifies a new authentication authority, but authority is not changed");
+      for (const auto& account_weight_pair : op.new_auth->account_auths)
+         account_weight_pair.first(d);
+   }
+
+   auto largest_index = *(--op.restrictions_to_remove.end());
+   FC_ASSERT(largest_index < old_object.restrictions.size(),
+             "Index of custom authority restriction to remove is out of bounds");
+
+   predicate = get_restriction_predicate(op.restrictions_to_add, old_object.operation_type);
+   return void_result();
+} FC_CAPTURE_AND_RETHROW((op)) }
+
+void_result custom_authority_update_evaluator::do_apply(const custom_authority_update_operation& op)
+{ try {
+   database& d = db();
+
+   d.modify(op.authority_to_update(d), [&op, p=std::move(predicate)](custom_authority_object& obj) {
+      if (op.new_enabled) obj.enabled = *op.new_enabled;
+      if (op.new_valid_from) obj.valid_from = *op.new_valid_from;
+      if (op.new_valid_to) obj.valid_to = *op.new_valid_to;
+      if (op.new_auth) obj.auth = *op.new_auth;
+
+      // Move restrictions at indexes to be removed to the end, then truncate them.
+      // Note: we could use partition instead of stable_partition, which would be slightly faster, but would also
+      // reorder the restrictions. I opted to preserve order as a courtesy to the user, who obviously does care about
+      // what items are at what indexes (removed items are specified by index)
+      std::stable_partition(obj.restrictions.begin(), obj.restrictions.end(), [&op, index=0](const auto&) mutable {
+         return op.restrictions_to_remove.count(index++) == 0;
+      });
+      obj.restrictions.resize(obj.restrictions.size() - op.restrictions_to_remove.size());
+
+      obj.restrictions.insert(obj.restrictions.end(), op.restrictions_to_add.begin(), op.restrictions_to_add.end());
+
+      obj.predicate_cache = std::move(p);
+   });
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW((op)) }
+
+void_result custom_authority_delete_evaluator::do_evaluate(const custom_authority_delete_operation& op)
+{ try {
+   const database& d = db();
+   FC_ASSERT(HARDFORK_BSIP_40_PASSED(d.head_block_time()), "Custom active authorities are not yet enabled");
+
+   op.account(d);
+   op.authority_to_delete(d);
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW((op)) }
+
+void_result custom_authority_delete_evaluator::do_apply(const custom_authority_delete_operation& op)
+{ try {
+   database& d = db();
+
+   d.remove(op.authority_to_delete(d));
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW((op)) }
+
+} } // graphene::chain

@@ -26,6 +26,8 @@
 
 namespace graphene { namespace protocol {
 
+   using custom_authority_lookup = std::function<vector<authority>(account_id_type, const operation&)>;
+
    /**
     * @defgroup transactions Transactions
     *
@@ -161,6 +163,7 @@ namespace graphene { namespace protocol {
        * @param chain_id the ID of a block chain
        * @param get_active callback function to retrieve active authorities of a given account
        * @param get_owner  callback function to retrieve owner authorities of a given account
+       * @param get_custom callback function to retrieve viable custom authorities for a given account and operation
        * @param allow_non_immediate_owner whether to allow owner authority of non-immediately
        *            required accounts to authorize operations in the transaction
        * @param ignore_custom_operation_required_auths See issue #210; whether to ignore the
@@ -172,6 +175,7 @@ namespace graphene { namespace protocol {
               const chain_id_type& chain_id,
               const std::function<const authority*(account_id_type)>& get_active,
               const std::function<const authority*(account_id_type)>& get_owner,
+              custom_authority_lookup get_custom,
               bool allow_non_immediate_owner,
               bool ignore_custom_operation_required_auths,
               uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH )const;
@@ -187,6 +191,7 @@ namespace graphene { namespace protocol {
               const flat_set<public_key_type>& available_keys,
               const std::function<const authority*(account_id_type)>& get_active,
               const std::function<const authority*(account_id_type)>& get_owner,
+              custom_authority_lookup get_custom,
               bool allow_non_immediate_owner,
               bool ignore_custom_operation_required_auths,
               uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH) const;
@@ -258,6 +263,7 @@ namespace graphene { namespace protocol {
    void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs,
                           const std::function<const authority*(account_id_type)>& get_active,
                           const std::function<const authority*(account_id_type)>& get_owner,
+                          custom_authority_lookup get_custom,
                           bool allow_non_immediate_owner,
                           bool ignore_custom_operation_required_auths,
                           uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH,

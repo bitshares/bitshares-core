@@ -64,6 +64,7 @@
 #include <graphene/chain/witness_evaluator.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
 #include <graphene/chain/htlc_evaluator.hpp>
+#include <graphene/chain/custom_authority_evaluator.hpp>
 
 #include <fc/crypto/digest.hpp>
 
@@ -181,6 +182,9 @@ void database::initialize_evaluators()
    register_evaluator<htlc_create_evaluator>();
    register_evaluator<htlc_redeem_evaluator>();
    register_evaluator<htlc_extend_evaluator>();
+   register_evaluator<custom_authority_create_evaluator>();
+   register_evaluator<custom_authority_update_evaluator>();
+   register_evaluator<custom_authority_delete_evaluator>();
 }
 
 void database::initialize_indexes()

@@ -49,8 +49,17 @@ namespace graphene { namespace chain {
          authority auth;
          vector<restriction> restrictions;
 
+         /// Check whether the custom authority is valid
+         bool is_valid(time_point_sec now) const { return enabled && now >= valid_from && now < valid_to; }
+
          /// Unreflected field to store a cache of the predicate function
-         optional<restriction_predicate_function> predicate_cache;
+         mutable optional<restriction_predicate_function> predicate_cache;
+
+         /// Get predicate, from cache if possible, and update cache if not (modifies const object!)
+         restriction_predicate_function get_predicate() const {
+            if (!predicate_cache.valid()) predicate_cache = get_restriction_predicate(restrictions, operation_type);
+            return *predicate_cache;
+         }
    };
 
    struct by_account_custom;
@@ -66,6 +75,8 @@ namespace graphene { namespace chain {
             composite_key<
                custom_authority_object,
                member<custom_authority_object, account_id_type, &custom_authority_object::account>,
+               member<custom_authority_object, unsigned_int, &custom_authority_object::operation_type>,
+               member<custom_authority_object, bool, &custom_authority_object::enabled>,
                member<object, object_id_type, &object::id>
             >
          >

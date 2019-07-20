@@ -39,10 +39,15 @@ template<typename...> using make_void = void;
 template<typename T> constexpr static bool is_integral =
         std::conditional_t<std::is_same<T, bool>::value, std::false_type, std::is_integral<T>>::value;
 
+// Metafunction to check if type is some instantiation of fc::safe
+template<typename> constexpr static bool is_safe = false;
+template<typename I> constexpr static bool is_safe<fc::safe<I>> = true;
+
 // Metafunction to check if two types are comparable, which means not void_t, and either the same or both integral
 template<typename T, typename U>
 constexpr static bool comparable_types = !std::is_same<T, void_t>::value &&
-                                         (std::is_same<T, U>::value || (is_integral<T> && is_integral<U>));
+                                         (std::is_same<T, U>::value || ((is_integral<T> || is_safe<T>) &&
+                                                                        (is_integral<U> || is_safe<U>)));
 
 // Metafunction to check if type is a container
 template<typename, typename = size_t> constexpr static bool is_container = false;
@@ -233,6 +238,9 @@ template<typename Element> struct predicate_in<flat_set<Element>> {
    // Simple inclusion check
    template<typename Field, typename = std::enable_if_t<comparable_types<Field, Element>>>
    bool operator()(const Field& f) const { return a.count(f) != 0; }
+   // Check for safe value
+   template<typename Field, typename = std::enable_if_t<comparable_types<Field, Element>>>
+   bool operator()(const fc::safe<Field>& f) const { return a.count(f.value) != 0; }
    // Check for optional value
    template<typename Field, typename = std::enable_if_t<comparable_types<Field, Element>>>
    bool operator()(const fc::optional<Field>& f) const {
