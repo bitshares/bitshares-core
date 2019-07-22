@@ -38,29 +38,43 @@ BOOST_FIXTURE_TEST_SUITE(custom_authority_tests, database_fixture)
 
 #define FUNC(TYPE) BOOST_PP_CAT(restriction::func_, TYPE)
 
+template<typename Object>
+unsigned_int member_index(string name) {
+   unsigned_int index;
+   fc::typelist_utils::for_each(typename fc::reflector<Object>::native_members(), [&name, &index](auto t) mutable {
+      if (name == decltype(t)::type::get_name())
+         index = decltype(t)::type::index;
+   });
+   return index;
+}
+
 BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    using namespace graphene::protocol;
    vector<restriction> restrictions;
    transfer_operation transfer;
 
-   restrictions.emplace_back("to", FUNC(eq), account_id_type(12));
+   auto to_index = member_index<transfer_operation>("to");
+   restrictions.emplace_back(to_index, FUNC(eq), account_id_type(12));
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == false);
    transfer.to = account_id_type(12);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == true);
 
-   restrictions.front() = restriction("foo", FUNC(eq), account_id_type(12));
+   restrictions.front() = restriction(fc::reflector<transfer_operation>::native_members::length,
+                                      FUNC(eq), account_id_type(12));
    BOOST_CHECK_THROW(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value),
                      fc::assert_exception);
-   restrictions.front() = restriction("to", FUNC(eq), asset_id_type(12));
+   restrictions.front() = restriction(to_index, FUNC(eq), asset_id_type(12));
    BOOST_CHECK_THROW(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value),
                      fc::assert_exception);
 
-   restrictions.front() = restriction("fee", FUNC(attr),
-                                      vector<restriction>{restriction("asset_id", FUNC(eq), asset_id_type(0))});
+   auto fee_index = member_index<transfer_operation>("fee");
+   auto asset_id_index = member_index<asset>("asset_id");
+   restrictions.front() = restriction(fee_index, FUNC(attr),
+                                      vector<restriction>{restriction(asset_id_index, FUNC(eq), asset_id_type(0))});
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == true);
    restrictions.front().argument.get<vector<restriction>>().front().argument = asset_id_type(1);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == false);
-   restrictions.emplace_back("to", FUNC(eq), account_id_type(12));
+   restrictions.emplace_back(to_index, FUNC(eq), account_id_type(12));
    transfer.to = account_id_type(12);
    transfer.fee.asset_id = asset_id_type(1);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == true);
@@ -69,8 +83,10 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
 
    account_update_operation update;
    restrictions.clear();
-   restrictions.emplace_back("extensions", FUNC(attr),
-                             vector<restriction>{restriction("owner_special_authority", FUNC(eq), void_t())});
+   auto extensions_index = member_index<account_update_operation>("extensions");
+   auto authority_index = member_index<account_update_operation::ext>("owner_special_authority");
+   restrictions.emplace_back(extensions_index, FUNC(attr),
+                             vector<restriction>{restriction(authority_index, FUNC(eq), void_t())});
    auto predicate = get_restriction_predicate(restrictions, operation::tag<account_update_operation>::value);
    BOOST_CHECK_THROW(predicate(transfer), fc::assert_exception);
    BOOST_CHECK(predicate(update) == true);
@@ -99,9 +115,13 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    op.enabled = true;
    op.valid_to = db.head_block_time() + 1000;
    op.operation_type = operation::tag<transfer_operation>::value;
-   op.restrictions = {restriction("amount", restriction::func_attr, vector<restriction>{
-                          restriction("amount", restriction::func_lt, int64_t(100*GRAPHENE_BLOCKCHAIN_PRECISION)),
-                          restriction("asset_id", restriction::func_eq, asset_id_type(0))})};
+   auto transfer_amount_index = member_index<transfer_operation>("amount");
+   auto asset_amount_index = member_index<asset>("amount");
+   auto assed_id_index = member_index<asset>("asset_id");
+   op.restrictions = {restriction(transfer_amount_index, restriction::func_attr, vector<restriction>{
+                          restriction(asset_amount_index, restriction::func_lt,
+                                      int64_t(100*GRAPHENE_BLOCKCHAIN_PRECISION)),
+                          restriction(assed_id_index, restriction::func_eq, asset_id_type(0))})};
 
    transfer_operation top;
    top.to = bob.get_id();

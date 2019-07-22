@@ -81,10 +81,10 @@ template<typename T> constexpr static bool is_container<T, decltype(declval<T>()
 //    subsequent layers work on any object or field
 //  - restrictions_to_predicate<Object>() -- takes a vector<restriction> and creates a predicate for each of them,
 //    but returns a single predicate that returns true only if all sub-predicates return true
-//    - object_field_predicator<Object> -- visits the object being restricted to resolve which specific field is the
-//      subject of the restriction
-//    - create_logical_or_predicate<Object>() -- If the predicate is a logical OR function, instead of using the
-//      object_field_predicator, we recurse into restrictions_to_predicate for each branch of the OR, returning a
+//    - create_field_predicate<Object>() -- Resolves which field of Object the restriction is referencing by indexing
+//      into the object's reflected fields with the predicates member_index
+//    - create_logical_or_predicate<Object>() -- If the predicate is a logical OR function, instead of using
+//      create_field_predicate, we recurse into restrictions_to_predicate for each branch of the OR, returning a
 //      predicate which returns true if any branch of the OR passes
 //  - create_predicate_function<Field>() -- switches on restriction type to determine which predicate template to use
 //    going forward
@@ -426,7 +426,7 @@ object_restriction_predicate<Field> create_predicate_function(restriction_functi
 }
 
 /**
- * @brief Create a predicate asserting on the field of an object a restriction is referencing
+ * @brief Create a predicate asserting on the field of the object a restriction is referencing
  *
  * @tparam Object The type the restriction restricts
  *
@@ -434,34 +434,23 @@ object_restriction_predicate<Field> create_predicate_function(restriction_functi
  * the restriction references to the particular field type, creates a predicate on that field, and wraps that
  * predicate to accept the object type and invoke the inner predicate on the specified field.
  */
-template<typename Object>
-struct object_field_predicator {
-   restriction r;
-   object_field_predicator(restriction&& r) : r(std::move(r)) {}
-   mutable fc::optional<object_restriction_predicate<Object>> predicate;
-
-   template<typename Field, typename, Field Object::*field>
-   void operator()(const char* member_name) const {
-      if (r.member_name == member_name) {
-         auto function = static_cast<restriction_function>(r.restriction_type.value);
-         auto p = create_predicate_function<Field>(function, std::move(r.argument));
-         predicate = [p=std::move(p)](const Object& obj) { return p(obj.*field); };
-      }
-   }
-};
-/// Helper function to invoke object_field_predicator
-template<typename Object, typename = std::enable_if_t<fc::reflector<Object>::is_defined::value>>
+template<typename Object, typename = std::enable_if_t<fc::reflector<Object>::native_members::length != 0>>
 object_restriction_predicate<Object> create_field_predicate(restriction&& r, short) {
-   object_field_predicator<Object> visitor(std::move(r));
-   fc::reflector<Object>::visit(visitor);
-   FC_ASSERT(visitor.predicate.valid(), "Invalid member name ${O}::${M} in restriction",
-             ("O", fc::get_typename<Object>::name())("M", visitor.r.member_name));
-   return std::move(*visitor.predicate);
+   using member_list = typename fc::reflector<Object>::native_members;
+   FC_ASSERT(r.member_index < member_list::length, "Invalid member index ${I} for object ${O}",
+             ("I", r.member_index)("O", fc::get_typename<Object>::name()));
+   auto predicator = [f=r.restriction_type, a=std::move(r.argument)](auto t) -> object_restriction_predicate<Object> {
+      using FieldReflection = typename decltype(t)::type;
+      using Field = typename FieldReflection::type;
+      auto p = create_predicate_function<Field>(static_cast<restriction_function>(f), std::move(a));
+      return [p=std::move(p)](const Object& o) { return p(FieldReflection::get(o)); };
+   };
+   return fc::typelist_utils::dispatch(member_list(), r.member_index, predicator);
 }
 template<typename Object>
-object_restriction_predicate<Object> create_field_predicate(restriction&& r, long) {
-   FC_THROW_EXCEPTION(fc::assert_exception, "Invalid restriction references member of non-object type: ${O}::${M}",
-                      ("O", fc::get_typename<Object>::name())("M", r.member_name));
+object_restriction_predicate<Object> create_field_predicate(restriction&&, long) {
+   FC_THROW_EXCEPTION(fc::assert_exception, "Invalid restriction references member of non-object type: ${O}",
+                      ("O", fc::get_typename<Object>::name()));
 }
 
 template<typename Object>

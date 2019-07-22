@@ -92,19 +92,19 @@ struct restriction {
 
     using argument_type = fc::static_variant<GRAPHENE_OP_RESTRICTION_ARGUMENTS_VARIADIC>;
 
-    string member_name;
+    unsigned_int member_index;
     unsigned_int restriction_type;
     argument_type argument;
 
     extensions_type extensions;
 
     restriction() = default;
-    restriction(const string& member_name, function_type type, const argument_type& argument)
-        : member_name(member_name), restriction_type(type), argument(argument) {}
+    restriction(const unsigned_int& member_index, function_type type, const argument_type& argument)
+        : member_index(member_index), restriction_type(type), argument(argument) {}
 
     friend bool operator==(const restriction& a, const restriction& b) {
-       return std::tie(a.member_name, a.restriction_type, a.argument, a.extensions) ==
-               std::tie(b.member_name, b.restriction_type, b.argument, b.extensions);
+       return std::tie(a.member_index, a.restriction_type, a.argument, a.extensions) ==
+               std::tie(b.member_index, b.restriction_type, b.argument, b.extensions);
     }
 };
 
@@ -126,7 +126,7 @@ FC_REFLECT_ENUM(graphene::protocol::restriction::function_type,
                 (FUNCTION_TYPE_COUNT))
 
 FC_REFLECT(graphene::protocol::restriction,
-           (member_name)
+           (member_index)
            (restriction_type)
            (argument)
            (extensions))
