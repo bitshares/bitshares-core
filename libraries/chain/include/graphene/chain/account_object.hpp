@@ -173,6 +173,8 @@ namespace graphene { namespace chain {
          account_id_type lifetime_referrer;
          /// The original registrar of this account, this value is set when account_upgrade_operation is performed
          optional<account_id_type> original_registrar;
+         /// The original referrer of this account, this value is set when account_upgrade_operation is performed
+         optional<account_id_type> original_referrer;
 
          /// Percentage of fee which should go to network.
          uint16_t network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
@@ -184,7 +186,7 @@ namespace graphene { namespace chain {
 
          /// The account's name. This name must be unique among all account names on the graph. May not be empty.
          string name;
-
+         
          /**
           * The owner authority represents absolute control over the account. Usually the keys in this authority will
           * be kept in cold storage, as they should not be needed very often and compromise of these keys constitutes
@@ -456,6 +458,7 @@ FC_REFLECT_DERIVED( graphene::chain::account_object,
                     (top_n_control_flags)
                     (allowed_assets)
                     (original_registrar)
+                    (original_referrer)
                     )
 
 FC_REFLECT_DERIVED( graphene::chain::account_balance_object,

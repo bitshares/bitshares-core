@@ -43,6 +43,7 @@ struct api_access_info_signed
 {
    bool required_lifetime_member;
    std::string required_registrar;
+   std::string required_referrer;
    std::vector< std::string > allowed_apis;
 };
 
@@ -58,7 +59,6 @@ typedef fc::static_variant<
    std::vector< api_access_info_signed >
 > api_access_info_signed_variant;
 
-
 } } // graphene::app
 
 FC_REFLECT( graphene::app::api_access_info,
@@ -70,6 +70,7 @@ FC_REFLECT( graphene::app::api_access_info,
 FC_REFLECT( graphene::app::api_access_info_signed,
     (required_lifetime_member)
     (required_registrar)
+    (required_referrer)
     (allowed_apis)
    )
 

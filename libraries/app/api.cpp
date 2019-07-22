@@ -102,18 +102,22 @@ namespace graphene { namespace app {
       auto op = trx.operations[0];
       if( op.which() != operation::tag<transfer_operation>::value ) // only transfer op for validation
          return false;
+
       const auto acc_id = op.get<transfer_operation>().from;
+      const auto to = op.get<transfer_operation>().to;
+      if( acc_id != to ) // prevent MITM attacks
+         return false;
 
       const auto& signature_keys = trx.get_signature_keys( db->get_chain_id() );
       if( signature_keys.empty() )
          return false;
-      
+
       const auto& public_key = *signature_keys.begin();
-      
+
       auto key_refs = (*_database_api)->get_key_references( {public_key} )[0];
       if( std::find( key_refs.begin(), key_refs.end(), acc_id ) == key_refs.end() )
          return false;
-      
+
       const auto& acc = acc_id(*db);
       optional< api_access_info_signed_variant > api_access_info_var = _app.get_api_access_info_signed( acc.name );
       if( !api_access_info_var )
@@ -123,7 +127,7 @@ namespace graphene { namespace app {
       {
          const auto& api_access_info = api_access_info_var->get<api_access_info_signed>();
          if( !verify_api_access_info_signed( acc, api_access_info ) )
-            return false; // TODO or try default login then???
+            return false; 
 
          for( const auto& api : api_access_info.allowed_apis )
             enable_api( api );
@@ -150,23 +154,48 @@ namespace graphene { namespace app {
     bool login_api::verify_api_access_info_signed( const account_object& acc,
        const api_access_info_signed& api_access_info )
     {
+      auto db = _app.chain_database();
+
       if( api_access_info.required_lifetime_member && !acc.is_lifetime_member() ) 
          return false;
 
       const auto& required_registrar_name = api_access_info.required_registrar;
-      if( required_registrar_name == "" )
+      bool registrar_required = required_registrar_name != "" ? true : false;
+
+      const auto& required_referrer_name = api_access_info.required_referrer;
+      bool referrer_required = required_referrer_name != "" ? true : false;
+
+      if( !referrer_required && !registrar_required )
          return true;
 
-      auto db = _app.chain_database();
-      const string account_registrar_name = acc.registrar(*db).name;
-      string account_original_registrar_name;
-      if( acc.original_registrar )
-         account_original_registrar_name = (*acc.original_registrar)(*db).name;
 
-      bool has_required_registrar = required_registrar_name == account_registrar_name
-         || required_registrar_name == account_original_registrar_name;
+      bool has_required_registrar = true;
+      if( registrar_required )
+      {
+         const string acc_registrar_name = acc.registrar(*db).name;
 
-      return has_required_registrar;
+         string acc_original_registrar_name;
+         if( acc.original_registrar )
+            acc_original_registrar_name = (*acc.original_registrar)(*db).name;
+
+         has_required_registrar = required_registrar_name == acc_registrar_name
+            || required_registrar_name == acc_original_registrar_name;
+      }
+
+      bool has_required_referrer = true;
+      if( referrer_required )
+      {
+         const string acc_referrer_name = acc.referrer(*db).name;
+
+         string acc_original_referrer_name;
+         if( acc.original_referrer )
+            acc_original_referrer_name = (*acc.original_registrar)(*db).name;
+
+         has_required_referrer = required_referrer_name == acc_referrer_name 
+            || required_referrer_name == acc_original_referrer_name;
+      }
+
+      return has_required_registrar && has_required_referrer;
     }
 
     void login_api::enable_api( const std::string& api_name )

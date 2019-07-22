@@ -185,6 +185,7 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
    {
          obj.registrar = o.registrar;
          obj.referrer = o.referrer;
+         obj.original_referrer = o.referrer;
          obj.lifetime_referrer = o.referrer(d).lifetime_referrer;
 
          const auto& params = global_properties.parameters;
@@ -417,7 +418,7 @@ void_result account_upgrade_evaluator::do_evaluate(const account_upgrade_evaluat
 void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator::operation_type& o)
 { try {
    database& d = db();
-
+   
    d.modify(*account, [&](account_object& a) {
       if( o.upgrade_to_lifetime_member )
       {

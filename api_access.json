@@ -22,6 +22,7 @@
       {
          "required_lifetime_member": false,
          "required_registrar": "registrar_name1",
+         "required_referrer": "",
          "allowed_apis": 
          [
             "database_api",
@@ -33,6 +34,7 @@
       {
          "required_lifetime_member": true,
          "required_registrar": "registrar_name2",
+         "required_referrer": "",
          "allowed_apis": 
          [
             "database_api",

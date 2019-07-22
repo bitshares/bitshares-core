@@ -52,6 +52,7 @@ BOOST_AUTO_TEST_CASE( fail_with_timestamp_too_fresh )
    ACTOR( alice );
    transfer_operation op;
    op.from = alice_id;
+   op.to = alice_id;
 
    signed_transaction trx;
    trx.operations.push_back( op );
@@ -74,10 +75,33 @@ BOOST_AUTO_TEST_CASE( fail_with_timestamp_too_old )
    ACTOR( alice );
    transfer_operation op;
    op.from = alice_id;
+   op.to = alice_id;
 
    signed_transaction trx;
    trx.operations.push_back( op );
    trx.expiration = db.head_block_time() - 60*60; // too far in the past
+   trx.sign( alice_private_key, db.get_chain_id() );
+
+   auto json = fc::json::to_string<signed_transaction>( trx );
+   auto encoded = fc::base64_encode( json );
+
+   login_api login_api( app );
+   bool logged_in = login_api.login_signed( encoded );
+   BOOST_CHECK( !logged_in );
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( fail_with_from_neq_to )
+{ try {
+
+   ACTORS( (alice) (bob) );
+   transfer_operation op;
+   op.from = alice_id;
+   op.to = bob_id;
+
+   signed_transaction trx;
+   trx.operations.push_back( op );
+   trx.expiration = db.head_block_time() + 60; // too far in the past
    trx.sign( alice_private_key, db.get_chain_id() );
 
    auto json = fc::json::to_string<signed_transaction>( trx );
@@ -95,7 +119,7 @@ BOOST_AUTO_TEST_CASE( fail_with_not_transfer_op_in_trx )
    ACTOR( alice );
    account_update_operation op;
    op.account = alice_id;
-
+   
    signed_transaction trx;
    trx.operations.push_back( op );
    trx.expiration = db.head_block_time() + 60;
@@ -116,6 +140,7 @@ BOOST_AUTO_TEST_CASE( fail_with_empty_signature_keys )
    ACTOR( alice );
    transfer_operation op;
    op.from = alice_id;
+   op.to = alice_id;
 
    signed_transaction trx;
    trx.operations.push_back( op );
@@ -136,6 +161,7 @@ BOOST_AUTO_TEST_CASE( fail_with_wrong_signature )
    ACTORS( (alice) (bob) );
    transfer_operation op;
    op.from = alice_id;
+   op.to = alice_id;
 
    signed_transaction trx;
    trx.operations.push_back( op );
@@ -165,6 +191,7 @@ BOOST_AUTO_TEST_CASE( fail_as_default_user_no_lifetime_member )
    ACTOR( alice );
    transfer_operation op;
    op.from = alice_id;
+   op.to = alice_id;
 
    signed_transaction trx;
    trx.operations.push_back( op );
@@ -194,6 +221,7 @@ BOOST_AUTO_TEST_CASE( fail_as_default_user_no_required_registrar )
    ACTOR( alice );
    transfer_operation op;
    op.from = alice_id;
+   op.to = alice_id;
 
    signed_transaction trx;
    trx.operations.push_back( op );
@@ -223,6 +251,7 @@ BOOST_AUTO_TEST_CASE( pass_as_default_user_no_specials )
    ACTOR( alice );
    transfer_operation op;
    op.from = alice_id;
+   op.to = alice_id;
 
    signed_transaction trx;
    trx.operations.push_back( op );
@@ -256,6 +285,7 @@ BOOST_AUTO_TEST_CASE( pass_as_default_user_with_lifetime_member )
 
    transfer_operation op;
    op.from = alice_id;
+   op.to = alice_id;
 
    signed_transaction trx;
    trx.operations.push_back( op );
@@ -285,6 +315,7 @@ BOOST_AUTO_TEST_CASE( pass_as_special_user )
    ACTOR( alice );
    transfer_operation op;
    op.from = alice_id;
+   op.to = alice_id;
 
    signed_transaction trx;
    trx.operations.push_back( op );
