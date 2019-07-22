@@ -1519,8 +1519,8 @@ class wallet_api
 
       /** Vote for a given committee_member.
        *
-       * An account can publish a list of all committee_memberes they approve of.  This 
-       * command allows you to add or remove committee_memberes from this list.
+       * An account can publish a list of all committee_members they approve of.  This 
+       * command allows you to add or remove committee_members from this list.
        * Each account's vote is weighted according to the number of shares of the
        * core asset owned by that account at the time the votes are tallied.
        *
