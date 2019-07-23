@@ -335,9 +335,9 @@ class database_api
                                                   optional<price> ostart_price = optional<price>());
 
       /**
-       * @brief Fetch all objects relevant to the specified accounts and subscribe to updates
-       * @param callback Function to call with updates
+       * @brief Fetch all objects relevant to the specified accounts and optionally subscribe to updates
        * @param names_or_ids Each item must be the name or ID of an account to retrieve
+       * @param subscribe whether subscribe to updates
        * @return Map of string from @ref names_or_ids to the corresponding account
        *
        * This function fetches all relevant objects for the given accounts, and subscribes to updates to the given
@@ -347,10 +347,17 @@ class database_api
        */
       std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids, bool subscribe );
 
+      /**
+       * @brief Get info of an account by name
+       * @param name Name of the account to retrieve
+       * @return The account holding the provided name
+       */
       optional<account_object> get_account_by_name( string name )const;
 
       /**
-       *  @return all accounts that referr to the key or account id in their owner or active authorities.
+       * @brief Get all accounts that refer to the specified account in their owner or active authorities
+       * @param account_id_or_name Account ID or name to query
+       * @return all accounts that refer to the specified account in their owner or active authorities
        */
       vector<account_id_type> get_account_references( const std::string account_id_or_name )const;
 
