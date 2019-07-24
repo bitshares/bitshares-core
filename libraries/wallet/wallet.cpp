@@ -4834,13 +4834,13 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
 
 
 
-/**
+/*
  *  Transfers a public balance from @from to one or more blinded balances using a
  *  stealth transfer.
  */
 blind_confirmation wallet_api::transfer_to_blind( string from_account_id_or_name,
                                                   string asset_symbol,
-                                                  /** map from key or label to amount */
+                                                  /* map from key or label to amount */
                                                   vector<pair<string, string>> to_amounts,
                                                   bool broadcast )
 { try {

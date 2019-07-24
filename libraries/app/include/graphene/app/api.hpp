@@ -171,7 +171,7 @@ namespace graphene { namespace app {
          )const;
 
          /**
-          * @breif Get operations relevant to the specified account referenced
+          * @brief Get operations relevant to the specified account referenced
           * by an event numbering specific to the account. The current number of operations
           * for the account can be found in the account statistics (or use 0 for start).
           * @param account_id_or_name The account ID or name whose history should be queried
@@ -398,7 +398,7 @@ namespace graphene { namespace app {
           * @param commit 33-byte pedersen commitment
           * @param commit_blind Sha-256 blind factor type for the correct digits
           * @param nonce Sha-256 blind factor type for our non-forged signatures
-          * @param exp Exponents base 10 in range [-1 ; 18] inclusively
+          * @param base10_exp Exponents base 10 in range [-1 ; 18] inclusively
           * @param min_bits 8-bit positive integer, must be in range [0 ; 64] inclusively
           * @param actual_value 64-bit positive integer, must be greater or equal min_value
           * @return A list of characters as proof in proof
@@ -481,13 +481,13 @@ namespace graphene { namespace app {
          //virtual ~orders_api() {}
 
          /**
-          * @breif Get tracked groups configured by the server.
+          * @brief Get tracked groups configured by the server.
           * @return A list of numbers which indicate configured groups, of those, 1 means 0.01% diff on price.
           */
          flat_set<uint16_t> get_tracked_groups()const;
 
          /**
-          * @breif Get grouped limit orders in given market.
+          * @brief Get grouped limit orders in given market.
           *
           * @param base_asset ID or symbol of asset being sold
           * @param quote_asset ID or symbol of asset being purchased
@@ -588,11 +588,11 @@ FC_REFLECT( graphene::app::history_operation_detail,
             (total_count)(operation_history_objs) )
 FC_REFLECT( graphene::app::limit_order_group,
             (min_price)(max_price)(total_for_sale) )
-//FC_REFLECT_TYPENAME( fc::ecc::compact_signature );
-//FC_REFLECT_TYPENAME( fc::ecc::commitment_type );
+//FC_REFLECT_TYPENAME( fc::ecc::compact_signature )
+//FC_REFLECT_TYPENAME( fc::ecc::commitment_type )
 
-FC_REFLECT( graphene::app::account_asset_balance, (name)(account_id)(amount) );
-FC_REFLECT( graphene::app::asset_holders, (asset_id)(count) );
+FC_REFLECT( graphene::app::account_asset_balance, (name)(account_id)(amount) )
+FC_REFLECT( graphene::app::asset_holders, (asset_id)(count) )
 
 FC_API(graphene::app::history_api,
        (get_account_history)
