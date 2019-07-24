@@ -588,7 +588,7 @@ public:
    template<typename ID>
    graphene::db::object_downcast_t<ID> get_object(ID id)const
    {
-      auto ob = _remote_db->get_objects({id}).front();
+      auto ob = _remote_db->get_objects({id}, {}).front();
       return ob.template as<graphene::db::object_downcast_t<ID>>( GRAPHENE_MAX_NESTED_OBJECTS );
    }
 
@@ -680,7 +680,7 @@ public:
    {
       std::string account_id = account_id_to_string(id);
 
-      auto rec = _remote_db->get_accounts({account_id}).front();
+      auto rec = _remote_db->get_accounts({account_id}, {}).front();
       FC_ASSERT(rec);
       return *rec;
    }
@@ -711,7 +711,7 @@ public:
    }
    optional<extended_asset_object> find_asset(asset_id_type id)const
    {
-      auto rec = _remote_db->get_assets({asset_id_to_string(id)}).front();
+      auto rec = _remote_db->get_assets({asset_id_to_string(id)}, {}).front();
       return rec;
    }
    optional<extended_asset_object> find_asset(string asset_symbol_or_id)const
@@ -750,7 +750,7 @@ public:
    {
       htlc_id_type id;
       fc::from_variant(htlc_id, id);
-      auto obj = _remote_db->get_objects( { id }).front();
+      auto obj = _remote_db->get_objects( { id }, {}).front();
       if ( !obj.is_null() )
       {
          return fc::optional<htlc_object>(obj.template as<htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS));
@@ -862,7 +862,7 @@ public:
             account_ids_to_send.push_back( account_id );
             ++it;
          }
-         std::vector< optional< account_object > > accounts = _remote_db->get_accounts(account_ids_to_send);
+         std::vector< optional< account_object > > accounts = _remote_db->get_accounts(account_ids_to_send, {});
          // server response should be same length as request
          FC_ASSERT( accounts.size() == account_ids_to_send.size() );
          size_t i = 0;
@@ -1842,7 +1842,7 @@ public:
 
       flat_set<vote_id_type> new_votes( acct.options.votes );
 
-      fc::variants objects = _remote_db->get_objects( query_ids );
+      fc::variants objects = _remote_db->get_objects( query_ids, {} );
       for( const variant& obj : objects )
       {
          worker_object wo;
@@ -3352,7 +3352,7 @@ vector<account_object> wallet_api::list_my_accounts()
 
 map<string,account_id_type> wallet_api::list_accounts(const string& lowerbound, uint32_t limit)
 {
-   return my->_remote_db->lookup_accounts(lowerbound, limit);
+   return my->_remote_db->lookup_accounts(lowerbound, limit, {});
 }
 
 vector<asset> wallet_api::list_account_balances(const string& id)
@@ -3653,7 +3653,7 @@ string wallet_api::serialize_transaction( signed_transaction tx )const
 
 variant wallet_api::get_object( object_id_type id ) const
 {
-   return my->_remote_db->get_objects({id});
+   return my->_remote_db->get_objects({id}, {});
 }
 
 string wallet_api::get_wallet_filename() const

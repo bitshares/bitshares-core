@@ -156,11 +156,14 @@ class database_api
       /**
        * @brief Get the objects corresponding to the provided IDs
        * @param ids IDs of the objects to retrieve
+       * @param subscribe @a true to subscribe to the queried objects; @a false to not subscribe;
+       *                  @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                  (see @ref set_auto_subscription)
        * @return The objects retrieved, in the order they are mentioned in ids
        *
        * If any of the provided IDs does not map to an object, a null variant is returned in its position.
        */
-      fc::variants get_objects(const vector<object_id_type>& ids)const;
+      fc::variants get_objects( const vector<object_id_type>& ids, optional<bool> subscribe = optional<bool>() )const;
 
       ///////////////////
       // Subscriptions //
@@ -187,9 +190,12 @@ class database_api
        * - get_assets
        * - get_objects
        * - lookup_accounts
-       *
-       * Does not impact this API:
        * - get_full_accounts
+       * - get_htlc
+       *
+       * Note: auto-subscription is enabled by default
+       *
+       * @see @ref set_subscribe_callback
        */
       void set_auto_subscription( bool enable );
       /**
@@ -321,16 +327,22 @@ class database_api
       /**
        * @brief Get a list of accounts by names or IDs
        * @param account_names_or_ids names or IDs of the accounts to retrieve
+       * @param subscribe @a true to subscribe to the queried account objects; @a false to not subscribe;
+       *                  @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                  (see @ref set_auto_subscription)
        * @return The accounts corresponding to the provided names or IDs
        *
        * This function has semantics identical to @ref get_objects
        */
-      vector<optional<account_object>> get_accounts(const vector<std::string>& account_names_or_ids)const;
+      vector<optional<account_object>> get_accounts( const vector<std::string>& account_names_or_ids,
+                                                     optional<bool> subscribe = optional<bool>() )const;
 
       /**
        * @brief Fetch all objects relevant to the specified accounts and optionally subscribe to updates
        * @param names_or_ids Each item must be the name or ID of an account to retrieve
-       * @param subscribe whether subscribe to updates
+       * @param subscribe @a true to subscribe to the queried full account objects; @a false to not subscribe;
+       *                  @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                  (see @ref set_auto_subscription)
        * @return Map of string from @p names_or_ids to the corresponding account
        *
        * This function fetches all relevant objects for the given accounts, and subscribes to updates to the given
@@ -338,7 +350,8 @@ class database_api
        * ignored. All other accounts will be retrieved and subscribed.
        *
        */
-      std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids, bool subscribe );
+      std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids,
+                                                       optional<bool> subscribe = optional<bool>() );
 
       /**
        * @brief Get info of an account by name
@@ -359,7 +372,7 @@ class database_api
        * @param account_names Names of the accounts to retrieve
        * @return The accounts holding the provided names
        *
-       * This function has semantics identical to @ref get_objects
+       * This function has semantics identical to @ref get_objects, but doesn't subscribe.
        */
       vector<optional<account_object>> lookup_account_names(const vector<string>& account_names)const;
 
@@ -367,9 +380,16 @@ class database_api
        * @brief Get names and IDs for registered accounts
        * @param lower_bound_name Lower bound of the first name to return
        * @param limit Maximum number of results to return -- must not exceed 1000
+       * @param subscribe @a true to subscribe to the queried account objects; @a false to not subscribe;
+       *                  @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                  (see @ref set_auto_subscription)
        * @return Map of account names to corresponding IDs
+       *
+       * Note: this API will subscribe to the queried account only if @p limit is 1.
        */
-      map<string,account_id_type> lookup_accounts(const string& lower_bound_name, uint32_t limit)const;
+      map<string,account_id_type> lookup_accounts( const string& lower_bound_name,
+                                                   uint32_t limit,
+                                                   optional<bool> subscribe = optional<bool>() )const;
 
       //////////////
       // Balances //
@@ -428,11 +448,15 @@ class database_api
       /**
        * @brief Get a list of assets by symbol names or IDs
        * @param asset_symbols_or_ids symbol names or IDs of the assets to retrieve
+       * @param subscribe @a true to subscribe to the queried asset objects; @a false to not subscribe;
+       *                  @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                  (see @ref set_auto_subscription)
        * @return The assets corresponding to the provided symbol names or IDs
        *
        * This function has semantics identical to @ref get_objects
        */
-      vector<optional<extended_asset_object>> get_assets(const vector<std::string>& asset_symbols_or_ids)const;
+      vector<optional<extended_asset_object>> get_assets( const vector<std::string>& asset_symbols_or_ids,
+                                                          optional<bool> subscribe = optional<bool>() )const;
 
       /**
        * @brief Get assets alphabetically by symbol name
@@ -658,7 +682,7 @@ class database_api
        * @param witness_ids IDs of the witnesses to retrieve
        * @return The witnesses corresponding to the provided IDs
        *
-       * This function has semantics identical to @ref get_objects
+       * This function has semantics identical to @ref get_objects, but doesn't subscribe
        */
       vector<optional<witness_object>> get_witnesses(const vector<witness_id_type>& witness_ids)const;
 
@@ -691,7 +715,7 @@ class database_api
        * @param committee_member_ids IDs of the committee_members to retrieve
        * @return The committee_members corresponding to the provided IDs
        *
-       * This function has semantics identical to @ref get_objects
+       * This function has semantics identical to @ref get_objects, but doesn't subscribe
        */
       vector<optional<committee_member_object>> get_committee_members(
             const vector<committee_member_id_type>& committee_member_ids)const;
@@ -898,9 +922,12 @@ class database_api
       /**
        *  @brief Get HTLC object
        *  @param id HTLC contract id
+       *  @param subscribe @a true to subscribe to the queried HTLC objects; @a false to not subscribe;
+       *                   @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                   (see @ref set_auto_subscription)
        *  @return HTLC object for the id
        */
-      optional<htlc_object> get_htlc(htlc_id_type id) const;
+      optional<htlc_object> get_htlc( htlc_id_type id, optional<bool> subscribe = optional<bool>() ) const;
 
       /**
        *  @brief Get non expired HTLC objects using the sender account

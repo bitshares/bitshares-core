@@ -59,7 +59,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
 
       // Objects
-      fc::variants get_objects(const vector<object_id_type>& ids)const;
+      fc::variants get_objects( const vector<object_id_type>& ids, optional<bool> subscribe )const;
 
       // Subscriptions
       void set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_remove_create );
@@ -87,12 +87,15 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Accounts
       account_id_type get_account_id_from_string(const std::string& name_or_id)const;
-      vector<optional<account_object>> get_accounts(const vector<std::string>& account_names_or_ids)const;
-      std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids, bool subscribe );
+      vector<optional<account_object>> get_accounts( const vector<std::string>& account_names_or_ids,
+                                                     optional<bool> subscribe )const;
+      std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids, optional<bool> subscribe );
       optional<account_object> get_account_by_name( string name )const;
       vector<account_id_type> get_account_references( const std::string account_id_or_name )const;
       vector<optional<account_object>> lookup_account_names(const vector<string>& account_names)const;
-      map<string,account_id_type> lookup_accounts(const string& lower_bound_name, uint32_t limit)const;
+      map<string,account_id_type> lookup_accounts( const string& lower_bound_name,
+                                                   uint32_t limit,
+                                                   optional<bool> subscribe )const;
       uint64_t get_account_count()const;
 
       // Balances
@@ -105,7 +108,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       // Assets
       uint64_t get_asset_count()const;
       asset_id_type get_asset_id_from_string(const std::string& symbol_or_id)const;
-      vector<optional<extended_asset_object>> get_assets(const vector<std::string>& asset_symbols_or_ids)const;
+      vector<optional<extended_asset_object>> get_assets( const vector<std::string>& asset_symbols_or_ids,
+                                                          optional<bool> subscribe )const;
       vector<extended_asset_object>           list_assets(const string& lower_bound_symbol, uint32_t limit)const;
       vector<optional<extended_asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
       vector<extended_asset_object>           get_assets_by_issuer(const std::string& issuer_name_or_id,
@@ -180,13 +184,23 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
 
       // HTLC
-      optional<htlc_object> get_htlc(htlc_id_type id) const;
+      optional<htlc_object> get_htlc( htlc_id_type id, optional<bool> subscribe ) const;
       vector<htlc_object> get_htlc_by_from(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const;
       vector<htlc_object> get_htlc_by_to(const std::string account_id_or_name, htlc_id_type start, uint32_t limit) const;
       vector<htlc_object> list_htlcs(const htlc_id_type lower_bound_id, uint32_t limit) const;
 
    //private:
       static string price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote );
+
+      // Decides whether to subscribe using member variables and given parameter
+      bool get_whether_to_subscribe( optional<bool> subscribe )const
+      {
+         if( !_subscribe_callback )
+            return false;
+         if( subscribe.valid() )
+            return *subscribe;
+         return _enabled_auto_subscription;
+      }
 
       // Note:
       //   Different type of object_id<T> objects could become identical after packed.
@@ -295,14 +309,16 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             FC_ASSERT( asset, "no such asset" );
          return asset;
       }
-      vector<optional<extended_asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const
+      vector<optional<extended_asset_object>> get_assets( const vector<asset_id_type>& asset_ids,
+                                                          optional<bool> subscribe = optional<bool>() )const
       {
+         bool to_subscribe = get_whether_to_subscribe( subscribe );
          vector<optional<extended_asset_object>> result; result.reserve(asset_ids.size());
          std::transform(asset_ids.begin(), asset_ids.end(), std::back_inserter(result),
-                 [this](asset_id_type id) -> optional<extended_asset_object> {
+                 [this,to_subscribe](asset_id_type id) -> optional<extended_asset_object> {
             if(auto o = _db.find(id))
             {
-               if( _enabled_auto_subscription )
+               if( to_subscribe )
                   subscribe_to_item( id );
                return extend_asset( *o );
             }
@@ -509,30 +525,26 @@ market_ticker::market_ticker(const fc::time_point_sec& now,
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-fc::variants database_api::get_objects(const vector<object_id_type>& ids)const
+fc::variants database_api::get_objects( const vector<object_id_type>& ids, optional<bool> subscribe )const
 {
-   return my->get_objects( ids );
+   return my->get_objects( ids, subscribe );
 }
 
-fc::variants database_api_impl::get_objects(const vector<object_id_type>& ids)const
+fc::variants database_api_impl::get_objects( const vector<object_id_type>& ids, optional<bool> subscribe )const
 {
-   if( _subscribe_callback && _enabled_auto_subscription )
-   {
-      for( auto id : ids )
-      {
-         if( id.type() == operation_history_object_type && id.space() == protocol_ids ) continue;
-         if( id.type() == impl_account_transaction_history_object_type && id.space() == implementation_ids ) continue;
-         this->subscribe_to_item( id );
-      }
-   }
+   bool to_subscribe = get_whether_to_subscribe( subscribe );
 
    fc::variants result;
    result.reserve(ids.size());
 
    std::transform(ids.begin(), ids.end(), std::back_inserter(result),
-                  [this](object_id_type id) -> fc::variant {
+                  [this,to_subscribe](object_id_type id) -> fc::variant {
       if(auto obj = _db.find_object(id))
+      {
+         if( to_subscribe && !id.is<operation_history_id_type>() && !id.is<account_transaction_history_id_type>() )
+            this->subscribe_to_item( id );
          return obj->to_variant();
+      }
       return {};
    });
 
@@ -834,21 +846,24 @@ account_id_type database_api::get_account_id_from_string(const std::string& name
    return my->get_account_from_string( name_or_id )->id;
 }
 
-vector<optional<account_object>> database_api::get_accounts(const vector<std::string>& account_names_or_ids)const
+vector<optional<account_object>> database_api::get_accounts( const vector<std::string>& account_names_or_ids,
+                                                             optional<bool> subscribe )const
 {
-   return my->get_accounts( account_names_or_ids );
+   return my->get_accounts( account_names_or_ids, subscribe );
 }
 
-vector<optional<account_object>> database_api_impl::get_accounts(const vector<std::string>& account_names_or_ids)const
+vector<optional<account_object>> database_api_impl::get_accounts( const vector<std::string>& account_names_or_ids,
+                                                                  optional<bool> subscribe )const
 {
+   bool to_subscribe = get_whether_to_subscribe( subscribe );
    vector<optional<account_object>> result; result.reserve(account_names_or_ids.size());
    std::transform(account_names_or_ids.begin(), account_names_or_ids.end(), std::back_inserter(result),
-                  [this](std::string id_or_name) -> optional<account_object> {
+                  [this,to_subscribe](std::string id_or_name) -> optional<account_object> {
 
       const account_object *account = get_account_from_string(id_or_name, false);
       if(account == nullptr)
          return {};
-      if( _enabled_auto_subscription )
+      if( to_subscribe )
          subscribe_to_item( account->id );
       return *account;
    });
@@ -924,7 +939,7 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders( const st
       }
    }
    else
-   { 
+   {
       // if reach here start_price must be valid
       lower_itr = index_by_account.lower_bound(std::make_tuple(account->id, *ostart_price));
    }
@@ -941,17 +956,21 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders( const st
    return results;
 }
 
-std::map<string,full_account> database_api::get_full_accounts( const vector<string>& names_or_ids, bool subscribe )
+std::map<string,full_account> database_api::get_full_accounts( const vector<string>& names_or_ids,
+                                                               optional<bool> subscribe )
 {
    return my->get_full_accounts( names_or_ids, subscribe );
 }
 
-std::map<std::string, full_account> database_api_impl::get_full_accounts( const vector<std::string>& names_or_ids, bool subscribe)
+std::map<std::string, full_account> database_api_impl::get_full_accounts( const vector<std::string>& names_or_ids,
+                                                                          optional<bool> subscribe )
 {
    FC_ASSERT( names_or_ids.size() <= _app_options->api_limit_get_full_accounts );
 
    const auto& proposal_idx = _db.get_index_type< primary_index< proposal_index > >();
    const auto& proposals_by_account = proposal_idx.get_secondary_index<graphene::chain::required_approval_index>();
+
+   bool to_subscribe = get_whether_to_subscribe( subscribe );
 
    std::map<std::string, full_account> results;
 
@@ -961,7 +980,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       if (account == nullptr)
          continue;
 
-      if( subscribe )
+      if( to_subscribe )
       {
          if(_subscribed_accounts.size() < 100) {
             _subscribed_accounts.insert( account->get_id() );
@@ -1162,12 +1181,16 @@ vector<optional<account_object>> database_api_impl::lookup_account_names(const v
    return result;
 }
 
-map<string,account_id_type> database_api::lookup_accounts(const string& lower_bound_name, uint32_t limit)const
+map<string,account_id_type> database_api::lookup_accounts( const string& lower_bound_name,
+                                                           uint32_t limit,
+                                                           optional<bool> subscribe )const
 {
-   return my->lookup_accounts( lower_bound_name, limit );
+   return my->lookup_accounts( lower_bound_name, limit, subscribe );
 }
 
-map<string,account_id_type> database_api_impl::lookup_accounts(const string& lower_bound_name, uint32_t limit)const
+map<string,account_id_type> database_api_impl::lookup_accounts( const string& lower_bound_name,
+                                                                uint32_t limit,
+                                                                optional<bool> subscribe )const
 {
    FC_ASSERT( limit <= 1000 );
    const auto& accounts_by_name = _db.get_index_type<account_index>().indices().get<by_name>();
@@ -1175,8 +1198,8 @@ map<string,account_id_type> database_api_impl::lookup_accounts(const string& low
 
    if( limit == 0 ) // shortcut to save a database query
       return result;
-
-   bool to_subscribe = (limit == 1 && _enabled_auto_subscription); // auto-subscribe if only look for one account
+   // auto-subscribe if only look for one account
+   bool to_subscribe = (limit == 1 && get_whether_to_subscribe( subscribe ));
    for( auto itr = accounts_by_name.lower_bound(lower_bound_name);
         limit-- && itr != accounts_by_name.end();
         ++itr )
@@ -1317,21 +1340,24 @@ asset_id_type database_api::get_asset_id_from_string(const std::string& symbol_o
    return my->get_asset_from_string( symbol_or_id )->id;
 }
 
-vector<optional<extended_asset_object>> database_api::get_assets(const vector<std::string>& asset_symbols_or_ids)const
+vector<optional<extended_asset_object>> database_api::get_assets( const vector<std::string>& asset_symbols_or_ids,
+                                                                  optional<bool> subscribe )const
 {
-   return my->get_assets( asset_symbols_or_ids );
+   return my->get_assets( asset_symbols_or_ids, subscribe );
 }
 
-vector<optional<extended_asset_object>> database_api_impl::get_assets(const vector<std::string>& asset_symbols_or_ids)const
+vector<optional<extended_asset_object>> database_api_impl::get_assets(const vector<std::string>& asset_symbols_or_ids,
+                                                                      optional<bool> subscribe )const
 {
+   bool to_subscribe = get_whether_to_subscribe( subscribe );
    vector<optional<extended_asset_object>> result; result.reserve(asset_symbols_or_ids.size());
    std::transform(asset_symbols_or_ids.begin(), asset_symbols_or_ids.end(), std::back_inserter(result),
-                  [this](std::string id_or_name) -> optional<extended_asset_object> {
+                  [this,to_subscribe](std::string id_or_name) -> optional<extended_asset_object> {
 
       const asset_object* asset_obj = get_asset_from_string( id_or_name, false );
       if( asset_obj == nullptr )
          return {};
-      if( _enabled_auto_subscription )
+      if( to_subscribe )
          subscribe_to_item( asset_obj->id );
       return extend_asset( *asset_obj );
    });
@@ -2377,7 +2403,7 @@ bool database_api::verify_account_authority( const string& account_name_or_id, c
    return my->verify_account_authority( account_name_or_id, signers );
 }
 
-bool database_api_impl::verify_account_authority( const string& account_name_or_id, 
+bool database_api_impl::verify_account_authority( const string& account_name_or_id,
       const flat_set<public_key_type>& keys )const
 {
    // create a dummy transfer
@@ -2392,7 +2418,7 @@ bool database_api_impl::verify_account_authority( const string& account_name_or_
             [this]( account_id_type id ){ return &id(_db).active; },
             [this]( account_id_type id ){ return &id(_db).owner; },
             true );
-   } 
+   }
    catch (fc::exception& ex)
    {
       return false;
@@ -2606,14 +2632,14 @@ vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_b
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-optional<htlc_object> database_api::get_htlc(htlc_id_type id)const
+optional<htlc_object> database_api::get_htlc( htlc_id_type id, optional<bool> subscribe )const
 {
-   return my->get_htlc(id);
+   return my->get_htlc( id, subscribe );
 }
 
-fc::optional<htlc_object> database_api_impl::get_htlc(htlc_id_type id) const
+fc::optional<htlc_object> database_api_impl::get_htlc( htlc_id_type id, optional<bool> subscribe )const
 {
-   auto obj = get_objects( { id }).front();
+   auto obj = get_objects( { id }, subscribe ).front();
    if ( !obj.is_null() )
    {
       return fc::optional<htlc_object>(obj.template as<htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS));
