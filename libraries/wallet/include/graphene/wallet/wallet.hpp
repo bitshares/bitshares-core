@@ -797,7 +797,7 @@ class wallet_api
        */
       bool    load_wallet_file(string wallet_filename = "");
 
-      /** Quitting from the wallet.
+      /** Quit from the wallet.
        *
        * The current wallet will be closed and saved.
        */
