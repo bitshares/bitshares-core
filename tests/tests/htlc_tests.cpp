@@ -978,6 +978,37 @@ try {
    full = db_api.get_full_accounts({bob.name}, false);
    BOOST_CHECK_EQUAL( full[bob.name].htlcs_to.size(), 1 );
 
+   auto list = db_api.list_htlcs(graphene::chain::htlc_id_type(0), 1);
+   BOOST_CHECK_EQUAL( list.size(), 1 );
+   BOOST_CHECK_EQUAL( list[0].id.instance(), 0 );
+
+   list = db_api.list_htlcs(graphene::chain::htlc_id_type(1), 1);
+   BOOST_CHECK_EQUAL( list.size(), 1 );
+   BOOST_CHECK_EQUAL( list[0].id.instance(), 1 );
+
+   list = db_api.list_htlcs(graphene::chain::htlc_id_type(2), 1);
+   BOOST_CHECK_EQUAL( list.size(), 1 );
+   BOOST_CHECK_EQUAL( list[0].id.instance(), 2 );
+
+   list = db_api.list_htlcs(graphene::chain::htlc_id_type(1), 2);
+   BOOST_CHECK_EQUAL( list.size(), 2 );
+   BOOST_CHECK_EQUAL( list[0].id.instance(), 1 );
+   BOOST_CHECK_EQUAL( list[1].id.instance(), 2 );
+
+   list = db_api.list_htlcs(graphene::chain::htlc_id_type(1), 3);
+   BOOST_CHECK_EQUAL( list.size(), 2 );
+   BOOST_CHECK_EQUAL( list[0].id.instance(), 1 );
+   BOOST_CHECK_EQUAL( list[1].id.instance(), 2 );
+
+   list = db_api.list_htlcs(graphene::chain::htlc_id_type(0), 100);
+   BOOST_CHECK_EQUAL( list.size(), 3 );
+   BOOST_CHECK_EQUAL( list[0].id.instance(), 0 );
+   BOOST_CHECK_EQUAL( list[1].id.instance(), 1 );
+   BOOST_CHECK_EQUAL( list[2].id.instance(), 2 );
+
+   list = db_api.list_htlcs(graphene::chain::htlc_id_type(10), 100);
+   BOOST_CHECK_EQUAL( list.size(), 0 );
+
 } catch (fc::exception &e) {
       edump((e.to_detail_string()));
       throw;
