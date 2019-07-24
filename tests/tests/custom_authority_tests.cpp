@@ -41,7 +41,7 @@ BOOST_FIXTURE_TEST_SUITE(custom_authority_tests, database_fixture)
 template<typename Object>
 unsigned_int member_index(string name) {
    unsigned_int index;
-   fc::typelist_utils::for_each(typename fc::reflector<Object>::native_members(), [&name, &index](auto t) mutable {
+   fc::typelist::runtime::for_each(typename fc::reflector<Object>::native_members(), [&name, &index](auto t) mutable {
       if (name == decltype(t)::type::get_name())
          index = decltype(t)::type::index;
    });
@@ -59,7 +59,7 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    transfer.to = account_id_type(12);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == true);
 
-   restrictions.front() = restriction(fc::reflector<transfer_operation>::native_members::length,
+   restrictions.front() = restriction(fc::typelist::length<fc::reflector<transfer_operation>::native_members>(),
                                       FUNC(eq), account_id_type(12));
    BOOST_CHECK_THROW(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value),
                      fc::assert_exception);

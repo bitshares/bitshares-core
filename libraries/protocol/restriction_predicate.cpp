@@ -27,6 +27,7 @@
 #include <fc/exception/exception.hpp>
 
 namespace graphene { namespace protocol {
+namespace typelist = fc::typelist;
 using std::declval;
 using std::size_t;
 using restriction_function = restriction::function_type;
@@ -50,10 +51,13 @@ constexpr static bool comparable_types = !std::is_same<T, void_t>::value &&
                                                                         (is_integral<U> || is_safe<U>)));
 
 // Metafunction to check if type is a container
-template<typename, typename = size_t> constexpr static bool is_container = false;
-template<typename T> constexpr static bool is_container<T, decltype(declval<T>().size())> = true;
+template<typename, typename = size_t>
+struct is_container_impl { constexpr static bool value = false; };
+template<typename T>
+struct is_container_impl<T, decltype(declval<T>().size())> { constexpr static bool value = true; };
+template<typename T> constexpr static bool is_container = is_container_impl<T>::value;
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // *** Restriction Predicate Logic ***
 
 // This file is where the magic happens for BSIP 40, aka Custom Active Authorities. This gets fairly complicated, so
@@ -93,57 +97,28 @@ template<typename T> constexpr static bool is_container<T, decltype(declval<T>()
 //    - attribute_assertion<Field> -- If the restriction is an attribute assertion, instead of using the
 //      restriction_argument_visitor, we recurse into restrictions_to_predicate with the current Field as the Object
 //  - predicate_xyz<Argument> -- These are functors implementing the various predicate function types
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // These typelists contain the argument types legal for various function types:
 
 // Valid for magnitude comparisons and equality comparisons
-using comparable_types_list = fc::typelist<int64_t, string, time_point_sec, account_id_type, asset_id_type,
-                                           force_settlement_id_type, committee_member_id_type, witness_id_type,
-                                           limit_order_id_type, call_order_id_type, custom_id_type, proposal_id_type,
-                                           withdraw_permission_id_type, vesting_balance_id_type, worker_id_type,
-                                           balance_id_type>;
+using comparable_types_list = typelist::list<int64_t, string, time_point_sec, account_id_type, asset_id_type,
+                                             force_settlement_id_type, committee_member_id_type, witness_id_type,
+                                             limit_order_id_type, call_order_id_type, custom_id_type,
+                                             proposal_id_type, withdraw_permission_id_type,
+                                             vesting_balance_id_type, worker_id_type, balance_id_type>;
 // Valid for list functions (in, not_in, has_all, has_none)
 struct make_flat_set { template<typename T> struct transform { using type = flat_set<T>; }; };
-using list_types_list = fc::typelist<bool, public_key_type, fc::sha256>::concat<comparable_types_list>::type
-                          ::transform<make_flat_set>;
+using list_types_list = typelist::transform<typelist::concat<typelist::list<bool, public_key_type, fc::sha256>,
+                                                             comparable_types_list>,
+                                            make_flat_set>;
 // Valid for equality comparisons but not necessarily magnitude comparisons
-using equality_types_list =
-      typename fc::typelist<void_t, bool, public_key_type, fc::sha256>::concat<comparable_types_list>::type
-                 ::concat<list_types_list>::type;
+using equality_types_list = typename typelist::concat<typelist::list<void_t, bool, public_key_type, fc::sha256>,
+                                                      comparable_types_list, list_types_list>;
 // Valid for attritube assertions
-using attr_types_list = fc::typelist<vector<restriction>>;
+using attr_types_list = typelist::list<vector<restriction>>;
 // Valid for logical or assertions
-using or_types_list = fc::typelist<vector<vector<restriction>>>;
-
-// slimmer_visitor and static_variant_slimmer accelerate build times by reducing the number of elements in the
-// argument static variant to only those supported for a given function type. This reduces build time because it
-// eliminates many options the compiler has to explore when visiting the argument variant to create a predicate
-template<typename List>
-struct slimmer_visitor {
-   using result_type = typename List::template apply<static_variant>;
-   template<typename T> constexpr static bool type_in_list = List::template contains<T>;
-
-   template<typename T, typename = std::enable_if_t<type_in_list<T>>>
-   result_type do_cast(const T& content, short) { return result_type(content); }
-   template<typename T>
-   result_type do_cast(const T&, long) {
-      FC_THROW_EXCEPTION(fc::assert_exception, "Invalid argument type for restriction function type");
-   }
-
-   template<typename T> result_type operator()(const T& content) {
-      return do_cast(content, short());
-   }
-};
-template<typename List>
-struct static_variant_slimmer {
-   using result_type = typename slimmer_visitor<List>::result_type;
-   template<typename SV>
-   static result_type slim(SV& variant) {
-      slimmer_visitor<List> visitor;
-      return variant.visit(visitor);
-   }
-};
+using or_types_list = typelist::list<vector<vector<restriction>>>;
 
 // Final implementations of predicate functors
 template<typename Argument> struct predicate_eq {
@@ -152,7 +127,7 @@ template<typename Argument> struct predicate_eq {
    template<typename, typename = void>
    struct can_evaluate_helper : std::false_type {}; template<typename Field>
    struct can_evaluate_helper<Field, make_void<decltype(declval<predicate_eq>()(declval<Field>()))>> {
-      static constexpr bool value = equality_types_list::contains<Argument>;
+      static constexpr bool value = typelist::contains<equality_types_list, Argument>();
    };
    template<typename Field> static constexpr bool can_evaluate = can_evaluate_helper<Field>::value;
 
@@ -190,7 +165,7 @@ template<typename Argument> struct predicate_compare {
    template<typename, typename = void> struct can_evaluate_helper : std::false_type {};
    template<typename Field>
    struct can_evaluate_helper<Field, make_void<decltype(declval<predicate_compare>()(declval<Field>()))>> {
-      static constexpr bool value = comparable_types_list::contains<Argument>;
+      static constexpr bool value = typelist::contains<comparable_types_list, Argument>();
    };
    template<typename Field> static constexpr bool can_evaluate = can_evaluate_helper<Field>::value;
 
@@ -231,7 +206,7 @@ template<typename Element> struct predicate_in<flat_set<Element>> {
    template<typename, typename = void> struct can_evaluate_helper : std::false_type {};
    template<typename Field>
    struct can_evaluate_helper<Field, make_void<decltype(declval<predicate_in>()(declval<Field>()))>> {
-      static constexpr bool value = equality_types_list::contains<Element>;
+      static constexpr bool value = typelist::contains<equality_types_list, Element>();
    };
    template<typename Field> static constexpr bool can_evaluate = can_evaluate_helper<Field>::value;
 
@@ -260,7 +235,7 @@ template<typename Element> struct predicate_has_all<flat_set<Element>> {
    template<typename, typename = void> struct can_evaluate_helper : std::false_type {};
    template<typename Field>
    struct can_evaluate_helper<Field, make_void<decltype(declval<predicate_has_all>()(declval<Field>()))>> {
-      static constexpr bool value = equality_types_list::contains<Element>;
+      static constexpr bool value = typelist::contains<equality_types_list, Element>();
    };
    template<typename Field> static constexpr bool can_evaluate = can_evaluate_helper<Field>::value;
 
@@ -293,7 +268,7 @@ template<typename Element> struct predicate_has_none<flat_set<Element>> {
    template<typename, typename = void> struct can_evaluate_helper : std::false_type {};
    template<typename Field>
    struct can_evaluate_helper<Field, make_void<decltype(declval<predicate_has_none>()(declval<Field>()))>> {
-      static constexpr bool value = equality_types_list::contains<Element>;
+      static constexpr bool value = typelist::contains<equality_types_list, Element>();
    };
    template<typename Field> static constexpr bool can_evaluate = can_evaluate_helper<Field>::value;
 
@@ -331,7 +306,8 @@ template<template<typename> class Predicate, typename Field>
 struct restriction_argument_visitor {
    using result_type = object_restriction_predicate<Field>;
 
-   template<typename Argument, typename = std::enable_if_t<Predicate<Argument>::template can_evaluate<Field>>>
+   template<typename Argument,
+            typename = std::enable_if_t<Predicate<Argument>::template can_evaluate_helper<Field>::value>>
    result_type make_predicate(const Argument& a, short) {
        return Predicate<Argument>(a);
    }
@@ -371,49 +347,73 @@ struct attribute_assertion<extension<Extension>> {
    }
 };
 
+// slimmer accelerates build times by reducing the number of elements in the argument static variant to only those
+// supported for a given function type. This reduces build time because it eliminates many options the compiler has
+// to explore when visiting the argument variant to create a predicate
+template<typename List>
+struct slimmer {
+   restriction_argument arg;
+   slimmer(restriction_argument&& arg) : arg(std::move(arg)) {}
+   using result_type = typelist::apply<List, static_variant>;
+
+   template<typename T, typename = std::enable_if_t<typelist::contains<List, T>()>>
+   result_type do_cast(T&& content, short) { return result_type(content); }
+   template<typename T>
+   result_type do_cast(T&&, long) {
+      FC_THROW_EXCEPTION(fc::assert_exception, "Invalid argument type for restriction function type");
+   }
+
+   template<typename T> result_type operator()(T) {
+      return do_cast(std::move(arg.get<typename T::type>()), short());
+   }
+};
+
 template<typename Field>
 object_restriction_predicate<Field> create_predicate_function(restriction_function func, restriction_argument arg) {
    try {
+      using typelist::runtime::dispatch;
+      using std::move;
+      using Arg = decltype(arg);
       switch(func) {
       case restriction::func_eq: {
          restriction_argument_visitor<predicate_eq, Field> visitor;
-         return static_variant_slimmer<equality_types_list>::slim(arg).visit(visitor);
+         return dispatch(Arg::list(), arg.which(), slimmer<equality_types_list>(move(arg))).visit(visitor);
       }
       case restriction::func_ne: {
          restriction_argument_visitor<predicate_ne, Field> visitor;
-         return static_variant_slimmer<equality_types_list>::slim(arg).visit(visitor);
+         return dispatch(Arg::list(), arg.which(), slimmer<equality_types_list>(move(arg))).visit(visitor);
       }
       case restriction::func_lt: {
          restriction_argument_visitor<predicate_lt, Field> visitor;
-         return static_variant_slimmer<comparable_types_list>::slim(arg).visit(visitor);
+         return dispatch(Arg::list(), arg.which(), slimmer<comparable_types_list>(move(arg))).visit(visitor);
       }
       case restriction::func_le: {
          restriction_argument_visitor<predicate_le, Field> visitor;
-         return static_variant_slimmer<comparable_types_list>::slim(arg).visit(visitor);
+         return dispatch(Arg::list(), arg.which(), slimmer<comparable_types_list>(move(arg))).visit(visitor);
       }
       case restriction::func_gt: {
          restriction_argument_visitor<predicate_gt, Field> visitor;
-         return static_variant_slimmer<comparable_types_list>::slim(arg).visit(visitor);
+         return dispatch(Arg::list(), arg.which(), slimmer<comparable_types_list>(move(arg))).visit(visitor);
       }
       case restriction::func_ge: {
          restriction_argument_visitor<predicate_ge, Field> visitor;
-         return static_variant_slimmer<comparable_types_list>::slim(arg).visit(visitor);
+         return dispatch(Arg::list(), arg.which(), slimmer<comparable_types_list>(move(arg))).visit(visitor);
       }
       case restriction::func_in: {
          restriction_argument_visitor<predicate_in, Field> visitor;
-         return static_variant_slimmer<list_types_list>::slim(arg).visit(visitor);
+         return dispatch(Arg::list(), arg.which(), slimmer<list_types_list>(move(arg))).visit(visitor);
       }
       case restriction::func_not_in: {
          restriction_argument_visitor<predicate_not_in, Field> visitor;
-         return static_variant_slimmer<list_types_list>::slim(arg).visit(visitor);
+         return dispatch(Arg::list(), arg.which(), slimmer<list_types_list>(move(arg))).visit(visitor);
       }
       case restriction::func_has_all: {
          restriction_argument_visitor<predicate_has_all, Field> visitor;
-         return static_variant_slimmer<list_types_list>::slim(arg).visit(visitor);
+         return dispatch(Arg::list(), arg.which(), slimmer<list_types_list>(move(arg))).visit(visitor);
       }
       case restriction::func_has_none: {
          restriction_argument_visitor<predicate_has_none, Field> visitor;
-         return static_variant_slimmer<list_types_list>::slim(arg).visit(visitor);
+         return dispatch(Arg::list(), arg.which(), slimmer<list_types_list>(move(arg))).visit(visitor);
       }
       case restriction::func_attr:
          FC_ASSERT(arg.which() == restriction_argument::tag<vector<restriction>>::value,
@@ -434,10 +434,11 @@ object_restriction_predicate<Field> create_predicate_function(restriction_functi
  * the restriction references to the particular field type, creates a predicate on that field, and wraps that
  * predicate to accept the object type and invoke the inner predicate on the specified field.
  */
-template<typename Object, typename = std::enable_if_t<fc::reflector<Object>::native_members::length != 0>>
+template<typename Object,
+         typename = std::enable_if_t<typelist::length<typename fc::reflector<Object>::native_members>() != 0>>
 object_restriction_predicate<Object> create_field_predicate(restriction&& r, short) {
    using member_list = typename fc::reflector<Object>::native_members;
-   FC_ASSERT(r.member_index < member_list::length, "Invalid member index ${I} for object ${O}",
+   FC_ASSERT(r.member_index < typelist::length<member_list>(), "Invalid member index ${I} for object ${O}",
              ("I", r.member_index)("O", fc::get_typename<Object>::name()));
    auto predicator = [f=r.restriction_type, a=std::move(r.argument)](auto t) -> object_restriction_predicate<Object> {
       using FieldReflection = typename decltype(t)::type;
@@ -445,7 +446,7 @@ object_restriction_predicate<Object> create_field_predicate(restriction&& r, sho
       auto p = create_predicate_function<Field>(static_cast<restriction_function>(f), std::move(a));
       return [p=std::move(p)](const Object& o) { return p(FieldReflection::get(o)); };
    };
-   return fc::typelist_utils::dispatch(member_list(), r.member_index, predicator);
+   return typelist::runtime::dispatch(member_list(), r.member_index, predicator);
 }
 template<typename Object>
 object_restriction_predicate<Object> create_field_predicate(restriction&&, long) {
@@ -462,8 +463,8 @@ object_restriction_predicate<Object> create_logical_or_predicate(vector<vector<r
    std::transform(std::make_move_iterator(rs.begin()), std::make_move_iterator(rs.end()),
                   std::back_inserter(predicates), to_predicate);
 
-   return [predicates=std::move(predicates)](const Object& object) {
-      return std::any_of(predicates.begin(), predicates.end(), [&o=object](const auto& p) { return p(o); });
+   return [predicates=std::move(predicates)](const Object& obj) {
+      return std::any_of(predicates.begin(), predicates.end(), [o=std::cref(obj)](const auto& p) { return p(o); });
    };
 }
 
@@ -483,8 +484,8 @@ object_restriction_predicate<Object> restrictions_to_predicate(vector<restrictio
       return create_field_predicate<Object>(std::move(r), short());
    });
 
-   return [predicates=std::move(predicates)](const Object& field) {
-      return std::all_of(predicates.begin(), predicates.end(), [&f=field](const auto& p) { return p(f); });
+   return [predicates=std::move(predicates)](const Object& obj) {
+      return std::all_of(predicates.begin(), predicates.end(), [o=std::cref(obj)](const auto& p) { return p(o); });
    };
 }
 

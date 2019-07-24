@@ -169,10 +169,10 @@ struct reflector<graphene::db::object_id<SpaceID,TypeID> >
 {
     typedef graphene::db::object_id<SpaceID,TypeID> type;
     typedef std::true_type is_defined;
-    using native_members = typelist<fc::field_reflection<0, type, unsigned_int, &type::instance>>;
-    using inherited_members = typelist<>;
+    using native_members = typelist::list<fc::field_reflection<0, type, unsigned_int, &type::instance>>;
+    using inherited_members = typelist::list<>;
     using members = native_members;
-    using base_classes = typelist<>;
+    using base_classes = typelist::list<>;
     enum  member_count_enum {
       local_member_count = 1,
       total_member_count = 1
