@@ -1249,6 +1249,11 @@ asset database::pay_market_fees(const account_object& seller, const asset_object
                FC_ASSERT( reward < issuer_fees, "Market reward should be less than issuer fees");
                // cut referrer percent from reward
                auto registrar_reward = reward;
+               
+               auto registrar = ( seller.registrar == GRAPHENE_TEMP_ACCOUNT && head_block_time() >= HARDFORK_CORE_1800_TIME ) 
+                                 ? GRAPHENE_COMMITTEE_ACCOUNT 
+                                 : seller.registrar;
+
                if( seller.referrer != seller.registrar )
                {
                   const auto referrer_rewards_value = detail::calculate_percent( reward.amount,
@@ -1263,7 +1268,8 @@ asset database::pay_market_fees(const account_object& seller, const asset_object
                      deposit_market_fee_vesting_balance(seller.referrer, referrer_reward);
                   }
                }
-               deposit_market_fee_vesting_balance(seller.registrar, registrar_reward);
+               deposit_market_fee_vesting_balance(registrar, registrar_reward);
+               
             }
          }
       }
