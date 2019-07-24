@@ -165,25 +165,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    {
       // https://bitsharestalk.org/index.php/topic,23715.0.html
       vector<string> seeds = {
-         "seed01.liondani.com:1776",          // liondani     (GERMANY)
-         "104.236.144.84:1777",               // puppies      (USA)
-         "128.199.143.47:2015",               // Harvey       (Singapore)
-         "209.105.239.13:1776",               // sahkan       (USA)
-         "45.35.12.22:1776",                  // sahkan       (USA)
-         "51.15.61.160:1776",                 // lafona       (France)
-         "bts-seed1.abit-more.com:62015",     // abit         (China)
-         "node.blckchnd.com:4243",            // blckchnd     (Germany)
-         "seed.bitsharesdex.com:50696",       // iHashFury    (Europe)
-         "seed.bitsharesnodes.com:1776",      // wackou       (Netherlands)
-         "seed.blocktrades.us:1776",          // BlockTrades  (USA)
-         "seed.cubeconnex.com:1777",          // cube         (USA)
-         "seed.roelandp.nl:1776",             // roelandp     (Canada)
-         "seed04.bts-nodes.net:1776",         // Thom         (Australia)
-         "seed05.bts-nodes.net:1776",         // Thom         (USA)
-         "seed06.bts-nodes.net:1776",         // Thom         (USA)
-         "seed07.bts-nodes.net:1776",         // Thom         (Singapore)
-         "seed.bts.bangzi.info:55501",        // Bangzi       (Germany)
-         "seeds.bitshares.eu:1776"            // pc           (http://seeds.quisquis.de/bitshares.html)
+         #include "../egenesis/seed-nodes.txt"
       };
       for( const string& endpoint_string : seeds )
       {
