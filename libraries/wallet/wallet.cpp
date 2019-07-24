@@ -4172,6 +4172,10 @@ string wallet_api::gethelp(const string& method)const
    std::stringstream ss;
    ss << "\n";
 
+   std::string doxygenHelpString = my->method_documentation.get_detailed_description(method);
+   if (!doxygenHelpString.empty())
+      ss << doxygenHelpString << "\n";
+
    if( method == "import_key" )
    {
       ss << "usage: import_key ACCOUNT_NAME_OR_ID  WIF_PRIVATE_KEY\n\n";
@@ -4219,14 +4223,8 @@ string wallet_api::gethelp(const string& method)const
       ss << fc::json::to_pretty_string( graphene::chain::bitasset_options() );
       ss << "\nBITASSET_OPTIONS may be null\n";
    }
-   else
-   {
-      std::string doxygenHelpString = my->method_documentation.get_detailed_description(method);
-      if (!doxygenHelpString.empty())
-         ss << doxygenHelpString;
-      else
-         ss << "No help defined for method " << method << "\n";
-   }
+   else if (doxygenHelpString.empty())
+      ss << "No help defined for method " << method << "\n";
 
    return ss.str();
 }
