@@ -308,9 +308,9 @@ class database_api
       account_id_type get_account_id_from_string(const std::string& name_or_id) const;
 
       /**
-       * @brief Get a list of accounts by IDs or names
+       * @brief Get a list of accounts by names or IDs
        * @param account_names_or_ids names or IDs of the accounts to retrieve
-       * @return The accounts corresponding to the provided IDs or names
+       * @return The accounts corresponding to the provided names or IDs
        *
        * This function has semantics identical to @ref get_objects
        */
