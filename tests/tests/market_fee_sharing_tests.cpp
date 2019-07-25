@@ -96,12 +96,6 @@ struct reward_database_fixture : database_fixture
       database_fixture::generate_block();
    }
 
-   void generate_blocks_before_hf1800()
-   {
-      database_fixture::generate_blocks( HARDFORK_CORE_1800_TIME );
-      // database_fixture::generate_block();
-   }
-
    void generate_blocks_past_hf1800()
    {
       database_fixture::generate_blocks( HARDFORK_CORE_1800_TIME );
@@ -457,13 +451,13 @@ BOOST_AUTO_TEST_CASE(create_actors)
    FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE(MFS_before_hardfork_1800)
+BOOST_AUTO_TEST_CASE(fee_shares_between_temp_acc_and_committee_acc)
 {
    try
    {
       INVOKE(create_actors);
 
-      generate_blocks_before_hf1800();
+      generate_blocks_past_hf1268();
       GET_ACTOR(jill);
 
       constexpr auto jillcoin_reward_percent = 2*GRAPHENE_1_PERCENT;
@@ -481,15 +475,15 @@ BOOST_AUTO_TEST_CASE(MFS_before_hardfork_1800)
       create_sell_order( alice, jillcoin.amount(100000), core_asset(1) );
       create_sell_order( old, core_asset(1), jillcoin.amount(100000) );
 
-      BOOST_CHECK_GE( get_market_fee_reward( GRAPHENE_TEMP_ACCOUNT(db), jillcoin), 0);
-      BOOST_CHECK_GE( get_market_fee_reward( GRAPHENE_COMMITTEE_ACCOUNT(db), jillcoin), 0);
+      BOOST_CHECK_GT( get_market_fee_reward( GRAPHENE_TEMP_ACCOUNT(db), jillcoin), 0);
+      BOOST_CHECK_GT( get_market_fee_reward( GRAPHENE_COMMITTEE_ACCOUNT(db), jillcoin), 0);
 
    }
    FC_LOG_AND_RETHROW()
    
 }
 
-BOOST_AUTO_TEST_CASE(MFS_after_hardfork_1800)
+BOOST_AUTO_TEST_CASE(fee_do_not_shares_between_temp_acc_and_committee_acc)
 {
    try
    {
@@ -515,7 +509,7 @@ BOOST_AUTO_TEST_CASE(MFS_after_hardfork_1800)
 
 
       BOOST_CHECK_EQUAL( get_market_fee_reward( GRAPHENE_TEMP_ACCOUNT(db), jillcoin), 0);
-      BOOST_CHECK_GE( get_market_fee_reward( GRAPHENE_COMMITTEE_ACCOUNT(db), jillcoin), 0);
+      BOOST_CHECK_GT( get_market_fee_reward( GRAPHENE_COMMITTEE_ACCOUNT(db), jillcoin), 0);
 
    }
    FC_LOG_AND_RETHROW()

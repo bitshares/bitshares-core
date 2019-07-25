@@ -1,4 +1,4 @@
 // bitshares-core issue #1800 Fix "Temp-account market fee sharing"
 #ifndef HARDFORK_CORE_1800_TIME
-#define HARDFORK_CORE_1800_TIME (fc::time_point_sec( 1563888919 )) // Tue, 23 Jul 2019 13:35:00 UTC
+#define HARDFORK_CORE_1800_TIME (fc::time_point_sec( 1600000000 )) // Tue, 23 Jul 2019 13:35:00 UTC
 #endif
