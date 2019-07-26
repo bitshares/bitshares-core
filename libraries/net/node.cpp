@@ -4218,7 +4218,15 @@ namespace graphene { namespace net { namespace detail {
    void node_impl::add_seed_node(const std::string& endpoint_string)
    {
       VERIFY_CORRECT_THREAD();
-      std::vector<fc::ip::endpoint> endpoints = graphene::net::node::resolve_string_to_ip_endpoints(endpoint_string);
+      std::vector<fc::ip::endpoint> endpoints;
+      try
+      {
+         endpoints = graphene::net::node::resolve_string_to_ip_endpoints(endpoint_string);
+      }
+      catch(...)
+      {
+         elog( "Unable to resolve endpoint during attempt to add seed node ${ep}", ("ep", endpoint_string) );
+      }
       for (const fc::ip::endpoint& endpoint : endpoints)
       {
          ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
@@ -5187,12 +5195,17 @@ namespace graphene { namespace net { namespace detail {
       for(const std::string& endpoint_string : seeds )
       {
          try {
-            INVOKE_IN_IMPL(add_seed_node, endpoint_string);
+            add_seed_node(endpoint_string);
          } catch( const fc::exception& e ) {
             wlog( "caught exception ${e} while adding seed node ${endpoint}",
                   ("e", e.to_detail_string())("endpoint", endpoint_string) );
          }
       }
+   }
+
+   void node::add_seed_node(const std::string& in)
+   {
+      INVOKE_IN_IMPL(add_seed_node, in);
    }
 
    void node::set_advertise_algorithm( std::string algo, const fc::optional<std::vector<std::string>>& advertise_or_exclude_list )

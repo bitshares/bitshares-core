@@ -235,6 +235,12 @@ namespace graphene { namespace net {
          */
         void add_seed_nodes( std::vector<std::string> seeds );
 
+        /****
+         * @brief add a node to seed the p2p network
+         * @param in the url as a string
+         */
+        void add_seed_node( const std::string& in);
+
         /**
          *  Attempt to connect to the specified endpoint immediately.
          */
