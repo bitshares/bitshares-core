@@ -19,7 +19,17 @@ set(sources
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/git_revision.cpp.in" "${CMAKE_CURRENT_BINARY_DIR}/git_revision.cpp" @ONLY)
 list(APPEND sources "${CMAKE_CURRENT_BINARY_DIR}/git_revision.cpp")
-find_package(CURL REQUIRED)
+
+if (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
+   set (OLD_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+   set (CMAKE_FIND_LIBRARY_SUFFIXES .a)
+   find_package(CURL REQUIRED)
+   list(APPEND CURL_LIBRARIES ssl crypto)
+   set (CMAKE_FIND_LIBRARY_SUFFIXES ${OLD_SUFFIXES})
+else (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
+   find_package(CURL REQUIRED)
+endif (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
+
 include_directories(${CURL_INCLUDE_DIRS})
 add_library( graphene_utilities
              ${sources}

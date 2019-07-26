@@ -3,7 +3,16 @@ file(GLOB HEADERS "include/graphene/elasticsearch/*.hpp")
 add_library( graphene_elasticsearch
         elasticsearch_plugin.cpp
            )
-find_package(CURL REQUIRED)
+if (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
+   set (OLD_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+   set (CMAKE_FIND_LIBRARY_SUFFIXES .a)
+   find_package(CURL REQUIRED)
+   list(APPEND CURL_LIBRARIES ssl crypto)
+   set (CMAKE_FIND_LIBRARY_SUFFIXES ${OLD_SUFFIXES})
+else (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
+   find_package(CURL REQUIRED)
+endif (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
+
 include_directories(${CURL_INCLUDE_DIRS})
 if(MSVC)
   set_source_files_properties(elasticsearch_plugin.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
