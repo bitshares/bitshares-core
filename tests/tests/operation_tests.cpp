@@ -286,10 +286,6 @@ BOOST_AUTO_TEST_CASE( old_call_order_update_test_after_hardfork_583 )
 
 BOOST_AUTO_TEST_CASE( asset_settle_cancel_operation_test_after_hf588 )
 {
-   // fast jump to hardfork time
-   generate_blocks( HARDFORK_CORE_588_TIME );
-   // one more block to pass hardfork time
-   generate_block();
    set_expiration( db, trx );
 
    BOOST_TEST_MESSAGE( "Creating a proposal containing a asset_settle_cancel_operation" );

@@ -41,30 +41,6 @@ struct proposal_operation_hardfork_visitor
    template<typename T>
    void operator()(const T &v) const {}
 
-   // hf_588
-   // issue #588
-   //
-   // As a virtual operation which has no evaluator `asset_settle_cancel_operation`
-   // originally won't be packed into blocks, yet its loose `validate()` method
-   // make it able to slip into blocks.
-   //
-   // We need to forbid this operation being packed into blocks via proposal but
-   // this will lead to a hardfork (this operation in proposal will denied by new
-   // node while accept by old node), so a hardfork guard code needed and a
-   // consensus upgrade over all nodes needed in future. And because the
-   // `validate()` method not suitable to check database status, so we put the
-   // code here.
-   //
-   // After the hardfork, all nodes will deny packing this operation into a block,
-   // and then we will check whether exists a proposal containing this kind of
-   // operation, if not exists, we can harden the `validate()` method to deny
-   // it in a earlier stage.
-   //
-   void operator()(const graphene::chain::asset_settle_cancel_operation &v) const {
-      if (block_time > HARDFORK_CORE_588_TIME) {
-         FC_ASSERT(!"Virtual operation");
-      }
-   }
    void operator()(const graphene::chain::committee_member_update_global_parameters_operation &op) const {
       if (block_time < HARDFORK_CORE_1468_TIME) {
          FC_ASSERT(!op.new_parameters.extensions.value.updatable_htlc_options.valid(), "Unable to set HTLC options before hardfork 1468");
