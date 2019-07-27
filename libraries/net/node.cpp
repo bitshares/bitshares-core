@@ -3346,7 +3346,7 @@ namespace graphene { namespace net { namespace detail {
     }
 
     void node_impl::on_get_current_connections_reply_message(peer_connection* originating_peer,
-                                                             const get_current_connections_reply_message& get_current_connections_reply_message_received)
+          const get_current_connections_reply_message& get_current_connections_reply_message_received)
     {
       VERIFY_CORRECT_THREAD();
     }
@@ -3358,19 +3358,22 @@ namespace graphene { namespace net { namespace detail {
     // this just passes the message to the client, and does the bookkeeping
     // related to requesting and rebroadcasting the message.
     void node_impl::process_ordinary_message( peer_connection* originating_peer,
-                                              const message& message_to_process, const message_hash_type& message_hash )
+                                              const message& message_to_process,
+                                              const message_hash_type& message_hash )
     {
       VERIFY_CORRECT_THREAD();
       fc::time_point message_receive_time = fc::time_point::now();
 
       // only process it if we asked for it
-      auto iter = originating_peer->items_requested_from_peer.find( item_id(message_to_process.msg_type.value(), message_hash) );
+      auto iter = originating_peer->items_requested_from_peer.find(
+                        item_id(message_to_process.msg_type.value(), message_hash) );
       if( iter == originating_peer->items_requested_from_peer.end() )
       {
         wlog( "received a message I didn't ask for from peer ${endpoint}, disconnecting from peer",
              ( "endpoint", originating_peer->get_remote_endpoint() ) );
-        fc::exception detailed_error( FC_LOG_MESSAGE(error, "You sent me a message that I didn't ask for, message_hash: ${message_hash}",
-                                                    ( "message_hash", message_hash ) ) );
+        fc::exception detailed_error( FC_LOG_MESSAGE(error,
+                            "You sent me a message that I didn't ask for, message_hash: ${message_hash}",
+                            ( "message_hash", message_hash ) ) );
         disconnect_from_peer( originating_peer, "You sent me a message that I didn't request", true, detailed_error );
         return;
       }
@@ -3387,7 +3390,8 @@ namespace graphene { namespace net { namespace detail {
           if (message_to_process.msg_type.value() == trx_message_type)
           {
             trx_message transaction_message_to_process = message_to_process.as<trx_message>();
-            dlog("passing message containing transaction ${trx} to client", ("trx", transaction_message_to_process.trx.id()));
+            dlog( "passing message containing transaction ${trx} to client",
+                  ("trx", transaction_message_to_process.trx.id()) );
             _delegate->handle_transaction(transaction_message_to_process);
           }
           else
@@ -3415,12 +3419,14 @@ namespace graphene { namespace net { namespace detail {
              break;
           }
           // record it so we don't try to fetch this item again
-          _recently_failed_items.insert(peer_connection::timestamped_item_id(item_id(message_to_process.msg_type.value(), message_hash ), fc::time_point::now()));
+          _recently_failed_items.insert( peer_connection::timestamped_item_id(
+                item_id( message_to_process.msg_type.value(), message_hash ), fc::time_point::now() ) );
           return;
         }
 
         // finally, if the delegate validated the message, broadcast it to our other peers
-        message_propagation_data propagation_data{message_receive_time, message_validated_time, originating_peer->node_id};
+        message_propagation_data propagation_data { message_receive_time, message_validated_time,
+                                                    originating_peer->node_id };
         broadcast( message_to_process, propagation_data );
       }
     }
