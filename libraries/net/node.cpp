@@ -3400,7 +3400,20 @@ namespace graphene { namespace net { namespace detail {
         }
         catch ( const fc::exception& e )
         {
-          wlog( "client rejected message sent by peer ${peer}, ${e}", ("peer", originating_peer->get_remote_endpoint() )("e", e) );
+          switch( e.code() )
+          {
+          // log common exceptions in debug level
+          case 3030001: // duplicate_transaction
+          case 3050101: // limit_order_create_kill_unfilled
+             dlog( "client rejected message sent by peer ${peer}, ${e}",
+                   ("peer", originating_peer->get_remote_endpoint() )("e", e) );
+             break;
+          // log rarer exceptions in warn level
+          default:
+             wlog( "client rejected message sent by peer ${peer}, ${e}",
+                   ("peer", originating_peer->get_remote_endpoint() )("e", e) );
+             break;
+          }
           // record it so we don't try to fetch this item again
           _recently_failed_items.insert(peer_connection::timestamped_item_id(item_id(message_to_process.msg_type.value(), message_hash ), fc::time_point::now()));
           return;

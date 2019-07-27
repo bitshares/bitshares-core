@@ -110,6 +110,7 @@ namespace graphene { namespace chain {
 
    FC_DECLARE_DERIVED_EXCEPTION( database_query_exception,     chain_exception, 3010000 )
    FC_DECLARE_DERIVED_EXCEPTION( block_validate_exception,     chain_exception, 3020000 )
+   FC_DECLARE_DERIVED_EXCEPTION( transaction_process_exception,chain_exception, 3030000 )
    FC_DECLARE_DERIVED_EXCEPTION( operation_validate_exception, chain_exception, 3040000 )
    FC_DECLARE_DERIVED_EXCEPTION( operation_evaluate_exception, chain_exception, 3050000 )
    FC_DECLARE_DERIVED_EXCEPTION( utility_exception,            chain_exception, 3060000 )
@@ -120,6 +121,8 @@ namespace graphene { namespace chain {
 
    FC_DECLARE_DERIVED_EXCEPTION( insufficient_feeds,           chain_exception, 37006 )
 
+   FC_DECLARE_DERIVED_EXCEPTION( duplicate_transaction,        transaction_process_exception, 3030001 )
+
    FC_DECLARE_DERIVED_EXCEPTION( pop_empty_chain,              undo_database_exception, 3070001 )
 
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( transfer );
@@ -127,7 +130,9 @@ namespace graphene { namespace chain {
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( to_account_not_whitelisted, transfer, 2, "owner mismatch" )
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( restricted_transfer_asset, transfer, 3, "restricted transfer asset" )
 
-   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_create );
+   GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_create );
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( kill_unfilled, limit_order_create, 1, )
+
    //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_cancel );
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( call_order_update );
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( unfilled_margin_call, call_order_update, 1, "Updating call order would trigger a margin call that cannot be fully filled" )
