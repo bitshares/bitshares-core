@@ -131,8 +131,17 @@ void_result limit_order_cancel_evaluator::do_evaluate(const limit_order_cancel_o
 { try {
    database& d = db();
 
-   _order = &o.order(d);
-   FC_ASSERT( _order->seller == o.fee_paying_account );
+   _order = d.find( o.order );
+
+   GRAPHENE_ASSERT( _order != nullptr,
+                    limit_order_cancel_nonexist_order,
+                    "Limit order ${oid} does not exist",
+                    ("oid", o.order) );
+
+   GRAPHENE_ASSERT( _order->seller == o.fee_paying_account,
+                    limit_order_cancel_owner_mismatch,
+                    "Limit order ${oid} is owned by someone else",
+                    ("oid", o.order) );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
