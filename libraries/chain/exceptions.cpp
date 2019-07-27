@@ -41,6 +41,7 @@ namespace graphene { namespace chain {
 
    FC_IMPLEMENT_DERIVED_EXCEPTION( database_query_exception,     chain_exception, 3010000, "database query exception" )
    FC_IMPLEMENT_DERIVED_EXCEPTION( block_validate_exception,     chain_exception, 3020000, "block validation exception" )
+   FC_IMPLEMENT_DERIVED_EXCEPTION( transaction_process_exception,chain_exception, 3030000, "transaction processing exception" )
    FC_IMPLEMENT_DERIVED_EXCEPTION( operation_validate_exception, chain_exception, 3040000, "operation validation exception" )
    FC_IMPLEMENT_DERIVED_EXCEPTION( operation_evaluate_exception, chain_exception, 3050000, "operation evaluation exception" )
    FC_IMPLEMENT_DERIVED_EXCEPTION( utility_exception,            chain_exception, 3060000, "utility method exception" )
@@ -51,6 +52,8 @@ namespace graphene { namespace chain {
 
    FC_IMPLEMENT_DERIVED_EXCEPTION( insufficient_feeds,           chain_exception, 37006, "insufficient feeds" )
 
+   FC_IMPLEMENT_DERIVED_EXCEPTION( duplicate_transaction,        transaction_process_exception, 3030001, "duplicate transaction" )
+
    FC_IMPLEMENT_DERIVED_EXCEPTION( pop_empty_chain,              undo_database_exception, 3070001, "there are no blocks to pop" )
 
    GRAPHENE_IMPLEMENT_OP_BASE_EXCEPTIONS( transfer );
@@ -58,7 +61,10 @@ namespace graphene { namespace chain {
    GRAPHENE_IMPLEMENT_OP_EVALUATE_EXCEPTION( to_account_not_whitelisted, transfer, 2, "owner mismatch" )
    GRAPHENE_IMPLEMENT_OP_EVALUATE_EXCEPTION( restricted_transfer_asset, transfer, 3, "restricted transfer asset" )
 
-   //GRAPHENE_IMPLEMENT_OP_BASE_EXCEPTIONS( limit_order_create );
+   GRAPHENE_IMPLEMENT_OP_BASE_EXCEPTIONS( limit_order_create );
+   GRAPHENE_IMPLEMENT_OP_EVALUATE_EXCEPTION( kill_unfilled, limit_order_create, 1,
+         "Killing limit order due to unable to fill" )
+
    //GRAPHENE_IMPLEMENT_OP_BASE_EXCEPTIONS( limit_order_cancel );
    GRAPHENE_IMPLEMENT_OP_BASE_EXCEPTIONS( call_order_update );
    GRAPHENE_IMPLEMENT_OP_EVALUATE_EXCEPTION( unfilled_margin_call, call_order_update, 1, "Updating call order would trigger a margin call that cannot be fully filled" )
