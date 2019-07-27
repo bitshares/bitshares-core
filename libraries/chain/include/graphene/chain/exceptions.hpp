@@ -133,7 +133,10 @@ namespace graphene { namespace chain {
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_create );
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( kill_unfilled, limit_order_create, 1, )
 
-   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_cancel );
+   GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_cancel );
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( nonexist_order, limit_order_cancel, 1, )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( owner_mismatch, limit_order_cancel, 2, )
+
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( call_order_update );
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( unfilled_margin_call, call_order_update, 1, "Updating call order would trigger a margin call that cannot be fully filled" )
 
