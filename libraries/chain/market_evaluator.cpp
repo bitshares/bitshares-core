@@ -119,7 +119,10 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
    else
       filled = db().apply_order( new_order_object );
 
-   FC_ASSERT( !op.fill_or_kill || filled );
+   GRAPHENE_ASSERT( !op.fill_or_kill || filled,
+                    limit_order_create_kill_unfilled,
+                    "Killing limit order ${op} due to unable to fill",
+                    ("op",op) );
 
    return order_id;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
