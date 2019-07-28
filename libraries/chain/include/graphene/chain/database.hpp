@@ -403,7 +403,6 @@ namespace graphene { namespace chain {
       private:
          void                  _apply_block( const signed_block& next_block );
          processed_transaction _apply_transaction( const signed_transaction& trx );
-         void                  _cancel_bids_and_revive_mpa( const asset_object& bitasset, const asset_bitasset_data_object& bad );
 
          ///Steps involved in applying a new block
          ///@{
@@ -424,8 +423,6 @@ namespace graphene { namespace chain {
          void clear_expired_proposals();
          void update_maintenance_flag( bool new_maintenance_flag );
          void update_withdraw_permissions();
-         bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
-                                   const asset_bitasset_data_object* bitasset_ptr = nullptr );
          void clear_expired_htlcs();
 
          ///Steps performed only at maintenance intervals

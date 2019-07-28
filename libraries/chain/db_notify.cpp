@@ -31,14 +31,6 @@ struct get_impacted_account_visitor
       _impacted.insert( op.to );
       _impacted.insert( op.fee_payer() ); // from
    }
-   void operator()( const asset_claim_fees_operation& op )
-   {
-      _impacted.insert( op.fee_payer() ); // issuer
-   }
-   void operator()( const asset_claim_pool_operation& op )
-   {
-      _impacted.insert( op.fee_payer() ); // issuer
-   }
    void operator()( const account_create_operation& op )
    {
       _impacted.insert( op.fee_payer() ); // registrar
@@ -76,10 +68,6 @@ struct get_impacted_account_visitor
    void operator()( const asset_reserve_operation& op )
    {
       _impacted.insert( op.fee_payer() ); // payer
-   }
-   void operator()( const asset_fund_fee_pool_operation& op )
-   {
-      _impacted.insert( op.fee_payer() ); // from_account
    }
    void operator()( const witness_create_operation& op )
    {
@@ -311,8 +299,6 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
              case impl_reserved0_object_type:
               break;
              case impl_asset_dynamic_data_type:
-              break;
-             case impl_asset_bitasset_data_type:
               break;
              case impl_account_balance_object_type:{
               const auto& aobj = dynamic_cast<const account_balance_object*>(obj);

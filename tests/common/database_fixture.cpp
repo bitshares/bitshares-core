@@ -108,7 +108,6 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    init_mpa1.accumulated_fees = 0;
    init_mpa1.accumulated_fees_for_marketing_partner = 0;
    init_mpa1.accumulated_fees_for_charity = 0;
-   init_mpa1.is_bitasset = true;
    // TODO add initial UIA's; add initial short positions; test non-zero accumulated_fees
    genesis_state.initial_assets.push_back( init_mpa1 );
 
@@ -219,9 +218,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       options.insert(std::make_pair("es-objects-accounts", boost::program_options::variable_value(true, false)));
       options.insert(std::make_pair("es-objects-assets", boost::program_options::variable_value(true, false)));
       options.insert(std::make_pair("es-objects-balances", boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("es-objects-limit-orders", boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("es-objects-asset-bitasset", boost::program_options::variable_value(true, false)));
-
+ 
       esobjects_plugin->plugin_initialize(options);
       esobjects_plugin->plugin_startup();
    }
@@ -664,22 +661,6 @@ void database_fixture::transfer(
       verify_asset_supplies(db);
       trx.operations.clear();
    } FC_CAPTURE_AND_RETHROW( (from.id)(to.id)(amount)(fee) )
-}
-
-void database_fixture::fund_fee_pool( const account_object& from, const asset_object& asset_to_fund, const share_type amount )
-{
-   asset_fund_fee_pool_operation fund;
-   fund.from_account = from.id;
-   fund.asset_id = asset_to_fund.id;
-   fund.amount = amount;
-   trx.operations.push_back( fund );
-
-   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
-   trx.validate();
-   set_expiration( db, trx );
-   PUSH_TX(db, trx, ~0);
-   trx.operations.clear();
-   verify_asset_supplies(db);
 }
 
 void database_fixture::enable_fees()

@@ -89,31 +89,11 @@ namespace graphene { namespace chain {
    };
 
    /**
-    * @ingroup operations
-    */
-   struct asset_fund_fee_pool_operation : public base_operation
-   {
-      struct fee_parameters_type { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
-
-      asset           fee; ///< core asset
-      account_id_type from_account;
-      asset_id_type   asset_id;
-      share_type      amount; ///< core asset
-      extensions_type extensions;
-
-      account_id_type fee_payer()const { return from_account; }
-      void       validate()const;
-   };
-
-   /**
     * @brief Update options common to all assets
     * @ingroup operations
     *
     * There are a number of options which all assets in the network use. These options are enumerated in the @ref
     * asset_options struct. This operation is used to update these options for an existing asset.
-    *
-    * @note This operation cannot be used to update BitAsset-specific options. For these options, use @ref
-    * asset_update_bitasset_operation instead.
     *
     * @pre @ref issuer SHALL be an existing account and MUST match asset_object::issuer on @ref asset_to_update
     * @pre @ref fee SHALL be nonnegative, and @ref issuer MUST have a sufficient balance to pay it
@@ -161,60 +141,7 @@ namespace graphene { namespace chain {
       account_id_type fee_payer()const { return payer; }
       void            validate()const;
    };
-
-   /**
-    * @brief used to transfer accumulated fees back to the issuer's balance.
-    */
-   struct asset_claim_fees_operation : public base_operation
-   {
-      struct fee_parameters_type {
-         uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
-      };
-
-      asset           fee;
-      account_id_type issuer;
-      asset           amount_to_claim; /// amount_to_claim.asset_id->issuer must == issuer
-      extensions_type extensions;
-
-      account_id_type fee_payer()const { return issuer; }
-      void            validate()const;
-   };
-
-   /**
-    * @brief Transfers TUSC from the fee pool of a specified asset back to the issuer's balance
-
-    * @param fee Payment for the operation execution
-    * @param issuer Account which will be used for transfering TUSC
-    * @param asset_id Id of the asset whose fee pool is going to be drained
-    * @param amount_to_claim Amount of TUSC to claim from the fee pool
-    * @param extensions Field for future expansion
-
-    * @pre @ref fee must be paid in the asset other than the one whose pool is being drained
-    * @pre @ref amount_to_claim should be specified in the core asset
-    * @pre @ref amount_to_claim should be nonnegative
-    */
-   struct asset_claim_pool_operation : public base_operation
-   {
-      struct fee_parameters_type {
-         uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
-      };
-
-      asset           fee;
-      account_id_type issuer;
-      asset_id_type   asset_id;        /// fee.asset_id must != asset_id
-      asset           amount_to_claim; /// core asset
-      extensions_type extensions;
-
-      account_id_type fee_payer()const { return issuer; }
-      void            validate()const;
-   };
-
 } } // graphene::chain
-
-FC_REFLECT( graphene::chain::asset_claim_fees_operation, (fee)(issuer)(amount_to_claim)(extensions) )
-FC_REFLECT( graphene::chain::asset_claim_fees_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::chain::asset_claim_pool_operation, (fee)(issuer)(asset_id)(amount_to_claim)(extensions) )
-FC_REFLECT( graphene::chain::asset_claim_pool_operation::fee_parameters_type, (fee) )
 
 FC_REFLECT( graphene::chain::asset_options,
             (initial_max_supply)
@@ -232,7 +159,6 @@ FC_REFLECT( graphene::chain::asset_options,
           )
 
 FC_REFLECT( graphene::chain::additional_asset_options, (reward_percent)(whitelist_market_fee_sharing) )
-FC_REFLECT( graphene::chain::asset_fund_fee_pool_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::asset_update_operation::fee_parameters_type, (fee)(price_per_kbyte) )
 FC_REFLECT( graphene::chain::asset_reserve_operation::fee_parameters_type, (fee) )
 
@@ -247,5 +173,3 @@ FC_REFLECT( graphene::chain::asset_update_operation,
 
 FC_REFLECT( graphene::chain::asset_reserve_operation,
             (fee)(payer)(amount_to_reserve)(extensions) )
-
-FC_REFLECT( graphene::chain::asset_fund_fee_pool_operation, (fee)(from_account)(asset_id)(amount)(extensions) );

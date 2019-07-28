@@ -95,13 +95,6 @@ void asset_reserve_operation::validate()const
    FC_ASSERT( amount_to_reserve.amount.value > 0 );
 }
 
-void asset_fund_fee_pool_operation::validate() const
-{
-   FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( fee.asset_id == asset_id_type() );
-   FC_ASSERT( amount > 0 );
-}
-
 void asset_options::validate()const
 {
    FC_ASSERT( initial_max_supply > 0 );
@@ -128,18 +121,6 @@ void asset_options::validate()const
    {
       FC_ASSERT( whitelist_markets.find(item) == whitelist_markets.end() );
    }
-}
-
-void asset_claim_fees_operation::validate()const {
-   FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( amount_to_claim.amount > 0 );
-}
-
-void asset_claim_pool_operation::validate()const {
-   FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( fee.asset_id != asset_id);
-   FC_ASSERT( amount_to_claim.amount > 0 );
-   FC_ASSERT( amount_to_claim.asset_id == asset_id_type());
 }
 
 } } // namespace graphene::chain

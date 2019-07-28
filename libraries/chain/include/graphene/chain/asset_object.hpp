@@ -26,16 +26,6 @@
 #include <boost/multi_index/composite_key.hpp>
 #include <graphene/db/generic_index.hpp>
 
-/**
- * @defgroup prediction_market Prediction Market
- *
- * A prediction market is a specialized BitAsset such that total debt and total collateral are always equal amounts
- * (although asset IDs differ). No margin calls or force settlements may be performed on a prediction market asset. A
- * prediction market is globally settled by the issuer after the event being predicted resolves, thus a prediction
- * market must always have the @ref global_settle permission enabled. The maximum price for global settlement or short
- * sale of a prediction market asset is 1-to-1.
- */
-
 namespace graphene { namespace chain {
    class account_object;
    class database;
@@ -87,14 +77,6 @@ namespace graphene { namespace chain {
          /// @return true if symbol is a valid ticker symbol; false otherwise.
          static bool is_valid_symbol( const string& symbol );
 
-         /// @return true if this is a market-issued asset; false otherwise.
-         bool is_market_issued()const { return bitasset_data_id.valid(); }
-         /// @return true if users may request force-settlement of this market-issued asset; false otherwise
-         bool can_force_settle()const { return !(options.flags & disable_force_settle); }
-         /// @return true if the issuer of this market-issued asset may globally settle the asset; false otherwise
-         bool can_global_settle()const { return options.issuer_permissions & global_settle; }
-         /// @return true if this asset charges a fee for the issuer on market operations; false otherwise
-         bool charges_market_fees()const { return options.flags & charge_market_fee; }
          /// @return true if this asset may only be transferred to/from the issuer or market orders
          bool is_transfer_restricted()const { return options.flags & transfer_restricted; }
          bool can_override()const { return options.flags & override_authority; }
@@ -129,8 +111,6 @@ namespace graphene { namespace chain {
 
          /// Current supply, fee pool, and collected fees are stored in a separate object as they change frequently.
          asset_dynamic_data_id_type  dynamic_asset_data_id;
-         /// Extra data associated with BitAssets. This field is non-null if and only if is_market_issued() returns true
-         optional<asset_bitasset_data_id_type> bitasset_data_id;
 
          optional<account_id_type> buyback_account;
 
@@ -138,12 +118,6 @@ namespace graphene { namespace chain {
 
          void validate()const
          {
-            // UIAs may not be prediction markets, have force settlement, or global settlements
-            if( !is_market_issued() )
-            {
-               FC_ASSERT(!(options.flags & disable_force_settle || options.flags & global_settle));
-               FC_ASSERT(!(options.issuer_permissions & disable_force_settle || options.issuer_permissions & global_settle));
-            }
          }
 
          template<class DB>
@@ -167,13 +141,7 @@ namespace graphene { namespace chain {
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_unique< tag<by_symbol>, member<asset_object, string, &asset_object::symbol> >,
-         ordered_non_unique< tag<by_issuer>, member<asset_object, account_id_type, &asset_object::issuer > >,
-         ordered_unique< tag<by_type>,
-            composite_key< asset_object,
-                const_mem_fun<asset_object, bool, &asset_object::is_market_issued>,
-                member< object, object_id_type, &object::id >
-            >
-         >
+         ordered_non_unique< tag<by_issuer>, member<asset_object, account_id_type, &asset_object::issuer > >
       >
    > asset_object_multi_index_type;
    typedef generic_index<asset_object, asset_object_multi_index_type> asset_index;
@@ -189,6 +157,5 @@ FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (issuer)
                     (options)
                     (dynamic_asset_data_id)
-                    (bitasset_data_id)
                     (buyback_account)
                   )

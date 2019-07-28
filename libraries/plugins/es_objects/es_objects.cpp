@@ -59,7 +59,6 @@ class es_objects_plugin_impl
       bool _es_objects_assets = true;
       bool _es_objects_balances = true;
       bool _es_objects_limit_orders = true;
-      bool _es_objects_asset_bitasset = true;
       std::string _es_objects_index_prefix = "objects-";
       uint32_t _es_objects_start_es_after_block = 0;
       CURL *curl; // curl handler
@@ -285,8 +284,6 @@ void es_objects_plugin::plugin_set_program_options(
          ("es-objects-accounts", boost::program_options::value<bool>(), "Store account objects(true)")
          ("es-objects-assets", boost::program_options::value<bool>(), "Store asset objects(true)")
          ("es-objects-balances", boost::program_options::value<bool>(), "Store balances objects(true)")
-         ("es-objects-limit-orders", boost::program_options::value<bool>(), "Store limit order objects(true)")
-         ("es-objects-asset-bitasset", boost::program_options::value<bool>(), "Store feed data(true)")
          ("es-objects-index-prefix", boost::program_options::value<std::string>(), "Add a prefix to the index(objects-)")
          ("es-objects-keep-only-current", boost::program_options::value<bool>(), "Keep only current state of the objects(true)")
          ("es-objects-start-es-after-block", boost::program_options::value<uint32_t>(), "Start doing ES job after block(0)")
@@ -346,12 +343,6 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
    }
    if (options.count("es-objects-balances")) {
       my->_es_objects_balances = options["es-objects-balances"].as<bool>();
-   }
-   if (options.count("es-objects-limit-orders")) {
-      my->_es_objects_limit_orders = options["es-objects-limit-orders"].as<bool>();
-   }
-   if (options.count("es-objects-asset-bitasset")) {
-      my->_es_objects_asset_bitasset = options["es-objects-asset-bitasset"].as<bool>();
    }
    if (options.count("es-objects-index-prefix")) {
       my->_es_objects_index_prefix = options["es-objects-index-prefix"].as<std::string>();

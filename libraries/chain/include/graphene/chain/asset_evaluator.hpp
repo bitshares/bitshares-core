@@ -53,33 +53,4 @@ namespace graphene { namespace chain {
          const asset_object* asset_to_update = nullptr;
    };
 
-   class asset_fund_fee_pool_evaluator : public evaluator<asset_fund_fee_pool_evaluator>
-   {
-      public:
-         typedef asset_fund_fee_pool_operation operation_type;
-
-         void_result do_evaluate(const asset_fund_fee_pool_operation& op);
-         void_result do_apply(const asset_fund_fee_pool_operation& op);
-
-         const asset_dynamic_data_object* asset_dyn_data = nullptr;
-   };
-
-   class asset_claim_fees_evaluator : public evaluator<asset_claim_fees_evaluator>
-   {
-      public:
-         typedef asset_claim_fees_operation operation_type;
-
-         void_result do_evaluate( const asset_claim_fees_operation& o );
-         void_result do_apply( const asset_claim_fees_operation& o );
-   };
-
-   class asset_claim_pool_evaluator : public evaluator<asset_claim_pool_evaluator>
-   {
-      public:
-         typedef asset_claim_pool_operation operation_type;
-
-         void_result do_evaluate( const asset_claim_pool_operation& o );
-         void_result do_apply( const asset_claim_pool_operation& o );
-   };
-
 } } // graphene::chain

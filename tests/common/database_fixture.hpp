@@ -305,7 +305,6 @@ struct database_fixture {
    void sign( signed_transaction& trx, const fc::ecc::private_key& key );
    void transfer( account_id_type from, account_id_type to, const asset& amount, const asset& fee = asset() );
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );
-   void fund_fee_pool( const account_object& from, const asset_object& asset_to_fund, const share_type amount );
    /**
     * NOTE: This modifies the database directly. You will probably have to call this each time you
     * finish creating a block

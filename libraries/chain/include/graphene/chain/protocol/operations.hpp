@@ -63,7 +63,7 @@ namespace graphene { namespace chain {
             // asset_update_feed_producers_operation,
             // asset_issue_operation,
             asset_reserve_operation,
-            asset_fund_fee_pool_operation,
+            // asset_fund_fee_pool_operation,
             // asset_settle_operation,
             // asset_global_settle_operation,
             // asset_publish_feed_operation,
@@ -90,11 +90,11 @@ namespace graphene { namespace chain {
             blind_transfer_operation,
             transfer_from_blind_operation,
             // asset_settle_cancel_operation,  // VIRTUAL
-            asset_claim_fees_operation,
+            // asset_claim_fees_operation,
             // fba_distribute_operation,       // VIRTUAL
-            //bid_collateral_operation,
-            //execute_bid_operation,          // VIRTUAL
-            asset_claim_pool_operation,
+            // bid_collateral_operation,
+            // execute_bid_operation,          // VIRTUAL
+            // asset_claim_pool_operation,
             // asset_update_issuer_operation,
             htlc_create_operation,
             htlc_redeem_operation,

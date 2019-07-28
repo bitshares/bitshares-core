@@ -1345,7 +1345,6 @@ BOOST_AUTO_TEST_CASE( genesis_reserve_ids )
          usd.precision = 4;
          usd.initial_max_supply = GRAPHENE_INITIAL_MAX_SHARE_SUPPLY;
          usd.accumulated_fees = 0;
-         usd.is_bitasset = true;
          
          genesis_state.immutable_parameters.num_special_accounts = num_special_accounts;
          genesis_state.immutable_parameters.num_special_assets = num_special_assets;

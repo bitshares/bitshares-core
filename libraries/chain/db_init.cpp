@@ -135,7 +135,6 @@ void database::initialize_evaluators()
    register_evaluator<assert_evaluator>();
    register_evaluator<transfer_evaluator>();
    register_evaluator<override_transfer_evaluator>();
-   register_evaluator<asset_fund_fee_pool_evaluator>();
    register_evaluator<proposal_create_evaluator>();
    register_evaluator<proposal_update_evaluator>();
    register_evaluator<proposal_delete_evaluator>();
@@ -152,8 +151,6 @@ void database::initialize_evaluators()
    register_evaluator<transfer_to_blind_evaluator>();
    register_evaluator<transfer_from_blind_evaluator>();
    register_evaluator<blind_transfer_evaluator>();
-   register_evaluator<asset_claim_fees_evaluator>();
-   register_evaluator<asset_claim_pool_evaluator>();
    register_evaluator<htlc_create_evaluator>();
    register_evaluator<htlc_redeem_evaluator>();
    register_evaluator<htlc_extend_evaluator>();
@@ -486,30 +483,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       total_supplies[ new_asset_id ] = 0;
 
       asset_dynamic_data_id_type dynamic_data_id;
-      optional<asset_bitasset_data_id_type> bitasset_data_id;
-      if( asset.is_bitasset )
-      {
-         int collateral_holder_number = 0;
-         total_debts[ new_asset_id ] = 0;
-         for( const auto& collateral_rec : asset.collateral_records )
-         {
-            account_create_operation cop;
-            cop.name = asset.symbol + "-collateral-holder-" + std::to_string(collateral_holder_number);
-            boost::algorithm::to_lower(cop.name);
-            cop.registrar = GRAPHENE_TEMP_ACCOUNT;
-            cop.owner = authority(1, collateral_rec.owner, 1);
-            cop.active = cop.owner;
-            account_id_type owner_account_id = apply_operation(genesis_eval_state, cop).get<object_id_type>();
-
-            modify( owner_account_id(*this).statistics(*this), [&collateral_rec]( account_statistics_object& o ) {
-               o.total_core_in_orders = collateral_rec.collateral;
-            });
-
-            total_supplies[ asset_id_type(0) ] += collateral_rec.collateral;
-            total_debts[ new_asset_id ] += collateral_rec.debt;
-            ++collateral_holder_number;
-         }
-      }
 
       dynamic_data_id = create<asset_dynamic_data_object>([&asset](asset_dynamic_data_object& d) {
          d.accumulated_fees = asset.accumulated_fees;
@@ -526,9 +499,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          a.options.initial_max_supply = asset.initial_max_supply;
          a.options.flags = witness_fed_asset;
          a.options.issuer_permissions = charge_market_fee | override_authority | white_list | transfer_restricted | disable_confidential |
-                                       ( asset.is_bitasset ? disable_force_settle | global_settle | witness_fed_asset | committee_fed_asset : 0 );
+                                       ( 0 );
          a.dynamic_asset_data_id = dynamic_data_id;
-         a.bitasset_data_id = bitasset_data_id;
       });
    }
 
@@ -576,31 +548,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    const auto& idx = get_index_type<asset_index>().indices().get<by_symbol>();
    auto it = idx.begin();
-   bool has_imbalanced_assets = false;
-
-   while( it != idx.end() )
-   {
-      if( it->bitasset_data_id.valid() )
-      {
-         auto supply_itr = total_supplies.find( it->id );
-         auto debt_itr = total_debts.find( it->id );
-         FC_ASSERT( supply_itr != total_supplies.end() );
-         FC_ASSERT( debt_itr != total_debts.end() );
-         if( supply_itr->second != debt_itr->second )
-         {
-            has_imbalanced_assets = true;
-            elog( "Genesis for asset ${aname} is not balanced\n"
-                  "   Debt is ${debt}\n"
-                  "   Supply is ${supply}\n",
-                  ("aname", it->symbol)
-                  ("debt", debt_itr->second)
-                  ("supply", supply_itr->second)
-                );
-         }
-      }
-      ++it;
-   }
-   FC_ASSERT( !has_imbalanced_assets );
 
    // Save tallied supplies
    for( const auto& item : total_supplies )
