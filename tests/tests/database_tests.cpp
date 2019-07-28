@@ -89,36 +89,6 @@ BOOST_AUTO_TEST_CASE(failed_modify_test)
    BOOST_CHECK_NE((long)db.find_object(obj_id), (long)nullptr);
 } FC_LOG_AND_RETHROW() }
 
-BOOST_AUTO_TEST_CASE( flat_index_test )
-{ try {
-   ACTORS((sam));
-   const auto& bitusd = create_bitasset("USDBIT", sam.id);
-   const asset_id_type bitusd_id = bitusd.id;
-   update_feed_producers(bitusd, {sam.id});
-   price_feed current_feed;
-   current_feed.settlement_price = bitusd.amount(100) / asset(100);
-   publish_feed(bitusd, sam, current_feed);
-   BOOST_CHECK_EQUAL( (int)bitusd.bitasset_data_id->instance, 1 );
-   BOOST_CHECK( !(*bitusd.bitasset_data_id)(db).current_feed.settlement_price.is_null() );
-   try {
-      auto ses = db._undo_db.start_undo_session();
-      const auto& obj1 = db.create<asset_bitasset_data_object>( [&]( asset_bitasset_data_object& obj ){
-          obj.settlement_fund = 17;
-      });
-      BOOST_REQUIRE_EQUAL( obj1.settlement_fund.value, 17 );
-      throw std::string("Expected");
-      // With flat_index, obj1 will not really be removed from the index
-   } catch ( const std::string& e )
-   { // ignore
-   }
-
-   // force maintenance
-   const auto& dynamic_global_props = db.get<dynamic_global_property_object>(dynamic_global_property_id_type());
-   generate_blocks(dynamic_global_props.next_maintenance_time, true);
-
-   BOOST_CHECK( !(*bitusd_id(db).bitasset_data_id)(db).current_feed.settlement_price.is_null() );
-} FC_CAPTURE_AND_RETHROW() }
-
 BOOST_AUTO_TEST_CASE( merge_test )
 {
    try {

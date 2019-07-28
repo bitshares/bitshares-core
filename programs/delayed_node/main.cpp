@@ -25,7 +25,6 @@
 
 #include <graphene/delayed_node/delayed_node_plugin.hpp>
 #include <graphene/account_history/account_history_plugin.hpp>
-#include <graphene/market_history/market_history_plugin.hpp>
 
 #include <fc/exception/exception.hpp>
 #include <fc/thread/thread.hpp>
@@ -66,7 +65,7 @@ int main(int argc, char** argv) {
       app_options.add_options()
               ("help,h", "Print this help message and exit.")
               ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("delayed_node_data_dir"), "Directory containing databases, configuration file, etc.")
-              ("plugins", bpo::value<std::string>()->default_value("delayed_node account_history market_history"),
+              ("plugins", bpo::value<std::string>()->default_value("delayed_node account_history"),
                "Space-separated list of plugins to activate");
               ;
 
@@ -77,12 +76,11 @@ int main(int argc, char** argv) {
       cfg_options.add(cfg);
 
       cfg_options.add_options()
-              ("plugins", bpo::value<std::string>()->default_value("delayed_node account_history market_history"),
+              ("plugins", bpo::value<std::string>()->default_value("delayed_node account_history"),
                "Space-separated list of plugins to activate");
 
       auto delayed_plug = node.register_plugin<delayed_node::delayed_node_plugin>();
       auto history_plug = node.register_plugin<account_history::account_history_plugin>();
-      auto market_history_plug = node.register_plugin<market_history::market_history_plugin>();
 
       // add plugin options to config
       try

@@ -30,7 +30,6 @@
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
-#include <graphene/chain/market_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
@@ -340,101 +339,101 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
  * Test asset whitelisting feature for withdrawals.
  * Reproduces https://github.com/bitshares/bitshares-core/issues/942 and tests the fix for it.
  */
-BOOST_AUTO_TEST_CASE( withdraw_permission_whitelist_asset_test )
-{ try {
+// BOOST_AUTO_TEST_CASE( withdraw_permission_whitelist_asset_test )
+// { try {
 
-   uint32_t skip = database::skip_witness_signature
-                 | database::skip_transaction_signatures
-                 | database::skip_transaction_dupe_check
-                 | database::skip_block_size_check
-                 | database::skip_tapos_check
-                 | database::skip_merkle_check
-                 ;
+//    uint32_t skip = database::skip_witness_signature
+//                  | database::skip_transaction_signatures
+//                  | database::skip_transaction_dupe_check
+//                  | database::skip_block_size_check
+//                  | database::skip_tapos_check
+//                  | database::skip_merkle_check
+//                  ;
 
-   generate_block( skip );
+//    generate_block( skip );
 
-   for( int i=0; i<2; i++ )
-   {
-      int blocks = 0;
-      set_expiration( db, trx );
+//    for( int i=0; i<2; i++ )
+//    {
+//       int blocks = 0;
+//       set_expiration( db, trx );
 
-      ACTORS( (nathan)(dan)(izzy) );
+//       ACTORS( (nathan)(dan)(izzy) );
 
-      const asset_id_type uia_id = create_user_issued_asset( "ADVANCED", izzy_id(db), white_list ).id;
+//       const asset_id_type uia_id = create_user_issued_asset( "ADVANCED", izzy_id(db), white_list ).id;
 
-      issue_uia( nathan_id, asset(1000, uia_id) );
+//       issue_uia( nathan_id, asset(1000, uia_id) );
 
-      // Make a whitelist authority
-      {
-         BOOST_TEST_MESSAGE( "Changing the whitelist authority" );
-         asset_update_operation uop;
-         uop.issuer = izzy_id;
-         uop.asset_to_update = uia_id;
-         uop.new_options = uia_id(db).options;
-         uop.new_options.whitelist_authorities.insert(izzy_id);
-         trx.operations.push_back(uop);
-         PUSH_TX( db, trx, ~0 );
-         trx.operations.clear();
-      }
+//       // Make a whitelist authority
+//       {
+//          BOOST_TEST_MESSAGE( "Changing the whitelist authority" );
+//          asset_update_operation uop;
+//          uop.issuer = izzy_id;
+//          uop.asset_to_update = uia_id;
+//          uop.new_options = uia_id(db).options;
+//          uop.new_options.whitelist_authorities.insert(izzy_id);
+//          trx.operations.push_back(uop);
+//          PUSH_TX( db, trx, ~0 );
+//          trx.operations.clear();
+//       }
 
-      // Add dan to whitelist
-      {
-         upgrade_to_lifetime_member( izzy_id );
+//       // Add dan to whitelist
+//       {
+//          upgrade_to_lifetime_member( izzy_id );
 
-         account_whitelist_operation wop;
-         wop.authorizing_account = izzy_id;
-         wop.account_to_list = dan_id;
-         wop.new_listing = account_whitelist_operation::white_listed;
-         trx.operations.push_back( wop );
-         PUSH_TX( db, trx, ~0 );
-         trx.operations.clear();
-      }
+//          account_whitelist_operation wop;
+//          wop.authorizing_account = izzy_id;
+//          wop.account_to_list = dan_id;
+//          wop.new_listing = account_whitelist_operation::white_listed;
+//          trx.operations.push_back( wop );
+//          PUSH_TX( db, trx, ~0 );
+//          trx.operations.clear();
+//       }
 
-      // create withdraw permission
-      {
-         withdraw_permission_create_operation op;
-         op.authorized_account = dan_id;
-         op.withdraw_from_account = nathan_id;
-         op.withdrawal_limit = asset(5, uia_id);
-         op.withdrawal_period_sec = fc::hours(1).to_seconds();
-         op.periods_until_expiration = 5;
-         op.period_start_time = db.head_block_time() + 1;
-         trx.operations.push_back(op);
-         PUSH_TX( db, trx, ~0 );
-         trx.operations.clear();
-      }
+//       // create withdraw permission
+//       {
+//          withdraw_permission_create_operation op;
+//          op.authorized_account = dan_id;
+//          op.withdraw_from_account = nathan_id;
+//          op.withdrawal_limit = asset(5, uia_id);
+//          op.withdrawal_period_sec = fc::hours(1).to_seconds();
+//          op.periods_until_expiration = 5;
+//          op.period_start_time = db.head_block_time() + 1;
+//          trx.operations.push_back(op);
+//          PUSH_TX( db, trx, ~0 );
+//          trx.operations.clear();
+//       }
 
-      withdraw_permission_id_type first_permit_id; // first object must have id 0
+//       withdraw_permission_id_type first_permit_id; // first object must have id 0
 
-      generate_block( skip ); // get to the time point that able to withdraw
-      ++blocks;
-      set_expiration( db, trx );
+//       generate_block( skip ); // get to the time point that able to withdraw
+//       ++blocks;
+//       set_expiration( db, trx );
 
-      // try claim a withdrawal
-      {
-         withdraw_permission_claim_operation op;
-         op.withdraw_permission = first_permit_id;
-         op.withdraw_from_account = nathan_id;
-         op.withdraw_to_account = dan_id;
-         op.amount_to_withdraw = asset(5, uia_id);
-         trx.operations.push_back(op);
-         GRAPHENE_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::assert_exception );
-         trx.operations.clear();
-      }
+//       // try claim a withdrawal
+//       {
+//          withdraw_permission_claim_operation op;
+//          op.withdraw_permission = first_permit_id;
+//          op.withdraw_from_account = nathan_id;
+//          op.withdraw_to_account = dan_id;
+//          op.amount_to_withdraw = asset(5, uia_id);
+//          trx.operations.push_back(op);
+//          GRAPHENE_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::assert_exception );
+//          trx.operations.clear();
+//       }
 
-      // TODO add test cases for other white-listing features
+//       // TODO add test cases for other white-listing features
 
-      // undo above tx's and reset
-      generate_block( skip );
-      ++blocks;
-      while( blocks > 0 )
-      {
-         db.pop_block();
-         --blocks;
-      }
-   }
+//       // undo above tx's and reset
+//       generate_block( skip );
+//       ++blocks;
+//       while( blocks > 0 )
+//       {
+//          db.pop_block();
+//          --blocks;
+//       }
+//    }
 
-} FC_LOG_AND_RETHROW() }
+// } FC_LOG_AND_RETHROW() }
 
 
 /**
@@ -711,111 +710,6 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_delete )
    PUSH_TX( db, trx );
 } FC_LOG_AND_RETHROW() }
 
-BOOST_AUTO_TEST_CASE( mia_feeds )
-{ try {
-   ACTORS((nathan)(dan)(ben)(vikram));
-   asset_id_type bit_usd_id = create_bitasset("USDBIT").id;
-
-   {
-      asset_update_operation op;
-      const asset_object& obj = bit_usd_id(db);
-      op.asset_to_update = bit_usd_id;
-      op.issuer = obj.issuer;
-      op.new_issuer = nathan_id;
-      op.new_options = obj.options;
-      op.new_options.flags &= ~witness_fed_asset;
-      trx.operations.push_back(op);
-      PUSH_TX( db, trx, ~0 );
-      generate_block();
-      trx.clear();
-   }
-   {
-      asset_update_feed_producers_operation op;
-      op.asset_to_update = bit_usd_id;
-      op.issuer = nathan_id;
-      op.new_feed_producers = {dan_id, ben_id, vikram_id};
-      trx.operations.push_back(op);
-      sign( trx, nathan_private_key );
-      PUSH_TX( db, trx );
-      generate_block(database::skip_nothing);
-   }
-   {
-      const asset_bitasset_data_object& obj = bit_usd_id(db).bitasset_data(db);
-      BOOST_CHECK_EQUAL(obj.feeds.size(), 3u);
-      BOOST_CHECK(obj.current_feed == price_feed());
-   }
-   {
-      const asset_object& bit_usd = bit_usd_id(db);
-      asset_publish_feed_operation op;
-      op.publisher = vikram_id;
-      op.asset_id = bit_usd_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
-
-      // We'll expire margins after a month
-      // Accept defaults for required collateral
-      trx.operations.emplace_back(op);
-      PUSH_TX( db, trx, ~0 );
-
-      const asset_bitasset_data_object& bitasset = bit_usd.bitasset_data(db);
-      BOOST_CHECK(bitasset.current_feed.settlement_price.to_real() == 30.0 / GRAPHENE_BLOCKCHAIN_PRECISION);
-      BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
-
-      op.publisher = ben_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
-      trx.operations.back() = op;
-      PUSH_TX( db, trx, ~0 );
-
-      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 30.0 / GRAPHENE_BLOCKCHAIN_PRECISION);
-      BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
-
-      op.publisher = dan_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
-      op.feed.maximum_short_squeeze_ratio = 1001;
-      op.feed.maintenance_collateral_ratio = 1001;
-      trx.operations.back() = op;
-      PUSH_TX( db, trx, ~0 );
-
-      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 30.0 / GRAPHENE_BLOCKCHAIN_PRECISION);
-      BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
-
-      op.publisher = nathan_id;
-      trx.operations.back() = op;
-      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
-   }
-} FC_LOG_AND_RETHROW() }
-
-BOOST_AUTO_TEST_CASE( feed_limit_test )
-{ try {
-   INVOKE( mia_feeds );
-   const asset_object& bit_usd = get_asset("USDBIT");
-   const asset_bitasset_data_object& bitasset = bit_usd.bitasset_data(db);
-   GET_ACTOR(nathan);
-
-   BOOST_CHECK(!bitasset.current_feed.settlement_price.is_null());
-
-   BOOST_TEST_MESSAGE("Setting minimum feeds to 4");
-   asset_update_bitasset_operation op;
-   op.new_options.minimum_feeds = 4;
-   op.asset_to_update = bit_usd.get_id();
-   op.issuer = bit_usd.issuer;
-   trx.operations = {op};
-   sign( trx, nathan_private_key );
-   PUSH_TX(db, trx);
-
-   BOOST_TEST_MESSAGE("Checking current_feed is null");
-   BOOST_CHECK(bitasset.current_feed.settlement_price.is_null());
-
-   BOOST_TEST_MESSAGE("Setting minimum feeds to 3");
-   op.new_options.minimum_feeds = 3;
-   trx.clear();
-   trx.operations = {op};
-   sign( trx, nathan_private_key );
-   PUSH_TX(db, trx);
-
-   BOOST_TEST_MESSAGE("Checking current_feed is not null");
-   BOOST_CHECK(!bitasset.current_feed.settlement_price.is_null());
-} FC_LOG_AND_RETHROW() }
-
 BOOST_AUTO_TEST_CASE( witness_create )
 { try {
 
@@ -995,121 +889,6 @@ BOOST_AUTO_TEST_CASE( witness_create )
          produced++;
    }
    BOOST_CHECK_GE( produced, 1 );
-} FC_LOG_AND_RETHROW() }
-
-/**
- *  This test should verify that the asset_global_settle operation works as expected,
- *  make sure that global settling cannot be performed by anyone other than the
- *  issuer and only if the global settle bit is set.
- */
-BOOST_AUTO_TEST_CASE( global_settle_test )
-{ try {
-   uint32_t skip = database::skip_witness_signature
-                 | database::skip_transaction_signatures
-                 | database::skip_transaction_dupe_check
-                 | database::skip_block_size_check
-                 | database::skip_tapos_check
-                 | database::skip_merkle_check
-                 ;
-
-   generate_block( skip );
-
-  for( int i=0; i<2; i++ )
-  {
-   if( i == 1 )
-   {
-      auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_342_TIME - mi, true, skip);
-      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
-   }
-   set_expiration( db, trx );
-
-   ACTORS((nathan)(ben)(valentine)(dan));
-   asset_id_type bit_usd_id = create_bitasset("USDBIT", nathan_id, 100, global_settle | charge_market_fee).get_id();
-
-   update_feed_producers( bit_usd_id(db), { nathan_id } );
-
-   price_feed feed;
-   feed.settlement_price = price( asset( 1000, bit_usd_id ), asset( 500 ) );
-   feed.maintenance_collateral_ratio = 175 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
-   feed.maximum_short_squeeze_ratio = 150 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
-   publish_feed( bit_usd_id(db), nathan, feed );
-
-   transfer(committee_account, ben_id, asset(10000));
-   transfer(committee_account, valentine_id, asset(10000));
-   transfer(committee_account, dan_id, asset(10000));
-   borrow(ben, asset(1000, bit_usd_id), asset(1000));
-   BOOST_CHECK_EQUAL(get_balance(ben_id, bit_usd_id), 1000);
-   BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 9000);
-
-   create_sell_order(ben_id, asset(1000, bit_usd_id), asset(1000));
-   BOOST_CHECK_EQUAL(get_balance(ben_id, bit_usd_id), 0);
-   BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 9000);
-
-   create_sell_order(valentine_id, asset(1000), asset(1000, bit_usd_id));
-   BOOST_CHECK_EQUAL(get_balance(ben_id, bit_usd_id), 0);
-   BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 10000);
-   BOOST_CHECK_EQUAL(get_balance(valentine_id, bit_usd_id), 990);
-   BOOST_CHECK_EQUAL(get_balance(valentine_id, asset_id_type()), 9000);
-
-   borrow(valentine, asset(500, bit_usd_id), asset(600));
-   BOOST_CHECK_EQUAL(get_balance(valentine_id, bit_usd_id), 1490);
-   BOOST_CHECK_EQUAL(get_balance(valentine_id, asset_id_type()), 8400);
-
-   create_sell_order(valentine_id, asset(500, bit_usd_id), asset(600));
-   BOOST_CHECK_EQUAL(get_balance(valentine_id, bit_usd_id), 990);
-   BOOST_CHECK_EQUAL(get_balance(valentine_id, asset_id_type()), 8400);
-
-   create_sell_order(dan_id, asset(600), asset(500, bit_usd_id));
-   BOOST_CHECK_EQUAL(get_balance(valentine_id, bit_usd_id), 990);
-   BOOST_CHECK_EQUAL(get_balance(valentine_id, asset_id_type()), 9000);
-   BOOST_CHECK_EQUAL(get_balance(ben_id, bit_usd_id), 0);
-   BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 10000);
-   BOOST_CHECK_EQUAL(get_balance(dan_id, bit_usd_id), 495);
-   BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 9400);
-
-   // add some collateral
-   borrow(ben, asset(0, bit_usd_id), asset(1000));
-   BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 9000);
-
-   {
-      asset_global_settle_operation op;
-      op.asset_to_settle = bit_usd_id;
-      op.issuer = nathan_id;
-      op.settle_price = ~price(asset(10), asset(11, bit_usd_id));
-      trx.clear();
-      trx.operations.push_back(op);
-      REQUIRE_THROW_WITH_VALUE(op, settle_price, ~price(asset(2001), asset(1000, bit_usd_id)));
-      REQUIRE_THROW_WITH_VALUE(op, asset_to_settle, asset_id_type());
-      REQUIRE_THROW_WITH_VALUE(op, asset_to_settle, asset_id_type(100));
-      REQUIRE_THROW_WITH_VALUE(op, issuer, account_id_type(2));
-      trx.operations.back() = op;
-      sign( trx, nathan_private_key );
-      PUSH_TX( db, trx );
-   }
-
-   force_settle(valentine_id(db), asset(990, bit_usd_id));
-   force_settle(dan_id(db), asset(495, bit_usd_id));
-
-   BOOST_CHECK_EQUAL(get_balance(valentine_id, bit_usd_id), 0);
-   BOOST_CHECK_EQUAL(get_balance(valentine_id, asset_id_type()), 10045);
-   BOOST_CHECK_EQUAL(get_balance(ben_id, bit_usd_id), 0);
-   if( i == 1 ) // BSIP35: better rounding
-   {
-      BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 10090);
-      BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 9850);
-   }
-   else
-   {
-      BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 10091);
-      BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 9849);
-   }
-   BOOST_CHECK_EQUAL(get_balance(dan_id, bit_usd_id), 0);
-
-   // undo above tx's and reset
-   generate_block( skip );
-   db.pop_block();
-  }
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( worker_create_test )
@@ -1378,235 +1157,6 @@ BOOST_AUTO_TEST_CASE( burn_worker_test )
    BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<burn_worker_type>().total_burned.value, 2000);
    BOOST_CHECK_EQUAL( get_balance(GRAPHENE_NULL_ACCOUNT, asset_id_type()), 2000 );
 }FC_LOG_AND_RETHROW()}
-
-BOOST_AUTO_TEST_CASE( force_settle_test )
-{
-   uint32_t skip = database::skip_witness_signature
-                 | database::skip_transaction_signatures
-                 | database::skip_transaction_dupe_check
-                 | database::skip_block_size_check
-                 | database::skip_tapos_check
-                 | database::skip_merkle_check
-                 ;
-
-   generate_block( skip );
-
-  for( int i=0; i<2; i++ )
-  {
-   if( i == 1 )
-   {
-      auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_342_TIME - mi, true, skip);
-      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
-   }
-   set_expiration( db, trx );
-
-   int blocks = 0;
-   try
-   {
-      ACTORS( (nathan)(shorter1)(shorter2)(shorter3)(shorter4)(shorter5) );
-
-      int64_t initial_balance = 100000000;
-
-      transfer(account_id_type()(db), shorter1_id(db), asset(initial_balance));
-      transfer(account_id_type()(db), shorter2_id(db), asset(initial_balance));
-      transfer(account_id_type()(db), shorter3_id(db), asset(initial_balance));
-      transfer(account_id_type()(db), shorter4_id(db), asset(initial_balance));
-      transfer(account_id_type()(db), shorter5_id(db), asset(initial_balance));
-
-      asset_id_type bitusd_id = create_bitasset(
-         "USDBIT",
-         nathan_id,
-         100,
-         disable_force_settle
-         ).id;
-
-      asset_id_type core_id = asset_id_type();
-
-      auto update_bitasset_options = [&]( asset_id_type asset_id,
-         std::function< void(bitasset_options&) > update_function )
-      {
-         const asset_object& _asset = asset_id(db);
-         asset_update_bitasset_operation op;
-         op.asset_to_update = asset_id;
-         op.issuer = _asset.issuer;
-         op.new_options = (*_asset.bitasset_data_id)(db).options;
-         update_function( op.new_options );
-         signed_transaction tx;
-         tx.operations.push_back( op );
-         set_expiration( db, tx );
-         PUSH_TX( db, tx, ~0 );
-      } ;
-
-      auto update_asset_options = [&]( asset_id_type asset_id,
-         std::function< void(asset_options&) > update_function )
-      {
-         const asset_object& _asset = asset_id(db);
-         asset_update_operation op;
-         op.asset_to_update = asset_id;
-         op.issuer = _asset.issuer;
-         op.new_options = _asset.options;
-         update_function( op.new_options );
-         signed_transaction tx;
-         tx.operations.push_back( op );
-         set_expiration( db, tx );
-         PUSH_TX( db, tx, ~0 );
-      } ;
-
-      BOOST_TEST_MESSAGE( "Update maximum_force_settlement_volume = 9000" );
-
-      BOOST_CHECK( bitusd_id(db).is_market_issued() );
-      update_bitasset_options( bitusd_id, [&]( bitasset_options& new_options )
-      { new_options.maximum_force_settlement_volume = 9000; } );
-
-      BOOST_TEST_MESSAGE( "Publish price feed" );
-
-      update_feed_producers( bitusd_id, { nathan_id } );
-      {
-         price_feed feed;
-         feed.settlement_price = price( asset( 1, bitusd_id ), asset( 1, core_id ) );
-         publish_feed( bitusd_id, nathan_id, feed );
-      }
-
-      BOOST_TEST_MESSAGE( "First short batch" );
-
-      call_order_id_type call1_id = borrow( shorter1_id, asset(1000, bitusd_id), asset(2*1000, core_id) )->id;   // 2.0000
-      call_order_id_type call2_id = borrow( shorter2_id, asset(2000, bitusd_id), asset(2*1999, core_id) )->id;   // 1.9990
-      call_order_id_type call3_id = borrow( shorter3_id, asset(3000, bitusd_id), asset(2*2890, core_id) )->id;   // 1.9267
-      call_order_id_type call4_id = borrow( shorter4_id, asset(4000, bitusd_id), asset(2*3950, core_id) )->id;   // 1.9750
-      call_order_id_type call5_id = borrow( shorter5_id, asset(5000, bitusd_id), asset(2*4900, core_id) )->id;   // 1.9600
-
-      transfer( shorter1_id, nathan_id, asset(1000, bitusd_id) );
-      transfer( shorter2_id, nathan_id, asset(2000, bitusd_id) );
-      transfer( shorter3_id, nathan_id, asset(3000, bitusd_id) );
-      transfer( shorter4_id, nathan_id, asset(4000, bitusd_id) );
-      transfer( shorter5_id, nathan_id, asset(5000, bitusd_id) );
-
-      BOOST_CHECK_EQUAL( get_balance(nathan_id, bitusd_id), 15000);
-      BOOST_CHECK_EQUAL( get_balance(nathan_id, core_id), 0);
-      BOOST_CHECK_EQUAL( get_balance(shorter1_id, core_id), initial_balance-2000 );
-      BOOST_CHECK_EQUAL( get_balance(shorter2_id, core_id), initial_balance-3998 );
-      BOOST_CHECK_EQUAL( get_balance(shorter3_id, core_id), initial_balance-5780 );
-      BOOST_CHECK_EQUAL( get_balance(shorter4_id, core_id), initial_balance-7900 );
-      BOOST_CHECK_EQUAL( get_balance(shorter5_id, core_id), initial_balance-9800 );
-
-      BOOST_TEST_MESSAGE( "Update force_settlement_delay_sec = 100, force_settlement_offset_percent = 1%" );
-
-      update_bitasset_options( bitusd_id, [&]( bitasset_options& new_options )
-      { new_options.force_settlement_delay_sec = 100;
-        new_options.force_settlement_offset_percent = GRAPHENE_1_PERCENT; } );
-
-      // Force settlement is disabled; check that it fails
-      GRAPHENE_REQUIRE_THROW( force_settle( nathan_id, asset( 50, bitusd_id ) ), fc::exception );
-
-      update_asset_options( bitusd_id, [&]( asset_options& new_options )
-      { new_options.flags &= ~disable_force_settle; } );
-
-      // Can't settle more BitUSD than you own
-      GRAPHENE_REQUIRE_THROW( force_settle( nathan_id, asset( 999999, bitusd_id ) ), fc::exception );
-
-      // settle3 should be least collateralized order according to index
-      BOOST_CHECK( db.get_index_type<call_order_index>().indices().get<by_collateral>().begin()->id == call3_id );
-      BOOST_CHECK_EQUAL( call3_id(db).debt.value, 3000 );
-
-      BOOST_TEST_MESSAGE( "Verify partial settlement of call" );
-      // Partially settle a call
-      force_settlement_id_type settle_id = force_settle( nathan_id, asset( 50, bitusd_id ) ).get< object_id_type >();
-
-      // Call does not take effect immediately
-      BOOST_CHECK_EQUAL( get_balance(nathan_id, bitusd_id), 14950);
-      BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 50);
-      BOOST_CHECK_EQUAL( call3_id(db).debt.value, 3000 );
-      BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 5780 );
-      BOOST_CHECK( settle_id(db).owner == nathan_id );
-
-      // Wait for settlement to take effect
-      generate_blocks( settle_id(db).settlement_date, true, skip );
-      blocks += 2;
-
-      BOOST_CHECK(db.find(settle_id) == nullptr);
-      BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 50 );
-      BOOST_CHECK_EQUAL( get_balance(nathan_id, bitusd_id), 14950);
-      BOOST_CHECK_EQUAL( get_balance(nathan_id, core_id), 49 );   // 1% force_settlement_offset_percent (rounded unfavorably)
-      BOOST_CHECK_EQUAL( call3_id(db).debt.value, 2950 );
-      BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 5731 );  // 5731 == 5780-49
-
-      BOOST_CHECK( db.get_index_type<call_order_index>().indices().get<by_collateral>().begin()->id == call3_id );
-
-      BOOST_TEST_MESSAGE( "Verify pending settlement is cancelled when asset's force_settle is disabled" );
-      // Ensure pending settlement is cancelled when force settle is disabled
-      settle_id = force_settle( nathan_id, asset( 50, bitusd_id ) ).get< object_id_type >();
-
-      BOOST_CHECK( !db.get_index_type<force_settlement_index>().indices().empty() );
-      update_asset_options( bitusd_id, [&]( asset_options& new_options )
-      { new_options.flags |= disable_force_settle; } );
-      BOOST_CHECK(  db.get_index_type<force_settlement_index>().indices().empty() );
-      update_asset_options( bitusd_id, [&]( asset_options& new_options )
-      { new_options.flags &= ~disable_force_settle; } );
-
-      BOOST_TEST_MESSAGE( "Perform iterative settlement" );
-      settle_id = force_settle( nathan_id, asset( 12500, bitusd_id ) ).get< object_id_type >();
-
-      // c3 2950 : 5731   1.9427   fully settled
-      // c5 5000 : 9800   1.9600   fully settled
-      // c4 4000 : 7900   1.9750   fully settled
-      // c2 2000 : 3998   1.9990   550 settled
-      // c1 1000 : 2000   2.0000
-
-      generate_blocks( settle_id(db).settlement_date, true, skip );
-      blocks += 2;
-
-      int64_t call1_payout =                0;
-      int64_t call2_payout =       550*99/100;
-      int64_t call3_payout = 49 + 2950*99/100;
-      int64_t call4_payout =      4000*99/100;
-      int64_t call5_payout =      5000*99/100;
-
-      if( i == 1 ) // BSIP35: better rounding
-      {
-         call3_payout = 49 + (2950*99+100-1)/100; // round up
-         call4_payout =      (4000*99+100-1)/100; // round up
-         call5_payout =      (5000*99+100-1)/100; // round up
-      }
-
-      BOOST_CHECK_EQUAL( get_balance(shorter1_id, core_id), initial_balance-2*1000 );  // full collat still tied up
-      BOOST_CHECK_EQUAL( get_balance(shorter2_id, core_id), initial_balance-2*1999 );  // full collat still tied up
-      BOOST_CHECK_EQUAL( get_balance(shorter3_id, core_id), initial_balance-call3_payout );  // initial balance minus transfer to Nathan (as BitUSD)
-      BOOST_CHECK_EQUAL( get_balance(shorter4_id, core_id), initial_balance-call4_payout );  // initial balance minus transfer to Nathan (as BitUSD)
-      BOOST_CHECK_EQUAL( get_balance(shorter5_id, core_id), initial_balance-call5_payout );  // initial balance minus transfer to Nathan (as BitUSD)
-
-      BOOST_CHECK_EQUAL( get_balance(nathan_id, core_id),
-           call1_payout + call2_payout + call3_payout + call4_payout + call5_payout );
-
-      BOOST_CHECK( db.find(call3_id) == nullptr );
-      BOOST_CHECK( db.find(call4_id) == nullptr );
-      BOOST_CHECK( db.find(call5_id) == nullptr );
-
-      BOOST_REQUIRE( db.find(call1_id) != nullptr );
-      BOOST_REQUIRE( db.find(call2_id) != nullptr );
-
-      BOOST_CHECK_EQUAL( call1_id(db).debt.value, 1000 );
-      BOOST_CHECK_EQUAL( call1_id(db).collateral.value, 2000 );
-
-      BOOST_CHECK_EQUAL( call2_id(db).debt.value, 2000-550 );
-      BOOST_CHECK_EQUAL( call2_id(db).collateral.value, 3998-call2_payout );
-   }
-   catch(fc::exception& e)
-   {
-      edump((e.to_detail_string()));
-      throw;
-   }
-
-   // undo above tx's and reset
-   generate_block( skip );
-   ++blocks;
-   while( blocks > 0 )
-   {
-      db.pop_block();
-      --blocks;
-   }
-  }
-}
 
 BOOST_AUTO_TEST_CASE( assert_op_test )
 {
@@ -1971,12 +1521,12 @@ BOOST_AUTO_TEST_CASE( vbo_withdraw_different )
       ACTORS((alice)(izzy));
       // don't pay witnesses so we have some worker budget to work with
 
-      // transfer(account_id_type(), alice_id, asset(1000));
+      transfer(account_id_type(), alice_id, asset(1000));
 
-      asset_id_type stuff_id = create_user_issued_asset( "STUFF", izzy_id(db), 0 ).id;
-      issue_uia( alice_id, asset( 1000, stuff_id ) );
+      asset_id_type core_id = asset_id_type();;
+      //issue_uia( alice_id, asset( 1000, core_id ) );
 
-      // deposit STUFF with linear vesting policy
+      // deposit TUSC with linear vesting policy
       vesting_balance_id_type vbid;
       {
          linear_vesting_policy_initializer pinit;
@@ -1987,7 +1537,7 @@ BOOST_AUTO_TEST_CASE( vbo_withdraw_different )
          vesting_balance_create_operation create_op;
          create_op.creator = alice_id;
          create_op.owner = alice_id;
-         create_op.amount = asset(100, stuff_id);
+         create_op.amount = asset(100, core_id);
          create_op.policy = pinit;
 
          signed_transaction create_tx;
@@ -2002,29 +1552,29 @@ BOOST_AUTO_TEST_CASE( vbo_withdraw_different )
       // wait for VB to mature
       generate_blocks( 30 );
 
-      BOOST_CHECK( vbid(db).get_allowed_withdraw( db.head_block_time() ) == asset(100, stuff_id) );
+      BOOST_CHECK( vbid(db).get_allowed_withdraw( db.head_block_time() ) == asset(100, core_id) );
 
-      // bad withdrawal op (wrong asset)
-      {
-         vesting_balance_withdraw_operation op;
+      // // bad withdrawal op (wrong asset)
+      // {
+      //    vesting_balance_withdraw_operation op;
 
-         op.vesting_balance = vbid;
-         op.amount = asset(100);
-         op.owner = alice_id;
+      //    op.vesting_balance = vbid;
+      //    op.amount = asset(100);
+      //    op.owner = alice_id;
 
-         signed_transaction withdraw_tx;
-         withdraw_tx.operations.push_back(op);
-         set_expiration( db, withdraw_tx );
-         sign( withdraw_tx, alice_private_key );
-         GRAPHENE_CHECK_THROW( PUSH_TX( db, withdraw_tx ), fc::exception );
-      }
+      //    signed_transaction withdraw_tx;
+      //    withdraw_tx.operations.push_back(op);
+      //    set_expiration( db, withdraw_tx );
+      //    sign( withdraw_tx, alice_private_key );
+      //    GRAPHENE_CHECK_THROW( PUSH_TX( db, withdraw_tx ), fc::exception );
+      // }
 
       // good withdrawal op
       {
          vesting_balance_withdraw_operation op;
 
          op.vesting_balance = vbid;
-         op.amount = asset(100, stuff_id);
+         op.amount = asset(100, core_id);
          op.owner = alice_id;
 
          signed_transaction withdraw_tx;
@@ -2041,288 +1591,160 @@ BOOST_AUTO_TEST_CASE( vbo_withdraw_different )
 
 BOOST_AUTO_TEST_CASE( top_n_special )
 {
-   ACTORS( (alice)(bob)(chloe)(dan)(izzy)(stan) );
+   // ACTORS( (alice)(bob)(chloe)(dan)(izzy)(stan) );
 
-   generate_blocks( HARDFORK_516_TIME );
+   // generate_blocks( HARDFORK_516_TIME );
 
-   try
-   {
-      {
-         //
-         // Izzy (issuer)
-         // Stan (special authority)
-         // Alice, Bob, Chloe, Dan (ABCD)
-         //
+   // try
+   // {
+   //    {
+   //       //
+   //       // Izzy (issuer)
+   //       // Stan (special authority)
+   //       // Alice, Bob, Chloe, Dan (ABCD)
+   //       //
 
-         asset_id_type topn_id = create_user_issued_asset( "TOPN", izzy_id(db), 0 ).id;
-         authority stan_owner_auth = stan_id(db).owner;
-         authority stan_active_auth = stan_id(db).active;
+   //       asset_id_type core_id = asset_id_type();
+   //       authority stan_owner_auth = stan_id(db).owner;
+   //       authority stan_active_auth = stan_id(db).active;
 
-         // set SA, wait for maint interval
-         // TODO:  account_create_operation
-         // TODO:  multiple accounts with different n for same asset
+   //       // set SA, wait for maint interval
+   //       // TODO:  account_create_operation
+   //       // TODO:  multiple accounts with different n for same asset
 
-         {
-            top_holders_special_authority top2, top3;
+   //       {
+   //          top_holders_special_authority top2, top3;
 
-            top2.num_top_holders = 2;
-            top2.asset = topn_id;
+   //          top2.num_top_holders = 2;
+   //          top2.asset = core_id;
 
-            top3.num_top_holders = 3;
-            top3.asset = topn_id;
+   //          top3.num_top_holders = 3;
+   //          top3.asset = core_id;
 
-            account_update_operation op;
-            op.account = stan_id;
-            op.extensions.value.active_special_authority = top3;
-            op.extensions.value.owner_special_authority = top2;
+   //          account_update_operation op;
+   //          op.account = stan_id;
+   //          op.extensions.value.active_special_authority = top3;
+   //          op.extensions.value.owner_special_authority = top2;
 
-            signed_transaction tx;
-            tx.operations.push_back( op );
+   //          signed_transaction tx;
+   //          tx.operations.push_back( op );
 
-            set_expiration( db, tx );
-            sign( tx, stan_private_key );
+   //          set_expiration( db, tx );
+   //          sign( tx, stan_private_key );
 
-            PUSH_TX( db, tx );
+   //          PUSH_TX( db, tx );
 
-            // TODO:  Check special_authority is properly set
-            // TODO:  Do it in steps
-         }
+   //          // TODO:  Check special_authority is properly set
+   //          // TODO:  Do it in steps
+   //       }
 
-         // wait for maint interval
-         // make sure we don't have any authority as account hasn't gotten distributed yet
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   //       // wait for maint interval
+   //       // make sure we don't have any authority as account hasn't gotten distributed yet
+   //       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
-         BOOST_CHECK( stan_id(db).owner  == stan_owner_auth );
-         BOOST_CHECK( stan_id(db).active == stan_active_auth );
+   //       authority stan_owner_auth1 = stan_id(db).owner;
+   //       authority stan_owner_auth2 = stan_id(db).owner;
+   //       authority stan_active_auth1 = stan_id(db).active;
 
-         // issue some to Alice, make sure she gets control of Stan
+   //       BOOST_CHECK( stan_id(db).owner  == stan_owner_auth );
+   //       BOOST_CHECK( stan_id(db).active == stan_active_auth );
 
-         // we need to set_expiration() before issue_uia() because the latter doens't call it #11
-         set_expiration( db, trx );  // #11
-         issue_uia( alice_id, asset( 1000, topn_id ) );
+   //       // issue some to Alice, make sure she gets control of Stan
 
-         BOOST_CHECK( stan_id(db).owner  == stan_owner_auth );
-         BOOST_CHECK( stan_id(db).active == stan_active_auth );
+   //       // we need to set_expiration() before issue_uia() because the latter doens't call it #11
+   //       set_expiration( db, trx );  // #11
+   //       //issue_uia( alice_id, asset( 1000, core_id ) );
+   //       transfer(account_id_type(), alice_id, asset(1000));
 
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   //       BOOST_CHECK( stan_id(db).owner  == stan_owner_auth );
+   //       BOOST_CHECK( stan_id(db).active == stan_active_auth );
 
-         /*  NOTE - this was an old check from an earlier implementation that only allowed SA for LTM's
-         // no boost yet, we need to upgrade to LTM before mechanics apply to Stan
-         BOOST_CHECK( stan_id(db).owner  == stan_owner_auth );
-         BOOST_CHECK( stan_id(db).active == stan_active_auth );
+   //       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
-         set_expiration( db, trx );  // #11
-         upgrade_to_lifetime_member(stan_id);
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-         */
+   //       /*  NOTE - this was an old check from an earlier implementation that only allowed SA for LTM's
+   //       // no boost yet, we need to upgrade to LTM before mechanics apply to Stan
+   //       BOOST_CHECK( stan_id(db).owner  == stan_owner_auth );
+   //       BOOST_CHECK( stan_id(db).active == stan_active_auth );
 
-         BOOST_CHECK( stan_id(db).owner  == authority(  501, alice_id, 1000 ) );
-         BOOST_CHECK( stan_id(db).active == authority(  501, alice_id, 1000 ) );
+   //       set_expiration( db, trx );  // #11
+   //       upgrade_to_lifetime_member(stan_id);
+   //       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   //       */
 
-         // give asset to Stan, make sure owner doesn't change at all
-         set_expiration( db, trx );  // #11
-         transfer( alice_id, stan_id, asset( 1000, topn_id ) );
+   //       BOOST_CHECK( stan_id(db).owner  == authority(  501, alice_id, 1000 ) );
+   //       BOOST_CHECK( stan_id(db).active == authority(  501, alice_id, 1000 ) );
 
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   //       // give asset to Stan, make sure owner doesn't change at all
+   //       set_expiration( db, trx );  // #11
+   //       transfer( alice_id, stan_id, asset( 1000, core_id ) );
 
-         BOOST_CHECK( stan_id(db).owner  == authority(  501, alice_id, 1000 ) );
-         BOOST_CHECK( stan_id(db).active == authority(  501, alice_id, 1000 ) );
+   //       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
-         set_expiration( db, trx );  // #11
-         issue_uia( chloe_id, asset( 131000, topn_id ) );
+   //       BOOST_CHECK( stan_id(db).owner  == authority(  501, alice_id, 1000 ) );
+   //       BOOST_CHECK( stan_id(db).active == authority(  501, alice_id, 1000 ) );
 
-         // now Chloe has 131,000 and Stan has 1k.  Make sure change occurs at next maintenance interval.
-         // NB, 131072 is a power of 2; the number 131000 was chosen so that we need a bitshift, but
-         // if we put the 1000 from Stan's balance back into play, we need a different bitshift.
+   //       set_expiration( db, trx );  // #11
+   //       transfer(account_id_type(), chloe_id, asset(131000));
+   //       //issue_uia( chloe_id, asset( 131000, core_id ) );
 
-         // we use Chloe so she can be displaced by Bob later (showing the tiebreaking logic).
+   //       // now Chloe has 131,000 and Stan has 1k.  Make sure change occurs at next maintenance interval.
+   //       // NB, 131072 is a power of 2; the number 131000 was chosen so that we need a bitshift, but
+   //       // if we put the 1000 from Stan's balance back into play, we need a different bitshift.
 
-         // Check Alice is still in control, because we're deferred to next maintenance interval
-         BOOST_CHECK( stan_id(db).owner  == authority(  501, alice_id, 1000 ) );
-         BOOST_CHECK( stan_id(db).active == authority(  501, alice_id, 1000 ) );
+   //       // we use Chloe so she can be displaced by Bob later (showing the tiebreaking logic).
 
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-
-         BOOST_CHECK( stan_id(db).owner  == authority( 32751, chloe_id, 65500 ) );
-         BOOST_CHECK( stan_id(db).active == authority( 32751, chloe_id, 65500 ) );
-
-         // put Alice's stake back in play
-         set_expiration( db, trx );  // #11
-         transfer( stan_id, alice_id, asset( 1000, topn_id ) );
-
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-
-         BOOST_CHECK( stan_id(db).owner  == authority( 33001, alice_id, 500, chloe_id, 65500 ) );
-         BOOST_CHECK( stan_id(db).active == authority( 33001, alice_id, 500, chloe_id, 65500 ) );
-
-         // issue 200,000 to Dan to cause another bitshift.
-         set_expiration( db, trx );  // #11
-         issue_uia( dan_id, asset( 200000, topn_id ) );
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-
-         // 200000 Dan
-         // 131000 Chloe
-         // 1000 Alice
-
-         BOOST_CHECK( stan_id(db).owner  == authority( 41376,                chloe_id, 32750, dan_id, 50000 ) );
-         BOOST_CHECK( stan_id(db).active == authority( 41501, alice_id, 250, chloe_id, 32750, dan_id, 50000 ) );
-
-         // have Alice send all but 1 back to Stan, verify that we clamp Alice at one vote
-         set_expiration( db, trx );  // #11
-         transfer( alice_id, stan_id, asset( 999, topn_id ) );
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-
-         BOOST_CHECK( stan_id(db).owner  == authority( 41376,                chloe_id, 32750, dan_id, 50000 ) );
-         BOOST_CHECK( stan_id(db).active == authority( 41376, alice_id,   1, chloe_id, 32750, dan_id, 50000 ) );
-
-         // send 131k to Bob so he's tied with Chloe, verify he displaces Chloe in top2
-         set_expiration( db, trx );  // #11
-         issue_uia( bob_id, asset( 131000, topn_id ) );
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-
-         BOOST_CHECK( stan_id(db).owner  == authority( 41376, bob_id, 32750,                  dan_id, 50000 ) );
-         BOOST_CHECK( stan_id(db).active == authority( 57751, bob_id, 32750, chloe_id, 32750, dan_id, 50000 ) );
-
-         // TODO more rounding checks
-      }
-
-   } FC_LOG_AND_RETHROW()
-}
-
-BOOST_AUTO_TEST_CASE( buyback )
-{
-   ACTORS( (alice)(bob)(chloe)(dan)(izzy)(philbin) );
-   upgrade_to_lifetime_member(philbin_id);
-
-   generate_blocks( HARDFORK_555_TIME );
-
-   try
-   {
-      {
-         //
-         // Izzy (issuer)
-         // Alice, Bob, Chloe, Dan (ABCD)
-         // Rex (recycler -- buyback account)
-         // Philbin (registrar)
-         //
-
-         asset_id_type nono_id = create_user_issued_asset( "NONO", izzy_id(db), 0 ).id;
-         asset_id_type buyme_id = create_user_issued_asset( "BUYME", izzy_id(db), 0 ).id;
-
-         // Create a buyback account
-         account_id_type rex_id;
-         {
-            buyback_account_options bbo;
-            bbo.asset_to_buy = buyme_id;
-            bbo.asset_to_buy_issuer = izzy_id;
-            bbo.markets.emplace( asset_id_type() );
-            account_create_operation create_op = make_account( "rex" );
-            create_op.registrar = philbin_id;
-            create_op.extensions.value.buyback_options = bbo;
-            create_op.owner = authority::null_authority();
-            create_op.active = authority::null_authority();
+   //       // Check Alice is still in control, because we're deferred to next maintenance interval
+   //       BOOST_CHECK( stan_id(db).owner  == authority(  501, alice_id, 1000 ) );
+   //       BOOST_CHECK( stan_id(db).active == authority(  501, alice_id, 1000 ) );
 
-            // Let's break it...
+   //       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
-            signed_transaction tx;
-            tx.operations.push_back( create_op );
-            set_expiration( db, tx );
+   //       BOOST_CHECK( stan_id(db).owner  == authority( 32751, chloe_id, 65500 ) );
+   //       BOOST_CHECK( stan_id(db).active == authority( 32751, chloe_id, 65500 ) );
 
-            tx.operations.back().get< account_create_operation >().extensions.value.buyback_options->asset_to_buy_issuer = alice_id;
-            sign( tx, alice_private_key );
-            sign( tx, philbin_private_key );
+   //       // put Alice's stake back in play
+   //       set_expiration( db, trx );  // #11
+   //       transfer( stan_id, alice_id, asset( 1000, core_id ) );
 
-            // Alice and Philbin signed, but asset issuer is invalid
-            GRAPHENE_CHECK_THROW( PUSH_TX(db, tx), account_create_buyback_incorrect_issuer );
+   //       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
-            tx.clear_signatures();
-            tx.operations.back().get< account_create_operation >().extensions.value.buyback_options->asset_to_buy_issuer = izzy_id;
-            sign( tx, philbin_private_key );
+   //       BOOST_CHECK( stan_id(db).owner  == authority( 33001, alice_id, 500, chloe_id, 65500 ) );
+   //       BOOST_CHECK( stan_id(db).active == authority( 33001, alice_id, 500, chloe_id, 65500 ) );
 
-            // Izzy didn't sign
-            GRAPHENE_CHECK_THROW( PUSH_TX(db, tx), tx_missing_active_auth );
-            sign( tx, izzy_private_key );
+   //       // issue 200,000 to Dan to cause another bitshift.
+   //       set_expiration( db, trx );  // #11
+   //       transfer(account_id_type(), dan_id, asset(200000));
+   //       //issue_uia( dan_id, asset( 200000, core_id ) );
+   //       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
-            // OK
-            processed_transaction ptx = PUSH_TX( db, tx );
-            rex_id = ptx.operation_results.back().get< object_id_type >();
+   //       // 200000 Dan
+   //       // 131000 Chloe
+   //       // 1000 Alice
 
-            // Try to create another account rex2 which is bbo on same asset
-            tx.clear_signatures();
-            tx.operations.back().get< account_create_operation >().name = "rex2";
-            sign( tx, izzy_private_key );
-            sign( tx, philbin_private_key );
-            GRAPHENE_CHECK_THROW( PUSH_TX(db, tx), account_create_buyback_already_exists );
-         }
+   //       BOOST_CHECK( stan_id(db).owner  == authority( 41376,                chloe_id, 32750, dan_id, 50000 ) );
+   //       BOOST_CHECK( stan_id(db).active == authority( 41501, alice_id, 250, chloe_id, 32750, dan_id, 50000 ) );
 
-         // issue some BUYME to Alice
-         // we need to set_expiration() before issue_uia() because the latter doens't call it #11
-         set_expiration( db, trx );  // #11
-         issue_uia( alice_id, asset( 1000, buyme_id ) );
-         issue_uia( alice_id, asset( 1000, nono_id ) );
+   //       // have Alice send all but 1 back to Stan, verify that we clamp Alice at one vote
+   //       set_expiration( db, trx );  // #11
+   //       transfer( alice_id, stan_id, asset( 999, core_id ) );
+   //       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
-         // Alice wants to sell 100 BUYME for 1000 TUSC, a middle price.
-         limit_order_id_type order_id_mid = create_sell_order( alice_id, asset( 100, buyme_id ), asset( 1000, asset_id_type() ) )->id;
+   //       BOOST_CHECK( stan_id(db).owner  == authority( 41376,                chloe_id, 32750, dan_id, 50000 ) );
+   //       BOOST_CHECK( stan_id(db).active == authority( 41376, alice_id,   1, chloe_id, 32750, dan_id, 50000 ) );
 
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-         generate_block();
+   //       // send 131k to Bob so he's tied with Chloe, verify he displaces Chloe in top2
+   //       set_expiration( db, trx );  // #11
+   //       transfer(account_id_type(), bob_id, asset(131000));
+   //       //issue_uia( bob_id, asset( 131000, core_id ) );
+   //       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
-         // no success because buyback has none for sale
-         BOOST_CHECK( order_id_mid(db).for_sale == 100 );
+   //       BOOST_CHECK( stan_id(db).owner  == authority( 41376, bob_id, 32750,                  dan_id, 50000 ) );
+   //       BOOST_CHECK( stan_id(db).active == authority( 57751, bob_id, 32750, chloe_id, 32750, dan_id, 50000 ) );
 
-         // but we can send some to buyback
-         fund( rex_id(db), asset( 100, asset_id_type() ) );
-         // no action until next maint
-         BOOST_CHECK( order_id_mid(db).for_sale == 100 );
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-         generate_block();
+   //       // TODO more rounding checks
+   //    }
 
-         // partial fill, Alice now sells 90 BUYME for 900 TUSC.
-         BOOST_CHECK( order_id_mid(db).for_sale == 90 );
-
-         // TODO check burn amount
-
-         // aagh more state in trx
-         set_expiration( db, trx );  // #11
-
-         // Selling 10 BUYME for 50 TUSC, a low price.
-         limit_order_id_type order_id_low  = create_sell_order( alice_id, asset( 10, buyme_id ), asset(  50, asset_id_type() ) )->id;
-         // Selling 10 BUYME for 150 TUSC, a high price.
-         limit_order_id_type order_id_high = create_sell_order( alice_id, asset( 10, buyme_id ), asset( 150, asset_id_type() ) )->id;
-
-         fund( rex_id(db), asset( 250, asset_id_type() ) );
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-         generate_block();
-
-         BOOST_CHECK( db.find( order_id_low  ) == nullptr );
-         BOOST_CHECK( db.find( order_id_mid  ) != nullptr );
-         BOOST_CHECK( db.find( order_id_high ) != nullptr );
-
-         // 250 CORE in rex                 90 BUYME in mid order    10 BUYME in low order
-         //  50 CORE goes to low order, buy 10 for 50 CORE
-         // 200 CORE goes to mid order, buy 20 for 200 CORE
-         //                                 70 BUYME in mid order     0 BUYME in low order
-
-         idump( (order_id_mid(db)) );
-         BOOST_CHECK( order_id_mid(db).for_sale == 70 );
-         BOOST_CHECK( order_id_high(db).for_sale == 10 );
-
-         BOOST_CHECK( get_balance( rex_id, asset_id_type() ) == 0 );
-
-         // clear out the books -- 700 left on mid order, 150 left on high order, so 2000 TUSC should result in 1150 left over
-
-         fund( rex_id(db), asset( 2000, asset_id_type() ) );
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-
-         idump( (get_balance( rex_id, asset_id_type() )) );
-
-         BOOST_CHECK( get_balance( rex_id, asset_id_type() ) == 1150 );
-
-         GRAPHENE_CHECK_THROW( transfer( alice_id, rex_id, asset( 1, nono_id ) ), fc::exception );
-         // TODO: Check cancellation works for account which is TUSC-restricted
-      }
-
-   } FC_LOG_AND_RETHROW()
+   // } FC_LOG_AND_RETHROW()
 }
 
 BOOST_AUTO_TEST_SUITE_END()

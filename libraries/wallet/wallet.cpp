@@ -137,7 +137,6 @@ public:
    std::string operator()(const transfer_to_blind_operation& op)const;
    std::string operator()(const account_create_operation& op)const;
    std::string operator()(const account_update_operation& op)const;
-   std::string operator()(const asset_create_operation& op)const;
    std::string operator()(const htlc_create_operation& op)const;
    std::string operator()(const htlc_redeem_operation& op)const;
    std::string operator()(const sale_operation& op)const;
@@ -1295,92 +1294,15 @@ public:
       return create_account_with_private_key(owner_privkey, account_name, registrar_account, referrer_account, broadcast, save_wallet);
    } FC_CAPTURE_AND_RETHROW( (account_name)(registrar_account)(referrer_account) ) }
 
-
-   signed_transaction create_asset(string issuer,
-                                   string symbol,
-                                   uint8_t precision,
-                                   asset_options common,
-                                   fc::optional<bitasset_options> bitasset_opts,
-                                   bool broadcast = false)
-   { try {
-      account_object issuer_account = get_account( issuer );
-      FC_ASSERT(!find_asset(symbol).valid(), "Asset with that symbol already exists!");
-
-      asset_create_operation create_op;
-      create_op.issuer = issuer_account.id;
-      create_op.symbol = symbol;
-      create_op.precision = precision;
-      create_op.common_options = common;
-      create_op.bitasset_opts = bitasset_opts;
-
-      signed_transaction tx;
-      tx.operations.push_back( create_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
-      tx.validate();
-
-      return sign_transaction( tx, broadcast );
-   } FC_CAPTURE_AND_RETHROW( (issuer)(symbol)(precision)(common)(bitasset_opts)(broadcast) ) }
-
    signed_transaction update_asset(string symbol,
-                                   optional<string> new_issuer,
                                    asset_options new_options,
                                    bool broadcast /* = false */)
    { try {
       optional<asset_object> asset_to_update = find_asset(symbol);
       if (!asset_to_update)
         FC_THROW("No asset with that symbol exists!");
-      optional<account_id_type> new_issuer_account_id;
-      if (new_issuer)
-      {
-        FC_ASSERT( false, "The use of 'new_issuer' is no longer supported. Please use `update_asset_issuer' instead!");
-      }
 
       asset_update_operation update_op;
-      update_op.issuer = asset_to_update->issuer;
-      update_op.asset_to_update = asset_to_update->id;
-      update_op.new_issuer = new_issuer_account_id;
-      update_op.new_options = new_options;
-
-      signed_transaction tx;
-      tx.operations.push_back( update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
-      tx.validate();
-
-      return sign_transaction( tx, broadcast );
-   } FC_CAPTURE_AND_RETHROW( (symbol)(new_issuer)(new_options)(broadcast) ) }
-
-   signed_transaction update_asset_issuer(string symbol,
-                                   string new_issuer,
-                                   bool broadcast /* = false */)
-   { try {
-      optional<asset_object> asset_to_update = find_asset(symbol);
-      if (!asset_to_update)
-        FC_THROW("No asset with that symbol exists!");
-
-      account_object new_issuer_account = get_account(new_issuer);
-
-      asset_update_issuer_operation update_issuer;
-      update_issuer.issuer = asset_to_update->issuer;
-      update_issuer.asset_to_update = asset_to_update->id;
-      update_issuer.new_issuer = new_issuer_account.id;
-
-      signed_transaction tx;
-      tx.operations.push_back( update_issuer );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
-      tx.validate();
-
-      return sign_transaction( tx, broadcast );
-   } FC_CAPTURE_AND_RETHROW( (symbol)(new_issuer)(broadcast) ) }
-
-   signed_transaction update_bitasset(string symbol,
-                                      bitasset_options new_options,
-                                      bool broadcast /* = false */)
-   { try {
-      optional<asset_object> asset_to_update = find_asset(symbol);
-      if (!asset_to_update)
-        FC_THROW("No asset with that symbol exists!");
-
-      asset_update_bitasset_operation update_op;
       update_op.issuer = asset_to_update->issuer;
       update_op.asset_to_update = asset_to_update->id;
       update_op.new_options = new_options;
@@ -1392,52 +1314,6 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (symbol)(new_options)(broadcast) ) }
-
-   signed_transaction update_asset_feed_producers(string symbol,
-                                                  flat_set<string> new_feed_producers,
-                                                  bool broadcast /* = false */)
-   { try {
-      optional<asset_object> asset_to_update = find_asset(symbol);
-      if (!asset_to_update)
-        FC_THROW("No asset with that symbol exists!");
-
-      asset_update_feed_producers_operation update_op;
-      update_op.issuer = asset_to_update->issuer;
-      update_op.asset_to_update = asset_to_update->id;
-      update_op.new_feed_producers.reserve(new_feed_producers.size());
-      std::transform(new_feed_producers.begin(), new_feed_producers.end(),
-                     std::inserter(update_op.new_feed_producers, update_op.new_feed_producers.end()),
-                     [this](const std::string& account_name_or_id){ return get_account_id(account_name_or_id); });
-
-      signed_transaction tx;
-      tx.operations.push_back( update_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
-      tx.validate();
-
-      return sign_transaction( tx, broadcast );
-   } FC_CAPTURE_AND_RETHROW( (symbol)(new_feed_producers)(broadcast) ) }
-
-   signed_transaction publish_asset_feed(string publishing_account,
-                                         string symbol,
-                                         price_feed feed,
-                                         bool broadcast /* = false */)
-   { try {
-      optional<asset_object> asset_to_update = find_asset(symbol);
-      if (!asset_to_update)
-        FC_THROW("No asset with that symbol exists!");
-
-      asset_publish_feed_operation publish_op;
-      publish_op.publisher = get_account_id(publishing_account);
-      publish_op.asset_id = asset_to_update->id;
-      publish_op.feed = feed;
-
-      signed_transaction tx;
-      tx.operations.push_back( publish_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
-      tx.validate();
-
-      return sign_transaction( tx, broadcast );
-   } FC_CAPTURE_AND_RETHROW( (publishing_account)(symbol)(feed)(broadcast) ) }
 
    signed_transaction fund_asset_fee_pool(string from,
                                           string symbol,
@@ -1507,73 +1383,6 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (from)(amount)(symbol)(broadcast) ) }
-
-   signed_transaction global_settle_asset(string symbol,
-                                          price settle_price,
-                                          bool broadcast /* = false */)
-   { try {
-      optional<asset_object> asset_to_settle = find_asset(symbol);
-      if (!asset_to_settle)
-        FC_THROW("No asset with that symbol exists!");
-
-      asset_global_settle_operation settle_op;
-      settle_op.issuer = asset_to_settle->issuer;
-      settle_op.asset_to_settle = asset_to_settle->id;
-      settle_op.settle_price = settle_price;
-
-      signed_transaction tx;
-      tx.operations.push_back( settle_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
-      tx.validate();
-
-      return sign_transaction( tx, broadcast );
-   } FC_CAPTURE_AND_RETHROW( (symbol)(settle_price)(broadcast) ) }
-
-   signed_transaction settle_asset(string account_to_settle,
-                                   string amount_to_settle,
-                                   string symbol,
-                                   bool broadcast /* = false */)
-   { try {
-      optional<asset_object> asset_to_settle = find_asset(symbol);
-      if (!asset_to_settle)
-        FC_THROW("No asset with that symbol exists!");
-
-      asset_settle_operation settle_op;
-      settle_op.account = get_account_id(account_to_settle);
-      settle_op.amount = asset_to_settle->amount_from_string(amount_to_settle);
-
-      signed_transaction tx;
-      tx.operations.push_back( settle_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
-      tx.validate();
-
-      return sign_transaction( tx, broadcast );
-   } FC_CAPTURE_AND_RETHROW( (account_to_settle)(amount_to_settle)(symbol)(broadcast) ) }
-
-   signed_transaction bid_collateral(string bidder_name,
-                                     string debt_amount, string debt_symbol,
-                                     string additional_collateral,
-                                     bool broadcast )
-   { try {
-      optional<asset_object> debt_asset = find_asset(debt_symbol);
-      if (!debt_asset)
-        FC_THROW("No asset with that symbol exists!");
-
-      FC_ASSERT(debt_asset->bitasset_data_id.valid(), "Not a bitasset, bidding not possible.");
-      const asset_object& collateral = get_asset(get_object(*debt_asset->bitasset_data_id).options.short_backing_asset);
-
-      bid_collateral_operation op;
-      op.bidder = get_account_id(bidder_name);
-      op.debt_covered = debt_asset->amount_from_string(debt_amount);
-      op.additional_collateral = collateral.amount_from_string(additional_collateral);
-
-      signed_transaction tx;
-      tx.operations.push_back( op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
-      tx.validate();
-
-      return sign_transaction( tx, broadcast );
-   } FC_CAPTURE_AND_RETHROW( (bidder_name)(debt_amount)(debt_symbol)(additional_collateral)(broadcast) ) }
 
    signed_transaction whitelist_account(string authorizing_account,
                                         string account_to_list,
@@ -2262,94 +2071,6 @@ public:
       return clear_text;
    }
 
-   signed_transaction sell_asset(string seller_account,
-                                 string amount_to_sell,
-                                 string symbol_to_sell,
-                                 string min_to_receive,
-                                 string symbol_to_receive,
-                                 uint32_t timeout_sec = 0,
-                                 bool   fill_or_kill = false,
-                                 bool   broadcast = false)
-   {
-      account_object seller   = get_account( seller_account );
-
-      limit_order_create_operation op;
-      op.seller = seller.id;
-      op.amount_to_sell = get_asset(symbol_to_sell).amount_from_string(amount_to_sell);
-      op.min_to_receive = get_asset(symbol_to_receive).amount_from_string(min_to_receive);
-      if( timeout_sec )
-         op.expiration = fc::time_point::now() + fc::seconds(timeout_sec);
-      op.fill_or_kill = fill_or_kill;
-
-      signed_transaction tx;
-      tx.operations.push_back(op);
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
-      tx.validate();
-
-      return sign_transaction( tx, broadcast );
-   }
-
-   signed_transaction borrow_asset(string seller_name, string amount_to_borrow, string asset_symbol,
-                                       string amount_of_collateral, bool broadcast = false)
-   {
-      account_object seller = get_account(seller_name);
-      asset_object mia = get_asset(asset_symbol);
-      FC_ASSERT(mia.is_market_issued());
-      asset_object collateral = get_asset(get_object(*mia.bitasset_data_id).options.short_backing_asset);
-
-      call_order_update_operation op;
-      op.funding_account = seller.id;
-      op.delta_debt   = mia.amount_from_string(amount_to_borrow);
-      op.delta_collateral = collateral.amount_from_string(amount_of_collateral);
-
-      signed_transaction trx;
-      trx.operations = {op};
-      set_operation_fees( trx, _remote_db->get_global_properties().parameters.get_current_fees());
-      trx.validate();
-
-      return sign_transaction(trx, broadcast);
-   }
-
-   signed_transaction borrow_asset_ext( string seller_name, string amount_to_borrow, string asset_symbol,
-                                        string amount_of_collateral,
-                                        call_order_update_operation::extensions_type extensions,
-                                        bool broadcast = false)
-   {
-      account_object seller = get_account(seller_name);
-      asset_object mia = get_asset(asset_symbol);
-      FC_ASSERT(mia.is_market_issued());
-      asset_object collateral = get_asset(get_object(*mia.bitasset_data_id).options.short_backing_asset);
-
-      call_order_update_operation op;
-      op.funding_account = seller.id;
-      op.delta_debt   = mia.amount_from_string(amount_to_borrow);
-      op.delta_collateral = collateral.amount_from_string(amount_of_collateral);
-      op.extensions = extensions;
-
-      signed_transaction trx;
-      trx.operations = {op};
-      set_operation_fees( trx, _remote_db->get_global_properties().parameters.get_current_fees());
-      trx.validate();
-
-      return sign_transaction(trx, broadcast);
-   }
-
-   signed_transaction cancel_order(object_id_type order_id, bool broadcast = false)
-   { try {
-         FC_ASSERT(!is_locked());
-         FC_ASSERT(order_id.space() == protocol_ids, "Invalid order ID ${id}", ("id", order_id));
-         signed_transaction trx;
-
-         limit_order_cancel_operation op;
-         op.fee_paying_account = get_object<limit_order_object>(order_id).seller;
-         op.order = order_id;
-         trx.operations = {op};
-         set_operation_fees( trx, _remote_db->get_global_properties().parameters.get_current_fees());
-
-         trx.validate();
-         return sign_transaction(trx, broadcast);
-   } FC_CAPTURE_AND_RETHROW((order_id)) }
-
    signed_transaction transfer(string from, string to, string amount,
                                string asset_symbol, string memo, bool broadcast = false)
    { try {
@@ -2419,36 +2140,6 @@ public:
 
       return sign_transaction(tx, broadcast);
    } FC_CAPTURE_AND_RETHROW( (buyer)(seller)(amount)(asset_symbol)(memo)(broadcast) ) }
-
-   signed_transaction issue_asset(string to_account, string amount, string symbol,
-                                  string memo, bool broadcast = false)
-   {
-      auto asset_obj = get_asset(symbol);
-
-      account_object to = get_account(to_account);
-      account_object issuer = get_account(asset_obj.issuer);
-
-      asset_issue_operation issue_op;
-      issue_op.issuer           = asset_obj.issuer;
-      issue_op.asset_to_issue   = asset_obj.amount_from_string(amount);
-      issue_op.issue_to_account = to.id;
-
-      if( memo.size() )
-      {
-         issue_op.memo = memo_data();
-         issue_op.memo->from = issuer.options.memo_key;
-         issue_op.memo->to = to.options.memo_key;
-         issue_op.memo->set_message(get_private_key(issuer.options.memo_key),
-                                    to.options.memo_key, memo);
-      }
-
-      signed_transaction tx;
-      tx.operations.push_back(issue_op);
-      set_operation_fees(tx,_remote_db->get_global_properties().parameters.get_current_fees());
-      tx.validate();
-
-      return sign_transaction(tx, broadcast);
-   }
 
    std::map<string,std::function<string(fc::variant,const fc::variants&)>> get_result_formatters() const
    {
@@ -2752,25 +2443,6 @@ public:
       return sign_transaction(tx, broadcast);
    }
 
-   void dbg_make_uia(string creator, string symbol)
-   {
-      asset_options opts;
-      opts.flags &= ~(white_list | disable_force_settle | global_settle);
-      opts.issuer_permissions = opts.flags;
-      opts.core_exchange_rate = price(asset(1), asset(1,asset_id_type(1)));
-      create_asset(get_account(creator).name, symbol, 2, opts, {}, true);
-   }
-
-   void dbg_make_mia(string creator, string symbol)
-   {
-      asset_options opts;
-      opts.flags &= ~white_list;
-      opts.issuer_permissions = opts.flags;
-      opts.core_exchange_rate = price(asset(1), asset(1,asset_id_type(1)));
-      bitasset_options bopts;
-      create_asset(get_account(creator).name, symbol, 2, opts, bopts, true);
-   }
-
    void dbg_push_blocks( const std::string& src_filename, uint32_t count )
    {
       use_debug_api();
@@ -2868,9 +2540,6 @@ public:
          const account_object& master = *_wallet.my_accounts.get<by_name>().lower_bound("import");
          int number_of_accounts = number_of_transactions / 3;
          number_of_transactions -= number_of_accounts;
-         try {
-            dbg_make_uia(master.name, "SHILL");
-         } catch(...) {/* Ignore; the asset probably already exists.*/}
 
          fc::time_point start = fc::time_point::now();
          for( int i = 0; i < number_of_accounts; ++i )
@@ -2892,15 +2561,6 @@ public:
          end = fc::time_point::now();
          ilog("Transferred to ${n} accounts in ${time} milliseconds",
               ("n", number_of_accounts*2)("time", (end - start).count() / 1000));
-
-         start = fc::time_point::now();
-         for( int i = 0; i < number_of_accounts; ++i )
-         {
-            signed_transaction trx = issue_asset(prefix + fc::to_string(i), "1000", "SHILL", "", true);
-         }
-         end = fc::time_point::now();
-         ilog("Issued to ${n} accounts in ${time} milliseconds",
-              ("n", number_of_accounts)("time", (end - start).count() / 1000));
       }
       catch (...)
       {
@@ -3030,17 +2690,6 @@ std::string operation_printer::operator()(const account_create_operation& op) co
 std::string operation_printer::operator()(const account_update_operation& op) const
 {
    out << "Update Account '" << wallet.get_account(op.account).name << "'";
-   return fee(op.fee);
-}
-
-std::string operation_printer::operator()(const asset_create_operation& op) const
-{
-   out << "Create ";
-   if( op.bitasset_opts.valid() )
-      out << "BitAsset ";
-   else
-      out << "User-Issue Asset ";
-   out << "'" << op.symbol << "' with issuer " << wallet.get_account(op.issuer).name;
    return fee(op.fee);
 }
 
@@ -3582,13 +3231,6 @@ asset_object wallet_api::get_asset(string asset_name_or_id) const
    return *a;
 }
 
-asset_bitasset_data_object wallet_api::get_bitasset_data(string asset_name_or_id) const
-{
-   auto asset = get_asset(asset_name_or_id);
-   FC_ASSERT(asset.is_market_issued() && asset.bitasset_data_id);
-   return my->get_object<asset_bitasset_data_object>(*asset.bitasset_data_id);
-}
-
 account_id_type wallet_api::get_account_id(string account_name_or_id) const
 {
    return my->get_account_id(account_name_or_id);
@@ -3774,11 +3416,6 @@ signed_transaction wallet_api::create_account_with_brain_key(string brain_key, s
             referrer_account, broadcast
             );
 }
-signed_transaction wallet_api::issue_asset(string to_account, string amount, string symbol,
-                                           string memo, bool broadcast)
-{
-   return my->issue_asset(to_account, amount, symbol, memo, broadcast);
-}
 
 signed_transaction wallet_api::transfer(string from, string to, string amount,
                                         string asset_symbol, string memo, bool broadcast /* = false */)
@@ -3792,52 +3429,11 @@ signed_transaction wallet_api::sale(string buyer, string seller, string amount,
    return my->sale(buyer, seller, amount, asset_symbol, memo, broadcast);
 }
 
-signed_transaction wallet_api::create_asset(string issuer,
-                                            string symbol,
-                                            uint8_t precision,
-                                            asset_options common,
-                                            fc::optional<bitasset_options> bitasset_opts,
-                                            bool broadcast)
-
-{
-   return my->create_asset(issuer, symbol, precision, common, bitasset_opts, broadcast);
-}
-
 signed_transaction wallet_api::update_asset(string symbol,
-                                            optional<string> new_issuer,
                                             asset_options new_options,
                                             bool broadcast /* = false */)
 {
-   return my->update_asset(symbol, new_issuer, new_options, broadcast);
-}
-
-signed_transaction wallet_api::update_asset_issuer(string symbol,
-                                            string new_issuer,
-                                            bool broadcast /* = false */)
-{
-   return my->update_asset_issuer(symbol, new_issuer, broadcast);
-}
-
-signed_transaction wallet_api::update_bitasset(string symbol,
-                                               bitasset_options new_options,
-                                               bool broadcast /* = false */)
-{
-   return my->update_bitasset(symbol, new_options, broadcast);
-}
-
-signed_transaction wallet_api::update_asset_feed_producers(string symbol,
-                                                           flat_set<string> new_feed_producers,
-                                                           bool broadcast /* = false */)
-{
-   return my->update_asset_feed_producers(symbol, new_feed_producers, broadcast);
-}
-
-signed_transaction wallet_api::publish_asset_feed(string publishing_account,
-                                                  string symbol,
-                                                  price_feed feed,
-                                                  bool broadcast /* = false */)
-{
-   return my->publish_asset_feed(publishing_account, symbol, feed, broadcast);
+   return my->update_asset(symbol, new_options, broadcast);
 }
 
 signed_transaction wallet_api::fund_asset_fee_pool(string from,
@@ -3861,29 +3457,6 @@ signed_transaction wallet_api::reserve_asset(string from,
                                           bool broadcast /* = false */)
 {
    return my->reserve_asset(from, amount, symbol, broadcast);
-}
-
-signed_transaction wallet_api::global_settle_asset(string symbol,
-                                                   price settle_price,
-                                                   bool broadcast /* = false */)
-{
-   return my->global_settle_asset(symbol, settle_price, broadcast);
-}
-
-signed_transaction wallet_api::settle_asset(string account_to_settle,
-                                            string amount_to_settle,
-                                            string symbol,
-                                            bool broadcast /* = false */)
-{
-   return my->settle_asset(account_to_settle, amount_to_settle, symbol, broadcast);
-}
-
-signed_transaction wallet_api::bid_collateral(string bidder_name,
-                                              string debt_amount, string debt_symbol,
-                                              string additional_collateral,
-                                              bool broadcast )
-{
-   return my->bid_collateral(bidder_name, debt_amount, debt_symbol, additional_collateral, broadcast);
 }
 
 signed_transaction wallet_api::whitelist_account(string authorizing_account,
@@ -4029,18 +3602,6 @@ operation wallet_api::get_prototype_operation(string operation_name)
    return my->get_prototype_operation( operation_name );
 }
 
-void wallet_api::dbg_make_uia(string creator, string symbol)
-{
-   FC_ASSERT(!is_locked());
-   my->dbg_make_uia(creator, symbol);
-}
-
-void wallet_api::dbg_make_mia(string creator, string symbol)
-{
-   FC_ASSERT(!is_locked());
-   my->dbg_make_mia(creator, symbol);
-}
-
 void wallet_api::dbg_push_blocks( std::string src_filename, uint32_t count )
 {
    my->dbg_push_blocks( src_filename, count );
@@ -4176,16 +3737,6 @@ string wallet_api::gethelp(const string& method)const
       ss << "example: register_account \"newaccount\" \"CORE6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV\" \"CORE6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV\" \"1.3.11\" \"1.3.11\" 50 true\n";
       ss << "\n";
       ss << "Use this method to register an account for which you do not know the private keys.";
-   }
-   else if( method == "create_asset" )
-   {
-      ss << "usage: ISSUER SYMBOL PRECISION_DIGITS OPTIONS BITASSET_OPTIONS BROADCAST\n\n";
-      ss << "PRECISION_DIGITS: the number of digits after the decimal point\n\n";
-      ss << "Example value of OPTIONS: \n";
-      ss << fc::json::to_pretty_string( graphene::chain::asset_options() );
-      ss << "\nExample value of BITASSET_OPTIONS: \n";
-      ss << fc::json::to_pretty_string( graphene::chain::bitasset_options() );
-      ss << "\nBITASSET_OPTIONS may be null\n";
    }
    else
    {
@@ -4394,41 +3945,6 @@ map<public_key_type, string> wallet_api::dump_private_keys()
 signed_transaction wallet_api::upgrade_account( string name, bool broadcast )
 {
    return my->upgrade_account(name,broadcast);
-}
-
-signed_transaction wallet_api::sell_asset(string seller_account,
-                                          string amount_to_sell,
-                                          string symbol_to_sell,
-                                          string min_to_receive,
-                                          string symbol_to_receive,
-                                          uint32_t expiration,
-                                          bool   fill_or_kill,
-                                          bool   broadcast)
-{
-   return my->sell_asset(seller_account, amount_to_sell, symbol_to_sell, min_to_receive,
-                         symbol_to_receive, expiration, fill_or_kill, broadcast);
-}
-
-signed_transaction wallet_api::borrow_asset(string seller_name, string amount_to_sell,
-                                                string asset_symbol, string amount_of_collateral, bool broadcast)
-{
-   FC_ASSERT(!is_locked());
-   return my->borrow_asset(seller_name, amount_to_sell, asset_symbol, amount_of_collateral, broadcast);
-}
-
-signed_transaction wallet_api::borrow_asset_ext( string seller_name, string amount_to_sell,
-                                                 string asset_symbol, string amount_of_collateral,
-                                                 call_order_update_operation::extensions_type extensions,
-                                                 bool broadcast)
-{
-   FC_ASSERT(!is_locked());
-   return my->borrow_asset_ext(seller_name, amount_to_sell, asset_symbol, amount_of_collateral, extensions, broadcast);
-}
-
-signed_transaction wallet_api::cancel_order(object_id_type order_id, bool broadcast)
-{
-   FC_ASSERT(!is_locked());
-   return my->cancel_order(order_id, broadcast);
 }
 
 memo_data wallet_api::sign_memo(string from, string to, string memo)

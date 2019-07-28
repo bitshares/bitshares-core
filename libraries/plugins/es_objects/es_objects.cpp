@@ -27,7 +27,6 @@
 #include <curl/curl.h>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/balance_object.hpp>
-#include <graphene/chain/market_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
 
@@ -178,24 +177,6 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
                   remove_from_database(b->id, "balance");
                else
                   prepareTemplate<account_balance_object>(*b, "balance");
-            }
-         } else if (value.is<limit_order_object>() && _es_objects_limit_orders) {
-            auto obj = db.find_object(value);
-            auto l = static_cast<const limit_order_object *>(obj);
-            if (l != nullptr) {
-               if (action == "delete")
-                  remove_from_database(l->id, "limitorder");
-               else
-                  prepareTemplate<limit_order_object>(*l, "limitorder");
-            }
-         } else if (value.is<asset_bitasset_data_object>() && _es_objects_asset_bitasset) {
-            auto obj = db.find_object(value);
-            auto ba = static_cast<const asset_bitasset_data_object *>(obj);
-            if (ba != nullptr) {
-               if (action == "delete")
-                  remove_from_database(ba->id, "bitasset");
-               else
-                  prepareTemplate<asset_bitasset_data_object>(*ba, "bitasset");
             }
          }
       }

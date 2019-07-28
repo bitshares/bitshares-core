@@ -302,15 +302,6 @@ namespace graphene { namespace chain {
           */
          void adjust_balance(account_id_type account, asset delta);
 
-         void deposit_market_fee_vesting_balance(const account_id_type &account_id, const asset &delta);
-        /**
-          * @brief Retrieve a particular account's market fee vesting balance in a given asset
-          * @param owner Account whose balance should be retrieved
-          * @param asset_id ID of the asset to get balance in
-          * @return owner's balance in asset
-          */
-         asset get_market_fee_vesting_balance(const account_id_type &account_id, const asset_id_type &asset_id);
-
          /**
           * @brief Helper to make lazy deposit to CDD VBO.
           *
@@ -431,7 +422,6 @@ namespace graphene { namespace chain {
          void update_last_irreversible_block();
          void clear_expired_transactions();
          void clear_expired_proposals();
-         void clear_expired_orders();
          void update_maintenance_flag( bool new_maintenance_flag );
          void update_withdraw_permissions();
          bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,

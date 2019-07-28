@@ -15,7 +15,5 @@ Folder                             | Name                     | Description     
 [delayed_node](delayed_node)       | Delayed Node             | Avoid forks by running a several times confirmed and delayed blockchain     | Business       | Stable        |
 [elasticsearch](elasticsearch)     | ElasticSearch Operations | Save account history data into elasticsearch database                       | History        | Experimental  | 6
 [es_objects](es_objects)           | ElasticSearch Objects    | Save selected objects into elasticsearch database                           | History        | Experimental  |
-[grouped_orders](grouped_orders)   | Grouped Orders           | Expose api to create a grouped order book of bitshares markets              | Market data    | Experimental  |
-[market_history](market_history)   | Market History           | Save market history data                                                    | Market data    | Stable        | 5
 [snapshot](snapshot)               | Snapshot                 | Get a json of all objects in blockchain at a specificed time or block       | Debug          | Stable        | 
 [witness](witness)                 | Witness                  | Generate and sign blocks                                                    | Block producer | Stable        | 
