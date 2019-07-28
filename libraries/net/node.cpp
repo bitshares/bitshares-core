@@ -2417,7 +2417,8 @@ namespace graphene { namespace net { namespace detail {
 
     }
 
-    void node_impl::on_closing_connection_message( peer_connection* originating_peer, const closing_connection_message& closing_connection_message_received )
+    void node_impl::on_closing_connection_message( peer_connection* originating_peer,
+          const closing_connection_message& closing_connection_message_received )
     {
       VERIFY_CORRECT_THREAD();
       originating_peer->they_have_requested_close = true;
@@ -2429,12 +2430,14 @@ namespace graphene { namespace net { namespace detail {
              ( "msg", closing_connection_message_received.reason_for_closing )
              ( "error", closing_connection_message_received.error ) );
         std::ostringstream message;
-        message << "Peer " << fc::variant( originating_peer->get_remote_endpoint(), GRAPHENE_NET_MAX_NESTED_OBJECTS ).as_string() <<
+        message << "Peer " << fc::variant( originating_peer->get_remote_endpoint(),
+                                           GRAPHENE_NET_MAX_NESTED_OBJECTS ).as_string() <<
                   " disconnected us: " << closing_connection_message_received.reason_for_closing;
-        fc::exception detailed_error(FC_LOG_MESSAGE(warn, "Peer ${peer} is disconnecting us because of an error: ${msg}, exception: ${error}",
-                                                    ( "peer", originating_peer->get_remote_endpoint() )
-                                                    ( "msg", closing_connection_message_received.reason_for_closing )
-                                                    ( "error", closing_connection_message_received.error ) ));
+        fc::exception detailed_error(FC_LOG_MESSAGE(warn,
+              "Peer ${peer} is disconnecting us because of an error: ${msg}, exception: ${error}",
+              ( "peer", originating_peer->get_remote_endpoint() )
+              ( "msg", closing_connection_message_received.reason_for_closing )
+              ( "error", closing_connection_message_received.error ) ));
         _delegate->error_encountered( message.str(),
                                       detailed_error );
       }
@@ -2667,7 +2670,8 @@ namespace graphene { namespace net { namespace detail {
         {
           ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
 
-          if (peer->ids_of_items_being_processed.find(block_message_to_send.block_id) != peer->ids_of_items_being_processed.end())
+          if (peer->ids_of_items_being_processed.find(block_message_to_send.block_id)
+                 != peer->ids_of_items_being_processed.end())
           {
             if (discontinue_fetching_blocks_from_peer)
             {
@@ -2676,7 +2680,9 @@ namespace graphene { namespace net { namespace detail {
               peer->inhibit_fetching_sync_blocks = true;
             }
             else
-              peers_to_disconnect[peer] = std::make_pair(std::string("You offered us a block that we reject as invalid"), fc::oexception(handle_message_exception));
+              peers_to_disconnect[peer] = std::make_pair(
+                    std::string("You offered us a block that we reject as invalid"),
+                    fc::oexception(handle_message_exception));
           }
         }
       }
