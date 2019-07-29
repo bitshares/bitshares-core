@@ -29,6 +29,7 @@
 #include <graphene/market_history/market_history_plugin.hpp>
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 #include <graphene/elasticsearch/elasticsearch_plugin.hpp>
+#include <graphene/api_helper_indexes/api_helper_indexes.hpp>
 #include <graphene/es_objects/es_objects.hpp>
 
 #include <graphene/chain/balance_object.hpp>
@@ -192,6 +193,11 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
     options.insert(std::make_pair("plugins", boost::program_options::variable_value(
        string("account_history"), false)));
    }
+   if( current_test_name == "asset_in_collateral" )
+   {
+    options.insert( std::make_pair( "plugins",
+                                    boost::program_options::variable_value( string("api_helper_indexes"), false ) ) );
+   }
 
    // add account tracking for ahplugin for special test case with track-account enabled
    if( !options.count("track-account") && current_test_name == "track_account") {
@@ -262,6 +268,13 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
 
       esobjects_plugin->plugin_initialize(options);
       esobjects_plugin->plugin_startup();
+   }
+   else if( current_test_name == "asset_in_collateral" )
+   {
+      auto ahiplugin = app.register_plugin<graphene::api_helper_indexes::api_helper_indexes>();
+      ahiplugin->plugin_set_app(&app);
+      ahiplugin->plugin_initialize(options);
+      ahiplugin->plugin_startup();
    }
 
    options.insert(std::make_pair("bucket-size", boost::program_options::variable_value(string("[15]"),false)));

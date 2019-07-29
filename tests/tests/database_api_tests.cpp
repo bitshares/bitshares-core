@@ -1542,4 +1542,142 @@ BOOST_AUTO_TEST_CASE( api_limit_get_order_book ){
    throw;
    }
 }
+
+BOOST_AUTO_TEST_CASE( asset_in_collateral )
+{ try {
+   ACTORS( (dan)(nathan) );
+   fund( nathan );
+   fund( dan );
+
+   graphene::app::database_api db_api( db, &( app.get_options() ) );
+
+   auto oassets = db_api.get_assets( { GRAPHENE_SYMBOL } );
+   BOOST_REQUIRE( !oassets.empty() );
+   BOOST_REQUIRE( oassets[0].valid() );
+   BOOST_REQUIRE( oassets[0]->total_in_collateral.valid() );
+   BOOST_CHECK_EQUAL( 0, oassets[0]->total_in_collateral->value );
+   BOOST_CHECK( !oassets[0]->total_backing_collateral.valid() );
+
+   asset_id_type bitusd_id = create_bitasset( "USDBIT", nathan_id, 100, charge_market_fee ).id;
+   update_feed_producers( bitusd_id, { nathan_id } );
+   asset_id_type bitdan_id = create_bitasset( "DANBIT", dan_id, 100, charge_market_fee ).id;
+   update_feed_producers( bitdan_id, { nathan_id } );
+   asset_id_type btc_id = create_bitasset( "BTC", nathan_id, 100, charge_market_fee, 8, bitusd_id ).id;
+   update_feed_producers( btc_id, { nathan_id } );
+
+   oassets = db_api.get_assets( { GRAPHENE_SYMBOL, "USDBIT", "DANBIT", "BTC" } );
+   BOOST_REQUIRE_EQUAL( 4, oassets.size() );
+   BOOST_REQUIRE( oassets[0].valid() );
+   BOOST_REQUIRE( oassets[0]->total_in_collateral.valid() );
+   BOOST_CHECK( !oassets[0]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[1].valid() );
+   BOOST_REQUIRE( oassets[1]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[1]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[2].valid() );
+   BOOST_REQUIRE( oassets[2]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[2]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[3].valid() );
+   BOOST_REQUIRE( oassets[3]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[3]->total_backing_collateral.valid() );
+   BOOST_CHECK_EQUAL( 0, oassets[0]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[1]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[1]->total_backing_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[2]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[2]->total_backing_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[3]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[3]->total_backing_collateral->value );
+
+   generate_block();
+   fc::usleep(fc::milliseconds(100));
+
+   const auto& bitusd = bitusd_id( db );
+   const auto& bitdan = bitdan_id( db );
+   const auto& btc = btc_id( db );
+
+   {
+      const auto& core = asset_id_type()( db );
+      price_feed current_feed;
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      current_feed.settlement_price = bitusd.amount(1) / core.amount(5);
+      publish_feed( bitusd_id, nathan_id, current_feed );
+      current_feed.settlement_price = bitdan.amount(1) / core.amount(5);
+      publish_feed( bitdan_id, nathan_id, current_feed );
+      current_feed.settlement_price = btc.amount(1) / bitusd.amount(100);
+      publish_feed( btc_id, nathan_id, current_feed );
+   }
+
+   borrow( nathan_id, bitusd.amount(1000), asset(15000) );
+   borrow( dan_id, bitusd.amount(100), asset(2000) );
+
+   oassets = db_api.get_assets( { GRAPHENE_SYMBOL, "USDBIT", "DANBIT", "BTC" } );
+   BOOST_REQUIRE_EQUAL( 4, oassets.size() );
+   BOOST_REQUIRE( oassets[0].valid() );
+   BOOST_REQUIRE( oassets[0]->total_in_collateral.valid() );
+   BOOST_CHECK( !oassets[0]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[1].valid() );
+   BOOST_REQUIRE( oassets[1]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[1]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[2].valid() );
+   BOOST_REQUIRE( oassets[2]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[2]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[3].valid() );
+   BOOST_REQUIRE( oassets[3]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[3]->total_backing_collateral.valid() );
+   BOOST_CHECK_EQUAL( 17000, oassets[0]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[1]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 17000, oassets[1]->total_backing_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[2]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[2]->total_backing_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[3]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[3]->total_backing_collateral->value );
+
+   borrow( nathan_id, bitdan.amount(1000), asset(15000) );
+   borrow( nathan_id, btc.amount(5), bitusd.amount(1000) );
+
+   oassets = db_api.lookup_asset_symbols( { GRAPHENE_SYMBOL, "USDBIT", "DANBIT", "BTC" } );
+   BOOST_REQUIRE_EQUAL( 4, oassets.size() );
+   BOOST_REQUIRE( oassets[0].valid() );
+   BOOST_REQUIRE( oassets[0]->total_in_collateral.valid() );
+   BOOST_CHECK( !oassets[0]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[1].valid() );
+   BOOST_REQUIRE( oassets[1]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[1]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[2].valid() );
+   BOOST_REQUIRE( oassets[2]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[2]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[3].valid() );
+   BOOST_REQUIRE( oassets[3]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[3]->total_backing_collateral.valid() );
+   BOOST_CHECK_EQUAL( 32000, oassets[0]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 1000, oassets[1]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 17000, oassets[1]->total_backing_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[2]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 15000, oassets[2]->total_backing_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[3]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 1000, oassets[3]->total_backing_collateral->value );
+
+   force_settle( dan_id(db), bitusd.amount(100) ); // settles against nathan, receives 500 CORE collateral
+   generate_blocks( db.head_block_time() + fc::days(2) );
+   fc::usleep(fc::milliseconds(100));
+
+   auto assets = db_api.list_assets( GRAPHENE_SYMBOL, 1 );
+   BOOST_REQUIRE( !assets.empty() );
+   BOOST_REQUIRE( assets[0].total_in_collateral.valid() );
+   BOOST_CHECK( !assets[0].total_backing_collateral.valid() );
+   BOOST_CHECK_EQUAL( 31500, assets[0].total_in_collateral->value );
+
+   assets = db_api.get_assets_by_issuer( "nathan", asset_id_type(1), 2 );
+   BOOST_REQUIRE_EQUAL( 2, assets.size() );
+   BOOST_REQUIRE( assets[0].total_in_collateral.valid() );
+   BOOST_REQUIRE( assets[0].total_backing_collateral.valid() );
+   BOOST_REQUIRE( assets[1].total_in_collateral.valid() );
+   BOOST_REQUIRE( assets[1].total_backing_collateral.valid() );
+   BOOST_CHECK_EQUAL( 1000, assets[0].total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 16500, assets[0].total_backing_collateral->value );
+   BOOST_CHECK_EQUAL( 0, assets[1].total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 1000, assets[1].total_backing_collateral->value );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()

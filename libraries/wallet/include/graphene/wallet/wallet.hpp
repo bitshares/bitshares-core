@@ -388,7 +388,7 @@ class wallet_api
        * @param limit the maximum number of assets to return (max: 100)
        * @returns the list of asset objects, ordered by symbol
        */
-      vector<asset_object>              list_assets(const string& lowerbound, uint32_t limit)const;
+      vector<extended_asset_object>     list_assets(const string& lowerbound, uint32_t limit)const;
       /** Returns assets count registered on the blockchain.
        *
        * @returns assets count
@@ -540,7 +540,7 @@ class wallet_api
        * @param asset_name_or_id the symbol or id of the asset in question
        * @returns the information about the asset stored in the block chain
        */
-      asset_object                      get_asset(string asset_name_or_id) const;
+      extended_asset_object             get_asset(string asset_name_or_id) const;
 
       /** Returns the BitAsset-specific data for a given asset.
        * Market-issued assets's behavior are determined both by their "BitAsset Data" and

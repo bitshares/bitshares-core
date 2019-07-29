@@ -42,6 +42,7 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
 
+#include <graphene/api_helper_indexes/api_helper_indexes.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
 
 #include <fc/api.hpp>
@@ -123,6 +124,16 @@ struct market_trade
    string                     value;
    account_id_type            side1_account_id = GRAPHENE_NULL_ACCOUNT;
    account_id_type            side2_account_id = GRAPHENE_NULL_ACCOUNT;
+};
+
+struct extended_asset_object : asset_object
+{
+   extended_asset_object() {}
+   explicit extended_asset_object( const asset_object& a ) : asset_object( a ) {}
+   explicit extended_asset_object( asset_object&& a ) : asset_object( std::move(a) ) {}
+
+   optional<share_type> total_in_collateral;
+   optional<share_type> total_backing_collateral;
 };
 
 /**
@@ -421,7 +432,7 @@ class database_api
        *
        * This function has semantics identical to @ref get_objects
        */
-      vector<optional<asset_object>> get_assets(const vector<std::string>& asset_symbols_or_ids)const;
+      vector<optional<extended_asset_object>> get_assets(const vector<std::string>& asset_symbols_or_ids)const;
 
       /**
        * @brief Get assets alphabetically by symbol name
@@ -429,7 +440,7 @@ class database_api
        * @param limit Maximum number of assets to fetch (must not exceed 101)
        * @return The assets found
        */
-      vector<asset_object> list_assets(const string& lower_bound_symbol, uint32_t limit)const;
+      vector<extended_asset_object> list_assets(const string& lower_bound_symbol, uint32_t limit)const;
 
       /**
        * @brief Get a list of assets by symbol names or IDs
@@ -438,7 +449,7 @@ class database_api
        *
        * This function has semantics identical to @ref get_objects, but doesn't subscribe
        */
-      vector<optional<asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
+      vector<optional<extended_asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
 
       /**
        * @brief Get assets count
@@ -453,8 +464,8 @@ class database_api
        * @param limit Maximum number of orders to retrieve
        * @return The assets issued (owned) by the account
        */
-      vector<asset_object> get_assets_by_issuer(const std::string& issuer_name_or_id,
-                                                asset_id_type start, uint32_t limit)const;
+      vector<extended_asset_object> get_assets_by_issuer(const std::string& issuer_name_or_id,
+                                                         asset_id_type start, uint32_t limit)const;
 
       /////////////////////
       // Markets / feeds //
@@ -936,6 +947,9 @@ FC_REFLECT( graphene::app::market_ticker,
             (time)(base)(quote)(latest)(lowest_ask)(highest_bid)(percent_change)(base_volume)(quote_volume) );
 FC_REFLECT( graphene::app::market_volume, (time)(base)(quote)(base_volume)(quote_volume) );
 FC_REFLECT( graphene::app::market_trade, (sequence)(date)(price)(amount)(value)(side1_account_id)(side2_account_id) );
+
+FC_REFLECT_DERIVED( graphene::app::extended_asset_object, (graphene::chain::asset_object),
+                    (total_in_collateral)(total_backing_collateral) );
 
 FC_API(graphene::app::database_api,
    // Objects

@@ -103,13 +103,13 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<vesting_balance_object> get_vesting_balances( const std::string account_id_or_name )const;
 
       // Assets
+      uint64_t get_asset_count()const;
       asset_id_type get_asset_id_from_string(const std::string& symbol_or_id)const;
-      vector<optional<asset_object>> get_assets(const vector<std::string>& asset_symbols_or_ids)const;
-      vector<asset_object>           list_assets(const string& lower_bound_symbol, uint32_t limit)const;
-      vector<optional<asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
-      uint64_t                       get_asset_count()const;
-      vector<asset_object>           get_assets_by_issuer(const std::string& issuer_name_or_id,
-                                                          asset_id_type start, uint32_t limit)const;
+      vector<optional<extended_asset_object>> get_assets(const vector<std::string>& asset_symbols_or_ids)const;
+      vector<extended_asset_object>           list_assets(const string& lower_bound_symbol, uint32_t limit)const;
+      vector<optional<extended_asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
+      vector<extended_asset_object>           get_assets_by_issuer(const std::string& issuer_name_or_id,
+                                                                   asset_id_type start, uint32_t limit)const;
 
       // Markets / feeds
       vector<limit_order_object>         get_limit_orders(const std::string& a, const std::string& b, uint32_t limit)const;
@@ -263,6 +263,20 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          return account;
       }
 
+      template<class ASSET>
+      extended_asset_object extend_asset( ASSET&& a )const
+      {
+         asset_id_type id = a.id;
+         extended_asset_object result = extended_asset_object( std::forward<ASSET>( a ) );
+         if( amount_in_collateral_index )
+         {
+            result.total_in_collateral = amount_in_collateral_index->get_amount_in_collateral( id );
+            if( result.bitasset_data_id.valid() )
+               result.total_backing_collateral = amount_in_collateral_index->get_backing_collateral( id );
+         }
+         return result;
+      }
+
       const asset_object* get_asset_from_string( const std::string& symbol_or_id, bool throw_if_not_found = true ) const
       {
          // TODO cache the result to avoid repeatly fetching from db
@@ -281,16 +295,16 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             FC_ASSERT( asset, "no such asset" );
          return asset;
       }
-      vector<optional<asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const
+      vector<optional<extended_asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const
       {
-         vector<optional<asset_object>> result; result.reserve(asset_ids.size());
+         vector<optional<extended_asset_object>> result; result.reserve(asset_ids.size());
          std::transform(asset_ids.begin(), asset_ids.end(), std::back_inserter(result),
-                 [this](asset_id_type id) -> optional<asset_object> {
+                 [this](asset_id_type id) -> optional<extended_asset_object> {
             if(auto o = _db.find(id))
             {
                if( _enabled_auto_subscription )
                   subscribe_to_item( id );
-               return *o;
+               return extend_asset( *o );
             }
             return {};
          });
@@ -375,6 +389,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       map< pair<asset_id_type,asset_id_type>, std::function<void(const variant&)> >      _market_subscriptions;
       graphene::chain::database&                                                                                                            _db;
       const application_options* _app_options = nullptr;
+      const graphene::api_helper_indexes::amount_in_collateral_index* amount_in_collateral_index;
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -406,6 +421,16 @@ database_api_impl::database_api_impl( graphene::chain::database& db, const appli
    _pending_trx_connection = _db.on_pending_transaction.connect([this](const signed_transaction& trx ){
                          if( _pending_trx_callback ) _pending_trx_callback( fc::variant(trx, GRAPHENE_MAX_NESTED_OBJECTS) );
                       });
+   try
+   {
+      amount_in_collateral_index = &_db.get_index_type< primary_index< call_order_index > >()
+                                     .get_secondary_index<graphene::api_helper_indexes::amount_in_collateral_index>();
+   }
+   catch( fc::assert_exception& e )
+   {
+      wlog( "amount_in_collateral_index not found - please enable api_helper_indexes plugin!" );
+      amount_in_collateral_index = nullptr;
+   }
 }
 
 database_api_impl::~database_api_impl()
@@ -1292,39 +1317,39 @@ asset_id_type database_api::get_asset_id_from_string(const std::string& symbol_o
    return my->get_asset_from_string( symbol_or_id )->id;
 }
 
-vector<optional<asset_object>> database_api::get_assets(const vector<std::string>& asset_symbols_or_ids)const
+vector<optional<extended_asset_object>> database_api::get_assets(const vector<std::string>& asset_symbols_or_ids)const
 {
    return my->get_assets( asset_symbols_or_ids );
 }
 
-vector<optional<asset_object>> database_api_impl::get_assets(const vector<std::string>& asset_symbols_or_ids)const
+vector<optional<extended_asset_object>> database_api_impl::get_assets(const vector<std::string>& asset_symbols_or_ids)const
 {
-   vector<optional<asset_object>> result; result.reserve(asset_symbols_or_ids.size());
+   vector<optional<extended_asset_object>> result; result.reserve(asset_symbols_or_ids.size());
    std::transform(asset_symbols_or_ids.begin(), asset_symbols_or_ids.end(), std::back_inserter(result),
-                  [this](std::string id_or_name) -> optional<asset_object> {
+                  [this](std::string id_or_name) -> optional<extended_asset_object> {
 
       const asset_object* asset_obj = get_asset_from_string( id_or_name, false );
       if( asset_obj == nullptr )
          return {};
       if( _enabled_auto_subscription )
          subscribe_to_item( asset_obj->id );
-      return *asset_obj;
+      return extend_asset( *asset_obj );
    });
    return result;
 }
 
-vector<asset_object> database_api::list_assets(const string& lower_bound_symbol, uint32_t limit)const
+vector<extended_asset_object> database_api::list_assets(const string& lower_bound_symbol, uint32_t limit)const
 {
    return my->list_assets( lower_bound_symbol, limit );
 }
 
-vector<asset_object> database_api_impl::list_assets(const string& lower_bound_symbol, uint32_t limit)const
+vector<extended_asset_object> database_api_impl::list_assets(const string& lower_bound_symbol, uint32_t limit)const
 {
    uint64_t api_limit_get_assets = _app_options->api_limit_get_assets;
    FC_ASSERT( limit <= api_limit_get_assets );
 
    const auto& assets_by_symbol = _db.get_index_type<asset_index>().indices().get<by_symbol>();
-   vector<asset_object> result;
+   vector<extended_asset_object> result;
    result.reserve(limit);
 
    auto itr = assets_by_symbol.lower_bound(lower_bound_symbol);
@@ -1333,7 +1358,7 @@ vector<asset_object> database_api_impl::list_assets(const string& lower_bound_sy
       itr = assets_by_symbol.begin();
 
    while(limit-- && itr != assets_by_symbol.end())
-      result.emplace_back(*itr++);
+      result.emplace_back( extend_asset( *itr++ ) );
 
    return result;
 }
@@ -1348,50 +1373,50 @@ uint64_t database_api_impl::get_asset_count()const
    return _db.get_index_type<asset_index>().indices().size();
 }
 
-vector<asset_object> database_api::get_assets_by_issuer(const std::string& issuer_name_or_id,
-                                                        asset_id_type start, uint32_t limit)const
+vector<extended_asset_object> database_api::get_assets_by_issuer(const std::string& issuer_name_or_id,
+                                                                 asset_id_type start, uint32_t limit)const
 {
    return my->get_assets_by_issuer(issuer_name_or_id, start, limit);
 }
 
-vector<asset_object> database_api_impl::get_assets_by_issuer(const std::string& issuer_name_or_id,
-                                                             asset_id_type start, uint32_t limit)const
+vector<extended_asset_object> database_api_impl::get_assets_by_issuer(const std::string& issuer_name_or_id,
+                                                                      asset_id_type start, uint32_t limit)const
 {
    uint64_t api_limit_get_assets = _app_options->api_limit_get_assets;
    FC_ASSERT( limit <= api_limit_get_assets );
 
-   vector<asset_object> result;
+   vector<extended_asset_object> result;
    const account_id_type account = get_account_from_string(issuer_name_or_id)->id;
    const auto& asset_idx = _db.get_index_type<asset_index>().indices().get<by_issuer>();
    auto asset_index_end = asset_idx.end();
    auto asset_itr = asset_idx.lower_bound(boost::make_tuple(account, start));
    while(asset_itr != asset_index_end && asset_itr->issuer == account && result.size() < limit)
    {
-      result.push_back(*asset_itr);
+      result.emplace_back( extend_asset( *asset_itr ) );
       ++asset_itr;
    }
    return result;
 }
 
-vector<optional<asset_object>> database_api::lookup_asset_symbols(const vector<string>& symbols_or_ids)const
+vector<optional<extended_asset_object>> database_api::lookup_asset_symbols(const vector<string>& symbols_or_ids)const
 {
    return my->lookup_asset_symbols( symbols_or_ids );
 }
 
-vector<optional<asset_object>> database_api_impl::lookup_asset_symbols(const vector<string>& symbols_or_ids)const
+vector<optional<extended_asset_object>> database_api_impl::lookup_asset_symbols(const vector<string>& symbols_or_ids)const
 {
    const auto& assets_by_symbol = _db.get_index_type<asset_index>().indices().get<by_symbol>();
-   vector<optional<asset_object> > result;
+   vector<optional<extended_asset_object> > result;
    result.reserve(symbols_or_ids.size());
    std::transform(symbols_or_ids.begin(), symbols_or_ids.end(), std::back_inserter(result),
-                  [this, &assets_by_symbol](const string& symbol_or_id) -> optional<asset_object> {
+                  [this, &assets_by_symbol](const string& symbol_or_id) -> optional<extended_asset_object> {
       if( !symbol_or_id.empty() && std::isdigit(symbol_or_id[0]) )
       {
          auto ptr = _db.find(variant(symbol_or_id, 1).as<asset_id_type>(1));
-         return ptr == nullptr? optional<asset_object>() : *ptr;
+         return ptr == nullptr? optional<extended_asset_object>() : extend_asset( *ptr );
       }
       auto itr = assets_by_symbol.find(symbol_or_id);
-      return itr == assets_by_symbol.end()? optional<asset_object>() : *itr;
+      return itr == assets_by_symbol.end()? optional<extended_asset_object>() : extend_asset( *itr );
    });
    return result;
 }
