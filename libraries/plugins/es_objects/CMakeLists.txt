@@ -4,15 +4,7 @@ add_library( graphene_es_objects
         es_objects.cpp
            )
 
-if (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
-   set (OLD_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-   set (CMAKE_FIND_LIBRARY_SUFFIXES .a)
-   find_package(CURL REQUIRED)
-   list(APPEND CURL_LIBRARIES ssl crypto)
-   set (CMAKE_FIND_LIBRARY_SUFFIXES ${OLD_SUFFIXES})
-else (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
-   find_package(CURL REQUIRED)
-endif (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
+find_curl()
 
 include_directories(${CURL_INCLUDE_DIRS})
 if(CURL_STATICLIB)

@@ -29,6 +29,19 @@ list( APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules" )
 include(CheckCCompilerFlag)
 include(Utils)
 
+# function to help with cUrl
+macro(FIND_CURL)
+   if (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
+      set (OLD_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+      set (CMAKE_FIND_LIBRARY_SUFFIXES .a)
+      find_package(CURL REQUIRED)
+      list(APPEND CURL_LIBRARIES ssl crypto)
+      set (CMAKE_FIND_LIBRARY_SUFFIXES ${OLD_SUFFIXES})
+   else (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
+      find_package(CURL REQUIRED)
+   endif (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
+endmacro()
+
 # Fortify source
 if (CMAKE_COMPILER_IS_GNUCXX)
 	if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
