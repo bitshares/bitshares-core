@@ -132,6 +132,11 @@ namespace graphene { namespace chain {
 
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_create );
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( kill_unfilled, limit_order_create, 1, )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( market_not_whitelisted, limit_order_create, 2, )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( market_blacklisted, limit_order_create, 3, )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( selling_asset_unauthorized, limit_order_create, 4, )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( receiving_asset_unauthorized, limit_order_create, 5, )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( insufficient_balance, limit_order_create, 6, )
 
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_cancel );
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( nonexist_order, limit_order_cancel, 1, )

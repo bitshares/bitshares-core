@@ -3415,6 +3415,11 @@ namespace graphene { namespace net { namespace detail {
           // log common exceptions in debug level
           case 3030001: // duplicate_transaction
           case 3050101: // limit_order_create_kill_unfilled
+          case 3050102: // limit_order_create_market_not_whitelisted
+          case 3050103: // limit_order_create_market_blacklisted
+          case 3050104: // limit_order_create_selling_asset_unauthorized
+          case 3050105: // limit_order_create_receiving_asset_unauthorized
+          case 3050106: // limit_order_create_insufficient_balance
           case 3050201: // limit_order_cancel_nonexist_order
           case 3050202: // limit_order_cancel_owner_mismatch
              dlog( "client rejected message sent by peer ${peer}, ${e}",
