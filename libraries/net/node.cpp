@@ -4225,7 +4225,7 @@ namespace graphene { namespace net { namespace detail {
       }
       catch(...)
       {
-         elog( "Unable to resolve endpoint during attempt to add seed node ${ep}", ("ep", endpoint_string) );
+         wlog( "Unable to resolve endpoint during attempt to add seed node ${ep}", ("ep", endpoint_string) );
       }
       for (const fc::ip::endpoint& endpoint : endpoints)
       {
