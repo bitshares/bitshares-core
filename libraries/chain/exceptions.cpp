@@ -64,6 +64,16 @@ namespace graphene { namespace chain {
    GRAPHENE_IMPLEMENT_OP_BASE_EXCEPTIONS( limit_order_create );
    GRAPHENE_IMPLEMENT_OP_EVALUATE_EXCEPTION( kill_unfilled, limit_order_create, 1,
          "Killing limit order due to unable to fill" )
+   GRAPHENE_IMPLEMENT_OP_EVALUATE_EXCEPTION( market_not_whitelisted, limit_order_create, 2,
+         "The market has not been whitelisted by the selling asset" )
+   GRAPHENE_IMPLEMENT_OP_EVALUATE_EXCEPTION( market_blacklisted, limit_order_create, 3,
+         "The market has been blacklisted by the selling asset" )
+   GRAPHENE_IMPLEMENT_OP_EVALUATE_EXCEPTION( selling_asset_unauthorized, limit_order_create, 4,
+         "The account is not allowed to transact the selling asset" )
+   GRAPHENE_IMPLEMENT_OP_EVALUATE_EXCEPTION( receiving_asset_unauthorized, limit_order_create, 5,
+         "The account is not allowed to transact the receiving asset" )
+   GRAPHENE_IMPLEMENT_OP_EVALUATE_EXCEPTION( insufficient_balance, limit_order_create, 6,
+         "Insufficient balance" )
 
    GRAPHENE_IMPLEMENT_OP_BASE_EXCEPTIONS( limit_order_cancel );
    GRAPHENE_IMPLEMENT_OP_EVALUATE_EXCEPTION( nonexist_order, limit_order_cancel, 1, "Order does not exist" )
