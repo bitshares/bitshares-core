@@ -71,7 +71,7 @@ struct operation_get_required_auth
    void operator()( const T& v )const 
    { 
       active.insert( v.fee_payer() );
-      v.get_required_active_authorities( active ); 
+   v.get_required_active_authorities( active ); 
       v.get_required_owner_authorities( owner ); 
       v.get_required_authorities( other );
    }

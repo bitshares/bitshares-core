@@ -147,59 +147,6 @@ BOOST_AUTO_TEST_CASE( one_hundred_k_benchmark )
       trx.clear();
    }
 
-   {
-      asset_create_operation aco;
-      aco.fee = asset( 100000 );
-      aco.common_options.core_exchange_rate = asset( 1 ) / asset( 1, asset_id_type(1) );
-      for( uint32_t i = 0; i < cycles; ++i )
-      {
-         aco.issuer = accounts[i];
-         aco.symbol = "ASSET" + fc::to_string( i );
-         trx.operations.push_back( aco );
-         ++total_count;
-         transactions[i] = trx;
-         trx.operations.clear();
-      }
-
-      auto start = fc::time_point::now();
-      for( uint32_t i = 0; i < cycles; ++i )
-      {
-         auto result = db.apply_transaction( transactions[i], ~0 );
-         assets[i] = result.operation_results[0].get<object_id_type>();
-      }
-      auto end = fc::time_point::now();
-      auto elapsed = end - start;
-      total_time += elapsed.count();
-      wlog( "${aps} asset create/s over ${total}ms",
-            ("aps",(cycles*1000000)/elapsed.count())("total",elapsed.count()/1000) );
-      trx.clear();
-   }
-
-   {
-      asset_issue_operation aio;
-      aio.fee = asset( 10 );
-      for( uint32_t i = 0; i < cycles; ++i )
-      {
-         aio.issuer = accounts[i];
-         aio.issue_to_account = accounts[i+1];
-         aio.asset_to_issue = asset( 10, assets[i] );
-         trx.operations.push_back( aio );
-         ++total_count;
-         transactions[i] = trx;
-         trx.operations.clear();
-      }
-
-      auto start = fc::time_point::now();
-      for( uint32_t i = 0; i < cycles; ++i )
-         db.apply_transaction( transactions[i], ~0 );
-      auto end = fc::time_point::now();
-      auto elapsed = end - start;
-      total_time += elapsed.count();
-      wlog( "${aps} issuances/s over ${total}ms",
-            ("aps",(cycles*1000000)/elapsed.count())("total",elapsed.count()/1000) );
-      trx.clear();
-   }
-
    wlog( "${total} operations in ${total_time}ms => ${avg} ops/s on average",
          ("total",total_count)("total_time",total_time/1000)
          ("avg",(total_count*1000000)/total_time) );

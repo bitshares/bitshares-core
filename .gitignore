@@ -21,6 +21,7 @@ libraries/egenesis/embed_genesis
 
 programs/cli_wallet/cli_wallet
 programs/js_operation_serializer/js_operation_serializer
+programs/network_mapper/network_mapper
 programs/witness_node/witness_node
 programs/build_helpers/cat-parts
 programs/build_helpers/member_enumerator

@@ -17,7 +17,6 @@ if( GRAPHENE_DISABLE_UNITY_BUILD )
         db_init.cpp
         db_maint.cpp
         db_management.cpp
-        db_market.cpp
         db_update.cpp
         db_witness_schedule.cpp
         db_notify.cpp
@@ -46,7 +45,6 @@ add_library( graphene_chain
              protocol/chain_parameters.cpp
              protocol/committee_member.cpp
              protocol/witness.cpp
-             protocol/market.cpp
              protocol/proposal.cpp
              protocol/withdraw_permission.cpp
              protocol/asset_ops.cpp
@@ -75,7 +73,6 @@ add_library( graphene_chain
              asset_evaluator.cpp
              transfer_evaluator.cpp
              proposal_evaluator.cpp
-             market_evaluator.cpp
              vesting_balance_evaluator.cpp
              withdraw_permission_evaluator.cpp
              worker_evaluator.cpp
@@ -87,8 +84,6 @@ add_library( graphene_chain
 
              account_object.cpp
              asset_object.cpp
-             fba_object.cpp
-             market_object.cpp
              proposal_object.cpp
              vesting_balance_object.cpp
 

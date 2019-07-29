@@ -326,9 +326,6 @@ void application_impl::set_api_limit() {
    if(_options->count("api-limit-get-account-history")){
       _app_options.api_limit_get_account_history = _options->at("api-limit-get-account-history").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-grouped-limit-orders")){
-      _app_options.api_limit_get_grouped_limit_orders = _options->at("api-limit-get-grouped-limit-orders").as<uint64_t>();
-   }
    if(_options->count("api-limit-get-relative-account-history")){
        _app_options.api_limit_get_relative_account_history = _options->at("api-limit-get-relative-account-history").as<uint64_t>();
    }
@@ -468,9 +465,6 @@ void application_impl::startup()
       _app_options.enable_subscribe_to_all = _options->at( "enable-subscribe-to-all" ).as<bool>();
 
    set_api_limit();
-
-   if( _active_plugins.find( "market_history" ) != _active_plugins.end() )
-      _app_options.has_market_history_plugin = true;
 
    if( _options->count("api-access") ) {
 
@@ -1010,8 +1004,6 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For history_api::get_account_history_operations to set its default limit value as 100")
          ("api-limit-get-account-history",boost::program_options::value<uint64_t>()->default_value(100),
           "For history_api::get_account_history to set its default limit value as 100")
-         ("api-limit-get-grouped-limit-orders",boost::program_options::value<uint64_t>()->default_value(101),
-          "For orders_api::get_grouped_limit_orders to set its default limit value as 101")
          ("api-limit-get-relative-account-history",boost::program_options::value<uint64_t>()->default_value(100),
           "For history_api::get_relative_account_history to set its default limit value as 100")
          ("api-limit-get-account-history-by-operations",boost::program_options::value<uint64_t>()->default_value(100),
@@ -1054,7 +1046,6 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
    {
       wanted.push_back("witness");
       wanted.push_back("account_history");
-      wanted.push_back("market_history");
    }
    int es_ah_conflict_counter = 0;
    for (auto& it : wanted)

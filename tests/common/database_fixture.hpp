@@ -29,7 +29,6 @@
 #include <fc/io/json.hpp>
 
 #include <graphene/chain/operation_history_object.hpp>
-#include <graphene/market_history/market_history_plugin.hpp>
 
 #include <iostream>
 
@@ -260,41 +259,15 @@ struct database_fixture {
 
    void publish_feed(const asset_object& mia, const account_object& by, const price_feed& f);
 
-   const call_order_object* borrow( account_id_type who, asset what, asset collateral,
-                                    optional<uint16_t> target_cr = {} )
-   { return borrow(who(db), what, collateral, target_cr); }
-   const call_order_object* borrow( const account_object& who, asset what, asset collateral,
-                                    optional<uint16_t> target_cr = {} );
    void cover(account_id_type who, asset what, asset collateral_freed,
                                     optional<uint16_t> target_cr = {} )
    { cover(who(db), what, collateral_freed, target_cr); }
    void cover(const account_object& who, asset what, asset collateral_freed,
                                     optional<uint16_t> target_cr = {} );
-   void bid_collateral(const account_object& who, const asset& to_bid, const asset& to_cover);
 
    const asset_object& get_asset( const string& symbol )const;
    const account_object& get_account( const string& name )const;
-   const asset_object& create_bitasset(const string& name,
-                                       account_id_type issuer = GRAPHENE_WITNESS_ACCOUNT,
-                                       uint16_t market_fee_percent = 100 /*1%*/,
-                                       uint16_t flags = charge_market_fee,
-                                       uint16_t precision = 2,
-                                       asset_id_type backing_asset = {},
-                                       share_type initial_max_supply = GRAPHENE_INITIAL_MAX_SHARE_SUPPLY );
-   const asset_object& create_prediction_market(const string& name,
-                                       account_id_type issuer = GRAPHENE_WITNESS_ACCOUNT,
-                                       uint16_t market_fee_percent = 100 /*1%*/,
-                                       uint16_t flags = charge_market_fee,
-                                       uint16_t precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS,
-                                       asset_id_type backing_asset = {});
-   const asset_object& create_user_issued_asset( const string& name );
-   const asset_object& create_user_issued_asset( const string& name,
-                                                 const account_object& issuer,
-                                                 uint16_t flags,
-                                                 const price& core_exchange_rate = price(asset(1, asset_id_type(1)), asset(1)),
-                                                 uint8_t precision = 2 /* traditional precision for tests */,
-                                                 uint16_t market_fee_percent = 0,
-                                                 additional_asset_options_t options = additional_asset_options_t());
+
    void issue_uia( const account_object& recipient, asset amount );
    void issue_uia( account_id_type recipient_id, asset amount );
 
@@ -330,16 +303,8 @@ struct database_fixture {
    uint64_t fund( const account_object& account, const asset& amount = asset(500000) );
    digest_type digest( const transaction& tx );
    void sign( signed_transaction& trx, const fc::ecc::private_key& key );
-   const limit_order_object* create_sell_order( account_id_type user, const asset& amount, const asset& recv,
-                                                const time_point_sec order_expiration = time_point_sec::maximum(),
-                                                const price& fee_core_exchange_rate = price::unit_price() );
-   const limit_order_object* create_sell_order( const account_object& user, const asset& amount, const asset& recv,
-                                                const time_point_sec order_expiration = time_point_sec::maximum(),
-                                                const price& fee_core_exchange_rate = price::unit_price() );
-   asset cancel_limit_order( const limit_order_object& order );
    void transfer( account_id_type from, account_id_type to, const asset& amount, const asset& fee = asset() );
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );
-   void fund_fee_pool( const account_object& from, const asset_object& asset_to_fund, const share_type amount );
    /**
     * NOTE: This modifies the database directly. You will probably have to call this each time you
     * finish creating a block
@@ -350,19 +315,13 @@ struct database_fixture {
    void upgrade_to_lifetime_member( const account_object& account );
    void upgrade_to_annual_member( account_id_type account );
    void upgrade_to_annual_member( const account_object& account );
-   void print_market( const string& syma, const string& symb )const;
+
    string pretty( const asset& a )const;
-   void print_limit_order( const limit_order_object& cur )const;
-   void print_call_orders( )const;
-   void print_joint_market( const string& syma, const string& symb )const;
+
    int64_t get_balance( account_id_type account, asset_id_type a )const;
    int64_t get_balance( const account_object& account, const asset_object& a )const;
 
-   int64_t get_market_fee_reward( account_id_type account, asset_id_type asset )const;
-   int64_t get_market_fee_reward( const account_object& account, const asset_object& asset )const;
-
    vector< operation_history_object > get_operation_history( account_id_type account_id )const;
-   vector< graphene::market_history::order_history_object > get_market_order_history( asset_id_type a, asset_id_type b )const;
 };
 
 namespace test {

@@ -39,10 +39,8 @@ namespace graphene { namespace app {
    {
       public:
          bool enable_subscribe_to_all = false;
-         bool has_market_history_plugin = false;
          uint64_t api_limit_get_account_history_operations = 100;
          uint64_t api_limit_get_account_history = 100;
-         uint64_t api_limit_get_grouped_limit_orders = 101;
          uint64_t api_limit_get_relative_account_history = 100;
          uint64_t api_limit_get_account_history_by_operations = 100;
          uint64_t api_limit_get_asset_holders = 100;

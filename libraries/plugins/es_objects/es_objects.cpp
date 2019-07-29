@@ -27,7 +27,6 @@
 #include <curl/curl.h>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/balance_object.hpp>
-#include <graphene/chain/market_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
 
@@ -60,7 +59,6 @@ class es_objects_plugin_impl
       bool _es_objects_assets = true;
       bool _es_objects_balances = true;
       bool _es_objects_limit_orders = true;
-      bool _es_objects_asset_bitasset = true;
       std::string _es_objects_index_prefix = "objects-";
       uint32_t _es_objects_start_es_after_block = 0;
       CURL *curl; // curl handler
@@ -179,24 +177,6 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
                else
                   prepareTemplate<account_balance_object>(*b, "balance");
             }
-         } else if (value.is<limit_order_object>() && _es_objects_limit_orders) {
-            auto obj = db.find_object(value);
-            auto l = static_cast<const limit_order_object *>(obj);
-            if (l != nullptr) {
-               if (action == "delete")
-                  remove_from_database(l->id, "limitorder");
-               else
-                  prepareTemplate<limit_order_object>(*l, "limitorder");
-            }
-         } else if (value.is<asset_bitasset_data_object>() && _es_objects_asset_bitasset) {
-            auto obj = db.find_object(value);
-            auto ba = static_cast<const asset_bitasset_data_object *>(obj);
-            if (ba != nullptr) {
-               if (action == "delete")
-                  remove_from_database(ba->id, "bitasset");
-               else
-                  prepareTemplate<asset_bitasset_data_object>(*ba, "bitasset");
-            }
          }
       }
 
@@ -304,8 +284,6 @@ void es_objects_plugin::plugin_set_program_options(
          ("es-objects-accounts", boost::program_options::value<bool>(), "Store account objects(true)")
          ("es-objects-assets", boost::program_options::value<bool>(), "Store asset objects(true)")
          ("es-objects-balances", boost::program_options::value<bool>(), "Store balances objects(true)")
-         ("es-objects-limit-orders", boost::program_options::value<bool>(), "Store limit order objects(true)")
-         ("es-objects-asset-bitasset", boost::program_options::value<bool>(), "Store feed data(true)")
          ("es-objects-index-prefix", boost::program_options::value<std::string>(), "Add a prefix to the index(objects-)")
          ("es-objects-keep-only-current", boost::program_options::value<bool>(), "Keep only current state of the objects(true)")
          ("es-objects-start-es-after-block", boost::program_options::value<uint32_t>(), "Start doing ES job after block(0)")
@@ -365,12 +343,6 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
    }
    if (options.count("es-objects-balances")) {
       my->_es_objects_balances = options["es-objects-balances"].as<bool>();
-   }
-   if (options.count("es-objects-limit-orders")) {
-      my->_es_objects_limit_orders = options["es-objects-limit-orders"].as<bool>();
-   }
-   if (options.count("es-objects-asset-bitasset")) {
-      my->_es_objects_asset_bitasset = options["es-objects-asset-bitasset"].as<bool>();
    }
    if (options.count("es-objects-index-prefix")) {
       my->_es_objects_index_prefix = options["es-objects-index-prefix"].as<std::string>();

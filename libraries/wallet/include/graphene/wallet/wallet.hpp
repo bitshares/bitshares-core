@@ -403,7 +403,6 @@ class wallet_api
        *
        */
       full_account                      get_full_account( const string& name_or_id);
-      // vector<bucket_object>             get_market_history(string symbol, string symbol2, uint32_t bucket, fc::time_point_sec start, fc::time_point_sec end)const;
 
       /**
        * @brief Fetch all orders relevant to the specified account sorted descendingly by price
@@ -483,14 +482,6 @@ class wallet_api
        * @returns the information about the asset stored in the block chain
        */
       asset_object                      get_asset(string asset_name_or_id) const;
-
-      /** Returns the BitAsset-specific data for a given asset.
-       * Market-issued assets's behavior are determined both by their "BitAsset Data" and
-       * their basic asset data, as returned by \c get_asset().
-       * @param asset_name_or_id the symbol or id of the BitAsset in question
-       * @returns the BitAsset-specific data for this asset
-       */
-      asset_bitasset_data_object        get_bitasset_data(string asset_name_or_id)const;
 
       /**
        * Returns information about the given HTLC object.
@@ -990,151 +981,11 @@ class wallet_api
                                          string symbol,
                                          bool broadcast = false );
 
-      /** Place a limit order attempting to sell one asset for another.
-       *
-       * Buying and selling are the same operation on Graphene; if you want to buy TUSC 
-       * with USD, you should sell USD for TUSC.
-       *
-       * The blockchain will attempt to sell the \c symbol_to_sell for as
-       * much \c symbol_to_receive as possible, as long as the price is at 
-       * least \c min_to_receive / \c amount_to_sell.   
-       *
-       * In addition to the transaction fees, market fees will apply as specified 
-       * by the issuer of both the selling asset and the receiving asset as
-       * a percentage of the amount exchanged.
-       *
-       * If either the selling asset or the receiving asset is whitelist
-       * restricted, the order will only be created if the seller is on
-       * the whitelist of the restricted asset type.
-       *
-       * Market orders are matched in the order they are included
-       * in the block chain.
-       *
-       * @todo Allow order expiration to be set here.  Document default/max expiration time
-       *
-       * @param seller_account the account providing the asset being sold, and which will 
-       *                       receive the proceeds of the sale.
-       * @param amount_to_sell the amount of the asset being sold to sell (in nominal units)
-       * @param symbol_to_sell the name or id of the asset to sell
-       * @param min_to_receive the minimum amount you are willing to receive in return for
-       *                       selling the entire amount_to_sell
-       * @param symbol_to_receive the name or id of the asset you wish to receive
-       * @param timeout_sec if the order does not fill immediately, this is the length of 
-       *                    time the order will remain on the order books before it is 
-       *                    cancelled and the un-spent funds are returned to the seller's 
-       *                    account
-       * @param fill_or_kill if true, the order will only be included in the blockchain
-       *                     if it is filled immediately; if false, an open order will be
-       *                     left on the books to fill any amount that cannot be filled
-       *                     immediately.
-       * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction selling the funds
-       */
-      signed_transaction sell_asset(string seller_account,
-                                    string amount_to_sell,
-                                    string   symbol_to_sell,
-                                    string min_to_receive,
-                                    string   symbol_to_receive,
-                                    uint32_t timeout_sec = 0,
-                                    bool     fill_or_kill = false,
-                                    bool     broadcast = false);
-
-      /** Borrow an asset or update the debt/collateral ratio for the loan.
-       *
-       * This is the first step in shorting an asset.  Call \c sell_asset() to complete the short.
-       *
-       * @param borrower_name the name or id of the account associated with the transaction.
-       * @param amount_to_borrow the amount of the asset being borrowed.  Make this value
-       *                         negative to pay back debt.
-       * @param asset_symbol the symbol or id of the asset being borrowed.
-       * @param amount_of_collateral the amount of the backing asset to add to your collateral
-       *        position.  Make this negative to claim back some of your collateral.
-       *        The backing asset is defined in the \c bitasset_options for the asset being borrowed.
-       * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction borrowing the asset
-       */
-      signed_transaction borrow_asset(string borrower_name, string amount_to_borrow, string asset_symbol,
-                                      string amount_of_collateral, bool broadcast = false);
-
-      /** Borrow an asset or update the debt/collateral ratio for the loan, with additional options.
-       *
-       * This is the first step in shorting an asset.  Call \c sell_asset() to complete the short.
-       *
-       * @param borrower_name the name or id of the account associated with the transaction.
-       * @param amount_to_borrow the amount of the asset being borrowed.  Make this value
-       *                         negative to pay back debt.
-       * @param asset_symbol the symbol or id of the asset being borrowed.
-       * @param amount_of_collateral the amount of the backing asset to add to your collateral
-       *        position.  Make this negative to claim back some of your collateral.
-       *        The backing asset is defined in the \c bitasset_options for the asset being borrowed.
-       * @param extensions additional options
-       * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction borrowing the asset
-       */
-      signed_transaction borrow_asset_ext( string borrower_name, string amount_to_borrow, string asset_symbol,
-                                           string amount_of_collateral,
-                                           call_order_update_operation::extensions_type extensions,
-                                           bool broadcast = false );
-
-      /** Cancel an existing order
-       *
-       * @param order_id the id of order to be cancelled
-       * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction canceling the order
-       */
-      signed_transaction cancel_order(object_id_type order_id, bool broadcast = false);
-
-      /** Creates a new user-issued or market-issued asset.
-       *
-       * Many options can be changed later using \c update_asset()
-       *
-       * Right now this function is difficult to use because you must provide raw JSON data
-       * structures for the options objects, and those include prices and asset ids.
-       *
-       * @param issuer the name or id of the account who will pay the fee and become the 
-       *               issuer of the new asset.  This can be updated later
-       * @param symbol the ticker symbol of the new asset
-       * @param precision the number of digits of precision to the right of the decimal point,
-       *                  must be less than or equal to 12
-       * @param common asset options required for all new assets.
-       *               Note that core_exchange_rate technically needs to store the asset ID of 
-       *               this new asset. Since this ID is not known at the time this operation is 
-       *               created, create this price as though the new asset has instance ID 1, and
-       *               the chain will overwrite it with the new asset's ID.
-       * @param bitasset_opts options specific to BitAssets.  This may be null unless the
-       *               \c market_issued flag is set in common.flags
-       * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction creating a new asset
-       */
-      signed_transaction create_asset(string issuer,
-                                      string symbol,
-                                      uint8_t precision,
-                                      asset_options common,
-                                      fc::optional<bitasset_options> bitasset_opts,
-                                      bool broadcast = false);
-
-      /** Issue new shares of an asset.
-       *
-       * @param to_account the name or id of the account to receive the new shares
-       * @param amount the amount to issue, in nominal units
-       * @param symbol the ticker symbol of the asset to issue
-       * @param memo a memo to include in the transaction, readable by the recipient
-       * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction issuing the new shares
-       */
-      signed_transaction issue_asset(string to_account, string amount,
-                                     string symbol,
-                                     string memo,
-                                     bool broadcast = false);
-
       /** Update the core options on an asset.
        * There are a number of options which all assets in the network use. These options are 
        * enumerated in the asset_object::asset_options struct. This command is used to update 
        * these options for an existing asset.
-       *
-       * @note This operation cannot be used to update BitAsset-specific options. For these options,
-       * \c update_bitasset() instead.
-       *
+       * 
        * @param symbol the name or id of the asset to update
        * @param new_issuer if changing the asset's issuer, the name or id of the new issuer.
        *                   null if you wish to remain the issuer of the asset
@@ -1144,116 +995,9 @@ class wallet_api
        * @returns the signed transaction updating the asset
        */
       signed_transaction update_asset(string symbol,
-                                      optional<string> new_issuer,
                                       asset_options new_options,
                                       bool broadcast = false);
 
-      /** Update the issuer of an asset
-       * Since this call requires the owner authority of the current issuer to sign the transaction,
-       * a separated operation is used to change the issuer. This call simplifies the use of this action.
-       *
-       * @note This operation requires the owner key to be available in the wallet.
-       *
-       * @param symbol the name or id of the asset to update
-       * @param new_issuer if changing the asset's issuer, the name or id of the new issuer.
-       * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction updating the asset
-       */
-      signed_transaction update_asset_issuer(string symbol,
-                                             string new_issuer,
-                                             bool broadcast = false);
-
-      /** Update the options specific to a BitAsset.
-       *
-       * BitAssets have some options which are not relevant to other asset types. This operation is used to update those
-       * options an an existing BitAsset.
-       *
-       * @see update_asset()
-       *
-       * @param symbol the name or id of the asset to update, which must be a market-issued asset
-       * @param new_options the new bitasset_options object, which will entirely replace the existing
-       *                    options.
-       * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction updating the bitasset
-       */
-      signed_transaction update_bitasset(string symbol,
-                                         bitasset_options new_options,
-                                         bool broadcast = false);
-
-      /** Update the set of feed-producing accounts for a BitAsset.
-       *
-       * BitAssets have price feeds selected by taking the median values of recommendations from a set of feed producers.
-       * This command is used to specify which accounts may produce feeds for a given BitAsset.
-       * @param symbol the name or id of the asset to update
-       * @param new_feed_producers a list of account names or ids which are authorized to produce feeds for the asset.
-       *                           this list will completely replace the existing list
-       * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction updating the bitasset's feed producers
-       */
-      signed_transaction update_asset_feed_producers(string symbol,
-                                                     flat_set<string> new_feed_producers,
-                                                     bool broadcast = false);
-      
-      /** Publishes a price feed for the named asset.
-       *
-       * Price feed providers use this command to publish their price feeds for market-issued assets. A price feed is
-       * used to tune the market for a particular market-issued asset. For each value in the feed, the median across all
-       * committee_member feeds for that asset is calculated and the market for the asset is configured with the median of that
-       * value.
-       *
-       * The feed object in this command contains three prices: a call price limit, a short price limit, and a settlement price.
-       * The call limit price is structured as (collateral asset) / (debt asset) and the short limit price is structured
-       * as (asset for sale) / (collateral asset). Note that the asset IDs are opposite to eachother, so if we're
-       * publishing a feed for USD, the call limit price will be CORE/USD and the short limit price will be USD/CORE. The
-       * settlement price may be flipped either direction, as long as it is a ratio between the market-issued asset and
-       * its collateral.
-       *
-       * @param publishing_account the account publishing the price feed
-       * @param symbol the name or id of the asset whose feed we're publishing
-       * @param feed the price_feed object containing the three prices making up the feed
-       * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction updating the price feed for the given asset
-       */
-      signed_transaction publish_asset_feed(string publishing_account,
-                                            string symbol,
-                                            price_feed feed,
-                                            bool broadcast = false);
-
-      /** Pay into the fee pool for the given asset.
-       *
-       * User-issued assets can optionally have a pool of the core asset which is 
-       * automatically used to pay transaction fees for any transaction using that
-       * asset (using the asset's core exchange rate).
-       *
-       * This command allows anyone to deposit the core asset into this fee pool.
-       *
-       * @param from the name or id of the account sending the core asset
-       * @param symbol the name or id of the asset whose fee pool you wish to fund
-       * @param amount the amount of the core asset to deposit
-       * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction funding the fee pool
-       */
-      signed_transaction fund_asset_fee_pool(string from,
-                                             string symbol,
-                                             string amount,
-                                             bool broadcast = false);
-
-      /** Claim funds from the fee pool for the given asset.
-       *
-       * User-issued assets can optionally have a pool of the core asset which is 
-       * automatically used to pay transaction fees for any transaction using that
-       * asset (using the asset's core exchange rate).
-       *
-       * This command allows the issuer to withdraw those funds from the fee pool.
-       *
-       * @param symbol the name or id of the asset whose fee pool you wish to claim
-       * @param amount the amount of the core asset to withdraw
-       * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction claiming from the fee pool
-       */
-      signed_transaction claim_asset_fee_pool(string symbol,
-                                              string amount,
-                                              bool broadcast = false);
 
       /** Burns the given user-issued asset.
        *
@@ -1269,66 +1013,6 @@ class wallet_api
                                     string amount,
                                     string symbol,
                                     bool broadcast = false);
-
-      /** Forces a global settling of the given asset (black swan or prediction markets).
-       *
-       * In order to use this operation, asset_to_settle must have the global_settle flag set
-       *
-       * When this operation is executed all balances are converted into the backing asset at the
-       * settle_price and all open margin positions are called at the settle price.  If this asset is
-       * used as backing for other bitassets, those bitassets will be force settled at their current
-       * feed price.
-       *
-       * @note this operation is used only by the asset issuer, \c settle_asset() may be used by 
-       *       any user owning the asset
-       *
-       * @param symbol the name or id of the asset to force settlement on
-       * @param settle_price the price at which to settle
-       * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction settling the named asset
-       */
-      signed_transaction global_settle_asset(string symbol,
-                                             price settle_price,
-                                             bool broadcast = false);
-
-      /** Schedules a market-issued asset for automatic settlement.
-       *
-       * Holders of market-issued assests may request a forced settlement for some amount of their asset. This means that
-       * the specified sum will be locked by the chain and held for the settlement period, after which time the chain will
-       * choose a margin posision holder and buy the settled asset using the margin's collateral. The price of this sale
-       * will be based on the feed price for the market-issued asset being settled. The exact settlement price will be the
-       * feed price at the time of settlement with an offset in favor of the margin position, where the offset is a
-       * blockchain parameter set in the global_property_object.
-       *
-       * @param account_to_settle the name or id of the account owning the asset
-       * @param amount_to_settle the amount of the named asset to schedule for settlement
-       * @param symbol the name or id of the asset to settlement on
-       * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction settling the named asset
-       */
-      signed_transaction settle_asset(string account_to_settle,
-                                      string amount_to_settle,
-                                      string symbol,
-                                      bool broadcast = false);
-
-      /** Creates or updates a bid on an MPA after global settlement.
-       *
-       * In order to revive a market-pegged asset after global settlement (aka
-       * black swan), investors can bid collateral in order to take over part of
-       * the debt and the settlement fund, see BSIP-0018. Updating an existing
-       * bid to cover 0 debt will delete the bid.
-       *
-       * @param bidder_name the name or id of the account making the bid
-       * @param debt_amount the amount of debt of the named asset to bid for
-       * @param debt_symbol the name or id of the MPA to bid for
-       * @param additional_collateral the amount of additional collateral to bid
-       *        for taking over debt_amount. The asset type of this amount is
-       *        determined automatically from debt_symbol.
-       * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction creating/updating the bid
-       */
-      signed_transaction bid_collateral(string bidder_name, string debt_amount, string debt_symbol,
-                                        string additional_collateral, bool broadcast = false);
 
       /** Whitelist and blacklist accounts, primarily for transacting in whitelisted assets.
        *
@@ -1734,8 +1418,6 @@ class wallet_api
       signed_transaction add_transaction_signature( signed_transaction tx,
                                                     bool broadcast = false );
 
-      void dbg_make_uia(string creator, string symbol);
-      void dbg_make_mia(string creator, string symbol);
       void dbg_push_blocks( std::string src_filename, uint32_t count );
       void dbg_generate_blocks( std::string debug_wif_key, uint32_t count );
       void dbg_stream_json_objects( const std::string& filename );
@@ -1862,29 +1544,13 @@ FC_API( graphene::wallet::wallet_api,
         (register_account)
         (upgrade_account)
         (create_account_with_brain_key)
-        (sell_asset)
-        (borrow_asset)
-        (borrow_asset_ext)
-        (cancel_order)
         (transfer)
         (transfer2)
         (get_transaction_id)
-        (create_asset)
         (update_asset)
-        (update_asset_issuer)
-        (update_bitasset)
         (get_htlc)
-        (update_asset_feed_producers)
-        (publish_asset_feed)
-        (issue_asset)
         (get_asset)
-        (get_bitasset_data)
-        (fund_asset_fee_pool)
-        (claim_asset_fee_pool)
         (reserve_asset)
-        (global_settle_asset)
-        (settle_asset)
-        (bid_collateral)
         (whitelist_account)
         (create_committee_member)
         (get_witness)
@@ -1911,20 +1577,14 @@ FC_API( graphene::wallet::wallet_api,
         (get_account_history)
         (get_relative_account_history)
         (get_account_history_by_operations)
-      //   (get_collateral_bids)
         (is_public_key_registered)
         (get_full_account)
-      //   (get_market_history)
         (get_global_properties)
         (get_dynamic_global_properties)
         (get_object)
         (get_private_key)
         (load_wallet_file)
         (normalize_brain_key)
-      //   (get_account_limit_orders)
-      //   (get_limit_orders)
-      //   (get_call_orders)
-      //   (get_settle_orders)
         (save_wallet_file)
         (serialize_transaction)
         (sign_transaction)
@@ -1935,8 +1595,6 @@ FC_API( graphene::wallet::wallet_api,
         (propose_parameter_change)
         (propose_fee_change)
         (approve_proposal)
-        (dbg_make_uia)
-        (dbg_make_mia)
         (dbg_push_blocks)
         (dbg_generate_blocks)
         (dbg_stream_json_objects)
@@ -1959,6 +1617,5 @@ FC_API( graphene::wallet::wallet_api,
         (blind_history)
         (receive_blind_transfer)
         (sale)
-      //   (get_order_book)
         (quit)
       )

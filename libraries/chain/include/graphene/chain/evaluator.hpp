@@ -97,11 +97,6 @@ namespace graphene { namespace chain {
 
       object_id_type get_relative_id( object_id_type rel_id )const;
 
-      /**
-       * pay_fee() for FBA subclass should simply call this method
-       */
-      void pay_fba_fee( uint64_t fba_id );
-
       // the next two functions are helpers that allow template functions declared in this 
       // header to call db() without including database.hpp, which would
       // cause a circular dependency

@@ -72,49 +72,6 @@ bool is_valid_symbol( const string& symbol )
     return true;
 }
 
-share_type asset_issue_operation::calculate_fee(const fee_parameters_type& k)const
-{
-   return k.fee + calculate_data_fee( fc::raw::pack_size(memo), k.price_per_kbyte );
-}
-
-share_type asset_create_operation::calculate_fee(const asset_create_operation::fee_parameters_type& param)const
-{
-   auto core_fee_required = param.long_symbol; 
-
-   switch(symbol.size()) {
-      case 3: core_fee_required = param.symbol3;
-          break;
-      case 4: core_fee_required = param.symbol4;
-          break;
-      default:
-          break;
-   }
-
-   // common_options contains several lists and a string. Charge fees for its size
-   core_fee_required += calculate_data_fee( fc::raw::pack_size(*this), param.price_per_kbyte );
-
-   return core_fee_required;
-}
-
-void  asset_create_operation::validate()const
-{
-   FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( is_valid_symbol(symbol) );
-   common_options.validate();
-   if( common_options.issuer_permissions & (disable_force_settle|global_settle) )
-      FC_ASSERT( bitasset_opts.valid() );
-   if( is_prediction_market )
-   {
-      FC_ASSERT( bitasset_opts.valid(), "Cannot have a User-Issued Asset implement a prediction market." );
-      FC_ASSERT( common_options.issuer_permissions & global_settle );
-   }
-   if( bitasset_opts ) bitasset_opts->validate();
-
-   asset dummy = asset(1) * common_options.core_exchange_rate;
-   FC_ASSERT(dummy.asset_id == asset_id_type(1));
-   FC_ASSERT(precision <= 12);
-}
-
 void asset_update_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
@@ -126,36 +83,9 @@ void asset_update_operation::validate()const
    FC_ASSERT(dummy.asset_id == asset_id_type());
 }
 
-void asset_update_issuer_operation::validate()const
-{
-   FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( issuer != new_issuer );
-}
-
 share_type asset_update_operation::calculate_fee(const asset_update_operation::fee_parameters_type& k)const
 {
    return k.fee + calculate_data_fee( fc::raw::pack_size(*this), k.price_per_kbyte );
-}
-
-
-void asset_publish_feed_operation::validate()const
-{
-   FC_ASSERT( fee.amount >= 0 );
-   feed.validate();
-
-   // maybe some of these could be moved to feed.validate()
-   if( !feed.core_exchange_rate.is_null() )
-   {
-      feed.core_exchange_rate.validate();
-   }
-   if( (!feed.settlement_price.is_null()) && (!feed.core_exchange_rate.is_null()) )
-   {
-      FC_ASSERT( feed.settlement_price.base.asset_id == feed.core_exchange_rate.base.asset_id );
-   }
-
-   FC_ASSERT( !feed.settlement_price.is_null() );
-   FC_ASSERT( !feed.core_exchange_rate.is_null() );
-   FC_ASSERT( feed.is_for( asset_id ) );
 }
 
 void asset_reserve_operation::validate()const
@@ -163,51 +93,6 @@ void asset_reserve_operation::validate()const
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( amount_to_reserve.amount.value <= GRAPHENE_INITIAL_MAX_SHARE_SUPPLY );
    FC_ASSERT( amount_to_reserve.amount.value > 0 );
-}
-
-void asset_issue_operation::validate()const
-{
-   FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( asset_to_issue.amount.value <= GRAPHENE_INITIAL_MAX_SHARE_SUPPLY );
-   FC_ASSERT( asset_to_issue.amount.value > 0 );
-   FC_ASSERT( asset_to_issue.asset_id != asset_id_type(0) );
-}
-
-void asset_fund_fee_pool_operation::validate() const
-{
-   FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( fee.asset_id == asset_id_type() );
-   FC_ASSERT( amount > 0 );
-}
-
-void asset_settle_operation::validate() const
-{
-   FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( amount.amount >= 0 );
-}
-
-void asset_update_bitasset_operation::validate() const
-{
-   FC_ASSERT( fee.amount >= 0 );
-   new_options.validate();
-}
-
-void asset_update_feed_producers_operation::validate() const
-{
-   FC_ASSERT( fee.amount >= 0 );
-}
-
-void asset_global_settle_operation::validate()const
-{
-   FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( asset_to_settle == settle_price.base.asset_id );
-}
-
-void bitasset_options::validate() const
-{
-   FC_ASSERT(minimum_feeds > 0);
-   FC_ASSERT(force_settlement_offset_percent <= GRAPHENE_100_PERCENT);
-   FC_ASSERT(maximum_force_settlement_volume <= GRAPHENE_100_PERCENT);
 }
 
 void asset_options::validate()const
@@ -236,18 +121,6 @@ void asset_options::validate()const
    {
       FC_ASSERT( whitelist_markets.find(item) == whitelist_markets.end() );
    }
-}
-
-void asset_claim_fees_operation::validate()const {
-   FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( amount_to_claim.amount > 0 );
-}
-
-void asset_claim_pool_operation::validate()const {
-   FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( fee.asset_id != asset_id);
-   FC_ASSERT( amount_to_claim.amount > 0 );
-   FC_ASSERT( amount_to_claim.asset_id == asset_id_type());
 }
 
 } } // namespace graphene::chain

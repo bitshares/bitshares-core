@@ -24,7 +24,6 @@
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/witness_object.hpp>
-#include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/balance_object.hpp>

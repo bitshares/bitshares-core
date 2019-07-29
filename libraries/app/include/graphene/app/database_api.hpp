@@ -23,6 +23,7 @@
  */
 #pragma once
 
+#include <graphene/app/application.hpp>
 #include <graphene/app/full_account.hpp>
 
 #include <graphene/chain/protocol/types.hpp>
@@ -35,14 +36,11 @@
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/confidential_object.hpp>
-#include <graphene/chain/market_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
-
-#include <graphene/market_history/market_history_plugin.hpp>
 
 #include <fc/api.hpp>
 #include <fc/optional.hpp>
@@ -60,68 +58,9 @@
 namespace graphene { namespace app {
 
 using namespace graphene::chain;
-using namespace graphene::market_history;
 using namespace std;
 
 class database_api_impl;
-
-struct order
-{
-   string                     price;
-   string                     quote;
-   string                     base;
-};
-
-struct order_book
-{
-  string                      base;
-  string                      quote;
-  vector< order >             bids;
-  vector< order >             asks;
-};
-
-struct market_ticker
-{
-   time_point_sec             time;
-   string                     base;
-   string                     quote;
-   string                     latest;
-   string                     lowest_ask;
-   string                     highest_bid;
-   string                     percent_change;
-   string                     base_volume;
-   string                     quote_volume;
-
-   market_ticker() {}
-   market_ticker(const market_ticker_object& mto,
-                 const fc::time_point_sec& now,
-                 const asset_object& asset_base,
-                 const asset_object& asset_quote,
-                 const order_book& orders);
-   market_ticker(const fc::time_point_sec& now,
-                 const asset_object& asset_base,
-                 const asset_object& asset_quote);
-};
-
-struct market_volume
-{
-   time_point_sec             time;
-   string                     base;
-   string                     quote;
-   string                     base_volume;
-   string                     quote_volume;
-};
-
-struct market_trade
-{
-   int64_t                    sequence = 0;
-   fc::time_point_sec         date;
-   string                     price;
-   string                     amount;
-   string                     value;
-   account_id_type            side1_account_id = GRAPHENE_NULL_ACCOUNT;
-   account_id_type            side2_account_id = GRAPHENE_NULL_ACCOUNT;
-};
 
 /**
  * @brief The database_api class implements the RPC API for the chain database.
@@ -180,7 +119,7 @@ class database_api
       /**
        * @brief Stop receiving any notifications
        *
-       * This unsubscribes from all subscribed markets and objects.
+       * This unsubscribes from all subscribed objects.
        */
       void cancel_all_subscriptions();
 
@@ -622,13 +561,6 @@ private:
 };
 
 } }
-
-FC_REFLECT( graphene::app::order, (price)(quote)(base) );
-FC_REFLECT( graphene::app::order_book, (base)(quote)(bids)(asks) );
-FC_REFLECT( graphene::app::market_ticker,
-            (time)(base)(quote)(latest)(lowest_ask)(highest_bid)(percent_change)(base_volume)(quote_volume) );
-FC_REFLECT( graphene::app::market_volume, (time)(base)(quote)(base_volume)(quote_volume) );
-FC_REFLECT( graphene::app::market_trade, (sequence)(date)(price)(amount)(value)(side1_account_id)(side2_account_id) );
 
 FC_API(graphene::app::database_api,
    // Objects

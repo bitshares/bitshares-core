@@ -1,8 +1,6 @@
 add_subdirectory( witness )
 add_subdirectory( account_history )
 add_subdirectory( elasticsearch )
-add_subdirectory( market_history )
-add_subdirectory( grouped_orders )
 add_subdirectory( delayed_node )
 add_subdirectory( debug_witness )
 add_subdirectory( snapshot )
