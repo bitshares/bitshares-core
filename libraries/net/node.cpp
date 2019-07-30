@@ -2575,11 +2575,20 @@ namespace graphene { namespace net { namespace detail {
       }
       catch (const fc::exception& e)
       {
+        auto block_num = block_message_to_send.block.block_num();
         wlog("Failed to push sync block ${num} (id:${id}): client rejected sync block sent by peer: ${e}",
-             ("num", block_message_to_send.block.block_num())
+             ("num", block_num)
              ("id", block_message_to_send.block_id)
              ("e", e));
-        handle_message_exception = e;
+        if( e.code() == block_timestamp_in_future_exception::code_enum::code_value )
+        {
+           handle_message_exception = block_timestamp_in_future_exception( FC_LOG_MESSAGE( warn, "",
+                ("block_header", static_cast<graphene::protocol::block_header>(block_message_to_send.block))
+                ("block_num", block_num)
+                ("block_id", block_message_to_send.block_id) ) );
+        }
+        else
+           handle_message_exception = e;
       }
 
       // build up lists for any potentially-blocking operations we need to do, then do them
@@ -2992,11 +3001,21 @@ namespace graphene { namespace net { namespace detail {
       catch (const fc::exception& e)
       {
         // client rejected the block.  Disconnect the client and any other clients that offered us this block
-        wlog("Failed to push block ${num} (id:${id}), client rejected block sent by peer",
-              ("num", block_message_to_process.block.block_num())
-              ("id", block_message_to_process.block_id));
+        auto block_num = block_message_to_process.block.block_num();
+        wlog("Failed to push block ${num} (id:${id}), client rejected block sent by peer: ${e}",
+              ("num", block_num)
+              ("id", block_message_to_process.block_id)
+              ("e",e));
 
-        disconnect_exception = e;
+        if( e.code() == block_timestamp_in_future_exception::code_enum::code_value )
+        {
+           disconnect_exception = block_timestamp_in_future_exception( FC_LOG_MESSAGE( warn, "",
+                ("block_header", static_cast<graphene::protocol::block_header>(block_message_to_process.block))
+                ("block_num", block_num)
+                ("block_id", block_message_to_process.block_id) ) );
+        }
+        else
+           disconnect_exception = e;
         disconnect_reason = "You offered me a block that I have deemed to be invalid";
 
         peers_to_disconnect.insert( originating_peer->shared_from_this() );
