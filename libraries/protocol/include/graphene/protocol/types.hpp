@@ -240,7 +240,8 @@ GRAPHENE_DEFINE_IDS(protocol, protocol_ids, /*protocol objects are not prefixed*
                     (worker)
                     (balance)
                     (htlc)
-                    (voting_statistics))
+                    (voting_statistics)
+                    (voteable_statistics))
 
 FC_REFLECT(graphene::protocol::public_key_type, (key_data))
 FC_REFLECT(graphene::protocol::public_key_type::binary_key, (data)(check))
