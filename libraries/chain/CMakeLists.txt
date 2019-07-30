@@ -89,7 +89,6 @@ add_library( graphene_chain
              market_object.cpp
              proposal_object.cpp
              vesting_balance_object.cpp
-             voting_statistics_object.cpp
 
              block_database.cpp
 
