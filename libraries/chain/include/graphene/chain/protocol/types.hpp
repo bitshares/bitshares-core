@@ -156,6 +156,7 @@ namespace graphene { namespace chain {
       balance_object_type,
       htlc_object_type,
       voting_statistics_object_type,
+      voteable_statistics_object_type,
       OBJECT_TYPE_COUNT ///< Sentry value which contains the number of different object types
    };
 
@@ -200,6 +201,7 @@ namespace graphene { namespace chain {
    class blinded_balance_object;
    class voting_statistics_object;
    class htlc_object;
+   class voteable_statistics_object;
 
    typedef object_id< protocol_ids, account_object_type,            account_object>               account_id_type;
    typedef object_id< protocol_ids, asset_object_type,              asset_object>                 asset_id_type;
@@ -217,6 +219,7 @@ namespace graphene { namespace chain {
    typedef object_id< protocol_ids, balance_object_type,            balance_object>               balance_id_type;
    typedef object_id< protocol_ids, voting_statistics_object_type,  voting_statistics_object>     voting_statistics_id_type;
    typedef object_id< protocol_ids, htlc_object_type,               htlc_object>                  htlc_id_type;
+   typedef object_id< protocol_ids, voteable_statistics_object_type, voteable_statistics_object>  voteable_statistics_id_type;
 
    // implementation types
    class global_property_object;
@@ -392,6 +395,7 @@ FC_REFLECT_ENUM( graphene::chain::object_type,
                  (balance_object_type)
                  (htlc_object_type)
                  (voting_statistics_object_type)
+                 (voteable_statistics_object_type)
                  (OBJECT_TYPE_COUNT)
                )
 FC_REFLECT_ENUM( graphene::chain::impl_object_type,
@@ -447,6 +451,7 @@ FC_REFLECT_TYPENAME( graphene::chain::fba_accumulator_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::collateral_bid_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::voting_statistics_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::htlc_id_type )
+FC_REFLECT_TYPENAME( graphene::chain::voteable_statistics_id_type )
 
 FC_REFLECT( graphene::chain::void_t, )
 
