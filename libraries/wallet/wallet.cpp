@@ -2244,6 +2244,55 @@ public:
       return clear_text;
    }
 
+   signed_message sign_message(string signer, string message)
+   {
+      FC_ASSERT( !self.is_locked() );
+
+      const account_object from_account = get_account(signer);
+
+      signed_message result;
+      result.payload.emplace_back( std::string("from") );
+      result.payload.emplace_back( from_account.name );
+      result.payload.emplace_back( std::string("key") );
+      result.payload.emplace_back( std::string( from_account.options.memo_key ) );
+      result.payload.emplace_back( std::string("time") );
+      result.payload.emplace_back( time(nullptr) );
+      result.payload.emplace_back( std::string("text") );
+      result.payload.emplace_back( std::move(message) );
+
+      digest_type::encoder enc;
+      fc::raw::pack( enc, _chain_id );
+      fc::raw::pack( enc, result.payload );
+      result.signature = get_private_key( from_account.options.memo_key ).sign_compact( enc.result() );
+
+      return result;
+   }
+
+   bool verify_message( signed_message message )
+   {
+      FC_ASSERT( message.payload.size() == 8 );
+      FC_ASSERT( message.payload[0].is_string() && message.payload[0].as_string() == "from" );
+      FC_ASSERT( message.payload[1].is_string() );
+      FC_ASSERT( message.payload[2].is_string() && message.payload[2].as_string() == "key" );
+      FC_ASSERT( message.payload[3].is_string() );
+      FC_ASSERT( message.payload[4].is_string() && message.payload[4].as_string() == "time" );
+      FC_ASSERT( message.payload[5].is_numeric() );
+      FC_ASSERT( message.payload[6].is_string() && message.payload[6].as_string() == "text" );
+      FC_ASSERT( message.payload[7].is_string() );
+
+      const account_object from_account = get_account( message.payload[1].as_string() );
+      const public_key_type key( message.payload[3].as_string() );
+
+      digest_type::encoder enc;
+      fc::raw::pack( enc, _chain_id );
+      fc::raw::pack( enc, message.payload );
+      const public_key signer( message.signature, enc.result() );
+      FC_ASSERT( signer == key.key_data, "Message wasn't signed by contained key!" );
+      FC_ASSERT( signer == from_account.options.memo_key.key_data,
+                 "Message was signed by contained key, but it doesn't belong to the contained account!" );
+      return true;
+   }
+
    signed_transaction sell_asset(string seller_account,
                                  string amount_to_sell,
                                  string symbol_to_sell,
@@ -4478,6 +4527,17 @@ string wallet_api::read_memo(const memo_data& memo)
 {
    FC_ASSERT(!is_locked());
    return my->read_memo(memo);
+}
+
+signed_message wallet_api::sign_message(string signer, string message)
+{
+   FC_ASSERT(!is_locked());
+   return my->sign_message(signer, message);
+}
+
+bool wallet_api::verify_message(signed_message message)
+{
+   return my->verify_message(message);
 }
 
 string wallet_api::get_key_label( public_key_type key )const
