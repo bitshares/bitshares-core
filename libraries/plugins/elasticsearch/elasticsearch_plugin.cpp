@@ -59,7 +59,7 @@ class elasticsearch_plugin_impl
       bool _elasticsearch_operation_object = false;
       uint32_t _elasticsearch_start_es_after_block = 0;
       bool _elasticsearch_operation_string = true;
-      std::string _elasticsearch_mode = "only_save";
+      mode _elasticsearch_mode = mode::only_save;
       CURL *curl; // curl handler
       vector <string> bulk_lines; //  vector of op lines
       vector<std::string> prepare;
@@ -446,8 +446,8 @@ void elasticsearch_plugin::plugin_set_program_options(
                "Start doing ES job after block(0)")
          ("elasticsearch-operation-string", boost::program_options::value<bool>(),
                "Save operation as string. Needed to serve history api calls(true)")
-         ("elasticsearch-mode", boost::program_options::value<std::string>(),
-               "Mode of operation: only_save, only_query, all(only_save)")
+         ("elasticsearch-mode", boost::program_options::value<uint16_t>(),
+               "Mode of operation: only_save(0), only_query(1), all(2) - Default: 0")
          ;
    cfg.add(cli);
 }
@@ -485,11 +485,14 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
       my->_elasticsearch_operation_string = options["elasticsearch-operation-string"].as<bool>();
    }
    if (options.count("elasticsearch-mode")) {
-      my->_elasticsearch_mode = options["elasticsearch-mode"].as<std::string>();
+      const auto option_number = options["elasticsearch-mode"].as<uint16_t>();
+      if(option_number > mode::all)
+         FC_THROW_EXCEPTION(fc::exception, "Elasticsearch mode not valid");
+      my->_elasticsearch_mode = static_cast<mode>(options["elasticsearch-mode"].as<uint16_t>());
    }
 
-   if(my->_elasticsearch_mode != "only_query") {
-      if (my->_elasticsearch_mode == "all")
+   if(my->_elasticsearch_mode != mode::only_query) {
+      if (my->_elasticsearch_mode == mode::all)
          my->_elasticsearch_operation_string = true;
 
       database().applied_block.connect([this](const signed_block &b) {
