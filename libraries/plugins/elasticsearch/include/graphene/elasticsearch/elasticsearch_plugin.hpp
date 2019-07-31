@@ -76,6 +76,8 @@ class elasticsearch_plugin : public graphene::app::plugin
       graphene::utilities::ES prepareHistoryQuery(string query);
 };
 
+enum mode { only_save = 0 , only_query = 1, all = 2 };
+
 struct operation_visitor
 {
    typedef void result_type;
@@ -302,6 +304,7 @@ struct adaptor_struct {
 
 } } //graphene::elasticsearch
 
+FC_REFLECT_ENUM( graphene::elasticsearch::mode, (only_save)(only_query)(all) )
 FC_REFLECT( graphene::elasticsearch::operation_history_struct, (trx_in_block)(op_in_trx)(operation_result)(virtual_op)(op)(op_object) )
 FC_REFLECT( graphene::elasticsearch::block_struct, (block_num)(block_time)(trx_id) )
 FC_REFLECT( graphene::elasticsearch::fee_struct, (asset)(asset_name)(amount)(amount_units) )
