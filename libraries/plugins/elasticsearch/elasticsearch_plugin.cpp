@@ -482,7 +482,7 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
       if (my->_elasticsearch_mode == "all")
          my->_elasticsearch_operation_string = true;
 
-      database().applied_block.connect([&](const signed_block &b) {
+      database().applied_block.connect([this](const signed_block &b) {
          if (!my->update_account_histories(b))
             FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error populating ES database, we are going to keep trying.");
       });
