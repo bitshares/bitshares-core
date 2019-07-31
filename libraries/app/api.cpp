@@ -343,9 +343,12 @@ namespace graphene { namespace app {
 
        if(_app.is_plugin_enabled("elasticsearch")) {
           auto es = _app.get_plugin<elasticsearch::elasticsearch_plugin>("elasticsearch");
-          auto _thread = std::make_shared<fc::thread>("elasticsearch");
-          return _thread->async([&](){ return es->get_account_history(account, stop, limit, start); },
-                "thread invoke for method " BOOST_PP_STRINGIZE(method_name)).wait();
+          if(es.get()->get_running_mode() != elasticsearch::mode::only_save) {
+             auto _thread = std::make_shared<fc::thread>("elasticsearch");
+             return _thread->async([&es, &account, &stop, &limit, &start]() {
+                return es->get_account_history(account, stop, limit, start);
+             }, "thread invoke for method " BOOST_PP_STRINGIZE(method_name)).wait();
+          }
        }
 
        const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
