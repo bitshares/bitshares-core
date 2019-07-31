@@ -487,17 +487,19 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
    if (options.count("elasticsearch-mode")) {
       const auto option_number = options["elasticsearch-mode"].as<uint16_t>();
       if(option_number > mode::all)
-         FC_THROW_EXCEPTION(fc::exception, "Elasticsearch mode not valid");
+         FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Elasticsearch mode not valid");
       my->_elasticsearch_mode = static_cast<mode>(options["elasticsearch-mode"].as<uint16_t>());
    }
 
    if(my->_elasticsearch_mode != mode::only_query) {
-      if (my->_elasticsearch_mode == mode::all)
-         my->_elasticsearch_operation_string = true;
+      if (my->_elasticsearch_mode == mode::all && !my->_elasticsearch_operation_string)
+         FC_THROW_EXCEPTION(graphene::chain::plugin_exception,
+               "If elasticsearch-mode is set to all then elasticsearch-operation-string need to be true");
 
       database().applied_block.connect([this](const signed_block &b) {
          if (!my->update_account_histories(b))
-            FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error populating ES database, we are going to keep trying.");
+            FC_THROW_EXCEPTION(graphene::chain::plugin_exception,
+                  "Error populating ES database, we are going to keep trying.");
       });
    }
 }
