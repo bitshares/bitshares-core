@@ -347,73 +347,49 @@ struct attribute_assertion<extension<Extension>> {
    }
 };
 
-// slimmer accelerates build times by reducing the number of elements in the argument static variant to only those
-// supported for a given function type. This reduces build time because it eliminates many options the compiler has
-// to explore when visiting the argument variant to create a predicate
-template<typename List>
-struct slimmer {
-   restriction_argument arg;
-   slimmer(restriction_argument&& arg) : arg(std::move(arg)) {}
-   using result_type = typelist::apply<List, static_variant>;
-
-   template<typename T, typename = std::enable_if_t<typelist::contains<List, T>()>>
-   result_type do_cast(T&& content, short) { return result_type(content); }
-   template<typename T>
-   result_type do_cast(T&&, long) {
-      FC_THROW_EXCEPTION(fc::assert_exception, "Invalid argument type for restriction function type");
-   }
-
-   template<typename T> result_type operator()(T) {
-      return do_cast(std::move(arg.get<typename T::type>()), short());
-   }
-};
-
 template<typename Field>
 object_restriction_predicate<Field> create_predicate_function(restriction_function func, restriction_argument arg) {
    try {
-      using typelist::runtime::dispatch;
-      using std::move;
-      using Arg = decltype(arg);
       switch(func) {
       case restriction::func_eq: {
          restriction_argument_visitor<predicate_eq, Field> visitor;
-         return dispatch(Arg::list(), arg.which(), slimmer<equality_types_list>(move(arg))).visit(visitor);
+         return typelist::apply<equality_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
       }
       case restriction::func_ne: {
          restriction_argument_visitor<predicate_ne, Field> visitor;
-         return dispatch(Arg::list(), arg.which(), slimmer<equality_types_list>(move(arg))).visit(visitor);
+         return typelist::apply<equality_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
       }
       case restriction::func_lt: {
          restriction_argument_visitor<predicate_lt, Field> visitor;
-         return dispatch(Arg::list(), arg.which(), slimmer<comparable_types_list>(move(arg))).visit(visitor);
+         return typelist::apply<comparable_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
       }
       case restriction::func_le: {
          restriction_argument_visitor<predicate_le, Field> visitor;
-         return dispatch(Arg::list(), arg.which(), slimmer<comparable_types_list>(move(arg))).visit(visitor);
+         return typelist::apply<comparable_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
       }
       case restriction::func_gt: {
          restriction_argument_visitor<predicate_gt, Field> visitor;
-         return dispatch(Arg::list(), arg.which(), slimmer<comparable_types_list>(move(arg))).visit(visitor);
+         return typelist::apply<comparable_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
       }
       case restriction::func_ge: {
          restriction_argument_visitor<predicate_ge, Field> visitor;
-         return dispatch(Arg::list(), arg.which(), slimmer<comparable_types_list>(move(arg))).visit(visitor);
+         return typelist::apply<comparable_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
       }
       case restriction::func_in: {
          restriction_argument_visitor<predicate_in, Field> visitor;
-         return dispatch(Arg::list(), arg.which(), slimmer<list_types_list>(move(arg))).visit(visitor);
+         return typelist::apply<list_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
       }
       case restriction::func_not_in: {
          restriction_argument_visitor<predicate_not_in, Field> visitor;
-         return dispatch(Arg::list(), arg.which(), slimmer<list_types_list>(move(arg))).visit(visitor);
+         return typelist::apply<list_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
       }
       case restriction::func_has_all: {
          restriction_argument_visitor<predicate_has_all, Field> visitor;
-         return dispatch(Arg::list(), arg.which(), slimmer<list_types_list>(move(arg))).visit(visitor);
+         return typelist::apply<list_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
       }
       case restriction::func_has_none: {
          restriction_argument_visitor<predicate_has_none, Field> visitor;
-         return dispatch(Arg::list(), arg.which(), slimmer<list_types_list>(move(arg))).visit(visitor);
+         return typelist::apply<list_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
       }
       case restriction::func_attr:
          FC_ASSERT(arg.which() == restriction_argument::tag<vector<restriction>>::value,
