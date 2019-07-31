@@ -50,6 +50,8 @@ namespace detail
     class elasticsearch_plugin_impl;
 }
 
+enum mode { only_save = 0 , only_query = 1, all = 2 };
+
 class elasticsearch_plugin : public graphene::app::plugin
 {
    public:
@@ -67,6 +69,7 @@ class elasticsearch_plugin : public graphene::app::plugin
       operation_history_object get_operation_by_id(operation_history_id_type id);
       vector<operation_history_object> get_account_history(const account_id_type account_id,
             operation_history_id_type stop, unsigned limit, operation_history_id_type start);
+      mode get_running_mode();
 
       friend class detail::elasticsearch_plugin_impl;
       std::unique_ptr<detail::elasticsearch_plugin_impl> my;
@@ -76,7 +79,6 @@ class elasticsearch_plugin : public graphene::app::plugin
       graphene::utilities::ES prepareHistoryQuery(string query);
 };
 
-enum mode { only_save = 0 , only_query = 1, all = 2 };
 
 struct operation_visitor
 {

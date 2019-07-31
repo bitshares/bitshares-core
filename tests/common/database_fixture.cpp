@@ -198,6 +198,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       options.insert(std::make_pair("elasticsearch-visitor", boost::program_options::variable_value(false, false)));
       options.insert(std::make_pair("elasticsearch-operation-object", boost::program_options::variable_value(true, false)));
       options.insert(std::make_pair("elasticsearch-operation-string", boost::program_options::variable_value(true, false)));
+      options.insert(std::make_pair("elasticsearch-mode", boost::program_options::variable_value(uint16_t(2), false)));
 
       esplugin->plugin_initialize(options);
       esplugin->plugin_startup();

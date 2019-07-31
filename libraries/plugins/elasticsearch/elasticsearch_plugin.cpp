@@ -630,4 +630,10 @@ graphene::utilities::ES elasticsearch_plugin::prepareHistoryQuery(string query)
    return es;
 }
 
+mode elasticsearch_plugin::get_running_mode()
+{
+   return my->_elasticsearch_mode;
+}
+
+
 } }
