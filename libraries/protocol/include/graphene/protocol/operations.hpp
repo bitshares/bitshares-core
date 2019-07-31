@@ -102,7 +102,8 @@ namespace graphene { namespace protocol {
             htlc_redeemed_operation,         // VIRTUAL
             htlc_extend_operation,
             htlc_refund_operation,           // VIRTUAL
-            account_unlock_operation
+            account_unlock_operation,
+            account_unlock_penalty_payment_operation  //VIRTUAL
          > operation;
 
    /// @} // operations group

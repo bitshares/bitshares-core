@@ -61,6 +61,11 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // account_id
    }
+   void operator()(const account_unlock_penalty_payment_operation& op)
+   {
+      _impacted.insert( op.fee_payer() );
+      _impacted.insert( GRAPHENE_COMMITTEE_ACCOUNT );
+   }
    void operator()( const execute_bid_operation& op )
    {
       _impacted.insert( op.fee_payer() ); // bidder

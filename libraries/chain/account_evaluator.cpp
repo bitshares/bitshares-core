@@ -464,6 +464,18 @@ void_result account_unlock_evaluator::do_apply( const account_unlock_operation& 
       a.stable_owner.reset();
    });
 
+   const auto& bal_idx = d.get_index_type< primary_index< account_balance_index > >().get_secondary_index< balances_by_account_index >();
+   for( const auto& entry : bal_idx.get_account_balances( acnt->get_id() ) )
+   {
+      const auto balance = entry.second->get_balance();
+      const auto unlock_cost = balance.amount / 10;
+      const auto penalty = asset(unlock_cost, balance.asset_id);
+
+      d.push_applied_operation(account_unlock_penalty_payment_operation( acnt->get_id(), penalty ));
+      d.adjust_balance(acnt->get_id(), penalty);
+      d.adjust_balance(GRAPHENE_COMMITTEE_ACCOUNT, -penalty);
+   }
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
