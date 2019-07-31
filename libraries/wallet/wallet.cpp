@@ -1195,7 +1195,7 @@ public:
       op.account_to_unlock = account_obj.get_id();
       op.previous_authority = *account_obj.stable_owner;
       tx.operations = {op};
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
       tx.validate();
 
       return sign_transaction( tx, broadcast );

@@ -38,12 +38,14 @@
 #include <algorithm>
 #include <tuple>
 
-namespace graphene { namespace chain {
-
-   void verify_cycled_authority( const account_id_type& id, 
+namespace graphene { 
+   namespace protocol {
+      void verify_cycled_authority( const account_id_type& id, 
                               const std::function<const authority*(account_id_type)>& get_active,
                               const std::function<const authority*(account_id_type)>& get_owner,
                               uint32_t max_recursion_depth );
+   }
+   namespace chain {   
 
 namespace detail {
 

@@ -348,6 +348,7 @@ GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_oper
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_whitelist_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_upgrade_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_unlock_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_transfer_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_whitelist_operation )
@@ -355,13 +356,3 @@ GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_oper
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_upgrade_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_unlock_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_transfer_operation )
-// FC_REFLECT( graphene::chain::account_whitelist_operation, (fee)(authorizing_account)(account_to_list)(new_listing)(extensions))
-
-// FC_REFLECT( graphene::chain::account_create_operation::fee_parameters_type, (basic_fee)(premium_fee)(price_per_kbyte) )
-// FC_REFLECT( graphene::chain::account_whitelist_operation::fee_parameters_type, (fee) )
-// FC_REFLECT( graphene::chain::account_update_operation::fee_parameters_type, (fee)(price_per_kbyte) )
-
-// FC_REFLECT( graphene::chain::account_upgrade_operation::fee_parameters_type, (membership_annual_fee)(membership_lifetime_fee) )
-// FC_REFLECT( graphene::chain::account_transfer_operation::fee_parameters_type, (fee) )
-
-// FC_REFLECT( graphene::chain::account_transfer_operation, (fee)(account_id)(new_owner)(extensions) )
