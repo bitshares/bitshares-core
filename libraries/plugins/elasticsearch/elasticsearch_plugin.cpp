@@ -523,22 +523,9 @@ operation_history_object elasticsearch_plugin::get_operation_by_id(operation_his
    const string query = R"(
    {
       "query": {
-         "bool": {
-            "must": [
-            {
-               "query_string": {
-                  "query": "account_history.operation_id: )" + operation_id_string + R"("
-               }
-            },
-            {
-               "range": {
-                  "block_data.block_time": {
-                     "gte": "now-20y",
-                     "lte": "now"
-                  }
-               }
-            }
-            ]
+         "match":
+         {
+            "account_history.operation_id": )" + operation_id_string + R"("
          }
       }
    }
