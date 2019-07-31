@@ -24,7 +24,7 @@
 
 #include <graphene/chain/get_config.hpp>
 #include <graphene/chain/config.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/types.hpp>
 
 namespace graphene { namespace chain {
 
@@ -69,7 +69,6 @@ fc::variant_object get_config()
    result[ "GRAPHENE_MAX_COLLATERAL_RATIO" ] = GRAPHENE_MAX_COLLATERAL_RATIO;
    result[ "GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO" ] = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
    result[ "GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO" ] = GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO;
-   result[ "GRAPHENE_DEFAULT_MARGIN_PERIOD_SEC" ] = GRAPHENE_DEFAULT_MARGIN_PERIOD_SEC;
    result[ "GRAPHENE_DEFAULT_MAX_WITNESSES" ] = GRAPHENE_DEFAULT_MAX_WITNESSES;
    result[ "GRAPHENE_DEFAULT_MAX_COMMITTEE" ] = GRAPHENE_DEFAULT_MAX_COMMITTEE;
    result[ "GRAPHENE_DEFAULT_MAX_PROPOSAL_LIFETIME_SEC" ] = GRAPHENE_DEFAULT_MAX_PROPOSAL_LIFETIME_SEC;

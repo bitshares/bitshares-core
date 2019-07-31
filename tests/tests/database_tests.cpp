@@ -27,6 +27,7 @@
 #include <graphene/chain/database.hpp>
 
 #include <graphene/chain/account_object.hpp>
+#include <graphene/chain/proposal_object.hpp>
 
 #include <fc/crypto/digest.hpp>
 
@@ -220,6 +221,93 @@ BOOST_AUTO_TEST_CASE( direct_index_test )
    }), fc::assert_exception );
    // This is actually undefined behaviour. The object has been modified, but
    // but the secondary has not updated its representation
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( required_approval_index_test ) // see https://github.com/bitshares/bitshares-core/issues/1719
+{ try {
+   ACTORS( (alice)(bob)(charlie)(agnetha)(benny)(carlos) );
+
+   database db1;
+   db1.initialize_indexes();
+   const auto& proposals = db1.get_index_type< primary_index< proposal_index > >();
+   const auto& required_approvals = proposals.get_secondary_index< required_approval_index >()._account_to_proposals;
+
+   // Create a proposal
+   const auto& prop = db1.create<proposal_object>( [this,alice_id,agnetha_id]( object& o ) {
+      proposal_object& prop = static_cast<proposal_object&>(o);
+      prop.proposer = committee_account;
+      prop.required_active_approvals.insert( alice_id );
+      prop.required_owner_approvals.insert( agnetha_id );
+   });
+
+   BOOST_CHECK_EQUAL( 2u, required_approvals.size() );
+   BOOST_REQUIRE( required_approvals.find( alice_id )   != required_approvals.end() );
+   BOOST_REQUIRE( required_approvals.find( agnetha_id ) != required_approvals.end() );
+   BOOST_CHECK_EQUAL( 1u, required_approvals.find(alice_id)->second.size() );
+   BOOST_CHECK_EQUAL( 1u, required_approvals.find(agnetha_id)->second.size() );
+
+   // add approvals
+   db1.modify( prop, [bob_id,benny_id]( object& o ) {
+      proposal_object& prop = static_cast<proposal_object&>(o);
+      prop.available_active_approvals.insert( bob_id );
+      prop.available_owner_approvals.insert( benny_id );
+   });
+
+   BOOST_CHECK_EQUAL( 4u, required_approvals.size() );
+   BOOST_REQUIRE( required_approvals.find( bob_id )   != required_approvals.end() );
+   BOOST_REQUIRE( required_approvals.find( benny_id ) != required_approvals.end() );
+   BOOST_CHECK_EQUAL( 1u, required_approvals.find(bob_id)->second.size() );
+   BOOST_CHECK_EQUAL( 1u, required_approvals.find(benny_id)->second.size() );
+
+   // remove approvals + add others
+   db1.modify( prop, [bob_id,charlie_id,benny_id,carlos_id]( object& o ) {
+      proposal_object& prop = static_cast<proposal_object&>(o);
+      prop.available_active_approvals.insert( charlie_id );
+      prop.available_owner_approvals.insert( carlos_id );
+      prop.available_active_approvals.erase( bob_id );
+      prop.available_owner_approvals.erase( benny_id );
+   });
+
+   BOOST_CHECK_EQUAL( 4u, required_approvals.size() );
+   BOOST_REQUIRE( required_approvals.find( charlie_id ) != required_approvals.end() );
+   BOOST_REQUIRE( required_approvals.find( carlos_id )  != required_approvals.end() );
+   BOOST_CHECK_EQUAL( 1u, required_approvals.find(charlie_id)->second.size() );
+   BOOST_CHECK_EQUAL( 1u, required_approvals.find(carlos_id)->second.size() );
+
+   // simulate save/restore
+   std::vector<char> serialized = fc::raw::pack( prop );
+   database db2;
+   db2.initialize_indexes();
+   const auto& reloaded_proposals = db2.get_index_type< primary_index< proposal_index > >();
+   const auto& reloaded_approvals = reloaded_proposals.get_secondary_index<required_approval_index>()
+                                                                                              ._account_to_proposals;
+   const_cast< primary_index< proposal_index >& >( reloaded_proposals ).load( serialized );
+   const auto& prop2 = *reloaded_proposals.indices().begin();
+
+   BOOST_CHECK_EQUAL( 4u, reloaded_approvals.size() );
+   BOOST_REQUIRE( reloaded_approvals.find( charlie_id ) != reloaded_approvals.end() );
+   BOOST_REQUIRE( reloaded_approvals.find( carlos_id )  != reloaded_approvals.end() );
+   BOOST_CHECK_EQUAL( 1u, reloaded_approvals.find(charlie_id)->second.size() );
+   BOOST_CHECK_EQUAL( 1u, reloaded_approvals.find(carlos_id)->second.size() );
+
+   db2.modify( prop2, []( object& o ) {
+      proposal_object& prop = static_cast<proposal_object&>(o);
+      prop.available_active_approvals.clear();
+      prop.available_owner_approvals.clear();
+   });
+
+   BOOST_CHECK_EQUAL( 2u, reloaded_approvals.size() );
+   BOOST_REQUIRE( reloaded_approvals.find( alice_id )   != reloaded_approvals.end() );
+   BOOST_REQUIRE( reloaded_approvals.find( agnetha_id ) != reloaded_approvals.end() );
+
+   db2.remove( prop2 );
+
+   BOOST_CHECK_EQUAL( 0u, reloaded_approvals.size() );
+
+   db1.remove( prop );
+
+   BOOST_CHECK_EQUAL( 0u, required_approvals.size() );
+
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

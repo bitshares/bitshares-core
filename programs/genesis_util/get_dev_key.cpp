@@ -28,8 +28,8 @@
 #include <fc/crypto/elliptic.hpp>
 #include <fc/io/json.hpp>
 
-#include <graphene/chain/protocol/address.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/address.hpp>
+#include <graphene/protocol/types.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 
 #ifndef WIN32
@@ -73,10 +73,10 @@ int main( int argc, char** argv )
       auto show_key = [&comma]( const fc::ecc::private_key& priv_key )
       {
          fc::limited_mutable_variant_object mvo(5);
-         graphene::chain::public_key_type pub_key = priv_key.get_public_key();
+         graphene::protocol::public_key_type pub_key = priv_key.get_public_key();
          mvo( "private_key", graphene::utilities::key_to_wif( priv_key ) )
             ( "public_key", std::string( pub_key ) )
-            ( "address", graphene::chain::address( pub_key ) )
+            ( "address", graphene::protocol::address( pub_key ) )
             ;
          if( comma )
             std::cout << ",\n";

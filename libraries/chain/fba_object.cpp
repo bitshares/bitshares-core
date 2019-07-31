@@ -70,12 +70,12 @@ bool fba_accumulator_object::is_configured( const database& db )const
    }
    const account_object& issuer_acct = dasset->issuer(db);
 
-   if( issuer_acct.owner_special_authority.which() != special_authority::tag< top_holders_special_authority >::value )
+   if( !issuer_acct.owner_special_authority.is_type< top_holders_special_authority >() )
    {
       ilog( "FBA fee in block ${b} not paid because of FBA misconfiguration:  designated asset issuer has not set owner top_n control", ("b", db.head_block_num()) );
       return false;
    }
-   if( issuer_acct.active_special_authority.which() != special_authority::tag< top_holders_special_authority >::value )
+   if( !issuer_acct.active_special_authority.is_type< top_holders_special_authority >() )
    {
       ilog( "FBA fee in block ${b} not paid because of FBA misconfiguration:  designated asset issuer has not set active top_n control", ("b", db.head_block_num()) );
       return false;

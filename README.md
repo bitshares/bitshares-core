@@ -55,7 +55,7 @@ We recommend building on Ubuntu 16.04 LTS (64-bit)
     git submodule sync --recursive
     git submodule update --init --recursive
 
-**NOTE:** Versions of [Boost](http://www.boost.org/) 1.57 through 1.69 are supported. Newer versions may work, but
+**NOTE:** Versions of [Boost](http://www.boost.org/) 1.58 through 1.69 are supported. Newer versions may work, but
 have not been tested. If your system came pre-installed with a version of Boost that you do not wish to use, you may
 manually build your preferred version and use it with BitShares by specifying it on the CMake command line.
 

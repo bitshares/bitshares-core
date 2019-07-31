@@ -22,6 +22,9 @@
  * THE SOFTWARE.
  */
 #pragma once
+
+#include <graphene/protocol/fee_schedule.hpp>
+
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/node_property_object.hpp>
 #include <graphene/chain/account_object.hpp>
@@ -45,6 +48,15 @@ namespace graphene { namespace chain {
    using graphene::db::object;
    class op_evaluator;
    class transaction_evaluation_state;
+   class proposal_object;
+   class operation_history_object;
+   class chain_property_object;
+   class witness_schedule_object;
+   class witness_object;
+   class force_settlement_object;
+   class limit_order_object;
+   class collateral_bid_object;
+   class call_order_object;
 
    struct budget_record;
    enum class vesting_balance_type;

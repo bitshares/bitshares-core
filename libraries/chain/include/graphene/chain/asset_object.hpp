@@ -22,9 +22,11 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/protocol/asset_ops.hpp>
-#include <boost/multi_index/composite_key.hpp>
+#include <graphene/chain/types.hpp>
 #include <graphene/db/generic_index.hpp>
+#include <graphene/protocol/asset_ops.hpp>
+
+#include <boost/multi_index/composite_key.hpp>
 
 /**
  * @defgroup prediction_market Prediction Market
@@ -37,7 +39,7 @@
  */
 
 namespace graphene { namespace chain {
-   class account_object;
+   class asset_bitasset_data_object;
    class database;
    using namespace graphene::db;
 
@@ -57,7 +59,7 @@ namespace graphene { namespace chain {
    {
       public:
          static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_asset_dynamic_data_type;
+         static const uint8_t type_id  = impl_asset_dynamic_data_object_type;
 
          /// The number of shares currently in existence
          share_type current_supply;
@@ -106,13 +108,13 @@ namespace graphene { namespace chain {
          string amount_to_string(share_type amount)const;
          /// Convert an asset to a textual representation, i.e. "123.45"
          string amount_to_string(const asset& amount)const
-         { FC_ASSERT(amount.asset_id == id); return amount_to_string(amount.amount); }
+         { FC_ASSERT(amount.asset_id == get_id()); return amount_to_string(amount.amount); }
          /// Convert an asset to a textual representation with symbol, i.e. "123.45 USD"
          string amount_to_pretty_string(share_type amount)const
          { return amount_to_string(amount) + " " + symbol; }
          /// Convert an asset to a textual representation with symbol, i.e. "123.45 USD"
          string amount_to_pretty_string(const asset &amount)const
-         { FC_ASSERT(amount.asset_id == id); return amount_to_pretty_string(amount.amount); }
+         { FC_ASSERT(amount.asset_id == get_id()); return amount_to_pretty_string(amount.amount); }
 
          /// Ticker symbol for this asset, i.e. "USD"
          string symbol;
@@ -174,7 +176,7 @@ namespace graphene { namespace chain {
    {
       public:
          static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_asset_bitasset_data_type;
+         static const uint8_t type_id  = impl_asset_bitasset_data_object_type;
 
          /// The asset this object belong to
          asset_id_type asset_id;
@@ -299,10 +301,15 @@ namespace graphene { namespace chain {
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_unique< tag<by_symbol>, member<asset_object, string, &asset_object::symbol> >,
-         ordered_non_unique< tag<by_issuer>, member<asset_object, account_id_type, &asset_object::issuer > >,
          ordered_unique< tag<by_type>,
             composite_key< asset_object,
                 const_mem_fun<asset_object, bool, &asset_object::is_market_issued>,
+                member< object, object_id_type, &object::id >
+            >
+         >,
+         ordered_unique< tag<by_issuer>,
+            composite_key< asset_object,
+                member< asset_object, account_id_type, &asset_object::issuer >,
                 member< object, object_id_type, &object::id >
             >
          >
@@ -312,23 +319,9 @@ namespace graphene { namespace chain {
 
 } } // graphene::chain
 
-FC_REFLECT_DERIVED( graphene::chain::asset_dynamic_data_object, (graphene::db::object),
-                    (current_supply)(confidential_supply)(accumulated_fees)(fee_pool) )
-
-FC_REFLECT_DERIVED( graphene::chain::asset_bitasset_data_object, (graphene::db::object),
-                    (asset_id)
-                    (feeds)
-                    (current_feed)
-                    (current_feed_publication_time)
-                    (current_maintenance_collateralization)
-                    (options)
-                    (force_settled_volume)
-                    (is_prediction_market)
-                    (settlement_price)
-                    (settlement_fund)
-                    (asset_cer_updated)
-                    (feed_cer_updated)
-                  )
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_dynamic_data_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_bitasset_data_object)
 
 FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (symbol)
@@ -339,3 +332,10 @@ FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (bitasset_data_id)
                     (buyback_account)
                   )
+
+FC_REFLECT_TYPENAME( graphene::chain::asset_bitasset_data_object )
+FC_REFLECT_TYPENAME( graphene::chain::asset_dynamic_data_object )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::asset_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::asset_bitasset_data_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::asset_dynamic_data_object )

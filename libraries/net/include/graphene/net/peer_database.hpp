@@ -24,13 +24,14 @@
 #pragma once
 #include <boost/iterator/iterator_facade.hpp>
 
+#include <graphene/protocol/types.hpp>
+
 #include <fc/network/ip.hpp>
 #include <fc/time.hpp>
 #include <fc/io/enum_type.hpp>
 #include <fc/reflect/reflect.hpp>
 #include <fc/reflect/variant.hpp>
 #include <fc/exception/exception.hpp>
-#include <fc/io/raw.hpp>
 
 namespace graphene { namespace net {
 
@@ -118,5 +119,6 @@ namespace graphene { namespace net {
 
 } } // end namespace graphene::net
 
-FC_REFLECT_ENUM(graphene::net::potential_peer_last_connection_disposition, (never_attempted_to_connect)(last_connection_failed)(last_connection_rejected)(last_connection_handshaking_failed)(last_connection_succeeded))
-FC_REFLECT(graphene::net::potential_peer_record, (endpoint)(last_seen_time)(last_connection_disposition)(last_connection_attempt_time)(number_of_successful_connection_attempts)(number_of_failed_connection_attempts)(last_error) )
+FC_REFLECT_TYPENAME( graphene::net::potential_peer_record )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::net::potential_peer_record)

@@ -157,7 +157,7 @@ bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
       vector<authority> other;
       operation_get_required_authorities( op.op, impacted, impacted, other ); // fee_payer is added here
 
-      if( op.op.which() == operation::tag< account_create_operation >::value )
+      if( op.op.is_type< account_create_operation >() )
          impacted.insert( op.result.get<object_id_type>() );
       else
          graphene::chain::operation_get_impacted_accounts( op.op, impacted );

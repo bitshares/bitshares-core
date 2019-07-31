@@ -33,6 +33,7 @@
 #include <graphene/snapshot/snapshot.hpp>
 #include <graphene/es_objects/es_objects.hpp>
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
+#include <graphene/api_helper_indexes/api_helper_indexes.hpp>
 
 #include <fc/thread/thread.hpp>
 #include <fc/interprocess/signals.hpp>
@@ -68,7 +69,8 @@ int main(int argc, char** argv) {
             ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("witness_node_data_dir"),
                     "Directory containing databases, configuration file, etc.")
             ("version,v", "Display version information")
-            ("plugins", bpo::value<std::string>()->default_value("witness account_history market_history grouped_orders"),
+            ("plugins", bpo::value<std::string>()
+                            ->default_value("witness account_history market_history grouped_orders api_helper_indexes"),
                     "Space-separated list of plugins to activate");
 
       bpo::variables_map options;
@@ -78,7 +80,8 @@ int main(int argc, char** argv) {
       cfg_options.add(cfg);
 
       cfg_options.add_options()
-              ("plugins", bpo::value<std::string>()->default_value("witness account_history market_history grouped_orders"),
+              ("plugins", bpo::value<std::string>()
+	                      ->default_value("witness account_history market_history grouped_orders api_helper_indexes"),
                "Space-separated list of plugins to activate");
 
       auto witness_plug = node->register_plugin<witness_plugin::witness_plugin>();
@@ -90,6 +93,7 @@ int main(int argc, char** argv) {
       auto snapshot_plug = node->register_plugin<snapshot_plugin::snapshot_plugin>();
       auto es_objects_plug = node->register_plugin<es_objects::es_objects_plugin>();
       auto grouped_orders_plug = node->register_plugin<grouped_orders::grouped_orders_plugin>();
+      auto api_helper_indexes_plug = node->register_plugin<api_helper_indexes::api_helper_indexes>();
 
       // add plugin options to config
       try

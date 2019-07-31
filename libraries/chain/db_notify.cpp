@@ -1,8 +1,9 @@
 #include <fc/container/flat.hpp>
 
-#include <graphene/chain/protocol/authority.hpp>
-#include <graphene/chain/protocol/operations.hpp>
-#include <graphene/chain/protocol/transaction.hpp>
+#include <graphene/protocol/authority.hpp>
+#include <graphene/protocol/operations.hpp>
+#include <graphene/protocol/transaction.hpp>
+
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/worker_object.hpp>
@@ -14,7 +15,7 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
-#include <graphene/chain/transaction_object.hpp>
+#include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/impacted.hpp>
 
 using namespace fc;
@@ -302,7 +303,6 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
       {
         case null_object_type:
         case base_object_type:
-        case OBJECT_TYPE_COUNT:
            return;
         case account_object_type:{
            accounts.insert( obj->id );
@@ -387,9 +387,9 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               break;
              case impl_reserved0_object_type:
               break;
-             case impl_asset_dynamic_data_type:
+             case impl_asset_dynamic_data_object_type:
               break;
-             case impl_asset_bitasset_data_type:
+             case impl_asset_bitasset_data_object_type:
               break;
              case impl_account_balance_object_type:{
               const auto& aobj = dynamic_cast<const account_balance_object*>(obj);
@@ -401,8 +401,8 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               FC_ASSERT( aobj != nullptr );
               accounts.insert( aobj->owner );
               break;
-           } case impl_transaction_object_type:{
-              const auto& aobj = dynamic_cast<const transaction_object*>(obj);
+           } case impl_transaction_history_object_type:{
+              const auto& aobj = dynamic_cast<const transaction_history_object*>(obj);
               FC_ASSERT( aobj != nullptr );
               transaction_get_impacted_accounts( aobj->trx, accounts );
               break;
