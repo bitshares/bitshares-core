@@ -267,6 +267,11 @@ struct vesting_balance_object_with_info : public vesting_balance_object
    fc::time_point_sec allowed_withdraw_time;
 };
 
+struct signed_message {
+   fc::variants               payload;
+   fc::ecc::compact_signature signature;
+};
+
 namespace detail {
 class wallet_api_impl;
 }
@@ -1054,6 +1059,21 @@ class wallet_api
        */
       string read_memo(const memo_data& memo);
 
+
+      /** Sign a message using an account's memo key.
+       *
+       * @param signer the name or id of signing account
+       * @param message text to sign
+       * @return the signed message in the format used in https://github.com/xeroc/python-graphenelib/blob/d9634d74273ebacc92555499eca7c444217ecba0/graphenecommon/message.py#L64
+       */
+      signed_message sign_message(string signer, string message);
+
+      /** Verify a message signed with sign_message
+       *
+       * @param message JSON-encoded signed message in the format used in https://github.com/xeroc/python-graphenelib/blob/d9634d74273ebacc92555499eca7c444217ecba0/graphenecommon/message.py#L64
+       * @return true if signature matches
+       */
+      bool verify_message(signed_message message);
 
       /** These methods are used for stealth transfers */
       ///@{
@@ -2034,6 +2054,8 @@ FC_REFLECT(graphene::wallet::operation_detail_ex,
 FC_REFLECT( graphene::wallet::account_history_operation_detail,
         (total_count)(result_count)(details))
 
+FC_REFLECT( graphene::wallet::signed_message, (payload)(signature) )
+
 FC_API( graphene::wallet::wallet_api,
         (help)
         (gethelp)
@@ -2151,6 +2173,8 @@ FC_API( graphene::wallet::wallet_api,
         (network_get_connected_peers)
         (sign_memo)
         (read_memo)
+        (sign_message)
+        (verify_message)
         (set_key_label)
         (get_key_label)
         (get_public_key)
