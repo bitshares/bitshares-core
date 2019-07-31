@@ -1102,9 +1102,7 @@ std::shared_ptr<abstract_plugin> application::get_plugin(const string& name) con
 
 bool application::is_plugin_enabled(const string& name) const
 {
-   if(my->_active_plugins.find(name) == my->_active_plugins.end())
-      return false;
-   return true;
+   return !(my->_active_plugins.find(name) == my->_active_plugins.end());
 }
 
 net::node_ptr application::p2p_node()
