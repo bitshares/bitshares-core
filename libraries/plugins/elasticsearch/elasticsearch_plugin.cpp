@@ -566,14 +566,6 @@ vector<operation_history_object> elasticsearch_plugin::get_account_history(
                "query_string": {
                   "query": "account_history.account: )" + account_id_string +  range + R"("
                }
-            },
-            {
-               "range": {
-                  "block_data.block_time": {
-                     "gte": "now-20y",
-                     "lte": "now"
-                  }
-               }
             }
             ]
          }
