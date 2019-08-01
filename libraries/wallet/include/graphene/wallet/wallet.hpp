@@ -1080,12 +1080,30 @@ class wallet_api
        */
       signed_message sign_message(string signer, string message);
 
-      /** Verify a message signed with sign_message
+      /** Verify a message signed with sign_message using the given account's memo key.
        *
-       * @param message either a JSON-encoded signed_message structure, or a signed message in encapsulated format
+       * @param message the message text
+       * @param account the account name of the message
+       * @param block the block number of the message
+       * @param time the timestamp of the message
+       * @param sig the message signature
        * @return true if signature matches
        */
-      bool verify_message(string message);
+      bool verify_message( string message, string account, int block, int time, compact_signature sig );
+
+      /** Verify a message signed with sign_message
+       *
+       * @param message the signed_message structure containing message, meta data and signature
+       * @return true if signature matches
+       */
+      bool verify_signed_message( signed_message message );
+
+      /** Verify a message signed with sign_message, in its encapsulated form.
+       *
+       * @param message the complete encapsulated message string including separators and line feeds
+       * @return true if signature matches
+       */
+      bool verify_encapsulated_message( string message );
 
       /** These methods are used for stealth transfers */
       ///@{
@@ -2188,6 +2206,8 @@ FC_API( graphene::wallet::wallet_api,
         (read_memo)
         (sign_message)
         (verify_message)
+        (verify_signed_message)
+        (verify_encapsulated_message)
         (set_key_label)
         (get_key_label)
         (get_public_key)
