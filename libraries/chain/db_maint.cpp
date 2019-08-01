@@ -26,6 +26,8 @@
 
 #include <fc/uint128.hpp>
 
+#include <graphene/protocol/market.hpp>
+
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/fba_accumulator_id.hpp>
 #include <graphene/chain/hardfork.hpp>
@@ -304,9 +306,9 @@ void database::update_active_committee_members()
    assert( _committee_count_histogram_buffer.size() > 0 );
    share_type stake_target = (_total_voting_stake-_committee_count_histogram_buffer[0]) / 2;
 
-   /// accounts that vote for 0 or 1 witness do not get to express an opinion on
-   /// the number of witnesses to have (they abstain and are non-voting accounts)
-   uint64_t stake_tally = 0; // _committee_count_histogram_buffer[0];
+   /// accounts that vote for 0 or 1 committee member do not get to express an opinion on
+   /// the number of committee members to have (they abstain and are non-voting accounts)
+   share_type stake_tally = 0;
    size_t committee_member_count = 0;
    if( stake_target > 0 )
    {
@@ -553,11 +555,11 @@ void visit_special_authorities( const database& db, Visitor visit )
    for( const special_authority_object& sao : sa_idx )
    {
       const account_object& acct = sao.account(db);
-      if( acct.owner_special_authority.which() != special_authority::tag< no_special_authority >::value )
+      if( !acct.owner_special_authority.is_type< no_special_authority >() )
       {
          visit( acct, true, acct.owner_special_authority );
       }
-      if( acct.active_special_authority.which() != special_authority::tag< no_special_authority >::value )
+      if( !acct.active_special_authority.is_type< no_special_authority >() )
       {
          visit( acct, false, acct.active_special_authority );
       }
@@ -569,7 +571,7 @@ void update_top_n_authorities( database& db )
    visit_special_authorities( db,
    [&]( const account_object& acct, bool is_owner, const special_authority& auth )
    {
-      if( auth.which() == special_authority::tag< top_holders_special_authority >::value )
+      if( auth.is_type< top_holders_special_authority >() )
       {
          // use index to grab the top N holders of the asset and vote_counter to obtain the weights
 

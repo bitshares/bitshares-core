@@ -18,6 +18,7 @@ VERSION=`cat /etc/bitshares/version`
 #   * $BITSHARESD_PARTIAL_OPERATIONS
 #   * $BITSHARESD_MAX_OPS_PER_ACCOUNT
 #   * $BITSHARESD_ES_NODE_URL
+#   * $BITSHARESD_ES_START_AFTER_BLOCK
 #   * $BITSHARESD_TRUSTED_NODE
 #
 
@@ -68,6 +69,10 @@ fi
 
 if [[ ! -z "$BITSHARESD_ES_NODE_URL" ]]; then
     ARGS+=" --elasticsearch-node-url=${BITSHARESD_ES_NODE_URL}"
+fi
+
+if [[ ! -z "$BITSHARESD_ES_START_AFTER_BLOCK" ]]; then
+    ARGS+=" --elasticsearch-start-es-after-block=${BITSHARESD_ES_START_AFTER_BLOCK}"
 fi
 
 if [[ ! -z "$BITSHARESD_TRUSTED_NODE" ]]; then

@@ -50,11 +50,8 @@ bool _is_authorized_asset(
          return false;
    }
 
-   if( d.head_block_time() > HARDFORK_415_TIME )
-   {
-      if( asset_obj.options.whitelist_authorities.size() == 0 )
-         return true;
-   }
+   if( asset_obj.options.whitelist_authorities.size() == 0 )
+      return true;
 
    for( const auto id : acct.whitelisting_accounts )
    {

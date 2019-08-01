@@ -26,7 +26,6 @@
 #include <graphene/net/node.hpp>
 #include <graphene/net/peer_database.hpp>
 #include <graphene/net/message_oriented_connection.hpp>
-#include <graphene/net/stcp_socket.hpp>
 #include <graphene/net/config.hpp>
 
 #include <boost/tuple/tuple.hpp>
@@ -35,9 +34,7 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/mem_fun.hpp>
 #include <boost/multi_index/member.hpp>
-#include <boost/multi_index/random_access_index.hpp>
 #include <boost/multi_index/tag.hpp>
-#include <boost/multi_index/sequenced_index.hpp>
 #include <boost/multi_index/hashed_index.hpp>
 
 #include <queue>

@@ -23,10 +23,9 @@
  */
 #pragma once
 
-#include <graphene/chain/protocol/asset.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/chain/types.hpp>
 #include <graphene/db/generic_index.hpp>
-#include <graphene/db/object.hpp>
+#include <graphene/protocol/asset.hpp>
 
 #include <boost/multi_index/composite_key.hpp>
 
@@ -68,7 +67,6 @@ class limit_order_object : public abstract_object<limit_order_object>
       asset_id_type receive_asset_id()const { return sell_price.quote.asset_id; }
 };
 
-struct by_id;
 struct by_price;
 struct by_expiration;
 struct by_account;
@@ -272,18 +270,17 @@ typedef generic_index<collateral_bid_object, collateral_bid_object_multi_index_t
 
 } } // graphene::chain
 
-FC_REFLECT_DERIVED( graphene::chain::limit_order_object,
-                    (graphene::db::object),
-                    (expiration)(seller)(for_sale)(sell_price)(deferred_fee)(deferred_paid_fee)
-                  )
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::limit_order_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::call_order_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::force_settlement_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::collateral_bid_object)
 
-FC_REFLECT_DERIVED( graphene::chain::call_order_object, (graphene::db::object),
-                    (borrower)(collateral)(debt)(call_price)(target_collateral_ratio) )
+FC_REFLECT_TYPENAME( graphene::chain::limit_order_object )
+FC_REFLECT_TYPENAME( graphene::chain::call_order_object )
+FC_REFLECT_TYPENAME( graphene::chain::force_settlement_object )
+FC_REFLECT_TYPENAME( graphene::chain::collateral_bid_object )
 
-FC_REFLECT_DERIVED( graphene::chain::force_settlement_object,
-                    (graphene::db::object),
-                    (owner)(balance)(settlement_date)
-                  )
-
-FC_REFLECT_DERIVED( graphene::chain::collateral_bid_object, (graphene::db::object),
-                    (bidder)(inv_swan_price) )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::limit_order_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::call_order_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::force_settlement_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::collateral_bid_object )

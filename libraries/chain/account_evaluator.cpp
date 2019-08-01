@@ -30,7 +30,7 @@
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/internal_exceptions.hpp>
-#include <graphene/chain/special_authority.hpp>
+#include <graphene/chain/special_authority_evaluation.hpp>
 #include <graphene/chain/special_authority_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
@@ -124,13 +124,6 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
    {
       FC_ASSERT( !op.extensions.value.owner_special_authority.valid() );
       FC_ASSERT( !op.extensions.value.active_special_authority.valid() );
-   }
-   if( d.head_block_time() < HARDFORK_599_TIME )
-   {
-      FC_ASSERT( !op.extensions.value.null_ext.valid() );
-      FC_ASSERT( !op.extensions.value.owner_special_authority.valid() );
-      FC_ASSERT( !op.extensions.value.active_special_authority.valid() );
-      FC_ASSERT( !op.extensions.value.buyback_options.valid() );
    }
 
    FC_ASSERT( fee_paying_account->is_lifetime_member(), "Only Lifetime members may register an account." );
@@ -277,12 +270,6 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
    database& d = db();
    if( d.head_block_time() < HARDFORK_516_TIME )
    {
-      FC_ASSERT( !o.extensions.value.owner_special_authority.valid() );
-      FC_ASSERT( !o.extensions.value.active_special_authority.valid() );
-   }
-   if( d.head_block_time() < HARDFORK_599_TIME )
-   {
-      FC_ASSERT( !o.extensions.value.null_ext.valid() );
       FC_ASSERT( !o.extensions.value.owner_special_authority.valid() );
       FC_ASSERT( !o.extensions.value.active_special_authority.valid() );
    }

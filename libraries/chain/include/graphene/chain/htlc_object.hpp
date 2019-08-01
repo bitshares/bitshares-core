@@ -23,15 +23,13 @@
  */
 #pragma once
 
-#include <boost/multi_index/composite_key.hpp>
-#include <fc/time.hpp>
-#include <graphene/chain/protocol/types.hpp>
-#include <graphene/chain/protocol/htlc.hpp>
-#include <graphene/chain/protocol/asset.hpp>
-#include <graphene/db/object.hpp>
+#include <graphene/protocol/htlc.hpp>
 #include <graphene/db/generic_index.hpp>
 
+#include <boost/multi_index/composite_key.hpp>
+
 namespace graphene { namespace chain {
+   using namespace protocol;
 
    /**
     * @brief database object to store HTLCs
@@ -77,10 +75,18 @@ namespace graphene { namespace chain {
          const result_type& operator()(const htlc_object& o)const { return o.transfer.from; }
       };
 
+      /*****
+       * Index helper for to
+       */
+      struct to_extractor {
+         typedef account_id_type result_type;
+         const result_type& operator()(const htlc_object& o)const { return o.transfer.to; }
+      };
    };
 
    struct by_from_id;
    struct by_expiration;
+   struct by_to_id;
    typedef multi_index_container<
          htlc_object,
          indexed_by<
@@ -94,8 +100,13 @@ namespace graphene { namespace chain {
             ordered_unique< tag< by_from_id >,
                   composite_key< htlc_object, 
                   htlc_object::from_extractor,
+                  member< object, object_id_type, &object::id > > >,
+
+            ordered_unique< tag< by_to_id >,
+                  composite_key< htlc_object,
+                  htlc_object::to_extractor,
                   member< object, object_id_type, &object::id > > >
-         >
+      >
 
    > htlc_object_index_type;
 
@@ -103,13 +114,11 @@ namespace graphene { namespace chain {
 
 } } // namespace graphene::chain
 
-FC_REFLECT( graphene::chain::htlc_object::transfer_info, 
-   (from) (to) (amount) (asset_id) )
-FC_REFLECT( graphene::chain::htlc_object::condition_info::hash_lock_info,
-   (preimage_hash) (preimage_size) )
-FC_REFLECT( graphene::chain::htlc_object::condition_info::time_lock_info,
-   (expiration) )
-FC_REFLECT( graphene::chain::htlc_object::condition_info, 
-   (hash_lock)(time_lock) )
-FC_REFLECT_DERIVED( graphene::chain::htlc_object, (graphene::db::object),
-               (transfer) (conditions) )
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::htlc_object)
+
+FC_REFLECT_TYPENAME( graphene::chain::htlc_object::condition_info::hash_lock_info )
+FC_REFLECT_TYPENAME( graphene::chain::htlc_object::condition_info::time_lock_info )
+FC_REFLECT_TYPENAME( graphene::chain::htlc_object::condition_info )
+FC_REFLECT_TYPENAME( graphene::chain::htlc_object )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::htlc_object )

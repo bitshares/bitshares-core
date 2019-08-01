@@ -80,6 +80,9 @@ int sockQuit(void)
 
 #include "../common/genesis_file_util.hpp"
 
+using std::exception;
+using std::cerr;
+
 #define INVOKE(test) ((struct test*)this)->test_method();
 
 //////
@@ -214,7 +217,8 @@ public:
       wallet_data.ws_password = "";
       websocket_connection  = websocket_client.connect( wallet_data.ws_server );
 
-      api_connection = std::make_shared<fc::rpc::websocket_api_connection>(*websocket_connection, GRAPHENE_MAX_NESTED_OBJECTS);
+      api_connection = std::make_shared<fc::rpc::websocket_api_connection>( websocket_connection,
+                                                                            GRAPHENE_MAX_NESTED_OBJECTS );
 
       remote_login_api = api_connection->get_remote_api< graphene::app::login_api >(1);
       BOOST_CHECK(remote_login_api->login( wallet_data.ws_user, wallet_data.ws_password ) );
@@ -470,7 +474,7 @@ BOOST_FIXTURE_TEST_CASE( cli_get_signed_transaction_signers, cli_fixture )
 
       const auto &test_acc = con.wallet_api_ptr->get_account("test");
       flat_set<public_key_type> expected_signers = {test_bki.pub_key};
-      vector<vector<account_id_type> > expected_key_refs{{test_acc.id, test_acc.id}};
+      vector<flat_set<account_id_type> > expected_key_refs{{test_acc.id, test_acc.id}};
 
       auto signers = con.wallet_api_ptr->get_transaction_signers(signed_trx);
       BOOST_CHECK(signers == expected_signers);
@@ -523,7 +527,10 @@ BOOST_FIXTURE_TEST_CASE( cli_get_available_transaction_signers, cli_fixture )
 
       // blockchain has no references to unknown accounts (privkey_1, privkey_2)
       // only test account available
-      vector<vector<account_id_type> > expected_key_refs{{}, {}, {test_acc.id, test_acc.id}};
+      vector<flat_set<account_id_type> > expected_key_refs;
+      expected_key_refs.push_back(flat_set<account_id_type>());
+      expected_key_refs.push_back(flat_set<account_id_type>());
+      expected_key_refs.push_back({test_acc.id});
 
       auto key_refs = con.wallet_api_ptr->get_key_references({expected_signers.begin(), expected_signers.end()});
       std::sort(key_refs.begin(), key_refs.end());
@@ -547,7 +554,6 @@ BOOST_FIXTURE_TEST_CASE( cli_cant_get_signers_from_modified_transaction, cli_fix
       con.wallet_api_ptr->register_account(
          "test", test_bki.pub_key, test_bki.pub_key, "nathan", "nathan", 0, true
       );
-      const auto &test_acc = con.wallet_api_ptr->get_account("test");
 
       // create and sign transaction
       signed_transaction trx;

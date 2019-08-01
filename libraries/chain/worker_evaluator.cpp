@@ -28,7 +28,7 @@
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 
-#include <graphene/chain/protocol/vote.hpp>
+#include <graphene/protocol/vote.hpp>
 
 namespace graphene { namespace chain {
 
@@ -85,8 +85,8 @@ object_id_type worker_create_evaluator::do_apply(const worker_create_evaluator::
    database& d = db();
    vote_id_type for_id, against_id;
    d.modify(d.get_global_properties(), [&for_id, &against_id](global_property_object& p) {
-      for_id = get_next_vote_id(p, vote_id_type::worker);
-      against_id = get_next_vote_id(p, vote_id_type::worker);
+      for_id = vote_id_type(vote_id_type::worker, p.next_available_vote_id++);
+      against_id = vote_id_type(vote_id_type::worker, p.next_available_vote_id++);
    });
 
    return d.create<worker_object>([&](worker_object& w) {
