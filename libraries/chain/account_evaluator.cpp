@@ -472,8 +472,8 @@ void_result account_unlock_evaluator::do_apply( const account_unlock_operation& 
       const auto penalty = asset(unlock_cost, balance.asset_id);
 
       d.push_applied_operation(account_unlock_penalty_payment_operation( acnt->get_id(), penalty ));
-      d.adjust_balance(acnt->get_id(), penalty);
-      d.adjust_balance(GRAPHENE_COMMITTEE_ACCOUNT, -penalty);
+      d.adjust_balance(acnt->get_id(), -penalty);
+      d.adjust_balance(GRAPHENE_COMMITTEE_ACCOUNT, penalty);
    }
 
    return void_result();
