@@ -107,6 +107,11 @@ using std::endl;
 
 namespace detail {
 
+static const string ENC_HEADER( "-----BEGIN BITSHARES SIGNED MESSAGE-----\n" );
+static const string ENC_META(   "-----BEGIN META-----\n" );
+static const string ENC_SIG(    "-----BEGIN SIGNATURE-----\n" );
+static const string ENC_FOOTER( "-----END BITSHARES SIGNED MESSAGE-----" );
+
 struct operation_result_printer
 {
 public:
@@ -2250,27 +2255,19 @@ public:
 
       const account_object from_account = get_account(signer);
 
-      signed_message result;
-      result.payload.emplace_back( std::string("from") );
-      result.payload.emplace_back( from_account.name );
-      result.payload.emplace_back( std::string("key") );
-      result.payload.emplace_back( std::string( from_account.options.memo_key ) );
-      result.payload.emplace_back( std::string("time") );
-      result.payload.emplace_back( time(nullptr) );
-      result.payload.emplace_back( std::string("text") );
-      result.payload.emplace_back( std::move(message) );
-
-      digest_type::encoder enc;
-      fc::raw::pack( enc, _chain_id );
-      fc::raw::pack( enc, result.payload );
-      result.signature = get_private_key( from_account.options.memo_key ).sign_compact( enc.result() );
-
-      return result;
+      signed_message msg;
+      msg.message = message;
+      msg.meta.account = from_account.name;
+      msg.meta.memo_key = from_account.options.memo_key;
+      msg.meta.block = 0;
+      msg.meta.time = 0;
+      msg.signature = get_private_key( from_account.options.memo_key ).sign_compact( msg.digest() );
+      return msg;
    }
 
-   bool verify_message( signed_message message )
+   bool verify_message( string message )
    {
-      FC_ASSERT( message.payload.size() == 8 );
+      /*FC_ASSERT( message.payload.size() == 8 );
       FC_ASSERT( message.payload[0].is_string() && message.payload[0].as_string() == "from" );
       FC_ASSERT( message.payload[1].is_string() );
       FC_ASSERT( message.payload[2].is_string() && message.payload[2].as_string() == "key" );
@@ -2289,7 +2286,8 @@ public:
       const public_key signer( message.signature, enc.result() );
       FC_ASSERT( signer == key.key_data, "Message wasn't signed by contained key!" );
       FC_ASSERT( signer == from_account.options.memo_key.key_data,
-                 "Message was signed by contained key, but it doesn't belong to the contained account!" );
+                 "Message was signed by contained key, but it doesn't belong to the contained account!" );*/
+      FC_ASSERT( !"Not implemented!" );
       return true;
    }
 
@@ -2684,6 +2682,25 @@ public:
             << "Sell Total: " << ask_sum << ' ' << orders.base << endl;
 
          return ss.str();
+      };
+
+      m["sign_message"] = [this](variant result, const fc::variants& a)
+      {
+         auto r = result.as<signed_message>( GRAPHENE_MAX_NESTED_OBJECTS );
+
+         fc::stringstream encapsulated;
+         encapsulated << ENC_HEADER;
+         encapsulated << r.message << '\n';
+         encapsulated << ENC_META;
+         encapsulated << "account=" << r.meta.account << '\n';
+         encapsulated << "memokey=" << std::string( r.meta.memo_key ) << '\n';
+         encapsulated << "block=" << r.meta.block << '\n';
+         encapsulated << "timestamp=" << r.meta.time << '\n';
+         encapsulated << ENC_SIG;
+         encapsulated << fc::to_hex( (const char*)r.signature->data, r.signature->size() ) << '\n';
+         encapsulated << ENC_FOOTER;
+
+         return encapsulated.str();
       };
 
       return m;
@@ -3185,6 +3202,17 @@ std::string operation_result_printer::operator()(const asset& a)
 }}}
 
 namespace graphene { namespace wallet {
+   fc::sha256 signed_message::digest()const
+   {
+      fc::stringstream to_sign;
+      to_sign << message << '\n';
+      to_sign << "account=" << meta.account << '\n';
+      to_sign << "memokey=" << std::string( meta.memo_key ) << '\n';
+      to_sign << "block=" << meta.block << '\n';
+      to_sign << "timestamp=" << meta.time;
+
+      return fc::sha256::hash( to_sign.str() );
+   }
    vector<brain_key_info> utility::derive_owner_keys_from_brain_key(string brain_key, int number_of_desired_keys)
    {
       // Safety-check
@@ -4535,7 +4563,7 @@ signed_message wallet_api::sign_message(string signer, string message)
    return my->sign_message(signer, message);
 }
 
-bool wallet_api::verify_message(signed_message message)
+bool wallet_api::verify_message(string message)
 {
    return my->verify_message(message);
 }
