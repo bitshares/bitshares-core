@@ -267,9 +267,20 @@ struct vesting_balance_object_with_info : public vesting_balance_object
    fc::time_point_sec allowed_withdraw_time;
 };
 
-struct signed_message {
-   fc::variants               payload;
-   fc::ecc::compact_signature signature;
+struct signed_message_meta {
+   string account;
+   public_key_type memo_key;
+   uint32_t block;
+   int64_t time;
+};
+
+class signed_message {
+public:
+   string message;
+   signed_message_meta meta;
+   fc::optional<fc::ecc::compact_signature> signature;
+
+   fc::sha256 digest()const;
 };
 
 namespace detail {
@@ -1060,20 +1071,21 @@ class wallet_api
       string read_memo(const memo_data& memo);
 
 
-      /** Sign a message using an account's memo key.
+      /** Sign a message using an account's memo key. The signature is generated as in
+       *   in https://github.com/xeroc/python-graphenelib/blob/d9634d74273ebacc92555499eca7c444217ecba0/graphenecommon/message.py#L64 .
        *
        * @param signer the name or id of signing account
        * @param message text to sign
-       * @return the signed message in the format used in https://github.com/xeroc/python-graphenelib/blob/d9634d74273ebacc92555499eca7c444217ecba0/graphenecommon/message.py#L64
+       * @return the signed message in an abstract format
        */
       signed_message sign_message(string signer, string message);
 
       /** Verify a message signed with sign_message
        *
-       * @param message JSON-encoded signed message in the format used in https://github.com/xeroc/python-graphenelib/blob/d9634d74273ebacc92555499eca7c444217ecba0/graphenecommon/message.py#L64
+       * @param message either a JSON-encoded signed_message structure, or a signed message in encapsulated format
        * @return true if signature matches
        */
-      bool verify_message(signed_message message);
+      bool verify_message(string message);
 
       /** These methods are used for stealth transfers */
       ///@{
@@ -2054,7 +2066,8 @@ FC_REFLECT(graphene::wallet::operation_detail_ex,
 FC_REFLECT( graphene::wallet::account_history_operation_detail,
         (total_count)(result_count)(details))
 
-FC_REFLECT( graphene::wallet::signed_message, (payload)(signature) )
+FC_REFLECT( graphene::wallet::signed_message_meta, (account)(memo_key)(block)(time) )
+FC_REFLECT( graphene::wallet::signed_message, (message)(meta)(signature) )
 
 FC_API( graphene::wallet::wallet_api,
         (help)
