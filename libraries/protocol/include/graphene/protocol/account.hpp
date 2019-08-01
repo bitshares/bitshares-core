@@ -207,10 +207,10 @@ namespace graphene { namespace protocol {
       struct fee_parameters_type {};
 
       account_unlock_penalty_payment_operation(){}
-      account_unlock_penalty_payment_operation( 
+      account_unlock_penalty_payment_operation(
          account_id_type a, asset p
       )
-         :account_id(a),penalty(p), fee() {}
+         :account_id(a), penalty(p), fee() {}
 
       account_id_type     account_id;
       asset               penalty;
@@ -347,7 +347,11 @@ FC_REFLECT( graphene::protocol::account_update_operation,
 
 FC_REFLECT( graphene::protocol::account_unlock_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::protocol::account_unlock_operation, (fee)(account_to_unlock)(previous_authority)(extensions) )
-FC_REFLECT( graphene::protocol::account_upgrade_operation, (fee)(account_to_upgrade)(upgrade_to_lifetime_member)(extensions) )
+
+
+FC_REFLECT( graphene::protocol::account_upgrade_operation,
+            (fee)(account_to_upgrade)(upgrade_to_lifetime_member)(extensions) )
+
 FC_REFLECT( graphene::protocol::account_whitelist_operation, (fee)(authorizing_account)(account_to_list)(new_listing)(extensions))
 FC_REFLECT( graphene::protocol::account_create_operation::fee_parameters_type, (basic_fee)(premium_fee)(price_per_kbyte) )
 FC_REFLECT( graphene::protocol::account_whitelist_operation::fee_parameters_type, (fee) )

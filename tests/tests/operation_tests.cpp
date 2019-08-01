@@ -1272,46 +1272,23 @@ BOOST_AUTO_TEST_CASE( unlock_operation_penalty_payment_test )
    {
       INVOKE(make_recursive_authority_test);
 
-      generate_blocks(HARDFORK_1268_TIME);
-      generate_block();
-
       GET_ACTOR(bob);
       fund(bob);
       ACTOR(issuer);
 
-      additional_asset_options_t options;
-      options.value.reward_percent = 2 * GRAPHENE_1_PERCENT;
-
-      const auto usd = create_user_issued_asset(
-                  "USD",
-                  issuer,
-                  charge_market_fee,
-                  price(asset(1, asset_id_type(1)), asset(1)),
-                  1,
-                  20 * GRAPHENE_1_PERCENT,
-                  options);
+      const auto usd = create_user_issued_asset("USD");
 
       issue_uia(issuer, usd.amount(2000));
       transfer(issuer, bob, usd.amount(200));
       transfer(issuer, GRAPHENE_COMMITTEE_ACCOUNT(db), usd.amount(200));
 
-      std::map<asset_id_type, share_type> bob_balance_helper;
-      std::map<asset_id_type, share_type> committee_balance_helper;
+      auto initial_balance_bob_BTS = get_balance(bob_id, asset_id_type());
+      auto initial_balance_bob_USD = get_balance(bob_id, usd.get_id());
 
-      const auto& bal_idx_before = db.get_index_type< primary_index< account_balance_index > >().get_secondary_index< balances_by_account_index >();
-      for( const auto& entry : bal_idx_before.get_account_balances( bob_id ) )
-      {
-         const auto balance = entry.second->get_balance();
-         bob_balance_helper.emplace(balance.asset_id, balance.amount);
-         BOOST_CHECK_GT(balance.amount.value, 0);
-      }
-      for( const auto& entry : bal_idx_before.get_account_balances( GRAPHENE_COMMITTEE_ACCOUNT ) )
-      {
-         const auto balance = entry.second->get_balance();
-         committee_balance_helper.emplace(balance.asset_id, balance.amount);
-         BOOST_CHECK_GT(balance.amount.value, 0);
-      }
-      
+      auto initial_balance_committee_BTS = get_balance( GRAPHENE_COMMITTEE_ACCOUNT, asset_id_type());
+      auto initial_balance_committee_USD = get_balance( GRAPHENE_COMMITTEE_ACCOUNT, usd.get_id());
+
+      generate_blocks(HARDFORK_CYCLED_ACCOUNTS_TIME);
       // unlock
       {
          account_unlock_operation op;
@@ -1326,40 +1303,27 @@ BOOST_AUTO_TEST_CASE( unlock_operation_penalty_payment_test )
          PUSH_TX( db, trx );
       }
 
-      const auto& bal_idx_after = db.get_index_type< primary_index< account_balance_index > >().get_secondary_index< balances_by_account_index >();
-      for( const auto& entry : bal_idx_after.get_account_balances( bob_id ) )
-      {
-         const auto balance = entry.second->get_balance();
-         BOOST_CHECK_EQUAL(balance.amount.value, bob_balance_helper.at(balance.asset_id).value * 0.9);
-      }
+      BOOST_CHECK_EQUAL( get_balance(bob_id, asset_id_type()), initial_balance_bob_BTS * 0.9);
+      BOOST_CHECK_EQUAL( get_balance(bob_id, usd.get_id()),    initial_balance_bob_USD * 0.9);
 
-      for( const auto& entry : bal_idx_after.get_account_balances( GRAPHENE_COMMITTEE_ACCOUNT ) )
-      {
-         const auto balance = entry.second->get_balance();
-         BOOST_CHECK_EQUAL(balance.amount.value - committee_balance_helper.at(balance.asset_id).value, bob_balance_helper.at(balance.asset_id).value * 0.1 );
-      }
+      BOOST_CHECK_EQUAL( get_balance(GRAPHENE_COMMITTEE_ACCOUNT, asset_id_type()), initial_balance_committee_BTS + initial_balance_bob_BTS * 0.1);
+      BOOST_CHECK_EQUAL( get_balance(GRAPHENE_COMMITTEE_ACCOUNT, usd.get_id()),    initial_balance_committee_USD + initial_balance_bob_USD * 0.1);
 
    } FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE(unloc_account_operation_failed_not_enough_BTS)
+BOOST_AUTO_TEST_CASE(unlock_account_operation_failed_not_enough_BTS)
 {
    try
    {
       INVOKE(make_recursive_authority_test);
 
-      generate_blocks(HARDFORK_1268_TIME);
+      generate_blocks(HARDFORK_CYCLED_ACCOUNTS_TIME);
       generate_block();
 
       GET_ACTOR(bob);
       enable_fees();
 
-      std::map<asset_id_type, share_type> bob_balance_helper;
-      std::map<asset_id_type, share_type> committee_balance_helper;
-
-      const auto& bal_idx_before = db.get_index_type< primary_index< account_balance_index > >().get_secondary_index< balances_by_account_index >();
-      BOOST_CHECK( bal_idx_before.get_account_balances( bob_id ).size() == 0);
-      
       // unlock
       account_unlock_operation op;
       op.account_to_unlock = bob_id;
@@ -1371,7 +1335,7 @@ BOOST_AUTO_TEST_CASE(unloc_account_operation_failed_not_enough_BTS)
       sign(trx, bob_private_key);
 
       GRAPHENE_CHECK_THROW( PUSH_TX( db, trx ), fc::exception );
-      
+
    } FC_LOG_AND_RETHROW()
 }
 

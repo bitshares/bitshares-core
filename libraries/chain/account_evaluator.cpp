@@ -38,14 +38,14 @@
 #include <algorithm>
 #include <tuple>
 
-namespace graphene { 
+namespace graphene {
    namespace protocol {
-      void verify_cycled_authority( const account_id_type& id, 
+      void verify_cycled_authority( const account_id_type& id,
                               const std::function<const authority*(account_id_type)>& get_active,
                               const std::function<const authority*(account_id_type)>& get_owner,
                               uint32_t max_recursion_depth );
    }
-   namespace chain {   
+   namespace chain {
 
 namespace detail {
 
@@ -471,9 +471,9 @@ void_result account_unlock_evaluator::do_apply( const account_unlock_operation& 
       const auto unlock_cost = balance.amount / 10;
       const auto penalty = asset(unlock_cost, balance.asset_id);
 
-      d.push_applied_operation(account_unlock_penalty_payment_operation( acnt->get_id(), penalty ));
       d.adjust_balance(acnt->get_id(), -penalty);
       d.adjust_balance(GRAPHENE_COMMITTEE_ACCOUNT, penalty);
+      d.push_applied_operation(account_unlock_penalty_payment_operation( acnt->get_id(), penalty ));
    }
 
    return void_result();
