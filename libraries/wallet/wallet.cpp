@@ -302,6 +302,26 @@ public:
    }
 };
 
+/* meta contains lines of the form "key=value".
+ * Returns the value for the corresponding key, throws if key is not present. */
+static string meta_extract( const string& meta, const string& key )
+{
+   FC_ASSERT( meta.size() > key.size(), "Key '${k}' not found!", ("k",key) );
+   size_t start;
+   if( meta.substr( 0, key.size() ) == key && meta[key.size()] == '=' )
+      start = 0;
+   else
+   {
+      start = meta.find( "\n" + key + "=" );
+      FC_ASSERT( start != string::npos, "Key '${k}' not found!", ("k",key) );
+      ++start;
+   }
+   start += key.size() + 1;
+   size_t lf = meta.find( "\n", start );
+   if( lf == string::npos ) lf = meta.size();
+   return meta.substr( start, lf - start );
+}
+
 class wallet_api_impl
 {
 public:
@@ -2267,27 +2287,38 @@ public:
 
    bool verify_message( string message )
    {
-      /*FC_ASSERT( message.payload.size() == 8 );
-      FC_ASSERT( message.payload[0].is_string() && message.payload[0].as_string() == "from" );
-      FC_ASSERT( message.payload[1].is_string() );
-      FC_ASSERT( message.payload[2].is_string() && message.payload[2].as_string() == "key" );
-      FC_ASSERT( message.payload[3].is_string() );
-      FC_ASSERT( message.payload[4].is_string() && message.payload[4].as_string() == "time" );
-      FC_ASSERT( message.payload[5].is_numeric() );
-      FC_ASSERT( message.payload[6].is_string() && message.payload[6].as_string() == "text" );
-      FC_ASSERT( message.payload[7].is_string() );
+      signed_message msg;
+      try {
+         variant json = fc::json::from_string( message );
+         msg = json.as<signed_message>( 5 );
+      } catch( const fc::parse_error_exception& e ) {
+         size_t begin_p = message.find( ENC_HEADER );
+         if( begin_p == string::npos ) throw;
+         size_t meta_p = message.find( ENC_META, begin_p );
+         if( meta_p == string::npos || meta_p < begin_p + ENC_HEADER.size() + 1 ) throw;
+         size_t sig_p = message.find( ENC_SIG, meta_p );
+         if( sig_p == string::npos || sig_p < meta_p + ENC_META.size() ) throw;
+         size_t end_p = message.find( ENC_FOOTER, meta_p );
+         if( end_p == string::npos || end_p < sig_p + ENC_SIG.size() + 1 ) throw;
+         msg.message = message.substr( begin_p + ENC_HEADER.size(), meta_p - begin_p - ENC_HEADER.size() - 1 );
+         const string meta = message.substr( meta_p + ENC_META.size(), sig_p - meta_p - ENC_META.size() );
+         const string sig = message.substr( sig_p + ENC_SIG.size(), end_p - sig_p - ENC_SIG.size() - 1 );
+         msg.meta.account = meta_extract( meta, "account" );
+         msg.meta.memo_key = public_key_type( meta_extract( meta, "memokey" ) );
+         msg.meta.block = boost::lexical_cast<uint32_t>( meta_extract( meta, "block" ) );
+         msg.meta.time = boost::lexical_cast<uint64_t>( meta_extract( meta, "timestamp" ) );
+         msg.signature = variant(sig).as< fc::ecc::compact_signature >( 5 );
+      }
 
-      const account_object from_account = get_account( message.payload[1].as_string() );
-      const public_key_type key( message.payload[3].as_string() );
+      if( !msg.signature.valid() ) return false;
 
-      digest_type::encoder enc;
-      fc::raw::pack( enc, _chain_id );
-      fc::raw::pack( enc, message.payload );
-      const public_key signer( message.signature, enc.result() );
-      FC_ASSERT( signer == key.key_data, "Message wasn't signed by contained key!" );
-      FC_ASSERT( signer == from_account.options.memo_key.key_data,
-                 "Message was signed by contained key, but it doesn't belong to the contained account!" );*/
-      FC_ASSERT( !"Not implemented!" );
+      const account_object from_account = get_account( msg.meta.account );
+
+      const public_key signer( *msg.signature, msg.digest() );
+      if( !( msg.meta.memo_key == signer ) ) return false;
+      FC_ASSERT( from_account.options.memo_key == signer,
+                 "Message was signed by contained key, but it doesn't belong to the contained account!" );
+
       return true;
    }
 
