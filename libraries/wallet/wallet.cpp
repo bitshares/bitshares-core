@@ -2285,41 +2285,66 @@ public:
       return msg;
    }
 
-   bool verify_message( string message )
+   bool verify_message( const string& message, const string& account, int block, int time, const compact_signature& sig )
    {
+      const account_object from_account = get_account( account );
+
       signed_message msg;
-      try {
-         variant json = fc::json::from_string( message );
-         msg = json.as<signed_message>( 5 );
-      } catch( const fc::parse_error_exception& e ) {
-         size_t begin_p = message.find( ENC_HEADER );
-         if( begin_p == string::npos ) throw;
-         size_t meta_p = message.find( ENC_META, begin_p );
-         if( meta_p == string::npos || meta_p < begin_p + ENC_HEADER.size() + 1 ) throw;
-         size_t sig_p = message.find( ENC_SIG, meta_p );
-         if( sig_p == string::npos || sig_p < meta_p + ENC_META.size() ) throw;
-         size_t end_p = message.find( ENC_FOOTER, meta_p );
-         if( end_p == string::npos || end_p < sig_p + ENC_SIG.size() + 1 ) throw;
-         msg.message = message.substr( begin_p + ENC_HEADER.size(), meta_p - begin_p - ENC_HEADER.size() - 1 );
-         const string meta = message.substr( meta_p + ENC_META.size(), sig_p - meta_p - ENC_META.size() );
-         const string sig = message.substr( sig_p + ENC_SIG.size(), end_p - sig_p - ENC_SIG.size() - 1 );
-         msg.meta.account = meta_extract( meta, "account" );
-         msg.meta.memo_key = public_key_type( meta_extract( meta, "memokey" ) );
-         msg.meta.block = boost::lexical_cast<uint32_t>( meta_extract( meta, "block" ) );
-         msg.meta.time = boost::lexical_cast<uint64_t>( meta_extract( meta, "timestamp" ) );
-         msg.signature = variant(sig).as< fc::ecc::compact_signature >( 5 );
-      }
+      msg.message = message;
+      msg.meta.account = from_account.name;
+      msg.meta.memo_key = from_account.options.memo_key;
+      msg.meta.block = block;
+      msg.meta.time = time;
+      msg.signature = sig;
 
-      if( !msg.signature.valid() ) return false;
+      return verify_signed_message( msg );
+   }
 
-      const account_object from_account = get_account( msg.meta.account );
+   bool verify_signed_message( const signed_message& message )
+   {
+      if( !message.signature.valid() ) return false;
 
-      const public_key signer( *msg.signature, msg.digest() );
-      if( !( msg.meta.memo_key == signer ) ) return false;
+      const account_object from_account = get_account( message.meta.account );
+
+      const public_key signer( *message.signature, message.digest() );
+      if( !( message.meta.memo_key == signer ) ) return false;
       FC_ASSERT( from_account.options.memo_key == signer,
                  "Message was signed by contained key, but it doesn't belong to the contained account!" );
 
       return true;
+   }
+
+   /** Verify a message signed with sign_message, in its encapsulated form.
+    *
+    * @param message the complete encapsulated message string including separators and line feeds
+    * @return true if signature matches
+    */
+   bool verify_encapsulated_message( const string& message )
+   {
+      signed_message msg;
+      size_t begin_p = message.find( ENC_HEADER );
+      FC_ASSERT( begin_p != string::npos, "BEGIN MESSAGE line not found!" );
+      size_t meta_p = message.find( ENC_META, begin_p );
+      FC_ASSERT( meta_p != string::npos, "BEGIN META line not found!" );
+      FC_ASSERT( meta_p >= begin_p + ENC_HEADER.size() + 1, "Missing message!?" );
+      size_t sig_p = message.find( ENC_SIG, meta_p );
+      FC_ASSERT( sig_p != string::npos, "BEGIN SIGNATURE line not found!" );
+      FC_ASSERT( sig_p >= meta_p + ENC_META.size(), "Missing metadata?!" );
+      size_t end_p = message.find( ENC_FOOTER, meta_p );
+      FC_ASSERT( end_p != string::npos, "END MESSAGE line not found!" );
+      FC_ASSERT( end_p >= sig_p + ENC_SIG.size() + 1, "Missing signature?!" );
+
+      msg.message = message.substr( begin_p + ENC_HEADER.size(), meta_p - begin_p - ENC_HEADER.size() - 1 );
+      const string meta = message.substr( meta_p + ENC_META.size(), sig_p - meta_p - ENC_META.size() );
+      const string sig = message.substr( sig_p + ENC_SIG.size(), end_p - sig_p - ENC_SIG.size() - 1 );
+
+      msg.meta.account = meta_extract( meta, "account" );
+      msg.meta.memo_key = public_key_type( meta_extract( meta, "memokey" ) );
+      msg.meta.block = boost::lexical_cast<uint32_t>( meta_extract( meta, "block" ) );
+      msg.meta.time = boost::lexical_cast<uint64_t>( meta_extract( meta, "timestamp" ) );
+      msg.signature = variant(sig).as< fc::ecc::compact_signature >( 5 );
+
+      return verify_signed_message( msg );
    }
 
    signed_transaction sell_asset(string seller_account,
@@ -4594,10 +4619,31 @@ signed_message wallet_api::sign_message(string signer, string message)
    return my->sign_message(signer, message);
 }
 
-bool wallet_api::verify_message(string message)
+bool wallet_api::verify_message( string message, string account, int block, int time, compact_signature sig )
 {
-   return my->verify_message(message);
+   return my->verify_message( message, account, block, time, sig );
 }
+
+/** Verify a message signed with sign_message
+ *
+ * @param message the signed_message structure containing message, meta data and signature
+ * @return true if signature matches
+ */
+bool wallet_api::verify_signed_message( signed_message message )
+{
+   return my->verify_signed_message( message );
+}
+
+/** Verify a message signed with sign_message, in its encapsulated form.
+ *
+ * @param message the complete encapsulated message string including separators and line feeds
+ * @return true if signature matches
+ */
+bool wallet_api::verify_encapsulated_message( string message )
+{
+   return my->verify_encapsulated_message( message );
+}
+
 
 string wallet_api::get_key_label( public_key_type key )const
 {
