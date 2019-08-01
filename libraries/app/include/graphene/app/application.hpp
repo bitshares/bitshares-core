@@ -128,6 +128,7 @@ namespace graphene { namespace app {
 
          bool is_plugin_enabled(const string& name) const;
 
+         std::shared_ptr<fc::thread> elasticsearch_thread;
 
    private:
          void add_available_plugin( std::shared_ptr<abstract_plugin> p );
