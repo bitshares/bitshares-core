@@ -44,6 +44,7 @@
 #include <graphene/chain/vote_count.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/custom_authority_object.hpp>
 
 namespace graphene { namespace chain {
 
@@ -1143,6 +1144,17 @@ void process_hf_935( database& db )
    }
 }
 
+/**
+ * @brief Remove any custom active authorities whose expiration dates are in the past
+ * @param db A mutable database reference
+ */
+void delete_expired_custom_authorities( database& db )
+{
+   const auto& index = db.get_index_type<custom_authority_index>().indices().get<by_expiration>();
+   while (!index.empty() && index.begin()->valid_to < db.head_block_time())
+      db.remove(*index.begin());
+}
+
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
 {
    const auto& gpo = get_global_properties();
@@ -1323,6 +1335,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    }
 
    process_bitassets();
+   delete_expired_custom_authorities(*this);
 
    // process_budget needs to run at the bottom because
    //   it needs to know the next_maintenance_time

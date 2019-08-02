@@ -65,6 +65,7 @@ namespace graphene { namespace chain {
    };
 
    struct by_account_custom;
+   struct by_expiration;
 
    /**
     * @ingroup object_index
@@ -74,13 +75,18 @@ namespace graphene { namespace chain {
       indexed_by<
          ordered_unique<tag<by_id>, member<object, object_id_type, &object::id>>,
          ordered_unique<tag<by_account_custom>,
-            composite_key<
-               custom_authority_object,
+            composite_key<custom_authority_object,
                member<custom_authority_object, account_id_type, &custom_authority_object::account>,
                member<custom_authority_object, unsigned_int, &custom_authority_object::operation_type>,
                member<custom_authority_object, bool, &custom_authority_object::enabled>,
                member<object, object_id_type, &object::id>
-            >
+            >>,
+         ordered_unique<tag<by_expiration>,
+            composite_key<custom_authority_object,
+               member<custom_authority_object, time_point_sec, &custom_authority_object::valid_to>,
+               member<object, object_id_type, &object::id>
+            >,
+            composite_key_compare<std::greater<time_point_sec>, std::less<object_id_type>>
          >
       >
    > custom_authority_multi_index_type;
