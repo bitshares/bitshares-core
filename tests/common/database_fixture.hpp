@@ -171,6 +171,9 @@ extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;
 #define ACTORS_IMPL(r, data, elem) ACTOR(elem)
 #define ACTORS(names) BOOST_PP_SEQ_FOR_EACH(ACTORS_IMPL, ~, names)
 
+#define INITIAL_WITNESS_COUNT (9u)
+#define INITIAL_COMMITTEE_MEMBER_COUNT INITIAL_WITNESS_COUNT
+
 namespace graphene { namespace chain {
 
 class clearable_block : public signed_block {
@@ -205,6 +208,7 @@ struct database_fixture {
    string generate_anon_acct_name();
    static void verify_asset_supplies( const database& db );
    void open_database();
+   void vote_for_committee_and_witnesses(uint16_t num_committee, uint16_t num_witness);
    signed_block generate_block(uint32_t skip = ~0,
                                const fc::ecc::private_key& key = generate_private_key("null_key"),
                                int miss_blocks = 0);

@@ -92,6 +92,9 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    else
       genesis_state.initial_active_witnesses = 10;
 
+   genesis_state.immutable_parameters.min_committee_member_count = INITIAL_COMMITTEE_MEMBER_COUNT;
+   genesis_state.immutable_parameters.min_witness_count = INITIAL_WITNESS_COUNT;
+
    for( unsigned int i = 0; i < genesis_state.initial_active_witnesses; ++i )
    {
       auto name = "init"+fc::to_string(i);
@@ -322,6 +325,46 @@ database_fixture::~database_fixture()
       BOOST_FAIL( "Uncaught exception in ~database_fixture" );
    }
 } 
+
+void database_fixture::vote_for_committee_and_witnesses(uint16_t num_committee, uint16_t num_witness)
+{ try {
+
+   auto &init0 = get_account("init0");
+   fund(init0, asset(10));
+
+   flat_set<vote_id_type> votes;
+
+   const auto& wits = db.get_index_type<witness_index>().indices().get<by_id>();
+   num_witness = std::min(num_witness, (uint16_t) wits.size());
+   auto wit_end = wits.begin();
+   std::advance(wit_end, num_witness);
+   std::transform(wits.begin(), wit_end,
+                  std::inserter(votes, votes.end()),
+                  [](const witness_object& w) { return w.vote_id; });
+
+   const auto& comms = db.get_index_type<committee_member_index>().indices().get<by_id>();
+   num_committee = std::min(num_committee, (uint16_t) comms.size());
+   auto comm_end = comms.begin();
+   std::advance(comm_end, num_committee);
+   std::transform(comms.begin(), comm_end,
+                  std::inserter(votes, votes.end()),
+                  [](const committee_member_object& cm) { return cm.vote_id; });
+
+   account_update_operation op;
+   op.account = init0.get_id();
+   op.new_options = init0.options;
+   op.new_options->votes = votes;
+   op.new_options->num_witness = num_witness;
+   op.new_options->num_committee = num_committee;
+
+   op.fee = db.current_fee_schedule().calculate_fee( op );
+
+   trx.operations.push_back(op);
+   trx.validate();
+   PUSH_TX(db, trx, ~0);
+   trx.operations.clear();
+
+} FC_CAPTURE_AND_RETHROW() }
 
 fc::ecc::private_key database_fixture::generate_private_key(string seed)
 {
