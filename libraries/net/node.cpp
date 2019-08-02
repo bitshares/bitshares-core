@@ -234,6 +234,16 @@ namespace graphene { namespace net { namespace detail {
          }
          reply.addresses = ret_val;
       }
+
+      bool should_advertise( const fc::ip::endpoint& in )
+      {
+         for (auto& it : advertise_list )
+         {
+            if ( in == it.second.remote_endpoint )
+               return true;
+         }
+         return false;
+      }
       private:
       std::unordered_map<std::string, graphene::net::address_info> advertise_list;
    };
@@ -263,6 +273,12 @@ namespace graphene { namespace net { namespace detail {
          }
          reply.addresses.shrink_to_fit();
       }
+      bool should_advertise( const fc::ip::endpoint& in )
+      {
+         if (exclude_list.find( in ) == exclude_list.end() )
+            return true;
+         return false;
+      }
       private:
       fc::flat_set<std::string> exclude_list;
    };
@@ -279,6 +295,10 @@ namespace graphene { namespace net { namespace detail {
          {
             reply.addresses.emplace_back(update_address_record(impl, active_peer));
          }
+      }
+      bool should_advertise( const fc::ip::endpoint& in )
+      {
+         return true;
       }
    };
 
@@ -3163,7 +3183,11 @@ namespace graphene { namespace net { namespace detail {
       {
         if (firewall_check_state->expected_node_id != peer->node_id && // it's not the node who is asking us to test
             !peer->firewall_check_state && // the peer isn't already performing a check for another node
-            firewall_check_state->nodes_already_tested.find(peer->node_id) == firewall_check_state->nodes_already_tested.end() &&
+            _address_builder != nullptr &&
+            peer->get_remote_endpoint().valid() && 
+            _address_builder->should_advertise(*peer->get_remote_endpoint()) && // can advertise who is about to be asked
+            firewall_check_state->nodes_already_tested.find(peer->node_id) 
+                  == firewall_check_state->nodes_already_tested.end() && // we haven't already asked
             peer->core_protocol_version >= 106)
         {
           wlog("forwarding firewall check for node ${to_check} to peer ${checker}",
@@ -3193,30 +3217,48 @@ namespace graphene { namespace net { namespace detail {
       delete firewall_check_state;
     }
 
+      fc::ip::endpoint node_impl::get_endpoint_to_check( peer_connection* originating_peer,
+            const check_firewall_message& message )
+      {
+         fc::ip::endpoint ret_val;
+         if (message.node_id == node_id_t() &&
+            message.endpoint_to_check == fc::ip::endpoint() )
+         {
+            // if they are using the same inbound and outbound port, try connecting to their outbound endpoint.
+            // if they are using a different inbound port, use their outbound address but the inbound port they reported
+            ret_val = originating_peer->get_socket().remote_endpoint();
+            if (originating_peer->inbound_port != originating_peer->outbound_port)
+               ret_val = fc::ip::endpoint(ret_val.get_address(), originating_peer->inbound_port);
+         }
+         ret_val = message.endpoint_to_check;
+         return ret_val;
+      }
+
     void node_impl::on_check_firewall_message(peer_connection* originating_peer,
                                               const check_firewall_message& check_firewall_message_received)
     {
       VERIFY_CORRECT_THREAD();
 
-      if (check_firewall_message_received.node_id == node_id_t() &&
-          check_firewall_message_received.endpoint_to_check == fc::ip::endpoint())
-      {
-        // originating_peer is asking us to test whether it is firewalled
-        // we're not going to try to connect back to the originating peer directly,
-        // instead, we're going to coordinate requests by asking some of our peers
-        // to try to connect to the originating peer, and relay the results back
-        wlog("Peer ${peer} wants us to check whether it is firewalled", ("peer", originating_peer->get_remote_endpoint()));
-        firewall_check_state_data* firewall_check_state = new firewall_check_state_data;
-        // if they are using the same inbound and outbound port, try connecting to their outbound endpoint.
-        // if they are using a different inbound port, use their outbound address but the inbound port they reported
-        fc::ip::endpoint endpoint_to_check = originating_peer->get_socket().remote_endpoint();
-        if (originating_peer->inbound_port != originating_peer->outbound_port)
-          endpoint_to_check = fc::ip::endpoint(endpoint_to_check.get_address(), originating_peer->inbound_port);
-        firewall_check_state->endpoint_to_test = endpoint_to_check;
-        firewall_check_state->expected_node_id = originating_peer->node_id;
-        firewall_check_state->requesting_peer = originating_peer->node_id;
+      const fc::ip::endpoint endpoint_to_check = get_endpoint_to_check(originating_peer, check_firewall_message_received );
 
-        forward_firewall_check_to_next_available_peer(firewall_check_state);
+      if (check_firewall_message_received.node_id == node_id_t() &&
+            check_firewall_message_received.endpoint_to_check == fc::ip::endpoint())
+      {
+         // originating_peer is asking us to test whether it is firewalled
+         // do not bother if this peer should not be advertised.
+         if ( _address_builder != nullptr
+               && !_address_builder->should_advertise( endpoint_to_check ))
+            return;
+         // we're not going to try to connect back to the originating peer directly,
+         // instead, we're going to coordinate requests by asking some of our peers
+         // to try to connect to the originating peer, and relay the results back
+         wlog("Peer ${peer} wants us to check whether it is firewalled", ("peer", originating_peer->get_remote_endpoint()));
+         firewall_check_state_data* firewall_check_state = new firewall_check_state_data;
+         firewall_check_state->endpoint_to_test = endpoint_to_check;
+         firewall_check_state->expected_node_id = originating_peer->node_id;
+         firewall_check_state->requesting_peer = originating_peer->node_id;
+
+         forward_firewall_check_to_next_available_peer(firewall_check_state);
       }
       else
       {
@@ -3225,11 +3267,11 @@ namespace graphene { namespace net { namespace detail {
         // can't perform the test
         if ( !_node_configuration.connect_to_new_peers || 
            ( is_already_connected_to_id(check_firewall_message_received.node_id) ||
-            is_connection_to_endpoint_in_progress(check_firewall_message_received.endpoint_to_check )))
+            is_connection_to_endpoint_in_progress(endpoint_to_check )))
         {
           check_firewall_reply_message reply;
           reply.node_id = check_firewall_message_received.node_id;
-          reply.endpoint_checked = check_firewall_message_received.endpoint_to_check;
+          reply.endpoint_checked = endpoint_to_check;
           reply.result = firewall_check_result::unable_to_check;
         }
         else
@@ -3238,10 +3280,10 @@ namespace graphene { namespace net { namespace detail {
           // to test.
           peer_connection_ptr peer_for_testing(peer_connection::make_shared(this));
           peer_for_testing->firewall_check_state = new firewall_check_state_data;
-          peer_for_testing->firewall_check_state->endpoint_to_test = check_firewall_message_received.endpoint_to_check;
+          peer_for_testing->firewall_check_state->endpoint_to_test = endpoint_to_check;
           peer_for_testing->firewall_check_state->expected_node_id = check_firewall_message_received.node_id;
           peer_for_testing->firewall_check_state->requesting_peer = originating_peer->node_id;
-          peer_for_testing->set_remote_endpoint(check_firewall_message_received.endpoint_to_check);
+          peer_for_testing->set_remote_endpoint(endpoint_to_check);
           initiate_connect_to(peer_for_testing);
         }
       }

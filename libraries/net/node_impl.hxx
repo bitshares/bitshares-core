@@ -254,6 +254,7 @@ class node_impl : public peer_connection_delegate
    {
       public:
       virtual void build( node_impl* impl, address_message& ) = 0;
+      virtual bool should_advertise(const  fc::ip::endpoint& in ) = 0;
       protected:
       address_info update_address_record( node_impl* impl, const peer_connection_ptr& active_peer);
    };
@@ -623,6 +624,8 @@ class node_impl : public peer_connection_delegate
 
       bool is_hard_fork_block(uint32_t block_number) const;
       uint32_t get_next_known_hard_fork_block_number(uint32_t block_number) const;
+      fc::ip::endpoint get_endpoint_to_check( peer_connection* originating_peer, 
+            const check_firewall_message& message );
     }; // end class node_impl
 
 }}} // end of namespace graphene::net::detail
