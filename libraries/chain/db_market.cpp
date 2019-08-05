@@ -331,8 +331,7 @@ bool maybe_cull_small_order( database& db, const limit_order_object& order )
    if( order.amount_to_receive().amount == 0 )
    {
       if( order.deferred_fee > 0 && db.head_block_time() <= HARDFORK_CORE_604_TIME )
-      { // TODO remove this warning after hard fork core-604
-         wlog( "At block ${n}, cancelling order without charging a fee: ${o}", ("n",db.head_block_num())("o",order) );
+      {
          db.cancel_limit_order( order, true, true );
       }
       else
