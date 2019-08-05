@@ -401,7 +401,7 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
 
    if( o.additional_collateral.amount > 0 )
    {
-      if( _bid && d.head_block_time() >= HARDFORK_CORE_1692_TIME )
+      if( _bid && d.head_block_time() >= HARDFORK_CORE_1692_TIME ) // TODO: see if HF check can be removed after HF
       {
          asset delta = o.additional_collateral - _bid->get_additional_collateral();
          FC_ASSERT( d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)) >= delta,
