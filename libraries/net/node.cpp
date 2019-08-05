@@ -195,28 +195,29 @@ namespace graphene { namespace net { namespace detail {
       {
          FC_ASSERT( address_list.valid(), "advertise-peer-list must be included" );
 
-         advertise_list.reserve( address_list->size() );
          std::for_each( address_list->begin(), address_list->end(), [&list = advertise_list]( std::string str )
             {
                // ignore fc exceptions (like poorly formatted endpoints)
                try
                {
-                  graphene::net::address_info tmp(
-                     fc::ip::endpoint::from_string(str),
-                     fc::time_point_sec(),
-                     fc::microseconds(0),
-                     node_id_t(),
-                     peer_connection_direction::unknown,
-                     firewalled_state::unknown );
-                  if ( std::find( list.begin(), list.end(), tmp ) == list.end() )
-                     list.emplace_back(tmp);
+                  fc::ip::endpoint ep = fc::ip::endpoint::from_string(str);
+                  if (list.find(ep) == list.end() )
+                  {
+                     graphene::net::address_info tmp(
+                           ep,
+                           fc::time_point_sec(),
+                           fc::microseconds(0),
+                           node_id_t(),
+                           peer_connection_direction::unknown,
+                           firewalled_state::unknown );
+                     list.insert(tmp);
+                  }
                }
                catch(const fc::exception& ) 
                {
                   wlog( "Address ${addr} invalid.", ("addr", str) );
                } 
             } );
-         advertise_list.shrink_to_fit();
       }
 
       void build(node_impl* impl, address_message& reply)
@@ -235,13 +236,12 @@ namespace graphene { namespace net { namespace detail {
 
       bool should_advertise( const fc::ip::endpoint& in )
       {
-         if (std::find(advertise_list.begin(), advertise_list.end(), in) 
-               == advertise_list.end())
+         if (advertise_list.find(in) == advertise_list.end())
             return false;
          return true;
       }
       private:
-      std::vector<graphene::net::address_info> advertise_list;
+      std::set<graphene::net::address_info, address_endpoint_comparator> advertise_list;
    };
 
    /****
