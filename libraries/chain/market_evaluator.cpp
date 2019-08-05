@@ -409,7 +409,8 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
                     ("oc", _bid->get_additional_collateral().amount)("nc", o.additional_collateral.amount)
                     ("b", d.get_balance(*_paying_account, o.additional_collateral.asset_id(d)).amount) );
       } else
-         FC_ASSERT( d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)) >= o.additional_collateral,
+         FC_ASSERT( d.get_balance( *_paying_account,
+                                   _bitasset_data->options.short_backing_asset(d) ) >= o.additional_collateral,
                     "Cannot bid ${c} collateral when payer only has ${b}", ("c", o.additional_collateral.amount)
                     ("b", d.get_balance(*_paying_account, o.additional_collateral.asset_id(d)).amount) );
    }
