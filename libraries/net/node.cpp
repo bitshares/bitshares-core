@@ -3278,7 +3278,7 @@ namespace graphene { namespace net { namespace detail {
         // can't perform the test
         if ( !_node_configuration.connect_to_new_peers || 
            ( is_already_connected_to_id(check_firewall_message_received.node_id) ||
-            is_connection_to_endpoint_in_progress( endpoint_to_check )))
+            is_connection_to_endpoint_in_progress( check_firewall_message_received.endpoint_to_check )))
         {
           check_firewall_reply_message reply;
           reply.node_id = check_firewall_message_received.node_id;
@@ -3292,10 +3292,10 @@ namespace graphene { namespace net { namespace detail {
           // to test.
           peer_connection_ptr peer_for_testing(peer_connection::make_shared(this));
           peer_for_testing->firewall_check_state = new firewall_check_state_data;
-          peer_for_testing->firewall_check_state->endpoint_to_test = endpoint_to_check;
+          peer_for_testing->firewall_check_state->endpoint_to_test = check_firewall_message_received.endpoint_to_check;
           peer_for_testing->firewall_check_state->expected_node_id = check_firewall_message_received.node_id;
           peer_for_testing->firewall_check_state->requesting_peer = originating_peer->node_id;
-          peer_for_testing->set_remote_endpoint(endpoint_to_check);
+          peer_for_testing->set_remote_endpoint( check_firewall_message_received.endpoint_to_check);
           initiate_connect_to(peer_for_testing);
         }
       }
