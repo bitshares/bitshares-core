@@ -36,26 +36,34 @@ using restriction_argument = restriction::argument_type;
 // Make our own std::void_t since the real one isn't available in C++14
 template<typename...> using make_void = void;
 
-// We use our own is_integral which does not consider bools integral (to disallow comparison between bool and ints)
-template<typename T> constexpr static bool is_integral =
-        std::conditional_t<std::is_same<T, bool>::value, std::false_type, std::is_integral<T>>::value;
-
 // Metafunction to check if type is some instantiation of fc::safe
 template<typename> constexpr static bool is_safe = false;
 template<typename I> constexpr static bool is_safe<fc::safe<I>> = true;
 
+// Metafunction to check if type is a flat_set of any element type
+template<typename> constexpr static bool is_flat_set = false;
+template<typename T> constexpr static bool is_flat_set<flat_set<T>> = true;
+
+// We use our own is_integral which does not consider bools integral (to disallow comparison between bool and ints)
+template<typename T> constexpr static bool is_integral = !std::is_same<T, bool>::value &&
+                                                         !std::is_same<T, safe<bool>>::value &&
+                                                         (is_safe<T> || std::is_integral<T>::value);
+
 // Metafunction to check if two types are comparable, which means not void_t, and either the same or both integral
 template<typename T, typename U>
 constexpr static bool comparable_types = !std::is_same<T, void_t>::value &&
-                                         (std::is_same<T, U>::value || ((is_integral<T> || is_safe<T>) &&
-                                                                        (is_integral<U> || is_safe<U>)));
+                                         (std::is_same<T, U>::value || (is_integral<T> && is_integral<U>));
 
 // Metafunction to check if type is a container
-template<typename, typename = size_t>
-struct is_container_impl { constexpr static bool value = false; };
+template<typename, typename = void>
+struct is_container_impl : std::false_type {};
 template<typename T>
-struct is_container_impl<T, decltype(declval<T>().size())> { constexpr static bool value = true; };
+struct is_container_impl<T, make_void<typename T::value_type, decltype(declval<T>().size())>> : std::true_type {};
 template<typename T> constexpr static bool is_container = is_container_impl<T>::value;
+
+// Type alias for a predicate on a particular field type
+template<typename Field>
+using object_restriction_predicate = std::function<bool(const Field&)>;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // *** Restriction Predicate Logic ***
@@ -120,185 +128,181 @@ using attr_types_list = typelist::list<vector<restriction>>;
 // Valid for logical or assertions
 using or_types_list = typelist::list<vector<vector<restriction>>>;
 
-// Final implementations of predicate functors
-template<typename Argument> struct predicate_eq {
-   Argument a;
-   constexpr predicate_eq(const Argument& a) : a(a) {}
-   template<typename, typename = void>
-   struct can_evaluate_helper : std::false_type {}; template<typename Field>
-   struct can_evaluate_helper<Field, make_void<decltype(declval<predicate_eq>()(declval<Field>()))>> {
-      static constexpr bool value = typelist::contains<equality_types_list, Argument>();
-   };
-   template<typename Field> static constexpr bool can_evaluate = can_evaluate_helper<Field>::value;
-
+//////////////////////////////////////////////// PREDICATE FUNCTORS ////////////////////////////////////////////////
+// An invalid predicate which throws upon construction. Inherited by other predicates when arg types are incompatible
+template<typename A, typename B>
+struct predicate_invalid {
+   constexpr static bool valid = false;
+   predicate_invalid() { FC_THROW_EXCEPTION(fc::assert_exception, "Invalid types for predicate"); }
+   bool operator()(const A&, const B&) const { return false; }
+};
+// Equality comparison
+template<typename A, typename B, typename = void> struct predicate_eq : predicate_invalid<A, B> {};
+template<typename Field, typename Argument>
+struct predicate_eq<Field, Argument, std::enable_if_t<comparable_types<Field, Argument>>> {
    // Simple comparison
-   template<typename Field, typename = std::enable_if_t<comparable_types<Field, Argument>>>
-   constexpr bool operator()(const Field& f) const { return f == a; }
+   constexpr static bool valid = true;
+   constexpr bool operator()(const Field& f, const Argument& a) const { return f == a; }
+};
+template<typename Field, typename Argument>
+struct predicate_eq<Field, Argument, std::enable_if_t<is_container<Field> && is_integral<Argument>>> {
    // Compare container size against int
-   template<typename Field, typename Arg = Argument,
-            typename = std::enable_if_t<is_container<Field> && is_integral<Arg>>>
-   bool operator()(const Field& f) const { return f.size() == a; }
+   constexpr static bool valid = true;
+   bool operator()(const Field& f, const Argument& a) const { return f.size() == a; }
+};
+template<typename Field, typename Argument>
+struct predicate_eq<fc::optional<Field>, Argument, std::enable_if_t<comparable_types<Field, Argument>>> {
    // Compare optional value against same type
-   template<typename Field, typename = std::enable_if_t<comparable_types<Field, Argument>>>
-   bool operator()(const fc::optional<Field>& f) const { return f.valid() && *f == a; }
+   constexpr static bool valid = true;
+   bool operator()(const fc::optional<Field>& f, const Argument& a) const { return f.valid() && *f == a; }
+};
+template<typename Field>
+struct predicate_eq<fc::optional<Field>, void_t, void> {
    // Compare optional value against void_t (checks that optional is null)
-   template<typename Field, typename Arg = Argument, typename = std::enable_if_t<std::is_same<Arg, void_t>::value>>
-   bool operator()(const fc::optional<Field>& f) const { return !f.valid(); }
-   // Compare containers of different types
-// TODO: Figure out how to actually make this compile... x(
-//   template<typename Field, typename Arg = Argument, typename =
-//            std::enable_if_t<is_container<Field> && is_container<Arg> && !std::is_same<Field, Arg>::value
-//                             && comparable_types<typename Arg::value_type, typename Field::value_type>>>
-//   bool operator()(const Field& f) const {
-//       flat_set<typename Field::value_type> fs(f.begin(), f.end());
-//       return (*this)(fs);
-//   }
+   constexpr static bool valid = true;
+   bool operator()(const fc::optional<Field>& f, const void_t&) const { return !f.valid(); }
 };
-template<typename Argument> struct predicate_ne : predicate_eq<Argument> {
-   using base = predicate_eq<Argument>;
-   predicate_ne(const Argument& a) : base(a) {}
-   template<typename Field> auto operator()(const Field& f) const { return !base::operator()(f); }
+// Not-equal is just an equality comparison wrapped in a negator
+template<typename Field, typename Argument> struct predicate_ne : predicate_eq<Field, Argument> {
+   using equal = predicate_eq<Field, Argument>;
+   bool operator()(const Field& f, const Argument& a) const { return !equal::operator()(f, a); }
 };
-template<typename Argument> struct predicate_compare {
-   Argument a;
-   constexpr predicate_compare(const Argument& a) : a(a) {}
-   template<typename, typename = void> struct can_evaluate_helper : std::false_type {};
-   template<typename Field>
-   struct can_evaluate_helper<Field, make_void<decltype(declval<predicate_compare>()(declval<Field>()))>> {
-      static constexpr bool value = typelist::contains<comparable_types_list, Argument>();
-   };
-   template<typename Field> static constexpr bool can_evaluate = can_evaluate_helper<Field>::value;
 
-   // Simple comparison
-   template<typename Field, typename = std::enable_if_t<comparable_types<Field, Argument>>>
-   constexpr int8_t operator()(const Field& f) const { return f<a? -1 : (f>a? 1 : 0); }
+// Shared implementation for all inequality comparisons
+template<typename A, typename B, typename = void> struct predicate_compare : predicate_invalid<A, B> {};
+template<typename Field, typename Argument>
+struct predicate_compare<Field, Argument, std::enable_if_t<comparable_types<Field, Argument>>> {
+   // Simple comparison, integral types
+   constexpr static bool valid = true;
+   constexpr int8_t operator()(const Field& f, const Argument& a) const {
+      return f<a? -1 : (f>a? 1 : 0);
+   }
+};
+template<typename Field, typename Argument>
+struct predicate_compare<fc::optional<Field>, Argument, void> : predicate_compare<Field, Argument> {
    // Compare optional value against same type
-   template<typename Field, typename = std::enable_if_t<comparable_types<Field, Argument>>>
-   constexpr int8_t operator()(const fc::optional<Field>& f) const {
+   constexpr static bool valid = true;
+   constexpr int8_t operator()(const fc::optional<Field>& f, const Argument& a) const {
        FC_ASSERT(f.valid(), "Cannot compute inequality comparison against a null optional");
-       return (*this)(*f);
+       return (*this)(*f, a);
    }
 };
-template<typename Argument> struct predicate_lt : predicate_compare<Argument> {
-   using base = predicate_compare<Argument>;
-   constexpr predicate_lt(const Argument& a) : base(a) {}
-   template<typename Field> constexpr bool operator()(const Field& f) const { return base::operator()(f) < 0; }
+// The actual inequality predicates
+template<typename Field, typename Argument> struct predicate_lt : predicate_compare<Field, Argument> {
+   using base = predicate_compare<Field, Argument>;
+   constexpr bool operator()(const Field& f, const Argument& a) const { return base::operator()(f, a) < 0; }
 };
-template<typename Argument> struct predicate_le : predicate_compare<Argument> {
-   using base = predicate_compare<Argument>;
-   constexpr predicate_le(const Argument& a) : base(a) {}
-   template<typename Field> constexpr bool operator()(const Field& f) const { return base::operator()(f) <= 0; }
+template<typename Field, typename Argument> struct predicate_le : predicate_compare<Field, Argument> {
+   using base = predicate_compare<Field, Argument>;
+   constexpr bool operator()(const Field& f, const Argument& a) const { return base::operator()(f, a) <= 0; }
 };
-template<typename Argument> struct predicate_gt : predicate_compare<Argument> {
-   using base = predicate_compare<Argument>;
-   constexpr predicate_gt(const Argument& a) : base(a) {}
-   template<typename Field> constexpr bool operator()(const Field& f) const { return base::operator()(f) > 0; }
+template<typename Field, typename Argument> struct predicate_gt : predicate_compare<Field, Argument> {
+   using base = predicate_compare<Field, Argument>;
+   constexpr bool operator()(const Field& f, const Argument& a) const { return base::operator()(f, a) > 0; }
 };
-template<typename Argument> struct predicate_ge : predicate_compare<Argument> {
-   using base = predicate_compare<Argument>;
-   constexpr predicate_ge(const Argument& a) : base(a) {}
-   template<typename Field> constexpr bool operator()(const Field& f) const { return base::operator()(f) >= 0; }
+template<typename Field, typename Argument> struct predicate_ge : predicate_compare<Field, Argument> {
+   using base = predicate_compare<Field, Argument>;
+   constexpr bool operator()(const Field& f, const Argument& a) const { return base::operator()(f, a) >= 0; }
 };
-template<typename> struct predicate_in { template<typename> static constexpr bool can_evaluate = false; };
-template<typename Element> struct predicate_in<flat_set<Element>> {
-   flat_set<Element> a;
-   predicate_in(const flat_set<Element>& a) : a(a) {}
-   template<typename, typename = void> struct can_evaluate_helper : std::false_type {};
-   template<typename Field>
-   struct can_evaluate_helper<Field, make_void<decltype(declval<predicate_in>()(declval<Field>()))>> {
-      static constexpr bool value = typelist::contains<equality_types_list, Element>();
-   };
-   template<typename Field> static constexpr bool can_evaluate = can_evaluate_helper<Field>::value;
 
+// Field-in-list predicate
+template<typename F, typename C, typename = void> struct predicate_in : predicate_invalid<F, C> {};
+template<typename Field, typename Element>
+struct predicate_in<Field, flat_set<Element>, std::enable_if_t<comparable_types<Field, Element> && !is_safe<Field>>> {
    // Simple inclusion check
-   template<typename Field, typename = std::enable_if_t<comparable_types<Field, Element>>>
-   bool operator()(const Field& f) const { return a.count(f) != 0; }
+   constexpr static bool valid = true;
+   bool operator()(const Field& f, const flat_set<Element>& c) const { return c.count(f) != 0; }
+};
+template<typename Field, typename Element>
+struct predicate_in<fc::safe<Field>, flat_set<Element>, std::enable_if_t<comparable_types<Field, Element>>> {
    // Check for safe value
-   template<typename Field, typename = std::enable_if_t<comparable_types<Field, Element>>>
-   bool operator()(const fc::safe<Field>& f) const { return a.count(f.value) != 0; }
+   constexpr static bool valid = true;
+   bool operator()(const fc::safe<Field>& f, const flat_set<Element>& c) const { return c.count(f.value) != 0; }
+};
+template<typename Field, typename Element>
+struct predicate_in<fc::optional<Field>, flat_set<Element>, std::enable_if_t<comparable_types<Field, Element>>> {
    // Check for optional value
-   template<typename Field, typename = std::enable_if_t<comparable_types<Field, Element>>>
-   bool operator()(const fc::optional<Field>& f) const {
+   constexpr static bool valid = true;
+   bool operator()(const fc::optional<Field>& f, const flat_set<Element>& c) const {
        FC_ASSERT(f.valid(), "Cannot compute whether null optional is in list");
-       return (*this)(*f);
+       return c.count(*f) != 0;
    }
 };
-template<typename Argument> struct predicate_not_in : predicate_in<Argument>{
-   using base = predicate_in<Argument>;
-   constexpr predicate_not_in(const Argument& a) : base(a) {}
-   template<typename Field> constexpr bool operator()(const Field& f) const { return !base::operator()(f); }
+// Field-not-in-list is just field-in-list wrapped in a negator
+template<typename Field, typename Container> struct predicate_not_in : predicate_in<Field, Container> {
+   using base = predicate_in<Field, Container>;
+   bool operator()(const Field& f, const Container& c) const { return !base::operator()(f, c); }
 };
-template<typename> struct predicate_has_all { template<typename> static constexpr bool can_evaluate = false; };
-template<typename Element> struct predicate_has_all<flat_set<Element>> {
-   flat_set<Element> a;
-   predicate_has_all(const flat_set<Element>& a) : a(a) {}
-   template<typename, typename = void> struct can_evaluate_helper : std::false_type {};
-   template<typename Field>
-   struct can_evaluate_helper<Field, make_void<decltype(declval<predicate_has_all>()(declval<Field>()))>> {
-      static constexpr bool value = typelist::contains<equality_types_list, Element>();
-   };
-   template<typename Field> static constexpr bool can_evaluate = can_evaluate_helper<Field>::value;
 
+// List-contains-list predicate
+template<typename C1, typename C2, typename = void> struct predicate_has_all : predicate_invalid<C1, C2> {};
+template<typename FieldElement, typename ArgumentElement>
+struct predicate_has_all<flat_set<FieldElement>, flat_set<ArgumentElement>,
+                         std::enable_if_t<comparable_types<FieldElement, ArgumentElement>>> {
    // Field is already flat_set
-   template<typename Field, typename = std::enable_if_t<comparable_types<Field, Element>>>
-   bool operator()(const flat_set<Field>& f) const {
+   constexpr static bool valid = true;
+   bool operator()(const flat_set<FieldElement>& f, const flat_set<ArgumentElement>& a) const {
       if (f.size() < a.size()) return false;
       return std::includes(f.begin(), f.end(), a.begin(), a.end());
    }
+};
+template<typename FieldContainer, typename ArgumentElement>
+struct predicate_has_all<FieldContainer, flat_set<ArgumentElement>,
+                         std::enable_if_t<is_container<FieldContainer> && !is_flat_set<FieldContainer> &&
+                                          comparable_types<typename FieldContainer::value_type, ArgumentElement>>> {
+   predicate_has_all<flat_set<typename FieldContainer::value_type>, flat_set<ArgumentElement>> inner;
    // Field is other container; convert to flat_set
-   template<typename Field, typename = std::enable_if_t<is_container<Field> &&
-                                                        comparable_types<typename Field::value_type, Element>>>
-   bool operator()(const Field& f) const {
+   constexpr static bool valid = true;
+   bool operator()(const FieldContainer& f, const flat_set<ArgumentElement>& a) const {
       if (f.size() < a.size()) return false;
-      flat_set<typename Field::value_type> fs(f.begin(), f.end());
-      return (*this)(fs);
-   }
-   // Field is optional container
-   template<typename Field, typename = std::enable_if_t<is_container<Field> &&
-                                                        comparable_types<typename Field::value_type, Element>>>
-   bool operator()(const fc::optional<Field>& f) const {
-      FC_ASSERT(f.valid(), "Cannot compute whether all elements of null optional container are in other container");
-      return (*this)(*f);
+      flat_set<typename FieldContainer::value_type> fs(f.begin(), f.end());
+      return inner(fs, a);
    }
 };
-template<typename> struct predicate_has_none { template<typename> static constexpr bool can_evaluate = false; };
-template<typename Element> struct predicate_has_none<flat_set<Element>> {
-   flat_set<Element> a;
-   predicate_has_none(const flat_set<Element>& a) : a(a) {}
-   template<typename, typename = void> struct can_evaluate_helper : std::false_type {};
-   template<typename Field>
-   struct can_evaluate_helper<Field, make_void<decltype(declval<predicate_has_none>()(declval<Field>()))>> {
-      static constexpr bool value = typelist::contains<equality_types_list, Element>();
-   };
-   template<typename Field> static constexpr bool can_evaluate = can_evaluate_helper<Field>::value;
+template<typename OptionalType, typename Argument>
+struct predicate_has_all<fc::optional<OptionalType>, Argument, void> : predicate_has_all<OptionalType, Argument> {
+   // Field is optional container
+   bool operator()(const fc::optional<OptionalType>& f, const Argument& a) const {
+      FC_ASSERT(f.valid(), "Cannot compute whether all elements of null optional container are in other container");
+      return (*this)(*f, a);
+   }
+};
 
+// List contains none of list predicate
+template<typename C1, typename C2, typename = void> struct predicate_has_none : predicate_invalid<C1, C2> {};
+template<typename FieldElement, typename ArgumentElement>
+struct predicate_has_none<flat_set<FieldElement>, flat_set<ArgumentElement>,
+                          std::enable_if_t<comparable_types<FieldElement, ArgumentElement>>> {
    // Field is already flat_set
-   template<typename Field, typename = std::enable_if_t<comparable_types<Field, Element>>>
-   bool operator()(const flat_set<Field>& f) const {
-      flat_set<Field> intersection;
+   constexpr static bool valid = true;
+   bool operator()(const flat_set<FieldElement>& f, const flat_set<ArgumentElement>& a) const {
+      flat_set<FieldElement> intersection;
       std::set_intersection(f.begin(), f.end(), a.begin(), a.end(),
                             std::inserter(intersection, intersection.begin()));
       return intersection.empty();
    }
+};
+template<typename FieldContainer, typename ArgumentElement>
+struct predicate_has_none<FieldContainer, flat_set<ArgumentElement>,
+                          std::enable_if_t<is_container<FieldContainer> && !is_flat_set<FieldContainer> &&
+                                           comparable_types<typename FieldContainer::value_type, ArgumentElement>>> {
+   predicate_has_none<flat_set<typename FieldContainer::value_type>, flat_set<ArgumentElement>> inner;
    // Field is other container; convert to flat_set
-   template<typename Field, typename = std::enable_if_t<is_container<Field> &&
-                                                        comparable_types<typename Field::value_type, Element>>>
-   bool operator()(const Field& f) const {
-      flat_set<typename Field::value_type> fs(f.begin(), f.end());
-      return (*this)(fs);
-   }
-   // Field is optional container
-   template<typename Field, typename = std::enable_if_t<is_container<Field> &&
-                                                        comparable_types<typename Field::value_type, Element>>>
-   bool operator()(const fc::optional<Field>& f) const {
-      FC_ASSERT(f.valid(), "Cannot compute whether no elements of null optional container are in other container");
-      return (*this)(*f);
+   constexpr static bool valid = true;
+   bool operator()(const FieldContainer& f, const flat_set<ArgumentElement>& a) const {
+      flat_set<typename FieldContainer::value_type> fs(f.begin(), f.end());
+      return inner(fs, a);
    }
 };
-
-// Type alias for a predicate on a particular field type
-template<typename Field>
-using object_restriction_predicate = std::function<bool(const Field&)>;
+template<typename OptionalType, typename Argument>
+struct predicate_has_none<fc::optional<OptionalType>, Argument, void> : predicate_has_all<OptionalType, Argument> {
+   // Field is optional container
+   bool operator()(const fc::optional<OptionalType>& f, const Argument& a) const {
+      FC_ASSERT(f.valid(), "Cannot evaluate list has-none-of list on null optional list");
+      return (*this)(*f, a);
+   }
+};
+////////////////////////////////////////////// END PREDICATE FUNCTORS //////////////////////////////////////////////
 
 // Template to visit the restriction argument, resolving its type, and create the appropriate predicate functor, or
 // throw if the types are not compatible for the predicate assertion
@@ -347,50 +351,55 @@ struct attribute_assertion<extension<Extension>> {
    }
 };
 
+template<typename F, typename P, typename A, typename = std::enable_if_t<P::valid>>
+object_restriction_predicate<F> mkpred(P p, A a, short) {
+   return std::bind(p, std::placeholders::_1, std::move(a));
+}
+template<typename F, typename P, typename A>
+object_restriction_predicate<F> mkpred(P, A, long) {
+   FC_THROW_EXCEPTION(fc::assert_exception, "Invalid types for predicated");
+}
+
+template<template<typename...> class Predicate, typename Field, typename ArgVariant>
+object_restriction_predicate<Field> make_predicate(ArgVariant arg) {
+   return typelist::runtime::dispatch(typename ArgVariant::list(), arg.which(),
+                                      [&arg](auto t) mutable -> object_restriction_predicate<Field> {
+      using Arg = typename decltype(t)::type;
+      return mkpred<Field>(Predicate<Field, Arg>(), std::move(arg.template get<Arg>()), short());
+   });
+}
+
 template<typename Field>
 object_restriction_predicate<Field> create_predicate_function(restriction_function func, restriction_argument arg) {
    try {
       switch(func) {
-      case restriction::func_eq: {
-         restriction_argument_visitor<predicate_eq, Field> visitor;
-         return typelist::apply<equality_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
-      }
-      case restriction::func_ne: {
-         restriction_argument_visitor<predicate_ne, Field> visitor;
-         return typelist::apply<equality_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
-      }
-      case restriction::func_lt: {
-         restriction_argument_visitor<predicate_lt, Field> visitor;
-         return typelist::apply<comparable_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
-      }
-      case restriction::func_le: {
-         restriction_argument_visitor<predicate_le, Field> visitor;
-         return typelist::apply<comparable_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
-      }
-      case restriction::func_gt: {
-         restriction_argument_visitor<predicate_gt, Field> visitor;
-         return typelist::apply<comparable_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
-      }
-      case restriction::func_ge: {
-         restriction_argument_visitor<predicate_ge, Field> visitor;
-         return typelist::apply<comparable_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
-      }
-      case restriction::func_in: {
-         restriction_argument_visitor<predicate_in, Field> visitor;
-         return typelist::apply<list_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
-      }
-      case restriction::func_not_in: {
-         restriction_argument_visitor<predicate_not_in, Field> visitor;
-         return typelist::apply<list_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
-      }
-      case restriction::func_has_all: {
-         restriction_argument_visitor<predicate_has_all, Field> visitor;
-         return typelist::apply<list_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
-      }
-      case restriction::func_has_none: {
-         restriction_argument_visitor<predicate_has_none, Field> visitor;
-         return typelist::apply<list_types_list, static_variant>::import_from(std::move(arg)).visit(visitor);
-      }
+      case restriction::func_eq:
+         return make_predicate<predicate_eq, Field>(static_variant<equality_types_list>::import_from(std::move(arg)));
+      case restriction::func_ne:
+         return make_predicate<predicate_ne, Field>(static_variant<equality_types_list>::import_from(std::move(arg)));
+      case restriction::func_lt:
+         return make_predicate<predicate_lt, Field>(static_variant<comparable_types_list>
+                                                    ::import_from(std::move(arg)));
+      case restriction::func_le:
+         return make_predicate<predicate_le, Field>(static_variant<comparable_types_list>
+                                                    ::import_from(std::move(arg)));
+      case restriction::func_gt:
+         return make_predicate<predicate_gt, Field>(static_variant<comparable_types_list>
+                                                    ::import_from(std::move(arg)));
+      case restriction::func_ge:
+         return make_predicate<predicate_ge, Field>(static_variant<comparable_types_list>
+                                                    ::import_from(std::move(arg)));
+      case restriction::func_in:
+         return make_predicate<predicate_in, Field>(static_variant<list_types_list>::import_from(std::move(arg)));
+      case restriction::func_not_in:
+         return make_predicate<predicate_not_in, Field>(static_variant<list_types_list>
+                                                        ::import_from(std::move(arg)));
+      case restriction::func_has_all:
+         return make_predicate<predicate_has_all, Field>(static_variant<list_types_list>
+                                                         ::import_from(std::move(arg)));
+      case restriction::func_has_none:
+         return make_predicate<predicate_has_none, Field>(static_variant<list_types_list>
+                                                          ::import_from(std::move(arg)));
       case restriction::func_attr:
          FC_ASSERT(arg.which() == restriction_argument::tag<vector<restriction>>::value,
                    "Argument type for attribute assertion must be restriction list");
@@ -398,7 +407,7 @@ object_restriction_predicate<Field> create_predicate_function(restriction_functi
       default:
           FC_THROW_EXCEPTION(fc::assert_exception, "Invalid function type on restriction");
       }
-   } FC_CAPTURE_AND_RETHROW( (func) )
+   } FC_CAPTURE_AND_RETHROW( (fc::get_typename<Field>::name())(func)(arg) )
 }
 
 /**
@@ -495,100 +504,104 @@ restriction_predicate_function get_restriction_predicate(const vector<restrictio
    return operation::visit(op_type, visitor, static_cast<void*>(nullptr));
 }
 
-// Now for some compile-time tests of the metafunctions we use in here...
-#ifndef NDEBUG
+// These are some compile-time tests of the metafunctions and predicate type analysis. They are turned off to make
+// building faster; they only need to be enabled when making changes in this file
+#if false
 static_assert(!is_container<int>, "");
 static_assert(is_container<vector<int>>, "");
+static_assert(is_container<flat_set<int>>, "");
+static_assert(is_container<string>, "");
+static_assert(is_flat_set<flat_set<int>>, "");
+static_assert(!is_flat_set<vector<int>>, "");
 
-static_assert(predicate_eq<int64_t>(10)(20) == false, "");
-static_assert(predicate_eq<int64_t>(10)(5) == false, "");
-static_assert(predicate_eq<int64_t>(10)(10) == true, "");
+static_assert(predicate_eq<int, int64_t>()(10, 20) == false, "");
+static_assert(predicate_eq<int, int64_t>()(10, 5) == false, "");
+static_assert(predicate_eq<int, int64_t>()(10, 10) == true, "");
 
-static_assert(predicate_eq<void_t>::can_evaluate<void_t> == false, "");
-static_assert(predicate_eq<void_t>::can_evaluate<int> == false, "");
-static_assert(predicate_eq<int64_t>::can_evaluate<void_t> == false, "");
-static_assert(predicate_eq<int64_t>::can_evaluate<int> == true, "");
-static_assert(predicate_eq<int64_t>::can_evaluate<long> == true, "");
-static_assert(predicate_eq<int64_t>::can_evaluate<vector<bool>> == true, "");
-static_assert(predicate_eq<int64_t>::can_evaluate<flat_set<char>> == true, "");
-static_assert(predicate_eq<int64_t>::can_evaluate<short> == true, "");
-static_assert(predicate_eq<int64_t>::can_evaluate<bool> == false, "");
-static_assert(predicate_eq<bool>::can_evaluate<int> == false, "");
-static_assert(predicate_eq<int64_t>::can_evaluate<fc::optional<int>> == true, "");
-static_assert(predicate_eq<int64_t>::can_evaluate<fc::optional<long>> == true, "");
-static_assert(predicate_eq<void_t>::can_evaluate<fc::optional<long>> == true, "");
-static_assert(predicate_eq<flat_set<bool>>::can_evaluate<flat_set<bool>> == true, "");
-//static_assert(predicate_eq<flat_set<bool>>::can_evaluate<vector<bool>> == true, "");
-static_assert(predicate_eq<string>::can_evaluate<flat_set<bool>> == false, "");
-static_assert(predicate_eq<string>::can_evaluate<string> == true, "");
-static_assert(predicate_ne<void_t>::can_evaluate<int> == false, "");
-static_assert(predicate_ne<int64_t>::can_evaluate<void_t> == false, "");
-static_assert(predicate_ne<int64_t>::can_evaluate<int> == true, "");
-static_assert(predicate_ne<int64_t>::can_evaluate<long> == true, "");
-static_assert(predicate_ne<int64_t>::can_evaluate<vector<bool>> == true, "");
-static_assert(predicate_ne<int64_t>::can_evaluate<flat_set<char>> == true, "");
-static_assert(predicate_ne<int64_t>::can_evaluate<short> == true, "");
-static_assert(predicate_ne<int64_t>::can_evaluate<bool> == false, "");
-static_assert(predicate_ne<bool>::can_evaluate<int> == false, "");
-static_assert(predicate_ne<int64_t>::can_evaluate<fc::optional<int>> == true, "");
-static_assert(predicate_ne<int64_t>::can_evaluate<fc::optional<long>> == true, "");
-static_assert(predicate_ne<void_t>::can_evaluate<fc::optional<long>> == true, "");
-static_assert(predicate_ne<string>::can_evaluate<string> == true, "");
+static_assert(predicate_eq<void_t, void_t>::valid == false, "");
+static_assert(predicate_eq<int, void_t>::valid == false, "");
+static_assert(predicate_eq<void_t, int64_t>::valid == false, "");
+static_assert(predicate_eq<int, int64_t>::valid == true, "");
+static_assert(predicate_eq<long, int64_t>::valid == true, "");
+static_assert(predicate_eq<vector<bool>, int64_t>::valid == true, "");
+static_assert(predicate_eq<flat_set<char>, int64_t>::valid == true, "");
+static_assert(predicate_eq<short, int64_t>::valid == true, "");
+static_assert(predicate_eq<bool, int64_t>::valid == false, "");
+static_assert(predicate_eq<int, bool>::valid == false, "");
+static_assert(predicate_eq<fc::optional<int>, int64_t>::valid == true, "");
+static_assert(predicate_eq<fc::optional<long>, int64_t>::valid == true, "");
+static_assert(predicate_eq<fc::optional<long>, void_t>::valid == true, "");
+static_assert(predicate_eq<flat_set<bool>, flat_set<bool>>::valid == true, "");
+static_assert(predicate_eq<flat_set<bool>, string>::valid == false, "");
+static_assert(predicate_eq<string, string>::valid == true, "");
+static_assert(predicate_ne<int, void_t>::valid == false, "");
+static_assert(predicate_ne<void_t, int64_t>::valid == false, "");
+static_assert(predicate_ne<int, int64_t>::valid == true, "");
+static_assert(predicate_ne<long, int64_t>::valid == true, "");
+static_assert(predicate_ne<vector<bool>, int64_t>::valid == true, "");
+static_assert(predicate_ne<flat_set<char>, int64_t>::valid == true, "");
+static_assert(predicate_ne<short, int64_t>::valid == true, "");
+static_assert(predicate_ne<bool, int64_t>::valid == false, "");
+static_assert(predicate_ne<int, bool>::valid == false, "");
+static_assert(predicate_ne<fc::optional<int>, int64_t>::valid == true, "");
+static_assert(predicate_ne<fc::optional<long>, int64_t>::valid == true, "");
+static_assert(predicate_ne<fc::optional<long>, void_t>::valid == true, "");
+static_assert(predicate_ne<string, string>::valid == true, "");
 
-static_assert(predicate_compare<int64_t>(10)(20) == 1, "");
-static_assert(predicate_compare<int64_t>(10)(5) == -1, "");
-static_assert(predicate_compare<int64_t>(10)(10) == 0, "");
-static_assert(predicate_lt<int64_t>(10)(20) == false, "");
-static_assert(predicate_lt<int64_t>(10)(5) == true, "");
-static_assert(predicate_lt<int64_t>(10)(10) == false, "");
-static_assert(predicate_le<int64_t>(10)(20) == false, "");
-static_assert(predicate_le<int64_t>(10)(5) == true, "");
-static_assert(predicate_le<int64_t>(10)(10) == true, "");
-static_assert(predicate_gt<int64_t>(10)(20) == true, "");
-static_assert(predicate_gt<int64_t>(10)(5) == false, "");
-static_assert(predicate_gt<int64_t>(10)(10) == false, "");
-static_assert(predicate_ge<int64_t>(10)(20) == true, "");
-static_assert(predicate_ge<int64_t>(10)(5) == false, "");
-static_assert(predicate_ge<int64_t>(10)(10) == true, "");
+static_assert(predicate_compare<int, int64_t>()(20, 10) == 1, "");
+static_assert(predicate_compare<int, int64_t>()(5, 10) == -1, "");
+static_assert(predicate_compare<int, int64_t>()(10, 10) == 0, "");
+static_assert(predicate_lt<int, int64_t>()(20, 10) == false, "");
+static_assert(predicate_lt<int, int64_t>()(5, 10) == true, "");
+static_assert(predicate_lt<int, int64_t>()(10, 10) == false, "");
+static_assert(predicate_le<int, int64_t>()(20, 10) == false, "");
+static_assert(predicate_le<int, int64_t>()(5, 10) == true, "");
+static_assert(predicate_le<int, int64_t>()(10, 10) == true, "");
+static_assert(predicate_gt<int, int64_t>()(20, 10) == true, "");
+static_assert(predicate_gt<int, int64_t>()(5, 10) == false, "");
+static_assert(predicate_gt<int, int64_t>()(10, 10) == false, "");
+static_assert(predicate_ge<int, int64_t>()(20, 10) == true, "");
+static_assert(predicate_ge<int, int64_t>()(5, 10) == false, "");
+static_assert(predicate_ge<int, int64_t>()(10, 10) == true, "");
 
-static_assert(predicate_compare<int64_t>::can_evaluate<int> == true, "");
-static_assert(predicate_compare<int64_t>::can_evaluate<short> == true, "");
-static_assert(predicate_compare<string>::can_evaluate<string> == true, "");
-static_assert(predicate_compare<int64_t>::can_evaluate<vector<int>> == false, "");
-static_assert(predicate_compare<int64_t>::can_evaluate<fc::optional<int>> == true, "");
-static_assert(predicate_compare<int64_t>::can_evaluate<fc::optional<short>> == true, "");
-static_assert(predicate_compare<string>::can_evaluate<fc::optional<string>> == true, "");
-static_assert(predicate_lt<int64_t>::can_evaluate<int> == true, "");
-static_assert(predicate_lt<int64_t>::can_evaluate<short> == true, "");
-static_assert(predicate_lt<string>::can_evaluate<string> == true, "");
-static_assert(predicate_lt<int64_t>::can_evaluate<vector<int>> == false, "");
-static_assert(predicate_lt<int64_t>::can_evaluate<fc::optional<int>> == true, "");
-static_assert(predicate_lt<int64_t>::can_evaluate<fc::optional<short>> == true, "");
-static_assert(predicate_lt<string>::can_evaluate<fc::optional<string>> == true, "");
+static_assert(predicate_compare<int, int64_t>::valid == true, "");
+static_assert(predicate_compare<short, int64_t>::valid == true, "");
+static_assert(predicate_compare<string, string>::valid == true, "");
+static_assert(predicate_compare<vector<int>, int64_t>::valid == false, "");
+static_assert(predicate_compare<fc::optional<int>, int64_t>::valid == true, "");
+static_assert(predicate_compare<fc::optional<short>, int64_t>::valid == true, "");
+static_assert(predicate_compare<fc::optional<string>, string>::valid == true, "");
+static_assert(predicate_lt<int, int64_t>::valid == true, "");
+static_assert(predicate_lt<short, int64_t>::valid == true, "");
+static_assert(predicate_lt<string, string>::valid == true, "");
+static_assert(predicate_lt<vector<int>, int64_t>::valid == false, "");
+static_assert(predicate_lt<fc::optional<int>, int64_t>::valid == true, "");
+static_assert(predicate_lt<fc::optional<short>, int64_t>::valid == true, "");
+static_assert(predicate_lt<fc::optional<string>, string>::valid == true, "");
 
-static_assert(predicate_in<string>::can_evaluate<string> == false, "");
-static_assert(predicate_in<flat_set<string>>::can_evaluate<int> == false, "");
-static_assert(predicate_in<flat_set<string>>::can_evaluate<string> == true, "");
-static_assert(predicate_in<flat_set<string>>::can_evaluate<flat_set<string>> == false, "");
-static_assert(predicate_in<flat_set<string>>::can_evaluate<fc::optional<string>> == true, "");
-static_assert(predicate_not_in<string>::can_evaluate<string> == false, "");
-static_assert(predicate_not_in<flat_set<string>>::can_evaluate<int> == false, "");
-static_assert(predicate_not_in<flat_set<string>>::can_evaluate<string> == true, "");
-static_assert(predicate_not_in<flat_set<string>>::can_evaluate<flat_set<string>> == false, "");
-static_assert(predicate_not_in<flat_set<string>>::can_evaluate<fc::optional<string>> == true, "");
+static_assert(predicate_in<string, string>::valid == false, "");
+static_assert(predicate_in<int, flat_set<string>>::valid == false, "");
+static_assert(predicate_in<string, flat_set<string>>::valid == true, "");
+static_assert(predicate_in<flat_set<string>, flat_set<string>>::valid == false, "");
+static_assert(predicate_in<fc::optional<string>, flat_set<string>>::valid == true, "");
+static_assert(predicate_not_in<string, string>::valid == false, "");
+static_assert(predicate_not_in<int, flat_set<string>>::valid == false, "");
+static_assert(predicate_not_in<string, flat_set<string>>::valid == true, "");
+static_assert(predicate_not_in<flat_set<string>, flat_set<string>>::valid == false, "");
+static_assert(predicate_not_in<fc::optional<string>, flat_set<string>>::valid == true, "");
 
-static_assert(predicate_has_all<string>::can_evaluate<string> == false, "");
-static_assert(predicate_has_all<flat_set<string>>::can_evaluate<int> == false, "");
-static_assert(predicate_has_all<flat_set<string>>::can_evaluate<string> == false, "");
-static_assert(predicate_has_all<flat_set<string>>::can_evaluate<flat_set<string>> == true, "");
-static_assert(predicate_has_all<flat_set<string>>::can_evaluate<fc::optional<string>> == false, "");
-static_assert(predicate_has_all<flat_set<string>>::can_evaluate<fc::optional<flat_set<string>>> == true, "");
-static_assert(predicate_has_none<string>::can_evaluate<string> == false, "");
-static_assert(predicate_has_none<flat_set<string>>::can_evaluate<int> == false, "");
-static_assert(predicate_has_none<flat_set<string>>::can_evaluate<string> == false, "");
-static_assert(predicate_has_none<flat_set<string>>::can_evaluate<flat_set<string>> == true, "");
-static_assert(predicate_has_none<flat_set<string>>::can_evaluate<fc::optional<string>> == false, "");
-static_assert(predicate_has_none<flat_set<string>>::can_evaluate<fc::optional<flat_set<string>>> == true, "");
+static_assert(predicate_has_all<string, string>::valid == false, "");
+static_assert(predicate_has_all<int, flat_set<string>>::valid == false, "");
+static_assert(predicate_has_all<string, flat_set<string>>::valid == false, "");
+static_assert(predicate_has_all<flat_set<string>, flat_set<string>>::valid == true, "");
+static_assert(predicate_has_all<fc::optional<string>, flat_set<string>>::valid == false, "");
+static_assert(predicate_has_all<fc::optional<flat_set<string>>, flat_set<string>>::valid == true, "");
+static_assert(predicate_has_none<string, string>::valid == false, "");
+static_assert(predicate_has_none<int, flat_set<string>>::valid == false, "");
+static_assert(predicate_has_none<string, flat_set<string>>::valid == false, "");
+static_assert(predicate_has_none<flat_set<string>, flat_set<string>>::valid == true, "");
+static_assert(predicate_has_none<fc::optional<string>, flat_set<string>>::valid == false, "");
+static_assert(predicate_has_none<fc::optional<flat_set<string>>, flat_set<string>>::valid == true, "");
 
 #endif
 
