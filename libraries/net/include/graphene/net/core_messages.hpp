@@ -293,6 +293,19 @@ namespace graphene { namespace net {
       direction(direction),
       firewalled(firewalled)
     {}
+    inline bool operator==(const fc::ip::endpoint& in)
+    { 
+       return in == remote_endpoint; 
+    }
+    inline bool operator==(const address_info& in)
+    {
+       return remote_endpoint == in.remote_endpoint &&
+            last_seen_time == in.last_seen_time &&
+            latency == in.latency &&
+            node_id == in.node_id &&
+            direction == in.direction &&
+            firewalled == in.firewalled;
+    }
   };
 
   struct address_message
