@@ -48,7 +48,7 @@ BOOST_FIXTURE_TEST_SUITE( login_signed_tests, login_signed_fixture )
 
 BOOST_AUTO_TEST_CASE( fail_with_timestamp_too_fresh )
 { try {
-   
+
    ACTOR( alice );
    transfer_operation op;
    op.from = alice_id;
@@ -119,7 +119,7 @@ BOOST_AUTO_TEST_CASE( fail_with_not_transfer_op_in_trx )
    ACTOR( alice );
    account_update_operation op;
    op.account = alice_id;
-   
+
    signed_transaction trx;
    trx.operations.push_back( op );
    trx.expiration = db.head_block_time() + 60;
@@ -145,7 +145,7 @@ BOOST_AUTO_TEST_CASE( fail_with_empty_signature_keys )
    signed_transaction trx;
    trx.operations.push_back( op );
    trx.expiration = db.head_block_time() + 60;
-   
+
    auto json = fc::json::to_string<signed_transaction>( trx );
    auto encoded = fc::base64_encode( json );
 

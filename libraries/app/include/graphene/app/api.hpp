@@ -585,7 +585,7 @@ namespace graphene { namespace app {
          optional< fc::api<orders_api> > _orders_api;
          optional< fc::api<graphene::debug_witness::debug_api> > _debug_api;
 
-         bool verify_api_access_info_signed( const account_object& acc, 
+         bool verify_api_access_info_signed( const account_object& acc,
             const api_access_info_signed& api_access_info );
    };
 

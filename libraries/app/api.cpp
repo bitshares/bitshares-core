@@ -97,7 +97,7 @@ namespace graphene { namespace app {
       auto db = _app.chain_database();
       int64_t offset( (trx.expiration - db->head_block_time()).to_seconds() );
       if( offset > 5*60 || offset < 0 )
-         return false; 
+         return false;
 
       auto op = trx.operations[0];
       if( op.which() != operation::tag<transfer_operation>::value ) // only transfer op for validation
@@ -127,7 +127,7 @@ namespace graphene { namespace app {
       {
          const auto& api_access_info = api_access_info_var->get<api_access_info_signed>();
          if( !verify_api_access_info_signed( acc, api_access_info ) )
-            return false; 
+            return false;
 
          for( const auto& api : api_access_info.allowed_apis )
             enable_api( api );
@@ -141,10 +141,10 @@ namespace graphene { namespace app {
          {
             if( !verify_api_access_info_signed( acc, api_access_info ) )
                continue;
-            
+
             for( const auto& api : api_access_info.allowed_apis )
                enable_api( api );
-            
+
             return true;
          }
          return false;
@@ -156,7 +156,7 @@ namespace graphene { namespace app {
     {
       auto db = _app.chain_database();
 
-      if( api_access_info.required_lifetime_member && !acc.is_lifetime_member() ) 
+      if( api_access_info.required_lifetime_member && !acc.is_lifetime_member() )
          return false;
 
       const auto& required_registrar_name = api_access_info.required_registrar;
@@ -191,7 +191,7 @@ namespace graphene { namespace app {
          if( acc.original_referrer )
             acc_original_referrer_name = (*acc.original_registrar)(*db).name;
 
-         has_required_referrer = required_referrer_name == acc_referrer_name 
+         has_required_referrer = required_referrer_name == acc_referrer_name
             || required_referrer_name == acc_original_referrer_name;
       }
 

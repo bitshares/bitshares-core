@@ -1,5 +1,5 @@
 {
-   "permission_map": 
+   "permission_map":
    [
       [
          "*",
@@ -23,26 +23,26 @@
          "required_lifetime_member": false,
          "required_registrar": "registrar_name1",
          "required_referrer": "",
-         "allowed_apis": 
+         "allowed_apis":
          [
             "database_api",
             "history_api",
             "block_api",
             "orders_api"
          ]
-      },  
+      },
       {
          "required_lifetime_member": true,
          "required_registrar": "registrar_name2",
          "required_referrer": "",
-         "allowed_apis": 
+         "allowed_apis":
          [
             "database_api",
             "history_api",
             "block_api",
             "orders_api"
          ]
-      }  
+      }
    ],
    "permission_map_signed_user":
    [
@@ -51,7 +51,7 @@
          {
             "required_lifetime_member": false,
             "required_registrar": "",
-            "allowed_apis": 
+            "allowed_apis":
             [
                "database_api",
                "history_api",

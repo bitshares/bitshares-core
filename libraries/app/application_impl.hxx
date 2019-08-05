@@ -47,14 +47,14 @@ class application_impl : public net::node_delegate
 
       fc::optional< api_access_info > get_api_access_info(const string& username)const;
 
-      fc::optional< api_access_info_signed_variant > get_api_access_info_signed(const string& username)const; 
+      fc::optional< api_access_info_signed_variant > get_api_access_info_signed(const string& username)const;
 
       void set_api_access_info(const string& username, api_access_info&& permissions);
 
       void set_api_access_info_signed_default(std::vector<api_access_info_signed>&& permissions);
 
       void set_api_access_info_signed_user(const string& username, api_access_info_signed&& permissions);
-      
+
       /**
        * If delegate has the item, the network has no need to fetch it.
        */
