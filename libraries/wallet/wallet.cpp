@@ -2316,11 +2316,6 @@ public:
       return true;
    }
 
-   /** Verify a message signed with sign_message, in its encapsulated form.
-    *
-    * @param message the complete encapsulated message string including separators and line feeds
-    * @return true if signature matches
-    */
    bool verify_encapsulated_message( const string& message )
    {
       signed_message msg;
