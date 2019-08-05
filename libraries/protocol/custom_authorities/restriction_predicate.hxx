@@ -22,7 +22,8 @@
  * THE SOFTWARE.
  */
 
-#include <graphene/protocol/restriction_predicate.hpp>
+#include <graphene/protocol/restriction.hpp>
+#include <graphene/protocol/operations.hpp>
 
 #include <fc/exception/exception.hpp>
 
@@ -41,8 +42,9 @@ template<typename> constexpr static bool is_safe = false;
 template<typename I> constexpr static bool is_safe<fc::safe<I>> = true;
 
 // Metafunction to check if type is a flat_set of any element type
-template<typename> constexpr static bool is_flat_set = false;
-template<typename T> constexpr static bool is_flat_set<flat_set<T>> = true;
+template<typename> struct is_flat_set_impl : std::false_type {};
+template<typename T> struct is_flat_set_impl<flat_set<T>> : std::true_type {};
+template<typename T> constexpr static bool is_flat_set = is_flat_set_impl<T>::value;
 
 // We use our own is_integral which does not consider bools integral (to disallow comparison between bool and ints)
 template<typename T> constexpr static bool is_integral = !std::is_same<T, bool>::value &&
@@ -474,135 +476,21 @@ object_restriction_predicate<Object> restrictions_to_predicate(vector<restrictio
    };
 }
 
-/**
- * @brief Visitor on the generic operation to determine the actual operation type and make a predicate for it
- *
- * This struct is used as a visitor to the operation static_variant. It has a visit method which is called with the
- * particular operation type as a template argument, and this method constructs a restriction predicate which accepts
- * an operation wrapping the visited type and returns whether the operation complies with all restrictions or not.
- */
-struct operation_type_resolver {
-   using result_type = restriction_predicate_function;
+// To make the build gentler on RAM, break the operation list into several pieces to build over several files
+using operation_list_1 = static_variant<typelist::slice<operation::list, 0, 5>>;
+using operation_list_2 = static_variant<typelist::slice<operation::list, 5, 10>>;
+using operation_list_3 = static_variant<typelist::slice<operation::list, 10, 20>>;
+using operation_list_4 = static_variant<typelist::slice<operation::list, 20, 30>>;
+using operation_list_5 = static_variant<typelist::slice<operation::list, 30, 40>>;
+using operation_list_6 = static_variant<typelist::slice<operation::list, 40, 50>>;
+using operation_list_7 = static_variant<typelist::slice<operation::list, 50>>;
 
-   const vector<restriction>& restrictions;
-
-   operation_type_resolver(const vector<restriction>& restrictions) : restrictions(restrictions) {}
-
-   template<typename Op>
-   result_type operator()(const Op&) {
-      auto predicate = restrictions_to_predicate<Op>(restrictions, true);
-      return [predicate=std::move(predicate)](const operation& op) {
-         FC_ASSERT(op.which() == operation::tag<Op>::value,
-                   "Supplied operation is incorrect type for restriction predicate");
-         return predicate(op.get<Op>());
-      };
-   }
-};
-
-restriction_predicate_function get_restriction_predicate(const vector<restriction> &r, operation::tag_type op_type) {
-   operation_type_resolver visitor(r);
-   return operation::visit(op_type, visitor, static_cast<void*>(nullptr));
-}
-
-// These are some compile-time tests of the metafunctions and predicate type analysis. They are turned off to make
-// building faster; they only need to be enabled when making changes in this file
-#if false
-static_assert(!is_container<int>, "");
-static_assert(is_container<vector<int>>, "");
-static_assert(is_container<flat_set<int>>, "");
-static_assert(is_container<string>, "");
-static_assert(is_flat_set<flat_set<int>>, "");
-static_assert(!is_flat_set<vector<int>>, "");
-
-static_assert(predicate_eq<int, int64_t>()(10, 20) == false, "");
-static_assert(predicate_eq<int, int64_t>()(10, 5) == false, "");
-static_assert(predicate_eq<int, int64_t>()(10, 10) == true, "");
-
-static_assert(predicate_eq<void_t, void_t>::valid == false, "");
-static_assert(predicate_eq<int, void_t>::valid == false, "");
-static_assert(predicate_eq<void_t, int64_t>::valid == false, "");
-static_assert(predicate_eq<int, int64_t>::valid == true, "");
-static_assert(predicate_eq<long, int64_t>::valid == true, "");
-static_assert(predicate_eq<vector<bool>, int64_t>::valid == true, "");
-static_assert(predicate_eq<flat_set<char>, int64_t>::valid == true, "");
-static_assert(predicate_eq<short, int64_t>::valid == true, "");
-static_assert(predicate_eq<bool, int64_t>::valid == false, "");
-static_assert(predicate_eq<int, bool>::valid == false, "");
-static_assert(predicate_eq<fc::optional<int>, int64_t>::valid == true, "");
-static_assert(predicate_eq<fc::optional<long>, int64_t>::valid == true, "");
-static_assert(predicate_eq<fc::optional<long>, void_t>::valid == true, "");
-static_assert(predicate_eq<flat_set<bool>, flat_set<bool>>::valid == true, "");
-static_assert(predicate_eq<flat_set<bool>, string>::valid == false, "");
-static_assert(predicate_eq<string, string>::valid == true, "");
-static_assert(predicate_ne<int, void_t>::valid == false, "");
-static_assert(predicate_ne<void_t, int64_t>::valid == false, "");
-static_assert(predicate_ne<int, int64_t>::valid == true, "");
-static_assert(predicate_ne<long, int64_t>::valid == true, "");
-static_assert(predicate_ne<vector<bool>, int64_t>::valid == true, "");
-static_assert(predicate_ne<flat_set<char>, int64_t>::valid == true, "");
-static_assert(predicate_ne<short, int64_t>::valid == true, "");
-static_assert(predicate_ne<bool, int64_t>::valid == false, "");
-static_assert(predicate_ne<int, bool>::valid == false, "");
-static_assert(predicate_ne<fc::optional<int>, int64_t>::valid == true, "");
-static_assert(predicate_ne<fc::optional<long>, int64_t>::valid == true, "");
-static_assert(predicate_ne<fc::optional<long>, void_t>::valid == true, "");
-static_assert(predicate_ne<string, string>::valid == true, "");
-
-static_assert(predicate_compare<int, int64_t>()(20, 10) == 1, "");
-static_assert(predicate_compare<int, int64_t>()(5, 10) == -1, "");
-static_assert(predicate_compare<int, int64_t>()(10, 10) == 0, "");
-static_assert(predicate_lt<int, int64_t>()(20, 10) == false, "");
-static_assert(predicate_lt<int, int64_t>()(5, 10) == true, "");
-static_assert(predicate_lt<int, int64_t>()(10, 10) == false, "");
-static_assert(predicate_le<int, int64_t>()(20, 10) == false, "");
-static_assert(predicate_le<int, int64_t>()(5, 10) == true, "");
-static_assert(predicate_le<int, int64_t>()(10, 10) == true, "");
-static_assert(predicate_gt<int, int64_t>()(20, 10) == true, "");
-static_assert(predicate_gt<int, int64_t>()(5, 10) == false, "");
-static_assert(predicate_gt<int, int64_t>()(10, 10) == false, "");
-static_assert(predicate_ge<int, int64_t>()(20, 10) == true, "");
-static_assert(predicate_ge<int, int64_t>()(5, 10) == false, "");
-static_assert(predicate_ge<int, int64_t>()(10, 10) == true, "");
-
-static_assert(predicate_compare<int, int64_t>::valid == true, "");
-static_assert(predicate_compare<short, int64_t>::valid == true, "");
-static_assert(predicate_compare<string, string>::valid == true, "");
-static_assert(predicate_compare<vector<int>, int64_t>::valid == false, "");
-static_assert(predicate_compare<fc::optional<int>, int64_t>::valid == true, "");
-static_assert(predicate_compare<fc::optional<short>, int64_t>::valid == true, "");
-static_assert(predicate_compare<fc::optional<string>, string>::valid == true, "");
-static_assert(predicate_lt<int, int64_t>::valid == true, "");
-static_assert(predicate_lt<short, int64_t>::valid == true, "");
-static_assert(predicate_lt<string, string>::valid == true, "");
-static_assert(predicate_lt<vector<int>, int64_t>::valid == false, "");
-static_assert(predicate_lt<fc::optional<int>, int64_t>::valid == true, "");
-static_assert(predicate_lt<fc::optional<short>, int64_t>::valid == true, "");
-static_assert(predicate_lt<fc::optional<string>, string>::valid == true, "");
-
-static_assert(predicate_in<string, string>::valid == false, "");
-static_assert(predicate_in<int, flat_set<string>>::valid == false, "");
-static_assert(predicate_in<string, flat_set<string>>::valid == true, "");
-static_assert(predicate_in<flat_set<string>, flat_set<string>>::valid == false, "");
-static_assert(predicate_in<fc::optional<string>, flat_set<string>>::valid == true, "");
-static_assert(predicate_not_in<string, string>::valid == false, "");
-static_assert(predicate_not_in<int, flat_set<string>>::valid == false, "");
-static_assert(predicate_not_in<string, flat_set<string>>::valid == true, "");
-static_assert(predicate_not_in<flat_set<string>, flat_set<string>>::valid == false, "");
-static_assert(predicate_not_in<fc::optional<string>, flat_set<string>>::valid == true, "");
-
-static_assert(predicate_has_all<string, string>::valid == false, "");
-static_assert(predicate_has_all<int, flat_set<string>>::valid == false, "");
-static_assert(predicate_has_all<string, flat_set<string>>::valid == false, "");
-static_assert(predicate_has_all<flat_set<string>, flat_set<string>>::valid == true, "");
-static_assert(predicate_has_all<fc::optional<string>, flat_set<string>>::valid == false, "");
-static_assert(predicate_has_all<fc::optional<flat_set<string>>, flat_set<string>>::valid == true, "");
-static_assert(predicate_has_none<string, string>::valid == false, "");
-static_assert(predicate_has_none<int, flat_set<string>>::valid == false, "");
-static_assert(predicate_has_none<string, flat_set<string>>::valid == false, "");
-static_assert(predicate_has_none<flat_set<string>, flat_set<string>>::valid == true, "");
-static_assert(predicate_has_none<fc::optional<string>, flat_set<string>>::valid == false, "");
-static_assert(predicate_has_none<fc::optional<flat_set<string>>, flat_set<string>>::valid == true, "");
-
-#endif
+object_restriction_predicate<operation> get_restriction_predicate_list_1(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_predicate_list_2(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_predicate_list_3(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_predicate_list_4(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_predicate_list_5(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_predicate_list_6(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_predicate_list_7(size_t idx, vector<restriction> rs);
 
 } } // namespace graphene::protocol

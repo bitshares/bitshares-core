@@ -21,25 +21,21 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#pragma once
 
-#include <graphene/protocol/restriction.hpp>
-#include <graphene/protocol/operations.hpp>
-
-#include <functional>
+#include "restriction_predicate.hxx"
 
 namespace graphene { namespace protocol {
 
-/// A restriction predicate is a function accepting an operation and returning a boolean which indicates whether the
-/// operation complies with the restrictions or not
-using restriction_predicate_function = std::function<bool(const operation&)>;
+using result_type = object_restriction_predicate<operation>;
 
-/**
- * @brief get_restriction_predicate Get a predicate function for the supplied restriction
- * @param rs The restrictions to evaluate operations against
- * @param op_type The tag specifying which operation type the restrictions apply to
- * @return A predicate function which evaluates an operation to determine whether it complies with the restriction
- */
-restriction_predicate_function get_restriction_predicate(vector<restriction> rs, operation::tag_type op_type);
-
-} } // namespace graphene::protocol
+result_type get_restriction_predicate_list_3(size_t idx, vector<restriction> rs) {
+   return typelist::runtime::dispatch(operation_list_3::list(), idx, [&rs] (auto t) -> result_type {
+      using Op = typename decltype(t)::type;
+      return [p=restrictions_to_predicate<Op>(std::move(rs), true)] (const operation& op) {
+         FC_ASSERT(op.which() == operation::tag<Op>::value,
+                   "Supplied operation is incorrect type for restriction predicate");
+         return p(op.get<Op>());
+      };
+   });
+}
+} }

@@ -17,7 +17,14 @@ list(APPEND SOURCES account.cpp
                     authority.cpp
                     special_authority.cpp
                     custom_authority.cpp
-                    restriction_predicate.cpp
+                    custom_authorities/restriction_predicate.cpp
+                    custom_authorities/list_1.cpp
+                    custom_authorities/list_2.cpp
+                    custom_authorities/list_3.cpp
+                    custom_authorities/list_4.cpp
+                    custom_authorities/list_5.cpp
+                    custom_authorities/list_6.cpp
+                    custom_authorities/list_7.cpp
                     committee_member.cpp
                     custom.cpp
                     market.cpp
