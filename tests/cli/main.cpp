@@ -1154,12 +1154,12 @@ BOOST_FIXTURE_TEST_CASE( cli_sign_message, cli_fixture )
    --msg.meta.block;
 
    // change time, verify failure
-   ++msg.meta.time;
+   ++msg.meta.time[0];
    BOOST_CHECK( !con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block, msg.meta.time,
                                                      *msg.signature ) );
    BOOST_CHECK( !con.wallet_api_ptr->verify_signed_message( msg ) );
    BOOST_CHECK( !con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
-   --msg.meta.time;
+   --msg.meta.time[0];
 
    // change signature, verify failure
    ++msg.signature->data[1];
