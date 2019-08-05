@@ -2280,12 +2280,13 @@ public:
       msg.meta.account = from_account.name;
       msg.meta.memo_key = from_account.options.memo_key;
       msg.meta.block = 0;
-      msg.meta.time = 0;
+      msg.meta.time = "1970-01-01T00:00:00Z";
       msg.signature = get_private_key( from_account.options.memo_key ).sign_compact( msg.digest() );
       return msg;
    }
 
-   bool verify_message( const string& message, const string& account, int block, int time, const compact_signature& sig )
+   bool verify_message( const string& message, const string& account, int block, const string& time,
+                        const compact_signature& sig )
    {
       const account_object from_account = get_account( account );
 
@@ -2341,7 +2342,7 @@ public:
       msg.meta.account = meta_extract( meta, "account" );
       msg.meta.memo_key = public_key_type( meta_extract( meta, "memokey" ) );
       msg.meta.block = boost::lexical_cast<uint32_t>( meta_extract( meta, "block" ) );
-      msg.meta.time = boost::lexical_cast<uint64_t>( meta_extract( meta, "timestamp" ) );
+      msg.meta.time = meta_extract( meta, "timestamp" );
       msg.signature = variant(sig).as< fc::ecc::compact_signature >( 5 );
 
       return verify_signed_message( msg );
@@ -4619,7 +4620,7 @@ signed_message wallet_api::sign_message(string signer, string message)
    return my->sign_message(signer, message);
 }
 
-bool wallet_api::verify_message( string message, string account, int block, int time, compact_signature sig )
+bool wallet_api::verify_message( string message, string account, int block, const string& time, compact_signature sig )
 {
    return my->verify_message( message, account, block, time, sig );
 }

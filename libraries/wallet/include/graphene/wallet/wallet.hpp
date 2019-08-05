@@ -271,7 +271,7 @@ struct signed_message_meta {
    string account;
    public_key_type memo_key;
    uint32_t block;
-   int64_t time;
+   string time;
 };
 
 class signed_message {
@@ -1089,7 +1089,7 @@ class wallet_api
        * @param sig the message signature
        * @return true if signature matches
        */
-      bool verify_message( string message, string account, int block, int time, compact_signature sig );
+      bool verify_message( string message, string account, int block, const string& time, compact_signature sig );
 
       /** Verify a message signed with sign_message
        *
