@@ -25,7 +25,6 @@
 #include "restriction_predicate.hxx"
 
 namespace graphene { namespace protocol {
-
 using result_type = object_restriction_predicate<operation>;
 
 result_type get_restriction_predicate_list_1(size_t idx, vector<restriction> rs) {

@@ -102,10 +102,12 @@ using object_restriction_predicate = std::function<bool(const Field&)>;
 //      predicate which returns true if any branch of the OR passes
 //  - create_predicate_function<Field>() -- switches on restriction type to determine which predicate template to use
 //    going forward
-//    - restriction_argument_visitor<Field> -- Determines what type the restriction argument is and creates a
-//      predicate functor for that type
+//    - make_predicate<Predicate, Field, ArgVariant> -- Determines what type the restriction argument is and creates
+//      a predicate functor for that type
 //    - attribute_assertion<Field> -- If the restriction is an attribute assertion, instead of using the
 //      restriction_argument_visitor, we recurse into restrictions_to_predicate with the current Field as the Object
+//  - embed_argument<Field, Predicate, Argument>() -- Embeds the argument into the predicate if it is a valid type
+//    for the predicate, and throws otherwise.
 //  - predicate_xyz<Argument> -- These are functors implementing the various predicate function types
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -306,26 +308,6 @@ struct predicate_has_none<fc::optional<OptionalType>, Argument, void> : predicat
 };
 ////////////////////////////////////////////// END PREDICATE FUNCTORS //////////////////////////////////////////////
 
-// Template to visit the restriction argument, resolving its type, and create the appropriate predicate functor, or
-// throw if the types are not compatible for the predicate assertion
-template<template<typename> class Predicate, typename Field>
-struct restriction_argument_visitor {
-   using result_type = object_restriction_predicate<Field>;
-
-   template<typename Argument,
-            typename = std::enable_if_t<Predicate<Argument>::template can_evaluate_helper<Field>::value>>
-   result_type make_predicate(const Argument& a, short) {
-       return Predicate<Argument>(a);
-   }
-   template<typename Argument>
-   result_type make_predicate(const Argument&, long) {
-      FC_THROW_EXCEPTION(fc::assert_exception, "Invalid argument types for predicate: ${Field}, ${Argument}",
-                         ("Field", fc::get_typename<Field>::name())("Argument", fc::get_typename<Argument>::name()));
-   }
-   template<typename Argument>
-   result_type operator()(const Argument& a) { return make_predicate(a, short()); }
-};
-
 // Forward declaration of restrictions_to_predicate, because attribute assertions and logical ORs recurse into it
 template<typename Field> object_restriction_predicate<Field> restrictions_to_predicate(vector<restriction>, bool);
 
@@ -353,21 +335,23 @@ struct attribute_assertion<extension<Extension>> {
    }
 };
 
+// Embed the argument into the predicate functor
 template<typename F, typename P, typename A, typename = std::enable_if_t<P::valid>>
-object_restriction_predicate<F> mkpred(P p, A a, short) {
+object_restriction_predicate<F> embed_argument(P p, A a, short) {
    return std::bind(p, std::placeholders::_1, std::move(a));
 }
 template<typename F, typename P, typename A>
-object_restriction_predicate<F> mkpred(P, A, long) {
+object_restriction_predicate<F> embed_argument(P, A, long) {
    FC_THROW_EXCEPTION(fc::assert_exception, "Invalid types for predicated");
 }
 
+// Resolve the argument type and make a predicate for it
 template<template<typename...> class Predicate, typename Field, typename ArgVariant>
 object_restriction_predicate<Field> make_predicate(ArgVariant arg) {
    return typelist::runtime::dispatch(typename ArgVariant::list(), arg.which(),
                                       [&arg](auto t) mutable -> object_restriction_predicate<Field> {
       using Arg = typename decltype(t)::type;
-      return mkpred<Field>(Predicate<Field, Arg>(), std::move(arg.template get<Arg>()), short());
+      return embed_argument<Field>(Predicate<Field, Arg>(), std::move(arg.template get<Arg>()), short());
    });
 }
 
@@ -477,6 +461,7 @@ object_restriction_predicate<Object> restrictions_to_predicate(vector<restrictio
 }
 
 // To make the build gentler on RAM, break the operation list into several pieces to build over several files
+// Process account create, update, and global parameters update operations separately, as they are the largest
 using operation_list_1 = static_variant<typelist::slice<operation::list, 0, 5>>;
 using operation_list_2 = static_variant<typelist::slice<operation::list, 5, 10>>;
 using operation_list_3 = static_variant<typelist::slice<operation::list, 10, 20>>;

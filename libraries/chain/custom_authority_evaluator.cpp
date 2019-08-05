@@ -45,7 +45,7 @@ void_result custom_authority_create_evaluator::do_evaluate(const custom_authorit
    FC_ASSERT((op.valid_to - now).to_seconds() <= config->max_custom_authority_lifetime_seconds,
              "Custom authority lifetime exceeds maximum limit");
 
-   FC_ASSERT(op.operation_type.value <= config->max_operation_tag,
+   FC_ASSERT(op.operation_type.value <= (size_t)config->max_operation_tag,
              "Cannot create custom authority for operation type which is not yet active");
 
    for (const auto& account_weight_pair : op.auth.account_auths)
