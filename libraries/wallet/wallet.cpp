@@ -2274,13 +2274,14 @@ public:
       FC_ASSERT( !self.is_locked() );
 
       const account_object from_account = get_account(signer);
+      auto dynamic_props = get_dynamic_global_properties();
 
       signed_message msg;
       msg.message = message;
       msg.meta.account = from_account.name;
       msg.meta.memo_key = from_account.options.memo_key;
-      msg.meta.block = 0;
-      msg.meta.time = "1970-01-01T00:00:00Z";
+      msg.meta.block = dynamic_props.head_block_number;
+      msg.meta.time = dynamic_props.time.to_iso_string() + "Z";
       msg.signature = get_private_key( from_account.options.memo_key ).sign_compact( msg.digest() );
       return msg;
    }
