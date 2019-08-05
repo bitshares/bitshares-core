@@ -5,7 +5,6 @@
 "bts.lafona.net:1776",               // lafona       (France)
 "bts-seed1.abit-more.com:62015",     // abit         (China)
 "node.blckchnd.com:4243",            // blckchnd     (Germany)
-"seed.bitsharesdex.com:50696",       // iHashFury    (Europe)
 "seed.roelandp.nl:1776",             // roelandp     (Canada)
 "seed04.bts-nodes.net:1776",         // Thom         (Australia)
 "seed05.bts-nodes.net:1776",         // Thom         (USA)
