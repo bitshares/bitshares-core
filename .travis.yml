@@ -30,4 +30,3 @@ jobs:
       script: ./programs/build_helpers/build_protocol
     - stage: build and test
       script: ./programs/build_helpers/build_and_test
-
