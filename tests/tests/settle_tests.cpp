@@ -1501,4 +1501,122 @@ BOOST_AUTO_TEST_CASE( global_settle_rounding_test_after_hf_184 )
    } FC_LOG_AND_RETHROW()
 }
 
+/**
+ * Test case to reproduce https://github.com/bitshares/bitshares-core/issues/1883.
+ * When there is only one fill_order object in the ticker rolling buffer, it should only be rolled out once.
+ */
+BOOST_AUTO_TEST_CASE( global_settle_ticker_test )
+{
+   try {
+      generate_block();
+
+      const auto& meta_idx = db.get_index_type<simple_index<graphene::market_history::market_ticker_meta_object>>();
+      const auto& ticker_idx = db.get_index_type<graphene::market_history::market_ticker_index>().indices();
+      const auto& history_idx = db.get_index_type<graphene::market_history::history_index>().indices();
+
+      BOOST_CHECK_EQUAL( meta_idx.size(), 0 );
+      BOOST_CHECK_EQUAL( ticker_idx.size(), 0 );
+      BOOST_CHECK_EQUAL( history_idx.size(), 0 );
+
+      ACTORS((judge)(alice));
+
+      const auto& pmark = create_prediction_market("PMARK", judge_id);
+      const auto& core  = asset_id_type()(db);
+
+      int64_t init_balance(1000000);
+      transfer(committee_account, judge_id, asset(init_balance));
+      transfer(committee_account, alice_id, asset(init_balance));
+
+      BOOST_TEST_MESSAGE( "Open position with equal collateral" );
+      borrow( alice, pmark.amount(1000), asset(1000) );
+
+      BOOST_TEST_MESSAGE( "Globally settling" );
+      force_global_settle( pmark, pmark.amount(1) / core.amount(1) );
+
+      generate_block();
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      {
+         BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( history_idx.size(), 1 );
+
+         const auto& meta = *meta_idx.begin();
+         const auto& tick = *ticker_idx.begin();
+         const auto& hist = *history_idx.begin();
+
+         BOOST_CHECK( meta.rolling_min_order_his_id == hist.id );
+         BOOST_CHECK( meta.skip_min_order_his_id == false );
+
+         BOOST_CHECK( tick.base_volume == 1000 );
+         BOOST_CHECK( tick.quote_volume == 1000 );
+      }
+
+      generate_blocks( db.head_block_time() + 86000 ); // less than a day
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      // nothing changes
+      {
+         BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( history_idx.size(), 1 );
+
+         const auto& meta = *meta_idx.begin();
+         const auto& tick = *ticker_idx.begin();
+         const auto& hist = *history_idx.begin();
+
+         BOOST_CHECK( meta.rolling_min_order_his_id == hist.id );
+         BOOST_CHECK( meta.skip_min_order_his_id == false );
+
+         BOOST_CHECK( tick.base_volume == 1000 );
+         BOOST_CHECK( tick.quote_volume == 1000 );
+      }
+
+      generate_blocks( db.head_block_time() + 4000 ); // now more than 24 hours
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      // the history is rolled out, new 24h volume should be 0
+      {
+         BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( history_idx.size(), 1 );
+
+         const auto& meta = *meta_idx.begin();
+         const auto& tick = *ticker_idx.begin();
+         const auto& hist = *history_idx.begin();
+
+         BOOST_CHECK( meta.rolling_min_order_his_id == hist.id );
+         BOOST_CHECK( meta.skip_min_order_his_id == true ); // the order should be skipped on next roll
+
+         BOOST_CHECK( tick.base_volume == 0 );
+         BOOST_CHECK( tick.quote_volume == 0 );
+      }
+
+      generate_block();
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      // nothing changes
+      {
+         BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( history_idx.size(), 1 );
+
+         const auto& meta = *meta_idx.begin();
+         const auto& tick = *ticker_idx.begin();
+         const auto& hist = *history_idx.begin();
+
+         BOOST_CHECK( meta.rolling_min_order_his_id == hist.id );
+         BOOST_CHECK( meta.skip_min_order_his_id == true );
+
+         BOOST_CHECK( tick.base_volume == 0 );
+         BOOST_CHECK( tick.quote_volume == 0 );
+      }
+
+
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
