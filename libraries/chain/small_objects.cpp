@@ -191,7 +191,8 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::worker_object, (graphene::db::o
                   )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::custom_authority_object, (graphene::db::object),
-                               (account)(enabled)(valid_from)(valid_to)(operation_type)(auth)(restrictions) )
+                               (account)(enabled)(valid_from)(valid_to)(operation_type)
+                               (auth)(restrictions)(restriction_counter) )
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::balance_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::block_summary_object )

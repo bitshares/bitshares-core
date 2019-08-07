@@ -38,7 +38,8 @@ namespace graphene { namespace chain {
     */
    class custom_authority_object : public abstract_object<custom_authority_object> {
       /// Unreflected field to store a cache of the predicate function
-      mutable optional<restriction_predicate_function> predicate_cache;
+      /// Note that this cache can be modified when the object is const!
+      optional<restriction_predicate_function> predicate_cache;
 
    public:
       static const uint8_t space_id = protocol_ids;
@@ -50,18 +51,31 @@ namespace graphene { namespace chain {
       time_point_sec valid_to;
       unsigned_int operation_type;
       authority auth;
-      vector<restriction> restrictions;
+      flat_map<uint16_t, restriction> restrictions;
+      uint16_t restriction_counter = 0;
 
       /// Check whether the custom authority is valid
       bool is_valid(time_point_sec now) const { return enabled && now >= valid_from && now < valid_to; }
 
+      /// Get the restrictions as a vector rather than a map
+      vector<restriction> get_restrictions() const {
+         vector<restriction> rs;
+         std::transform(restrictions.begin(), restrictions.end(),
+                        std::back_inserter(rs), [](auto i) { return i.second; });
+         return rs;
+      }
       /// Get predicate, from cache if possible, and update cache if not (modifies const object!)
       restriction_predicate_function get_predicate() const {
-         if (!predicate_cache.valid()) predicate_cache = get_restriction_predicate(restrictions, operation_type);
+         if (predicate_cache.valid())
+            return *predicate_cache;
+
+         const_cast<custom_authority_object*>(this)->update_predicate_cache();
          return *predicate_cache;
       }
       /// Regenerate predicate function and update predicate cache
-      void update_predicate_cache() { predicate_cache = get_restriction_predicate(restrictions, operation_type); }
+      void update_predicate_cache() {
+         predicate_cache = get_restriction_predicate(get_restrictions(), operation_type);
+      }
    };
 
    struct by_account_custom;

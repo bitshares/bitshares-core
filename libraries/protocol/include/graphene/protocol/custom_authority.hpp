@@ -87,9 +87,9 @@ namespace graphene { namespace protocol {
       optional<time_point_sec> new_valid_to;
       /// Change to the authentication for the custom authority
       optional<authority> new_auth;
-      /// Set of indexes of restrictions to remove
+      /// Set of IDs of restrictions to remove
       flat_set<uint16_t> restrictions_to_remove;
-      /// Vector of new restrictions; will be appended to the old list
+      /// Vector of new restrictions
       vector<restriction> restrictions_to_add;
 
       extensions_type extensions;

@@ -71,7 +71,9 @@ object_id_type custom_authority_create_evaluator::do_apply(const custom_authorit
       obj.valid_to = op.valid_to;
       obj.operation_type = op.operation_type;
       obj.auth = op.auth;
-      obj.restrictions = op.restrictions;
+      std::for_each(op.restrictions.begin(), op.restrictions.end(), [&obj](const restriction& r) mutable {
+         obj.restrictions.insert(std::make_pair(obj.restriction_counter++, r));
+      });
 
       // Update the predicate cache
       obj.update_predicate_cache();
@@ -116,9 +118,18 @@ void_result custom_authority_update_evaluator::do_evaluate(const custom_authorit
          account_weight_pair.first(d);
    }
 
-   auto largest_index = *(--op.restrictions_to_remove.end());
-   FC_ASSERT(largest_index < old_object->restrictions.size(),
-             "Index of custom authority restriction to remove is out of bounds");
+   std::for_each(op.restrictions_to_remove.begin(), op.restrictions_to_remove.end(), [this](uint16_t id) {
+      FC_ASSERT(old_object->restrictions.count(id) == 1, "Cannot remove restriction ID ${I}: ID not found",
+                ("I", id));
+   });
+   if (!op.restrictions_to_add.empty()) {
+      // Sanity check
+      if (!old_object->restrictions.empty())
+         FC_ASSERT((--old_object->restrictions.end())->first < old_object->restriction_counter,
+                   "LOGIC ERROR: Restriction counter overlaps restrictions. Please report this error.");
+      FC_ASSERT(old_object->restriction_counter + op.restrictions_to_add.size() > old_object->restriction_counter,
+                "Unable to add restrictions: causes wraparound of restriction IDs");
+   }
 
    get_restriction_predicate(op.restrictions_to_add, old_object->operation_type);
    return void_result();
@@ -134,16 +145,12 @@ void_result custom_authority_update_evaluator::do_apply(const custom_authority_u
       if (op.new_valid_to) obj.valid_to = *op.new_valid_to;
       if (op.new_auth) obj.auth = *op.new_auth;
 
-      // Move restrictions at indexes to be removed to the end, then truncate them.
-      // Note: we could use partition instead of stable_partition, which would be slightly faster, but would also
-      // reorder the restrictions. I opted to preserve order as a courtesy to the user, who obviously does care about
-      // what items are at what indexes (removed items are specified by index)
-      std::stable_partition(obj.restrictions.begin(), obj.restrictions.end(), [&op, index=0](const auto&) mutable {
-         return op.restrictions_to_remove.count(index++) == 0;
+      std::for_each(op.restrictions_to_remove.begin(), op.restrictions_to_remove.end(), [&obj](auto id) mutable {
+         obj.restrictions.erase(id);
       });
-      obj.restrictions.resize(obj.restrictions.size() - op.restrictions_to_remove.size());
-
-      obj.restrictions.insert(obj.restrictions.end(), op.restrictions_to_add.begin(), op.restrictions_to_add.end());
+      std::for_each(op.restrictions_to_add.begin(), op.restrictions_to_add.end(), [&obj](const auto& r) mutable {
+         obj.restrictions.insert(std::make_pair(obj.restriction_counter++, r));
+      });
 
       // Update the predicate cache
       obj.update_predicate_cache();

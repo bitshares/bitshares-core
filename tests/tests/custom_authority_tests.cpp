@@ -165,7 +165,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    // Alice publishes an update to the custom authority, making the restriction require exactly 100
    PUSH_TX(db, trx);
 
-   BOOST_CHECK(auth_id(db).restrictions == uop.restrictions_to_add);
+   BOOST_CHECK(auth_id(db).get_restrictions() == uop.restrictions_to_add);
 
    trx.clear();
    trx.operations = {top};
