@@ -3273,31 +3273,39 @@ namespace graphene { namespace net { namespace detail {
       }
       else
       {
-        // we're being asked to check another node
-        // first, find out if we're currently connected to that node.  If we are, we
-        // can't perform the test
-        if ( !_node_configuration.connect_to_new_peers || 
-           ( is_already_connected_to_id(check_firewall_message_received.node_id) ||
-            is_connection_to_endpoint_in_progress( check_firewall_message_received.endpoint_to_check )))
-        {
-          check_firewall_reply_message reply;
-          reply.node_id = check_firewall_message_received.node_id;
-          reply.endpoint_checked = endpoint_to_check;
-          reply.result = firewall_check_result::unable_to_check;
-          originating_peer->send_message(reply);
-        }
-        else
-        {
-          // we're not connected to them, so we need to set up a connection to them
-          // to test.
-          peer_connection_ptr peer_for_testing(peer_connection::make_shared(this));
-          peer_for_testing->firewall_check_state = new firewall_check_state_data;
-          peer_for_testing->firewall_check_state->endpoint_to_test = check_firewall_message_received.endpoint_to_check;
-          peer_for_testing->firewall_check_state->expected_node_id = check_firewall_message_received.node_id;
-          peer_for_testing->firewall_check_state->requesting_peer = originating_peer->node_id;
-          peer_for_testing->set_remote_endpoint( check_firewall_message_received.endpoint_to_check);
-          initiate_connect_to(peer_for_testing);
-        }
+         // we're being asked to check another node
+         // first, find out if we're currently connected to that node.  If we are, we
+         // can't perform the test
+         if ( !_node_configuration.connect_to_new_peers || 
+               ( is_already_connected_to_id(check_firewall_message_received.node_id) ||
+               is_connection_to_endpoint_in_progress( check_firewall_message_received.endpoint_to_check )))
+         {
+            check_firewall_reply_message reply;
+            reply.node_id = check_firewall_message_received.node_id;
+            reply.endpoint_checked = endpoint_to_check;
+            reply.result = firewall_check_result::unable_to_check;
+            originating_peer->send_message(reply);
+         }
+         else
+         {
+            if ( !_node_configuration.connect_to_new_peers )
+            {
+               check_firewall_reply_message reply;
+               reply.node_id = check_firewall_message_received.node_id;
+               reply.endpoint_checked = endpoint_to_check;
+               reply.result = firewall_check_result::unable_to_check;
+               originating_peer->send_message(reply);
+            }
+            // we're not connected to them, so we need to set up a connection to them
+            // to test.
+            peer_connection_ptr peer_for_testing(peer_connection::make_shared(this));
+            peer_for_testing->firewall_check_state = new firewall_check_state_data;
+            peer_for_testing->firewall_check_state->endpoint_to_test = check_firewall_message_received.endpoint_to_check;
+            peer_for_testing->firewall_check_state->expected_node_id = check_firewall_message_received.node_id;
+            peer_for_testing->firewall_check_state->requesting_peer = originating_peer->node_id;
+            peer_for_testing->set_remote_endpoint( check_firewall_message_received.endpoint_to_check);
+            initiate_connect_to(peer_for_testing);
+         }
       }
     }
 
@@ -3405,40 +3413,48 @@ namespace graphene { namespace net { namespace detail {
       }
 
       fc::time_point now = fc::time_point::now();
-      for (const peer_connection_ptr& peer : _active_connections)
+      if ( _address_builder != nullptr )
       {
-        ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
+         for (const peer_connection_ptr& peer : _active_connections)
+         {
+            ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
 
-        current_connection_data data_for_this_peer;
-        data_for_this_peer.connection_duration = now.sec_since_epoch() - peer->connection_initiation_time.sec_since_epoch();
-        if (peer->get_remote_endpoint()) // should always be set for anyone we're actively connected to
-          data_for_this_peer.remote_endpoint = *peer->get_remote_endpoint();
-        data_for_this_peer.clock_offset = peer->clock_offset;
-        data_for_this_peer.round_trip_delay = peer->round_trip_delay;
-        data_for_this_peer.node_id = peer->node_id;
-        data_for_this_peer.connection_direction = peer->direction;
-        data_for_this_peer.firewalled = peer->is_firewalled;
-        fc::mutable_variant_object user_data;
-        if (peer->graphene_git_revision_sha)
-          user_data["graphene_git_revision_sha"] = *peer->graphene_git_revision_sha;
-        if (peer->graphene_git_revision_unix_timestamp)
-          user_data["graphene_git_revision_unix_timestamp"] = *peer->graphene_git_revision_unix_timestamp;
-        if (peer->fc_git_revision_sha)
-          user_data["fc_git_revision_sha"] = *peer->fc_git_revision_sha;
-        if (peer->fc_git_revision_unix_timestamp)
-          user_data["fc_git_revision_unix_timestamp"] = *peer->fc_git_revision_unix_timestamp;
-        if (peer->platform)
-          user_data["platform"] = *peer->platform;
-        if (peer->bitness)
-          user_data["bitness"] = *peer->bitness;
-        user_data["user_agent"] = peer->user_agent;
+            if ( peer->get_remote_endpoint().valid() && 
+                  _address_builder->should_advertise( *peer->get_remote_endpoint() ) )
+            {
+               current_connection_data data_for_this_peer;
+               data_for_this_peer.connection_duration =
+                     now.sec_since_epoch() - peer->connection_initiation_time.sec_since_epoch();
+               if (peer->get_remote_endpoint()) // should always be set for anyone we're actively connected to
+                  data_for_this_peer.remote_endpoint = *peer->get_remote_endpoint();
+               data_for_this_peer.clock_offset = peer->clock_offset;
+               data_for_this_peer.round_trip_delay = peer->round_trip_delay;
+               data_for_this_peer.node_id = peer->node_id;
+               data_for_this_peer.connection_direction = peer->direction;
+               data_for_this_peer.firewalled = peer->is_firewalled;
+               fc::mutable_variant_object user_data;
+               if (peer->graphene_git_revision_sha)
+                  user_data["graphene_git_revision_sha"] = *peer->graphene_git_revision_sha;
+               if (peer->graphene_git_revision_unix_timestamp)
+                  user_data["graphene_git_revision_unix_timestamp"] = *peer->graphene_git_revision_unix_timestamp;
+               if (peer->fc_git_revision_sha)
+                  user_data["fc_git_revision_sha"] = *peer->fc_git_revision_sha;
+               if (peer->fc_git_revision_unix_timestamp)
+                  user_data["fc_git_revision_unix_timestamp"] = *peer->fc_git_revision_unix_timestamp;
+               if (peer->platform)
+                  user_data["platform"] = *peer->platform;
+               if (peer->bitness)
+                  user_data["bitness"] = *peer->bitness;
+               user_data["user_agent"] = peer->user_agent;
 
-        user_data["last_known_block_hash"] = fc::variant( peer->last_block_delegate_has_seen, 1 );
-        user_data["last_known_block_number"] = _delegate->get_block_number(peer->last_block_delegate_has_seen);
-        user_data["last_known_block_time"] = peer->last_block_time_delegate_has_seen;
+               user_data["last_known_block_hash"] = fc::variant( peer->last_block_delegate_has_seen, 1 );
+               user_data["last_known_block_number"] = _delegate->get_block_number(peer->last_block_delegate_has_seen);
+               user_data["last_known_block_time"] = peer->last_block_time_delegate_has_seen;
 
-        data_for_this_peer.user_data = user_data;
-        reply.current_connections.emplace_back(data_for_this_peer);
+               data_for_this_peer.user_data = user_data;
+               reply.current_connections.emplace_back(data_for_this_peer);
+            }
+         }
       }
       originating_peer->send_message(reply);
     }
