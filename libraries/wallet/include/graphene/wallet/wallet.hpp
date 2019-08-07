@@ -267,6 +267,22 @@ struct vesting_balance_object_with_info : public vesting_balance_object
    fc::time_point_sec allowed_withdraw_time;
 };
 
+struct signed_message_meta {
+   string account;
+   public_key_type memo_key;
+   uint32_t block;
+   string time;
+};
+
+class signed_message {
+public:
+   string message;
+   signed_message_meta meta;
+   fc::optional<fc::ecc::compact_signature> signature;
+
+   fc::sha256 digest()const;
+};
+
 namespace detail {
 class wallet_api_impl;
 }
@@ -1054,6 +1070,40 @@ class wallet_api
        */
       string read_memo(const memo_data& memo);
 
+
+      /** Sign a message using an account's memo key. The signature is generated as in
+       *   in https://github.com/xeroc/python-graphenelib/blob/d9634d74273ebacc92555499eca7c444217ecba0/graphenecommon/message.py#L64 .
+       *
+       * @param signer the name or id of signing account
+       * @param message text to sign
+       * @return the signed message in an abstract format
+       */
+      signed_message sign_message(string signer, string message);
+
+      /** Verify a message signed with sign_message using the given account's memo key.
+       *
+       * @param message the message text
+       * @param account the account name of the message
+       * @param block the block number of the message
+       * @param time the timestamp of the message
+       * @param sig the message signature
+       * @return true if signature matches
+       */
+      bool verify_message( string message, string account, int block, const string& time, compact_signature sig );
+
+      /** Verify a message signed with sign_message
+       *
+       * @param message the signed_message structure containing message, meta data and signature
+       * @return true if signature matches
+       */
+      bool verify_signed_message( signed_message message );
+
+      /** Verify a message signed with sign_message, in its encapsulated form.
+       *
+       * @param message the complete encapsulated message string including separators and line feeds
+       * @return true if signature matches
+       */
+      bool verify_encapsulated_message( string message );
 
       /** These methods are used for stealth transfers */
       ///@{
@@ -2034,6 +2084,9 @@ FC_REFLECT(graphene::wallet::operation_detail_ex,
 FC_REFLECT( graphene::wallet::account_history_operation_detail,
         (total_count)(result_count)(details))
 
+FC_REFLECT( graphene::wallet::signed_message_meta, (account)(memo_key)(block)(time) )
+FC_REFLECT( graphene::wallet::signed_message, (message)(meta)(signature) )
+
 FC_API( graphene::wallet::wallet_api,
         (help)
         (gethelp)
@@ -2151,6 +2204,10 @@ FC_API( graphene::wallet::wallet_api,
         (network_get_connected_peers)
         (sign_memo)
         (read_memo)
+        (sign_message)
+        (verify_message)
+        (verify_signed_message)
+        (verify_encapsulated_message)
         (set_key_label)
         (get_key_label)
         (get_public_key)

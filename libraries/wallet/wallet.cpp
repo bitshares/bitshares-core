@@ -107,6 +107,11 @@ using std::endl;
 
 namespace detail {
 
+static const string ENC_HEADER( "-----BEGIN BITSHARES SIGNED MESSAGE-----\n" );
+static const string ENC_META(   "-----BEGIN META-----\n" );
+static const string ENC_SIG(    "-----BEGIN SIGNATURE-----\n" );
+static const string ENC_FOOTER( "-----END BITSHARES SIGNED MESSAGE-----" );
+
 struct operation_result_printer
 {
 public:
@@ -296,6 +301,26 @@ public:
       return "SHA256 " + hash.str();
    }
 };
+
+/* meta contains lines of the form "key=value".
+ * Returns the value for the corresponding key, throws if key is not present. */
+static string meta_extract( const string& meta, const string& key )
+{
+   FC_ASSERT( meta.size() > key.size(), "Key '${k}' not found!", ("k",key) );
+   size_t start;
+   if( meta.substr( 0, key.size() ) == key && meta[key.size()] == '=' )
+      start = 0;
+   else
+   {
+      start = meta.find( "\n" + key + "=" );
+      FC_ASSERT( start != string::npos, "Key '${k}' not found!", ("k",key) );
+      ++start;
+   }
+   start += key.size() + 1;
+   size_t lf = meta.find( "\n", start );
+   if( lf == string::npos ) lf = meta.size();
+   return meta.substr( start, lf - start );
+}
 
 class wallet_api_impl
 {
@@ -2244,6 +2269,81 @@ public:
       return clear_text;
    }
 
+   signed_message sign_message(string signer, string message)
+   {
+      FC_ASSERT( !self.is_locked() );
+
+      const account_object from_account = get_account(signer);
+      auto dynamic_props = get_dynamic_global_properties();
+
+      signed_message msg;
+      msg.message = message;
+      msg.meta.account = from_account.name;
+      msg.meta.memo_key = from_account.options.memo_key;
+      msg.meta.block = dynamic_props.head_block_number;
+      msg.meta.time = dynamic_props.time.to_iso_string() + "Z";
+      msg.signature = get_private_key( from_account.options.memo_key ).sign_compact( msg.digest() );
+      return msg;
+   }
+
+   bool verify_message( const string& message, const string& account, int block, const string& time,
+                        const compact_signature& sig )
+   {
+      const account_object from_account = get_account( account );
+
+      signed_message msg;
+      msg.message = message;
+      msg.meta.account = from_account.name;
+      msg.meta.memo_key = from_account.options.memo_key;
+      msg.meta.block = block;
+      msg.meta.time = time;
+      msg.signature = sig;
+
+      return verify_signed_message( msg );
+   }
+
+   bool verify_signed_message( const signed_message& message )
+   {
+      if( !message.signature.valid() ) return false;
+
+      const account_object from_account = get_account( message.meta.account );
+
+      const public_key signer( *message.signature, message.digest() );
+      if( !( message.meta.memo_key == signer ) ) return false;
+      FC_ASSERT( from_account.options.memo_key == signer,
+                 "Message was signed by contained key, but it doesn't belong to the contained account!" );
+
+      return true;
+   }
+
+   bool verify_encapsulated_message( const string& message )
+   {
+      signed_message msg;
+      size_t begin_p = message.find( ENC_HEADER );
+      FC_ASSERT( begin_p != string::npos, "BEGIN MESSAGE line not found!" );
+      size_t meta_p = message.find( ENC_META, begin_p );
+      FC_ASSERT( meta_p != string::npos, "BEGIN META line not found!" );
+      FC_ASSERT( meta_p >= begin_p + ENC_HEADER.size() + 1, "Missing message!?" );
+      size_t sig_p = message.find( ENC_SIG, meta_p );
+      FC_ASSERT( sig_p != string::npos, "BEGIN SIGNATURE line not found!" );
+      FC_ASSERT( sig_p >= meta_p + ENC_META.size(), "Missing metadata?!" );
+      size_t end_p = message.find( ENC_FOOTER, meta_p );
+      FC_ASSERT( end_p != string::npos, "END MESSAGE line not found!" );
+      FC_ASSERT( end_p >= sig_p + ENC_SIG.size() + 1, "Missing signature?!" );
+
+      msg.message = message.substr( begin_p + ENC_HEADER.size(), meta_p - begin_p - ENC_HEADER.size() - 1 );
+      const string meta = message.substr( meta_p + ENC_META.size(), sig_p - meta_p - ENC_META.size() );
+      const string sig = message.substr( sig_p + ENC_SIG.size(), end_p - sig_p - ENC_SIG.size() - 1 );
+
+      msg.meta.account = meta_extract( meta, "account" );
+      msg.meta.memo_key = public_key_type( meta_extract( meta, "memokey" ) );
+      msg.meta.block = boost::lexical_cast<uint32_t>( meta_extract( meta, "block" ) );
+      msg.meta.time = meta_extract( meta, "timestamp" );
+      msg.signature = variant(sig).as< fc::ecc::compact_signature >( 5 );
+
+      return verify_signed_message( msg );
+   }
+
    signed_transaction sell_asset(string seller_account,
                                  string amount_to_sell,
                                  string symbol_to_sell,
@@ -2635,6 +2735,25 @@ public:
             << "Sell Total: " << ask_sum << ' ' << orders.base << endl;
 
          return ss.str();
+      };
+
+      m["sign_message"] = [this](variant result, const fc::variants& a)
+      {
+         auto r = result.as<signed_message>( GRAPHENE_MAX_NESTED_OBJECTS );
+
+         fc::stringstream encapsulated;
+         encapsulated << ENC_HEADER;
+         encapsulated << r.message << '\n';
+         encapsulated << ENC_META;
+         encapsulated << "account=" << r.meta.account << '\n';
+         encapsulated << "memokey=" << std::string( r.meta.memo_key ) << '\n';
+         encapsulated << "block=" << r.meta.block << '\n';
+         encapsulated << "timestamp=" << r.meta.time << '\n';
+         encapsulated << ENC_SIG;
+         encapsulated << fc::to_hex( (const char*)r.signature->data, r.signature->size() ) << '\n';
+         encapsulated << ENC_FOOTER;
+
+         return encapsulated.str();
       };
 
       return m;
@@ -3136,6 +3255,17 @@ std::string operation_result_printer::operator()(const asset& a)
 }}}
 
 namespace graphene { namespace wallet {
+   fc::sha256 signed_message::digest()const
+   {
+      fc::stringstream to_sign;
+      to_sign << message << '\n';
+      to_sign << "account=" << meta.account << '\n';
+      to_sign << "memokey=" << std::string( meta.memo_key ) << '\n';
+      to_sign << "block=" << meta.block << '\n';
+      to_sign << "timestamp=" << meta.time;
+
+      return fc::sha256::hash( to_sign.str() );
+   }
    vector<brain_key_info> utility::derive_owner_keys_from_brain_key(string brain_key, int number_of_desired_keys)
    {
       // Safety-check
@@ -4479,6 +4609,38 @@ string wallet_api::read_memo(const memo_data& memo)
    FC_ASSERT(!is_locked());
    return my->read_memo(memo);
 }
+
+signed_message wallet_api::sign_message(string signer, string message)
+{
+   FC_ASSERT(!is_locked());
+   return my->sign_message(signer, message);
+}
+
+bool wallet_api::verify_message( string message, string account, int block, const string& time, compact_signature sig )
+{
+   return my->verify_message( message, account, block, time, sig );
+}
+
+/** Verify a message signed with sign_message
+ *
+ * @param message the signed_message structure containing message, meta data and signature
+ * @return true if signature matches
+ */
+bool wallet_api::verify_signed_message( signed_message message )
+{
+   return my->verify_signed_message( message );
+}
+
+/** Verify a message signed with sign_message, in its encapsulated form.
+ *
+ * @param message the complete encapsulated message string including separators and line feeds
+ * @return true if signature matches
+ */
+bool wallet_api::verify_encapsulated_message( string message )
+{
+   return my->verify_encapsulated_message( message );
+}
+
 
 string wallet_api::get_key_label( public_key_type key )const
 {
