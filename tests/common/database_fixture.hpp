@@ -371,6 +371,7 @@ struct database_fixture {
 
    vector< operation_history_object > get_operation_history( account_id_type account_id )const;
    vector< graphene::market_history::order_history_object > get_market_order_history( asset_id_type a, asset_id_type b )const;
+   void validation_api_limits_inputs(string & current_test_name) const;
 };
 
 namespace test {
