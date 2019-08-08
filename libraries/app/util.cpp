@@ -40,7 +40,7 @@ static fc::uint128_t to_capped_128( const uint256_t& t )
 
 std::string uint128_amount_to_string( const fc::uint128_t& amount, const uint8_t precision )
 { try {
-   std::string s = boost::lexical_cast<std::string>(amount);
+   std::string s = fc::variant( amount, 2 ).as_string();
    if( precision == 0 || amount == fc::uint128_t() )
       return s;
 
