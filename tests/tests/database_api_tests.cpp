@@ -787,9 +787,42 @@ BOOST_AUTO_TEST_CASE( subscription_key_collision_test )
 BOOST_AUTO_TEST_CASE( subscription_notification_test )
 {
    try {
+
+      generate_blocks(HARDFORK_CORE_1468_TIME);
+      set_expiration( db, trx );
+      set_htlc_committee_parameters();
+      generate_block();
+      set_expiration( db, trx );
+
       ACTORS( (alice)(bob) );
 
       create_user_issued_asset( "UIATEST" );
+
+      // prepare data for get_htlc
+      {
+         int64_t init_balance(100 * GRAPHENE_BLOCKCHAIN_PRECISION);
+         transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
+
+         uint16_t preimage_size = 256;
+         std::vector<char> pre_image(256);
+         std::independent_bits_engine<std::default_random_engine, sizeof(unsigned), unsigned int> rbe;
+         std::generate(begin(pre_image), end(pre_image), std::ref(rbe));
+
+         // alice puts a htlc contract to bob
+         graphene::chain::htlc_create_operation create_operation;
+         BOOST_TEST_MESSAGE("Alice, who has 100 coins, is transferring 3 coins to Bob");
+         create_operation.amount = graphene::chain::asset( 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
+         create_operation.to = bob_id;
+         create_operation.claim_period_seconds = 60;
+         create_operation.preimage_hash = hash_it<fc::sha256>( pre_image );
+         create_operation.preimage_size = preimage_size;
+         create_operation.from = alice_id;
+         create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
+         trx.operations.push_back(create_operation);
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx, ~0);
+         trx.clear();
+      }
 
 // declare db_api1 ~ db_api60
 #define SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE 61
@@ -901,6 +934,14 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       db_api47.get_assets( asset_names, true );  // db_api47 subscribe to UIA
       db_api57.get_assets( asset_names, false ); // db_api57 doesn't subscribe to UIA
 
+      graphene::chain::htlc_id_type alice_htlc_id_bob; // assuming ID of the first htlc object is 0
+      db_api8.get_htlc( alice_htlc_id_bob );         // db_api8  subscribe to the HTLC object
+      db_api18.get_htlc( alice_htlc_id_bob, true );  // db_api18 subscribe to the HTLC object
+      db_api28.get_htlc( alice_htlc_id_bob, false ); // db_api28 doesn't subscribe to the HTLC object
+      db_api38.get_htlc( alice_htlc_id_bob );        // db_api38 doesn't subscribe to the HTLC object
+      db_api48.get_htlc( alice_htlc_id_bob, true );  // db_api48 subscribe to the HTLC object
+      db_api58.get_htlc( alice_htlc_id_bob, false ); // db_api58 doesn't subscribe to the HTLC object
+
       generate_block();
       ++expected_objects_changed1; // db_api1 subscribed to Alice, notify Alice account creation
       ++expected_objects_changed11; // db_api11 subscribed to Alice, notify Alice account creation
@@ -917,6 +958,9 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       ++expected_objects_changed7; // db_api7 subscribed to UIA, notify asset creation
       ++expected_objects_changed17; // db_api17 subscribed to UIA, notify asset creation
       ++expected_objects_changed47; // db_api47 subscribed to UIA, notify asset creation
+      ++expected_objects_changed8; // db_api8 subscribed to HTLC object, notify object creation
+      ++expected_objects_changed18; // db_api18 subscribed to HTLC object, notify object creation
+      ++expected_objects_changed48; // db_api48 subscribed to HTLC object, notify object creation
 
       fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
       check_results();
