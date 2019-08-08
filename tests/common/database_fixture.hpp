@@ -371,6 +371,26 @@ struct database_fixture {
 
    vector< operation_history_object > get_operation_history( account_id_type account_id )const;
    vector< graphene::market_history::order_history_object > get_market_order_history( asset_id_type a, asset_id_type b )const;
+
+   /****
+    * @brief return htlc fee parameters
+    */
+   flat_map< uint64_t, graphene::chain::fee_parameters > get_htlc_fee_parameters();
+   /****
+    * @brief push through a proposal that sets htlc parameters and fees
+    */
+   void set_htlc_committee_parameters();
+   /****
+    * Hash the preimage and put it in a vector
+    * @param preimage the preimage
+    * @returns a vector that cointains the sha256 hash of the preimage
+    */
+   template<typename H>
+   H hash_it(std::vector<char> preimage)
+   {
+      return H::hash( (char*)preimage.data(), preimage.size() );
+   }
+
 };
 
 namespace test {

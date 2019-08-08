@@ -40,6 +40,7 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
+#include <graphene/chain/proposal_object.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 
@@ -1348,6 +1349,82 @@ vector< graphene::market_history::order_history_object > database_fixture::get_m
        ++itr;
    }
    return result;
+}
+
+flat_map< uint64_t, graphene::chain::fee_parameters > database_fixture::get_htlc_fee_parameters()
+{
+   flat_map<uint64_t, graphene::chain::fee_parameters> ret_val;
+
+   htlc_create_operation::fee_parameters_type create_param;
+   create_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   create_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   ret_val[((operation)htlc_create_operation()).which()] = create_param;
+
+   htlc_redeem_operation::fee_parameters_type redeem_param;
+   redeem_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   redeem_param.fee_per_kb = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   ret_val[((operation)htlc_redeem_operation()).which()] = redeem_param;
+
+   htlc_extend_operation::fee_parameters_type extend_param;
+   extend_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   extend_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   ret_val[((operation)htlc_extend_operation()).which()] = extend_param;
+
+   return ret_val;
+}
+
+void database_fixture::set_htlc_committee_parameters()
+{
+   // htlc fees
+   // get existing fee_schedule
+   const chain_parameters& existing_params = db.get_global_properties().parameters;
+   const fee_schedule_type& existing_fee_schedule = *(existing_params.current_fees);
+   // create a new fee_shedule
+   std::shared_ptr<fee_schedule_type> new_fee_schedule = std::make_shared<fee_schedule_type>();
+   new_fee_schedule->scale = GRAPHENE_100_PERCENT;
+   // replace the old with the new
+   flat_map<uint64_t, graphene::chain::fee_parameters> params_map = get_htlc_fee_parameters();
+   for(auto param : existing_fee_schedule.parameters)
+   {
+      auto itr = params_map.find(param.which());
+      if (itr == params_map.end())
+         new_fee_schedule->parameters.insert(param);
+      else
+      {
+         new_fee_schedule->parameters.insert( (*itr).second);
+      }
+   }
+   // htlc parameters
+   proposal_create_operation cop = proposal_create_operation::committee_proposal(
+         db.get_global_properties().parameters, db.head_block_time());
+   cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+   cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
+   committee_member_update_global_parameters_operation uop;
+   graphene::chain::htlc_options new_params;
+   new_params.max_preimage_size = 19200;
+   new_params.max_timeout_secs = 60 * 60 * 24 * 28;
+   uop.new_parameters.extensions.value.updatable_htlc_options = new_params;
+   uop.new_parameters.current_fees = new_fee_schedule;
+   cop.proposed_ops.emplace_back(uop);
+
+   trx.operations.push_back(cop);
+   graphene::chain::processed_transaction proc_trx = db.push_transaction(trx);
+   trx.clear();
+   proposal_id_type good_proposal_id = proc_trx.operation_results[0].get<object_id_type>();
+
+   proposal_update_operation puo;
+   puo.proposal = good_proposal_id;
+   puo.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+   puo.key_approvals_to_add.emplace( init_account_priv_key.get_public_key() );
+   trx.operations.push_back(puo);
+   sign( trx, init_account_priv_key );
+   db.push_transaction(trx);
+   trx.clear();
+
+   generate_blocks( good_proposal_id( db ).expiration_time + 5 );
+   generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+   generate_block();   // get the maintenance skip slots out of the way
+
 }
 
 namespace test {
