@@ -44,7 +44,7 @@ int main( int argc, char** argv )
    {
       std::string dev_key_prefix;
       bool need_help = false;
-      if( argc < 2 )
+      if( argc < 3 ) // requires at least a prefix and a suffix
          need_help = true;
       else
       {
@@ -57,13 +57,13 @@ int main( int argc, char** argv )
 
       if( need_help )
       {
-         std::cerr << argc << " " << argv[1]  << "\n";
-         std::cerr << "get-dev-key <prefix> <suffix> ...\n"
-             "\n"
-             "example:\n"
-             "\n"
-             "get-dev-key wxyz- owner-5 active-7 balance-9 wit-block-signing-3 wit-owner-5 wit-active-33\n"
-             "get-dev-key wxyz- wit-block-signing-0:101\n"
+         std::cerr << "\nThis program generates keys with specified prefix and suffix(es) as seed(s).\n\n"
+             "Syntax:\n\n"
+             "  get_dev_key <prefix> <suffix> ...\n\n"
+             "Examples:\n\n"
+             "  get_dev_key nath an\n"
+             "  get_dev_key wxyz- owner-5 active-7 balance-9 wit-block-signing-3 wit-owner-5 wit-active-33\n"
+             "  get_dev_key wxyz- wit-block-signing-0:101\n"
              "\n";
          return 1;
       }
@@ -121,7 +121,7 @@ int main( int argc, char** argv )
    }
    catch ( const fc::exception& e )
    {
-      std::cout << e.to_detail_string() << "\n";
+      std::cerr << e.to_detail_string() << "\n";
       return 1;
    }
    return 0;
