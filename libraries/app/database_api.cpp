@@ -26,19 +26,15 @@
 #include <graphene/app/util.hpp>
 #include <graphene/chain/get_config.hpp>
 #include <graphene/chain/hardfork.hpp>
-#include <graphene/protocol/address.hpp>
 #include <graphene/protocol/pts_address.hpp>
 
 #include <fc/bloom_filter.hpp>
 #include <fc/crypto/hex.hpp>
 #include <fc/rpc/api_connection.hpp>
-#include <fc/uint128.hpp>
 
 #include <boost/range/iterator_range.hpp>
-#include <boost/rational.hpp>
 
 #include <cctype>
-
 #include <cfenv>
 #include <iostream>
 
