@@ -26,6 +26,7 @@
 
 #include <graphene/app/util.hpp>
 #include <graphene/protocol/asset.hpp>
+#include <graphene/chain/asset_object.hpp>
 
 namespace graphene { namespace app {
 
@@ -64,7 +65,9 @@ std::string uint128_amount_to_string( const fc::uint128_t& amount, const uint8_t
    return ss.str();
 } FC_CAPTURE_AND_RETHROW( (amount)(precision) ) }
 
-std::string price_to_string( const graphene::protocol::price& _price, const uint8_t base_precision, const uint8_t quote_precision )
+std::string price_to_string( const graphene::protocol::price& _price,
+                             const uint8_t base_precision,
+                             const uint8_t quote_precision )
 { try {
    if( _price.base.amount == 0 )
       return "0";
@@ -85,6 +88,18 @@ std::string price_to_string( const graphene::protocol::price& _price, const uint
 
    return uint128_amount_to_string( price128, 19 + base_precision - quote_precision );
 } FC_CAPTURE_AND_RETHROW( (_price)(base_precision)(quote_precision) ) }
+
+std::string price_to_string( const graphene::protocol::price& _price,
+                             const graphene::chain::asset_object& _base,
+                             const graphene::chain::asset_object& _quote )
+{ try {
+   if( _price.base.asset_id == _base.id && _price.quote.asset_id == _quote.id )
+      return price_to_string( _price, _base.precision, _quote.precision );
+   else if( _price.base.asset_id == _quote.id && _price.quote.asset_id == _base.id )
+      return price_to_string( ~_price, _base.precision, _quote.precision );
+   else
+      FC_ASSERT( !"bad parameters" );
+} FC_CAPTURE_AND_RETHROW( (_price)(_base)(_quote) ) }
 
 std::string price_diff_percent_string( const graphene::protocol::price& old_price,
                                        const graphene::protocol::price& new_price )

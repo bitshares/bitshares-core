@@ -186,7 +186,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<htlc_object> list_htlcs(const htlc_id_type lower_bound_id, uint32_t limit) const;
 
    //private:
-      static string price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote );
 
       // Decides whether to subscribe using member variables and given parameter
       bool get_whether_to_subscribe( optional<bool> subscribe )const
@@ -447,71 +446,6 @@ database_api_impl::database_api_impl( graphene::chain::database& db, const appli
 database_api_impl::~database_api_impl()
 {
    dlog("freeing database api ${x}", ("x",int64_t(this)) );
-}
-
-//////////////////////////////////////////////////////////////////////
-//                                                                  //
-// Market ticker constructor                                        //
-//                                                                  //
-//////////////////////////////////////////////////////////////////////
-market_ticker::market_ticker(const market_ticker_object& mto,
-                             const fc::time_point_sec& now,
-                             const asset_object& asset_base,
-                             const asset_object& asset_quote,
-                             const order_book& orders)
-{
-   time = now;
-   base = asset_base.symbol;
-   quote = asset_quote.symbol;
-   percent_change = "0";
-   lowest_ask = "0";
-   highest_bid = "0";
-
-   fc::uint128_t bv;
-   fc::uint128_t qv;
-   price latest_price = asset( mto.latest_base, mto.base ) / asset( mto.latest_quote, mto.quote );
-   if( mto.base != asset_base.id )
-      latest_price = ~latest_price;
-   latest = database_api_impl::price_to_string( latest_price, asset_base, asset_quote );
-   if( mto.last_day_base != 0 && mto.last_day_quote != 0 // has trade data before 24 hours
-       && ( mto.last_day_base != mto.latest_base || mto.last_day_quote != mto.latest_quote ) ) // price changed
-   {
-      price last_day_price = asset( mto.last_day_base, mto.base ) / asset( mto.last_day_quote, mto.quote );
-      if( mto.base != asset_base.id )
-         last_day_price = ~last_day_price;
-      percent_change = price_diff_percent_string( last_day_price, latest_price );
-   }
-   if( asset_base.id == mto.base )
-   {
-      bv = mto.base_volume;
-      qv = mto.quote_volume;
-   }
-   else
-   {
-      bv = mto.quote_volume;
-      qv = mto.base_volume;
-   }
-   base_volume = uint128_amount_to_string( bv, asset_base.precision );
-   quote_volume = uint128_amount_to_string( qv, asset_quote.precision );
-
-   if(!orders.asks.empty())
-      lowest_ask = orders.asks[0].price;
-   if(!orders.bids.empty())
-      highest_bid = orders.bids[0].price;
-}
-market_ticker::market_ticker(const fc::time_point_sec& now,
-                             const asset_object& asset_base,
-                             const asset_object& asset_quote)
-{
-   time = now;
-   base = asset_base.symbol;
-   quote = asset_quote.symbol;
-   latest = "0";
-   lowest_ask = "0";
-   highest_bid = "0";
-   percent_change = "0";
-   base_volume = "0";
-   quote_volume = "0";
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -1648,16 +1582,6 @@ void database_api_impl::unsubscribe_from_market(const std::string& a, const std:
    FC_ASSERT(asset_a_id != asset_b_id);
    _market_subscriptions.erase(std::make_pair(asset_a_id,asset_b_id));
 }
-
-string database_api_impl::price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote )
-{ try {
-   if( _price.base.asset_id == _base.id && _price.quote.asset_id == _quote.id )
-      return graphene::app::price_to_string( _price, _base.precision, _quote.precision );
-   else if( _price.base.asset_id == _quote.id && _price.quote.asset_id == _base.id )
-      return graphene::app::price_to_string( ~_price, _base.precision, _quote.precision );
-   else
-      FC_ASSERT( !"bad parameters" );
-} FC_CAPTURE_AND_RETHROW( (_price)(_base)(_quote) ) }
 
 market_ticker database_api::get_ticker( const string& base, const string& quote )const
 {
