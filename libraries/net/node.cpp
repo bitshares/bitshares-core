@@ -3236,6 +3236,16 @@ namespace graphene { namespace net { namespace detail {
          return ret_val;
       }
 
+    void node_impl::send_unable_to_check(peer_connection* peer, const node_id_t& node_id,
+         const fc::ip::endpoint& endpoint )
+    {
+      check_firewall_reply_message reply;
+      reply.node_id = node_id;
+      reply.endpoint_checked = endpoint;
+      reply.result = firewall_check_result::unable_to_check;
+      peer->send_message(reply);
+    }
+
     void node_impl::on_check_firewall_message(peer_connection* originating_peer,
                                               const check_firewall_message& check_firewall_message_received)
     {
@@ -3251,11 +3261,7 @@ namespace graphene { namespace net { namespace detail {
          if ( _address_builder != nullptr
                && !_address_builder->should_advertise( endpoint_to_check ))
          {
-            check_firewall_reply_message reply;
-            reply.node_id = check_firewall_message_received.node_id;
-            reply.endpoint_checked = endpoint_to_check;
-            reply.result = firewall_check_result::unable_to_check;
-            originating_peer->send_message(reply);
+            send_unable_to_check( originating_peer, check_firewall_message_received.node_id, endpoint_to_check );
          }
          else
          {
@@ -3280,21 +3286,14 @@ namespace graphene { namespace net { namespace detail {
                ( is_already_connected_to_id(check_firewall_message_received.node_id) ||
                is_connection_to_endpoint_in_progress( check_firewall_message_received.endpoint_to_check )))
          {
-            check_firewall_reply_message reply;
-            reply.node_id = check_firewall_message_received.node_id;
-            reply.endpoint_checked = endpoint_to_check;
-            reply.result = firewall_check_result::unable_to_check;
-            originating_peer->send_message(reply);
+            send_unable_to_check( originating_peer, check_firewall_message_received.node_id, endpoint_to_check );
          }
          else
          {
             if ( !_node_configuration.connect_to_new_peers )
             {
-               check_firewall_reply_message reply;
-               reply.node_id = check_firewall_message_received.node_id;
-               reply.endpoint_checked = endpoint_to_check;
-               reply.result = firewall_check_result::unable_to_check;
-               originating_peer->send_message(reply);
+               send_unable_to_check( originating_peer, check_firewall_message_received.node_id, endpoint_to_check );
+               return;
             }
             // we're not connected to them, so we need to set up a connection to them
             // to test.

@@ -517,6 +517,7 @@ class node_impl : public peer_connection_delegate
 
       void forward_firewall_check_to_next_available_peer(firewall_check_state_data* firewall_check_state);
 
+      void send_unable_to_check( peer_connection* peer, const node_id_t& node_id, const fc::ip::endpoint& endpoint );
       void on_check_firewall_message(peer_connection* originating_peer,
                                      const check_firewall_message& check_firewall_message_received);
 
