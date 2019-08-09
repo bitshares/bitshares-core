@@ -3,6 +3,7 @@ file(GLOB EGENESIS_HEADERS "../egenesis/include/graphene/app/*.hpp")
 
 add_library( graphene_app 
              api.cpp
+             api_objects.cpp
              application.cpp
              util.cpp
              database_api.cpp
