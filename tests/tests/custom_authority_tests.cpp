@@ -56,8 +56,14 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    auto to_index = member_index<transfer_operation>("to");
    restrictions.emplace_back(to_index, FUNC(eq), account_id_type(12));
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == false);
+   BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
+               .failure_path.size() == 1);
+   BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
+               .failure_path.front().get<size_t>() == 0);
    transfer.to = account_id_type(12);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == true);
+   BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
+               .failure_path.size() == 0);
 
    restrictions.front() = restriction(fc::typelist::length<fc::reflector<transfer_operation>::native_members>(),
                                       FUNC(eq), account_id_type(12));
@@ -72,14 +78,28 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    restrictions.front() = restriction(fee_index, FUNC(attr),
                                       vector<restriction>{restriction(asset_id_index, FUNC(eq), asset_id_type(0))});
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == true);
+   BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
+               .failure_path.size() == 0);
    restrictions.front().argument.get<vector<restriction>>().front().argument = asset_id_type(1);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == false);
+   BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
+               .failure_path.size() == 2);
+   BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
+               .failure_path.front().get<size_t>() == 0);
+   BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
+               .failure_path[1].get<size_t>() == 0);
    restrictions.emplace_back(to_index, FUNC(eq), account_id_type(12));
    transfer.to = account_id_type(12);
    transfer.fee.asset_id = asset_id_type(1);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == true);
+   BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
+               .failure_path.size() == 0);
    transfer.to = account_id_type(10);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == false);
+   BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
+               .failure_path.size() == 1);
+   BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
+               .failure_path.front().get<size_t>() == 1);
 
    account_update_operation update;
    restrictions.clear();
@@ -90,8 +110,12 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    auto predicate = get_restriction_predicate(restrictions, operation::tag<account_update_operation>::value);
    BOOST_CHECK_THROW(predicate(transfer), fc::assert_exception);
    BOOST_CHECK(predicate(update) == true);
+   BOOST_CHECK(predicate(update).failure_path.size() == 0);
    update.extensions.value.owner_special_authority = special_authority();
    BOOST_CHECK(predicate(update) == false);
+   BOOST_CHECK(predicate(update).failure_path.size() == 2);
+   BOOST_CHECK(predicate(update).failure_path.front().get<size_t>() == 0);
+   BOOST_CHECK(predicate(update).failure_path[1].get<size_t>() == 0);
    restrictions.front().argument.get<vector<restriction>>().front().restriction_type = FUNC(ne);
    predicate = get_restriction_predicate(restrictions, operation::tag<account_update_operation>::value);
    BOOST_CHECK(predicate(update) == true);

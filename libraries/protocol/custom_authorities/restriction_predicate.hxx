@@ -22,8 +22,7 @@
  * THE SOFTWARE.
  */
 
-#include <graphene/protocol/restriction.hpp>
-#include <graphene/protocol/operations.hpp>
+#include <graphene/protocol/restriction_predicate.hpp>
 
 #include <fc/exception/exception.hpp>
 
@@ -65,7 +64,7 @@ template<typename T> constexpr static bool is_container = is_container_impl<T>::
 
 // Type alias for a predicate on a particular field type
 template<typename Field>
-using object_restriction_predicate = std::function<bool(const Field&)>;
+using object_restriction_predicate = std::function<predicate_result(const Field&)>;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // *** Restriction Predicate Logic ***
@@ -338,7 +337,10 @@ struct attribute_assertion<extension<Extension>> {
 // Embed the argument into the predicate functor
 template<typename F, typename P, typename A, typename = std::enable_if_t<P::valid>>
 object_restriction_predicate<F> embed_argument(P p, A a, short) {
-   return std::bind(p, std::placeholders::_1, std::move(a));
+   return [p=std::move(p), a=std::move(a)](const F& f) {
+      if (p(f, a)) return predicate_result{true, {}};
+      return predicate_result();
+   };
 }
 template<typename F, typename P, typename A>
 object_restriction_predicate<F> embed_argument(P, A, long) {
@@ -435,7 +437,17 @@ object_restriction_predicate<Object> create_logical_or_predicate(vector<vector<r
                   std::back_inserter(predicates), to_predicate);
 
    return [predicates=std::move(predicates)](const Object& obj) {
-      return std::any_of(predicates.begin(), predicates.end(), [o=std::cref(obj)](const auto& p) { return p(o); });
+      vector<predicate_result> failures;
+      bool success = std::any_of(predicates.begin(), predicates.end(),
+                                 [o=std::cref(obj), &failures](const auto& p) {
+         auto result = p(o);
+         if (!result) failures.push_back(std::move(result));
+         return !!result;
+      });
+      if (success) return predicate_result{true, {}};
+      predicate_result r;
+      r.failure_path.emplace_back(std::move(failures));
+      return r;
    };
 }
 
@@ -456,12 +468,18 @@ object_restriction_predicate<Object> restrictions_to_predicate(vector<restrictio
    });
 
    return [predicates=std::move(predicates)](const Object& obj) {
-      return std::all_of(predicates.begin(), predicates.end(), [o=std::cref(obj)](const auto& p) { return p(o); });
+      for (size_t i = 0; i < predicates.size(); ++i) {
+         auto result = predicates[i](obj);
+         if (!result) {
+            result.failure_path.push_back(i);
+            return result;
+         }
+      }
+      return predicate_result{true, {}};
    };
 }
 
 // To make the build gentler on RAM, break the operation list into several pieces to build over several files
-// Process account create, update, and global parameters update operations separately, as they are the largest
 using operation_list_1 = static_variant<typelist::slice<operation::list, 0, 5>>;
 using operation_list_2 = static_variant<typelist::slice<operation::list, 5, 10>>;
 using operation_list_3 = static_variant<typelist::slice<operation::list, 10, 20>>;

@@ -30,9 +30,22 @@
 
 namespace graphene { namespace protocol {
 
+/// A type describing the result of a restriction predicate
+struct predicate_result {
+   /// Whether or not the operation complied with the restrictions or not
+   bool success = false;
+
+   /// Either the index of a restriction in a list, or a list of indexes of restrictions (for logical OR branches)
+   using restriction_index = static_variant<size_t, vector<predicate_result>>;
+   /// The path of indexes to the restriction(s) that failed
+   vector<restriction_index> failure_path;
+
+   operator bool() const { return success; }
+};
+
 /// A restriction predicate is a function accepting an operation and returning a boolean which indicates whether the
 /// operation complies with the restrictions or not
-using restriction_predicate_function = std::function<bool(const operation&)>;
+using restriction_predicate_function = std::function<predicate_result(const operation&)>;
 
 /**
  * @brief get_restriction_predicate Get a predicate function for the supplied restriction
@@ -43,3 +56,5 @@ using restriction_predicate_function = std::function<bool(const operation&)>;
 restriction_predicate_function get_restriction_predicate(vector<restriction> rs, operation::tag_type op_type);
 
 } } // namespace graphene::protocol
+
+FC_REFLECT_TYPENAME(graphene::protocol::predicate_result);
