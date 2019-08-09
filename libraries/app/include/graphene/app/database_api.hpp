@@ -23,7 +23,7 @@
  */
 #pragma once
 
-#include <graphene/app/full_account.hpp>
+#include <graphene/app/api_objects.hpp>
 
 #include <graphene/protocol/types.hpp>
 
