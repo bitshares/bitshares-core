@@ -152,6 +152,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
             a.options = *op.bitasset_opts;
             a.is_prediction_market = op.is_prediction_market;
             a.asset_id = next_asset_id;
+            a.symbol = op.symbol;
          }).id;
 
    const asset_object& new_asset =

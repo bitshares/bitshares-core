@@ -88,4 +88,21 @@ market_ticker::market_ticker(const fc::time_point_sec& now,
    quote_volume = "0";
 }
 
+general_asset_info::general_asset_info( const asset_object& a, const asset_bitasset_data_object* b )
+: id(a.id), symbol(a.symbol), precision(a.precision), issuer(a.issuer)
+{
+   if( id == asset_id_type() )
+      type = CORE;
+   else if( !b )
+      type = UIA;
+   else
+   {
+      if( b->is_prediction_market )
+         type = PM;
+      else
+         type = MPA;
+      backing_asset_id = b->options.short_backing_asset;
+   }
+}
+
 } } // graphene::app

@@ -863,6 +863,30 @@ vector<optional<extended_asset_object>> database_api_impl::get_assets(
    return result;
 }
 
+vector<optional<general_asset_info>> database_api::get_assets_general_info(
+                                              const vector<std::string>& asset_symbols_or_ids ) const
+{
+   return my->get_assets_general_info( asset_symbols_or_ids );
+}
+
+vector<optional<general_asset_info>> database_api_impl::get_assets_general_info(
+                                              const vector<std::string>& asset_symbols_or_ids ) const
+{
+   vector<optional<general_asset_info>> result; result.reserve(asset_symbols_or_ids.size());
+   std::transform(asset_symbols_or_ids.begin(), asset_symbols_or_ids.end(), std::back_inserter(result),
+                  [this](std::string id_or_name) -> optional<general_asset_info> {
+
+      const asset_object* asset_obj = get_asset_from_string( id_or_name, false );
+      if( asset_obj == nullptr )
+         return {};
+      const asset_bitasset_data_object* bitasset = nullptr;
+      if( asset_obj->is_market_issued() )
+         bitasset = &asset_obj->bitasset_data(_db);
+      return general_asset_info( *asset_obj, bitasset );
+   });
+   return result;
+}
+
 vector<extended_asset_object> database_api::list_assets(const string& lower_bound_symbol, uint32_t limit)const
 {
    return my->list_assets( lower_bound_symbol, limit );
@@ -884,6 +908,132 @@ vector<extended_asset_object> database_api_impl::list_assets(const string& lower
 
    while(limit-- && itr != assets_by_symbol.end())
       result.emplace_back( extend_asset( *itr++ ) );
+
+   return result;
+}
+
+vector<general_asset_info> database_api::list_assets_general_info(
+                                                 optional<string> lower_bound_symbol,
+                                                 optional<uint32_t> limit,
+                                                 optional<general_asset_info::asset_type> type )const
+{
+   return my->list_assets_general_info( lower_bound_symbol, limit, type );
+}
+
+vector<general_asset_info> database_api_impl::list_assets_general_info(
+                                                 optional<string> lower_bound_symbol,
+                                                 optional<uint32_t> olimit,
+                                                 optional<general_asset_info::asset_type> type )const
+{
+   uint32_t limit = olimit.valid() ? *olimit : 100;
+   uint64_t api_limit_get_assets = _app_options->api_limit_get_assets;
+   FC_ASSERT( limit <= api_limit_get_assets );
+
+   vector<general_asset_info> result;
+   if( limit == 0 )
+      return result;
+
+   result.reserve(limit);
+
+   if( !type.valid() || *type == general_asset_info::ALL )
+   {
+      const auto& assets_by_symbol = _db.get_index_type<asset_index>().indices().get<by_symbol>();
+      auto itr = lower_bound_symbol.valid() ? assets_by_symbol.lower_bound(*lower_bound_symbol)
+                                            : assets_by_symbol.begin();
+      for( ; limit > 0 && itr != assets_by_symbol.end(); ++itr, --limit )
+      {
+         const asset_object& asset_obj = *itr;
+         const asset_bitasset_data_object* bitasset = nullptr;
+         if( asset_obj.is_market_issued() )
+            bitasset = &asset_obj.bitasset_data(_db);
+         result.emplace_back( asset_obj, bitasset );
+      }
+      return result;
+   }
+
+   const asset_object& core_asset = _db.get_core_asset();
+   if( *type == general_asset_info::CORE )
+   {
+      if( !lower_bound_symbol.valid() || *lower_bound_symbol <= core_asset.symbol )
+         result.emplace_back( core_asset );
+      return result;
+   }
+
+   switch( *type )
+   {
+      case general_asset_info::UIA :
+      case general_asset_info::CORE_OR_UIA :
+      case general_asset_info::MPA_OR_PM :
+      {
+         const auto& assets_by_type_symbol = _db.get_index_type<asset_index>().indices().get<by_type_symbol>();
+         auto itr = assets_by_type_symbol.begin();
+         auto itr_end = assets_by_type_symbol.end();
+
+         if( *type == general_asset_info::MPA_OR_PM )
+         {
+            if( lower_bound_symbol.valid() )
+               itr = assets_by_type_symbol.lower_bound( boost::make_tuple( true, *lower_bound_symbol ) );
+            else
+               itr = assets_by_type_symbol.lower_bound( true );
+         }
+         else
+         {
+            itr_end = assets_by_type_symbol.lower_bound( true );
+            if( lower_bound_symbol.valid() )
+               itr = assets_by_type_symbol.lower_bound( boost::make_tuple( false, *lower_bound_symbol ) );
+            // else itr = assets_by_type_symbol.begin()
+         }
+
+         bool include_core = ( *type == general_asset_info::CORE_OR_UIA );
+         bool mpa_or_pm    = ( *type == general_asset_info::MPA_OR_PM );
+
+         for( ; limit > 0 && itr != itr_end; ++itr )
+         {
+            const asset_object& asset_obj = *itr;
+            if( !include_core && (&asset_obj) == (&core_asset) )
+               continue;
+            const asset_bitasset_data_object* bitasset = nullptr;
+            if( mpa_or_pm )
+               bitasset = &asset_obj.bitasset_data(_db);
+            result.emplace_back( asset_obj, bitasset );
+            --limit;
+         }
+         break;
+      }
+      case general_asset_info::MPA :
+      case general_asset_info::PM :
+      {
+         const auto& bitassets_by_type_symbol = _db.get_index_type<asset_bitasset_data_index>().indices()
+                                                   .get<by_type_symbol>();
+         auto itr = bitassets_by_type_symbol.begin();
+         auto itr_end = bitassets_by_type_symbol.end();
+
+         if( *type == general_asset_info::PM )
+         {
+            if( lower_bound_symbol.valid() )
+               itr = bitassets_by_type_symbol.lower_bound( boost::make_tuple( true, *lower_bound_symbol ) );
+            else
+               itr = bitassets_by_type_symbol.lower_bound( true );
+         }
+         else
+         {
+            itr_end = bitassets_by_type_symbol.lower_bound( true );
+            if( lower_bound_symbol.valid() )
+               itr = bitassets_by_type_symbol.lower_bound( boost::make_tuple( false, *lower_bound_symbol ) );
+            // else itr = bitassets_by_type_symbol.begin()
+         }
+
+         for( ; limit > 0 && itr != itr_end; ++itr, --limit )
+         {
+            const asset_bitasset_data_object& bitasset = *itr;
+            const asset_object& asset_obj = bitasset.asset_id(_db);
+            result.emplace_back( asset_obj, &bitasset );
+         }
+         break;
+      }
+      default: // nothing here
+         break;
+   }
 
    return result;
 }

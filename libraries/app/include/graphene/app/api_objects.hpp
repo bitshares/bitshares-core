@@ -146,6 +146,32 @@ namespace graphene { namespace app {
       optional<share_type> total_backing_collateral;
    };
 
+   /// General information of an asset
+   struct general_asset_info
+   {
+      /// General asset types
+      enum asset_type
+      {
+         CORE,        ///< Core asset
+         UIA,         ///< User-issued asset
+         MPA,         ///< Market-pegged asset
+         PM,          ///< Predition market
+         CORE_OR_UIA, ///< CORE or UIA, to be used as query parameter
+         MPA_OR_PM,   ///< MPA or PM, to be used as query parameter
+         ALL          ///< ALL, to be used as query parameter
+      };
+
+      explicit general_asset_info( const asset_object& a,
+                                   const asset_bitasset_data_object* b = nullptr );
+
+      asset_id_type           id;                ///< ID of this asset, i.e. "1.3.1"
+      string                  symbol;            ///< Ticker symbol for this asset, i.e. "USD"
+      uint8_t                 precision = 0;     ///< Maximum number of digits after the decimal point
+      account_id_type         issuer;            ///< ID of the account which created this asset
+      asset_type              type;              ///< Type of the asset
+      optional<asset_id_type> backing_asset_id;  ///< ID of backing asset if this asset is a MPA or PM
+   };
+
 } }
 
 FC_REFLECT( graphene::app::more_data,
@@ -184,3 +210,7 @@ FC_REFLECT( graphene::app::market_trade, (sequence)(date)(price)(amount)(value)(
 
 FC_REFLECT_DERIVED( graphene::app::extended_asset_object, (graphene::chain::asset_object),
                     (total_in_collateral)(total_backing_collateral) );
+
+FC_REFLECT( graphene::app::general_asset_info, (id)(symbol)(precision)(issuer)(type)(backing_asset_id) )
+
+FC_REFLECT_ENUM( graphene::app::general_asset_info::asset_type, (CORE)(UIA)(MPA)(PM)(CORE_OR_UIA)(MPA_OR_PM)(ALL) )
