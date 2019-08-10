@@ -962,7 +962,9 @@ FC_API(graphene::app::database_api,
 
    // Assets
    (get_assets)
+   (get_assets_general_info)
    (list_assets)
+   (list_assets_general_info)
    (lookup_asset_symbols)
    (get_asset_count)
    (get_assets_by_issuer)
