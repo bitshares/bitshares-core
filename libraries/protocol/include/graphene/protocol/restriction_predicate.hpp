@@ -57,4 +57,5 @@ restriction_predicate_function get_restriction_predicate(vector<restriction> rs,
 
 } } // namespace graphene::protocol
 
-FC_REFLECT_TYPENAME(graphene::protocol::predicate_result);
+FC_REFLECT_TYPENAME(graphene::protocol::predicate_result::restriction_index)
+FC_REFLECT(graphene::protocol::predicate_result, (success)(failure_path))

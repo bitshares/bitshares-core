@@ -2002,8 +2002,8 @@ bool database_api_impl::verify_authority( const signed_transaction& trx )const
    trx.verify_authority( _db.get_chain_id(),
                          [this]( account_id_type id ){ return &id(_db).active; },
                          [this]( account_id_type id ){ return &id(_db).owner; },
-                         [this]( account_id_type id, const operation& op ) {
-                           return _db.get_viable_custom_authorities(id, op); },
+                         [this]( account_id_type id, const operation& op, rejected_predicate_map* rejects ) {
+                           return _db.get_viable_custom_authorities(id, op, rejects); },
                          allow_non_immediate_owner,
                          _db.get_global_properties().parameters.max_authority_depth );
    return true;
@@ -2030,7 +2030,7 @@ bool database_api_impl::verify_account_authority( const string& account_name_or_
             [this]( account_id_type id ){ return &id(_db).active; },
             [this]( account_id_type id ){ return &id(_db).owner; },
             // Use a no-op lookup for custom authorities; we don't want it even if one does apply for our dummy op
-            [](auto, auto) { return vector<authority>(); },
+            [](auto, auto, auto*) { return vector<authority>(); },
             true, MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(_db.head_block_time()) );
    } 
    catch (fc::exception& ex)

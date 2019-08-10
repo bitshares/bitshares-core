@@ -96,17 +96,25 @@ node_property_object& database::node_properties()
    return _node_property_object;
 }
 
-vector<authority> database::get_viable_custom_authorities(account_id_type account, const operation &op) const
+vector<authority> database::get_viable_custom_authorities(
+      account_id_type account, const operation &op,
+      rejected_predicate_map* rejected_authorities) const
 {
    const auto& index = get_index_type<custom_authority_index>().indices().get<by_account_custom>();
    auto range = index.equal_range(boost::make_tuple(account, unsigned_int(op.which()), true));
-   vector<authority> results;
 
-   std::for_each(range.first, range.second,
-                 [&results, &op, now=head_block_time()](const custom_authority_object& cust_auth) {
-      if (cust_auth.is_valid(now) && cust_auth.get_predicate()(op))
-         results.insert(results.end(), cust_auth.auth);
-   });
+   auto is_valid = [now=head_block_time()](const custom_authority_object& auth) { return auth.is_valid(now); };
+   vector<std::reference_wrapper<const custom_authority_object>> valid_auths;
+   std::copy_if(range.first, range.second, std::back_inserter(valid_auths), is_valid);
+
+   vector<authority> results;
+   for (const auto& cust_auth : valid_auths) {
+      auto result = cust_auth.get().get_predicate()(op);
+      if (result.success)
+         results.emplace_back(cust_auth.get().auth);
+      else if (rejected_authorities != nullptr)
+         rejected_authorities->insert(std::make_pair(cust_auth.get().id, std::move(result)));
+   }
 
    return results;
 }

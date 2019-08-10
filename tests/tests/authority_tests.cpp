@@ -44,7 +44,8 @@ using namespace graphene::chain::test;
 BOOST_FIXTURE_TEST_SUITE( authority_tests, database_fixture )
 
 auto make_get_custom(const database& db) {
-   return [&db](account_id_type id, const operation& op) { return db.get_viable_custom_authorities(id, op); };
+   return [&db](account_id_type id, const operation& op, rejected_predicate_map* rejects) {
+      return db.get_viable_custom_authorities(id, op, rejects); };
 }
 
 BOOST_AUTO_TEST_CASE( simple_single_signature )
@@ -1328,9 +1329,7 @@ BOOST_FIXTURE_TEST_CASE( nonminimal_sig_test, database_fixture )
          ) -> bool
       {
          //wdump( (tx)(available_keys) );
-          auto get_custom = [&db=db](account_id_type id, const operation& op) {
-             return db.get_viable_custom_authorities(id, op);
-          };
+          auto get_custom = make_get_custom(db);
          set<public_key_type> result_set = tx.minimize_required_signatures(db.get_chain_id(), available_keys,
                                                                            get_active, get_owner, get_custom,
                                                                            false, false);

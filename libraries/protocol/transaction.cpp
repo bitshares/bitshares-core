@@ -27,6 +27,7 @@
 #include <graphene/protocol/exceptions.hpp>
 #include <graphene/protocol/fee_schedule.hpp>
 #include <graphene/protocol/pts_address.hpp>
+#include <graphene/protocol/restriction_predicate.hpp>
 
 #include <fc/io/raw.hpp>
 
@@ -268,14 +269,16 @@ struct sign_state
 void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs,
                        const std::function<const authority*(account_id_type)>& get_active,
                        const std::function<const authority*(account_id_type)>& get_owner,
-                       custom_authority_lookup get_custom,
+                       const custom_authority_lookup& get_custom,
                        bool allow_non_immediate_owner,
                        bool ignore_custom_operation_required_auths,
                        uint32_t max_recursion_depth,
                        bool  allow_committee,
                        const flat_set<account_id_type>& active_aprovals,
                        const flat_set<account_id_type>& owner_approvals )
-{ try {
+{
+   map<custom_authority_id_type, predicate_result> rejected_custom_auths;
+   try {
    flat_set<account_id_type> required_active;
    flat_set<account_id_type> required_owner;
    vector<authority> other;
@@ -286,11 +289,12 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
    for( auto& id : owner_approvals )
       s.approved_by.insert( id );
 
-   auto approved_by_custom_authority = [&s, get_custom = std::move(get_custom)]( account_id_type account,
-                                                                                 operation op ) mutable {
-      auto viable_custom_auths = get_custom(account, op);
-      for (const auto& auth : viable_custom_auths)
-         if (s.check_authority(&auth)) return true;
+   auto approved_by_custom_authority = [&s, &rejected_custom_auths, get_custom = std::move(get_custom)](
+           account_id_type account,
+           operation op ) mutable {
+      auto viable_custom_auths = get_custom( account, op, &rejected_custom_auths );
+      for( const auto& auth : viable_custom_auths )
+         if( s.check_authority( &auth ) ) return true;
       return false;
    };
 
@@ -340,7 +344,7 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
       tx_irrelevant_sig,
       "Unnecessary signature(s) detected"
       );
-} FC_CAPTURE_AND_RETHROW( (ops)(sigs) ) }
+} FC_CAPTURE_AND_RETHROW( (rejected_custom_auths)(ops)(sigs) ) }
 
 
 const flat_set<public_key_type>& signed_transaction::get_signature_keys( const chain_id_type& chain_id )const
@@ -399,7 +403,7 @@ set<public_key_type> signed_transaction::minimize_required_signatures(
          const flat_set<public_key_type>& available_keys,
          const std::function<const authority*(account_id_type)>& get_active,
          const std::function<const authority*(account_id_type)>& get_owner,
-         custom_authority_lookup get_custom,
+         const custom_authority_lookup &get_custom,
          bool allow_non_immediate_owner,
          bool ignore_custom_operation_required_auths,
          uint32_t max_recursion )const
@@ -459,7 +463,7 @@ const flat_set<public_key_type>& precomputable_transaction::get_signature_keys( 
 void signed_transaction::verify_authority( const chain_id_type& chain_id,
                                            const std::function<const authority*(account_id_type)>& get_active,
                                            const std::function<const authority*(account_id_type)>& get_owner,
-                                           custom_authority_lookup get_custom,
+                                           const custom_authority_lookup& get_custom,
                                            bool allow_non_immediate_owner,
                                            bool ignore_custom_operation_required_auths,
                                            uint32_t max_recursion )const

@@ -43,9 +43,12 @@
 
 #include <map>
 
+namespace graphene { namespace protocol { struct predicate_result; } }
+
 namespace graphene { namespace chain {
    using graphene::db::abstract_object;
    using graphene::db::object;
+   using rejected_predicate_map = map<custom_authority_id_type, predicate_result>;
    class op_evaluator;
    class transaction_evaluation_state;
    class proposal_object;
@@ -279,7 +282,17 @@ namespace graphene { namespace chain {
 
          node_property_object& node_properties();
 
-         vector<authority> get_viable_custom_authorities( account_id_type account, const operation& op )const;
+         /**
+          * @brief Get a list of custom authorities which can validate the provided operation for the provided account
+          * @param account The account whose authority is required
+          * @param op The operation requring the specified account's authority
+          * @param rejected_authorities [Optional] A pointer to a map that should be populated with the custom
+          * authorities which were valid, but rejected because the operation did not comply with the restrictions
+          * @return A vector of authorities which can be used to authorize op in place of account
+          */
+         vector<authority> get_viable_custom_authorities(
+                 account_id_type account, const operation& op,
+                 rejected_predicate_map* rejected_authorities = nullptr )const;
 
          uint32_t last_non_undoable_block_num() const;
          //////////////////// db_init.cpp ////////////////////

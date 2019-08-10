@@ -48,6 +48,18 @@ unsigned_int member_index(string name) {
    return index;
 }
 
+template<typename Expression>
+void expect_exception_string(const string& s, Expression e) {
+   try{
+      e();
+      FC_THROW_EXCEPTION(fc::assert_exception, "Expected exception with string ${s}, but no exception thrown",
+                         ("s", s));
+   } catch (fc::exception e) {
+      FC_ASSERT(e.to_detail_string().find(s) != string::npos, "Did not find expected string ${s} in exception: ${e}",
+                ("s", s)("e", e));
+   }
+}
+
 BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    using namespace graphene::protocol;
    vector<restriction> restrictions;
@@ -175,7 +187,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    trx.clear_signatures();
    sign(trx, bob_private_key);
    // If bob tries to transfer 100, it fails because the restriction is strictly less than 100
-   BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+   expect_exception_string("\"failure_path\":[[0,0],[0,0]]", [&] {PUSH_TX(db, trx);});
 
    op.restrictions.front().argument.get<vector<restriction>>().front().restriction_type = restriction::func_eq;
    custom_authority_update_operation uop;
@@ -196,7 +208,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    trx.expiration += 5;
    sign(trx, bob_private_key);
    // The transfer of 99 should fail now becaues the requirement is for exactly 100
-   BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+   expect_exception_string("\"failure_path\":[[0,0],[0,0]]", [&] {PUSH_TX(db, trx);});
 
    trx.operations.front().get<transfer_operation>().amount.amount = 100*GRAPHENE_BLOCKCHAIN_PRECISION;
    trx.clear_signatures();

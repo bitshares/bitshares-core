@@ -651,8 +651,8 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
       bool allow_non_immediate_owner = ( head_block_time() >= HARDFORK_CORE_584_TIME );
       auto get_active = [this]( account_id_type id ) { return &id(*this).active; };
       auto get_owner  = [this]( account_id_type id ) { return &id(*this).owner;  };
-      auto get_custom = [this]( account_id_type id, const operation& op ) {
-         return get_viable_custom_authorities(id, op);
+      auto get_custom = [this]( account_id_type id, const operation& op, rejected_predicate_map* rejects ) {
+         return get_viable_custom_authorities(id, op, rejects);
       };
 
       trx.verify_authority(chain_id, get_active, get_owner, get_custom, allow_non_immediate_owner,
