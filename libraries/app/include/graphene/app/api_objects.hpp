@@ -161,6 +161,7 @@ namespace graphene { namespace app {
          ALL          ///< ALL, to be used as query parameter
       };
 
+      general_asset_info() {}
       explicit general_asset_info( const asset_object& a,
                                    const asset_bitasset_data_object* b = nullptr );
 
