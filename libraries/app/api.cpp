@@ -437,6 +437,20 @@ namespace graphene { namespace app {
        return result;
     }
 
+    vector<operation_history_object> history_api::get_block_operation_history(
+          uint32_t block_num,
+          optional<uint16_t> trx_in_block ) const
+    {
+       FC_ASSERT(_app.chain_database());
+       const auto& db = *_app.chain_database();
+       const auto& idx = db.get_index_type<operation_history_index>().indices().get<by_block>();
+       auto range = trx_in_block.valid() ? idx.equal_range( boost::make_tuple( block_num, *trx_in_block  ) )
+                                         : idx.equal_range( block_num );
+       vector<operation_history_object> result;
+       std::copy( range.first, range.second, std::back_inserter( result ) );
+       return result;
+    }
+
     flat_set<uint32_t> history_api::get_market_history_buckets()const
     {
        auto hist = _app.get_plugin<market_history_plugin>( "market_history" );

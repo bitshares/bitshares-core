@@ -188,6 +188,23 @@ namespace graphene { namespace app {
                                                                         uint64_t start = 0) const;
 
          /**
+          * @brief Get all operations inside a block or a transaction, including virtual operations
+          * @param block_num the number (height) of the block to fetch
+          * @param trx_in_block the sequence of a transaction in the block, starts from @a 0, optional,
+          *                     if specified, will return only operations of that transaction;
+          *                     if omitted, will return all operations in the specified block
+          * @return a list of @a operation_history objects ordered by ID
+          *
+          * @note the data is fetched from @a account_history plugin, thus the result is possible to
+          *       be incomplete due to the @a partial-operations option configured in the API node.
+          *       For complete data, it is recommended to query from ElasticSearch where data is
+          *       maintained by @a elastic_search plugin.
+          */
+         vector<operation_history_object> get_block_operation_history(
+               uint32_t block_num,
+               optional<uint16_t> trx_in_block = {} ) const;
+
+         /**
           * @brief Get details of order executions occurred most recently in a trading pair
           * @param a Asset symbol or ID in a trading pair
           * @param b The other asset symbol or ID in the trading pair
@@ -609,6 +626,7 @@ FC_API(graphene::app::history_api,
        (get_account_history_by_operations)
        (get_account_history_operations)
        (get_relative_account_history)
+       (get_block_operation_history)
        (get_fill_order_history)
        (get_market_history)
        (get_market_history_buckets)

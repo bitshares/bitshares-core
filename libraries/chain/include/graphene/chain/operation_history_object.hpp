@@ -98,10 +98,20 @@ namespace graphene { namespace chain {
          account_transaction_history_id_type  next;
    };
 
+   struct by_block;
+
    typedef multi_index_container<
       operation_history_object,
       indexed_by<
-         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_unique< tag<by_block>,
+            composite_key< operation_history_object,
+               member< operation_history_object, uint32_t, &operation_history_object::block_num>,
+               member< operation_history_object, uint16_t, &operation_history_object::trx_in_block>,
+               member< operation_history_object, uint16_t, &operation_history_object::op_in_trx>,
+               member< operation_history_object, uint32_t, &operation_history_object::virtual_op>
+            >
+         >
       >
    > operation_history_multi_index_type;
 
@@ -117,23 +127,28 @@ namespace graphene { namespace chain {
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_unique< tag<by_seq>,
             composite_key< account_transaction_history_object,
-               member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
+               member< account_transaction_history_object, account_id_type,
+                       &account_transaction_history_object::account>,
                member< account_transaction_history_object, uint64_t, &account_transaction_history_object::sequence>
             >
          >,
          ordered_unique< tag<by_op>,
             composite_key< account_transaction_history_object,
-               member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
-               member< account_transaction_history_object, operation_history_id_type, &account_transaction_history_object::operation_id>
+               member< account_transaction_history_object, account_id_type,
+                       &account_transaction_history_object::account>,
+               member< account_transaction_history_object, operation_history_id_type,
+                       &account_transaction_history_object::operation_id>
             >
          >,
          ordered_non_unique< tag<by_opid>,
-            member< account_transaction_history_object, operation_history_id_type, &account_transaction_history_object::operation_id>
+            member< account_transaction_history_object, operation_history_id_type,
+                    &account_transaction_history_object::operation_id>
          >
       >
    > account_transaction_history_multi_index_type;
 
-   typedef generic_index<account_transaction_history_object, account_transaction_history_multi_index_type> account_transaction_history_index;
+   typedef generic_index<account_transaction_history_object,
+                         account_transaction_history_multi_index_type> account_transaction_history_index;
 
 
 } } // graphene::chain
