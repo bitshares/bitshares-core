@@ -27,7 +27,7 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
-#include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/hardfork_visitor.hpp>
 
 namespace graphene { namespace chain {
 
@@ -45,8 +45,8 @@ void_result custom_authority_create_evaluator::do_evaluate(const custom_authorit
    FC_ASSERT((op.valid_to - now).to_seconds() <= config->max_custom_authority_lifetime_seconds,
              "Custom authority lifetime exceeds maximum limit");
 
-   FC_ASSERT(op.operation_type.value <= (size_t)config->max_operation_tag,
-             "Cannot create custom authority for operation type which is not yet active");
+   bool operation_forked_in = hardfork_visitor(now).visit((operation::tag_type)op.operation_type.value);
+   FC_ASSERT(operation_forked_in, "Cannot create custom authority for operation which is not valid yet");
 
    for (const auto& account_weight_pair : op.auth.account_auths)
       account_weight_pair.first(d);
