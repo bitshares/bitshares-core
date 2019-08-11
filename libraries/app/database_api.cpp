@@ -864,7 +864,8 @@ vector<limit_order_object> database_api::get_account_limit_orders( const string&
 vector<limit_order_object> database_api_impl::get_account_limit_orders( const string& account_name_or_id, const string &base,
         const string &quote, uint32_t limit, optional<limit_order_id_type> ostart_id, optional<price> ostart_price)
 {
-   FC_ASSERT( limit <= 101 );
+   uint64_t api_limit_get_account_limit_orders =_app_options->api_limit_get_account_limit_orders;
+   FC_ASSERT( limit <= api_limit_get_account_limit_orders );
 
    vector<limit_order_object>   results;
    uint32_t                     count = 0;
@@ -1169,7 +1170,8 @@ map<string,account_id_type> database_api::lookup_accounts(const string& lower_bo
 
 map<string,account_id_type> database_api_impl::lookup_accounts(const string& lower_bound_name, uint32_t limit)const
 {
-   FC_ASSERT( limit <= 1000 );
+   uint64_t api_limit_lookup_accounts = _app_options->api_limit_lookup_accounts;
+   FC_ASSERT( limit <= api_limit_lookup_accounts );
    const auto& accounts_by_name = _db.get_index_type<account_index>().indices().get<by_name>();
    map<string,account_id_type> result;
 
@@ -1578,7 +1580,8 @@ vector<collateral_bid_object> database_api::get_collateral_bids(const std::strin
 
 vector<collateral_bid_object> database_api_impl::get_collateral_bids(const std::string& asset, uint32_t limit, uint32_t skip)const
 { try {
-   FC_ASSERT( limit <= 100 );
+   uint64_t api_limit_get_collateral_bids=_app_options->api_limit_get_collateral_bids;
+   FC_ASSERT( limit <= api_limit_get_collateral_bids );
    const asset_id_type asset_id = get_asset_from_string(asset)->id;
    const asset_object& swan = asset_id(_db);
    FC_ASSERT( swan.is_market_issued() );
@@ -1589,7 +1592,14 @@ vector<collateral_bid_object> database_api_impl::get_collateral_bids(const std::
    auto start = aidx.lower_bound( boost::make_tuple( asset_id, price::max(back.id, asset_id), collateral_bid_id_type() ) );
    auto end = aidx.lower_bound( boost::make_tuple( asset_id, price::min(back.id, asset_id), collateral_bid_id_type(GRAPHENE_DB_MAX_INSTANCE_ID) ) );
    vector<collateral_bid_object> result;
-   while( skip-- > 0 && start != end ) { ++start; }
+   if(skip<aidx.size())
+   {
+     std::advance(start,skip);
+   }
+   else
+   {
+      return result;
+   }
    while( start != end && limit-- > 0)
    {
       result.push_back(*start);
@@ -1746,7 +1756,7 @@ vector<market_ticker> database_api_impl::get_top_markets(uint32_t limit)const
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-   FC_ASSERT( limit <= 100 );
+   FC_ASSERT( limit <= _app_options->api_limit_get_top_markets );
 
    const auto& volume_idx = _db.get_index_type<graphene::market_history::market_ticker_index>().indices().get<by_volume>();
    auto itr = volume_idx.rbegin();
@@ -1784,7 +1794,7 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-   FC_ASSERT( limit <= 100 );
+   FC_ASSERT( limit <= _app_options->api_limit_get_trade_history );
 
    auto assets = lookup_asset_symbols( {base, quote} );
    FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
@@ -1875,7 +1885,7 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-   FC_ASSERT( limit <= 100 );
+   FC_ASSERT( limit <= _app_options->api_limit_get_trade_history_by_sequence );
    FC_ASSERT( start >= 0 );
    int64_t start_seq = -start;
 
@@ -2006,7 +2016,8 @@ map<string, witness_id_type> database_api::lookup_witness_accounts(const string&
 
 map<string, witness_id_type> database_api_impl::lookup_witness_accounts(const string& lower_bound_name, uint32_t limit)const
 {
-   FC_ASSERT( limit <= 1000 );
+   uint64_t api_limit_lookup_witness_accounts = _app_options->api_limit_lookup_witness_accounts;
+   FC_ASSERT( limit <= api_limit_lookup_witness_accounts );
    const auto& witnesses_by_id = _db.get_index_type<witness_index>().indices().get<by_id>();
 
    // we want to order witnesses by account name, but that name is in the account object
@@ -2082,7 +2093,8 @@ map<string, committee_member_id_type> database_api::lookup_committee_member_acco
 
 map<string, committee_member_id_type> database_api_impl::lookup_committee_member_accounts(const string& lower_bound_name, uint32_t limit)const
 {
-   FC_ASSERT( limit <= 1000 );
+   uint64_t api_limit_lookup_committee_member_accounts = _app_options->api_limit_lookup_committee_member_accounts;
+   FC_ASSERT( limit <= api_limit_lookup_committee_member_accounts );
    const auto& committee_members_by_id = _db.get_index_type<committee_member_index>().indices().get<by_id>();
 
    // we want to order committee_members by account name, but that name is in the account object
@@ -2180,7 +2192,8 @@ vector<variant> database_api::lookup_vote_ids( const vector<vote_id_type>& votes
 
 vector<variant> database_api_impl::lookup_vote_ids( const vector<vote_id_type>& votes )const
 {
-   FC_ASSERT( votes.size() < 1000, "Only 1000 votes can be queried at a time" );
+   uint64_t api_limit_lookup_vote_ids = _app_options->api_limit_lookup_vote_ids;
+   FC_ASSERT( votes.size() < api_limit_lookup_vote_ids, "Only 1000 votes can be queried at a time" );
 
    const auto& witness_idx = _db.get_index_type<witness_index>().indices().get<by_vote_id>();
    const auto& committee_idx = _db.get_index_type<committee_member_index>().indices().get<by_vote_id>();
@@ -2563,7 +2576,7 @@ vector<withdraw_permission_object> database_api::get_withdraw_permissions_by_giv
 
 vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_by_giver(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const
 {
-   FC_ASSERT( limit <= 101 );
+   FC_ASSERT( limit <= _app_options->api_limit_get_withdraw_permissions_by_giver );
    vector<withdraw_permission_object> result;
 
    const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_from>();
@@ -2585,7 +2598,7 @@ vector<withdraw_permission_object> database_api::get_withdraw_permissions_by_rec
 
 vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_by_recipient(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const
 {
-   FC_ASSERT( limit <= 101 );
+   FC_ASSERT( limit <= _app_options->api_limit_get_withdraw_permissions_by_recipient );
    vector<withdraw_permission_object> result;
 
    const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_authorized>();
