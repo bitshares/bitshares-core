@@ -14,9 +14,9 @@ set( CMAKE_CXX_STANDARD_REQUIRED ON )
 
 if( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
   set( CMAKE_CXX_EXTENSIONS ON ) # for __int128 support
-else( GNU )
+else( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
   set( CMAKE_CXX_EXTENSIONS OFF )
-endif( GNU )
+endif( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
 
 # http://stackoverflow.com/a/18369825
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
