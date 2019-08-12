@@ -26,6 +26,8 @@
 
 #include <fc/exception/exception.hpp>
 
+#include <boost/safe_numerics/safe_compare.hpp>
+
 namespace graphene { namespace protocol {
 namespace typelist = fc::typelist;
 using std::declval;
@@ -66,45 +68,49 @@ template<typename T> constexpr static bool is_container = is_container_impl<T>::
 template<typename Field>
 using object_restriction_predicate = std::function<predicate_result(const Field&)>;
 
+// Get the actual number when type might be a safe<I>
+template<typename I, typename=std::enable_if_t<std::is_integral<I>::value>>
+const auto& to_num(const I& i) { return i; }
+template<typename I>
+const auto& to_num(const fc::safe<I>& i) { return i.value; }
+inline auto to_num(const fc::time_point_sec& t) { return t.sec_since_epoch(); }
+
+namespace safenum = boost::safe_numerics::safe_compare;
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // *** Restriction Predicate Logic ***
-
-// This file is where the magic happens for BSIP 40, aka Custom Active Authorities. This gets fairly complicated, so
-// let me break it down: we're given a restriction object and an operation type. The restriction contains one or more
-// assertions that will eventually be made on operation instances, and this file creates a predicate function that
-// takes such an operation instance, evaluates all of the assertions, and returns whether they all pass or not.
 //
-// So this file works on restriction instances, but only operation *types* -- the actual operation instance won't
-// show up until the predicate function this file returns is eventually called. But first, we need to dig into the
-// operation/fields based on the specifications in the restrictions, make sure all the assertions are valid, then
-// create a predicate that runs quickly, looking through the operation and checking all the assertions.
+// This file implements the core logic of Custom Active Authorities. A CAA is an authority which is permitted by an
+// account to execute a particular authority on that account's behalf, with some restrictions on the content of that
+// operation. This file implements the logic to validate those restrictions, and create a predicate function which
+// takes a particular operation and determines whether it complies with the restrictions or not.
 //
-// It kicks off at the bottom of this file, in get_restriction_predicate(), which gets a vector of restrictions and
-// an operation type tag. So first, we've got to enter into a template context that knows the actual operation type,
-// not just the type tag. And we do a lot of entering into deeper and deeper template contexts, resolving tags to
-// actual types so that we know all the type information when we create the predicate, and it can execute quickly
-// on an operation instance, knowing exactly what types and fields it needs, how to cast things, how to execute the
-// assertions, etc.
+// The restrictions are a recursive structure, which applies to a particular operation struct, but may recurse to
+// specify restrictions on fields or subfields of that struct. This file explores the restriction structure in tandem
+// with the operation struct to verify that all of the restrictions are valid and to produce a predicate function.
+// Note that this file operates primarily on restriction data, but only operation *types*, meaning the actual
+// operation value does not appear until the predicate returned by this file is run.
+//
+// As a result, this file is very template heavy, and does a good deal of type manipulation. Its contents are
+// organized as a series of layers, which recursively examine the restrictions and types they apply to, and finally,
+// once all the types have been resolved, a predicate function is created which evaluates the restrictions on an
+// operation.
 //
 // To give an overview of the logic, the layers stack up like so, from beginning (bottom of file) to end:
-//  - get_restriction_predicate() -- gets vector<restriction> and operation::tag_type, visits operation with the tag
-//    type to get an actual operation type as a template parameter
-//  - operation_type_resolver -- gets vector<restriction> and operation type tag, resolves tag to operation type
-//    template argument. This is the last layer that can assume the type being restricted is an operation; all
-//    subsequent layers work on any object or field
 //  - restrictions_to_predicate<Object>() -- takes a vector<restriction> and creates a predicate for each of them,
 //    but returns a single predicate that returns true only if all sub-predicates return true
 //    - create_field_predicate<Object>() -- Resolves which field of Object the restriction is referencing by indexing
-//      into the object's reflected fields with the predicates member_index
-//    - create_logical_or_predicate<Object>() -- If the predicate is a logical OR function, instead of using
-//      create_field_predicate, we recurse into restrictions_to_predicate for each branch of the OR, returning a
-//      predicate which returns true if any branch of the OR passes
+//      into the object's reflected fields with the predicate's member_index
+//    - create_logical_or_predicate<Object>() -- If the predicate is a logical OR function, the predicate does not
+//      specify a field to examine; rather, the predicates in its branches do. Thus this function recurses into
+//      restrictions_to_predicate for each branch of the OR, and combines the resulting predicates in a predicate
+//      which returns true if any branch of the OR passes
 //  - create_predicate_function<Field>() -- switches on restriction type to determine which predicate template to use
 //    going forward
 //    - make_predicate<Predicate, Field, ArgVariant> -- Determines what type the restriction argument is and creates
 //      a predicate functor for that type
-//    - attribute_assertion<Field> -- If the restriction is an attribute assertion, instead of using the
-//      restriction_argument_visitor, we recurse into restrictions_to_predicate with the current Field as the Object
+//    - attribute_assertion<Field> -- If the restriction is an attribute assertion, instead of using make_predicate
+//      to create a predicate function, we first recurse into restrictions_to_predicate with Field as the Object
 //  - embed_argument<Field, Predicate, Argument>() -- Embeds the argument into the predicate if it is a valid type
 //    for the predicate, and throws otherwise.
 //  - predicate_xyz<Argument> -- These are functors implementing the various predicate function types
@@ -142,22 +148,33 @@ struct predicate_invalid {
 // Equality comparison
 template<typename A, typename B, typename = void> struct predicate_eq : predicate_invalid<A, B> {};
 template<typename Field, typename Argument>
-struct predicate_eq<Field, Argument, std::enable_if_t<comparable_types<Field, Argument>>> {
-   // Simple comparison
+struct predicate_eq<Field, Argument, std::enable_if_t<std::is_same<Field, Argument>::value>> {
+   // Simple comparison, same type
    constexpr static bool valid = true;
    constexpr bool operator()(const Field& f, const Argument& a) const { return f == a; }
+};
+template<typename Field, typename Argument>
+struct predicate_eq<Field, Argument, std::enable_if_t<is_integral<Field> && is_integral<Argument> &&
+                                                      !std::is_same<Field, Argument>::value>> {
+   // Simple comparison, integral types
+   constexpr static bool valid = true;
+   constexpr bool operator()(const Field& f, const Argument& a) const { return safenum::equal(to_num(f), to_num(a)); }
 };
 template<typename Field, typename Argument>
 struct predicate_eq<Field, Argument, std::enable_if_t<is_container<Field> && is_integral<Argument>>> {
    // Compare container size against int
    constexpr static bool valid = true;
-   bool operator()(const Field& f, const Argument& a) const { return f.size() == a; }
+   bool operator()(const Field& f, const Argument& a) const { return safenum::equal(f.size(), to_num(a)); }
 };
 template<typename Field, typename Argument>
-struct predicate_eq<fc::optional<Field>, Argument, std::enable_if_t<comparable_types<Field, Argument>>> {
-   // Compare optional value against same type
-   constexpr static bool valid = true;
-   bool operator()(const fc::optional<Field>& f, const Argument& a) const { return f.valid() && *f == a; }
+struct predicate_eq<fc::optional<Field>, Argument, std::enable_if_t<comparable_types<Field, Argument>>>
+   : predicate_eq<Field, Argument> {
+   // Compare optional value against comparable type
+   using base = predicate_eq<Field, Argument>;
+   bool operator()(const fc::optional<Field>& f, const Argument& a) const {
+
+      return f.valid() && (*this)(*f, a);
+   }
 };
 template<typename Field>
 struct predicate_eq<fc::optional<Field>, void_t, void> {
@@ -174,16 +191,27 @@ template<typename Field, typename Argument> struct predicate_ne : predicate_eq<F
 // Shared implementation for all inequality comparisons
 template<typename A, typename B, typename = void> struct predicate_compare : predicate_invalid<A, B> {};
 template<typename Field, typename Argument>
-struct predicate_compare<Field, Argument, std::enable_if_t<comparable_types<Field, Argument>>> {
-   // Simple comparison, integral types
+struct predicate_compare<Field, Argument, std::enable_if_t<std::is_same<Field, Argument>::value>> {
+   // Simple comparison, same types
    constexpr static bool valid = true;
    constexpr int8_t operator()(const Field& f, const Argument& a) const {
       return f<a? -1 : (f>a? 1 : 0);
    }
 };
 template<typename Field, typename Argument>
+struct predicate_compare<Field, Argument, std::enable_if_t<is_integral<Field> && is_integral<Argument> &&
+                                                           !std::is_same<Field, Argument>::value>> {
+   // Simple comparison, integral types
+   constexpr static bool valid = true;
+   constexpr int8_t operator()(const Field& f, const Argument& a) const {
+      auto nf = to_num(f);
+      auto na = to_num(a);
+      return safenum::less_than(nf, na)? -1 : (safenum::greater_than(nf, na)? 1 : 0);
+   }
+};
+template<typename Field, typename Argument>
 struct predicate_compare<fc::optional<Field>, Argument, void> : predicate_compare<Field, Argument> {
-   // Compare optional value against same type
+   // Compare optional value against comparable type
    constexpr static bool valid = true;
    constexpr int8_t operator()(const fc::optional<Field>& f, const Argument& a) const {
        FC_ASSERT(f.valid(), "Cannot compute inequality comparison against a null optional");
