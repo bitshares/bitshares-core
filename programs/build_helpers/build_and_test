@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 programs/build_helpers/buildstep -s 3500
 ccache -s
