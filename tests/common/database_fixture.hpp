@@ -391,6 +391,7 @@ struct database_fixture {
       return H::hash( (char*)preimage.data(), preimage.size() );
    }
 
+   bool validation_current_test_name_for_setting_api_limit (string & current_test_name) const;
 };
 
 namespace test {

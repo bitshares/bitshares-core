@@ -349,6 +349,39 @@ void application_impl::set_api_limit() {
    if(_options->count("api-limit-list-htlcs")){
       _app_options.api_limit_list_htlcs = _options->at("api-limit-list-htlcs").as<uint64_t>();
    }
+   if(_options->count("api-limit-lookup-accounts")) {
+      _app_options.api_limit_lookup_accounts = _options->at("api-limit-lookup-accounts").as<uint64_t>();
+   }
+   if(_options->count("api-limit-lookup-witness-accounts")) {
+      _app_options.api_limit_lookup_witness_accounts = _options->at("api-limit-lookup-witness-accounts").as<uint64_t>();
+   }
+   if(_options->count("api-limit-lookup-committee-member-accounts")) {
+      _app_options.api_limit_lookup_committee_member_accounts = _options->at("api-limit-lookup-committee-member-accounts").as<uint64_t>();
+   }
+   if(_options->count("api-limit-lookup-vote-ids")) {
+      _app_options.api_limit_lookup_vote_ids = _options->at("api-limit-lookup-vote-ids").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-account-limit-orders")) {
+      _app_options.api_limit_get_account_limit_orders = _options->at("api-limit-get-account-limit-orders").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-collateral-bids")) {
+      _app_options.api_limit_get_collateral_bids = _options->at("api-limit-get-collateral-bids").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-top-markets")) {
+      _app_options.api_limit_get_top_markets = _options->at("api-limit-get-top-markets").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-trade-history")) {
+      _app_options.api_limit_get_trade_history = _options->at("api-limit-get-trade-history").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-trade-history-by-sequence")) {
+      _app_options.api_limit_get_trade_history_by_sequence = _options->at("api-limit-get-trade-history-by-sequence").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-withdraw-permissions-by-giver")) {
+      _app_options.api_limit_get_withdraw_permissions_by_giver = _options->at("api-limit-get-withdraw-permissions-by-giver").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-withdraw-permissions-by-recipient")) {
+      _app_options.api_limit_get_withdraw_permissions_by_recipient = _options->at("api-limit-get-withdraw-permissions-by-recipient").as<uint64_t>();
+   }
 }
 
 void application_impl::startup()
@@ -1044,6 +1077,28 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::get_limit_orders to set its default limit value as 300")
          ("api-limit-get-order-book",boost::program_options::value<uint64_t>()->default_value(50),
           "For database_api_impl::get_order_book to set its default limit value as 50")
+         ("api-limit-lookup-accounts",boost::program_options::value<uint64_t>()->default_value(1000),
+          "For database_api_impl::lookup_accounts to set its default limit values as 1000")
+         ("api-limit-lookup-witness-accounts",boost::program_options::value<uint64_t>()->default_value(1000),
+          "For database_api_impl::lookup_witness_accounts to set its default limit values as 1000")
+         ("api-limit-lookup-committee-member-accounts",boost::program_options::value<uint64_t>()->default_value(1000),
+          "For database_api_impl::lookup_committee_member_accounts to set its default limit values as 1000")
+         ("api-limit-lookup-vote-ids",boost::program_options::value<uint64_t>()->default_value(1000),
+          "For database_api_impl::lookup_vote_ids to set its default limit values as 1000")
+         ("api-limit-get-account-limit-orders",boost::program_options::value<uint64_t>()->default_value(101),
+          "For database_api_impl::get_account_limit_orders to set its default limit values as 101")
+         ("api-limit-get-collateral-bids",boost::program_options::value<uint64_t>()->default_value(100),
+          "For database_api_impl::get_collateral_bids to set its default limit values as 100")
+         ("api-limit-get-top-markets",boost::program_options::value<uint64_t>()->default_value(100),
+          "For database_api_impl::get_top_markets to set its default limit values as 100")
+         ("api-limit-get-trade-history",boost::program_options::value<uint64_t>()->default_value(100),
+          "For database_api_impl::get_trade_history to set its default limit values as 100")
+         ("api-limit-get-trade-history-by-sequence",boost::program_options::value<uint64_t>()->default_value(100),
+          "For database_api_impl::get_trade_history_by_sequence to set its default limit values as 100")
+         ("api-limit-get-withdraw-permissions-by-giver",boost::program_options::value<uint64_t>()->default_value(101),
+          "For database_api_impl::get_withdraw_permissions_by_giver to set its default limit values as 101")
+         ("api-limit-get-withdraw-permissions-by-recipient",boost::program_options::value<uint64_t>()->default_value(101),
+          "For database_api_impl::get_withdraw_permissions_by_recipient to set its default limit values as 101")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
