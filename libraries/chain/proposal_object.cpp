@@ -27,6 +27,8 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/hardfork.hpp>
 
+#include <graphene/protocol/restriction_predicate.hpp>
+
 namespace graphene { namespace chain {
 
 bool proposal_object::is_authorized_to_execute( database& db ) const

@@ -33,6 +33,8 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/hardfork.hpp>
 
+#include <graphene/protocol/restriction_predicate.hpp>
+
 #include <graphene/db/simple_index.hpp>
 
 #include <fc/crypto/digest.hpp>

@@ -28,6 +28,7 @@
 #include <graphene/chain/get_config.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/protocol/pts_address.hpp>
+#include <graphene/protocol/restriction_predicate.hpp>
 
 #include <fc/crypto/hex.hpp>
 #include <fc/rpc/api_connection.hpp>
