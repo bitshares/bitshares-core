@@ -26,7 +26,7 @@
 
 #include <fc/exception/exception.hpp>
 
-#include <boost/safe_numerics/safe_compare.hpp>
+#include "safe_compare.hpp"
 
 namespace graphene { namespace protocol {
 namespace typelist = fc::typelist;
