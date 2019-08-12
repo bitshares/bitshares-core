@@ -1798,6 +1798,24 @@ BOOST_AUTO_TEST_CASE(api_limit_get_trade_history){
       throw;
    }
 }
+BOOST_AUTO_TEST_CASE( api_limit_get_full_accounts2 ) {
+   try {
+      graphene::app::database_api db_api(db, &(this->app.get_options()));
+      vector<string> accounts;
+      for (int i=0; i<201; i++) {
+         std::string acct_name = "mytempacct" + std::to_string(i);
+         const account_object& account_name=create_account(acct_name);
+         accounts.push_back(account_name.name);
+      }
+      GRAPHENE_CHECK_THROW(db_api.get_full_accounts(accounts, false), fc::exception);
+      accounts.erase(accounts.begin());
+      auto full_accounts = db_api.get_full_accounts(accounts, false);
+      BOOST_REQUIRE_EQUAL(full_accounts.size(), 200u);
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
 BOOST_AUTO_TEST_CASE(api_limit_get_top_markets){
    try{
       app.enable_plugin("market_history");
@@ -1965,6 +1983,4 @@ BOOST_AUTO_TEST_CASE( api_limit_lookup_committee_member_accounts ) {
       throw;
    }
 }
-
-
 BOOST_AUTO_TEST_SUITE_END()

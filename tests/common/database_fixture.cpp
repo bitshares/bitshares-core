@@ -449,25 +449,6 @@ bool database_fixture::validation_current_test_name_for_setting_api_limit(string
 
    return false;
 }
-
-void database_fixture::validation_api_limits_inputs(string & current_test_name) const
-{
-   //api_limit_get_account_history_operations
-   //    options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
-   //    options.insert(std::make_pair("api-limit-get-account-history-operations", boost::program_options::variable_value((uint64_t)300, false)));
-   //    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
-   //   //inputs and labels
-   //   //plugin
-   //   map<string,int64_t > config_name_inputs;
-   //   string plugin_name;
-   const static api_limits_inputs list1;
-  // list1.config_name_inputs.insert(std::pair<string, int64_t>("max-ops-per-account", 125));
-
-
-
-}
-
-
 void database_fixture::verify_asset_supplies( const database& db )
 {
    //wlog("*** Begin asset supply verification ***");

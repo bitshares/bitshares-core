@@ -67,7 +67,6 @@ namespace graphene { namespace app {
          uint64_t api_limit_get_trade_history_by_sequence = 100;
          uint64_t api_limit_get_withdraw_permissions_by_giver = 101;
          uint64_t api_limit_get_withdraw_permissions_by_recipient = 101;
-
    };
 
    class application
