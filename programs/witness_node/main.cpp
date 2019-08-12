@@ -34,6 +34,7 @@
 #include <graphene/es_objects/es_objects.hpp>
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 #include <graphene/api_helper_indexes/api_helper_indexes.hpp>
+#include <graphene/plugins/txid/txid_plugin.hpp>
 
 #include <fc/thread/thread.hpp>
 #include <fc/interprocess/signals.hpp>
@@ -56,6 +57,7 @@
 #endif
 
 using namespace graphene;
+using namespace graphene::plugins;
 namespace bpo = boost::program_options;
 
 int main(int argc, char** argv) {
@@ -64,14 +66,14 @@ int main(int argc, char** argv) {
    try {
       bpo::options_description app_options("Graphene Witness Node");
       bpo::options_description cfg_options("Graphene Witness Node");
+      std::string default_plugins = "witness account_history market_history grouped_orders api_helper_indexes txid";
       app_options.add_options()
             ("help,h", "Print this help message and exit.")
             ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("witness_node_data_dir"),
-                    "Directory containing databases, configuration file, etc.")
+                  "Directory containing databases, configuration file, etc.")
             ("version,v", "Display version information")
-            ("plugins", bpo::value<std::string>()
-                            ->default_value("witness account_history market_history grouped_orders api_helper_indexes"),
-                    "Space-separated list of plugins to activate")
+            ("plugins", bpo::value<std::string>()->default_value( default_plugins ),
+                  "Space-separated list of plugins to activate")
             ("ignore-api-helper-indexes-warning", "Do not exit if api_helper_indexes plugin is not enabled.");
 
       bpo::variables_map options;
@@ -81,9 +83,8 @@ int main(int argc, char** argv) {
       cfg_options.add(cfg);
 
       cfg_options.add_options()
-              ("plugins", bpo::value<std::string>()
-	                      ->default_value("witness account_history market_history grouped_orders api_helper_indexes"),
-               "Space-separated list of plugins to activate")
+            ("plugins", bpo::value<std::string>()->default_value( default_plugins ),
+                  "Space-separated list of plugins to activate")
             ("ignore-api-helper-indexes-warning", "Do not exit if api_helper_indexes plugin is not enabled.");
 
       auto witness_plug = node->register_plugin<witness_plugin::witness_plugin>();
@@ -96,6 +97,7 @@ int main(int argc, char** argv) {
       auto es_objects_plug = node->register_plugin<es_objects::es_objects_plugin>();
       auto grouped_orders_plug = node->register_plugin<grouped_orders::grouped_orders_plugin>();
       auto api_helper_indexes_plug = node->register_plugin<api_helper_indexes::api_helper_indexes>();
+      auto txid_plug = node->register_plugin<txid::txid_plugin>();
 
       // add plugin options to config
       try

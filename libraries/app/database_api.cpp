@@ -262,6 +262,44 @@ processed_transaction database_api_impl::get_transaction(uint32_t block_num, uin
    return opt_block->transactions[trx_num];
 }
 
+optional<extended_transaction_info> database_api::get_transaction_by_id(
+            const transaction_id_type& txid,
+            optional<bool> skip_full_tx )const
+{
+   return my->get_transaction_by_id( txid, skip_full_tx );
+}
+
+optional<extended_transaction_info> database_api_impl::get_transaction_by_id(
+            const transaction_id_type& txid,
+            optional<bool> skip_full_tx )const
+{
+   FC_ASSERT( _app_options && _app_options->has_txid_plugin, "txid plugin is not enabled" );
+
+   const auto& idx = _db.get_index_type<transaction_position_index>().indices().get<by_txid>();
+   auto itr = idx.find( txid );
+   if( itr == idx.end() )
+      return {};
+
+   const auto& tx = *itr;
+   if( skip_full_tx.valid() && *skip_full_tx )
+      return tx;
+
+   extended_transaction_info tx_info(tx);
+   tx_info.tx = get_transaction( tx.block_num, tx.trx_in_block );
+   return tx_info;
+}
+
+uint64_t database_api::get_transaction_count()const
+{
+   return my->get_transaction_count();
+}
+
+uint64_t database_api_impl::get_transaction_count()const
+{
+   FC_ASSERT( _app_options && _app_options->has_txid_plugin, "txid plugin is not enabled" );
+   return _db.get_index_type<transaction_position_index>().indices().size();
+}
+
 //////////////////////////////////////////////////////////////////////
 //                                                                  //
 // Globals                                                          //

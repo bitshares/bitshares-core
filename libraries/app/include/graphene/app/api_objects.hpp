@@ -33,12 +33,14 @@
 
 #include <graphene/api_helper_indexes/api_helper_indexes.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
+#include <graphene/plugins/txid/txid_plugin.hpp>
 
 #include <fc/optional.hpp>
 
 namespace graphene { namespace app {
    using namespace graphene::chain;
    using namespace graphene::market_history;
+   using namespace graphene::plugins::txid;
 
    struct more_data
    {
@@ -76,6 +78,15 @@ namespace graphene { namespace app {
       vector<htlc_object>              htlcs_from;
       vector<htlc_object>              htlcs_to;
       more_data                        more_data_available;
+   };
+
+   /// @brief A transaction's position in the blockchain and optionally the full transaction
+   struct extended_transaction_info : public transaction_position_object
+   {
+      extended_transaction_info() : transaction_position_object() {}
+      extended_transaction_info( const transaction_position_object& tx ) : transaction_position_object(tx) {}
+
+      optional<processed_transaction> tx; ///< The full transaction
    };
 
    struct order
@@ -174,6 +185,10 @@ FC_REFLECT( graphene::app::full_account,
             (htlcs_to)
             (more_data_available)
           )
+
+FC_REFLECT_DERIVED( graphene::app::extended_transaction_info,
+                    (graphene::plugins::txid::transaction_position_object),
+                    (tx) )
 
 FC_REFLECT( graphene::app::order, (price)(quote)(base) );
 FC_REFLECT( graphene::app::order_book, (base)(quote)(bids)(asks) );

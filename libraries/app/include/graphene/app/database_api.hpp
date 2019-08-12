@@ -53,6 +53,8 @@ namespace graphene { namespace app {
 
 using namespace graphene::chain;
 using namespace graphene::market_history;
+using namespace graphene::plugins::txid;
+
 using std::string;
 using std::vector;
 using std::map;
@@ -187,6 +189,26 @@ class database_api
        * @return the corresponding transaction if found, or null if not found
        */
       optional<signed_transaction> get_recent_transaction_by_id( const transaction_id_type& txid )const;
+
+      /**
+       * @brief Search for an individual transaction by its hash
+       * @param txid hash of the transaction
+       * @param skip_full_tx whether to not return the full transaction data, optional,
+       *                     if omitted or set to @a false, will return the full transaction data,
+       *                     if set to @a true, will not return full transaction data
+       * @return info about the transaction if found, or @a null if not found
+       * @note This API can only find a transaction if it is already included in a block.
+       *       For pending transactions, try @ref get_recent_transaction_by_id.
+       */
+      optional<extended_transaction_info> get_transaction_by_id(
+            const transaction_id_type& txid,
+            optional<bool> skip_full_tx = {} )const;
+
+      /**
+       * @brief Return total number of transactions in the blockchain
+       * @return total number of transactions in the blockchain
+       */
+      uint64_t get_transaction_count()const;
 
       /////////////
       // Globals //
@@ -912,6 +934,8 @@ FC_API(graphene::app::database_api,
    (get_block)
    (get_transaction)
    (get_recent_transaction_by_id)
+   (get_transaction_by_id)
+   (get_transaction_count)
 
    // Globals
    (get_chain_properties)
