@@ -49,9 +49,10 @@
    #include <winsock2.h>
    #include <WS2tcpip.h>
 #else
-   #include <sys/socket.h>
-   #include <netinet/ip.h>
    #include <sys/types.h>
+   #include <sys/socket.h>
+   #include <netinet/in.h>
+   #include <netinet/ip.h>
 #endif
 #include <thread>
 
