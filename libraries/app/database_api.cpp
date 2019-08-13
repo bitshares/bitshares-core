@@ -88,7 +88,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       account_id_type get_account_id_from_string(const std::string& name_or_id)const;
       vector<optional<account_object>> get_accounts( const vector<std::string>& account_names_or_ids,
                                                      optional<bool> subscribe )const;
-      std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids, optional<bool> subscribe );
+      std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids,
+                                                       optional<bool> subscribe );
       optional<account_object> get_account_by_name( string name )const;
       vector<account_id_type> get_account_references( const std::string account_id_or_name )const;
       vector<optional<account_object>> lookup_account_names(const vector<string>& account_names)const;
@@ -1197,7 +1198,7 @@ map<string,account_id_type> database_api_impl::lookup_accounts( const string& lo
 
    if( limit == 0 ) // shortcut to save a database query
       return result;
-   // auto-subscribe if only look for one account
+   // In addition to the common auto-subscription rules, here we auto-subscribe if only look for one account
    bool to_subscribe = (limit == 1 && get_whether_to_subscribe( subscribe ));
    for( auto itr = accounts_by_name.lower_bound(lower_bound_name);
         limit-- && itr != accounts_by_name.end();
