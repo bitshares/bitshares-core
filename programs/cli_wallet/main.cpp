@@ -31,7 +31,6 @@
 #include <fc/io/stdio.hpp>
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/cli.hpp>
-#include <fc/rpc/http_api.hpp>
 #include <fc/rpc/websocket_api.hpp>
 
 #include <graphene/app/api.hpp>
@@ -360,7 +359,7 @@ int main( int argc, char** argv )
       }
       else
       {
-         fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
+         fc::promise<int>::ptr exit_promise = fc::promise<int>::create("UNIX Signal Handler");
 
          fc::set_signal_handler( [&exit_promise](int signal) {
             ilog( "Captured SIGINT in daemon mode, exiting" );

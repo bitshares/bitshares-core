@@ -23,21 +23,15 @@
  */
 #pragma once
 
-#include <boost/multiprecision/cpp_int.hpp>
-
 #include <fc/uint128.hpp>
 
-#include <graphene/protocol/asset.hpp>
+namespace graphene {
+namespace protocol {
+   struct price;
+}
 
-namespace graphene { namespace app {
-   using namespace graphene::protocol;
-
-   typedef boost::multiprecision::uint256_t u256;
-
-   u256 to256( const fc::uint128& t );
-   fc::uint128 to_capped128( const u256& t );
-   string uint128_amount_to_string( const fc::uint128& amount, const uint8_t precision );
-   string price_to_string( const price& _price, const uint8_t base_precision, const uint8_t quote_precision);
-   string price_diff_percent_string( const price& old_price, const price& new_price );
-
+namespace app {
+   std::string uint128_amount_to_string( const fc::uint128_t& amount, const uint8_t precision );
+   std::string price_to_string( const graphene::protocol::price& _price, const uint8_t base_precision, const uint8_t quote_precision);
+   std::string price_diff_percent_string( const graphene::protocol::price& old_price, const graphene::protocol::price& new_price );
 } }
