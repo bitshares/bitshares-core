@@ -25,20 +25,22 @@
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 #include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 namespace graphene { namespace chain {
 
-bool proposal_object::is_authorized_to_execute(database& db) const
+bool proposal_object::is_authorized_to_execute( database& db ) const
 {
-   transaction_evaluation_state dry_run_eval(&db);
+   transaction_evaluation_state dry_run_eval( &db );
 
    try {
       bool allow_non_immediate_owner = ( db.head_block_time() >= HARDFORK_CORE_584_TIME );
-      verify_authority( proposed_transaction.operations, 
+      verify_authority( proposed_transaction.operations,
                         available_key_approvals,
-                        [&]( account_id_type id ){ return &id(db).active; },
-                        [&]( account_id_type id ){ return &id(db).owner;  },
+                        [&db]( account_id_type id ){ return &id( db ).active; },
+                        [&db]( account_id_type id ){ return &id( db ).owner;  },
                         allow_non_immediate_owner,
+                        MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( db.head_block_time() ),
                         db.get_global_properties().parameters.max_authority_depth,
                         true, /* allow committee */
                         available_active_approvals,

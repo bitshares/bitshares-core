@@ -25,6 +25,7 @@
 #include <graphene/elasticsearch/elasticsearch_plugin.hpp>
 #include <graphene/chain/impacted.hpp>
 #include <graphene/chain/account_evaluator.hpp>
+#include <graphene/chain/hardfork.hpp>
 #include <curl/curl.h>
 #include <graphene/utilities/elasticsearch.hpp>
 
@@ -154,12 +155,15 @@ bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
       // get the set of accounts this operation applies to
       flat_set<account_id_type> impacted;
       vector<authority> other;
-      operation_get_required_authorities( op.op, impacted, impacted, other ); // fee_payer is added here
+      // fee_payer is added here
+      operation_get_required_authorities( op.op, impacted, impacted, other,
+                                          MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( db.head_block_time() ) );
 
       if( op.op.is_type< account_create_operation >() )
          impacted.insert( op.result.get<object_id_type>() );
       else
-         graphene::chain::operation_get_impacted_accounts( op.op, impacted );
+         operation_get_impacted_accounts( op.op, impacted,
+                                          MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( db.head_block_time() ) );
 
       for( auto& a : other )
          for( auto& item : a.account_auths )
