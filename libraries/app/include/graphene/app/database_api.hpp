@@ -160,10 +160,13 @@ class database_api
        *                  @a null to subscribe or not subscribe according to current auto-subscription setting
        *                  (see @ref set_auto_subscription)
        * @return The objects retrieved, in the order they are mentioned in ids
+       * @note operation_history_object (1.11.x) and account_transaction_history_object (2.9.x)
+       *       can not be subscribed.
        *
        * If any of the provided IDs does not map to an object, a null variant is returned in its position.
        */
-      fc::variants get_objects( const vector<object_id_type>& ids, optional<bool> subscribe = optional<bool>() )const;
+      fc::variants get_objects( const vector<object_id_type>& ids,
+                                optional<bool> subscribe = optional<bool>() )const;
 
       ///////////////////
       // Subscriptions //
@@ -385,7 +388,8 @@ class database_api
        *                  (see @ref set_auto_subscription)
        * @return Map of account names to corresponding IDs
        *
-       * Note: this API will subscribe to the queried account only if @p limit is 1.
+       * @note In addition to the common auto-subscription rules,
+       *       this API will subscribe to the returned account only if @p limit is 1.
        */
       map<string,account_id_type> lookup_accounts( const string& lower_bound_name,
                                                    uint32_t limit,
