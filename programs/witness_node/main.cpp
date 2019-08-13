@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
    try {
       bpo::options_description app_options("Graphene Witness Node");
       bpo::options_description cfg_options("Graphene Witness Node");
-      std::string default_plugins = "witness account_history market_history grouped_orders api_helper_indexes txid";
+      std::string default_plugins = "witness account_history market_history grouped_orders api_helper_indexes";
       app_options.add_options()
             ("help,h", "Print this help message and exit.")
             ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("witness_node_data_dir"),
