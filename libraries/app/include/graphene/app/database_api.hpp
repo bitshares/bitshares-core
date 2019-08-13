@@ -41,7 +41,7 @@
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
-
+#include <graphene/chain/transaction_entry_object.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
 
 #include <fc/api.hpp>
@@ -232,6 +232,8 @@ class database_api
        * @brief used to fetch an individual transaction.
        */
       processed_transaction get_transaction( uint32_t block_num, uint32_t trx_in_block )const;
+
+      optional<processed_transaction> get_transaction_by_txid(transaction_id_type txid)const;
 
       /**
        * If the transaction has not expired, this method will return the transaction for the given ID or
@@ -853,6 +855,7 @@ FC_API(graphene::app::database_api,
    (get_block)
    (get_transaction)
    (get_recent_transaction_by_id)
+   (get_transaction_by_txid)
 
    // Globals
    (get_chain_properties)
