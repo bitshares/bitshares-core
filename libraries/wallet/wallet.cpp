@@ -2751,7 +2751,7 @@ public:
          encapsulated << "block=" << r.meta.block << '\n';
          encapsulated << "timestamp=" << r.meta.time << '\n';
          encapsulated << ENC_SIG;
-         encapsulated << fc::to_hex( (const char*)r.signature->data, r.signature->size() ) << '\n';
+         encapsulated << fc::to_hex( (const char*)r.signature->data(), r.signature->size() ) << '\n';
          encapsulated << ENC_FOOTER;
 
          return encapsulated.str();

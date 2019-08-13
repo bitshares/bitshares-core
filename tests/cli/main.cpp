@@ -1098,7 +1098,7 @@ static string encapsulate( const graphene::wallet::signed_message& msg )
                 << "block=" << msg.meta.block << '\n'
                 << "timestamp=" << msg.meta.time << '\n'
                 << "-----BEGIN SIGNATURE-----\n"
-                << fc::to_hex( (const char*)msg.signature->data, msg.signature->size() ) << '\n'
+                << fc::to_hex( (const char*)msg.signature->data(), msg.signature->size() ) << '\n'
                 << "-----END BITSHARES SIGNED MESSAGE-----";
    return encapsulated.str();
 }
@@ -1138,12 +1138,12 @@ BOOST_FIXTURE_TEST_CASE( cli_sign_message, cli_fixture )
    msg.meta.account = "nathan";
 
    // change key, verify failure
-   ++msg.meta.memo_key.key_data.data[1];
+   ++msg.meta.memo_key.key_data.data()[1];
    //BOOST_CHECK( !con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block, msg.meta.time,
    //                                                  *msg.signature ) );
    BOOST_CHECK( !con.wallet_api_ptr->verify_signed_message( msg ) );
    BOOST_CHECK( !con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
-   --msg.meta.memo_key.key_data.data[1];
+   --msg.meta.memo_key.key_data.data()[1];
 
    // change block, verify failure
    ++msg.meta.block;
@@ -1162,7 +1162,7 @@ BOOST_FIXTURE_TEST_CASE( cli_sign_message, cli_fixture )
    --msg.meta.time[0];
 
    // change signature, verify failure
-   ++msg.signature->data[1];
+   ++msg.signature->data()[1];
    try {
       BOOST_CHECK( !con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block, msg.meta.time,
                                                         *msg.signature ) );
@@ -1173,7 +1173,7 @@ BOOST_FIXTURE_TEST_CASE( cli_sign_message, cli_fixture )
    try {
       BOOST_CHECK( !con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
    } catch( const fc::assert_exception& ) {} // failure to reconstruct key from signature is ok as well
-   --msg.signature->data[1];
+   --msg.signature->data()[1];
 
    // verify success
    BOOST_CHECK( con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block, msg.meta.time,
