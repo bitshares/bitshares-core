@@ -38,6 +38,8 @@
 #include <boost/rational.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 
+#include <graphene/query_txid/query_txid_plugin.hpp>
+
 #include <cctype>
 
 #include <cfenv>
@@ -73,6 +75,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       map<uint32_t, optional<block_header>> get_block_header_batch(const vector<uint32_t> block_nums)const;
       optional<signed_block> get_block(uint32_t block_num)const;
       processed_transaction get_transaction( uint32_t block_num, uint32_t trx_in_block )const;
+      optional<processed_transaction> get_transaction_by_txid(transaction_id_type txid)const;
 
       // Globals
       chain_property_object get_chain_properties()const;
@@ -635,6 +638,11 @@ processed_transaction database_api::get_transaction( uint32_t block_num, uint32_
    return my->get_transaction( block_num, trx_in_block );
 }
 
+optional<processed_transaction> database_api::get_transaction_by_txid(transaction_id_type txid)const
+{
+   return my->get_transaction_by_txid(txid);
+}
+
 optional<signed_transaction> database_api::get_recent_transaction_by_id( const transaction_id_type& id )const
 {
    try {
@@ -652,6 +660,37 @@ processed_transaction database_api_impl::get_transaction(uint32_t block_num, uin
    return opt_block->transactions[trx_num];
 }
 
+optional<processed_transaction> database_api_impl::get_transaction_by_txid(transaction_id_type txid)const
+{
+    auto &txid_index = _db.get_index_type<trx_entry_index>().indices().get<by_txid>();
+    auto itor = txid_index.find(txid);
+    if (itor == txid_index.end()) {
+        std::string txid_str(txid);
+        auto result = query_txid::query_txid_plugin::query_trx_by_id(txid_str);
+        if (result) {
+            const auto &trx_entry = *result;
+            auto opt_block = _db.fetch_block_by_number(trx_entry.block_num);
+            FC_ASSERT(opt_block);
+            FC_ASSERT(opt_block->transactions.size() > trx_entry.trx_in_block);
+            optional<processed_transaction> res = opt_block->transactions[trx_entry.trx_in_block];
+            return res;
+        }
+        return {};
+    } else {
+        const auto &dpo = _db.get_dynamic_global_properties();
+        if (itor->block_num <= dpo.last_irreversible_block_num) {
+            const auto &trx_entry = *itor;
+            auto opt_block = _db.fetch_block_by_number(trx_entry.block_num);
+            FC_ASSERT(opt_block);
+            FC_ASSERT(opt_block->transactions.size() > trx_entry.trx_in_block);
+            optional<processed_transaction> res = opt_block->transactions[trx_entry.trx_in_block];
+            return res;
+        } else {
+            return {};
+        }
+    }
+    return {};
+}
 //////////////////////////////////////////////////////////////////////
 //                                                                  //
 // Globals                                                          //
