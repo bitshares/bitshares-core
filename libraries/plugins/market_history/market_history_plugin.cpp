@@ -181,7 +181,7 @@ struct operation_process_fill_order
       auto ticker_itr = ticker_idx.find( std::make_tuple( key.base, key.quote ) );
       if( ticker_itr == ticker_idx.end() )
       {
-         db.create<market_ticker_object>( [&]( market_ticker_object& mt ) {
+         db.create<market_ticker_object>( [&key,&fill_price,&trade_price]( market_ticker_object& mt ) {
             mt.base           = key.base;
             mt.quote          = key.quote;
             mt.last_day_base  = 0;
@@ -191,15 +191,37 @@ struct operation_process_fill_order
             mt.base_volume    = trade_price.base.amount.value;
             mt.quote_volume   = trade_price.quote.amount.value;
          });
+         // save an object for "flipped" market for get_top_markets API
+         db.create<market_ticker_object>( [&key,&fill_price,&trade_price]( market_ticker_object& mt ) {
+            mt.base           = key.quote;
+            mt.quote          = key.base;
+            mt.last_day_base  = 0;
+            mt.last_day_quote = 0;
+            mt.latest_base    = fill_price.quote.amount;
+            mt.latest_quote   = fill_price.base.amount;
+            mt.base_volume    = trade_price.quote.amount.value;
+            mt.quote_volume   = trade_price.base.amount.value;
+         });
       }
       else
       {
-         db.modify( *ticker_itr, [&]( market_ticker_object& mt ) {
+         db.modify( *ticker_itr, [&fill_price,&trade_price]( market_ticker_object& mt ) {
             mt.latest_base    = fill_price.base.amount;
             mt.latest_quote   = fill_price.quote.amount;
             mt.base_volume    += trade_price.base.amount.value;  // ignore overflow
             mt.quote_volume   += trade_price.quote.amount.value; // ignore overflow
          });
+         // update data of flipped market
+         auto flipped_ticker_itr = ticker_idx.find( std::make_tuple( key.quote, key.base ) );
+         if( flipped_ticker_itr != ticker_idx.end() ) // should always be true
+         {
+            db.modify( *flipped_ticker_itr, [&fill_price,&trade_price]( market_ticker_object& mt ) {
+               mt.latest_base    = fill_price.quote.amount;
+               mt.latest_quote   = fill_price.base.amount;
+               mt.base_volume    += trade_price.quote.amount.value;  // ignore overflow
+               mt.quote_volume   += trade_price.base.amount.value;   // ignore overflow
+            });
+         }
       }
 
       // To update buckets data
@@ -347,11 +369,22 @@ void market_history_plugin_impl::update_market_histories( const signed_block& b 
             auto ticker_itr = ticker_idx.find( std::make_tuple( key.base, key.quote ) );
             if( ticker_itr != ticker_idx.end() ) // should always be true
             {
-               db.modify( *ticker_itr, [&]( market_ticker_object& mt ) {
+               db.modify( *ticker_itr, [&fill_price,&trade_price]( market_ticker_object& mt ) {
                   mt.last_day_base  = fill_price.base.amount;
                   mt.last_day_quote = fill_price.quote.amount;
                   mt.base_volume    -= trade_price.base.amount.value;  // ignore underflow
                   mt.quote_volume   -= trade_price.quote.amount.value; // ignore underflow
+               });
+            }
+            // update data of flipped market
+            ticker_itr = ticker_idx.find( std::make_tuple( key.quote, key.base ) );
+            if( ticker_itr != ticker_idx.end() ) // should always be true
+            {
+               db.modify( *ticker_itr, [&fill_price,&trade_price]( market_ticker_object& mt ) {
+                  mt.last_day_base  = fill_price.quote.amount;
+                  mt.last_day_quote = fill_price.base.amount;
+                  mt.base_volume    -= trade_price.quote.amount.value;  // ignore underflow
+                  mt.quote_volume   -= trade_price.base.amount.value;   // ignore underflow
                });
             }
          }
