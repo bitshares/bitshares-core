@@ -145,7 +145,8 @@ int main(int argc, char** argv) {
          return 1;
       }
 
-      if( !plugins.count("api_helper_indexes") && !options.count("ignore-api-helper-indexes-warning") )
+      if( !plugins.count("api_helper_indexes") && !options.count("ignore-api-helper-indexes-warning")
+          && ( options.count("rpc-endpoint") || options.count("rpc-tls-endpoint") ) )
       {
          std::cerr << "\nIf this is an API node, please enable api_helper_indexes plugin."
                       "\nIf this is not an API node, please start with \"--ignore-api-helper-indexes-warning\""
