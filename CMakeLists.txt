@@ -13,6 +13,15 @@ set( CMAKE_CXX_STANDARD 14 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
 set( CMAKE_CXX_EXTENSIONS OFF )
 
+set( LOAD_TXID_PLUGIN 0)
+
+if(LOAD_TXID_PLUGIN)
+  add_definitions(-DQUERY_TXID_PLUGIN_ABLE)
+  set( QUERY_TXID graphene_query_txid)
+else()
+    MESSAGE("the query_txid plugin is off")
+endif()
+
 # http://stackoverflow.com/a/18369825
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8)

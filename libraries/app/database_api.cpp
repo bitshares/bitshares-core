@@ -38,12 +38,13 @@
 #include <boost/rational.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 
-#include <graphene/query_txid/query_txid_plugin.hpp>
-
 #include <cctype>
 
 #include <cfenv>
 #include <iostream>
+#ifdef QUERY_TXID_PLUGIN_ABLE
+#include <graphene/query_txid/query_txid_plugin.hpp>
+#endif
 
 #define GET_REQUIRED_FEES_MAX_RECURSION 4
 
@@ -662,6 +663,7 @@ processed_transaction database_api_impl::get_transaction(uint32_t block_num, uin
 
 optional<processed_transaction> database_api_impl::get_transaction_by_txid(transaction_id_type txid)const
 {
+   #ifdef QUERY_TXID_PLUGIN_ABLE //newchange
     auto &txid_index = _db.get_index_type<trx_entry_index>().indices().get<by_txid>();
     auto itor = txid_index.find(txid);
     if (itor == txid_index.end()) {
@@ -689,6 +691,7 @@ optional<processed_transaction> database_api_impl::get_transaction_by_txid(trans
             return {};
         }
     }
+#endif
     return {};
 }
 //////////////////////////////////////////////////////////////////////

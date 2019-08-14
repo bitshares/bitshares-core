@@ -34,7 +34,6 @@
 #include <graphene/es_objects/es_objects.hpp>
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 
-#include <graphene/query_txid/query_txid_plugin.hpp>
 
 #include <fc/thread/thread.hpp>
 #include <fc/interprocess/signals.hpp>
@@ -47,6 +46,9 @@
 #include <graphene/utilities/git_revision.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <websocketpp/version.hpp>
+#ifdef QUERY_TXID_PLUGIN_ABLE
+#include <graphene/query_txid/query_txid_plugin.hpp>
+#endif
 
 #include <iostream>
 
@@ -92,7 +94,9 @@ int main(int argc, char** argv) {
       auto snapshot_plug = node->register_plugin<snapshot_plugin::snapshot_plugin>();
       auto es_objects_plug = node->register_plugin<es_objects::es_objects_plugin>();
       auto grouped_orders_plug = node->register_plugin<grouped_orders::grouped_orders_plugin>();
-      auto query_txid_plug = node->register_plugin<query_txid::query_txid_plugin>();
+      #ifdef QUERY_TXID_PLUGIN_ABLE
+      auto querytxid_plug = node->register_plugin<query_txid::query_txid_plugin>();
+      #endif
       // add plugin options to config
       try
       {
