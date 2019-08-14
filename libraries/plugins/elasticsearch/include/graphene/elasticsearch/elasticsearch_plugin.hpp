@@ -26,6 +26,7 @@
 #include <graphene/app/plugin.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/operation_history_object.hpp>
+#include <graphene/utilities/elasticsearch.hpp>
 
 namespace graphene { namespace elasticsearch {
    using namespace chain;
@@ -49,6 +50,8 @@ namespace detail
     class elasticsearch_plugin_impl;
 }
 
+enum mode { only_save = 0 , only_query = 1, all = 2 };
+
 class elasticsearch_plugin : public graphene::app::plugin
 {
    public:
@@ -63,9 +66,19 @@ class elasticsearch_plugin : public graphene::app::plugin
       virtual void plugin_initialize(const boost::program_options::variables_map& options) override;
       virtual void plugin_startup() override;
 
+      operation_history_object get_operation_by_id(operation_history_id_type id);
+      vector<operation_history_object> get_account_history(const account_id_type account_id,
+            operation_history_id_type stop, unsigned limit, operation_history_id_type start);
+      mode get_running_mode();
+
       friend class detail::elasticsearch_plugin_impl;
       std::unique_ptr<detail::elasticsearch_plugin_impl> my;
+
+   private:
+      operation_history_object fromEStoOperation(variant source);
+      graphene::utilities::ES prepareHistoryQuery(string query);
 };
+
 
 struct operation_visitor
 {
@@ -293,6 +306,7 @@ struct adaptor_struct {
 
 } } //graphene::elasticsearch
 
+FC_REFLECT_ENUM( graphene::elasticsearch::mode, (only_save)(only_query)(all) )
 FC_REFLECT( graphene::elasticsearch::operation_history_struct, (trx_in_block)(op_in_trx)(operation_result)(virtual_op)(op)(op_object) )
 FC_REFLECT( graphene::elasticsearch::block_struct, (block_num)(block_time)(trx_id) )
 FC_REFLECT( graphene::elasticsearch::fee_struct, (asset)(asset_name)(amount)(amount_units) )

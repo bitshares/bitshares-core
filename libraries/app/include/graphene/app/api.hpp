@@ -32,6 +32,8 @@
 
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 
+#include <graphene/elasticsearch/elasticsearch_plugin.hpp>
+
 #include <graphene/debug_witness/debug_api.hpp>
 
 #include <graphene/net/node.hpp>
