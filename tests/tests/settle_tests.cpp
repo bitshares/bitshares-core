@@ -1538,7 +1538,7 @@ BOOST_AUTO_TEST_CASE( global_settle_ticker_test )
 
       {
          BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
-         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 2 );
          BOOST_CHECK_EQUAL( history_idx.size(), 1 );
 
          const auto& meta = *meta_idx.begin();
@@ -1558,7 +1558,7 @@ BOOST_AUTO_TEST_CASE( global_settle_ticker_test )
       // nothing changes
       {
          BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
-         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 2 );
          BOOST_CHECK_EQUAL( history_idx.size(), 1 );
 
          const auto& meta = *meta_idx.begin();
@@ -1578,7 +1578,7 @@ BOOST_AUTO_TEST_CASE( global_settle_ticker_test )
       // the history is rolled out, new 24h volume should be 0
       {
          BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
-         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 2 );
          BOOST_CHECK_EQUAL( history_idx.size(), 1 );
 
          const auto& meta = *meta_idx.begin();
@@ -1598,7 +1598,7 @@ BOOST_AUTO_TEST_CASE( global_settle_ticker_test )
       // nothing changes
       {
          BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
-         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 2 );
          BOOST_CHECK_EQUAL( history_idx.size(), 1 );
 
          const auto& meta = *meta_idx.begin();

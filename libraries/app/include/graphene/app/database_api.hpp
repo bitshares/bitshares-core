@@ -564,9 +564,12 @@ class database_api
        * @brief Returns vector of tickers sorted by reverse base_volume
        * Note: this API is experimental and subject to change in next releases
        * @param limit Max number of results
+       * @param base symbol name or ID of the base asset, optional,
+       *             if specified and is not empty, will only return tickers of the specified base asset,
+       *             otherwise will return tickers of all assets
        * @return Desc Sorted ticker vector
        */
-      vector<market_ticker> get_top_markets(uint32_t limit)const;
+      vector<market_ticker> get_top_markets( uint32_t limit, const optional<string>& base = {} )const;
 
       /**
        * @brief Returns recent trades for the market base:quote, ordered by time, most recent first.

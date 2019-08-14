@@ -126,7 +126,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       market_volume                      get_24_volume( const string& base, const string& quote )const;
       order_book                         get_order_book( const string& base, const string& quote,
                                                          unsigned limit = 50 )const;
-      vector<market_ticker>              get_top_markets( uint32_t limit )const;
+      vector<market_ticker>              get_top_markets( uint32_t limit, const optional<string>& base )const;
       vector<market_trade>               get_trade_history( const string& base, const string& quote,
                                                             fc::time_point_sec start, fc::time_point_sec stop,
                                                             unsigned limit = 100 )const;
@@ -234,6 +234,10 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       // helper function
       vector<limit_order_object> get_limit_orders( const asset_id_type a, const asset_id_type b,
                                                    const uint32_t limit )const;
+
+      // helper function for fewer DB queries
+      order_book                 get_order_book( const asset_object& base, const asset_object& quote,
+                                                 unsigned limit = 50 )const;
 
       ////////////////////////////////////////////////
       // Subscription

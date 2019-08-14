@@ -937,7 +937,9 @@ vector<optional<extended_asset_object>> database_api_impl::lookup_asset_symbols(
    result.reserve(symbols_or_ids.size());
    std::transform(symbols_or_ids.begin(), symbols_or_ids.end(), std::back_inserter(result),
                   [this, &assets_by_symbol](const string& symbol_or_id) -> optional<extended_asset_object> {
-      if( !symbol_or_id.empty() && std::isdigit(symbol_or_id[0]) )
+      if( symbol_or_id.empty() )
+         return optional<extended_asset_object>();
+      if( std::isdigit(symbol_or_id[0]) )
       {
          auto ptr = _db.find(variant(symbol_or_id, 1).as<asset_id_type>(1));
          return ptr == nullptr? optional<extended_asset_object>() : extend_asset( *ptr );
@@ -991,12 +993,14 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders(
    if (account == nullptr)
       return results;
 
-   auto assets = lookup_asset_symbols( {base, quote} );
-   FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
-   FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
+   const asset_object* base_ptr = get_asset_from_string( base, false );
+   FC_ASSERT( base_ptr, "Invalid base asset: ${s}", ("s",base) );
 
-   auto base_id = assets[0]->id;
-   auto quote_id = assets[1]->id;
+   const asset_object* quote_ptr = get_asset_from_string( quote, false );
+   FC_ASSERT( quote_ptr, "Invalid quote asset: ${s}", ("s",quote) );
+
+   asset_id_type base_id = base_ptr->id;
+   asset_id_type quote_id = quote_ptr->id;
 
    if (ostart_price.valid()) {
       FC_ASSERT(ostart_price->base.asset_id == base_id, "Base asset inconsistent with start price");
@@ -1262,28 +1266,29 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-   const auto assets = lookup_asset_symbols( {base, quote} );
+   const asset_object* base_ptr = get_asset_from_string( base, false );
+   FC_ASSERT( base_ptr, "Invalid base asset: ${s}", ("s",base) );
 
-   FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
-   FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
+   const asset_object* quote_ptr = get_asset_from_string( quote, false );
+   FC_ASSERT( quote_ptr, "Invalid quote asset: ${s}", ("s",quote) );
 
-   auto base_id = assets[0]->id;
-   auto quote_id = assets[1]->id;
+   asset_id_type base_id = base_ptr->id;
+   asset_id_type quote_id = quote_ptr->id;
    if( base_id > quote_id ) std::swap( base_id, quote_id );
    const auto& ticker_idx = _db.get_index_type<market_ticker_index>().indices().get<by_market>();
    auto itr = ticker_idx.find( std::make_tuple( base_id, quote_id ) );
    const fc::time_point_sec now = _db.head_block_time();
    if( itr != ticker_idx.end() )
    {
-      order_book orders;
+      optional<order_book> orders;
       if (!skip_order_book)
       {
-         orders = get_order_book(assets[0]->symbol, assets[1]->symbol, 1);
+         orders = get_order_book( *base_ptr, *quote_ptr, 1 );
       }
-      return market_ticker(*itr, now, *assets[0], *assets[1], orders);
+      return market_ticker(*itr, now, *base_ptr, *quote_ptr, orders);
    }
    // if no ticker is found for this market we return an empty ticker
-   market_ticker empty_result(now, *assets[0], *assets[1]);
+   market_ticker empty_result(now, *base_ptr, *quote_ptr);
    return empty_result;
 }
 
@@ -1316,72 +1321,73 @@ order_book database_api_impl::get_order_book( const string& base, const string& 
    uint64_t api_limit_get_order_book=_app_options->api_limit_get_order_book;
    FC_ASSERT( limit <= api_limit_get_order_book );
 
-   order_book result;
+   const asset_object* base_ptr = get_asset_from_string( base, false );
+   FC_ASSERT( base_ptr, "Invalid base asset: ${s}", ("s",base) );
+
+   const asset_object* quote_ptr = get_asset_from_string( quote, false );
+   FC_ASSERT( quote_ptr, "Invalid quote asset: ${s}", ("s",quote) );
+
+   order_book result = get_order_book( *base_ptr, *quote_ptr, limit );
    result.base = base;
    result.quote = quote;
-
-   auto assets = lookup_asset_symbols( {base, quote} );
-   FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
-   FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
-
-   auto base_id = assets[0]->id;
-   auto quote_id = assets[1]->id;
-   auto orders = get_limit_orders( base_id, quote_id, limit );
-
-   for( const auto& o : orders )
-   {
-      if( o.sell_price.base.asset_id == base_id )
-      {
-         order ord;
-         ord.price = price_to_string( o.sell_price, *assets[0], *assets[1] );
-         ord.quote = assets[1]->amount_to_string( share_type( fc::uint128_t( o.for_sale.value )
-                                                              * o.sell_price.quote.amount.value
-                                                              / o.sell_price.base.amount.value ) );
-         ord.base = assets[0]->amount_to_string( o.for_sale );
-         result.bids.push_back( ord );
-      }
-      else
-      {
-         order ord;
-         ord.price = price_to_string( o.sell_price, *assets[0], *assets[1] );
-         ord.quote = assets[1]->amount_to_string( o.for_sale );
-         ord.base = assets[0]->amount_to_string( share_type( fc::uint128_t( o.for_sale.value )
-                                                             * o.sell_price.quote.amount.value
-                                                             / o.sell_price.base.amount.value ) );
-         result.asks.push_back( ord );
-      }
-   }
 
    return result;
 }
 
-vector<market_ticker> database_api::get_top_markets(uint32_t limit)const
+vector<market_ticker> database_api::get_top_markets( uint32_t limit, const optional<string>& base )const
 {
-   return my->get_top_markets(limit);
+   return my->get_top_markets( limit, base );
 }
 
-vector<market_ticker> database_api_impl::get_top_markets(uint32_t limit)const
+vector<market_ticker> database_api_impl::get_top_markets( uint32_t limit, const optional<string>& base )const
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
    FC_ASSERT( limit <= 100 );
 
-   const auto& volume_idx = _db.get_index_type<market_ticker_index>().indices().get<by_volume>();
-   auto itr = volume_idx.rbegin();
    vector<market_ticker> result;
+
+   if( limit == 0 ) // shortcut to save a DB query
+      return result;
+
    result.reserve(limit);
    const fc::time_point_sec now = _db.head_block_time();
 
-   while( itr != volume_idx.rend() && result.size() < limit)
+   if( !base.valid() || *base == "" )
    {
-      const asset_object base = itr->base(_db);
-      const asset_object quote = itr->quote(_db);
-      order_book orders;
-      orders = get_order_book(base.symbol, quote.symbol, 1);
+      std::set<std::pair<asset_id_type, asset_id_type>> inserted;
+      const auto& volume_idx = _db.get_index_type<market_ticker_index>().indices().get<by_volume>();
+      for( auto itr = volume_idx.begin(); limit > 0 && itr != volume_idx.end(); ++itr )
+      {
+         const auto& tick = *itr;
+         // skip if the flipped market is already in the result
+         if( inserted.find( std::make_pair( tick.quote, tick.base ) ) != inserted.end() )
+            continue;
+         inserted.insert( std::make_pair( tick.base, tick.quote ) );
 
-      result.emplace_back(market_ticker(*itr, now, base, quote, orders));
-      ++itr;
+         const asset_object& base_obj = tick.base(_db);
+         const asset_object& quote_obj = tick.quote(_db);
+         order_book orders = get_order_book( base_obj, quote_obj, 1 );
+         result.emplace_back( tick, now, base_obj, quote_obj, orders );
+         --limit;
+      }
    }
+   else // specified base asset
+   {
+      const asset_object& base_obj = *get_asset_from_string( *base );
+
+      const auto& asset_volume_idx = _db.get_index_type<market_ticker_index>().indices().get<by_asset_volume>();
+      auto range = asset_volume_idx.equal_range( base_obj.id );
+
+      for( auto itr = range.first; limit > 0 && itr != range.second; ++itr, --limit )
+      {
+         const auto& tick = *itr;
+         const asset_object& quote_obj = tick.quote(_db);
+         order_book orders = get_order_book( base_obj, quote_obj, 1 );
+         result.emplace_back( tick, now, base_obj, quote_obj, orders );
+      }
+   }
+
    return result;
 }
 
@@ -1404,12 +1410,14 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
 
    FC_ASSERT( limit <= 100 );
 
-   auto assets = lookup_asset_symbols( {base, quote} );
-   FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
-   FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
+   const asset_object* base_ptr = get_asset_from_string( base, false );
+   FC_ASSERT( base_ptr, "Invalid base asset: ${s}", ("s",base) );
 
-   auto base_id = assets[0]->id;
-   auto quote_id = assets[1]->id;
+   const asset_object* quote_ptr = get_asset_from_string( quote, false );
+   FC_ASSERT( quote_ptr, "Invalid quote asset: ${s}", ("s",quote) );
+
+   asset_id_type base_id = base_ptr->id;
+   asset_id_type quote_id = quote_ptr->id;
 
    if( base_id > quote_id ) std::swap( base_id, quote_id );
 
@@ -1427,19 +1435,19 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
       {
          market_trade trade;
 
-         if( assets[0]->id == itr->op.receives.asset_id )
+         if( base_id == itr->op.receives.asset_id )
          {
-            trade.amount = assets[1]->amount_to_string( itr->op.pays );
-            trade.value = assets[0]->amount_to_string( itr->op.receives );
+            trade.amount = quote_ptr->amount_to_string( itr->op.pays );
+            trade.value = base_ptr->amount_to_string( itr->op.receives );
          }
          else
          {
-            trade.amount = assets[1]->amount_to_string( itr->op.receives );
-            trade.value = assets[0]->amount_to_string( itr->op.pays );
+            trade.amount = quote_ptr->amount_to_string( itr->op.receives );
+            trade.value = base_ptr->amount_to_string( itr->op.pays );
          }
 
          trade.date = itr->time;
-         trade.price = price_to_string( itr->op.fill_price, *assets[0], *assets[1] );
+         trade.price = price_to_string( itr->op.fill_price, *base_ptr, *quote_ptr );
 
          if( itr->op.is_maker )
          {
@@ -1498,12 +1506,14 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
    FC_ASSERT( start >= 0 );
    int64_t start_seq = -start;
 
-   auto assets = lookup_asset_symbols( {base, quote} );
-   FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
-   FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
+   const asset_object* base_ptr = get_asset_from_string( base, false );
+   FC_ASSERT( base_ptr, "Invalid base asset: ${s}", ("s",base) );
 
-   auto base_id = assets[0]->id;
-   auto quote_id = assets[1]->id;
+   const asset_object* quote_ptr = get_asset_from_string( quote, false );
+   FC_ASSERT( quote_ptr, "Invalid quote asset: ${s}", ("s",quote) );
+
+   asset_id_type base_id = base_ptr->id;
+   asset_id_type quote_id = quote_ptr->id;
 
    if( base_id > quote_id ) std::swap( base_id, quote_id );
    const auto& history_idx = _db.get_index_type<graphene::market_history::history_index>().indices().get<by_key>();
@@ -1533,19 +1543,19 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
       {
          market_trade trade;
 
-         if( assets[0]->id == itr->op.receives.asset_id )
+         if( base_id == itr->op.receives.asset_id )
          {
-            trade.amount = assets[1]->amount_to_string( itr->op.pays );
-            trade.value = assets[0]->amount_to_string( itr->op.receives );
+            trade.amount = quote_ptr->amount_to_string( itr->op.pays );
+            trade.value = base_ptr->amount_to_string( itr->op.receives );
          }
          else
          {
-            trade.amount = assets[1]->amount_to_string( itr->op.receives );
-            trade.value = assets[0]->amount_to_string( itr->op.pays );
+            trade.amount = quote_ptr->amount_to_string( itr->op.receives );
+            trade.value = base_ptr->amount_to_string( itr->op.pays );
          }
 
          trade.date = itr->time;
-         trade.price = price_to_string( itr->op.fill_price, *assets[0], *assets[1] );
+         trade.price = price_to_string( itr->op.fill_price, *base_ptr, *quote_ptr );
 
          if( itr->op.is_maker )
          {
@@ -2409,9 +2419,6 @@ vector<optional<extended_asset_object>> database_api_impl::get_assets( const vec
 vector<limit_order_object> database_api_impl::get_limit_orders( const asset_id_type a, const asset_id_type b,
                                                                 const uint32_t limit )const
 {
-   uint64_t api_limit_get_limit_orders=_app_options->api_limit_get_limit_orders;
-   FC_ASSERT( limit <= api_limit_get_limit_orders );
-
    const auto& limit_order_idx = _db.get_index_type<limit_order_index>();
    const auto& limit_price_idx = limit_order_idx.indices().get<by_price>();
 
@@ -2433,6 +2440,58 @@ vector<limit_order_object> database_api_impl::get_limit_orders( const asset_id_t
    while(limit_itr != limit_end && count < limit)
    {
       result.push_back(*limit_itr);
+      ++limit_itr;
+      ++count;
+   }
+
+   return result;
+}
+
+// helper function for fewer DB queries
+order_book database_api_impl::get_order_book( const asset_object& base, const asset_object& quote,
+                                              unsigned limit )const
+{
+   order_book result;
+
+   asset_id_type base_id = base.id;
+   asset_id_type quote_id = quote.id;
+
+   const auto& limit_price_idx = _db.get_index_type<limit_order_index>().indices().get<by_price>();
+
+   uint32_t count = 0;
+   auto limit_itr = limit_price_idx.lower_bound( price::max( base_id, quote_id ) );
+   auto limit_end = limit_price_idx.upper_bound( price::min( base_id, quote_id ) );
+   while( limit_itr != limit_end && count < limit )
+   {
+      const auto& o = *limit_itr;
+
+      order ord;
+      ord.price = price_to_string( o.sell_price, base, quote );
+      ord.quote = quote.amount_to_string( share_type( fc::uint128_t( o.for_sale.value )
+                                                      * o.sell_price.quote.amount.value
+                                                      / o.sell_price.base.amount.value ) );
+      ord.base = base.amount_to_string( o.for_sale );
+      result.bids.push_back( std::move(ord) );
+
+      ++limit_itr;
+      ++count;
+   }
+
+   count = 0;
+   limit_itr = limit_price_idx.lower_bound( price::max( quote_id, base_id ) );
+   limit_end = limit_price_idx.upper_bound( price::min( quote_id, base_id ) );
+   while( limit_itr != limit_end && count < limit )
+   {
+      const auto& o = *limit_itr;
+
+      order ord;
+      ord.price = price_to_string( o.sell_price, base, quote );
+      ord.quote = quote.amount_to_string( o.for_sale );
+      ord.base = base.amount_to_string( share_type( fc::uint128_t( o.for_sale.value )
+                                                    * o.sell_price.quote.amount.value
+                                                    / o.sell_price.base.amount.value ) );
+      result.asks.push_back( std::move(ord) );
+
       ++limit_itr;
       ++count;
    }
