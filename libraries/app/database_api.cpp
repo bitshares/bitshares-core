@@ -444,7 +444,6 @@ database_api_impl::database_api_impl( graphene::chain::database& db, const appli
    }
    catch( fc::assert_exception& e )
    {
-      wlog( "amount_in_collateral_index not found - please enable api_helper_indexes plugin!" );
       amount_in_collateral_index = nullptr;
    }
 }
