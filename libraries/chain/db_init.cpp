@@ -191,7 +191,6 @@ void database::initialize_indexes()
 
    auto acnt_index = add_index< primary_index<account_index, 20> >(); // ~1 million accounts per chunk
    acnt_index->add_secondary_index<account_member_index>();
-   acnt_index->add_secondary_index<account_referrer_index>();
 
    add_index< primary_index<committee_member_index, 8> >(); // 256 members per chunk
    add_index< primary_index<witness_index, 10> >(); // 1024 witnesses per chunk
