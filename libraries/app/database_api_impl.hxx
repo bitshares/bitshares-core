@@ -25,10 +25,6 @@
 #include <graphene/app/database_api.hpp>
 
 #include <fc/bloom_filter.hpp>
-#include <fc/rpc/api_connection.hpp>
-
-#include <cctype>
-#include <cfenv>
 
 #define GET_REQUIRED_FEES_MAX_RECURSION 4
 

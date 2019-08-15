@@ -24,19 +24,17 @@
 
 #include "database_api_impl.hxx"
 
-#include <graphene/app/database_api.hpp>
 #include <graphene/app/util.hpp>
 #include <graphene/chain/get_config.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/protocol/pts_address.hpp>
 
 #include <fc/crypto/hex.hpp>
+#include <fc/rpc/api_connection.hpp>
 
 #include <boost/range/iterator_range.hpp>
 
 #include <cctype>
-#include <cfenv>
-#include <iostream>
 
 template class fc::api<graphene::app::database_api>;
 
