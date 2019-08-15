@@ -28,9 +28,11 @@
 #include <graphene/chain/hardfork.hpp>
 
 #include <fc/crypto/digest.hpp>
-
 #include <fc/crypto/hex.hpp>
+
 #include "../common/database_fixture.hpp"
+
+#include <random>
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
