@@ -194,10 +194,7 @@ void database::initialize_indexes()
    add_index< primary_index<witness_index, 10> >(); // 1024 witnesses per chunk
    add_index< primary_index<limit_order_index > >();
    add_index< primary_index<call_order_index > >();
-
-   auto prop_index = add_index< primary_index<proposal_index > >();
-   prop_index->add_secondary_index<required_approval_index>();
-
+   add_index< primary_index<proposal_index > >();
    add_index< primary_index<withdraw_permission_index > >();
    add_index< primary_index<vesting_balance_index> >();
    add_index< primary_index<worker_index> >();

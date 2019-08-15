@@ -325,7 +325,9 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       esobjects_plugin->plugin_initialize(options);
       esobjects_plugin->plugin_startup();
    }
-   else if( current_test_name == "asset_in_collateral" || current_suite_name == "database_api_tests" )
+   else if( current_test_name == "asset_in_collateral"
+            || current_test_name == "htlc_database_api"
+            || current_suite_name == "database_api_tests" )
    {
       auto ahiplugin = app.register_plugin<graphene::api_helper_indexes::api_helper_indexes>();
       ahiplugin->plugin_set_app(&app);

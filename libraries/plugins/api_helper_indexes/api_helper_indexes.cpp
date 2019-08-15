@@ -24,6 +24,7 @@
 
 #include <graphene/api_helper_indexes/api_helper_indexes.hpp>
 #include <graphene/chain/market_object.hpp>
+#include <graphene/chain/proposal_object.hpp>
 
 namespace graphene { namespace api_helper_indexes {
 
@@ -153,6 +154,10 @@ void api_helper_indexes::plugin_startup()
    auto& account_members = *database().add_secondary_index< primary_index<account_index>, account_member_index >();
    for( const auto& account : database().get_index_type< account_index >().indices() )
       account_members.object_inserted( account );
+
+   auto& approvals = *database().add_secondary_index< primary_index<proposal_index>, required_approval_index >();
+   for( const auto& proposal : database().get_index_type< proposal_index >().indices() )
+      approvals.object_inserted( proposal );
 }
 
 } }
