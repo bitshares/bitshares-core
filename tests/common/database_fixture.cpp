@@ -125,8 +125,10 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    /**
     * Test specific settings
     */
-   auto current_test_name = boost::unit_test::framework::current_test_case().p_name.value;
-   auto current_test_suite_id = boost::unit_test::framework::current_test_case().p_parent_id;
+   const auto current_test_name = boost::unit_test::framework::current_test_case().p_name.value;
+   const auto current_test_suite_id = boost::unit_test::framework::current_test_case().p_parent_id;
+   const auto current_suite_name = boost::unit_test::framework::get<boost::unit_test::test_suite>(current_test_suite_id)
+                                        .p_name.value;
    if (current_test_name == "get_account_history_operations")
    {
       options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)75, false)));
@@ -292,7 +294,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       esplugin->plugin_initialize(options);
       esplugin->plugin_startup();
    }
-   else if( boost::unit_test::framework::get<boost::unit_test::test_suite>(current_test_suite_id).p_name.value != "performance_tests" )
+   else if( current_suite_name != "performance_tests" )
    {
       auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
       ahplugin->plugin_set_app(&app);
@@ -323,7 +325,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       esobjects_plugin->plugin_initialize(options);
       esobjects_plugin->plugin_startup();
    }
-   else if( current_test_name == "asset_in_collateral" )
+   else if( current_test_name == "asset_in_collateral" || current_suite_name == "database_api_tests" )
    {
       auto ahiplugin = app.register_plugin<graphene::api_helper_indexes::api_helper_indexes>();
       ahiplugin->plugin_set_app(&app);
@@ -431,7 +433,7 @@ string database_fixture::generate_anon_acct_name()
    //    to workaround issue #46
    return "anon-acct-x" + std::to_string( anon_acct_count++ );
 }
-bool database_fixture::validation_current_test_name_for_setting_api_limit(string & current_test_name) const
+bool database_fixture::validation_current_test_name_for_setting_api_limit( const string& current_test_name ) const
 {
    vector <string> valid_testcase {"api_limit_get_account_history_operations","api_limit_get_account_history"
       ,"api_limit_get_grouped_limit_orders","api_limit_get_relative_account_history"

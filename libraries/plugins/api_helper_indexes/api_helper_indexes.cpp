@@ -149,6 +149,10 @@ void api_helper_indexes::plugin_startup()
    amount_in_collateral = database().add_secondary_index< primary_index<call_order_index>, amount_in_collateral_index >();
    for( const auto& call : database().get_index_type<call_order_index>().indices() )
       amount_in_collateral->object_inserted( call );
+
+   auto& account_members = *database().add_secondary_index< primary_index<account_index>, account_member_index >();
+   for( const auto& account : database().get_index_type< account_index >().indices() )
+      account_members.object_inserted( account );
 }
 
 } }
