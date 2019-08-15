@@ -30,7 +30,7 @@ namespace protocol {
    struct price;
 }
 namespace chain {
-   struct asset_object;
+   class asset_object;
 }
 
 namespace app {
