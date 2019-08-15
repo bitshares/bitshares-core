@@ -386,12 +386,31 @@ class database_api
                                                           optional<bool> subscribe = optional<bool>() )const;
 
       /**
-       * @brief Get assets alphabetically by symbol name
+       * @brief Get general info of a list of assets by symbol names or IDs
+       * @param asset_symbols_or_ids symbol names or IDs of the assets to retrieve
+       * @return General info of the assets corresponding to the provided symbol names or IDs
+       */
+      vector<optional<general_asset_info>> get_assets_general_info(
+                                              const vector<std::string>& asset_symbols_or_ids ) const;
+
+      /**
+       * @brief Get assets alphabetically ordered by symbol name
        * @param lower_bound_symbol Lower bound of symbol names to retrieve
-       * @param limit Maximum number of assets to fetch (must not exceed 101)
+       * @param limit Maximum number of assets to fetch
        * @return The assets found
        */
       vector<extended_asset_object> list_assets(const string& lower_bound_symbol, uint32_t limit)const;
+
+      /**
+       * @brief Get general info of assets alphabetically ordered by symbol name
+       * @param lower_bound_symbol Lower bound of symbol names to retrieve, optional, empty string if omitted
+       * @param limit Maximum number of assets to fetch, optional, @a 100 if omitted
+       * @param type type of assets to fetch, optional, @a ALL if omitted
+       * @return General info of the assets found
+       */
+      vector<general_asset_info> list_assets_general_info( optional<string> lower_bound_symbol = {},
+                                                           optional<uint32_t> limit = {},
+                                                           optional<general_asset_info::asset_type> type = {} )const;
 
       /**
        * @brief Get a list of assets by symbol names or IDs
@@ -943,7 +962,9 @@ FC_API(graphene::app::database_api,
 
    // Assets
    (get_assets)
+   (get_assets_general_info)
    (list_assets)
+   (list_assets_general_info)
    (lookup_asset_symbols)
    (get_asset_count)
    (get_assets_by_issuer)

@@ -181,6 +181,9 @@ namespace graphene { namespace chain {
          /// The asset this object belong to
          asset_id_type asset_id;
 
+         /// The symbol of this asset
+         string symbol;
+
          /// The tunable options for BitAssets are stored in this field.
          bitasset_options options;
 
@@ -271,6 +274,8 @@ namespace graphene { namespace chain {
       }
    };
 
+   struct by_symbol;
+   struct by_type_symbol;
    struct by_short_backing_asset;
    struct by_feed_expiration;
    struct by_cer_update;
@@ -279,38 +284,55 @@ namespace graphene { namespace chain {
       asset_bitasset_data_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_unique< tag<by_symbol>,
+            member< asset_bitasset_data_object, string, &asset_bitasset_data_object::symbol >
+         >,
+         ordered_unique< tag<by_type_symbol>,
+            composite_key< asset_bitasset_data_object,
+               member< asset_bitasset_data_object, bool, &asset_bitasset_data_object::is_prediction_market >,
+               member< asset_bitasset_data_object, string, &asset_bitasset_data_object::symbol >
+            >
+         >,
          ordered_non_unique< tag<by_short_backing_asset>, bitasset_short_backing_asset_extractor >,
          ordered_unique< tag<by_feed_expiration>,
             composite_key< asset_bitasset_data_object,
-               const_mem_fun< asset_bitasset_data_object, time_point_sec, &asset_bitasset_data_object::feed_expiration_time >,
+               const_mem_fun< asset_bitasset_data_object,
+                              time_point_sec,
+                              &asset_bitasset_data_object::feed_expiration_time >,
                member< asset_bitasset_data_object, asset_id_type, &asset_bitasset_data_object::asset_id >
             >
          >,
          ordered_non_unique< tag<by_cer_update>,
-                             const_mem_fun< asset_bitasset_data_object, bool, &asset_bitasset_data_object::need_to_update_cer >
+            const_mem_fun< asset_bitasset_data_object, bool, &asset_bitasset_data_object::need_to_update_cer >
          >
       >
    > asset_bitasset_data_object_multi_index_type;
-   typedef generic_index<asset_bitasset_data_object, asset_bitasset_data_object_multi_index_type> asset_bitasset_data_index;
+   typedef generic_index<asset_bitasset_data_object,
+                         asset_bitasset_data_object_multi_index_type> asset_bitasset_data_index;
 
-   struct by_symbol;
    struct by_type;
    struct by_issuer;
    typedef multi_index_container<
       asset_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-         ordered_unique< tag<by_symbol>, member<asset_object, string, &asset_object::symbol> >,
+         ordered_unique< tag<by_symbol>, member<asset_object, string, &asset_object::symbol > >,
          ordered_unique< tag<by_type>,
             composite_key< asset_object,
-                const_mem_fun<asset_object, bool, &asset_object::is_market_issued>,
-                member< object, object_id_type, &object::id >
+               const_mem_fun< asset_object, bool, &asset_object::is_market_issued >,
+               member< object, object_id_type, &object::id >
+            >
+         >,
+         ordered_unique< tag<by_type_symbol>,
+            composite_key< asset_object,
+               const_mem_fun< asset_object, bool, &asset_object::is_market_issued >,
+               member< asset_object, string, &asset_object::symbol >
             >
          >,
          ordered_unique< tag<by_issuer>,
             composite_key< asset_object,
-                member< asset_object, account_id_type, &asset_object::issuer >,
-                member< object, object_id_type, &object::id >
+               member< asset_object, account_id_type, &asset_object::issuer >,
+               member< object, object_id_type, &object::id >
             >
          >
       >

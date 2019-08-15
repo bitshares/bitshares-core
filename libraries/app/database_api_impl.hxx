@@ -93,7 +93,13 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       asset_id_type get_asset_id_from_string(const std::string& symbol_or_id)const;
       vector<optional<extended_asset_object>> get_assets( const vector<std::string>& asset_symbols_or_ids,
                                                           optional<bool> subscribe )const;
+      vector<optional<general_asset_info>>    get_assets_general_info(
+                                                 const vector<std::string>& asset_symbols_or_ids ) const;
       vector<extended_asset_object>           list_assets(const string& lower_bound_symbol, uint32_t limit)const;
+      vector<general_asset_info>              list_assets_general_info(
+                                                 optional<string> lower_bound_symbol,
+                                                 optional<uint32_t> limit,
+                                                 optional<general_asset_info::asset_type> type )const;
       vector<optional<extended_asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
       vector<extended_asset_object>           get_assets_by_issuer(const std::string& issuer_name_or_id,
                                                                    asset_id_type start, uint32_t limit)const;
