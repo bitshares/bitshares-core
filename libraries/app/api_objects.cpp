@@ -31,7 +31,7 @@ market_ticker::market_ticker(const market_ticker_object& mto,
                              const fc::time_point_sec& now,
                              const asset_object& asset_base,
                              const asset_object& asset_quote,
-                             const order_book& orders)
+                             const optional<order_book>& orders)
 {
    time = now;
    base = asset_base.symbol;
@@ -67,10 +67,13 @@ market_ticker::market_ticker(const market_ticker_object& mto,
    base_volume = uint128_amount_to_string( bv, asset_base.precision );
    quote_volume = uint128_amount_to_string( qv, asset_quote.precision );
 
-   if(!orders.asks.empty())
-      lowest_ask = orders.asks[0].price;
-   if(!orders.bids.empty())
-      highest_bid = orders.bids[0].price;
+   if( orders.valid() )
+   {
+      if( !orders->asks.empty() )
+         lowest_ask = orders->asks[0].price;
+      if( !orders->bids.empty() )
+         highest_bid = orders->bids[0].price;
+   }
 }
 
 market_ticker::market_ticker(const fc::time_point_sec& now,
