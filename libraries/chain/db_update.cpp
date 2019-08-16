@@ -37,6 +37,8 @@
 
 #include <graphene/protocol/fee_schedule.hpp>
 
+#include <fc/uint128.hpp>
+
 namespace graphene { namespace chain {
 
 void database::update_global_dynamic_data( const signed_block& b, const uint32_t missed_blocks )
@@ -410,9 +412,9 @@ void database::clear_expired_orders()
          {
             auto& pays = order.balance;
             auto receives = (order.balance * mia.current_feed.settlement_price);
-            receives.amount = static_cast<uint64_t>( fc::uint128_t(receives.amount.value) *
+            receives.amount = ( fc::uint128_t(receives.amount.value) *
                                 (GRAPHENE_100_PERCENT - mia.options.force_settlement_offset_percent) /
-                                GRAPHENE_100_PERCENT );
+                                GRAPHENE_100_PERCENT ).to_uint64();
             assert(receives <= order.balance * mia.current_feed.settlement_price);
             settlement_price = pays / receives;
          }

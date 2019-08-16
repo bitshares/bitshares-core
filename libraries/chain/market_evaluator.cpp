@@ -34,6 +34,8 @@
 
 #include <graphene/protocol/market.hpp>
 
+#include <fc/uint128.hpp>
+
 namespace graphene { namespace chain {
 void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_operation& op)
 { try {
@@ -46,32 +48,19 @@ void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_o
    _receive_asset = &op.min_to_receive.asset_id(d);
 
    if( _sell_asset->options.whitelist_markets.size() )
-   {
-      GRAPHENE_ASSERT( _sell_asset->options.whitelist_markets.find(_receive_asset->id)
-                          != _sell_asset->options.whitelist_markets.end(),
-                       limit_order_create_market_not_whitelisted,
-                       "This market has not been whitelisted by the selling asset", );
-   }
+      FC_ASSERT( _sell_asset->options.whitelist_markets.find(_receive_asset->id) 
+            != _sell_asset->options.whitelist_markets.end(),
+            "This market has not been whitelisted." );
    if( _sell_asset->options.blacklist_markets.size() )
-   {
-      GRAPHENE_ASSERT( _sell_asset->options.blacklist_markets.find(_receive_asset->id)
-                          == _sell_asset->options.blacklist_markets.end(),
-                       limit_order_create_market_blacklisted,
-                       "This market has been blacklisted by the selling asset", );
-   }
+      FC_ASSERT( _sell_asset->options.blacklist_markets.find(_receive_asset->id) 
+            == _sell_asset->options.blacklist_markets.end(),
+            "This market has been blacklisted." );
 
-   GRAPHENE_ASSERT( is_authorized_asset( d, *_seller, *_sell_asset ),
-                    limit_order_create_selling_asset_unauthorized,
-                    "The account is not allowed to transact the selling asset", );
+   FC_ASSERT( is_authorized_asset( d, *_seller, *_sell_asset ) );
+   FC_ASSERT( is_authorized_asset( d, *_seller, *_receive_asset ) );
 
-   GRAPHENE_ASSERT( is_authorized_asset( d, *_seller, *_receive_asset ),
-                    limit_order_create_receiving_asset_unauthorized,
-                    "The account is not allowed to transact the receiving asset", );
-
-   GRAPHENE_ASSERT( d.get_balance( *_seller, *_sell_asset ) >= op.amount_to_sell,
-                    limit_order_create_insufficient_balance,
-                    "insufficient balance",
-                    ("balance",d.get_balance(*_seller,*_sell_asset))("amount_to_sell",op.amount_to_sell) );
+   FC_ASSERT( d.get_balance( *_seller, *_sell_asset ) >= op.amount_to_sell, "insufficient balance",
+              ("balance",d.get_balance(*_seller,*_sell_asset))("amount_to_sell",op.amount_to_sell) );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -130,10 +119,7 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
    else
       filled = db().apply_order( new_order_object );
 
-   GRAPHENE_ASSERT( !op.fill_or_kill || filled,
-                    limit_order_create_kill_unfilled,
-                    "Killing limit order ${op} due to unable to fill",
-                    ("op",op) );
+   FC_ASSERT( !op.fill_or_kill || filled );
 
    return order_id;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -142,17 +128,8 @@ void_result limit_order_cancel_evaluator::do_evaluate(const limit_order_cancel_o
 { try {
    database& d = db();
 
-   _order = d.find( o.order );
-
-   GRAPHENE_ASSERT( _order != nullptr,
-                    limit_order_cancel_nonexist_order,
-                    "Limit order ${oid} does not exist",
-                    ("oid", o.order) );
-
-   GRAPHENE_ASSERT( _order->seller == o.fee_paying_account,
-                    limit_order_cancel_owner_mismatch,
-                    "Limit order ${oid} is owned by someone else",
-                    ("oid", o.order) );
+   _order = &o.order(d);
+   FC_ASSERT( _order->seller == o.fee_paying_account );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

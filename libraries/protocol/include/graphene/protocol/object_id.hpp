@@ -168,7 +168,8 @@ template<uint8_t SpaceID, uint8_t TypeID>
 struct reflector<graphene::db::object_id<SpaceID,TypeID> >
 {
     typedef graphene::db::object_id<SpaceID,TypeID> type;
-    typedef std::true_type is_defined;
+    typedef fc::true_type  is_defined;
+    typedef fc::false_type is_enum;
     enum  member_count_enum {
       local_member_count = 1,
       total_member_count = 1

@@ -23,7 +23,6 @@
  */
 
 #include <fc/io/json.hpp>
-#include <fc/io/raw.hpp>
 #include <fc/variant.hpp>
 #include <fc/variant_object.hpp>
 

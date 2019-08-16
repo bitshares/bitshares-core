@@ -65,7 +65,8 @@ void database::reindex( fc::path data_dir )
    ilog( "reindexing blockchain" );
    auto start = fc::time_point::now();
    const auto last_block_num = last_block->block_num();
-   uint32_t undo_point = last_block_num < GRAPHENE_MAX_UNDO_HISTORY ? 0 : last_block_num - GRAPHENE_MAX_UNDO_HISTORY;
+   uint32_t flush_point = last_block_num < 10000 ? 0 : last_block_num - 10000;
+   uint32_t undo_point = last_block_num < 50 ? 0 : last_block_num - 50;
 
    ilog( "Replaying blocks, starting at ${next}...", ("next",head_block_num() + 1) );
    if( head_block_num() >= undo_point )
@@ -137,7 +138,7 @@ void database::reindex( fc::path data_dir )
                ("last", last_block_num)
             );
          }
-         if( i == undo_point )
+         if( i == flush_point )
          {
             ilog( "Writing database to disk at block ${i}", ("i",i) );
             flush();

@@ -3,9 +3,7 @@ file(GLOB HEADERS "include/graphene/es_objects/*.hpp")
 add_library( graphene_es_objects
         es_objects.cpp
            )
-
-find_curl()
-
+find_package(CURL REQUIRED)
 include_directories(${CURL_INCLUDE_DIRS})
 if(CURL_STATICLIB)
   SET_TARGET_PROPERTIES(graphene_es_objects PROPERTIES

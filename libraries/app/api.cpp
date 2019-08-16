@@ -36,7 +36,6 @@
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 
-#include <fc/crypto/base64.hpp>
 #include <fc/crypto/hex.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/thread/future.hpp>
@@ -181,7 +180,7 @@ namespace graphene { namespace app {
 
     fc::variant network_broadcast_api::broadcast_transaction_synchronous(const precomputable_transaction& trx)
     {
-       fc::promise<fc::variant>::ptr prom = fc::promise<fc::variant>::create();
+       fc::promise<fc::variant>::ptr prom( new fc::promise<fc::variant>() );
        broadcast_transaction_with_callback( [prom]( const fc::variant& v ){
         prom->set_value(v);
        }, trx );
@@ -340,18 +339,6 @@ namespace graphene { namespace app {
           if(start == operation_history_id_type() || start.instance.value > node.operation_id.instance.value)
              start = node.operation_id;
        } catch(...) { return result; }
-
-       if(_app.is_plugin_enabled("elasticsearch")) {
-          auto es = _app.get_plugin<elasticsearch::elasticsearch_plugin>("elasticsearch");
-          if(es.get()->get_running_mode() != elasticsearch::mode::only_save) {
-             if(!_app.elasticsearch_thread)
-                _app.elasticsearch_thread= std::make_shared<fc::thread>("elasticsearch");
-
-             return _app.elasticsearch_thread->async([&es, &account, &stop, &limit, &start]() {
-                return es->get_account_history(account, stop, limit, start);
-             }, "thread invoke for method " BOOST_PP_STRINGIZE(method_name)).wait();
-          }
-       }
 
        const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
        const auto& by_op_idx = hist_idx.indices().get<by_op>();

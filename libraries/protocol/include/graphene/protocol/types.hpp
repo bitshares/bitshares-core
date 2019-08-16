@@ -54,6 +54,7 @@
 
 #include <fc/io/datastream.hpp>
 #include <fc/io/raw_fwd.hpp>
+#include <fc/uint128.hpp>
 #include <fc/static_variant.hpp>
 
 #include <graphene/protocol/object_id.hpp>
@@ -76,7 +77,8 @@ namespace raw { \
 namespace fc { \
 template<> struct reflector<TYPE> {\
     typedef TYPE type; \
-    typedef std::true_type is_defined; \
+    typedef fc::true_type  is_defined; \
+    typedef fc::false_type is_enum; \
     enum  member_count_enum {  \
       local_member_count = 0  BOOST_PP_SEQ_FOR_EACH( FC_REFLECT_MEMBER_COUNT, +, MEMBERS ),\
       total_member_count = local_member_count BOOST_PP_SEQ_FOR_EACH( FC_REFLECT_BASE_MEMBER_COUNT, +, INHERITS )\

@@ -24,8 +24,6 @@
 
 #include <graphene/protocol/vote.hpp>
 
-#include <fc/io/raw.hpp>
-
 namespace fc
 {
 

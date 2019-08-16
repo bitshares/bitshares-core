@@ -23,13 +23,10 @@
  */
 #pragma once
 
-#include <array>
-#include <cstring>
-#include <string>
-
+#include <fc/array.hpp>
 #include <fc/io/datastream.hpp>
 #include <fc/io/raw_fwd.hpp>
-#include <fc/variant.hpp>
+#include <string>
 
 namespace fc { namespace ecc { class public_key; } }
 
@@ -49,7 +46,7 @@ namespace graphene { namespace protocol {
 
        operator std::string()const; ///< converts to base58 + checksum
 
-       std::array<char,25> addr; ///< binary representation of address
+       fc::array<char,25> addr; ///< binary representation of address
    };
 
    inline bool operator == ( const pts_address& a, const pts_address& b ) { return a.addr == b.addr; }
@@ -67,7 +64,7 @@ namespace std
          size_t operator()(const graphene::protocol::pts_address &a) const 
          {
             size_t s;
-            std::memcpy( (char*)&s, a.addr.data() + a.addr.size() - sizeof(s), sizeof(s) );
+            memcpy( (char*)&s, &a.addr.data[sizeof(a)-sizeof(s)], sizeof(s) );
             return s;
          }
    };

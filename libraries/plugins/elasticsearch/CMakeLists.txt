@@ -3,9 +3,7 @@ file(GLOB HEADERS "include/graphene/elasticsearch/*.hpp")
 add_library( graphene_elasticsearch
         elasticsearch_plugin.cpp
            )
-
-find_curl()
-
+find_package(CURL REQUIRED)
 include_directories(${CURL_INCLUDE_DIRS})
 if(MSVC)
   set_source_files_properties(elasticsearch_plugin.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )

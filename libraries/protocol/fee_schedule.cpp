@@ -25,7 +25,6 @@
 #include <graphene/protocol/fee_schedule.hpp>
 
 #include <fc/io/raw.hpp>
-#include <fc/uint128.hpp>
 
 #define MAX_FEE_STABILIZATION_ITERATION 4
 
@@ -123,11 +122,11 @@ namespace graphene { namespace protocol {
       uint64_t required_fee = op.visit( calc_fee_visitor( *this, op ) );
       if( scale != GRAPHENE_100_PERCENT )
       {
-         auto scaled = fc::uint128_t(required_fee) * scale;
+         auto scaled = fc::uint128(required_fee) * scale;
          scaled /= GRAPHENE_100_PERCENT;
          FC_ASSERT( scaled <= GRAPHENE_MAX_SHARE_SUPPLY,
                     "Required fee after scaling would exceed maximum possible supply" );
-         required_fee = static_cast<uint64_t>(scaled);
+         required_fee = scaled.to_uint64();
       }
       return asset( required_fee );
    }
