@@ -494,7 +494,8 @@ public:
         _remote_api(rapi),
         _remote_db(rapi->database()),
         _remote_net_broadcast(rapi->network_broadcast()),
-        _remote_hist(rapi->history())
+        _remote_hist(rapi->history()),
+        _custom_operations(rapi->custom())
    {
       chain_id_type remote_chain_id = _remote_db->get_chain_id();
       if( remote_chain_id != _chain_id )
@@ -1960,6 +1961,96 @@ public:
       } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(seconds_to_add)(broadcast) )
    }
 
+   signed_transaction set_contact_information(string account, account_contact_operation::ext data, bool broadcast)
+   {
+      try
+      {
+         FC_ASSERT( !self.is_locked() );
+
+         account_id_type account_id = get_account(account).id;
+
+         custom_operation op;
+         account_contact_operation contact;
+         contact.extensions.value = data;
+
+         auto packed = fc::raw::pack(contact);
+         packed.insert(packed.begin(), types::account_contact);
+         packed.insert(packed.begin(), 0xFF);
+
+         op.payer = account_id;
+         op.data = packed;
+
+         signed_transaction tx;
+         tx.operations.push_back(op);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+         tx.validate();
+
+         return sign_transaction(tx, broadcast);
+
+      } FC_CAPTURE_AND_RETHROW( (account)(data)(broadcast) )
+   }
+
+   signed_transaction create_htlc_offer(string account, create_htlc_order_operation::ext data, bool broadcast)
+   {
+      try
+      {
+         FC_ASSERT( !self.is_locked() );
+         FC_ASSERT(data.bitshares_amount.valid());
+         fc::optional<asset_object> asset_obj = get_asset(data.bitshares_amount->asset_id);
+         FC_ASSERT(asset_obj, "Could not find asset matching ${asset}", ("asset", data.bitshares_amount->asset_id));
+
+         account_id_type bitshares_account_id = get_account(account).id;
+
+         custom_operation op;
+         create_htlc_order_operation htlc;
+         htlc.extensions.value = data;
+
+         auto packed = fc::raw::pack(htlc);
+         packed.insert(packed.begin(), types::create_htlc);
+         packed.insert(packed.begin(), 0xFF);
+
+         op.payer = bitshares_account_id;
+         op.data = packed;
+
+         signed_transaction tx;
+         tx.operations.push_back(op);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+         tx.validate();
+
+         return sign_transaction(tx, broadcast);
+
+      } FC_CAPTURE_AND_RETHROW( (account)(data)(broadcast) )
+   }
+
+   signed_transaction take_htlc_offer(string account, take_htlc_order_operation::ext data, bool broadcast)
+   {
+      try
+      {
+         FC_ASSERT( !self.is_locked() );
+
+         account_id_type bitshares_account_id = get_account(account).id;
+
+         custom_operation op;
+         take_htlc_order_operation htlc;
+         htlc.extensions.value = data;
+
+         auto packed = fc::raw::pack(htlc);
+         packed.insert(packed.begin(), types::take_htlc);
+         packed.insert(packed.begin(), 0xFF);
+
+         op.payer = bitshares_account_id;
+         op.data = packed;
+
+         signed_transaction tx;
+         tx.operations.push_back(op);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+         tx.validate();
+
+         return sign_transaction(tx, broadcast);
+
+      } FC_CAPTURE_AND_RETHROW( (account)(data)(broadcast) )
+   }
+
    vector< vesting_balance_object_with_info > get_vesting_balances( string account_name )
    { try {
       fc::optional<vesting_balance_id_type> vbid = maybe_id<vesting_balance_id_type>( account_name );
@@ -3087,6 +3178,7 @@ public:
    fc::api<database_api>   _remote_db;
    fc::api<network_broadcast_api>   _remote_net_broadcast;
    fc::api<history_api>    _remote_hist;
+   fc::api<custom_operations_api>    _custom_operations;
    optional< fc::api<network_node_api> > _remote_net_node;
    optional< fc::api<graphene::debug_witness::debug_api> > _remote_debug;
 
@@ -5184,6 +5276,41 @@ vector<blind_receipt> wallet_api::blind_history( string key_or_account )
 order_book wallet_api::get_order_book( const string& base, const string& quote, unsigned limit )
 {
    return( my->_remote_db->get_order_book( base, quote, limit ) );
+}
+
+signed_transaction wallet_api::set_contact_information(string account, account_contact_operation::ext data,
+      bool broadcast)
+{
+   return my->set_contact_information(account, data, broadcast);
+}
+
+optional<account_contact_object> wallet_api::get_contact_information(string account)
+{
+   return my->_custom_operations->get_contact_info(account);
+}
+
+signed_transaction wallet_api::create_htlc_offer(string account, create_htlc_order_operation::ext data, bool broadcast)
+{
+   return my->create_htlc_offer(account, data, broadcast);
+}
+
+signed_transaction wallet_api::take_htlc_offer(string account, take_htlc_order_operation::ext data, bool broadcast)
+{
+   return my->take_htlc_offer(account, data, broadcast);
+}
+
+vector<htlc_order_object> wallet_api::get_active_htlc_offers(uint16_t blockchain)
+{
+   FC_ASSERT(blockchain <= blockchains::ethereum);
+
+   vector<htlc_order_object> results;
+   auto orders = my->_custom_operations->get_active_htlc_offers(htlc_order_id_type(0), 100);
+   for(const auto order : orders)
+   {
+      if(order.blockchain == static_cast<blockchains>(blockchain))
+         results.push_back(order);
+   }
+   return results;
 }
 
 signed_block_with_info::signed_block_with_info( const signed_block& block )

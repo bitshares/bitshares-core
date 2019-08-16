@@ -29,8 +29,8 @@
 #include <graphene/protocol/confidential.hpp>
 
 #include <graphene/market_history/market_history_plugin.hpp>
-
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
+#include <graphene/custom_operations/custom_operations_plugin.hpp>
 
 #include <graphene/elasticsearch/elasticsearch_plugin.hpp>
 
@@ -54,6 +54,8 @@ namespace graphene { namespace app {
    using namespace graphene::chain;
    using namespace graphene::market_history;
    using namespace graphene::grouped_orders;
+   using namespace graphene::custom_operations;
+
    using namespace fc::ecc;
    using std::string;
    using std::vector;
@@ -518,6 +520,61 @@ namespace graphene { namespace app {
          application& _app;
          graphene::app::database_api database_api;
    };
+
+   /**
+    * @brief The custom_operations_api class exposes access to standard custom objects parsed by the
+    * custom_operations_plugin.
+    */
+   class custom_operations_api
+   {
+      public:
+         custom_operations_api(application& app):_app(app), database_api( std::ref(*app.chain_database()),
+               &(app.get_options()) ){}
+
+         /**
+          * @breif Get contact information of an account
+          *
+          * @param account Account name to get info from
+          *
+          * @return The contact information of the account or empty
+          */
+         optional<account_contact_object> get_contact_info(std::string account)const;
+
+         /**
+          * @breif Get htlc offers from an account
+          *
+          * @param account Account name to get htlc offers from
+          * @param start ID of the most recent htlc offer to retrieve
+          * @param limit Maximum number of order objects to retrieve
+          *
+          * @return A vector of htlc offer objects from the account
+          */
+         vector<htlc_order_object> get_account_htlc_offers(std::string account, htlc_order_id_type start,
+               uint32_t limit)const;
+
+         /**
+          * @breif Get all active and non expired htlc offers
+          *
+          * @param start ID of the most recent htlc offer to retrieve
+          * @param limit Maximum number of order objects to retrieve
+          *
+          * @return A vector of active and non expired htlc offers
+          */
+         vector<htlc_order_object> get_active_htlc_offers(htlc_order_id_type start, uint32_t limit)const;
+
+         /**
+          * @breif Get htlc order offer by id
+          *
+          * @param id ID of the htlc order offer to retrieve
+          *
+          * @return A vector of active and non expired htlc offers
+          */
+         optional<htlc_order_object> get_htlc_offer(htlc_order_id_type id)const;
+
+   private:
+         application& _app;
+         graphene::app::database_api database_api;
+   };
 } } // graphene::app
 
 extern template class fc::api<graphene::app::block_api>;
@@ -528,6 +585,7 @@ extern template class fc::api<graphene::app::crypto_api>;
 extern template class fc::api<graphene::app::asset_api>;
 extern template class fc::api<graphene::app::orders_api>;
 extern template class fc::api<graphene::debug_witness::debug_api>;
+extern template class fc::api<graphene::app::custom_operations_api>;
 
 namespace graphene { namespace app {
    /**
@@ -569,6 +627,8 @@ namespace graphene { namespace app {
          fc::api<orders_api> orders()const;
          /// @brief Retrieve the debug API (if available)
          fc::api<graphene::debug_witness::debug_api> debug()const;
+         /// @brief Retrieve the custom operations API
+         fc::api<custom_operations_api> custom()const;
 
          /// @brief Called to enable an API, not reflected.
          void enable_api( const string& api_name );
@@ -584,6 +644,7 @@ namespace graphene { namespace app {
          optional< fc::api<asset_api> > _asset_api;
          optional< fc::api<orders_api> > _orders_api;
          optional< fc::api<graphene::debug_witness::debug_api> > _debug_api;
+         optional< fc::api<custom_operations_api> > _custom_operations_api;
    };
 
 }}  // graphene::app
@@ -650,6 +711,12 @@ FC_API(graphene::app::orders_api,
        (get_tracked_groups)
        (get_grouped_limit_orders)
      )
+FC_API(graphene::app::custom_operations_api,
+       (get_contact_info)
+       (get_account_htlc_offers)
+       (get_active_htlc_offers)
+       (get_htlc_offer)
+     )
 FC_API(graphene::app::login_api,
        (login)
        (block)
@@ -661,4 +728,5 @@ FC_API(graphene::app::login_api,
        (asset)
        (orders)
        (debug)
+       (custom)
      )

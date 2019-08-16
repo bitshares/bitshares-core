@@ -30,6 +30,7 @@
 #include <graphene/account_history/account_history_plugin.hpp>
 #include <graphene/witness/witness.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
+#include <graphene/custom_operations/custom_operations_plugin.hpp>
 #include <graphene/egenesis/egenesis.hpp>
 #include <graphene/wallet/wallet.hpp>
 
@@ -113,6 +114,30 @@ int get_available_port()
    return ntohs(sin.sin_port);
 }
 
+boost::filesystem::path create_api_access_file(fc::temp_directory& directory) {
+   boost::filesystem::path apiaccess_path = boost::filesystem::path{directory.path().generic_string()} / "api-access.json";
+   fc::path apiaccess_out = apiaccess_path;
+
+   const string apiaccess_content = R"(
+   {
+      "permission_map" :
+      [
+         [
+            "*",
+            {
+               "password_hash_b64" : "*",
+               "password_salt_b64" : "*",
+               "allowed_apis" : ["database_api", "network_broadcast_api", "history_api", "custom_operations_api"]
+            }
+         ]
+      ]
+   }
+   )";
+
+   fc::json::save_to_file(fc::json::from_string(apiaccess_content), apiaccess_out);
+   return apiaccess_path;
+}
+
 ///////////
 /// @brief Start the application
 /// @param app_dir the temporary directory to use
@@ -125,7 +150,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    app1->register_plugin<graphene::account_history::account_history_plugin>(true);
    app1->register_plugin< graphene::market_history::market_history_plugin >(true);
    app1->register_plugin< graphene::witness_plugin::witness_plugin >(true);
-   app1->register_plugin< graphene::grouped_orders::grouped_orders_plugin>(true);
+   app1->register_plugin< graphene::custom_operations::custom_operations_plugin>(true);
    app1->startup_plugins();
    boost::program_options::variables_map cfg;
 #ifdef _WIN32
@@ -138,6 +163,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    );
    cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
    cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
+   cfg.emplace("api-access", boost::program_options::variable_value(create_api_access_file(app_dir), false));
    app1->initialize(app_dir.path(), cfg);
 
    app1->initialize_plugins(cfg);
@@ -145,6 +171,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 
    app1->startup();
    fc::usleep(fc::milliseconds(500));
+
    return app1;
 }
 
@@ -1182,3 +1209,101 @@ BOOST_FIXTURE_TEST_CASE( cli_sign_message, cli_fixture )
    BOOST_CHECK( con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
 
 } FC_LOG_AND_RETHROW() }
+
+///////////////////
+// Test the contact information by custom operations plugin
+///////////////////
+BOOST_FIXTURE_TEST_CASE( account_contact_information, cli_fixture )
+{
+   try {
+      // just to fund nathan
+      INVOKE(upgrade_nathan_account);
+
+      BOOST_TEST_MESSAGE("Check account information.");
+      auto account_contact_info = con.wallet_api_ptr->get_contact_information("nathan");
+      BOOST_CHECK(!account_contact_info.valid()); // no info yet
+
+      BOOST_TEST_MESSAGE("About to add contact information.");
+
+      account_contact_operation::ext data;
+      data.name = "Nathan";
+      data.email = "nathan@nathan.com";
+      data.phone = "2121212121";
+      data.address = "Bv DD 22";
+      data.company = "";
+      data.url = "";
+
+      signed_transaction custom_tx = con.wallet_api_ptr->set_contact_information("nathan", data, true);
+
+      BOOST_TEST_MESSAGE("The system is generating a block.");
+      BOOST_CHECK(generate_block(app1));
+
+      BOOST_TEST_MESSAGE("Check account contact information.");
+      account_contact_info = con.wallet_api_ptr->get_contact_information("nathan");
+
+      BOOST_CHECK_EQUAL(account_contact_info->account.instance.value, 17 );
+      BOOST_CHECK_EQUAL(*account_contact_info->name, "Nathan");
+      BOOST_CHECK_EQUAL(*account_contact_info->email, "nathan@nathan.com");
+      BOOST_CHECK_EQUAL(*account_contact_info->phone, "2121212121");
+      BOOST_CHECK_EQUAL(*account_contact_info->address, "Bv DD 22");
+      BOOST_CHECK_EQUAL(*account_contact_info->company, "");
+      BOOST_CHECK_EQUAL(*account_contact_info->url, "");
+
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+///////////////////
+// Test the htlc offer orderbook by custom operations plugin
+///////////////////
+BOOST_FIXTURE_TEST_CASE( htlc_orderbook, cli_fixture )
+{
+   try {
+      // create the taker account
+      INVOKE(create_new_account);
+
+      auto db = app1->chain_database();
+
+      BOOST_TEST_MESSAGE("Adding an offer.");
+
+      create_htlc_order_operation::ext data_maker;
+      data_maker.blockchain = blockchains::bitcoin;
+      data_maker.blockchain_account = "nathan";
+      data_maker.bitshares_amount = asset(100);
+      data_maker.blockchain_asset = "BTC";
+      data_maker.blockchain_amount = "2000";
+      data_maker.expiration = db->head_block_time() + 7200;
+      data_maker.tag = "Some text, can be a memo";
+
+      signed_transaction custom_tx = con.wallet_api_ptr->create_htlc_offer("nathan", data_maker, true);
+
+      BOOST_TEST_MESSAGE("The system is generating a block.");
+      BOOST_CHECK(generate_block(app1));
+
+      BOOST_TEST_MESSAGE("Get active htlc offers.");
+      auto offers = con.wallet_api_ptr->get_active_htlc_offers(blockchains::bitcoin);
+      if(offers[0].blockchain == blockchains::bitcoin) {
+         BOOST_CHECK_EQUAL(offers[0].id.instance(), 0);
+      }
+
+      BOOST_TEST_MESSAGE("Taking the offfer.");
+      take_htlc_order_operation::ext data_taker;
+      data_taker.htlc_order_id = offers[0].id;
+      data_taker.blockchain_account = "nathan";
+
+      custom_tx = con.wallet_api_ptr->take_htlc_offer("jmjatlanta", data_taker, true);
+
+      BOOST_TEST_MESSAGE("The system is generating a block.");
+      BOOST_CHECK(generate_block(app1));
+
+      BOOST_TEST_MESSAGE("Get active htlc offers.");
+      offers = con.wallet_api_ptr->get_active_htlc_offers(blockchains::bitcoin);
+      BOOST_CHECK_EQUAL(offers.size(), 0);
+
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}

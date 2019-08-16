@@ -48,6 +48,7 @@ template class fc::api<graphene::app::history_api>;
 template class fc::api<graphene::app::crypto_api>;
 template class fc::api<graphene::app::asset_api>;
 template class fc::api<graphene::app::orders_api>;
+template class fc::api<graphene::app::custom_operations_api>;
 template class fc::api<graphene::debug_witness::debug_api>;
 template class fc::api<graphene::app::login_api>;
 
@@ -118,6 +119,11 @@ namespace graphene { namespace app {
        else if( api_name == "orders_api" )
        {
           _orders_api = std::make_shared< orders_api >( std::ref( _app ) );
+       }
+       else if( api_name == "custom_operations_api" )
+       {
+          if( _app.get_plugin( "custom_operations" ) )
+             _custom_operations_api = std::make_shared< custom_operations_api >( std::ref( _app ) );
        }
        else if( api_name == "debug_api" )
        {
@@ -294,6 +300,12 @@ namespace graphene { namespace app {
     {
        FC_ASSERT(_debug_api);
        return *_debug_api;
+    }
+
+    fc::api<custom_operations_api> login_api::custom() const
+    {
+       FC_ASSERT(_custom_operations_api);
+       return *_custom_operations_api;
     }
 
     vector<order_history_object> history_api::get_fill_order_history( std::string asset_a, std::string asset_b, uint32_t limit  )const
@@ -672,6 +684,58 @@ namespace graphene { namespace app {
          ++itr;
       }
       return result;
+   }
+
+   // custom operations api
+   optional<account_contact_object> custom_operations_api::get_contact_info(std::string account_id_or_name)const
+   {
+      const auto account_id = database_api.get_account_id_from_string(account_id_or_name);
+      auto &index = _app.chain_database()->get_index_type<account_contact_index>().indices().get<by_custom_account>();
+      auto itr = index.find(account_id);
+      if(itr != index.end())
+         return *itr;
+      return optional<account_contact_object>();
+   }
+
+   vector<htlc_order_object> custom_operations_api::get_account_htlc_offers(std::string account_id_or_name,
+         htlc_order_id_type start, uint32_t limit)const
+   {
+      FC_ASSERT(limit <= 101);
+
+      const auto account_id = database_api.get_account_id_from_string(account_id_or_name);
+      vector<htlc_order_object> results;
+      auto &index = _app.chain_database()->get_index_type<htlc_orderbook_index>().indices().get<by_bitshares_account>();
+
+      auto itr = index.lower_bound(boost::make_tuple(account_id, start));
+      while(itr != index.end() && itr->bitshares_account == account_id && results.size() < limit)
+      {
+         results.push_back(*itr);
+         ++itr;
+      }
+      return results;
+   }
+   vector<htlc_order_object> custom_operations_api::get_active_htlc_offers(htlc_order_id_type start, uint32_t limit)const
+   {
+      FC_ASSERT(limit <= 101);
+
+      vector<htlc_order_object> results;
+      auto db = _app.chain_database();
+      auto &index = db->get_index_type<htlc_orderbook_index>().indices().get<by_active>();
+      auto itr = index.lower_bound(make_tuple(true, db->head_block_time(), start));
+      while(itr != index.end() && itr->active && itr->expiration > db->head_block_time() && results.size() < limit)
+      {
+         results.push_back(*itr);
+         ++itr;
+      }
+      return results;
+   }
+   optional<htlc_order_object> custom_operations_api::get_htlc_offer(htlc_order_id_type id)const
+   {
+      auto &index = _app.chain_database()->get_index_type<htlc_orderbook_index>().indices().get<by_custom_id>();
+      auto itr = index.find(id);
+      if(itr != index.end())
+         return *itr;
+      return optional<htlc_order_object>();
    }
 
 } } // graphene::app
