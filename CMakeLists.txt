@@ -47,6 +47,9 @@ macro(FIND_CURL)
    endif (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
 endmacro()
 
+# Save the old value of CMAKE_REQUIRED_FLAGS
+set( TEMP_REQUIRED_FLAGS ${CMAKE_REQUIRED_FLAGS} )
+
 # Fortify source
 if (CMAKE_COMPILER_IS_GNUCXX)
 	if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
@@ -91,6 +94,8 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 	endif ()
 endif ()
 
+set(CMAKE_REQUIRED_FLAGS ${TEMP_REQUIRED_FLAGS} )
+
 # check for Data relocation and Protection (RELRO)
 set(CMAKE_REQUIRED_FLAGS "-Wl,-zrelro,-znow")
 check_c_compiler_flag("" HAVE_RELROFULL)
@@ -107,6 +112,8 @@ else()
 		add_linker_flag("-zrelro")
 	endif()
 endif()
+
+set(CMAKE_REQUIRED_FLAGS ${TEMP_REQUIRED_FLAGS} )
 
 # position independent executetable (PIE)
 # position independent code (PIC)
