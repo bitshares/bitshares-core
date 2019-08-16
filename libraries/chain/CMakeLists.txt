@@ -1,9 +1,5 @@
 
-add_custom_target( build_hardfork_hpp
-                   COMMAND cat-parts "${CMAKE_CURRENT_SOURCE_DIR}/hardfork.d" "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp" )
 set_source_files_properties( "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp" PROPERTIES GENERATED TRUE )
-
-add_dependencies( build_hardfork_hpp cat-parts )
 
 file(GLOB HEADERS "include/graphene/chain/*.hpp")
 
@@ -73,7 +69,22 @@ add_library( graphene_chain
              "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp"
            )
 
-add_dependencies( graphene_chain build_hardfork_hpp )
+if( GRAPHENE_PREGENERATE_FILES )
+  message( STATUS "Generating hardfork.hpp" )
+  file( MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/" )
+  file( REMOVE "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp" )
+  file( GLOB HARDFORKS "${CMAKE_CURRENT_SOURCE_DIR}/hardfork.d/*" )
+  foreach( HF ${HARDFORKS} )
+    file( READ "${HF}" INCL )
+    file( APPEND "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp" "${INCL}" )
+  endforeach( HF )
+else( GRAPHENE_PREGENERATE_FILES )
+  add_custom_target( build_hardfork_hpp
+                     COMMAND cat-parts "${CMAKE_CURRENT_SOURCE_DIR}/hardfork.d" "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp" )
+  add_dependencies( build_hardfork_hpp cat-parts )
+  add_dependencies( graphene_chain build_hardfork_hpp )
+endif( GRAPHENE_PREGENERATE_FILES )
+
 target_link_libraries( graphene_chain fc graphene_db graphene_protocol )
 target_include_directories( graphene_chain
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/include" )

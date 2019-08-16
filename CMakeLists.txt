@@ -12,6 +12,9 @@ set( INSTALLER_APP_ID "68ad7005-8eee-49c9-95ce-9eed97e5b347" )
 set( CMAKE_CXX_STANDARD 14 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
 
+SET( GRAPHENE_PREGENERATE_FILES OFF CACHE BOOL
+     "ON for pre-creating generated sources instead of during the build. Useful for cross-compilation." )
+
 if( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
   set( CMAKE_CXX_EXTENSIONS ON ) # for __int128 support
 else( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
