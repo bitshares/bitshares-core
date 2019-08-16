@@ -237,7 +237,12 @@
     "accounts_per_fee_scale": 1000,
     "account_fee_scale_bitshifts": 4,
     "max_authority_depth": 2,
-    "extensions": []
+    "extensions": {
+        "updatable_htlc_options": {
+            "max_timeout_secs": 2592000,
+            "max_preimage_size": 1024000
+        }
+    }
   },
   "initial_accounts": [{
       "name": "init0",
