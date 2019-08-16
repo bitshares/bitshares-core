@@ -1,5 +1,5 @@
 # Defines BitShares-Testnet library target.
-project( BitShares-Testnet LANGAUGES CXX C )
+project( BitShares-Testnet LANGUAGES CXX C )
 cmake_minimum_required( VERSION 3.2 FATAL_ERROR )
 
 set( BLOCKCHAIN_NAME "Testnet" )
