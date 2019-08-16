@@ -149,7 +149,14 @@ IF( WIN32 )
   SET(BOOST_ROOT $ENV{BOOST_ROOT})
   set(Boost_USE_MULTITHREADED ON)
   set(BOOST_ALL_DYN_LINK OFF) # force dynamic linking for all libraries
-ENDIF(WIN32)
+ELSE ( WIN32 )
+   IF ( APPLE )
+      set( CMAKE_THREAD_LIBS_INIT "-lpthread" )
+      set( CMAKE_HAVE_THREADS_LIBRARY 1 )
+      set( CMAKE_USE_WIN32_THREADS_INIT 0 )
+      set( THREADS_PREFER_PTHREAD_FLAG ON )
+   ENDIF ( APPLE )
+ENDIF ( WIN32 )
 
 FIND_PACKAGE(Boost 1.57 REQUIRED COMPONENTS ${BOOST_COMPONENTS})
 # For Boost 1.53 on windows, coroutine was not in BOOST_LIBRARYDIR and do not need it to build,  but if boost versin >= 1.54, find coroutine otherwise will cause link errors
