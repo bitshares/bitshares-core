@@ -1,6 +1,6 @@
 # Defines BitShares-Testnet library target.
-project( BitShares-Testnet )
-cmake_minimum_required( VERSION 3.1 )
+project( BitShares-Testnet LANGUAGES CXX C )
+cmake_minimum_required( VERSION 3.2 FATAL_ERROR )
 
 set( BLOCKCHAIN_NAME "Testnet" )
 set(GRAPHENE_EGENESIS_JSON "${CMAKE_CURRENT_SOURCE_DIR}/genesis.json" )
@@ -12,7 +12,12 @@ set( INSTALLER_APP_ID "68ad7005-8eee-49c9-95ce-9eed97e5b347" )
 
 set( CMAKE_CXX_STANDARD 14 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
-set( CMAKE_CXX_EXTENSIONS OFF )
+
+if( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
+  set( CMAKE_CXX_EXTENSIONS ON ) # for __int128 support
+else( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
+  set( CMAKE_CXX_EXTENSIONS OFF )
+endif( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
 
 # http://stackoverflow.com/a/18369825
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -26,6 +31,87 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 endif()
 
 list( APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules" )
+
+include(CheckCCompilerFlag)
+include(Utils)
+
+# function to help with cUrl
+macro(FIND_CURL)
+   if (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
+      set (OLD_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+      set (CMAKE_FIND_LIBRARY_SUFFIXES .a)
+      find_package(CURL REQUIRED)
+      list(APPEND CURL_LIBRARIES ssl crypto)
+      set (CMAKE_FIND_LIBRARY_SUFFIXES ${OLD_SUFFIXES})
+   else (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
+      find_package(CURL REQUIRED)
+   endif (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
+endmacro()
+
+# Fortify source
+if (CMAKE_COMPILER_IS_GNUCXX)
+	if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+		message ("-- Setting optimizations for clang++")
+		set(CMAKE_CXX_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2 -O3 -DNDEBUG=1")
+		set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-D_FORTIFY_SOURCE=2 -O3 -DNDEBUG=1 -g")
+
+		# check and add data execution prevention
+		message ("-- Enabling data execution prevention")
+		add_linker_flag("-fsanitize=safe-stack")
+
+		# check and add Stack-based buffer overrun detection
+		set(CMAKE_REQUIRED_FLAGS "-fstack-protector")
+		check_c_compiler_flag("" HAVE_STACKPROTECTOR)
+		if(HAVE_STACKPROTECTOR)
+			message ("-- Enabling stack-based buffer overrun detection")
+			add_flag_append(CMAKE_C_FLAGS "-fstack-protector")
+			add_flag_append(CMAKE_CXX_FLAGS "-fstack-protector")
+		endif()
+	else ()
+		message ("-- Setting optimizations for g++")
+		set(CMAKE_CXX_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2 -O3 -DNDEBUG=1")
+		set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-D_FORTIFY_SOURCE=2 -O3 -DNDEBUG=1 -g")
+
+		# check and add data execution prevention
+		set(CMAKE_REQUIRED_FLAGS "-Wl,-znoexecstack")
+		check_c_compiler_flag("" HAVE_NOEXECSTACK)
+		if(HAVE_NOEXECSTACK)
+			message ("-- Enabling data execution prevention")
+			add_linker_flag("-znoexecstack")
+		endif()
+
+		# check and add Stack-based buffer overrun detection
+		set(CMAKE_REQUIRED_FLAGS "-fstack-protector-strong")
+		check_c_compiler_flag("" HAVE_STACKPROTECTOR)
+		if(HAVE_STACKPROTECTOR)
+			message ("-- Enabling stack-based buffer overrun detection")
+			add_flag_append(CMAKE_C_FLAGS "-fstack-protector-strong")
+			add_flag_append(CMAKE_CXX_FLAGS "-fstack-protector-strong")
+		endif()
+
+	endif ()
+endif ()
+
+# check for Data relocation and Protection (RELRO)
+set(CMAKE_REQUIRED_FLAGS "-Wl,-zrelro,-znow")
+check_c_compiler_flag("" HAVE_RELROFULL)
+if(HAVE_RELROFULL)
+	message ("-- Enabling full data relocation and protection")
+	add_linker_flag("-zrelro")
+	add_linker_flag("-znow")
+else()
+	#if full relro is not available, try partial relro
+	set(CMAKE_REQUIRED_FLAGS "-Wl,-zrelro")
+	check_c_compiler_flag("" HAVE_RELROPARTIAL)
+	if(HAVE_RELROPARTIAL)
+		message ("-- Enabling partial data relocation and protection")
+		add_linker_flag("-zrelro")
+	endif()
+endif()
+
+# position independent executetable (PIE)
+# position independent code (PIC)
+add_definitions (-fPIC)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS "ON")
 set(GRAPHENE_EGENESIS_JSON "${CMAKE_CURRENT_SOURCE_DIR}/libraries/egenesis/genesis.json" )
@@ -63,7 +149,14 @@ IF( WIN32 )
   SET(BOOST_ROOT $ENV{BOOST_ROOT})
   set(Boost_USE_MULTITHREADED ON)
   set(BOOST_ALL_DYN_LINK OFF) # force dynamic linking for all libraries
-ENDIF(WIN32)
+ELSE ( WIN32 )
+   IF ( APPLE )
+      set( CMAKE_THREAD_LIBS_INIT "-lpthread" )
+      set( CMAKE_HAVE_THREADS_LIBRARY 1 )
+      set( CMAKE_USE_WIN32_THREADS_INIT 0 )
+      set( THREADS_PREFER_PTHREAD_FLAG ON )
+   ENDIF ( APPLE )
+ENDIF ( WIN32 )
 
 FIND_PACKAGE(Boost 1.57 REQUIRED COMPONENTS ${BOOST_COMPONENTS})
 # For Boost 1.53 on windows, coroutine was not in BOOST_LIBRARYDIR and do not need it to build,  but if boost versin >= 1.54, find coroutine otherwise will cause link errors

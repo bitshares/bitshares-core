@@ -10,11 +10,12 @@ Code in libraries is the most important part of **bitshares-core** project and i
 Folder | Name | Description | Status
 ---|---|---|---
 [app](app) | Application | Bundles component libraries (chain, network, plugins) into a useful application. Also provides API access. | Active 
-[chain](chain) | Blockchain | Defines all objects, operations and types. This include the consensus protocol, defines the whole blockchain behaviour. | Active 
+[chain](chain) | Blockchain | Blockchain implementation and business logic. Database structure in the form of objects and updates to the blockchain in the form of evaluators are implemented here. | Active 
 [db](db) | Database | Defines the internal database graphene uses. | Active 
 [egenesis](egenesis) | Genesis | Hardcodes the `genesis.json` file into the `witness_node` executable.| Active
 [fc](fc) | Fast-compiling C++ library | https://github.com/bitshares/bitshares-fc | Active 
 [net](net) | Network | The graphene p2p layer. | Active 
 [plugins](plugins) | Plugins | Collection of singleton designed modules used for extending the bitshares-core.  | Active 
+[protocol](protocol) | Protocol | Fundamental structure of the data that will be transmitted on the wire. Operations are defined and basic data integrity checks are done for each.  | Active 
 [utilities](utilities) | Utilities | Common utility calls used in applications or other libraries. | Active 
 [wallet](wallet) | Wallet | Wallet definition for the `cli_wallet` software. | Active
