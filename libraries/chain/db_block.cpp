@@ -636,7 +636,12 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    auto& trx_idx = get_mutable_index_type<transaction_index>();
    const chain_id_type& chain_id = get_chain_id();
    if( !(skip & skip_transaction_dupe_check) )
-      FC_ASSERT( trx_idx.indices().get<by_trx_id>().find(trx.id()) == trx_idx.indices().get<by_trx_id>().end() );
+   {
+      GRAPHENE_ASSERT( trx_idx.indices().get<by_trx_id>().find(trx.id()) == trx_idx.indices().get<by_trx_id>().end(),
+                       duplicate_transaction,
+                       "Transaction '${txid}' is already in the database",
+                       ("txid",trx.id()) );
+   }
    transaction_evaluation_state eval_state(this);
    const chain_parameters& chain_parameters = get_global_properties().parameters;
    eval_state._trx = &trx;
@@ -804,7 +809,7 @@ fc::future<void> database::precompute_parallel( const signed_block& block, const
    block.id();
 
    if( workers.empty() )
-      return fc::future< void >( fc::promise< void >::ptr( new fc::promise< void >( true ) ) );
+      return fc::future< void >( fc::promise< void >::create( true ) );
 
    auto first = workers.begin();
    auto worker = first;

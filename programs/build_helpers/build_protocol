@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+
+programs/build_helpers/buildstep -s 3500
+ccache -s
+programs/build_helpers/buildstep Prepare 1 "sed -i '/tests/d' libraries/fc/CMakeLists.txt"
+programs/build_helpers/buildstep cmake 5 "cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage -DBoost_USE_STATIC_LIBS=OFF -DCMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON ."
+programs/build_helpers/buildstep make.fc 200 "make -j 2 fc"
+programs/build_helpers/buildstep make.custom_auths 1000 "make -j 2 graphene_protocol"
+programs/build_helpers/buildstep end 0
+ccache -s

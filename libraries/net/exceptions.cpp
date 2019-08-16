@@ -37,5 +37,7 @@ namespace graphene { namespace net {
    FC_IMPLEMENT_DERIVED_EXCEPTION( peer_is_on_an_unreachable_fork,      net_exception, 90005,
                                    "peer is on another fork" )
    FC_IMPLEMENT_DERIVED_EXCEPTION( unlinkable_block_exception,          net_exception, 90006, "unlinkable block" )
+   FC_IMPLEMENT_DERIVED_EXCEPTION( block_timestamp_in_future_exception, net_exception, 90007,
+                                   "block timestamp in the future" )
 
 } }
