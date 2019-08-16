@@ -110,7 +110,7 @@ void class_processor::process_class( const static_variant< T... >* dummy )
    }
 }
 
-template<typename IsReflected=fc::false_type>
+template<typename IsReflected=std::false_type>
 struct if_reflected
 {
    template< typename T >
@@ -122,7 +122,7 @@ struct if_reflected
 };
 
 template<>
-struct if_reflected<fc::true_type>
+struct if_reflected<std::true_type>
 {
    template< typename T >
    static void process_class( class_processor* proc, const T* dummy )

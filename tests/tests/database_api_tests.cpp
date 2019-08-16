@@ -28,9 +28,11 @@
 #include <graphene/chain/hardfork.hpp>
 
 #include <fc/crypto/digest.hpp>
-
 #include <fc/crypto/hex.hpp>
+
 #include "../common/database_fixture.hpp"
+
+#include <random>
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
@@ -787,12 +789,50 @@ BOOST_AUTO_TEST_CASE( subscription_key_collision_test )
 BOOST_AUTO_TEST_CASE( subscription_notification_test )
 {
    try {
+
+      generate_blocks(HARDFORK_CORE_1468_TIME);
+      set_expiration( db, trx );
+      set_htlc_committee_parameters();
+      generate_block();
+      set_expiration( db, trx );
+
       ACTORS( (alice)(bob) );
 
       create_user_issued_asset( "UIATEST" );
 
-#define SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE 8
+      // prepare data for get_htlc
+      {
+         int64_t init_balance(100 * GRAPHENE_BLOCKCHAIN_PRECISION);
+         transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
 
+         uint16_t preimage_size = 256;
+         std::vector<char> pre_image(256);
+         std::independent_bits_engine<std::default_random_engine, sizeof(unsigned), unsigned int> rbe;
+         std::generate(begin(pre_image), end(pre_image), std::ref(rbe));
+
+         // alice puts a htlc contract to bob
+         graphene::chain::htlc_create_operation create_operation;
+         BOOST_TEST_MESSAGE("Alice, who has 100 coins, is transferring 3 coins to Bob");
+         create_operation.amount = graphene::chain::asset( 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
+         create_operation.to = bob_id;
+         create_operation.claim_period_seconds = 60;
+         create_operation.preimage_hash = hash_it<fc::sha256>( pre_image );
+         create_operation.preimage_size = preimage_size;
+         create_operation.from = alice_id;
+         create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
+         trx.operations.push_back(create_operation);
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx, ~0);
+         trx.clear();
+      }
+
+// declare db_api1 ~ db_api60
+#define SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE 61
+// db_api1  ~ db_api30 auto-subscribe in the beginning,
+// db_api31 ~ db_api60 don't auto-subscribe
+#define SUB_NOTIF_TEST_START_ID_DISABLE_AUTO_SUB 31
+
+// create callback functions
 #define SUB_NOTIF_TEST_INIT_CALLBACKS(z, i, data) \
       uint32_t objects_changed ## i = 0; \
       auto callback ## i = [&]( const variant& v ) \
@@ -802,6 +842,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       }; \
       uint32_t expected_objects_changed ## i = 0;
 
+// create function to check results
 #define SUB_NOTIF_TEST_CHECK(z, i, data) \
       if( expected_objects_changed ## i > 0 ) { \
          BOOST_CHECK_LE( expected_objects_changed ## i, objects_changed ## i ); \
@@ -834,6 +875,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       graphene::app::database_api db_api2( db, &opt );
       db_api2.set_subscribe_callback( callback2, true ); // subscribing to all should succeed
 
+// declare the rest of API callers and initialize callbacks
 #define SUB_NOTIF_TEST_INIT_APIS(z, i, data) \
       graphene::app::database_api db_api ## i( db, &opt ); \
       db_api ## i.set_subscribe_callback( callback ## i, false );
@@ -841,32 +883,86 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       BOOST_PP_REPEAT_FROM_TO( 3, SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE, SUB_NOTIF_TEST_INIT_APIS, unused );
 
 #undef SUB_NOTIF_TEST_INIT_APIS
+
+// disable auto-subscription for some API callers
+#define SUB_NOTIF_TEST_DISABLE_AUTO_SUB(z, i, data) \
+      db_api ## i.set_auto_subscription( false );
+
+      BOOST_PP_REPEAT_FROM_TO( SUB_NOTIF_TEST_START_ID_DISABLE_AUTO_SUB, SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE,
+                               SUB_NOTIF_TEST_DISABLE_AUTO_SUB, unused );
+
+#undef SUB_NOTIF_TEST_DISABLE_AUTO_SUB
 #undef SUB_NOTIF_TEST_NUM_CALLBACKS_PLUS_ONE
+#undef SUB_NOTIF_TEST_START_ID_DISABLE_AUTO_SUB
 
       vector<object_id_type> account_ids;
       account_ids.push_back( alice_id );
-      db_api1.get_objects( account_ids ); // db_api1 subscribe to Alice
+      db_api1.get_objects( account_ids );         // db_api1  subscribe to Alice
+      db_api11.get_objects( account_ids, true );  // db_api11 subscribe to Alice
+      db_api21.get_objects( account_ids, false ); // db_api21 doesn't subscribe to Alice
+      db_api31.get_objects( account_ids );        // db_api31 doesn't subscribe to Alice
+      db_api41.get_objects( account_ids, true );  // db_api41 subscribe to Alice
+      db_api51.get_objects( account_ids, false ); // db_api51 doesn't subscribe to Alice
 
       vector<string> account_names;
       account_names.push_back( "alice" );
-      db_api4.get_accounts( account_names ); // db_api4 subscribe to Alice
+      db_api4.get_accounts( account_names );         // db_api4  subscribe to Alice
+      db_api14.get_accounts( account_names, true );  // db_api14 subscribe to Alice
+      db_api24.get_accounts( account_names, false ); // db_api24 doesn't subscribe to Alice
+      db_api34.get_accounts( account_names );        // db_api34 doesn't subscribe to Alice
+      db_api44.get_accounts( account_names, true );  // db_api44 subscribe to Alice
+      db_api54.get_accounts( account_names, false ); // db_api54 doesn't subscribe to Alice
 
-      db_api5.lookup_accounts( "ali", 1 ); // db_api5 subscribe to Alice
+      db_api5.lookup_accounts( "ali", 1 );         // db_api5  subscribe to Alice
+      db_api15.lookup_accounts( "ali", 1, true );  // db_api15 subscribe to Alice
+      db_api25.lookup_accounts( "ali", 1, false ); // db_api25 doesn't subscribe to Alice
+      db_api35.lookup_accounts( "ali", 1 );        // db_api35 doesn't subscribe to Alice
+      db_api45.lookup_accounts( "ali", 1, true );  // db_api45 subscribe to Alice
+      db_api55.lookup_accounts( "ali", 1, false ); // db_api55 doesn't subscribe to Alice
 
-      db_api6.lookup_accounts( "alice", 3 ); // db_api6 does not subscribe to Alice
+      db_api6.lookup_accounts( "alice", 3 );         // db_api6  does not subscribe to Alice
+      db_api16.lookup_accounts( "alice", 3, true );  // db_api16 does not subscribe to Alice
+      db_api26.lookup_accounts( "alice", 3, false ); // db_api26 does not subscribe to Alice
+      db_api36.lookup_accounts( "alice", 3 );        // db_api36 does not subscribe to Alice
+      db_api46.lookup_accounts( "alice", 3, true );  // db_api46 does not subscribe to Alice
+      db_api56.lookup_accounts( "alice", 3, false ); // db_api56 does not subscribe to Alice
 
       vector<string> asset_names;
       asset_names.push_back( "UIATEST" );
-      db_api7.get_assets( asset_names ); // db_api7 subscribe to UIA
+      db_api7.get_assets( asset_names );         // db_api7  subscribe to UIA
+      db_api17.get_assets( asset_names, true );  // db_api17 subscribe to UIA
+      db_api27.get_assets( asset_names, false ); // db_api27 doesn't subscribe to UIA
+      db_api37.get_assets( asset_names );        // db_api37 doesn't subscribe to UIA
+      db_api47.get_assets( asset_names, true );  // db_api47 subscribe to UIA
+      db_api57.get_assets( asset_names, false ); // db_api57 doesn't subscribe to UIA
+
+      graphene::chain::htlc_id_type alice_htlc_id_bob; // assuming ID of the first htlc object is 0
+      db_api8.get_htlc( alice_htlc_id_bob );         // db_api8  subscribe to the HTLC object
+      db_api18.get_htlc( alice_htlc_id_bob, true );  // db_api18 subscribe to the HTLC object
+      db_api28.get_htlc( alice_htlc_id_bob, false ); // db_api28 doesn't subscribe to the HTLC object
+      db_api38.get_htlc( alice_htlc_id_bob );        // db_api38 doesn't subscribe to the HTLC object
+      db_api48.get_htlc( alice_htlc_id_bob, true );  // db_api48 subscribe to the HTLC object
+      db_api58.get_htlc( alice_htlc_id_bob, false ); // db_api58 doesn't subscribe to the HTLC object
 
       generate_block();
       ++expected_objects_changed1; // db_api1 subscribed to Alice, notify Alice account creation
+      ++expected_objects_changed11; // db_api11 subscribed to Alice, notify Alice account creation
+      ++expected_objects_changed41; // db_api41 subscribed to Alice, notify Alice account creation
       ++expected_objects_changed2; // db_api2 subscribed to all, notify new objects
       // db_api3 didn't subscribe to anything, nothing would be notified
       ++expected_objects_changed4; // db_api4 subscribed to Alice, notify Alice account creation
+      ++expected_objects_changed14; // db_api14 subscribed to Alice, notify Alice account creation
+      ++expected_objects_changed44; // db_api44 subscribed to Alice, notify Alice account creation
       ++expected_objects_changed5; // db_api5 subscribed to Alice, notify Alice account creation
-      // db_api6 didn't subscribe to anything, nothing would be notified
+      ++expected_objects_changed15; // db_api15 subscribed to Alice, notify Alice account creation
+      ++expected_objects_changed45; // db_api45 subscribed to Alice, notify Alice account creation
+      // db_api*6 didn't subscribe to anything, nothing would be notified
       ++expected_objects_changed7; // db_api7 subscribed to UIA, notify asset creation
+      ++expected_objects_changed17; // db_api17 subscribed to UIA, notify asset creation
+      ++expected_objects_changed47; // db_api47 subscribed to UIA, notify asset creation
+      ++expected_objects_changed8; // db_api8 subscribed to HTLC object, notify object creation
+      ++expected_objects_changed18; // db_api18 subscribed to HTLC object, notify object creation
+      ++expected_objects_changed48; // db_api48 subscribed to HTLC object, notify object creation
 
       fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
       check_results();
@@ -889,7 +985,13 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       obj_ids.push_back( db.get_dynamic_global_properties().id );
       db_api3.get_objects( obj_ids ); // db_api3 subscribe to dynamic global properties
 
-      db_api4.get_full_accounts( account_names, true );  // db_api4 subscribe to Alice with get_full_accounts
+      db_api4.get_full_accounts( account_names, true );   // db_api4 subscribe to Alice with get_full_accounts
+      db_api14.get_full_accounts( account_names, false ); // db_api14 doesn't subscribe
+      db_api24.get_full_accounts( account_names );        // db_api24 subscribe to Alice with get_full_accounts
+      db_api34.get_full_accounts( account_names, true );  // db_api34 subscribe to Alice with get_full_accounts
+      db_api44.get_full_accounts( account_names, false ); // db_api44 doesn't subscribe
+      db_api54.get_full_accounts( account_names );        // db_api54 doesn't subscribe
+
       db_api5.get_full_accounts( account_names, false ); // db_api5 doesn't subscribe
 
       transfer( account_id_type(), alice_id, asset(1) );
@@ -899,6 +1001,8 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       ++expected_objects_changed2; // db_api2 subscribed to all, notify new history records and etc
       ++expected_objects_changed3; // db_api3 subscribed to dynamic global properties, would be notified
       ++expected_objects_changed4; // db_api4 subscribed to full account data of Alice, would be notified
+      ++expected_objects_changed24; // db_api24 subscribed to full account data of Alice, would be notified
+      ++expected_objects_changed34; // db_api34 subscribed to full account data of Alice, would be notified
       // db_api5 only subscribed to the account object of Alice, nothing notified
       // db_api6 didn't subscribe to anything, nothing would be notified
       // db_api7: no change on UIA, nothing would be notified
@@ -969,6 +1073,8 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       ++expected_objects_changed2; // db_api2 subscribed to all, notify new history records and etc
       ++expected_objects_changed3; // db_api3 subscribed to dynamic global properties, would be notified
       ++expected_objects_changed4; // db_api4 subscribed to full account data of Alice, would be notified
+      ++expected_objects_changed24; // db_api24 subscribed to full account data of Alice, would be notified
+      ++expected_objects_changed34; // db_api34 subscribed to full account data of Alice, would be notified
       // db_api5 subscribed to anything, nothing notified
       // db_api6 subscribed to anything, nothing notified
       // db_api7: no change on UIA, nothing would be notified
@@ -1542,4 +1648,142 @@ BOOST_AUTO_TEST_CASE( api_limit_get_order_book ){
    throw;
    }
 }
+
+BOOST_AUTO_TEST_CASE( asset_in_collateral )
+{ try {
+   ACTORS( (dan)(nathan) );
+   fund( nathan );
+   fund( dan );
+
+   graphene::app::database_api db_api( db, &( app.get_options() ) );
+
+   auto oassets = db_api.get_assets( { GRAPHENE_SYMBOL } );
+   BOOST_REQUIRE( !oassets.empty() );
+   BOOST_REQUIRE( oassets[0].valid() );
+   BOOST_REQUIRE( oassets[0]->total_in_collateral.valid() );
+   BOOST_CHECK_EQUAL( 0, oassets[0]->total_in_collateral->value );
+   BOOST_CHECK( !oassets[0]->total_backing_collateral.valid() );
+
+   asset_id_type bitusd_id = create_bitasset( "USDBIT", nathan_id, 100, charge_market_fee ).id;
+   update_feed_producers( bitusd_id, { nathan_id } );
+   asset_id_type bitdan_id = create_bitasset( "DANBIT", dan_id, 100, charge_market_fee ).id;
+   update_feed_producers( bitdan_id, { nathan_id } );
+   asset_id_type btc_id = create_bitasset( "BTC", nathan_id, 100, charge_market_fee, 8, bitusd_id ).id;
+   update_feed_producers( btc_id, { nathan_id } );
+
+   oassets = db_api.get_assets( { GRAPHENE_SYMBOL, "USDBIT", "DANBIT", "BTC" } );
+   BOOST_REQUIRE_EQUAL( 4, oassets.size() );
+   BOOST_REQUIRE( oassets[0].valid() );
+   BOOST_REQUIRE( oassets[0]->total_in_collateral.valid() );
+   BOOST_CHECK( !oassets[0]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[1].valid() );
+   BOOST_REQUIRE( oassets[1]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[1]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[2].valid() );
+   BOOST_REQUIRE( oassets[2]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[2]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[3].valid() );
+   BOOST_REQUIRE( oassets[3]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[3]->total_backing_collateral.valid() );
+   BOOST_CHECK_EQUAL( 0, oassets[0]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[1]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[1]->total_backing_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[2]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[2]->total_backing_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[3]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[3]->total_backing_collateral->value );
+
+   generate_block();
+   fc::usleep(fc::milliseconds(100));
+
+   const auto& bitusd = bitusd_id( db );
+   const auto& bitdan = bitdan_id( db );
+   const auto& btc = btc_id( db );
+
+   {
+      const auto& core = asset_id_type()( db );
+      price_feed current_feed;
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      current_feed.settlement_price = bitusd.amount(1) / core.amount(5);
+      publish_feed( bitusd_id, nathan_id, current_feed );
+      current_feed.settlement_price = bitdan.amount(1) / core.amount(5);
+      publish_feed( bitdan_id, nathan_id, current_feed );
+      current_feed.settlement_price = btc.amount(1) / bitusd.amount(100);
+      publish_feed( btc_id, nathan_id, current_feed );
+   }
+
+   borrow( nathan_id, bitusd.amount(1000), asset(15000) );
+   borrow( dan_id, bitusd.amount(100), asset(2000) );
+
+   oassets = db_api.get_assets( { GRAPHENE_SYMBOL, "USDBIT", "DANBIT", "BTC" } );
+   BOOST_REQUIRE_EQUAL( 4, oassets.size() );
+   BOOST_REQUIRE( oassets[0].valid() );
+   BOOST_REQUIRE( oassets[0]->total_in_collateral.valid() );
+   BOOST_CHECK( !oassets[0]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[1].valid() );
+   BOOST_REQUIRE( oassets[1]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[1]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[2].valid() );
+   BOOST_REQUIRE( oassets[2]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[2]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[3].valid() );
+   BOOST_REQUIRE( oassets[3]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[3]->total_backing_collateral.valid() );
+   BOOST_CHECK_EQUAL( 17000, oassets[0]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[1]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 17000, oassets[1]->total_backing_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[2]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[2]->total_backing_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[3]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[3]->total_backing_collateral->value );
+
+   borrow( nathan_id, bitdan.amount(1000), asset(15000) );
+   borrow( nathan_id, btc.amount(5), bitusd.amount(1000) );
+
+   oassets = db_api.lookup_asset_symbols( { GRAPHENE_SYMBOL, "USDBIT", "DANBIT", "BTC" } );
+   BOOST_REQUIRE_EQUAL( 4, oassets.size() );
+   BOOST_REQUIRE( oassets[0].valid() );
+   BOOST_REQUIRE( oassets[0]->total_in_collateral.valid() );
+   BOOST_CHECK( !oassets[0]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[1].valid() );
+   BOOST_REQUIRE( oassets[1]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[1]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[2].valid() );
+   BOOST_REQUIRE( oassets[2]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[2]->total_backing_collateral.valid() );
+   BOOST_REQUIRE( oassets[3].valid() );
+   BOOST_REQUIRE( oassets[3]->total_in_collateral.valid() );
+   BOOST_REQUIRE( oassets[3]->total_backing_collateral.valid() );
+   BOOST_CHECK_EQUAL( 32000, oassets[0]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 1000, oassets[1]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 17000, oassets[1]->total_backing_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[2]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 15000, oassets[2]->total_backing_collateral->value );
+   BOOST_CHECK_EQUAL( 0, oassets[3]->total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 1000, oassets[3]->total_backing_collateral->value );
+
+   force_settle( dan_id(db), bitusd.amount(100) ); // settles against nathan, receives 500 CORE collateral
+   generate_blocks( db.head_block_time() + fc::days(2) );
+   fc::usleep(fc::milliseconds(100));
+
+   auto assets = db_api.list_assets( GRAPHENE_SYMBOL, 1 );
+   BOOST_REQUIRE( !assets.empty() );
+   BOOST_REQUIRE( assets[0].total_in_collateral.valid() );
+   BOOST_CHECK( !assets[0].total_backing_collateral.valid() );
+   BOOST_CHECK_EQUAL( 31500, assets[0].total_in_collateral->value );
+
+   assets = db_api.get_assets_by_issuer( "nathan", asset_id_type(1), 2 );
+   BOOST_REQUIRE_EQUAL( 2, assets.size() );
+   BOOST_REQUIRE( assets[0].total_in_collateral.valid() );
+   BOOST_REQUIRE( assets[0].total_backing_collateral.valid() );
+   BOOST_REQUIRE( assets[1].total_in_collateral.valid() );
+   BOOST_REQUIRE( assets[1].total_backing_collateral.valid() );
+   BOOST_CHECK_EQUAL( 1000, assets[0].total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 16500, assets[0].total_backing_collateral->value );
+   BOOST_CHECK_EQUAL( 0, assets[1].total_in_collateral->value );
+   BOOST_CHECK_EQUAL( 1000, assets[1].total_backing_collateral->value );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()

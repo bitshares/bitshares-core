@@ -164,11 +164,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    else
    {
       vector<string> seeds = {
-               "seed.testnet.bitshares.eu:1776",   // BitShares Europe
-               "176.9.148.19:16543",               // Uptick.rocks
-               "31.171.251.20:1776",               // @Taconator
-               "23.92.53.25:11010",                // sahkan
-               "139.162.242.253:1700",             // rnglab
+         #include "../egenesis/seed-nodes-testnet.txt"
       };
       for( const string& endpoint_string : seeds )
       {
@@ -348,6 +344,9 @@ void application_impl::set_api_limit() {
    }
    if(_options->count("api-limit-get-order-book")){
       _app_options.api_limit_get_order_book = _options->at("api-limit-get-order-book").as<uint64_t>();
+   }
+   if(_options->count("api-limit-list-htlcs")){
+      _app_options.api_limit_list_htlcs = _options->at("api-limit-list-htlcs").as<uint64_t>();
    }
 }
 
@@ -568,7 +567,9 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
            ("w",witness_account.name)
            ("i",last_irr)("d",blk_msg.block.block_num()-last_irr) );
    }
-   FC_ASSERT( (latency.count()/1000) > -5000, "Rejecting block with timestamp in the future" );
+   GRAPHENE_ASSERT( latency.count()/1000 > -5000,
+                    graphene::net::block_timestamp_in_future_exception,
+                    "Rejecting block with timestamp in the future", );
 
    try {
       const uint32_t skip = (_is_block_producer | _force_validate) ?
@@ -1098,6 +1099,11 @@ void application::set_api_limit()
 std::shared_ptr<abstract_plugin> application::get_plugin(const string& name) const
 {
    return my->_active_plugins[name];
+}
+
+bool application::is_plugin_enabled(const string& name) const
+{
+   return !(my->_active_plugins.find(name) == my->_active_plugins.end());
 }
 
 net::node_ptr application::p2p_node()
