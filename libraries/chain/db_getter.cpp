@@ -109,11 +109,15 @@ vector<authority> database::get_viable_custom_authorities(
 
    vector<authority> results;
    for (const auto& cust_auth : valid_auths) {
-      auto result = cust_auth.get().get_predicate()(op);
-      if (result.success)
-         results.emplace_back(cust_auth.get().auth);
-      else if (rejected_authorities != nullptr)
-         rejected_authorities->insert(std::make_pair(cust_auth.get().id, std::move(result)));
+      try {
+         auto result = cust_auth.get().get_predicate()(op);
+         if (result.success)
+            results.emplace_back(cust_auth.get().auth);
+         else if (rejected_authorities != nullptr)
+            rejected_authorities->insert(std::make_pair(cust_auth.get().id, std::move(result)));
+      } catch (fc::exception& e) {
+         rejected_authorities->insert(std::make_pair(cust_auth.get().id, std::move(e)));
+      }
    }
 
    return results;

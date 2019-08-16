@@ -35,10 +35,22 @@ struct predicate_result {
    /// Whether or not the operation complied with the restrictions or not
    bool success = false;
 
-   /// Either the index of a restriction in a list, or a list of indexes of restrictions (for logical OR branches)
-   using restriction_index = static_variant<size_t, vector<predicate_result>>;
-   /// The path of indexes to the restriction(s) that failed
-   vector<restriction_index> failure_path;
+   /// Enumeration of the general reasons a predicate may reject
+   enum rejection_reason {
+      predicate_was_false,
+      null_optional,
+      incorrect_variant_type
+   };
+
+   /// An indicator of what rejection occurred at a particular restriction -- either an index to a sub-restriction, a
+   /// list of rejection results from the branches of a logical OR, or the immediate reason for rejection
+   using rejection_indicator = static_variant<size_t, vector<predicate_result>, rejection_reason>;
+   /// Failure indicators, from specific (restriction at point of rejection) to general (outermost restriction)
+   vector<rejection_indicator> rejection_path;
+
+   static predicate_result Rejection(rejection_reason reason) { return {false, {reason}}; }
+   static predicate_result Rejection(vector<predicate_result> branches) { return {false, {std::move(branches)}}; }
+   static predicate_result Success() { return {true, {}}; }
 
    operator bool() const { return success; }
 };
@@ -57,5 +69,7 @@ restriction_predicate_function get_restriction_predicate(vector<restriction> rs,
 
 } } // namespace graphene::protocol
 
-FC_REFLECT_TYPENAME(graphene::protocol::predicate_result::restriction_index)
-FC_REFLECT(graphene::protocol::predicate_result, (success)(failure_path))
+FC_REFLECT_ENUM(graphene::protocol::predicate_result::rejection_reason,
+                (predicate_was_false)(null_optional)(incorrect_variant_type))
+FC_REFLECT_TYPENAME(graphene::protocol::predicate_result::rejection_indicator)
+FC_REFLECT(graphene::protocol::predicate_result, (success)(rejection_path))

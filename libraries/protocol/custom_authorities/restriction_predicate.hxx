@@ -111,6 +111,8 @@ namespace safenum = boost::safe_numerics::safe_compare;
 //      a predicate functor for that type
 //    - attribute_assertion<Field> -- If the restriction is an attribute assertion, instead of using make_predicate
 //      to create a predicate function, we first recurse into restrictions_to_predicate with Field as the Object
+//    - variant_assertion<Field> -- If the restriction is a variant assertion, instead of using make_predicate, we
+//      recurse into restrictions_to_predicate with the variant value as the Object
 //  - embed_argument<Field, Predicate, Argument>() -- Embeds the argument into the predicate if it is a valid type
 //    for the predicate, and throws otherwise.
 //  - predicate_xyz<Argument> -- These are functors implementing the various predicate function types
@@ -172,8 +174,8 @@ struct predicate_eq<fc::optional<Field>, Argument, std::enable_if_t<comparable_t
    // Compare optional value against comparable type
    using base = predicate_eq<Field, Argument>;
    bool operator()(const fc::optional<Field>& f, const Argument& a) const {
-
-      return f.valid() && (*this)(*f, a);
+      if (!f.valid()) return predicate_result::Rejection(predicate_result::null_optional);
+      return (*this)(*f, a);
    }
 };
 template<typename Field>
@@ -214,7 +216,7 @@ struct predicate_compare<fc::optional<Field>, Argument, void> : predicate_compar
    // Compare optional value against comparable type
    constexpr static bool valid = true;
    constexpr int8_t operator()(const fc::optional<Field>& f, const Argument& a) const {
-       FC_ASSERT(f.valid(), "Cannot compute inequality comparison against a null optional");
+      if (!f.valid()) return predicate_result::Rejection(predicate_result::null_optional);
        return (*this)(*f, a);
    }
 };
@@ -255,7 +257,7 @@ struct predicate_in<fc::optional<Field>, flat_set<Element>, std::enable_if_t<com
    // Check for optional value
    constexpr static bool valid = true;
    bool operator()(const fc::optional<Field>& f, const flat_set<Element>& c) const {
-       FC_ASSERT(f.valid(), "Cannot compute whether null optional is in list");
+      if (!f.valid()) return predicate_result::Rejection(predicate_result::null_optional);
        return c.count(*f) != 0;
    }
 };
@@ -294,7 +296,7 @@ template<typename OptionalType, typename Argument>
 struct predicate_has_all<fc::optional<OptionalType>, Argument, void> : predicate_has_all<OptionalType, Argument> {
    // Field is optional container
    bool operator()(const fc::optional<OptionalType>& f, const Argument& a) const {
-      FC_ASSERT(f.valid(), "Cannot compute whether all elements of null optional container are in other container");
+      if (!f.valid()) return predicate_result::Rejection(predicate_result::null_optional);
       return (*this)(*f, a);
    }
 };
@@ -329,14 +331,14 @@ template<typename OptionalType, typename Argument>
 struct predicate_has_none<fc::optional<OptionalType>, Argument, void> : predicate_has_all<OptionalType, Argument> {
    // Field is optional container
    bool operator()(const fc::optional<OptionalType>& f, const Argument& a) const {
-      FC_ASSERT(f.valid(), "Cannot evaluate list has-none-of list on null optional list");
+      if (!f.valid()) return predicate_result::Rejection(predicate_result::null_optional);
       return (*this)(*f, a);
    }
 };
 ////////////////////////////////////////////// END PREDICATE FUNCTORS //////////////////////////////////////////////
 
 // Forward declaration of restrictions_to_predicate, because attribute assertions and logical ORs recurse into it
-template<typename Field> object_restriction_predicate<Field> restrictions_to_predicate(vector<restriction>, bool);
+template<typename Object> object_restriction_predicate<Object> restrictions_to_predicate(vector<restriction>, bool);
 
 template<typename Field>
 struct attribute_assertion {
@@ -348,7 +350,7 @@ template<typename Field>
 struct attribute_assertion<fc::optional<Field>> {
    static object_restriction_predicate<fc::optional<Field>> create(vector<restriction>&& rs) {
       return [p=restrictions_to_predicate<Field>(std::move(rs), false)](const fc::optional<Field>& f) {
-         FC_ASSERT(f.valid(), "Cannot evaluate attribute assertion on null optional field");
+         if (!f.valid()) return predicate_result::Rejection(predicate_result::null_optional);
          return p(*f);
       };
    }
@@ -362,17 +364,61 @@ struct attribute_assertion<extension<Extension>> {
    }
 };
 
+template<typename Variant>
+struct variant_assertion {
+   static object_restriction_predicate<Variant> create(restriction::variant_assert_argument_type&&) {
+      FC_THROW_EXCEPTION(fc::assert_exception, "Invalid variant assertion on non-variant field",
+                         ("Field", fc::get_typename<Variant>::name()));
+   }
+};
+template<typename... Types>
+struct variant_assertion<static_variant<Types...>> {
+   using Variant = static_variant<Types...>;
+
+   template<typename Value>
+   static auto make_predicate(vector<restriction>&& rs) {
+      return [p=restrictions_to_predicate<Value>(std::move(rs), true)](const Variant& v) {
+         if (v.which() == Variant::template tag<Value>::value)
+            return p(v.template get<Value>());
+         return predicate_result::Rejection(predicate_result::incorrect_variant_type);
+      };
+   }
+   static object_restriction_predicate<Variant> create(restriction::variant_assert_argument_type&& arg) {
+      return typelist::runtime::dispatch(typelist::list<Types...>(), arg.first,
+                                         [&arg](auto t) -> object_restriction_predicate<Variant> {
+         using Value = typename decltype(t)::type;
+         return variant_assertion::make_predicate<Value>(std::move(arg.second));
+      });
+   }
+};
+template<typename... Types>
+struct variant_assertion<fc::optional<static_variant<Types...>>> {
+   using Variant = static_variant<Types...>;
+   using Optional = fc::optional<Variant>;
+   static object_restriction_predicate<Optional> create(restriction::variant_assert_argument_type&& arg) {
+      return typelist::runtime::dispatch(typelist::list<Types...>(), arg.first,
+                                         [&arg](auto t) -> object_restriction_predicate<Optional> {
+         using Value = typename decltype(t)::type;
+         auto pred = variant_assertion<Variant>::template make_predicate<Value>(std::move(arg.second));
+         return [p=std::move(pred)](const Optional& opt) {
+            if (!opt.valid()) return predicate_result::Rejection(predicate_result::null_optional);
+            return p(*opt);
+         };
+      });
+   }
+};
+
 // Embed the argument into the predicate functor
 template<typename F, typename P, typename A, typename = std::enable_if_t<P::valid>>
 object_restriction_predicate<F> embed_argument(P p, A a, short) {
    return [p=std::move(p), a=std::move(a)](const F& f) {
-      if (p(f, a)) return predicate_result{true, {}};
-      return predicate_result();
+      if (p(f, a)) return predicate_result::Success();
+      return predicate_result::Rejection(predicate_result::predicate_was_false);
    };
 }
 template<typename F, typename P, typename A>
 object_restriction_predicate<F> embed_argument(P, A, long) {
-   FC_THROW_EXCEPTION(fc::assert_exception, "Invalid types for predicated");
+   FC_THROW_EXCEPTION(fc::assert_exception, "Invalid types for predicate");
 }
 
 // Resolve the argument type and make a predicate for it
@@ -420,6 +466,10 @@ object_restriction_predicate<Field> create_predicate_function(restriction_functi
          FC_ASSERT(arg.which() == restriction_argument::tag<vector<restriction>>::value,
                    "Argument type for attribute assertion must be restriction list");
          return attribute_assertion<Field>::create(std::move(arg.get<vector<restriction>>()));
+      case restriction::func_variant_assert:
+         FC_ASSERT(arg.which() == restriction_argument::tag<restriction::variant_assert_argument_type>::value,
+                   "Argument type for attribute assertion must be pair of variant tag and restriction list");
+         return variant_assertion<Field>::create(std::move(arg.get<restriction::variant_assert_argument_type>()));
       default:
           FC_THROW_EXCEPTION(fc::assert_exception, "Invalid function type on restriction");
       }
@@ -465,17 +515,15 @@ object_restriction_predicate<Object> create_logical_or_predicate(vector<vector<r
                   std::back_inserter(predicates), to_predicate);
 
    return [predicates=std::move(predicates)](const Object& obj) {
-      vector<predicate_result> failures;
+      vector<predicate_result> rejections;
       bool success = std::any_of(predicates.begin(), predicates.end(),
-                                 [o=std::cref(obj), &failures](const auto& p) {
+                                 [o=std::cref(obj), &rejections](const auto& p) {
          auto result = p(o);
-         if (!result) failures.push_back(std::move(result));
+         if (!result) rejections.push_back(std::move(result));
          return !!result;
       });
-      if (success) return predicate_result{true, {}};
-      predicate_result r;
-      r.failure_path.emplace_back(std::move(failures));
-      return r;
+      if (success) return predicate_result::Success();
+      return predicate_result::Rejection(std::move(rejections));
    };
 }
 
@@ -499,11 +547,11 @@ object_restriction_predicate<Object> restrictions_to_predicate(vector<restrictio
       for (size_t i = 0; i < predicates.size(); ++i) {
          auto result = predicates[i](obj);
          if (!result) {
-            result.failure_path.push_back(i);
+            result.rejection_path.push_back(i);
             return result;
          }
       }
-      return predicate_result{true, {}};
+      return predicate_result::Success();
    };
 }
 

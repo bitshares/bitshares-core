@@ -277,7 +277,7 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
                        const flat_set<account_id_type>& active_aprovals,
                        const flat_set<account_id_type>& owner_approvals )
 {
-   map<custom_authority_id_type, predicate_result> rejected_custom_auths;
+   rejected_predicate_map rejected_custom_auths;
    try {
    flat_set<account_id_type> required_active;
    flat_set<account_id_type> required_owner;

@@ -44,8 +44,13 @@ struct restriction {
         func_has_none,
         func_attr,
         func_logical_or,
+        func_variant_assert,
         FUNCTION_TYPE_COUNT ///< Sentry value which contains the number of different types
     };
+
+    // A variant assertion argument is a pair of the tag expected to be in the variant, and the restrictions to apply
+    // to the value
+    using variant_assert_argument_type = pair<int64_t, vector<restriction>>;
 
 #define GRAPHENE_OP_RESTRICTION_ARGUMENTS_VARIADIC \
     /*  0 */ void_t, \
@@ -88,7 +93,8 @@ struct restriction {
     /* 37 */ flat_set<worker_id_type>, \
     /* 38 */ flat_set<balance_id_type>, \
     /* 39 */ vector<restriction>, \
-    /* 40 */ vector<vector<restriction>>
+    /* 40 */ vector<vector<restriction>>, \
+    /* 41 */ variant_assert_argument_type
 
     using argument_type = fc::static_variant<GRAPHENE_OP_RESTRICTION_ARGUMENTS_VARIADIC>;
 
@@ -123,6 +129,7 @@ FC_REFLECT_ENUM(graphene::protocol::restriction::function_type,
                 (func_has_none)
                 (func_attr)
                 (func_logical_or)
+                (func_variant_assert)
                 (FUNCTION_TYPE_COUNT))
 
 FC_REFLECT(graphene::protocol::restriction,

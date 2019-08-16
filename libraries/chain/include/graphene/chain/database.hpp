@@ -48,7 +48,6 @@ namespace graphene { namespace protocol { struct predicate_result; } }
 namespace graphene { namespace chain {
    using graphene::db::abstract_object;
    using graphene::db::object;
-   using rejected_predicate_map = map<custom_authority_id_type, predicate_result>;
    class op_evaluator;
    class transaction_evaluation_state;
    class proposal_object;

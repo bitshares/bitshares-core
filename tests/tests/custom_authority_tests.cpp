@@ -59,6 +59,9 @@ void expect_exception_string(const string& s, Expression e) {
                 ("s", s)("e", e));
    }
 }
+#define EXPECT_EXCEPTION_STRING(S, E) \
+    BOOST_TEST_CHECKPOINT("Expect exception containing string: " S); \
+    expect_exception_string(S, E)
 
 BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    using namespace graphene::protocol;
@@ -69,13 +72,15 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    restrictions.emplace_back(to_index, FUNC(eq), account_id_type(12));
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == false);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
-               .failure_path.size() == 1);
+               .rejection_path.size() == 2);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
-               .failure_path.front().get<size_t>() == 0);
+               .rejection_path[0].get<predicate_result::rejection_reason>() == predicate_result::predicate_was_false);
+   BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
+               .rejection_path[1].get<size_t>() == 0);
    transfer.to = account_id_type(12);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == true);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
-               .failure_path.size() == 0);
+               .rejection_path.size() == 0);
 
    restrictions.front() = restriction(fc::typelist::length<fc::reflector<transfer_operation>::native_members>(),
                                       FUNC(eq), account_id_type(12));
@@ -91,27 +96,31 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
                                       vector<restriction>{restriction(asset_id_index, FUNC(eq), asset_id_type(0))});
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == true);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
-               .failure_path.size() == 0);
+               .rejection_path.size() == 0);
    restrictions.front().argument.get<vector<restriction>>().front().argument = asset_id_type(1);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == false);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
-               .failure_path.size() == 2);
+               .rejection_path.size() == 3);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
-               .failure_path.front().get<size_t>() == 0);
+               .rejection_path[0].get<predicate_result::rejection_reason>() == predicate_result::predicate_was_false);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
-               .failure_path[1].get<size_t>() == 0);
+               .rejection_path[1].get<size_t>() == 0);
+   BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
+               .rejection_path[2].get<size_t>() == 0);
    restrictions.emplace_back(to_index, FUNC(eq), account_id_type(12));
    transfer.to = account_id_type(12);
    transfer.fee.asset_id = asset_id_type(1);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == true);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
-               .failure_path.size() == 0);
+               .rejection_path.size() == 0);
    transfer.to = account_id_type(10);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer) == false);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
-               .failure_path.size() == 1);
+               .rejection_path.size() == 2);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
-               .failure_path.front().get<size_t>() == 1);
+               .rejection_path[0].get<predicate_result::rejection_reason>() == predicate_result::predicate_was_false);
+   BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
+               .rejection_path[1].get<size_t>() == 1);
 
    account_update_operation update;
    restrictions.clear();
@@ -122,12 +131,14 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    auto predicate = get_restriction_predicate(restrictions, operation::tag<account_update_operation>::value);
    BOOST_CHECK_THROW(predicate(transfer), fc::assert_exception);
    BOOST_CHECK(predicate(update) == true);
-   BOOST_CHECK(predicate(update).failure_path.size() == 0);
+   BOOST_CHECK(predicate(update).rejection_path.size() == 0);
    update.extensions.value.owner_special_authority = special_authority();
    BOOST_CHECK(predicate(update) == false);
-   BOOST_CHECK(predicate(update).failure_path.size() == 2);
-   BOOST_CHECK(predicate(update).failure_path.front().get<size_t>() == 0);
-   BOOST_CHECK(predicate(update).failure_path[1].get<size_t>() == 0);
+   BOOST_CHECK_EQUAL(predicate(update).rejection_path.size(), 3);
+   BOOST_CHECK(predicate(update).rejection_path[0].get<predicate_result::rejection_reason>() ==
+               predicate_result::predicate_was_false);
+   BOOST_CHECK(predicate(update).rejection_path[1].get<size_t>() == 0);
+   BOOST_CHECK(predicate(update).rejection_path[2].get<size_t>() == 0);
    restrictions.front().argument.get<vector<restriction>>().front().restriction_type = FUNC(ne);
    predicate = get_restriction_predicate(restrictions, operation::tag<account_update_operation>::value);
    BOOST_CHECK(predicate(update) == true);
@@ -165,7 +176,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    top.amount.amount = 99 * GRAPHENE_BLOCKCHAIN_PRECISION;
    trx.operations = {top};
    sign(trx, bob_private_key);
-   // No custom auth yet; bob's transfer should fail
+   // No custom auth yet; bob's transfer should reject
    BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
 
    trx.clear();
@@ -186,8 +197,8 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    trx.operations.front().get<transfer_operation>().amount.amount = 100*GRAPHENE_BLOCKCHAIN_PRECISION;
    trx.clear_signatures();
    sign(trx, bob_private_key);
-   // If bob tries to transfer 100, it fails because the restriction is strictly less than 100
-   expect_exception_string("\"failure_path\":[[0,0],[0,0]]", [&] {PUSH_TX(db, trx);});
+   // If bob tries to transfer 100, it rejects because the restriction is strictly less than 100
+   EXPECT_EXCEPTION_STRING("\"rejection_path\":[[2,\"predicate_was_false\"],[0,0],[0,0]]", [&] {PUSH_TX(db, trx);});
 
    op.restrictions.front().argument.get<vector<restriction>>().front().restriction_type = restriction::func_eq;
    custom_authority_update_operation uop;
@@ -207,8 +218,8 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    trx.operations = {top};
    trx.expiration += 5;
    sign(trx, bob_private_key);
-   // The transfer of 99 should fail now becaues the requirement is for exactly 100
-   expect_exception_string("\"failure_path\":[[0,0],[0,0]]", [&] {PUSH_TX(db, trx);});
+   // The transfer of 99 should reject because the requirement is for exactly 100
+   EXPECT_EXCEPTION_STRING("\"rejection_path\":[[2,\"predicate_was_false\"],[0,0],[0,0]]", [&] {PUSH_TX(db, trx);});
 
    trx.operations.front().get<transfer_operation>().amount.amount = 100*GRAPHENE_BLOCKCHAIN_PRECISION;
    trx.clear_signatures();

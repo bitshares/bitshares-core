@@ -27,8 +27,10 @@
 namespace graphene { namespace protocol {
    struct predicate_result;
 
+   using rejected_predicate = static_variant<predicate_result, fc::exception>;
+   using rejected_predicate_map = map<custom_authority_id_type, rejected_predicate>;
    using custom_authority_lookup = std::function<vector<authority>(account_id_type, const operation&,
-                                                                   map<custom_authority_id_type, predicate_result>*)>;
+                                                                   rejected_predicate_map*)>;
 
    /**
     * @defgroup transactions Transactions
