@@ -32,15 +32,16 @@ using namespace graphene::chain;
 using namespace graphene::chain::test;
 using namespace graphene::app;
 
+using fc::uint128_t;
+
 BOOST_AUTO_TEST_SUITE(app_util_tests)
 
 BOOST_AUTO_TEST_CASE(uint128_amount_to_string_test) {
 
-   fc::uint128 max_u64( std::numeric_limits<uint64_t>::max() );
-   fc::uint128 min_gt_u64 = max_u64 + 1;
-   fc::uint128 one_u128 = max_u64 * 10;
-   fc::uint128 max_u128 = fc::uint128::max_value();
-   //idump( ( uint128_amount_to_string( fc::uint128::max_value(), 0) ) );
+   fc::uint128_t max_u64( std::numeric_limits<uint64_t>::max() );
+   fc::uint128_t min_gt_u64 = max_u64 + 1;
+   fc::uint128_t one_u128 = max_u64 * 10;
+   fc::uint128_t max_u128 = std::numeric_limits<fc::uint128_t>::max();
 
    BOOST_CHECK_EQUAL( uint128_amount_to_string( 0,          0), "0" );
    BOOST_CHECK_EQUAL( uint128_amount_to_string( 1,          0), "1" );

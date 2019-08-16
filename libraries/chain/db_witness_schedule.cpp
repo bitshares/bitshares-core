@@ -27,6 +27,8 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/witness_schedule_object.hpp>
 
+#include <fc/popcount.hpp>
+
 namespace graphene { namespace chain {
 
 using boost::container::flat_set;
@@ -96,7 +98,7 @@ uint32_t database::update_witness_missed_blocks( const signed_block& b )
 uint32_t database::witness_participation_rate()const
 {
    const dynamic_global_property_object& dpo = get_dynamic_global_properties();
-   return uint64_t(GRAPHENE_100_PERCENT) * dpo.recent_slots_filled.popcount() / 128;
+   return uint64_t(GRAPHENE_100_PERCENT) * fc::popcount(dpo.recent_slots_filled) / 128;
 }
 
 void database::update_witness_schedule()
