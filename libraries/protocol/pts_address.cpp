@@ -33,14 +33,14 @@ namespace graphene { namespace protocol {
 
    pts_address::pts_address()
    {
-      memset( addr.data, 0, sizeof(addr.data) );
+      memset( addr.data(), 0, addr.size() );
    }
 
    pts_address::pts_address( const std::string& base58str )
    {
       std::vector<char> v = fc::from_base58( fc::string(base58str) );
       if( v.size() )
-         memcpy( addr.data, v.data(), std::min<size_t>( v.size(), sizeof(addr) ) );
+         memcpy( addr.data(), v.data(), std::min<size_t>( v.size(), addr.size() ) );
 
       FC_ASSERT(is_valid(), "invalid pts_address ${a}", ("a", base58str));
    }
@@ -51,19 +51,19 @@ namespace graphene { namespace protocol {
        if( compressed )
        {
            auto dat = pub.serialize();
-           sha2     = fc::sha256::hash(dat.data, sizeof(dat) );
+           sha2     = fc::sha256::hash((char*) dat.data(), dat.size() );
        }
        else
        {
            auto dat = pub.serialize_ecc_point();
-           sha2     = fc::sha256::hash(dat.data, sizeof(dat) );
+           sha2     = fc::sha256::hash((char*) dat.data(), dat.size() );
        }
        auto rep      = fc::ripemd160::hash((char*)&sha2,sizeof(sha2));
-       addr.data[0]  = version;
-       memcpy( addr.data+1, (char*)&rep, sizeof(rep) );
-       auto check    = fc::sha256::hash( addr.data, sizeof(rep)+1 );
+       addr[0]  = version;
+       memcpy( addr.data() + 1, (char*)&rep, sizeof(rep) );
+       auto check    = fc::sha256::hash( addr.data(), sizeof(rep)+1 );
        check = fc::sha256::hash(check);
-       memcpy( addr.data+1+sizeof(rep), (char*)&check, 4 );
+       memcpy( addr.data() + 1 + sizeof(rep), (char*)&check, 4 );
    }
 
    /**
@@ -72,14 +72,14 @@ namespace graphene { namespace protocol {
     */
    bool pts_address::is_valid()const
    {
-       auto check    = fc::sha256::hash( addr.data, sizeof(fc::ripemd160)+1 );
+       auto check    = fc::sha256::hash( addr.data(), sizeof(fc::ripemd160)+1 );
        check = fc::sha256::hash(check);
-       return memcmp( addr.data+1+sizeof(fc::ripemd160), (char*)&check, 4 ) == 0;
+       return memcmp( addr.data() + 1 + sizeof(fc::ripemd160), (char*)&check, 4 ) == 0;
    }
 
    pts_address::operator std::string()const
    {
-        return fc::to_base58( addr.data, sizeof(addr) );
+        return fc::to_base58( addr.data(), addr.size() );
    }
 
 } } // namespace graphene

@@ -31,7 +31,6 @@
 #include <fc/io/stdio.hpp>
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/cli.hpp>
-#include <fc/rpc/http_api.hpp>
 #include <fc/rpc/websocket_api.hpp>
 
 #include <graphene/app/api.hpp>
@@ -309,9 +308,11 @@ int main( int argc, char** argv )
          for( auto& name_formatter : wapiptr->get_result_formatters() )
             wallet_cli->format_result( name_formatter.first, name_formatter.second );
 
+         std::cout << "\nType \"help\" for a list of available commands.\n";
+         std::cout << "Type \"gethelp <command>\" for info about individual commands.\n\n";
          if( wapiptr->is_new() )
          {
-            std::cout << "Please use the set_password method to initialize a new wallet before continuing\n";
+            std::cout << "Please use the \"set_password\" method to initialize a new wallet before continuing\n";
             wallet_cli->set_prompt( "new >>> " );
          }
          else
@@ -358,7 +359,7 @@ int main( int argc, char** argv )
       }
       else
       {
-         fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
+         fc::promise<int>::ptr exit_promise = fc::promise<int>::create("UNIX Signal Handler");
 
          fc::set_signal_handler( [&exit_promise](int signal) {
             ilog( "Captured SIGINT in daemon mode, exiting" );

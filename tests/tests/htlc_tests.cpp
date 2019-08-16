@@ -58,107 +58,16 @@ BOOST_FIXTURE_TEST_SUITE( htlc_tests, database_fixture )
 
 void generate_random_preimage(uint16_t key_size, std::vector<char>& vec)
 {
-	std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned int> rbe;
+	std::independent_bits_engine<std::default_random_engine, sizeof(unsigned), unsigned int> rbe;
 	std::generate(begin(vec), end(vec), std::ref(rbe));
 	return;
-}
-
-/****
- * Hash the preimage and put it in a vector
- * @param preimage the preimage
- * @returns a vector that cointains the sha256 hash of the preimage
- */
-template<typename H>
-H hash_it(std::vector<char> preimage)
-{
-   return H::hash( (char*)preimage.data(), preimage.size() );
-}
-
-flat_map< uint64_t, graphene::chain::fee_parameters > get_htlc_fee_parameters()
-{
-   flat_map<uint64_t, graphene::chain::fee_parameters> ret_val;
-
-   htlc_create_operation::fee_parameters_type create_param;
-   create_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
-   create_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
-   ret_val[((operation)htlc_create_operation()).which()] = create_param;
-
-   htlc_redeem_operation::fee_parameters_type redeem_param;
-   redeem_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
-   redeem_param.fee_per_kb = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
-   ret_val[((operation)htlc_redeem_operation()).which()] = redeem_param;
-
-   htlc_extend_operation::fee_parameters_type extend_param;
-   extend_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
-   extend_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
-   ret_val[((operation)htlc_extend_operation()).which()] = extend_param;
-
-   return ret_val;
-}
-
-/****
- * @brief push through a proposal that sets htlc parameters and fees
- * @param db_fixture the database connection
- */
-void set_committee_parameters(database_fixture* db_fixture)
-{
-   // htlc fees
-   // get existing fee_schedule
-   const chain_parameters& existing_params = db_fixture->db.get_global_properties().parameters;
-   const fee_schedule_type& existing_fee_schedule = *(existing_params.current_fees);
-   // create a new fee_shedule
-   std::shared_ptr<fee_schedule_type> new_fee_schedule = std::make_shared<fee_schedule_type>();
-   new_fee_schedule->scale = GRAPHENE_100_PERCENT;
-   // replace the old with the new
-   flat_map<uint64_t, graphene::chain::fee_parameters> params_map = get_htlc_fee_parameters();
-   for(auto param : existing_fee_schedule.parameters)
-   {
-      auto itr = params_map.find(param.which());
-      if (itr == params_map.end())
-         new_fee_schedule->parameters.insert(param);
-      else
-      {
-         new_fee_schedule->parameters.insert( (*itr).second);
-      }
-   }
-   // htlc parameters
-   proposal_create_operation cop = proposal_create_operation::committee_proposal(
-         db_fixture->db.get_global_properties().parameters, db_fixture->db.head_block_time());
-   cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
-   cop.expiration_time = db_fixture->db.head_block_time() + *cop.review_period_seconds + 10;
-   committee_member_update_global_parameters_operation uop;
-   graphene::chain::htlc_options new_params;
-   new_params.max_preimage_size = 19200;
-   new_params.max_timeout_secs = 60 * 60 * 24 * 28;
-   uop.new_parameters.extensions.value.updatable_htlc_options = new_params;
-   uop.new_parameters.current_fees = new_fee_schedule;
-   cop.proposed_ops.emplace_back(uop);
-   
-   db_fixture->trx.operations.push_back(cop);
-   graphene::chain::processed_transaction proc_trx =db_fixture->db.push_transaction(db_fixture->trx);
-   db_fixture->trx.clear();
-   proposal_id_type good_proposal_id = proc_trx.operation_results[0].get<object_id_type>();
-
-   proposal_update_operation puo;
-   puo.proposal = good_proposal_id;
-   puo.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
-   puo.key_approvals_to_add.emplace( db_fixture->init_account_priv_key.get_public_key() );
-   db_fixture->trx.operations.push_back(puo);
-   db_fixture->sign( db_fixture->trx, db_fixture->init_account_priv_key );
-   db_fixture->db.push_transaction(db_fixture->trx);
-   db_fixture->trx.clear();
-
-   db_fixture->generate_blocks( good_proposal_id( db_fixture->db ).expiration_time + 5 );
-   db_fixture->generate_blocks( db_fixture->db.get_dynamic_global_properties().next_maintenance_time );
-   db_fixture->generate_block();   // get the maintenance skip slots out of the way
-
 }
 
 void advance_past_hardfork(database_fixture* db_fixture)
 {
    db_fixture->generate_blocks(HARDFORK_CORE_1468_TIME);
    set_expiration(db_fixture->db, db_fixture->trx);
-   set_committee_parameters(db_fixture);
+   db_fixture->set_htlc_committee_parameters();
    set_expiration(db_fixture->db, db_fixture->trx);
 }
 
@@ -844,11 +753,11 @@ try {
    generate_blocks(HARDFORK_CORE_1468_TIME);
    set_expiration( db, trx );
 
-   set_committee_parameters(this);
+   set_htlc_committee_parameters();
 
    uint16_t preimage_size = 256;
    std::vector<char> pre_image(256);
-   std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned char> rbe;
+   std::independent_bits_engine<std::default_random_engine, sizeof(unsigned), unsigned int> rbe;
    std::generate(begin(pre_image), end(pre_image), std::ref(rbe));
    graphene::chain::htlc_id_type alice_htlc_id_bob;
    graphene::chain::htlc_id_type alice_htlc_id_carl;
@@ -977,6 +886,37 @@ try {
 
    full = db_api.get_full_accounts({bob.name}, false);
    BOOST_CHECK_EQUAL( full[bob.name].htlcs_to.size(), 1 );
+
+   auto list = db_api.list_htlcs(graphene::chain::htlc_id_type(0), 1);
+   BOOST_CHECK_EQUAL( list.size(), 1 );
+   BOOST_CHECK_EQUAL( list[0].id.instance(), 0 );
+
+   list = db_api.list_htlcs(graphene::chain::htlc_id_type(1), 1);
+   BOOST_CHECK_EQUAL( list.size(), 1 );
+   BOOST_CHECK_EQUAL( list[0].id.instance(), 1 );
+
+   list = db_api.list_htlcs(graphene::chain::htlc_id_type(2), 1);
+   BOOST_CHECK_EQUAL( list.size(), 1 );
+   BOOST_CHECK_EQUAL( list[0].id.instance(), 2 );
+
+   list = db_api.list_htlcs(graphene::chain::htlc_id_type(1), 2);
+   BOOST_CHECK_EQUAL( list.size(), 2 );
+   BOOST_CHECK_EQUAL( list[0].id.instance(), 1 );
+   BOOST_CHECK_EQUAL( list[1].id.instance(), 2 );
+
+   list = db_api.list_htlcs(graphene::chain::htlc_id_type(1), 3);
+   BOOST_CHECK_EQUAL( list.size(), 2 );
+   BOOST_CHECK_EQUAL( list[0].id.instance(), 1 );
+   BOOST_CHECK_EQUAL( list[1].id.instance(), 2 );
+
+   list = db_api.list_htlcs(graphene::chain::htlc_id_type(0), 100);
+   BOOST_CHECK_EQUAL( list.size(), 3 );
+   BOOST_CHECK_EQUAL( list[0].id.instance(), 0 );
+   BOOST_CHECK_EQUAL( list[1].id.instance(), 1 );
+   BOOST_CHECK_EQUAL( list[2].id.instance(), 2 );
+
+   list = db_api.list_htlcs(graphene::chain::htlc_id_type(10), 100);
+   BOOST_CHECK_EQUAL( list.size(), 0 );
 
 } catch (fc::exception &e) {
       edump((e.to_detail_string()));

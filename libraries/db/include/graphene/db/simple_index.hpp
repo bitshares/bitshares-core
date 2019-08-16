@@ -98,13 +98,6 @@ namespace graphene { namespace db {
                }
             } FC_CAPTURE_AND_RETHROW()
          }
-         virtual fc::uint128 hash()const override {
-            fc::uint128 result;
-            for( const auto& ptr : _objects )
-               result += ptr->hash();
-
-            return result;
-         }
 
          class const_iterator
          {

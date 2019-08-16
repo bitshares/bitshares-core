@@ -323,7 +323,16 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_dynamic_data_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_bitasset_data_object)
 
-FC_REFLECT_TYPENAME( graphene::chain::asset_object )
+FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
+                    (symbol)
+                    (precision)
+                    (issuer)
+                    (options)
+                    (dynamic_asset_data_id)
+                    (bitasset_data_id)
+                    (buyback_account)
+                  )
+
 FC_REFLECT_TYPENAME( graphene::chain::asset_bitasset_data_object )
 FC_REFLECT_TYPENAME( graphene::chain::asset_dynamic_data_object )
 
