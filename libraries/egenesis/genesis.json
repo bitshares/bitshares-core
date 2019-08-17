@@ -366,6 +366,7 @@
         "charity_fee_percentage": 1000,
         "lifetime_referrer_percent_of_fee": 3000,
         "witness_pay_per_block": 150000,
+        "core_inflation_amount": 0,
         "worker_budget_per_day": "50000000000"
     },
     "initial_marketing_partner_account_name": "nathan",
