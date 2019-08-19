@@ -1087,6 +1087,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
 
 BOOST_AUTO_TEST_CASE( lookup_vote_ids )
 { try {
+   graphene::app::database_api db_api( db, &( app.get_options() ));
    ACTORS( (connie)(whitney)(wolverine) );
 
    fund(connie);
@@ -1100,8 +1101,6 @@ BOOST_AUTO_TEST_CASE( lookup_vote_ids )
    const auto& witness = create_witness( whitney );
    const auto& worker = create_worker( wolverine_id );
 
-   graphene::app::database_api db_api(db);
-
    std::vector<vote_id_type> votes;
    votes.push_back( committee.vote_id );
    votes.push_back( witness.vote_id );
@@ -1113,7 +1112,7 @@ BOOST_AUTO_TEST_CASE( lookup_vote_ids )
 
 BOOST_AUTO_TEST_CASE(get_account_limit_orders)
 { try {
-
+   graphene::app::database_api db_api( db, &( app.get_options() ));
    ACTORS((seller));
 
    const auto& bitcny = create_bitasset("CNY");
@@ -1135,7 +1134,6 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
       BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250 - i)));
    }
 
-   graphene::app::database_api db_api(db);
    std::vector<limit_order_object> results;
    limit_order_object o;
 
@@ -1788,11 +1786,7 @@ BOOST_AUTO_TEST_CASE( asset_in_collateral )
 BOOST_AUTO_TEST_CASE( api_limit_lookup_accounts ) {
    try{
       graphene::app::database_api db_api( db, &( app.get_options() ));
-      auto bob_private_key = generate_private_key("bob");
-      account_id_type bob_id = create_account("bob", bob_private_key.get_public_key()).id;
-      transfer(account_id_type(), bob_id, asset(100));
-      generate_block();
-      fc::usleep(fc::milliseconds(100));
+      ACTOR(bob);
       GRAPHENE_CHECK_THROW(db_api.lookup_accounts("bob",220), fc::exception);
       map<string,account_id_type> result =db_api.lookup_accounts("bob",190);
       BOOST_REQUIRE_EQUAL( result.size(), 17u);
@@ -1806,11 +1800,7 @@ BOOST_AUTO_TEST_CASE( api_limit_lookup_accounts ) {
 BOOST_AUTO_TEST_CASE( api_limit_lookup_witness_accounts ) {
    try{
       graphene::app::database_api db_api( db, &( app.get_options() ));
-      auto bob_private_key = generate_private_key("bob");
-      account_id_type bob_id = create_account("bob", bob_private_key.get_public_key()).id;
-      transfer(account_id_type(), bob_id, asset(100));
-      generate_block();
-      fc::usleep(fc::milliseconds(100));
+      ACTORS((bob)) ;
       GRAPHENE_CHECK_THROW(db_api.lookup_witness_accounts("bob",220), fc::exception);
       map<string, witness_id_type> result =db_api.lookup_witness_accounts("bob",190);
       BOOST_REQUIRE_EQUAL( result.size(), 10u);
@@ -1844,7 +1834,6 @@ BOOST_AUTO_TEST_CASE(api_limit_get_withdraw_permissions_by_recipient){
       graphene::app::database_api db_api( db, &app.get_options());
       ACTORS((bob)) ;
       withdraw_permission_id_type withdraw_permission;
-      transfer(account_id_type(), bob_id, asset(100));
       GRAPHENE_CHECK_THROW(db_api.get_withdraw_permissions_by_recipient(
          "bob",withdraw_permission, 251), fc::exception);
       vector<withdraw_permission_object> result =db_api.get_withdraw_permissions_by_recipient(
@@ -1860,7 +1849,6 @@ BOOST_AUTO_TEST_CASE(api_limit_get_withdraw_permissions_by_giver){
       graphene::app::database_api db_api( db, &app.get_options());
       ACTORS((bob)) ;
       withdraw_permission_id_type withdraw_permission;
-      transfer(account_id_type(), bob_id, asset(100));
       GRAPHENE_CHECK_THROW(db_api.get_withdraw_permissions_by_giver(
          "bob",withdraw_permission, 251), fc::exception);
       vector<withdraw_permission_object> result =db_api.get_withdraw_permissions_by_giver(
@@ -1877,19 +1865,18 @@ BOOST_AUTO_TEST_CASE(api_limit_get_trade_history_by_sequence){
       graphene::app::application_options opt=app.get_options();
       opt.has_market_history_plugin = true;
       graphene::app::database_api db_api( db, &opt);
-      ACTORS((bob) (alice) (fred)) ;
-      const auto& bitusd = create_bitasset("USDBIT", bob_id);
+      const auto& bitusd = create_bitasset("USDBIT");
       asset_id_type asset_1, asset_2;
       asset_1 = bitusd.id;
       asset_2 = asset_id_type();
       GRAPHENE_CHECK_THROW(db_api.get_trade_history_by_sequence(
          std::string( static_cast<object_id_type>(asset_1)),
          std::string( static_cast<object_id_type>(asset_2)),
-         0,fc::time_point_sec(1532008940), 251), fc::exception);
+         0,fc::time_point_sec(), 251), fc::exception);
       vector<graphene::app::market_trade> result =db_api.get_trade_history_by_sequence(
          std::string( static_cast<object_id_type>(asset_1)),
          std::string( static_cast<object_id_type>(asset_2)),
-         0,fc::time_point_sec(1532008940),250);
+         0,fc::time_point_sec(),250);
       BOOST_REQUIRE_EQUAL( result.size(), 0u);
    }catch (fc::exception& e) {
       edump((e.to_detail_string()));
@@ -1903,20 +1890,19 @@ BOOST_AUTO_TEST_CASE(api_limit_get_trade_history){
       graphene::app::application_options opt=app.get_options();
       opt.has_market_history_plugin = true;
       graphene::app::database_api db_api( db, &opt);
-      ACTORS((bob) (alice) (fred)) ;
-      const auto& bitusd = create_bitasset("USDBIT", bob_id);
+      const auto& bitusd = create_bitasset("USDBIT");
       asset_id_type asset_1, asset_2;
       asset_1 = bitusd.id;
       asset_2 = asset_id_type();
       GRAPHENE_CHECK_THROW(db_api.get_trade_history(
                               std::string( static_cast<object_id_type>(asset_1)),
                               std::string( static_cast<object_id_type>(asset_2)),
-                              fc::time_point_sec(1532008920),fc::time_point_sec(1532008940),
+                              fc::time_point_sec(),fc::time_point_sec(),
                               251), fc::exception);
       vector<graphene::app::market_trade> result =db_api.get_trade_history(
          std::string( static_cast<object_id_type>(asset_1)),
          std::string( static_cast<object_id_type>(asset_2)),
-         fc::time_point_sec(1532008920),fc::time_point_sec(1532008940),250);
+         fc::time_point_sec(),fc::time_point_sec(),250);
       BOOST_REQUIRE_EQUAL( result.size(), 0u);
    }catch (fc::exception& e) {
       edump((e.to_detail_string()));
@@ -1929,8 +1915,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_top_markets){
       graphene::app::application_options opt=app.get_options();
       opt.has_market_history_plugin = true;
       graphene::app::database_api db_api( db, &opt);
-      ACTORS((bob) (alice) (fred)) ;
-      const auto& bitusd = create_bitasset("USDBIT", bob_id);
+      const auto& bitusd = create_bitasset("USDBIT");
       asset_id_type asset_1, asset_2;
       asset_1 = bitusd.id;
       asset_2 = asset_id_type();
@@ -2076,11 +2061,7 @@ BOOST_AUTO_TEST_CASE( api_limit_lookup_vote_ids ) {
 BOOST_AUTO_TEST_CASE( api_limit_lookup_committee_member_accounts ) {
    try{
       graphene::app::database_api db_api( db, &( app.get_options() ));
-      auto bob_private_key = generate_private_key("bob");
-      account_id_type bob_id = create_account("bob", bob_private_key.get_public_key()).id;
-      transfer(account_id_type(), bob_id, asset(100));
-      generate_block();
-      fc::usleep(fc::milliseconds(100));
+      ACTORS((bob));
       GRAPHENE_CHECK_THROW(db_api.lookup_committee_member_accounts("bob",220), fc::exception);
       std::map<std::string, committee_member_id_type>  result =db_api.lookup_committee_member_accounts("bob",190);
       BOOST_REQUIRE_EQUAL( result.size(), 10u);
