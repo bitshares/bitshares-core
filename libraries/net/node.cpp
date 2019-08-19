@@ -3182,7 +3182,6 @@ namespace graphene { namespace net { namespace detail {
          {
             if (firewall_check_state->expected_node_id != peer->node_id && // it's not the node who is asking us to test
                   !peer->firewall_check_state && // the peer isn't already performing a check for another node
-                  peer->get_remote_endpoint().valid() && 
                   _address_builder->should_advertise(*peer->get_remote_endpoint()) && // can adv. who is about to be asked
                   firewall_check_state->nodes_already_tested.find(peer->node_id) 
                         == firewall_check_state->nodes_already_tested.end() && // we haven't already asked
@@ -3418,8 +3417,7 @@ namespace graphene { namespace net { namespace detail {
          {
             ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
 
-            if ( peer->get_remote_endpoint().valid() && 
-                  _address_builder->should_advertise( *peer->get_remote_endpoint() ) )
+            if ( _address_builder->should_advertise( *peer->get_remote_endpoint() ) )
             {
                current_connection_data data_for_this_peer;
                data_for_this_peer.connection_duration =
