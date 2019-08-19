@@ -56,6 +56,10 @@ macro(FIND_CURL)
    else (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
       find_package(CURL REQUIRED)
    endif (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
+
+   if(MINGW)
+       list(APPEND CURL_LIBRARIES pthread)
+   endif(MINGW)
 endmacro()
 
 # Save the old value of CMAKE_REQUIRED_FLAGS
