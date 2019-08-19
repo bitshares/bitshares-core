@@ -1048,57 +1048,57 @@ void application::set_program_options(boost::program_options::options_descriptio
           "Whether to enable tracking of votes of standby witnesses and committee members. "
           "Set it to true to provide accurate data to API clients, set to false for slightly better performance.")
          ("api-limit-get-account-history-operations",boost::program_options::value<uint64_t>()->default_value(100),
-          "For history_api::get_account_history_operations to set its default limit value as 100")
+          "For history_api::get_account_history_operations to set max limit value")
          ("api-limit-get-account-history",boost::program_options::value<uint64_t>()->default_value(100),
-          "For history_api::get_account_history to set its default limit value as 100")
+          "For history_api::get_account_history to set max limit value")
          ("api-limit-get-grouped-limit-orders",boost::program_options::value<uint64_t>()->default_value(101),
-          "For orders_api::get_grouped_limit_orders to set its default limit value as 101")
+          "For orders_api::get_grouped_limit_orders to set max limit value")
          ("api-limit-get-relative-account-history",boost::program_options::value<uint64_t>()->default_value(100),
-          "For history_api::get_relative_account_history to set its default limit value as 100")
+          "For history_api::get_relative_account_history to set max limit value")
          ("api-limit-get-account-history-by-operations",boost::program_options::value<uint64_t>()->default_value(100),
-          "For history_api::get_account_history_by_operations to set its default limit value as 100")
+          "For history_api::get_account_history_by_operations to set max limit value")
          ("api-limit-get-asset-holders",boost::program_options::value<uint64_t>()->default_value(100),
-          "For asset_api::get_asset_holders to set its default limit value as 100")
+          "For asset_api::get_asset_holders to set max limit value")
          ("api-limit-get-key-references",boost::program_options::value<uint64_t>()->default_value(100),
-          "For database_api_impl::get_key_references to set its default limit value as 100")
+          "For database_api_impl::get_key_references to set max limit value")
          ("api-limit-get-htlc-by",boost::program_options::value<uint64_t>()->default_value(100),
-          "For database_api_impl::get_htlc_by_from and get_htlc_by_to to set its default limit value as 100")
+          "For database_api_impl::get_htlc_by_from and get_htlc_by_to to set max limit value")
          ("api-limit-get-full-accounts",boost::program_options::value<uint64_t>()->default_value(10),
-          "For database_api_impl::get_full_accounts to set its account default limit values as 10")
+          "For database_api_impl::get_full_accounts to set max limit value")
          ("api-limit-get-full-accounts-lists",boost::program_options::value<uint64_t>()->default_value(100),
-          "For database_api_impl::get_full_accounts to set its lists default limit values as 100")
+          "For database_api_impl::get_full_accounts to set max limit value")
          ("api-limit-get-call-orders",boost::program_options::value<uint64_t>()->default_value(300),
-          "For database_api_impl::get_call_orders and get_call_orders_by_account to set its default limit values as 300")
+          "For database_api_impl::get_call_orders and get_call_orders_by_account to set max limit value")
          ("api-limit-get-settle-orders",boost::program_options::value<uint64_t>()->default_value(300),
-          "For database_api_impl::get_settle_orders and get_settle_orders_by_account to set its default limit values as 300")
+          "For database_api_impl::get_settle_orders and get_settle_orders_by_account to set max limit value")
          ("api-limit-get-assets",boost::program_options::value<uint64_t>()->default_value(101),
-          "For database_api_impl::list_assets and get_assets_by_issuer to set its default limit values as 101")
+          "For database_api_impl::list_assets and get_assets_by_issuer to set max limit value")
          ("api-limit-get-limit-orders",boost::program_options::value<uint64_t>()->default_value(300),
-          "For database_api_impl::get_limit_orders to set its default limit value as 300")
+          "For database_api_impl::get_limit_orders to set max limit value")
          ("api-limit-get-order-book",boost::program_options::value<uint64_t>()->default_value(50),
-          "For database_api_impl::get_order_book to set its default limit value as 50")
+          "For database_api_impl::get_order_book to set max limit value")
          ("api-limit-lookup-accounts",boost::program_options::value<uint64_t>()->default_value(1000),
-          "For database_api_impl::lookup_accounts to set its default limit values as 1000")
+          "For database_api_impl::lookup_accounts to set max limit value")
          ("api-limit-lookup-witness-accounts",boost::program_options::value<uint64_t>()->default_value(1000),
-          "For database_api_impl::lookup_witness_accounts to set its default limit values as 1000")
+          "For database_api_impl::lookup_witness_accounts to set max limit value")
          ("api-limit-lookup-committee-member-accounts",boost::program_options::value<uint64_t>()->default_value(1000),
-          "For database_api_impl::lookup_committee_member_accounts to set its default limit values as 1000")
+          "For database_api_impl::lookup_committee_member_accounts to set max limit value")
          ("api-limit-lookup-vote-ids",boost::program_options::value<uint64_t>()->default_value(1000),
-          "For database_api_impl::lookup_vote_ids to set its default limit values as 1000")
+          "For database_api_impl::lookup_vote_ids to set max limit value")
          ("api-limit-get-account-limit-orders",boost::program_options::value<uint64_t>()->default_value(101),
-          "For database_api_impl::get_account_limit_orders to set its default limit values as 101")
+          "For database_api_impl::get_account_limit_orders to set max limit value")
          ("api-limit-get-collateral-bids",boost::program_options::value<uint64_t>()->default_value(100),
-          "For database_api_impl::get_collateral_bids to set its default limit values as 100")
+          "For database_api_impl::get_collateral_bids to set max limit value")
          ("api-limit-get-top-markets",boost::program_options::value<uint64_t>()->default_value(100),
-          "For database_api_impl::get_top_markets to set its default limit values as 100")
+          "For database_api_impl::get_top_markets to set max limit value")
          ("api-limit-get-trade-history",boost::program_options::value<uint64_t>()->default_value(100),
-          "For database_api_impl::get_trade_history to set its default limit values as 100")
+          "For database_api_impl::get_trade_history to set max limit value")
          ("api-limit-get-trade-history-by-sequence",boost::program_options::value<uint64_t>()->default_value(100),
-          "For database_api_impl::get_trade_history_by_sequence to set its default limit values as 100")
+          "For database_api_impl::get_trade_history_by_sequence to set max limit value")
          ("api-limit-get-withdraw-permissions-by-giver",boost::program_options::value<uint64_t>()->default_value(101),
-          "For database_api_impl::get_withdraw_permissions_by_giver to set its default limit values as 101")
+          "For database_api_impl::get_withdraw_permissions_by_giver to set max limit value")
          ("api-limit-get-withdraw-permissions-by-recipient",boost::program_options::value<uint64_t>()->default_value(101),
-          "For database_api_impl::get_withdraw_permissions_by_recipient to set its default limit values as 101")
+          "For database_api_impl::get_withdraw_permissions_by_recipient to set max limit value")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
