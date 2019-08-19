@@ -2007,7 +2007,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_collateral_bids) {
 }
 BOOST_AUTO_TEST_CASE(api_limit_get_account_limit_orders) {
    try {
-
+      graphene::app::database_api db_api( db, &( app.get_options() ));
       ACTORS((seller));
       const auto &bitcny = create_bitasset("CNY");
       const auto &core = asset_id_type()(db);
@@ -2020,7 +2020,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_account_limit_orders) {
          BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250+i)));
       }
 
-      graphene::app::database_api db_api( db, &( app.get_options() ));
+
       std::vector<limit_order_object> results=db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY",250);
       BOOST_REQUIRE_EQUAL( results.size(), 250u);
       GRAPHENE_CHECK_THROW( db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY",251), fc::exception);
