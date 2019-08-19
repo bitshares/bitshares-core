@@ -637,7 +637,6 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    FC_ASSERT( bid.receive_asset_id() == ask.collateral_type() );
    FC_ASSERT( bid.for_sale > 0 && ask.debt > 0 && ask.collateral > 0 );
 
-   auto maint_time = get_dynamic_global_properties().next_maintenance_time;
    bool cull_taker = false;
 
    asset usd_for_sale = bid.amount_for_sale();
