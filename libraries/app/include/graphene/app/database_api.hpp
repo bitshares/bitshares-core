@@ -23,30 +23,21 @@
  */
 #pragma once
 
-#include <graphene/app/full_account.hpp>
+#include <graphene/app/api_objects.hpp>
 
 #include <graphene/protocol/types.hpp>
 
 #include <graphene/chain/database.hpp>
 
-#include <graphene/chain/account_object.hpp>
-#include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/confidential_object.hpp>
-#include <graphene/chain/market_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
-#include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/witness_object.hpp>
-#include <graphene/chain/htlc_object.hpp>
-
-#include <graphene/api_helper_indexes/api_helper_indexes.hpp>
-#include <graphene/market_history/market_history_plugin.hpp>
 
 #include <fc/api.hpp>
-#include <fc/optional.hpp>
 #include <fc/variant_object.hpp>
 
 #include <fc/network/ip.hpp>
@@ -68,74 +59,6 @@ using std::map;
 
 class database_api_impl;
 
-struct order
-{
-   string                     price;
-   string                     quote;
-   string                     base;
-};
-
-struct order_book
-{
-  string                      base;
-  string                      quote;
-  vector< order >             bids;
-  vector< order >             asks;
-};
-
-struct market_ticker
-{
-   time_point_sec             time;
-   string                     base;
-   string                     quote;
-   string                     latest;
-   string                     lowest_ask;
-   string                     highest_bid;
-   string                     percent_change;
-   string                     base_volume;
-   string                     quote_volume;
-
-   market_ticker() {}
-   market_ticker(const market_ticker_object& mto,
-                 const fc::time_point_sec& now,
-                 const asset_object& asset_base,
-                 const asset_object& asset_quote,
-                 const order_book& orders);
-   market_ticker(const fc::time_point_sec& now,
-                 const asset_object& asset_base,
-                 const asset_object& asset_quote);
-};
-
-struct market_volume
-{
-   time_point_sec             time;
-   string                     base;
-   string                     quote;
-   string                     base_volume;
-   string                     quote_volume;
-};
-
-struct market_trade
-{
-   int64_t                    sequence = 0;
-   fc::time_point_sec         date;
-   string                     price;
-   string                     amount;
-   string                     value;
-   account_id_type            side1_account_id = GRAPHENE_NULL_ACCOUNT;
-   account_id_type            side2_account_id = GRAPHENE_NULL_ACCOUNT;
-};
-
-struct extended_asset_object : asset_object
-{
-   extended_asset_object() {}
-   explicit extended_asset_object( const asset_object& a ) : asset_object( a ) {}
-   explicit extended_asset_object( asset_object&& a ) : asset_object( std::move(a) ) {}
-
-   optional<share_type> total_in_collateral;
-   optional<share_type> total_backing_collateral;
-};
-
 /**
  * @brief The database_api class implements the RPC API for the chain database.
  *
@@ -156,11 +79,17 @@ class database_api
       /**
        * @brief Get the objects corresponding to the provided IDs
        * @param ids IDs of the objects to retrieve
+       * @param subscribe @a true to subscribe to the queried objects; @a false to not subscribe;
+       *                  @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                  (see @ref set_auto_subscription)
        * @return The objects retrieved, in the order they are mentioned in ids
+       * @note operation_history_object (1.11.x) and account_transaction_history_object (2.9.x)
+       *       can not be subscribed.
        *
        * If any of the provided IDs does not map to an object, a null variant is returned in its position.
        */
-      fc::variants get_objects(const vector<object_id_type>& ids)const;
+      fc::variants get_objects( const vector<object_id_type>& ids,
+                                optional<bool> subscribe = optional<bool>() )const;
 
       ///////////////////
       // Subscriptions //
@@ -187,9 +116,12 @@ class database_api
        * - get_assets
        * - get_objects
        * - lookup_accounts
-       *
-       * Does not impact this API:
        * - get_full_accounts
+       * - get_htlc
+       *
+       * Note: auto-subscription is enabled by default
+       *
+       * @see @ref set_subscribe_callback
        */
       void set_auto_subscription( bool enable );
       /**
@@ -321,16 +253,22 @@ class database_api
       /**
        * @brief Get a list of accounts by names or IDs
        * @param account_names_or_ids names or IDs of the accounts to retrieve
+       * @param subscribe @a true to subscribe to the queried account objects; @a false to not subscribe;
+       *                  @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                  (see @ref set_auto_subscription)
        * @return The accounts corresponding to the provided names or IDs
        *
        * This function has semantics identical to @ref get_objects
        */
-      vector<optional<account_object>> get_accounts(const vector<std::string>& account_names_or_ids)const;
+      vector<optional<account_object>> get_accounts( const vector<std::string>& account_names_or_ids,
+                                                     optional<bool> subscribe = optional<bool>() )const;
 
       /**
        * @brief Fetch all objects relevant to the specified accounts and optionally subscribe to updates
        * @param names_or_ids Each item must be the name or ID of an account to retrieve
-       * @param subscribe whether subscribe to updates
+       * @param subscribe @a true to subscribe to the queried full account objects; @a false to not subscribe;
+       *                  @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                  (see @ref set_auto_subscription)
        * @return Map of string from @p names_or_ids to the corresponding account
        *
        * This function fetches all relevant objects for the given accounts, and subscribes to updates to the given
@@ -338,7 +276,8 @@ class database_api
        * ignored. All other accounts will be retrieved and subscribed.
        *
        */
-      std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids, bool subscribe );
+      std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids,
+                                                       optional<bool> subscribe = optional<bool>() );
 
       /**
        * @brief Get info of an account by name
@@ -359,7 +298,7 @@ class database_api
        * @param account_names Names of the accounts to retrieve
        * @return The accounts holding the provided names
        *
-       * This function has semantics identical to @ref get_objects
+       * This function has semantics identical to @ref get_objects, but doesn't subscribe.
        */
       vector<optional<account_object>> lookup_account_names(const vector<string>& account_names)const;
 
@@ -367,9 +306,17 @@ class database_api
        * @brief Get names and IDs for registered accounts
        * @param lower_bound_name Lower bound of the first name to return
        * @param limit Maximum number of results to return -- must not exceed 1000
+       * @param subscribe @a true to subscribe to the queried account objects; @a false to not subscribe;
+       *                  @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                  (see @ref set_auto_subscription)
        * @return Map of account names to corresponding IDs
+       *
+       * @note In addition to the common auto-subscription rules,
+       *       this API will subscribe to the returned account only if @p limit is 1.
        */
-      map<string,account_id_type> lookup_accounts(const string& lower_bound_name, uint32_t limit)const;
+      map<string,account_id_type> lookup_accounts( const string& lower_bound_name,
+                                                   uint32_t limit,
+                                                   optional<bool> subscribe = optional<bool>() )const;
 
       //////////////
       // Balances //
@@ -428,11 +375,15 @@ class database_api
       /**
        * @brief Get a list of assets by symbol names or IDs
        * @param asset_symbols_or_ids symbol names or IDs of the assets to retrieve
+       * @param subscribe @a true to subscribe to the queried asset objects; @a false to not subscribe;
+       *                  @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                  (see @ref set_auto_subscription)
        * @return The assets corresponding to the provided symbol names or IDs
        *
        * This function has semantics identical to @ref get_objects
        */
-      vector<optional<extended_asset_object>> get_assets(const vector<std::string>& asset_symbols_or_ids)const;
+      vector<optional<extended_asset_object>> get_assets( const vector<std::string>& asset_symbols_or_ids,
+                                                          optional<bool> subscribe = optional<bool>() )const;
 
       /**
        * @brief Get assets alphabetically by symbol name
@@ -658,7 +609,7 @@ class database_api
        * @param witness_ids IDs of the witnesses to retrieve
        * @return The witnesses corresponding to the provided IDs
        *
-       * This function has semantics identical to @ref get_objects
+       * This function has semantics identical to @ref get_objects, but doesn't subscribe
        */
       vector<optional<witness_object>> get_witnesses(const vector<witness_id_type>& witness_ids)const;
 
@@ -691,7 +642,7 @@ class database_api
        * @param committee_member_ids IDs of the committee_members to retrieve
        * @return The committee_members corresponding to the provided IDs
        *
-       * This function has semantics identical to @ref get_objects
+       * This function has semantics identical to @ref get_objects, but doesn't subscribe
        */
       vector<optional<committee_member_object>> get_committee_members(
             const vector<committee_member_id_type>& committee_member_ids)const;
@@ -898,9 +849,12 @@ class database_api
       /**
        *  @brief Get HTLC object
        *  @param id HTLC contract id
+       *  @param subscribe @a true to subscribe to the queried HTLC objects; @a false to not subscribe;
+       *                   @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                   (see @ref set_auto_subscription)
        *  @return HTLC object for the id
        */
-      optional<htlc_object> get_htlc(htlc_id_type id) const;
+      optional<htlc_object> get_htlc( htlc_id_type id, optional<bool> subscribe = optional<bool>() ) const;
 
       /**
        *  @brief Get non expired HTLC objects using the sender account
@@ -940,16 +894,6 @@ private:
 } }
 
 extern template class fc::api<graphene::app::database_api>;
-
-FC_REFLECT( graphene::app::order, (price)(quote)(base) );
-FC_REFLECT( graphene::app::order_book, (base)(quote)(bids)(asks) );
-FC_REFLECT( graphene::app::market_ticker,
-            (time)(base)(quote)(latest)(lowest_ask)(highest_bid)(percent_change)(base_volume)(quote_volume) );
-FC_REFLECT( graphene::app::market_volume, (time)(base)(quote)(base_volume)(quote_volume) );
-FC_REFLECT( graphene::app::market_trade, (sequence)(date)(price)(amount)(value)(side1_account_id)(side2_account_id) );
-
-FC_REFLECT_DERIVED( graphene::app::extended_asset_object, (graphene::chain::asset_object),
-                    (total_in_collateral)(total_backing_collateral) );
 
 FC_API(graphene::app::database_api,
    // Objects

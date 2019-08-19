@@ -1103,14 +1103,14 @@ BOOST_FIXTURE_TEST_CASE( rsf_missed_blocks, database_fixture )
    {
       generate_block();
 
-      auto rsf = [&]() -> string
+      auto rsf = [this]() -> string
       {
-         fc::uint128 rsf = db.get_dynamic_global_properties().recent_slots_filled;
+	 fc::uint128_t rsf = db.get_dynamic_global_properties().recent_slots_filled;
          string result = "";
          result.reserve(128);
          for( int i=0; i<128; i++ )
          {
-            result += ((rsf.lo & 1) == 0) ? '0' : '1';
+            result += rsf & 1 ? '1' : '0';
             rsf >>= 1;
          }
          return result;

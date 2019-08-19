@@ -71,7 +71,8 @@ int main(int argc, char** argv) {
             ("version,v", "Display version information")
             ("plugins", bpo::value<std::string>()
                             ->default_value("witness account_history market_history grouped_orders api_helper_indexes"),
-                    "Space-separated list of plugins to activate");
+                    "Space-separated list of plugins to activate")
+            ("ignore-api-helper-indexes-warning", "Do not exit if api_helper_indexes plugin is not enabled.");
 
       bpo::variables_map options;
 
@@ -82,7 +83,8 @@ int main(int argc, char** argv) {
       cfg_options.add_options()
               ("plugins", bpo::value<std::string>()
 	                      ->default_value("witness account_history market_history grouped_orders api_helper_indexes"),
-               "Space-separated list of plugins to activate");
+               "Space-separated list of plugins to activate")
+            ("ignore-api-helper-indexes-warning", "Do not exit if api_helper_indexes plugin is not enabled.");
 
       auto witness_plug = node->register_plugin<witness_plugin::witness_plugin>();
       auto debug_witness_plug = node->register_plugin<debug_witness_plugin::debug_witness_plugin>();
@@ -143,6 +145,15 @@ int main(int argc, char** argv) {
          return 1;
       }
 
+      if( !plugins.count("api_helper_indexes") && !options.count("ignore-api-helper-indexes-warning")
+          && ( options.count("rpc-endpoint") || options.count("rpc-tls-endpoint") ) )
+      {
+         std::cerr << "\nIf this is an API node, please enable api_helper_indexes plugin."
+                      "\nIf this is not an API node, please start with \"--ignore-api-helper-indexes-warning\""
+                      " or enable it in config.ini file.\n\n";
+         return 1;
+      }
+
       std::for_each(plugins.begin(), plugins.end(), [node](const std::string& plug) mutable {
          if (!plug.empty()) {
             node->enable_plugin(plug);
@@ -157,7 +168,7 @@ int main(int argc, char** argv) {
       node->startup();
       node->startup_plugins();
 
-      fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
+      fc::promise<int>::ptr exit_promise = fc::promise<int>::create("UNIX Signal Handler");
 
       fc::set_signal_handler([&exit_promise](int signal) {
          elog( "Caught SIGINT attempting to exit cleanly" );

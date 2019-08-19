@@ -88,11 +88,11 @@ namespace graphene { namespace chain {
     */
    struct cdd_vesting_policy
    {
-      uint32_t                       vesting_seconds = 0;
-      fc::uint128_t                  coin_seconds_earned;
+      uint32_t                         vesting_seconds = 0;
+      fc::uint128_t                    coin_seconds_earned;
       /** while coindays may accrue over time, none may be claimed before first_claim date */
-      fc::time_point_sec             start_claim;
-      fc::time_point_sec             coin_seconds_earned_last_update;
+      fc::time_point_sec               start_claim;
+      fc::time_point_sec               coin_seconds_earned_last_update;
 
       /**
        * Compute coin_seconds_earned.  Used to

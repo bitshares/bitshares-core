@@ -25,8 +25,8 @@
 
 #include <graphene/protocol/types.hpp>
 
+#include <fc/crypto/elliptic.hpp>
 #include <fc/crypto/ripemd160.hpp>
-#include <fc/reflect/typename.hpp>
 
 namespace graphene { namespace protocol {
    struct pts_address;
