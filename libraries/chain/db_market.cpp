@@ -638,12 +638,6 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    FC_ASSERT( bid.for_sale > 0 && ask.debt > 0 && ask.collateral > 0 );
 
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
-   // TODO remove when we're sure it's always false
-   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
-
-   if( before_core_hardfork_342 )
-      ilog( "match(limit,call) is called before hardfork core-342 at block #${block}", ("block",head_block_num()) );
-
    bool cull_taker = false;
 
    asset usd_for_sale = bid.amount_for_sale();
@@ -660,29 +654,17 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
       if( order_receives.amount == 0 )
          return 1;
 
-      if( before_core_hardfork_342 ) // TODO remove this "if" when we're sure it's always false (keep the code in else)
-         call_receives = usd_for_sale;
-      else
-      {
-         // The remaining amount in the limit order would be too small,
-         //   so we should cull the order in fill_limit_order() below.
-         // The order would receive 0 even at `match_price`, so it would receive 0 at its own price,
-         //   so calling maybe_cull_small() will always cull it.
-         call_receives = order_receives.multiply_and_round_up( match_price );
-         cull_taker = true;
-      }
+      // The remaining amount in the limit order would be too small,
+      //   so we should cull the order in fill_limit_order() below.
+      // The order would receive 0 even at `match_price`, so it would receive 0 at its own price,
+      //   so calling maybe_cull_small() will always cull it.
+      call_receives = order_receives.multiply_and_round_up( match_price );
+      cull_taker = true;
    }
    else
    {  // fill call order
       call_receives  = usd_to_buy;
-      if( before_core_hardfork_342 ) // TODO remove this "if" when we're sure it's always false (keep the code in else)
-      {
-         order_receives = usd_to_buy * match_price; // round down here, in favor of call order
-         if( order_receives.amount == 0 )
-            return 1;
-      }
-      else // has hardfork core-342
-         order_receives = usd_to_buy.multiply_and_round_up( match_price ); // round up here, in favor of limit order
+      order_receives = usd_to_buy.multiply_and_round_up( match_price ); // round up here, in favor of limit order
    }
 
    call_pays  = order_receives;
