@@ -639,12 +639,8 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
 
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
    // TODO remove when we're sure it's always false
-   bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
-   // TODO remove when we're sure it's always false
    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
 
-   if( before_core_hardfork_184 )
-      ilog( "match(limit,call) is called before hardfork core-184 at block #${block}", ("block",head_block_num()) );
    if( before_core_hardfork_342 )
       ilog( "match(limit,call) is called before hardfork core-342 at block #${block}", ("block",head_block_num()) );
 
@@ -661,8 +657,7 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
 
       // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
       // In this case, we see it as filled and cancel it later
-      // TODO remove hardfork check when we're sure it's always after hard fork (but keep the zero amount check)
-      if( order_receives.amount == 0 && !before_core_hardfork_184 )
+      if( order_receives.amount == 0 )
          return 1;
 
       if( before_core_hardfork_342 ) // TODO remove this "if" when we're sure it's always false (keep the code in else)
@@ -683,8 +678,7 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
       if( before_core_hardfork_342 ) // TODO remove this "if" when we're sure it's always false (keep the code in else)
       {
          order_receives = usd_to_buy * match_price; // round down here, in favor of call order
-         // TODO remove hardfork check when we're sure it's always after hard fork (but keep the zero amount check)
-         if( order_receives.amount == 0 && !before_core_hardfork_184 )
+         if( order_receives.amount == 0 )
             return 1;
       }
       else // has hardfork core-342
@@ -1035,7 +1029,6 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     bool before_hardfork_615 = ( head_time < HARDFORK_615_TIME );
     bool after_hardfork_436 = ( head_time > HARDFORK_436_TIME );
 
-    bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
     bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
     bool before_core_hardfork_343 = ( maint_time <= HARDFORK_CORE_343_TIME ); // update call_price after partially filled
     bool before_core_hardfork_453 = ( maint_time <= HARDFORK_CORE_453_TIME ); // multiple matching issue
@@ -1105,13 +1098,6 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
           //   * when the limit order is a taker, it could be paying something for nothing only when
           //     the call order is smaller and is too small
           //   * when the limit order is a maker, it won't be paying something for nothing
-          if( order_receives.amount == 0 ) // TODO this should not happen. remove the warning after confirmed
-          {
-             if( before_core_hardfork_184 )
-                wlog( "Something for nothing issue (#184, variant D-1) occurred at block #${block}", ("block",head_num) );
-             else
-                wlog( "Something for nothing issue (#184, variant D-2) occurred at block #${block}", ("block",head_num) );
-          }
 
           if( before_core_hardfork_342 )
              call_receives = usd_for_sale;
