@@ -1627,7 +1627,7 @@ namespace graphene { namespace net { namespace detail {
           _last_firewall_check_message_sent < now - fc::minutes(5) &&
           originating_peer->core_protocol_version >= 106)
       {
-        wlog("I don't know if I'm firewalled.  Sending a firewall check message to peer ${peer}",
+        ilog("I don't know if I'm firewalled.  Sending a firewall check message to peer ${peer}",
              ("peer", originating_peer->get_remote_endpoint()));
         originating_peer->firewall_check_state = new firewall_check_state_data;
 
@@ -3320,7 +3320,7 @@ namespace graphene { namespace net { namespace detail {
         // and they're reporting back
         // if they got a result, return it to the original peer.  if they were unable to check,
         // we'll try another peer.
-        wlog("Peer ${reporter} reports firewall check status ${status} for ${peer}",
+        ilog("Peer ${reporter} reports firewall check status ${status} for ${peer}",
              ("reporter", originating_peer->get_remote_endpoint())
              ("status", check_firewall_reply_message_received.result)
              ("peer", check_firewall_reply_message_received.endpoint_checked));
@@ -3364,7 +3364,7 @@ namespace graphene { namespace net { namespace detail {
       else if (originating_peer->firewall_check_state)
       {
         // this is a reply to a firewall check we initiated.
-        wlog("Firewall check we initiated has returned with result: ${result}, endpoint = ${endpoint}",
+        ilog("Firewall check we initiated has returned with result: ${result}, endpoint = ${endpoint}",
              ("result", check_firewall_reply_message_received.result)
              ("endpoint", check_firewall_reply_message_received.endpoint_checked));
         if (check_firewall_reply_message_received.result == firewall_check_result::connection_successful)
@@ -3972,7 +3972,7 @@ namespace graphene { namespace net { namespace detail {
       }
       else
       {
-        wlog("connecting to peer ${peer} for firewall check", ("peer", new_peer->get_remote_endpoint()));
+        ilog("connecting to peer ${peer} for firewall check", ("peer", new_peer->get_remote_endpoint()));
       }
 
       fc::oexception connect_failed_exception;
@@ -4022,7 +4022,7 @@ namespace graphene { namespace net { namespace detail {
           reply.result = connect_failed_exception ?
                            firewall_check_result::unable_to_connect :
                            firewall_check_result::connection_successful;
-          wlog("firewall check of ${peer_checked} ${success_or_failure}, sending reply to ${requester}",
+          ilog("firewall check of ${peer_checked} ${success_or_failure}, sending reply to ${requester}",
                 ("peer_checked", new_peer->get_remote_endpoint())
                 ("success_or_failure", connect_failed_exception ? "failed" : "succeeded" )
                 ("requester", requesting_peer->get_remote_endpoint()));
