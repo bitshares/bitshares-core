@@ -1926,34 +1926,36 @@ set<address> database_api::get_potential_address_signatures( const signed_transa
 
 set<public_key_type> database_api_impl::get_potential_signatures( const signed_transaction& trx )const
 {
-   bool allow_non_immediate_owner = ( _db.head_block_time() >= HARDFORK_CORE_584_TIME );
+   auto chain_time = _db.head_block_time();
+   bool allow_non_immediate_owner = ( chain_time >= HARDFORK_CORE_584_TIME );
+   bool ignore_custom_op_reqd_auths = MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( chain_time );
+
    set<public_key_type> result;
-   trx.get_required_signatures(
-      _db.get_chain_id(),
-      flat_set<public_key_type>(),
-      [&]( account_id_type id )
-      {
-         const auto& auth = id(_db).active;
-         for( const auto& k : auth.get_keys() )
-            result.insert(k);
-         return &auth;
-      },
-      [&]( account_id_type id )
-      {
-         const auto& auth = id(_db).owner;
-         for( const auto& k : auth.get_keys() )
-            result.insert(k);
-         return &auth;
-      },
-      allow_non_immediate_owner,
-      _db.get_global_properties().parameters.max_authority_depth
-   );
+   auto get_active = [this, &result]( account_id_type id ){
+      const auto& auth = id( _db ).active;
+      for( const auto& k : auth.get_keys() )
+         result.insert( k );
+      return &auth;
+   };
+   auto get_owner = [this, &result]( account_id_type id ){
+      const auto& auth = id( _db ).owner;
+      for( const auto& k : auth.get_keys() )
+         result.insert( k );
+      return &auth;
+   };
+
+   trx.get_required_signatures( _db.get_chain_id(),
+                                flat_set<public_key_type>(),
+                                get_active, get_owner,
+                                allow_non_immediate_owner,
+                                ignore_custom_op_reqd_auths,
+                                _db.get_global_properties().parameters.max_authority_depth );
 
    // Insert keys in required "other" authories
    flat_set<account_id_type> required_active;
    flat_set<account_id_type> required_owner;
    vector<authority> other;
-   trx.get_required_authorities( required_active, required_owner, other );
+   trx.get_required_authorities( required_active, required_owner, other, ignore_custom_op_reqd_auths );
    for( const auto& auth : other )
       for( const auto& key : auth.get_keys() )
          result.insert( key );
@@ -1963,26 +1965,30 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
 
 set<address> database_api_impl::get_potential_address_signatures( const signed_transaction& trx )const
 {
+   auto chain_time = _db.head_block_time();
+   bool allow_non_immediate_owner = ( chain_time >= HARDFORK_CORE_584_TIME );
+   bool ignore_custom_op_reqd_auths = MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( chain_time );
+
    set<address> result;
-   trx.get_required_signatures(
-      _db.get_chain_id(),
-      flat_set<public_key_type>(),
-      [&]( account_id_type id )
-      {
-         const auto& auth = id(_db).active;
-         for( const auto& k : auth.get_addresses() )
-            result.insert(k);
-         return &auth;
-      },
-      [&]( account_id_type id )
-      {
-         const auto& auth = id(_db).owner;
-         for( const auto& k : auth.get_addresses() )
-            result.insert(k);
-         return &auth;
-      },
-      _db.get_global_properties().parameters.max_authority_depth
-   );
+   auto get_active = [this, &result]( account_id_type id ){
+      const auto& auth = id( _db ).active;
+      for( const auto& k : auth.get_addresses() )
+         result.insert( k );
+      return &auth;
+   };
+   auto get_owner = [this, &result]( account_id_type id ) {
+      const auto& auth = id( _db ).owner;
+      for (const auto& k : auth.get_addresses())
+         result.insert( k );
+      return &auth;
+   };
+
+   trx.get_required_signatures( _db.get_chain_id(),
+                                flat_set<public_key_type>(),
+                                get_active, get_owner,
+                                allow_non_immediate_owner,
+                                ignore_custom_op_reqd_auths,
+                                _db.get_global_properties().parameters.max_authority_depth );
    return result;
 }
 
@@ -2022,8 +2028,8 @@ bool database_api_impl::verify_account_authority( const string& account_name_or_
       graphene::chain::verify_authority(ops, keys,
             [this]( account_id_type id ){ return &id(_db).active; },
             [this]( account_id_type id ){ return &id(_db).owner; },
-            true );
-   }
+            true, MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(_db.head_block_time()) );
+   } 
    catch (fc::exception& ex)
    {
       return false;
