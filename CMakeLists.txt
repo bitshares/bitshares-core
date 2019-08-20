@@ -94,8 +94,6 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 	endif ()
 endif ()
 
-set(CMAKE_REQUIRED_FLAGS ${TEMP_REQUIRED_FLAGS} )
-
 # check for Data relocation and Protection (RELRO)
 set(CMAKE_REQUIRED_FLAGS "-Wl,-zrelro,-znow")
 check_c_compiler_flag("" HAVE_RELROFULL)
