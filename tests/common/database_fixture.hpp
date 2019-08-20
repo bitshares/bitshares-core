@@ -171,6 +171,9 @@ extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;
 #define ACTORS_IMPL(r, data, elem) ACTOR(elem)
 #define ACTORS(names) BOOST_PP_SEQ_FOR_EACH(ACTORS_IMPL, ~, names)
 
+#define INITIAL_WITNESS_COUNT (9u)
+#define INITIAL_COMMITTEE_MEMBER_COUNT INITIAL_WITNESS_COUNT
+
 namespace graphene { namespace chain {
 
 class clearable_block : public signed_block {
@@ -205,6 +208,7 @@ struct database_fixture {
    string generate_anon_acct_name();
    static void verify_asset_supplies( const database& db );
    void open_database();
+   void vote_for_committee_and_witnesses(uint16_t num_committee, uint16_t num_witness);
    signed_block generate_block(uint32_t skip = ~0,
                                const fc::ecc::private_key& key = generate_private_key("null_key"),
                                int miss_blocks = 0);
@@ -367,6 +371,26 @@ struct database_fixture {
 
    vector< operation_history_object > get_operation_history( account_id_type account_id )const;
    vector< graphene::market_history::order_history_object > get_market_order_history( asset_id_type a, asset_id_type b )const;
+
+   /****
+    * @brief return htlc fee parameters
+    */
+   flat_map< uint64_t, graphene::chain::fee_parameters > get_htlc_fee_parameters();
+   /****
+    * @brief push through a proposal that sets htlc parameters and fees
+    */
+   void set_htlc_committee_parameters();
+   /****
+    * Hash the preimage and put it in a vector
+    * @param preimage the preimage
+    * @returns a vector that cointains the sha256 hash of the preimage
+    */
+   template<typename H>
+   H hash_it(std::vector<char> preimage)
+   {
+      return H::hash( (char*)preimage.data(), preimage.size() );
+   }
+
 };
 
 namespace test {

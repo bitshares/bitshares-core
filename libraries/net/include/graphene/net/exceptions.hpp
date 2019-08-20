@@ -34,5 +34,6 @@ namespace graphene { namespace net {
    FC_DECLARE_DERIVED_EXCEPTION( block_older_than_undo_history,       net_exception, 90004 )
    FC_DECLARE_DERIVED_EXCEPTION( peer_is_on_an_unreachable_fork,      net_exception, 90005 )
    FC_DECLARE_DERIVED_EXCEPTION( unlinkable_block_exception,          net_exception, 90006 )
+   FC_DECLARE_DERIVED_EXCEPTION( block_timestamp_in_future_exception, net_exception, 90007 )
 
 } }

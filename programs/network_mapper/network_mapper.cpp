@@ -33,7 +33,7 @@ public:
     _connection(graphene::net::peer_connection::make_shared(this)),
     _connection_was_rejected(false),
     _done(false),
-    _probe_complete_promise(fc::promise<void>::ptr(new fc::promise<void>("probe_complete")))
+    _probe_complete_promise(fc::promise<void>::create("probe_complete"))
   {}
 
   void start(const fc::ip::endpoint& endpoint_to_probe,
