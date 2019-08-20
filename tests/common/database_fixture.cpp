@@ -88,13 +88,14 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
 
    genesis_state.initial_timestamp = initial_timestamp;
 
-   if(boost::unit_test::framework::current_test_case().p_name.value == "hf_935_test")
+   if(boost::unit_test::framework::current_test_case().p_name.value == "hf_935_test") {
       genesis_state.initial_active_witnesses = 20;
-   else
+   }
+   else {
       genesis_state.initial_active_witnesses = 10;
-
-   genesis_state.immutable_parameters.min_committee_member_count = INITIAL_COMMITTEE_MEMBER_COUNT;
-   genesis_state.immutable_parameters.min_witness_count = INITIAL_WITNESS_COUNT;
+      genesis_state.immutable_parameters.min_committee_member_count = INITIAL_COMMITTEE_MEMBER_COUNT;
+      genesis_state.immutable_parameters.min_witness_count = INITIAL_WITNESS_COUNT;
+   }
 
    for( unsigned int i = 0; i < genesis_state.initial_active_witnesses; ++i )
    {
