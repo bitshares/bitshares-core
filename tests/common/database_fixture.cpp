@@ -41,6 +41,7 @@
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/hardfork_visitor.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 
@@ -1452,14 +1453,15 @@ void database_fixture::set_htlc_committee_parameters()
    std::shared_ptr<fee_schedule_type> new_fee_schedule = std::make_shared<fee_schedule_type>();
    new_fee_schedule->scale = GRAPHENE_100_PERCENT;
    // replace the old with the new
-   flat_map<uint64_t, graphene::chain::fee_parameters> params_map = get_htlc_fee_parameters();
+   flat_map<uint64_t, graphene::chain::fee_parameters> htlc_fees = get_htlc_fee_parameters();
    for(auto param : existing_fee_schedule.parameters)
    {
-      auto itr = params_map.find(param.which());
-      if (itr == params_map.end())
-         new_fee_schedule->parameters.insert(param);
-      else
-      {
+      auto itr = htlc_fees.find(param.which());
+      if (itr == htlc_fees.end()) {
+         // Only define fees for operations which are already forked in!
+         if (hardfork_visitor(db.head_block_time()).visit(param.which()))
+            new_fee_schedule->parameters.insert(param);
+      } else {
          new_fee_schedule->parameters.insert( (*itr).second);
       }
    }

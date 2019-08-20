@@ -33,7 +33,6 @@ class custom_authority_object;
 class custom_authority_create_evaluator : public evaluator<custom_authority_create_evaluator> {
 public:
    using operation_type = custom_authority_create_operation;
-   restriction_predicate_function predicate;
 
    void_result do_evaluate(const operation_type& op);
    object_id_type do_apply(const operation_type& op);

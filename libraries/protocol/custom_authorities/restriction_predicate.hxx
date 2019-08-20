@@ -497,7 +497,7 @@ object_restriction_predicate<Object> create_field_predicate(restriction&& r, sho
       auto p = create_predicate_function<Field>(static_cast<restriction_function>(f), std::move(a));
       return [p=std::move(p)](const Object& o) { return p(FieldReflection::get(o)); };
    };
-   return typelist::runtime::dispatch(member_list(), r.member_index, predicator);
+   return typelist::runtime::dispatch(member_list(), r.member_index.value, predicator);
 }
 template<typename Object>
 object_restriction_predicate<Object> create_field_predicate(restriction&&, long) {

@@ -25,6 +25,8 @@
 #include <graphene/protocol/operations.hpp>
 #include <graphene/protocol/restriction_predicate.hpp>
 
+#include <fc/io/raw.hpp>
+
 namespace graphene { namespace protocol {
 
 share_type custom_authority_create_operation::calculate_fee(const fee_parameters_type& k)const {

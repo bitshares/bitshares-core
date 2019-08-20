@@ -56,7 +56,7 @@ void_result custom_authority_create_evaluator::do_evaluate(const custom_authorit
    FC_ASSERT(std::distance(range.first, range.second) < config->max_custom_authorities_per_account,
              "Cannot create custom authority for account: account already has maximum number");
 
-   predicate = get_restriction_predicate(op.restrictions, op.operation_type);
+   get_restriction_predicate(op.restrictions, op.operation_type);
    return void_result();
 } FC_CAPTURE_AND_RETHROW((op)) }
 
@@ -64,7 +64,7 @@ object_id_type custom_authority_create_evaluator::do_apply(const custom_authorit
 { try {
    database& d = db();
 
-   return d.create<custom_authority_object>([&op, p=std::move(predicate)] (custom_authority_object& obj) mutable {
+   return d.create<custom_authority_object>([&op] (custom_authority_object& obj) mutable {
       obj.account = op.account;
       obj.enabled = op.enabled;
       obj.valid_from = op.valid_from;
