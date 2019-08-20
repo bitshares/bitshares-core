@@ -385,13 +385,6 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
 
    FC_ASSERT( !_bitasset_data->is_prediction_market, "Cannot bid on a prediction market!" );
 
-   if( o.additional_collateral.amount > 0 )
-   {
-      FC_ASSERT( d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)) >= o.additional_collateral,
-                 "Cannot bid ${c} collateral when payer only has ${b}", ("c", o.additional_collateral.amount)
-                 ("b", d.get_balance(*_paying_account, o.additional_collateral.asset_id(d)).amount) );
-   }
-
    const collateral_bid_index& bids = d.get_index_type<collateral_bid_index>();
    const auto& index = bids.indices().get<by_account>();
    const auto& bid = index.find( boost::make_tuple( o.debt_covered.asset_id, o.bidder ) );
@@ -399,6 +392,22 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
       _bid = &(*bid);
    else
        FC_ASSERT( o.debt_covered.amount > 0, "Can't find bid to cancel?!");
+
+   if( o.additional_collateral.amount > 0 )
+   {
+      if( _bid && d.head_block_time() >= HARDFORK_CORE_1692_TIME ) // TODO: see if HF check can be removed after HF
+      {
+         asset delta = o.additional_collateral - _bid->get_additional_collateral();
+         FC_ASSERT( d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)) >= delta,
+                    "Cannot increase bid from ${oc} to ${nc} collateral when payer only has ${b}",
+                    ("oc", _bid->get_additional_collateral().amount)("nc", o.additional_collateral.amount)
+                    ("b", d.get_balance(*_paying_account, o.additional_collateral.asset_id(d)).amount) );
+      } else
+         FC_ASSERT( d.get_balance( *_paying_account,
+                                   _bitasset_data->options.short_backing_asset(d) ) >= o.additional_collateral,
+                    "Cannot bid ${c} collateral when payer only has ${b}", ("c", o.additional_collateral.amount)
+                    ("b", d.get_balance(*_paying_account, o.additional_collateral.asset_id(d)).amount) );
+   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
