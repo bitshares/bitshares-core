@@ -12,20 +12,6 @@ set( INSTALLER_APP_ID "68ad7005-8eee-49c9-95ce-9eed97e5b347" )
 set( CMAKE_CXX_STANDARD 14 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
 
-set( GRAPHENE_PREGENERATE_FILES OFF CACHE BOOL
-     "ON for pre-creating generated sources instead of during the build. Useful for cross-compilation." )
-if( CMAKE_CROSSCOMPILING )
-    message(STATUS "Cross-compilation detected.")
-    if( NOT(GRAPHENE_PREGENERATE_FILES) )
-        message( WARNING "Hint: set GRAPHENE_PREGENERATE_FILES=ON to avoid problems with cat-parts and egenesis!" )
-    endif( NOT(GRAPHENE_PREGENERATE_FILES) )
-else( CMAKE_CROSSCOMPILING )
-    message(STATUS "Native build detected")
-    if( GRAPHENE_PREGENERATE_FILES )
-        message( WARNING "Hint: set GRAPHENE_PREGENERATE_FILES=OFF to avoid stale dependencies!" )
-    endif( GRAPHENE_PREGENERATE_FILES )
-endif( CMAKE_CROSSCOMPILING )
-
 if( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
   set( CMAKE_CXX_EXTENSIONS ON ) # for __int128 support
 else( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )

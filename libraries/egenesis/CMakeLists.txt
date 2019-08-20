@@ -1,59 +1,31 @@
+message( STATUS "Generating egenesis" )
 
-if( GRAPHENE_PREGENERATE_FILES )
-  message( STATUS "Generating egenesis" )
-  file( MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" )
+if( GRAPHENE_EGENESIS_JSON )
+  set( embed_genesis_args "${GRAPHENE_EGENESIS_JSON}" )
+else( GRAPHENE_EGENESIS_JSON )
+  set( embed_genesis_args "genesis.json" )
+endif( GRAPHENE_EGENESIS_JSON )
 
-  if( GRAPHENE_EGENESIS_JSON )
-    set( embed_genesis_args "${GRAPHENE_EGENESIS_JSON}" )
-  else( GRAPHENE_EGENESIS_JSON )
-    set( embed_genesis_args "genesis.json" )
-  endif( GRAPHENE_EGENESIS_JSON )
-  file( SHA256 "${embed_genesis_args}" chain_id )
-  set( generated_file_banner "/*** GENERATED FILE - DO NOT EDIT! ***/" )
-  set( genesis_json_hash "${chain_id}" )
-  configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/egenesis_brief.cpp.tmpl"
-                  "${CMAKE_CURRENT_BINARY_DIR}/egenesis_brief.cpp" )
+file( MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tmp/" )
+configure_file( "${embed_genesis_args}"
+                "${CMAKE_CURRENT_BINARY_DIR}/tmp/genesis" )
 
-  file( READ "${embed_genesis_args}" genesis_json )
-  string( LENGTH "${genesis_json}" genesis_json_length )
-  string( REGEX REPLACE "(\"|\\\\)" "\\\\\\1" genesis_json_escaped "${genesis_json}" )
-  string( REPLACE "\n" "\\n" genesis_json_escaped "${genesis_json_escaped}" )
-  string( REPLACE "\t" "\\t" genesis_json_escaped "${genesis_json_escaped}" )
-  set( genesis_json_array "\"${genesis_json_escaped}\"" )
-  set( genesis_json_array_height 1 )
-  set( genesis_json_array_width ${genesis_json_length} )
-  configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/egenesis_full.cpp.tmpl"
-                  "${CMAKE_CURRENT_BINARY_DIR}/egenesis_full.cpp" )
+file( SHA256 "${embed_genesis_args}" chain_id )
+set( generated_file_banner "/*** GENERATED FILE - DO NOT EDIT! ***/" )
+set( genesis_json_hash "${chain_id}" )
+configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/egenesis_brief.cpp.tmpl"
+                "${CMAKE_CURRENT_BINARY_DIR}/egenesis_brief.cpp" )
 
-else( GRAPHENE_PREGENERATE_FILES )
-  add_executable( embed_genesis embed_genesis.cpp )
-  target_link_libraries( embed_genesis graphene_chain graphene_app graphene_egenesis_none fc )
-  set( embed_genesis_args
-            -t "${CMAKE_CURRENT_SOURCE_DIR}/egenesis_brief.cpp.tmpl---${CMAKE_CURRENT_BINARY_DIR}/egenesis_brief.cpp"
-            -t "${CMAKE_CURRENT_SOURCE_DIR}/egenesis_full.cpp.tmpl---${CMAKE_CURRENT_BINARY_DIR}/egenesis_full.cpp"
-  )
-
-  MESSAGE( STATUS "egenesis: " ${GRAPHENE_EGENESIS_JSON} )
-
-  if( GRAPHENE_EGENESIS_JSON )
-    list( APPEND embed_genesis_args --genesis-json "${GRAPHENE_EGENESIS_JSON}" )
-  endif( GRAPHENE_EGENESIS_JSON )
-
-  MESSAGE( STATUS "embed_genesis_args: " ${embed_genesis_args} )
-
-  add_custom_command(
-    OUTPUT
-      "${CMAKE_CURRENT_BINARY_DIR}/egenesis_brief.cpp"
-      "${CMAKE_CURRENT_BINARY_DIR}/egenesis_full.cpp"
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    COMMAND embed_genesis ${embed_genesis_args}
-    DEPENDS
-      "${GRAPHENE_EGENESIS_JSON}"
-      "${CMAKE_CURRENT_SOURCE_DIR}/egenesis_brief.cpp.tmpl"
-      "${CMAKE_CURRENT_SOURCE_DIR}/egenesis_full.cpp.tmpl"
-      embed_genesis )
-
-endif( GRAPHENE_PREGENERATE_FILES )
+file( READ "${embed_genesis_args}" genesis_json )
+string( LENGTH "${genesis_json}" genesis_json_length )
+string( REGEX REPLACE "(\"|\\\\)" "\\\\\\1" genesis_json_escaped "${genesis_json}" )
+string( REPLACE "\n" "\\n" genesis_json_escaped "${genesis_json_escaped}" )
+string( REPLACE "\t" "\\t" genesis_json_escaped "${genesis_json_escaped}" )
+set( genesis_json_array "\"${genesis_json_escaped}\"" )
+set( genesis_json_array_height 1 )
+set( genesis_json_array_width ${genesis_json_length} )
+configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/egenesis_full.cpp.tmpl"
+                "${CMAKE_CURRENT_BINARY_DIR}/egenesis_full.cpp" )
 
 add_library( graphene_egenesis_none egenesis_none.cpp
              include/graphene/egenesis/egenesis.hpp )
