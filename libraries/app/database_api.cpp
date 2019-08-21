@@ -1298,14 +1298,7 @@ vector<collateral_bid_object> database_api_impl::get_collateral_bids( const std:
                                                    collateral_bid_id_type(GRAPHENE_DB_MAX_INSTANCE_ID) ) );
    vector<collateral_bid_object> result;
    auto distance_between_start_end= std::distance(start,end);
-   if(skip<distance_between_start_end)
-   {
-     std::advance(start,skip);
-   }
-   else
-   {
-      return result;
-   }
+   while( skip-- > 0 && start != end ) { ++start; }
    while( start != end && limit-- > 0)
    {
       result.push_back(*start);
