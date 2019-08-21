@@ -592,14 +592,11 @@ void database::clear_expired_htlcs()
       const htlc_object& obj = *htlc_idx.begin();
       const auto amount = asset(obj.transfer.amount, obj.transfer.asset_id);
       adjust_balance( obj.transfer.from, amount );
-      // virtual op
+      // notify related parties
       htlc_refund_operation vop( obj.id, obj.transfer.from, obj.transfer.to, amount,
          obj.conditions.hash_lock.preimage_hash, obj.conditions.hash_lock.preimage_size );
-      vop.htlc_id = htlc_idx.begin()->id;
       push_applied_operation( vop );
-
-      // remove the db object
-      remove( *htlc_idx.begin() );
+      remove( obj );
    }
 }
 
