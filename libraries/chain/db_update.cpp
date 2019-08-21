@@ -590,9 +590,11 @@ void database::clear_expired_htlcs()
          && htlc_idx.begin()->conditions.time_lock.expiration <= head_block_time() )
    {
       const htlc_object& obj = *htlc_idx.begin();
-      adjust_balance( obj.transfer.from, asset(obj.transfer.amount, obj.transfer.asset_id) );
+      const auto amount = asset(obj.transfer.amount, obj.transfer.asset_id);
+      adjust_balance( obj.transfer.from, amount );
       // virtual op
-      htlc_refund_operation vop( obj.id, obj.transfer.from );
+      htlc_refund_operation vop( obj.id, obj.transfer.from, obj.transfer.to, amount,
+         obj.conditions.hash_lock.preimage_hash, obj.conditions.hash_lock.preimage_size );
       vop.htlc_id = htlc_idx.begin()->id;
       push_applied_operation( vop );
 

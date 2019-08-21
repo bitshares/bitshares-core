@@ -173,8 +173,11 @@ namespace graphene { namespace protocol {
          struct fee_parameters_type {};
 
          htlc_refund_operation(){}
-         htlc_refund_operation( const htlc_id_type& htlc_id, const account_id_type& to ) 
-         : htlc_id(htlc_id), to(to) {}
+         htlc_refund_operation( const htlc_id_type& htlc_id,
+               const account_id_type& htlc_from, const account_id_type& htlc_to, const asset& amount,
+               const htlc_hash& preimage_hash, uint16_t preimage_size ) :
+               htlc_id(htlc_id), to(htlc_from), original_htlc_recipient(htlc_to), htlc_amount(amount),
+               htlc_preimage_hash(preimage_hash), htlc_preimage_size(preimage_size) {}
 
          account_id_type fee_payer()const { return to; }
          void            validate()const { FC_ASSERT( !"virtual operation" ); }
@@ -182,9 +185,15 @@ namespace graphene { namespace protocol {
          /// This is a virtual operation; there is no fee
          share_type      calculate_fee(const fee_parameters_type& k)const { return 0; }
 
-         htlc_id_type htlc_id;
-         account_id_type to;
          asset fee;
+
+         htlc_id_type htlc_id; // of the associated htlc object; it is deleted during emittance of this operation
+         account_id_type to, original_htlc_recipient;
+         account_id_type htlc_from() const { return to; };
+         account_id_type htlc_to()   const { return original_htlc_recipient; };
+         asset htlc_amount;
+         htlc_hash htlc_preimage_hash;
+         uint16_t htlc_preimage_size;
       };
    } 
 }
@@ -202,7 +211,8 @@ FC_REFLECT( graphene::protocol::htlc_create_operation,
 FC_REFLECT( graphene::protocol::htlc_redeem_operation, (fee)(htlc_id)(redeemer)(preimage)(extensions))
 FC_REFLECT( graphene::protocol::htlc_redeemed_operation, (fee)(htlc_id)(from)(to)(redeemer)(amount) )
 FC_REFLECT( graphene::protocol::htlc_extend_operation, (fee)(htlc_id)(update_issuer)(seconds_to_add)(extensions))
-FC_REFLECT( graphene::protocol::htlc_refund_operation, (fee)(htlc_id)(to))
+FC_REFLECT( graphene::protocol::htlc_refund_operation,
+      (fee)(htlc_id)(to)(original_htlc_recipient)(htlc_amount)(htlc_preimage_hash)(htlc_preimage_size))
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_create_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_redeem_operation::fee_parameters_type )
