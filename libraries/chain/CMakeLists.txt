@@ -69,18 +69,7 @@ add_library( graphene_chain
              "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp"
            )
 
-message( STATUS "Generating hardfork.hpp" )
-file( MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/" )
-file( MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tmp/" )
-file( REMOVE "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp" )
-file( GLOB HARDFORKS "${CMAKE_CURRENT_SOURCE_DIR}/hardfork.d/*" )
-foreach( HF ${HARDFORKS} )
-  file( READ "${HF}" INCL )
-  file( APPEND "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp" "${INCL}" )
-  get_filename_component( _HF "${HF}" NAME )
-  configure_file( "${HF}" "${CMAKE_CURRENT_BINARY_DIR}/tmp/${_HF}.tmp")
-endforeach( HF )
-
+add_dependencies( graphene_chain build_hardfork_hpp )
 target_link_libraries( graphene_chain fc graphene_db graphene_protocol )
 target_include_directories( graphene_chain
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/include" )
@@ -88,6 +77,15 @@ target_include_directories( graphene_chain
 if(MSVC)
   set_source_files_properties( db_init.cpp db_block.cpp database.cpp block_database.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
 endif(MSVC)
+
+# Support for CMake < 3.7
+if (${CMAKE_VERSION} VERSION_LESS "3.7.0")
+    MESSAGE(STATUS "Configuring for legacy CMake (CMake version ${CMAKE_VERSION} older than 3.7.0)")
+    MESSAGE(STATUS "  Target propertes not supported (SOURCE_DIR, BINARY_DIR)")
+
+    set(GRAPHENE_CHAIN_BIN_LEGACY "${PROJECT_BINARY_DIR}")
+    set(GRAPHENE_CHAIN_SOURCE_LEGACY "${PROJECT_SOURCE_DIR}")
+endif ()
 
 INSTALL( TARGETS
    graphene_chain
