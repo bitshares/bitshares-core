@@ -120,8 +120,10 @@ namespace graphene { namespace protocol {
          struct fee_parameters_type {};
 
          htlc_redeemed_operation() {}
-         htlc_redeemed_operation( htlc_id_type htlc_id, account_id_type from, account_id_type to, account_id_type redeemer, asset amount ) :
-               htlc_id(htlc_id), from(from), to(to), redeemer(redeemer), amount(amount) {}
+         htlc_redeemed_operation( htlc_id_type htlc_id, account_id_type from, account_id_type to,
+               account_id_type redeemer, asset amount, const htlc_hash& preimage_hash, uint16_t preimage_size ) :
+               htlc_id(htlc_id), from(from), to(to), redeemer(redeemer), amount(amount),
+               htlc_preimage_hash(preimage_hash), htlc_preimage_size(preimage_size) {}
 
          account_id_type fee_payer()const { return to; }
          void validate()const { FC_ASSERT( !"virtual operation" ); }
@@ -131,6 +133,9 @@ namespace graphene { namespace protocol {
          htlc_id_type htlc_id;
          account_id_type from, to, redeemer;
          asset amount;
+         htlc_hash htlc_preimage_hash;
+         uint16_t htlc_preimage_size;
+
          asset fee;
       };
 
@@ -209,7 +214,8 @@ FC_REFLECT( graphene::protocol::htlc_refund_operation::fee_parameters_type, ) //
 FC_REFLECT( graphene::protocol::htlc_create_operation,
       (fee)(from)(to)(amount)(preimage_hash)(preimage_size)(claim_period_seconds)(extensions))
 FC_REFLECT( graphene::protocol::htlc_redeem_operation, (fee)(htlc_id)(redeemer)(preimage)(extensions))
-FC_REFLECT( graphene::protocol::htlc_redeemed_operation, (fee)(htlc_id)(from)(to)(redeemer)(amount) )
+FC_REFLECT( graphene::protocol::htlc_redeemed_operation,
+      (fee)(htlc_id)(from)(to)(redeemer)(amount)(htlc_preimage_hash)(htlc_preimage_size))
 FC_REFLECT( graphene::protocol::htlc_extend_operation, (fee)(htlc_id)(update_issuer)(seconds_to_add)(extensions))
 FC_REFLECT( graphene::protocol::htlc_refund_operation,
       (fee)(htlc_id)(to)(original_htlc_recipient)(htlc_amount)(htlc_preimage_hash)(htlc_preimage_size))
