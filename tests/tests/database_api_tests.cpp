@@ -1087,6 +1087,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
 
 BOOST_AUTO_TEST_CASE( lookup_vote_ids )
 { try {
+   graphene::app::database_api db_api( db, &( app.get_options() ));
    ACTORS( (connie)(whitney)(wolverine) );
 
    fund(connie);
@@ -1100,8 +1101,6 @@ BOOST_AUTO_TEST_CASE( lookup_vote_ids )
    const auto& witness = create_witness( whitney );
    const auto& worker = create_worker( wolverine_id );
 
-   graphene::app::database_api db_api(db);
-
    std::vector<vote_id_type> votes;
    votes.push_back( committee.vote_id );
    votes.push_back( witness.vote_id );
@@ -1113,7 +1112,7 @@ BOOST_AUTO_TEST_CASE( lookup_vote_ids )
 
 BOOST_AUTO_TEST_CASE(get_account_limit_orders)
 { try {
-
+   graphene::app::database_api db_api( db, &( app.get_options() ));
    ACTORS((seller));
 
    const auto& bitcny = create_bitasset("CNY");
@@ -1135,7 +1134,6 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
       BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250 - i)));
    }
 
-   graphene::app::database_api db_api(db);
    std::vector<limit_order_object> results;
    limit_order_object o;
 
@@ -1785,5 +1783,292 @@ BOOST_AUTO_TEST_CASE( asset_in_collateral )
    BOOST_CHECK_EQUAL( 1000, assets[1].total_backing_collateral->value );
 
 } FC_LOG_AND_RETHROW() }
+BOOST_AUTO_TEST_CASE( api_limit_lookup_accounts ) {
+   try{
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      ACTOR(bob);
+      GRAPHENE_CHECK_THROW(db_api.lookup_accounts("bob",220), fc::exception);
+      map<string,account_id_type> result =db_api.lookup_accounts("bob",190);
+      BOOST_REQUIRE_EQUAL( result.size(), 17u);
 
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( api_limit_lookup_witness_accounts ) {
+   try{
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      ACTORS((bob)) ;
+      GRAPHENE_CHECK_THROW(db_api.lookup_witness_accounts("bob",220), fc::exception);
+      map<string, witness_id_type> result =db_api.lookup_witness_accounts("bob",190);
+      BOOST_REQUIRE_EQUAL( result.size(), 10u);
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+BOOST_AUTO_TEST_CASE( api_limit_get_full_accounts2 ) {
+
+   try {
+      graphene::app::database_api db_api(db, &(this->app.get_options()));
+      vector<string> accounts;
+      for (int i=0; i<201; i++) {
+         std::string acct_name = "mytempacct" + std::to_string(i);
+         const account_object& account_name=create_account(acct_name);
+         accounts.push_back(account_name.name);
+      }
+      GRAPHENE_CHECK_THROW(db_api.get_full_accounts(accounts, false), fc::exception);
+      accounts.erase(accounts.begin());
+      auto full_accounts = db_api.get_full_accounts(accounts, false);
+      BOOST_REQUIRE_EQUAL(full_accounts.size(), 200u);
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+BOOST_AUTO_TEST_CASE(api_limit_get_withdraw_permissions_by_recipient){
+   try{
+      graphene::app::database_api db_api( db, &app.get_options());
+      ACTORS((bob)) ;
+      withdraw_permission_id_type withdraw_permission;
+      GRAPHENE_CHECK_THROW(db_api.get_withdraw_permissions_by_recipient(
+         "bob",withdraw_permission, 251), fc::exception);
+      vector<withdraw_permission_object> result =db_api.get_withdraw_permissions_by_recipient(
+         "bob",withdraw_permission,250);
+      BOOST_REQUIRE_EQUAL( result.size(), 0u);
+   }catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+BOOST_AUTO_TEST_CASE(api_limit_get_withdraw_permissions_by_giver){
+   try{
+      graphene::app::database_api db_api( db, &app.get_options());
+      ACTORS((bob)) ;
+      withdraw_permission_id_type withdraw_permission;
+      GRAPHENE_CHECK_THROW(db_api.get_withdraw_permissions_by_giver(
+         "bob",withdraw_permission, 251), fc::exception);
+      vector<withdraw_permission_object> result =db_api.get_withdraw_permissions_by_giver(
+         "bob",withdraw_permission,250);
+      BOOST_REQUIRE_EQUAL( result.size(), 0u);
+   }catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+BOOST_AUTO_TEST_CASE(api_limit_get_trade_history_by_sequence){
+   try{
+      app.enable_plugin("market_history");
+      graphene::app::application_options opt=app.get_options();
+      opt.has_market_history_plugin = true;
+      graphene::app::database_api db_api( db, &opt);
+      const auto& bitusd = create_bitasset("USDBIT");
+      asset_id_type asset_1, asset_2;
+      asset_1 = bitusd.id;
+      asset_2 = asset_id_type();
+      GRAPHENE_CHECK_THROW(db_api.get_trade_history_by_sequence(
+         std::string( static_cast<object_id_type>(asset_1)),
+         std::string( static_cast<object_id_type>(asset_2)),
+         0,fc::time_point_sec(), 251), fc::exception);
+      vector<graphene::app::market_trade> result =db_api.get_trade_history_by_sequence(
+         std::string( static_cast<object_id_type>(asset_1)),
+         std::string( static_cast<object_id_type>(asset_2)),
+         0,fc::time_point_sec(),250);
+      BOOST_REQUIRE_EQUAL( result.size(), 0u);
+   }catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE(api_limit_get_trade_history){
+   try{
+      app.enable_plugin("market_history");
+      graphene::app::application_options opt=app.get_options();
+      opt.has_market_history_plugin = true;
+      graphene::app::database_api db_api( db, &opt);
+      const auto& bitusd = create_bitasset("USDBIT");
+      asset_id_type asset_1, asset_2;
+      asset_1 = bitusd.id;
+      asset_2 = asset_id_type();
+      GRAPHENE_CHECK_THROW(db_api.get_trade_history(
+                              std::string( static_cast<object_id_type>(asset_1)),
+                              std::string( static_cast<object_id_type>(asset_2)),
+                              fc::time_point_sec(),fc::time_point_sec(),
+                              251), fc::exception);
+      vector<graphene::app::market_trade> result =db_api.get_trade_history(
+         std::string( static_cast<object_id_type>(asset_1)),
+         std::string( static_cast<object_id_type>(asset_2)),
+         fc::time_point_sec(),fc::time_point_sec(),250);
+      BOOST_REQUIRE_EQUAL( result.size(), 0u);
+   }catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+BOOST_AUTO_TEST_CASE(api_limit_get_top_markets){
+   try{
+      app.enable_plugin("market_history");
+      graphene::app::application_options opt=app.get_options();
+      opt.has_market_history_plugin = true;
+      graphene::app::database_api db_api( db, &opt);
+      const auto& bitusd = create_bitasset("USDBIT");
+      asset_id_type asset_1, asset_2;
+      asset_1 = bitusd.id;
+      asset_2 = asset_id_type();
+      GRAPHENE_CHECK_THROW(db_api.get_top_markets(251), fc::exception);
+      vector<graphene::app::market_ticker> result =db_api.get_top_markets(250);
+      BOOST_REQUIRE_EQUAL( result.size(), 0u);
+   }catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+BOOST_AUTO_TEST_CASE(api_limit_get_collateral_bids) {
+   try {
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+
+      int64_t init_balance = 10000;
+      ///account_id_type borrower, borrower2, feedproducer;
+      asset_id_type swan, back;
+      ACTORS((borrower) (borrower2) (feedproducer)) ;
+      const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+      swan = bitusd.id;
+      back = asset_id_type();
+      update_feed_producers(swan(db), {feedproducer_id});
+      transfer(committee_account, borrower_id, asset(init_balance));
+      transfer(committee_account, borrower2_id, asset(init_balance));
+
+      generate_blocks( HARDFORK_CORE_216_TIME );
+      generate_block();
+
+      price_feed feed;
+      feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
+      feed.settlement_price = swan(db).amount(1) / back(db).amount(1);
+      publish_feed(swan(db), feedproducer_id(db), feed);
+      // start out with 2:1 collateral
+      borrow(borrower_id(db), swan(db).amount(10), back(db).amount(2*10));
+      borrow(borrower2_id(db), swan(db).amount(10), back(db).amount(4*10));
+      //feed 1: 2
+      feed.settlement_price = swan(db).amount(1) / back(db).amount(2);
+      publish_feed(swan(db), feedproducer_id(db), feed);
+
+      // this sell order is designed to trigger a black swan
+
+      create_sell_order( borrower2_id(db), swan(db).amount(1), back(db).amount(3) )->id;
+      BOOST_CHECK( swan(db).bitasset_data(db).has_settlement() );
+      //making 3 collateral bids
+      for (int i=0; i<3; i++) {
+
+         std::string acct_name = "mytempacct" + std::to_string(i);
+         account_id_type account_id=create_account(acct_name).id;
+         transfer(committee_account, account_id, asset(init_balance));
+         bid_collateral(account_id(db), back(db).amount(10), swan(db).amount(1));
+      }
+      auto swan_symbol = swan(db).symbol;
+
+
+      //validating normal case; total_bids =3 ; result_bids=3
+      vector<collateral_bid_object> result_bids = db_api.get_collateral_bids(swan_symbol, 250, 0);
+      BOOST_CHECK_EQUAL( 3u, result_bids.size() );
+
+      //verify skip /// inefficient code test
+      //skip < total_bids; skip=1; total_bids =3 ; result_bids=2
+      result_bids = db_api.get_collateral_bids(swan_symbol, 250, 1);
+      BOOST_CHECK_EQUAL( 2u, result_bids.size() );
+      //skip= total_bids; skip=3; total_bids =3 ; result_bids=0
+      result_bids = db_api.get_collateral_bids(swan_symbol, 250, 3);
+      BOOST_CHECK_EQUAL( 0u, result_bids.size() );
+      //skip> total_bids; skip=4; total_bids =3 ; result_bids=0
+      result_bids = db_api.get_collateral_bids(swan_symbol, 250, 4);
+      BOOST_CHECK_EQUAL( 0u, result_bids.size() );
+
+      //verify limit // inefficient code test
+      //limit= api_limit
+      for (int i=3; i<255; i++) {
+         std::string acct_name = "mytempacct" + std::to_string(i);
+         account_id_type account_id=create_account(acct_name).id;
+         transfer(committee_account, account_id, asset(init_balance));
+         bid_collateral(account_id(db), back(db).amount(10), swan(db).amount(1));
+      }
+      result_bids=db_api.get_collateral_bids(swan_symbol, 250, 0);
+      BOOST_CHECK_EQUAL( 250u, result_bids.size() );
+      //limit> api_limit throw error
+      GRAPHENE_CHECK_THROW(db_api.get_collateral_bids(swan_symbol, 253, 3), fc::exception);
+
+   }
+   catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+BOOST_AUTO_TEST_CASE(api_limit_get_account_limit_orders) {
+   try {
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      ACTORS((seller));
+      const auto &bitcny = create_bitasset("CNY");
+      const auto &core = asset_id_type()(db);
+
+      int64_t init_balance(10000000);
+      transfer(committee_account, seller_id, asset(init_balance));
+
+      /// Create  versatile orders
+      for (size_t i = 0; i < 250; ++i) {
+         BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250+i)));
+      }
+
+
+      std::vector<limit_order_object> results=db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY",250);
+      BOOST_REQUIRE_EQUAL( results.size(), 250u);
+      GRAPHENE_CHECK_THROW( db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY",251), fc::exception);
+
+   }
+   catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+BOOST_AUTO_TEST_CASE( api_limit_lookup_vote_ids ) {
+   try{
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      ACTORS( (connie)(whitney)(wolverine) );
+      fund(connie);
+      upgrade_to_lifetime_member(connie);
+      fund(whitney);
+      upgrade_to_lifetime_member(whitney);
+      fund(wolverine);
+      upgrade_to_lifetime_member(wolverine);
+      const auto& committee = create_committee_member( connie );
+      const auto& witness = create_witness( whitney );
+      const auto& worker = create_worker( wolverine_id );
+      std::vector<vote_id_type> votes;
+      votes.push_back( committee.vote_id );
+      votes.push_back( witness.vote_id );
+      const auto results = db_api.lookup_vote_ids( votes );
+      BOOST_REQUIRE_EQUAL( results.size(), 2u);
+      votes.push_back( worker.vote_for );
+      GRAPHENE_CHECK_THROW(db_api.lookup_vote_ids(votes), fc::exception);
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( api_limit_lookup_committee_member_accounts ) {
+   try{
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      ACTORS((bob));
+      GRAPHENE_CHECK_THROW(db_api.lookup_committee_member_accounts("bob",220), fc::exception);
+      std::map<std::string, committee_member_id_type>  result =db_api.lookup_committee_member_accounts("bob",190);
+      BOOST_REQUIRE_EQUAL( result.size(), 10u);
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
 BOOST_AUTO_TEST_SUITE_END()
