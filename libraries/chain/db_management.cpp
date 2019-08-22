@@ -38,6 +38,7 @@
 #include <iostream>
 #include <queue>
 #include <tuple>
+#include <ctime>
 
 namespace graphene { namespace chain {
 
@@ -124,16 +125,22 @@ void database::reindex( fc::path data_dir )
 
          if( i % 10000 == 0 )
          {
+            time_t now = time(0);
+            tm *ltm = localtime(&now);
             std::stringstream bysize;
             std::stringstream bynum;
             bysize << std::fixed << std::setprecision(5) << double(std::get<0>(blocks.front())) / total_block_size * 100;
             bynum << std::fixed << std::setprecision(5) << double(i*100)/last_block_num;
             ilog(
-               "   [by size: ${size}%   ${processed} of ${total}]   [by num: ${num}%   ${i} of ${last}]",
+               "   [by size: ${size}%   ${processed} of ${total}]   [by num: ${num}%   ${i} of ${last}] localtime: ${ld},${lh}:${lm}:${ls}",
                ("size", bysize.str())
                ("processed", std::get<0>(blocks.front()))
                ("total", total_block_size)
                ("num", bynum.str())
+               ("ld",ltm->tm_mday)
+               ("lh",ltm->tm_hour)
+               ("lm",ltm->tm_min)
+               ("ls",ltm->tm_sec)
                ("i", i)
                ("last", last_block_num)
             );
