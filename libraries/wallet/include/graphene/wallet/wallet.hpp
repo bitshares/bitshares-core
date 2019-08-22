@@ -818,6 +818,16 @@ class wallet_api
        */
       signed_transaction upgrade_account(string name, bool broadcast);
 
+      /**
+       *  Fix locked account.
+       *  This restores access to locked account.
+       *
+       * @param name the name or id of the account to unlock
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction unlocking the account
+       */
+      signed_transaction fix_locked_account(string name, bool broadcast = false);
+
       /** Creates a new account and registers it on the blockchain.
        *
        * @todo why no referrer_percent here?
@@ -1846,6 +1856,7 @@ FC_API( graphene::wallet::wallet_api,
         (derive_owner_keys_from_brain_key)
         (register_account)
         (upgrade_account)
+        (fix_locked_account)        
         (create_account_with_brain_key)
         (sell_asset)
         (borrow_asset)

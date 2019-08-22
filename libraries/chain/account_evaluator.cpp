@@ -36,8 +36,57 @@
 #include <graphene/chain/worker_object.hpp>
 
 #include <algorithm>
+#include <tuple>
 
-namespace graphene { namespace chain {
+namespace graphene {
+   namespace protocol {
+      void verify_cycled_authority( const account_id_type& id,
+                              const std::function<const authority*(account_id_type)>& get_active,
+                              const std::function<const authority*(account_id_type)>& get_owner,
+                              uint32_t max_recursion_depth );
+   }
+   namespace chain {
+
+namespace detail {
+
+   template <class DB>
+   void check_account_authorities(const account_id_type account_id,
+                                 const DB& db,
+                                 const optional<authority>& active,
+                                 const optional<authority>& owner)
+   {
+      const auto empty_auth = authority{};
+      const auto no_account = account_id_type{};
+
+      auto get_active = [&account_id, &db, &active, &owner, &empty_auth, &no_account]( account_id_type id )
+      {
+         if ( (no_account == id) || (account_id == id) )
+         {
+            if (active)
+            {
+               return &(*active);
+            }
+            return &empty_auth;
+         }
+         return &id(db).active;
+      };
+
+      auto get_owner = [&account_id, &db, &active, &owner, &empty_auth, &no_account]( account_id_type id )
+      {
+         if ( (no_account == id) || (account_id == id) )
+         {
+            if (owner)
+            {
+               return &(*owner);
+            }
+            return &empty_auth;
+         }
+         return &id(db).owner;
+      };
+
+      verify_cycled_authority(account_id, get_active, get_owner, db.get_global_properties().parameters.max_authority_depth);
+   };
+} //detail
 
 void verify_authority_accounts( const database& db, const authority& a )
 {
@@ -133,6 +182,11 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
    {
       verify_authority_accounts( d, op.owner );
       verify_authority_accounts( d, op.active );
+
+      if( d.head_block_time() >= HARDFORK_CYCLED_ACCOUNTS_TIME )
+      {
+         detail::check_account_authorities({}, d, op.active, op.owner);
+      }
    }
    GRAPHENE_RECODE_EXC( internal_verify_auth_max_auth_exceeded, account_create_max_auth_exceeded )
    GRAPHENE_RECODE_EXC( internal_verify_auth_account_not_found, account_create_auth_account_not_found )
@@ -276,8 +330,30 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
 
    try
    {
-      if( o.owner )  verify_authority_accounts( d, *o.owner );
-      if( o.active ) verify_authority_accounts( d, *o.active );
+      if( o.owner )
+      {
+         verify_authority_accounts( d, *o.owner );
+      }
+      if( o.active )
+      {
+         verify_authority_accounts( d, *o.active );
+      }
+   
+      try 
+      {
+         detail::check_account_authorities(o.account, d, o.active, o.owner);
+      }
+      catch (tx_missing_active_auth)
+      {
+         if( d.head_block_time() < HARDFORK_CYCLED_ACCOUNTS_TIME )
+         {
+            cycle_detected = true;
+         }
+         else
+         {
+            throw;
+         }         
+      }
    }
    GRAPHENE_RECODE_EXC( internal_verify_auth_max_auth_exceeded, account_update_max_auth_exceeded )
    GRAPHENE_RECODE_EXC( internal_verify_auth_account_not_found, account_update_auth_account_not_found )
@@ -316,7 +392,12 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
    }
 
    // update account object
-   d.modify( *acnt, [&o](account_object& a){
+   d.modify( *acnt, [&o, this](account_object& a){
+      if( cycle_detected && !a.stable_owner.valid())
+      {
+         a.stable_owner = a.owner;
+      }
+
       if( o.owner )
       {
          a.owner = *o.owner;
@@ -355,6 +436,44 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
       {
          sa.account = o.account;
       } );
+   }
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+void_result account_unlock_evaluator::do_evaluate( const account_unlock_operation& o )
+{ try {
+   database& d = db();
+   FC_ASSERT(d.head_block_time() >= HARDFORK_CYCLED_ACCOUNTS_TIME,
+             "Unlocking account is available after HARDFORK_CYCLED_ACCOUNTS_TIME only!"
+   );
+
+   acnt = &o.account_to_unlock(d);
+   FC_ASSERT( acnt->stable_owner.valid(), "Account ${a} is not unlockable.", ("a", o.account_to_unlock) );
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+void_result account_unlock_evaluator::do_apply( const account_unlock_operation& o )
+{ try {
+   database& d = db();
+
+   // update account object
+   d.modify( *acnt, [&o, this](account_object& a){
+      a.owner = *a.stable_owner;
+      a.stable_owner.reset();
+   });
+
+   const auto& bal_idx = d.get_index_type< primary_index< account_balance_index > >().get_secondary_index< balances_by_account_index >();
+   for( const auto& entry : bal_idx.get_account_balances( acnt->get_id() ) )
+   {
+      const auto balance = entry.second->get_balance();
+      const auto unlock_cost = balance.amount / 10;
+      const auto penalty = asset(unlock_cost, balance.asset_id);
+
+      d.adjust_balance(acnt->get_id(), -penalty);
+      d.adjust_balance(GRAPHENE_COMMITTEE_ACCOUNT, penalty);
+      d.push_applied_operation(account_unlock_penalty_payment_operation( acnt->get_id(), penalty ));
    }
 
    return void_result();

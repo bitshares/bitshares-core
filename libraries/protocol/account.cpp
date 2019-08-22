@@ -258,6 +258,17 @@ void account_update_operation::validate()const
       validate_special_authority( *extensions.value.active_special_authority );
 }
 
+share_type account_unlock_operation::calculate_fee( const fee_parameters_type& k ) const
+{
+   auto core_fee_required = k.fee;
+   return core_fee_required;
+}
+
+void account_unlock_operation::validate() const
+{
+   FC_ASSERT( fee.amount >= 0 );
+}
+
 share_type account_upgrade_operation::calculate_fee(const fee_parameters_type& k) const
 {
    if( upgrade_to_lifetime_member )
@@ -284,9 +295,12 @@ GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_op
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_whitelist_operation::fee_parameters_type )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_operation::fee_parameters_type )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_upgrade_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_unlock_operation::fee_parameters_type )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_transfer_operation::fee_parameters_type )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_whitelist_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_upgrade_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_unlock_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_transfer_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::account_unlock_penalty_payment_operation )

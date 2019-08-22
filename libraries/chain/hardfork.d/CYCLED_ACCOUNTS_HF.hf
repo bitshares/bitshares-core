@@ -1,0 +1,4 @@
+// #HARDFORK_CYCLED_ACCOUNTS_TIME Prevent to create/update account authorities that locks account.
+#ifndef HARDFORK_CYCLED_ACCOUNTS_TIME 
+#define HARDFORK_CYCLED_ACCOUNTS_TIME (fc::time_point_sec( 1600000000 )) // Sunday, September 13, 2020 12:26:40 PM
+#endif

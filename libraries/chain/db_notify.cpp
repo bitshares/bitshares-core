@@ -67,6 +67,11 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // account_id
    }
+   void operator()(const account_unlock_penalty_payment_operation& op)
+   {
+      _impacted.insert( op.fee_payer() );
+      _impacted.insert( GRAPHENE_COMMITTEE_ACCOUNT );
+   }
    void operator()( const execute_bid_operation& op )
    {
       _impacted.insert( op.fee_payer() ); // bidder
@@ -85,6 +90,10 @@ struct get_impacted_account_visitor
          add_authority_accounts( _impacted, *(op.owner) );
       if( op.active )
          add_authority_accounts( _impacted, *(op.active) );
+   }
+   void operator()( const account_unlock_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account_to_unlock
    }
    void operator()( const account_whitelist_operation& op )
    {

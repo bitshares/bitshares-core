@@ -123,9 +123,11 @@ struct sign_state
          auto itr = provided_signatures.find(k);
          if( itr == provided_signatures.end() )
          {
-            auto pk = available_keys.find(k);
-            if( pk  != available_keys.end() )
+            if( is_key_available(k) )
+            {
                return provided_signatures[k] = true;
+            }
+
             return false;
          }
          return itr->second = true;
@@ -157,10 +159,13 @@ struct sign_state
          if( itr == provided_address_sigs->end() )
          {
             auto aitr = available_address_sigs->find(a);
-            if( aitr != available_address_sigs->end() ) {
-               auto pk = available_keys.find(aitr->second);
-               if( pk != available_keys.end() )
+            if( aitr != available_address_sigs->end() ) 
+            {               
+               if( is_key_available(aitr->second) )
+               {
                   return provided_signatures[aitr->second] = true;
+               }
+
                return false;
             }
          }
@@ -171,6 +176,17 @@ struct sign_state
       {
          if( approved_by.find(id) != approved_by.end() ) return true;
          return check_authority( get_active(id) ) || ( allow_non_immediate_owner && check_authority( get_owner(id) ) );
+      }
+
+      bool is_key_available(const public_key_type &key)
+      {
+         if (verify_keyset)
+         {
+            return true;
+         }
+
+         auto pk = available_keys.find(key);
+         return (pk != available_keys.end());
       }
 
       /**
@@ -241,12 +257,14 @@ struct sign_state
                   const std::function<const authority*(account_id_type)>& owner,
                   bool allow_owner,
                   uint32_t max_recursion_depth = GRAPHENE_MAX_SIG_CHECK_DEPTH,
-                  const flat_set<public_key_type>& keys = empty_keyset )
+                  const flat_set<public_key_type>& keys = empty_keyset,
+                  const bool verify = false )
       :  get_active(active),
          get_owner(owner),
          allow_non_immediate_owner(allow_owner),
          max_recursion(max_recursion_depth),
-         available_keys(keys)
+         available_keys(keys),
+         verify_keyset(verify)
       {
          for( const auto& key : sigs )
             provided_signatures[ key ] = false;
@@ -259,11 +277,26 @@ struct sign_state
       const bool                       allow_non_immediate_owner;
       const uint32_t                   max_recursion;
       const flat_set<public_key_type>& available_keys;
+      const bool                       verify_keyset;
 
       flat_map<public_key_type,bool>   provided_signatures;
       flat_set<account_id_type>        approved_by;
 };
 
+
+void verify_cycled_authority( const account_id_type& id, 
+                              const std::function<const authority*(account_id_type)>& get_active,
+                              const std::function<const authority*(account_id_type)>& get_owner,
+                              uint32_t max_recursion_depth )
+{ try {
+   sign_state s( empty_keyset, get_active, get_owner, true, max_recursion_depth, empty_keyset, true );
+
+   GRAPHENE_ASSERT( s.check_authority(id),
+                  tx_missing_active_auth,
+                  "Missing Authority ${id}",
+                  ("id",id)("auth",*get_active(id))("owner",*get_owner(id)) 
+   );
+} FC_CAPTURE_AND_RETHROW( (id)(max_recursion_depth) ) }
 
 void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs,
                        const std::function<const authority*(account_id_type)>& get_active,
