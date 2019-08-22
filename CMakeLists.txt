@@ -216,13 +216,19 @@ else( WIN32 ) # Apple AND Linux
         message( STATUS "Configuring BitShares on OS X" )
         set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -stdlib=libc++ -Wall" )
     else( APPLE )
-        # Linux Specific Options Here
-        message( STATUS "Configuring BitShares on Linux" )
+        if ( "${CMAKE_SYSTEM_NAME}" STREQUAL "OpenBSD" )
+            # OpenBSD Specific Options
+            message( STATUS "Configuring BitShares on OpenBSD" )
+        else()
+            # Linux Specific Options Here
+            message( STATUS "Configuring BitShares on Linux" )
+            set( rt_library rt )
+        endif()
+        # Common Linux & OpenBSD Options
         set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -Wall" )
         if(USE_PROFILER)
             set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg" )
         endif( USE_PROFILER )
-        set( rt_library rt )
         set( pthread_library pthread)
         if ( NOT DEFINED crypto_library )
           # I'm not sure why this is here, I guess someone has openssl and can't detect it with find_package()?
