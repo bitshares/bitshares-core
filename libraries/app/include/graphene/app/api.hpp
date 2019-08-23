@@ -571,6 +571,15 @@ namespace graphene { namespace app {
           */
          optional<htlc_order_object> get_htlc_offer(htlc_order_id_type id)const;
 
+         /**
+          * @breif Get storage information of an account
+          *
+          * @param account Account name to get info from
+          *
+          * @return The storage information of the account or empty
+          */
+         optional<account_storage_object> get_storage_info(std::string account)const;
+
    private:
          application& _app;
          graphene::app::database_api database_api;

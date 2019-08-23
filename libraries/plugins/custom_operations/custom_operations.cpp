@@ -46,8 +46,21 @@ void take_htlc_order_operation::validate()const
    FC_ASSERT(extensions.value.htlc_order_id.valid());
 }
 
+void account_store_data::validate()const
+{
+   FC_ASSERT(extensions.value.pairs.valid());
+   FC_ASSERT(extensions.value.pairs->size() <= 10);
+}
+void account_list_data::validate()const
+{
+   FC_ASSERT(extensions.value.accounts.valid());
+   FC_ASSERT(extensions.value.accounts->size() <= 10);
+}
+
 } } //graphene::custom_operations
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::custom_operations::account_contact_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::custom_operations::create_htlc_order_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::custom_operations::take_htlc_order_operation )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::custom_operations::account_store_data )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::custom_operations::account_list_data )

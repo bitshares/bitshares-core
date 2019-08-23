@@ -738,4 +738,14 @@ namespace graphene { namespace app {
       return optional<htlc_order_object>();
    }
 
+   optional<account_storage_object> custom_operations_api::get_storage_info(std::string account_id_or_name)const
+   {
+      const auto account_id = database_api.get_account_id_from_string(account_id_or_name);
+      auto &index = _app.chain_database()->get_index_type<account_storage_index>().indices().get<by_custom_account>();
+      auto itr = index.find(account_id);
+      if(itr != index.end())
+         return *itr;
+      return optional<account_storage_object>();
+   }
+
 } } // graphene::app

@@ -35,6 +35,17 @@ custom_generic_evaluator::custom_generic_evaluator(database& db, const account_i
    _account = account;
 }
 
+void fill_contact_object(account_contact_object& aco, account_id_type account, const account_contact_operation& op)
+{
+   aco.account = account;
+   if(op.extensions.value.name.valid()) aco.name = *op.extensions.value.name;
+   if(op.extensions.value.email.valid()) aco.email = *op.extensions.value.email;
+   if(op.extensions.value.phone.valid()) aco.phone = *op.extensions.value.phone;
+   if(op.extensions.value.address.valid()) aco.address = *op.extensions.value.address;
+   if(op.extensions.value.company.valid()) aco.company = *op.extensions.value.company;
+   if(op.extensions.value.url.valid()) aco.url = *op.extensions.value.url;
+}
+
 object_id_type custom_generic_evaluator::do_apply(const account_contact_operation& op)
 {
    auto &index = _db->get_index_type<account_contact_index>().indices().get<by_custom_account>();
@@ -43,26 +54,14 @@ object_id_type custom_generic_evaluator::do_apply(const account_contact_operatio
    if( itr != index.end() )
    {
       _db->modify( *itr, [&op, this]( account_contact_object& aco ){
-         aco.account = _account;
-         if(op.extensions.value.name.valid()) aco.name = *op.extensions.value.name;
-         if(op.extensions.value.email.valid()) aco.email = *op.extensions.value.email;
-         if(op.extensions.value.phone.valid()) aco.phone = *op.extensions.value.phone;
-         if(op.extensions.value.address.valid()) aco.address = *op.extensions.value.address;
-         if(op.extensions.value.company.valid()) aco.company = *op.extensions.value.company;
-         if(op.extensions.value.url.valid()) aco.url = *op.extensions.value.url;
+         fill_contact_object(aco, _account, op);
       });
       return itr->id;
    }
    else
    {
       auto created = _db->create<account_contact_object>( [&op, this]( account_contact_object& aco ) {
-         aco.account = _account;
-         if(op.extensions.value.name.valid()) aco.name = *op.extensions.value.name;
-         if(op.extensions.value.email.valid()) aco.email = *op.extensions.value.email;
-         if(op.extensions.value.phone.valid()) aco.phone = *op.extensions.value.phone;
-         if(op.extensions.value.address.valid()) aco.address = *op.extensions.value.address;
-         if(op.extensions.value.company.valid()) aco.company = *op.extensions.value.company;
-         if(op.extensions.value.url.valid()) aco.url = *op.extensions.value.url;
+         fill_contact_object(aco, _account, op);
       });
       return created.id;
    }
@@ -112,6 +111,76 @@ object_id_type custom_generic_evaluator::do_apply(const take_htlc_order_operatio
       }
    }
    return htlc_order_id;
+}
+
+void fill_storage_map(account_storage_object& aso, account_id_type account, const account_store_data& op)
+{
+   aso.account = account;
+   if(op.extensions.value.pairs.valid())
+   {
+      for(auto const& row: *op.extensions.value.pairs) {
+         if (op.extensions.value.remove.valid() && *op.extensions.value.remove)
+            aso.storage_map.erase(row.first);
+         else
+            aso.storage_map[row.first] = row.second;
+      }
+   }
+}
+
+object_id_type custom_generic_evaluator::do_apply(const account_store_data& op)
+{
+   auto &index = _db->get_index_type<account_storage_index>().indices().get<by_custom_account>();
+
+   auto itr = index.find(_account);
+   if( itr != index.end() )
+   {
+      _db->modify( *itr, [&op, this]( account_storage_object& aso ) {
+         fill_storage_map(aso, _account, op);
+      });
+      return itr->id;
+   }
+   else
+   {
+      auto created = _db->create<account_storage_object>( [&op, this]( account_storage_object& aso ) {
+         fill_storage_map(aso, _account, op);
+      });
+      return created.id;
+   }
+}
+
+void fill_account_list(account_storage_object& aso, account_id_type account, const account_list_data& op)
+{
+   aso.account = account;
+   if(op.extensions.value.accounts.valid())
+   {
+      for(auto const& account: *op.extensions.value.accounts) {
+         if (op.extensions.value.remove.valid() && *op.extensions.value.remove)
+            aso.account_list.erase(account);
+         else
+            aso.account_list.insert(account);
+      }
+   }
+}
+
+object_id_type custom_generic_evaluator::do_apply(const account_list_data& op)
+{
+   auto &index = _db->get_index_type<account_storage_index>().indices().get<by_custom_account>();
+
+   auto itr = index.find(_account);
+   if( itr != index.end() )
+   {
+      _db->modify( *itr, [&op, this]( account_storage_object& aso ) {
+         fill_account_list(aso, _account, op);
+      });
+      return itr->id;
+   }
+   else
+   {
+      auto created = _db->create<account_storage_object>( [&op, this]( account_storage_object& aso ) {
+         fill_account_list(aso, _account, op);
+      });
+      return created.id;
+   }
 }
 
 } }

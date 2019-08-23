@@ -56,11 +56,12 @@ class custom_operations_plugin : public graphene::app::plugin
       std::unique_ptr<detail::custom_operations_plugin_impl> my;
 };
 
-
 typedef fc::static_variant<
       account_contact_operation,
       create_htlc_order_operation,
-      take_htlc_order_operation
+      take_htlc_order_operation,
+      account_store_data,
+      account_list_data
 > custom_plugin_operation;
 
 struct custom_operation_wrapper {
@@ -83,7 +84,6 @@ struct custom_op_visitor
       evaluator.do_apply(v);
    }
 };
-
 
 } } //graphene::custom_operations
 
