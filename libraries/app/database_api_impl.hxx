@@ -54,7 +54,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       map<uint32_t, optional<block_header>> get_block_header_batch(const vector<uint32_t> block_nums)const;
       optional<signed_block> get_block(uint32_t block_num)const;
       processed_transaction get_transaction( uint32_t block_num, uint32_t trx_in_block )const;
-
+      optional<processed_transaction> get_transaction_by_txid(transaction_id_type txid)const;
       // Globals
       chain_property_object get_chain_properties()const;
       global_property_object get_global_properties()const;

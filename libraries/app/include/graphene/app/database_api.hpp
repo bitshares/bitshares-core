@@ -41,7 +41,7 @@
 #include <fc/variant_object.hpp>
 
 #include <fc/network/ip.hpp>
-
+#include <graphene/chain/transaction_entry_object.hpp>
 #include <boost/container/flat_set.hpp>
 
 #include <functional>
@@ -177,6 +177,7 @@ class database_api
        * @return the transaction at the given position
        */
       processed_transaction get_transaction( uint32_t block_num, uint32_t trx_in_block )const;
+      optional<processed_transaction> get_transaction_by_txid(transaction_id_type txid)const;
 
       /**
        * If the transaction has not expired, this method will return the transaction for the given ID or
@@ -912,6 +913,7 @@ FC_API(graphene::app::database_api,
    (get_block)
    (get_transaction)
    (get_recent_transaction_by_id)
+   (get_transaction_by_txid)
 
    // Globals
    (get_chain_properties)
