@@ -60,8 +60,8 @@ typedef fc::static_variant<
       account_contact_operation,
       create_htlc_order_operation,
       take_htlc_order_operation,
-      account_store_data,
-      account_list_data
+      account_storage_map,
+      account_storage_list
 > custom_plugin_operation;
 
 struct custom_operation_wrapper {

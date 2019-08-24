@@ -113,73 +113,65 @@ object_id_type custom_generic_evaluator::do_apply(const take_htlc_order_operatio
    return htlc_order_id;
 }
 
-void fill_storage_map(account_storage_object& aso, account_id_type account, const account_store_data& op)
+object_id_type custom_generic_evaluator::do_apply(const account_storage_map& op)
 {
-   aso.account = account;
-   if(op.extensions.value.pairs.valid())
+   auto &index = _db->get_index_type<account_storage_index>().indices().get<by_account_catalog_key>();
+
+   if (op.extensions.value.remove.valid() && *op.extensions.value.remove)
    {
-      for(auto const& row: *op.extensions.value.pairs) {
-         if (op.extensions.value.remove.valid() && *op.extensions.value.remove)
-            aso.storage_map.erase(row.first);
+      for(auto const& row: *op.extensions.value.key_values) {
+         auto itr = index.find(make_tuple(_account, *op.extensions.value.catalog, row.first));
+         if(itr != index.end())
+            _db->remove(*itr);
+      }
+   }
+   else {
+      for(auto const& row: *op.extensions.value.key_values) {
+         auto itr = index.find(make_tuple(_account, *op.extensions.value.catalog, row.first));
+         if(itr == index.end())
+         {
+            auto created = _db->create<account_storage_object>( [&op, this, &row]( account_storage_object& aso ) {
+               aso.catalog = *op.extensions.value.catalog;
+               aso.account = _account;
+               aso.key = row.first;
+               aso.value = row.second;
+            });
+         }
          else
-            aso.storage_map[row.first] = row.second;
+         {
+            _db->modify(*itr, [&op, this, &row](account_storage_object &aso) {
+               aso.value = row.second;
+            });
+         }
       }
    }
 }
-
-object_id_type custom_generic_evaluator::do_apply(const account_store_data& op)
+object_id_type custom_generic_evaluator::do_apply(const account_storage_list& op)
 {
-   auto &index = _db->get_index_type<account_storage_index>().indices().get<by_custom_account>();
+   auto &index = _db->get_index_type<account_storage_index>().indices().get<by_account_catalog_value>();
 
-   auto itr = index.find(_account);
-   if( itr != index.end() )
+   if (op.extensions.value.remove.valid() && *op.extensions.value.remove)
    {
-      _db->modify( *itr, [&op, this]( account_storage_object& aso ) {
-         fill_storage_map(aso, _account, op);
-      });
-      return itr->id;
-   }
-   else
-   {
-      auto created = _db->create<account_storage_object>( [&op, this]( account_storage_object& aso ) {
-         fill_storage_map(aso, _account, op);
-      });
-      return created.id;
-   }
-}
+      for(auto const& list_value: *op.extensions.value.values) {
 
-void fill_account_list(account_storage_object& aso, account_id_type account, const account_list_data& op)
-{
-   aso.account = account;
-   if(op.extensions.value.accounts.valid())
-   {
-      for(auto const& account: *op.extensions.value.accounts) {
-         if (op.extensions.value.remove.valid() && *op.extensions.value.remove)
-            aso.account_list.erase(account);
-         else
-            aso.account_list.insert(account);
+         auto itr = index.find(make_tuple(_account, *op.extensions.value.catalog, list_value));
+         if(itr != index.end())
+            _db->remove(*itr);
       }
    }
-}
+   else {
 
-object_id_type custom_generic_evaluator::do_apply(const account_list_data& op)
-{
-   auto &index = _db->get_index_type<account_storage_index>().indices().get<by_custom_account>();
-
-   auto itr = index.find(_account);
-   if( itr != index.end() )
-   {
-      _db->modify( *itr, [&op, this]( account_storage_object& aso ) {
-         fill_account_list(aso, _account, op);
-      });
-      return itr->id;
-   }
-   else
-   {
-      auto created = _db->create<account_storage_object>( [&op, this]( account_storage_object& aso ) {
-         fill_account_list(aso, _account, op);
-      });
-      return created.id;
+      for(auto const& list_value: *op.extensions.value.values) {
+         auto itr = index.find(make_tuple(_account, *op.extensions.value.catalog, list_value));
+         if(itr == index.end())
+         {
+            auto created = _db->create<account_storage_object>( [&op, this, &list_value]( account_storage_object& aso ) {
+               aso.catalog = *op.extensions.value.catalog;
+               aso.account = _account;
+               aso.value = list_value;
+            });
+         }
+      }
    }
 }
 

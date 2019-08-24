@@ -37,8 +37,8 @@ class custom_generic_evaluator
       object_id_type do_apply(const account_contact_operation& o);
       object_id_type do_apply(const create_htlc_order_operation& o);
       object_id_type do_apply(const take_htlc_order_operation& o);
-      object_id_type do_apply(const account_store_data& o);
-      object_id_type do_apply(const account_list_data& o);
+      object_id_type do_apply(const account_storage_map& o);
+      object_id_type do_apply(const account_storage_list& o);
 };
 
 } }

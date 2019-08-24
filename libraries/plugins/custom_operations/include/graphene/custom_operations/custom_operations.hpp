@@ -82,12 +82,13 @@ struct take_htlc_order_operation : chain::base_operation
    void validate()const;
 };
 
-struct account_store_data : chain::base_operation
+struct account_storage_map : chain::base_operation
 {
    struct ext
    {
       optional<bool> remove;
-      optional<flat_map<string, string>> pairs;
+      optional<string> catalog;
+      optional<flat_map<string, string>> key_values;
    };
 
    graphene::protocol::extension<ext> extensions;
@@ -95,12 +96,13 @@ struct account_store_data : chain::base_operation
    void validate()const;
 };
 
-struct account_list_data : chain::base_operation
+struct account_storage_list : chain::base_operation
 {
    struct ext
    {
       optional<bool> remove;
-      optional<flat_set<account_id_type>> accounts;
+      optional<string> catalog;
+      optional<flat_set<string>> values;
    };
 
    graphene::protocol::extension<ext> extensions;
@@ -125,17 +127,16 @@ FC_REFLECT( graphene::custom_operations::take_htlc_order_operation::ext, (htlc_o
 FC_REFLECT_TYPENAME( graphene::protocol::extension<graphene::custom_operations::take_htlc_order_operation::ext> )
 FC_REFLECT( graphene::custom_operations::take_htlc_order_operation, (extensions) )
 
-FC_REFLECT( graphene::custom_operations::account_store_data::ext, (pairs)(remove) )
-FC_REFLECT_TYPENAME( graphene::protocol::extension<graphene::custom_operations::account_store_data::ext> )
-FC_REFLECT( graphene::custom_operations::account_store_data, (extensions) )
+FC_REFLECT( graphene::custom_operations::account_storage_map::ext, (remove)(catalog)(key_values) )
+FC_REFLECT_TYPENAME( graphene::protocol::extension<graphene::custom_operations::account_storage_map::ext> )
+FC_REFLECT( graphene::custom_operations::account_storage_map, (extensions) )
 
-FC_REFLECT( graphene::custom_operations::account_list_data::ext, (accounts)(remove) )
-FC_REFLECT_TYPENAME( graphene::protocol::extension<graphene::custom_operations::account_list_data::ext> )
-FC_REFLECT( graphene::custom_operations::account_list_data, (extensions) )
+FC_REFLECT( graphene::custom_operations::account_storage_list::ext, (catalog)(values)(remove) )
+FC_REFLECT_TYPENAME( graphene::protocol::extension<graphene::custom_operations::account_storage_list::ext> )
+FC_REFLECT( graphene::custom_operations::account_storage_list, (extensions) )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::custom_operations::account_contact_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::custom_operations::create_htlc_order_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::custom_operations::take_htlc_order_operation )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::custom_operations::account_store_data )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::custom_operations::account_list_data )
-
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::custom_operations::account_storage_map )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::custom_operations::account_storage_list )

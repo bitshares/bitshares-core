@@ -485,17 +485,18 @@ try {
    transfer(committee_account, nathan_id, asset(init_balance));
    transfer(committee_account, alice_id, asset(init_balance));
 
-   // nathan adds arbitrary account data via custom operation, simulating some dapp settings in this case
+   // nathan adds key-value data via custom operation to a settings catalog
    {
       custom_operation op;
-      account_store_data store;
-      account_store_data::ext data;
+      account_storage_map store;
+      account_storage_map::ext data;
 
       flat_map<string, string> pairs;
       pairs["language"] = "en";
       pairs["image_url"] = "http://some.image.url/img.jpg";
 
-      store.extensions.value.pairs = pairs;
+      store.extensions.value.key_values = pairs;
+      store.extensions.value.catalog = "settings";
 
       auto packed = fc::raw::pack(store);
       packed.insert(packed.begin(), types::account_store);
@@ -514,28 +515,27 @@ try {
    fc::usleep(fc::milliseconds(200));
 
    // check nathan stored data with the api
-   account_storage_object storage_results_nathan = *custom_operations_api.get_storage_info("nathan");
+   vector<account_storage_object> storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].value, "http://some.image.url/img.jpg");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, "language");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].value, "en");
 
-   BOOST_CHECK_EQUAL(storage_results_nathan.account.instance.value, 16 );
-   auto row1 = storage_results_nathan.storage_map.find("language");
-   auto row2 = storage_results_nathan.storage_map.find("image_url");
-
-   BOOST_CHECK_EQUAL(row1->first, "language");
-   BOOST_CHECK_EQUAL(row1->second, "en");
-   BOOST_CHECK_EQUAL(row2->first, "image_url");
-   BOOST_CHECK_EQUAL(row2->second, "http://some.image.url/img.jpg");
-
-   // add accounts to account list storage
+   // nathan add a list of accounts to storage
    {
       custom_operation op;
-      account_list_data list;
-      account_list_data::ext data;
+      account_storage_list list;
+      account_storage_list::ext data;
 
-      flat_set<account_id_type> accounts;
-      accounts.insert(alice_id);
-      accounts.insert(robert_id);
+      flat_set<string> accounts;
+      accounts.insert(alice.name);
+      accounts.insert(robert.name);
 
-      list.extensions.value.accounts = accounts;
+      list.extensions.value.values = accounts;
+      list.extensions.value.catalog = "contact_list";
 
       auto packed = fc::raw::pack(list);
       packed.insert(packed.begin(), types::account_list);
@@ -554,25 +554,24 @@ try {
    fc::usleep(fc::milliseconds(200));
 
    // get the account list for nathan, check alice and robert are there
-   auto account_list_nathan = *custom_operations_api.get_storage_info("nathan");
-
-   BOOST_CHECK_EQUAL(account_list_nathan.account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(account_list_nathan.account_list.size(), 2 );
-   auto itr = account_list_nathan.account_list.begin();
-   BOOST_CHECK_EQUAL(itr->instance.value, alice_id.instance.value);
-   ++itr;
-   BOOST_CHECK_EQUAL(itr->instance.value, robert_id.instance.value);
+   storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].value, alice.name);
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].value, robert.name);
 
    // add a value into account list already there
    {
       custom_operation op;
-      account_list_data list;
-      account_list_data::ext data;
+      account_storage_list list;
+      account_storage_list::ext data;
 
-      flat_set<account_id_type> accounts;
-      accounts.insert(alice_id);
+      flat_set<string> accounts;
+      accounts.insert(alice.name);
 
-      list.extensions.value.accounts = accounts;
+      list.extensions.value.values = accounts;
+      list.extensions.value.catalog = "contact_list";
 
       auto packed = fc::raw::pack(list);
       packed.insert(packed.begin(), types::account_list);
@@ -591,25 +590,25 @@ try {
    fc::usleep(fc::milliseconds(200));
 
    // nothing changes
-   account_list_nathan = *custom_operations_api.get_storage_info("nathan");
-   BOOST_CHECK_EQUAL(account_list_nathan.account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(account_list_nathan.account_list.size(), 2 );
-   itr = account_list_nathan.account_list.begin();
-   BOOST_CHECK_EQUAL(itr->instance.value, alice_id.instance.value);
-   ++itr;
-   BOOST_CHECK_EQUAL(itr->instance.value, robert_id.instance.value);
+   storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].value, alice.name);
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].value, robert.name);
 
    // delete alice from the list
    {
       custom_operation op;
-      account_list_data list;
-      account_list_data::ext data;
+      account_storage_list list;
+      account_storage_list::ext data;
 
-      flat_set<account_id_type> accounts;
-      accounts.insert(alice_id);
+      flat_set<string> accounts;
+      accounts.insert(alice.name);
 
-      list.extensions.value.accounts = accounts;
+      list.extensions.value.values = accounts;
       list.extensions.value.remove = true;
+      list.extensions.value.catalog = "contact_list";
 
       auto packed = fc::raw::pack(list);
       packed.insert(packed.begin(), types::account_list);
@@ -628,23 +627,23 @@ try {
    fc::usleep(fc::milliseconds(200));
 
    // alice gone
-   account_list_nathan = *custom_operations_api.get_storage_info("nathan");
-   BOOST_CHECK_EQUAL(account_list_nathan.account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(account_list_nathan.account_list.size(), 1 );
-   itr = account_list_nathan.account_list.begin();
-   BOOST_CHECK_EQUAL(itr->instance.value, robert_id.instance.value);
+   storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 1 );
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].value, robert.name);
 
    // add and edit more stuff to the storage
    {
       custom_operation op;
-      account_store_data store;
-      account_store_data::ext data;
+      account_storage_map store;
+      account_storage_map::ext data;
 
       flat_map<string, string> pairs;
       pairs["image_url"] = "http://new.image.url/newimg.jpg";
       pairs["theme"] = "dark";
 
-      store.extensions.value.pairs = pairs;
+      store.extensions.value.key_values = pairs;
+      store.extensions.value.catalog = "settings";
 
       auto packed = fc::raw::pack(store);
       packed.insert(packed.begin(), types::account_store);
@@ -662,31 +661,30 @@ try {
    generate_block();
    fc::usleep(fc::milliseconds(200));
 
-   // all good, image_url updated and theme added
-   storage_results_nathan = *custom_operations_api.get_storage_info("nathan");
-   BOOST_CHECK_EQUAL(storage_results_nathan.account.instance.value, 16 );
-   row1 = storage_results_nathan.storage_map.find("language");
-   row2 = storage_results_nathan.storage_map.find("image_url");
-   auto row3 = storage_results_nathan.storage_map.find("theme");
-
-   BOOST_CHECK_EQUAL(row1->first, "language");
-   BOOST_CHECK_EQUAL(row1->second, "en");
-   BOOST_CHECK_EQUAL(row2->first, "image_url");
-   BOOST_CHECK_EQUAL(row2->second, "http://new.image.url/newimg.jpg");
-   BOOST_CHECK_EQUAL(row3->first, "theme");
-   BOOST_CHECK_EQUAL(row3->second, "dark");
+   // check old and new stuff
+   storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 3 );
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].value, "http://new.image.url/newimg.jpg");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, "language");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].value, "en");
+   BOOST_CHECK_EQUAL(*storage_results_nathan[2].key, "theme");
+   BOOST_CHECK_EQUAL(storage_results_nathan[2].value, "dark");
 
    // delete stuff from the storage
    {
       custom_operation op;
-      account_store_data store;
-      account_store_data::ext data;
+      account_storage_map store;
+      account_storage_map::ext data;
 
       flat_map<string, string> pairs;
       pairs["theme"] = "dark";
 
-      store.extensions.value.pairs = pairs;
+      store.extensions.value.key_values = pairs;
       store.extensions.value.remove = true;
+      store.extensions.value.catalog = "settings";
 
       auto packed = fc::raw::pack(store);
       packed.insert(packed.begin(), types::account_store);
@@ -705,27 +703,27 @@ try {
    fc::usleep(fc::milliseconds(200));
 
    // theme is removed from the storage
-   storage_results_nathan = *custom_operations_api.get_storage_info("nathan");
-   BOOST_CHECK_EQUAL(storage_results_nathan.account.instance.value, 16 );
-   row1 = storage_results_nathan.storage_map.find("language");
-   row2 = storage_results_nathan.storage_map.find("image_url");
+   storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].value, "http://new.image.url/newimg.jpg");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, "language");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].value, "en");
 
-   BOOST_CHECK_EQUAL(row1->first, "language");
-   BOOST_CHECK_EQUAL(row1->second, "en");
-   BOOST_CHECK_EQUAL(row2->first, "image_url");
-   BOOST_CHECK_EQUAL(row2->second, "http://new.image.url/newimg.jpg");
-
-   // delete stuff from that it is not there
+   // delete stuff that it is not there
    {
       custom_operation op;
-      account_store_data store;
-      account_store_data::ext data;
+      account_storage_map store;
+      account_storage_map::ext data;
 
       flat_map<string, string> pairs;
       pairs["nothere"] = "nothere";
 
-      store.extensions.value.pairs = pairs;
+      store.extensions.value.key_values = pairs;
       store.extensions.value.remove = true;
+      store.extensions.value.catalog = "settings";
 
       auto packed = fc::raw::pack(store);
       packed.insert(packed.begin(), types::account_store);
@@ -744,21 +742,20 @@ try {
    fc::usleep(fc::milliseconds(200));
 
    // nothing changes
-   storage_results_nathan = *custom_operations_api.get_storage_info("nathan");
-   BOOST_CHECK_EQUAL(storage_results_nathan.account.instance.value, 16 );
-   row1 = storage_results_nathan.storage_map.find("language");
-   row2 = storage_results_nathan.storage_map.find("image_url");
-
-   BOOST_CHECK_EQUAL(row1->first, "language");
-   BOOST_CHECK_EQUAL(row1->second, "en");
-   BOOST_CHECK_EQUAL(row2->first, "image_url");
-   BOOST_CHECK_EQUAL(row2->second, "http://new.image.url/newimg.jpg");
+   storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].value, "http://new.image.url/newimg.jpg");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, "language");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].value, "en");
 
    // add more than 10 storage items in 1 operation is not allowed
    {
       custom_operation op;
-      account_store_data store;
-      account_store_data::ext data;
+      account_storage_map store;
+      account_storage_map::ext data;
 
       flat_map<string, string> pairs;
       pairs["key1"] = "value1";
@@ -773,7 +770,8 @@ try {
       pairs["key10"] = "value10";
       pairs["key11"] = "value11";
 
-      store.extensions.value.pairs = pairs;
+      store.extensions.value.key_values = pairs;
+      store.extensions.value.catalog = "settings";
 
       auto packed = fc::raw::pack(store);
       packed.insert(packed.begin(), types::account_store);
@@ -794,23 +792,24 @@ try {
    // add more than 10 accounts to the list in 1 operation is not allowed
    {
       custom_operation op;
-      account_list_data list;
-      account_list_data::ext data;
+      account_storage_list list;
+      account_storage_list::ext data;
 
-      flat_set<account_id_type> accounts;
-      accounts.insert(account_id_type(0));
-      accounts.insert(account_id_type(1));
-      accounts.insert(account_id_type(2));
-      accounts.insert(account_id_type(3));
-      accounts.insert(account_id_type(4));
-      accounts.insert(account_id_type(5));
-      accounts.insert(account_id_type(6));
-      accounts.insert(account_id_type(7));
-      accounts.insert(account_id_type(8));
-      accounts.insert(account_id_type(9));
-      accounts.insert(account_id_type(10));
+      flat_set<string> accounts;
+      accounts.insert("init0");
+      accounts.insert("init1");
+      accounts.insert("init2");
+      accounts.insert("init3");
+      accounts.insert("init4");
+      accounts.insert("init5");
+      accounts.insert("init6");
+      accounts.insert("init7");
+      accounts.insert("init8");
+      accounts.insert("init9");
+      accounts.insert("init10");
 
-      list.extensions.value.accounts = accounts;
+      list.extensions.value.values = accounts;
+      list.extensions.value.catalog = "contact_list";
       list.extensions.value.remove = true;
 
       auto packed = fc::raw::pack(list);
@@ -832,14 +831,15 @@ try {
    // alice, duplicated keys in storage, only second value will be added
    {
       custom_operation op;
-      account_store_data store;
-      account_store_data::ext data;
+      account_storage_map store;
+      account_storage_map::ext data;
 
       flat_map<string, string> pairs;
       pairs["key1"] = "value1";
       pairs["key1"] = "value2";
 
-      store.extensions.value.pairs = pairs;
+      store.extensions.value.key_values = pairs;
+      store.extensions.value.catalog = "random";
 
       auto packed = fc::raw::pack(store);
       packed.insert(packed.begin(), types::account_store);
@@ -857,24 +857,24 @@ try {
    generate_block();
    fc::usleep(fc::milliseconds(200));
 
-   auto storage_results_alice = *custom_operations_api.get_storage_info("alice");
-   BOOST_CHECK_EQUAL(storage_results_alice.account.instance.value, 17 );
-   row1 = storage_results_alice.storage_map.find("key1");
-
-   BOOST_CHECK_EQUAL(row1->first, "key1");
-   BOOST_CHECK_EQUAL(row1->second, "value2");
+   vector<account_storage_object> storage_results_alice = custom_operations_api.get_storage_info("alice", "random");
+   BOOST_CHECK_EQUAL(storage_results_alice.size(), 1 );
+   BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17 );
+   BOOST_CHECK_EQUAL(*storage_results_alice[0].key, "key1");
+   BOOST_CHECK_EQUAL(storage_results_alice[0].value, "value2");
 
    // duplicated accounts in the list, only 1 will be inserted
    {
       custom_operation op;
-      account_list_data list;
-      account_list_data::ext data;
+      account_storage_list list;
+      account_storage_list::ext data;
 
-      flat_set<account_id_type> accounts;
-      accounts.insert(robert_id);
-      accounts.insert(robert_id);
+      flat_set<string> accounts;
+      accounts.insert(robert.name);
+      accounts.insert(robert.name);
 
-      list.extensions.value.accounts = accounts;
+      list.extensions.value.values = accounts;
+      list.extensions.value.catalog = "contact_list";
 
       auto packed = fc::raw::pack(list);
       packed.insert(packed.begin(), types::account_list);
@@ -892,11 +892,10 @@ try {
    generate_block();
    fc::usleep(fc::milliseconds(200));
 
-   auto account_list_alice = *custom_operations_api.get_storage_info("alice");
-   BOOST_CHECK_EQUAL(account_list_alice.account.instance.value, 17 );
-   BOOST_CHECK_EQUAL(account_list_alice.account_list.size(), 1 );
-   itr = account_list_nathan.account_list.begin();
-   BOOST_CHECK_EQUAL(itr->instance.value, robert_id.instance.value);
+   storage_results_alice = custom_operations_api.get_storage_info("alice", "contact_list");
+   BOOST_CHECK_EQUAL(storage_results_alice.size(), 1 );
+   BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17 );
+   BOOST_CHECK_EQUAL(storage_results_alice[0].value, robert.name);
 
 }
 catch (fc::exception &e) {

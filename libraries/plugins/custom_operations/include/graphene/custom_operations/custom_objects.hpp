@@ -91,8 +91,9 @@ struct account_storage_object : public abstract_object<account_storage_object>
    static const uint8_t type_id  = account_store;
 
    account_id_type account;
-   flat_map<string, string> storage_map;
-   flat_set<account_id_type> account_list;
+   string catalog;
+   optional<string> key;
+   string value;
 };
 
 struct by_custom_id;
@@ -132,12 +133,45 @@ typedef multi_index_container<
 
 typedef generic_index<htlc_order_object, htlc_orderbook_multi_index_type> htlc_orderbook_index;
 
+struct by_account_catalog;
+struct by_account_catalog_key;
+struct by_account_catalog_value;
+struct by_account_catalog_key_value;
+
 typedef multi_index_container<
       account_storage_object,
       indexed_by<
             ordered_non_unique< tag<by_custom_id>, member< object, object_id_type, &object::id > >,
-            ordered_unique< tag<by_custom_account>,
-                  member< account_storage_object, account_id_type, &account_storage_object::account > >
+            ordered_non_unique< tag<by_custom_account>,
+                  member< account_storage_object, account_id_type, &account_storage_object::account > >,
+            ordered_non_unique< tag<by_account_catalog>,
+                  composite_key< account_storage_object,
+                        member< account_storage_object, account_id_type, &account_storage_object::account >,
+                        member< account_storage_object, string, &account_storage_object::catalog >
+                  >
+            >,
+            ordered_non_unique< tag<by_account_catalog_key>,
+                  composite_key< account_storage_object,
+                        member< account_storage_object, account_id_type, &account_storage_object::account >,
+                        member< account_storage_object, string, &account_storage_object::catalog >,
+                        member< account_storage_object, optional<string>, &account_storage_object::key >
+                  >
+            >,
+            ordered_unique< tag<by_account_catalog_value>,
+                  composite_key< account_storage_object,
+                        member< account_storage_object, account_id_type, &account_storage_object::account >,
+                        member< account_storage_object, string, &account_storage_object::catalog >,
+                        member< account_storage_object, string, &account_storage_object::value >
+                  >
+            >,
+            ordered_unique< tag<by_account_catalog_key_value>,
+                  composite_key< account_storage_object,
+                        member< account_storage_object, account_id_type, &account_storage_object::account >,
+                        member< account_storage_object, string, &account_storage_object::catalog >,
+                        member< account_storage_object, optional<string>, &account_storage_object::key >,
+                        member< account_storage_object, string, &account_storage_object::value >
+                  >
+            >
       >
 > account_storage_multi_index_type;
 
@@ -157,7 +191,7 @@ FC_REFLECT_DERIVED( graphene::custom_operations::htlc_order_object, (graphene::d
                     (blockchain_asset_precision)(token_contract)(tag)(taker_bitshares_account)
                     (taker_blockchain_account)(close_time))
 FC_REFLECT_DERIVED( graphene::custom_operations::account_storage_object, (graphene::db::object),
-                    (account)(storage_map)(account_list))
+                    (account)(catalog)(key)(value))
 FC_REFLECT_ENUM( graphene::custom_operations::types, (account_contact)(create_htlc)(take_htlc)(account_store)
                 (account_list))
 FC_REFLECT_ENUM( graphene::custom_operations::blockchains, (eos)(bitcoin)(ripple)(ethereum) )

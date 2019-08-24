@@ -738,14 +738,18 @@ namespace graphene { namespace app {
       return optional<htlc_order_object>();
    }
 
-   optional<account_storage_object> custom_operations_api::get_storage_info(std::string account_id_or_name)const
+   vector<account_storage_object> custom_operations_api::get_storage_info(std::string account_id_or_name,
+         std::string catalog)const
    {
       const auto account_id = database_api.get_account_id_from_string(account_id_or_name);
-      auto &index = _app.chain_database()->get_index_type<account_storage_index>().indices().get<by_custom_account>();
-      auto itr = index.find(account_id);
-      if(itr != index.end())
-         return *itr;
-      return optional<account_storage_object>();
+      vector<account_storage_object> results;
+      auto &index = _app.chain_database()->get_index_type<account_storage_index>().indices().get<by_account_catalog>();
+      auto itr = index.lower_bound(make_tuple(account_id, catalog));
+      while(itr != index.end() && itr->account == account_id && itr->catalog == catalog) {
+         results.push_back(*itr);
+         ++itr;
+      }
+      return results;
    }
 
 } } // graphene::app
