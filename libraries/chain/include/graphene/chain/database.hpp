@@ -391,6 +391,9 @@ namespace graphene { namespace chain {
 
          template<class Index>
          vector<std::reference_wrapper<const typename Index::object_type>> sort_votable_objects(size_t count)const;
+         
+         template<class Index>
+         vector<std::reference_wrapper<const typename Index::object_type>> sort_standby_objects(size_t count)const;
 
          //////////////////// db_block.cpp ////////////////////
 
@@ -440,6 +443,7 @@ namespace graphene { namespace chain {
          void handle_core_inflation();
          void handle_marketing_fees();
          void handle_charity_fees();
+         void handle_block_reward_payout();
 
          template<class Type>
          void perform_account_maintenance( Type tally_helper );
