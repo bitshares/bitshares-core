@@ -84,17 +84,27 @@ void database::update_global_dynamic_data( const signed_block& b, const uint32_t
 void database::update_signing_witness(const witness_object& signing_witness, const signed_block& new_block)
 {
    const global_property_object& gpo = get_global_properties();
+   auto& acnt_indx = get_index_type<account_index>();
+   auto mp_itr = acnt_indx.indices().get<by_name>().find( gpo.marketing_partner_account_name );
    const dynamic_global_property_object& dpo = get_dynamic_global_properties();
    uint64_t new_block_aslot = dpo.current_aslot + get_slot_at_time( new_block.timestamp );
 
    share_type witness_pay = std::min( gpo.parameters.witness_pay_per_block, dpo.witness_budget );
 
+   share_type twinty_percent_pay = witness_pay * 0.2;
+   share_type ten_percent_pay = witness_pay * 0.1;
+   share_type sixty_percent_pay = witness_pay - (twinty_percent_pay + ten_percent_pay + ten_percent_pay);
+
    modify( dpo, [&]( dynamic_global_property_object& _dpo )
    {
       _dpo.witness_budget -= witness_pay;
+      _dpo.standby_witness_fund += twinty_percent_pay;
+      _dpo.marketing_partner_fund += ten_percent_pay;
+      _dpo.network_fund += ten_percent_pay;
    } );
 
-   deposit_witness_pay( signing_witness, witness_pay );
+   //adjust_balance( mp_itr->id, twinty_percent_pay ); //TODO remove
+   deposit_witness_pay( signing_witness, sixty_percent_pay );
 
    modify( signing_witness, [&]( witness_object& _wit )
    {
