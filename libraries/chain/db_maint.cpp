@@ -755,7 +755,6 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
 
    perform_account_maintenance( tally_helper );
    handle_marketing_fees();
-   handle_charity_fees();
    
 
    struct clear_canary {

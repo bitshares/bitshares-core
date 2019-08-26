@@ -93,10 +93,8 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       REQUIRE_THROW_WITH_VALUE(op, name, "saM");
       REQUIRE_THROW_WITH_VALUE(op, name, "sAm");
       REQUIRE_THROW_WITH_VALUE(op, name, "6j");
-      REQUIRE_THROW_WITH_VALUE(op, name, "j-");
       REQUIRE_THROW_WITH_VALUE(op, name, "-j");
       REQUIRE_THROW_WITH_VALUE(op, name, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-      REQUIRE_THROW_WITH_VALUE(op, name, "aaaa.");
       REQUIRE_THROW_WITH_VALUE(op, name, ".aaaa");
       REQUIRE_THROW_WITH_VALUE(op, options.voting_account, account_id_type(999999999));
 

@@ -32,7 +32,7 @@
 #define GRAPHENE_MIN_ASSET_SYMBOL_LENGTH 3
 #define GRAPHENE_MAX_ASSET_SYMBOL_LENGTH 16
 
-#define GRAPHENE_INITIAL_MAX_SHARE_SUPPLY int64_t(1000000000000000ll)
+#define GRAPHENE_INITIAL_MAX_SHARE_SUPPLY int64_t(5000000000000000ll)
 // Assuming a 3 second block interval, and an initial supply of 5 billion, 
 // this will cause a 5% inflation of supply per year
 #define GRAPHENE_INITIAL_INFLATION_AMOUNT int64_t(0) // int64_t(23782344) 
@@ -106,6 +106,7 @@
 #define GRAPHENE_DEFAULT_CHARITY_PERCENT_OF_FEE               (10*GRAPHENE_1_PERCENT)
 // ********** 
 
+#define GRAPHENE_DEFAULT_MARKETING_PARTNER_ACCOUNT_NAME       "tuscmpone"
 #define GRAPHENE_DEFAULT_CASHBACK_VESTING_PERIOD_SEC          (60*60*24*365) ///< 1 year
 #define GRAPHENE_DEFAULT_CASHBACK_VESTING_THRESHOLD           (GRAPHENE_BLOCKCHAIN_PRECISION*int64_t(100))
 #define GRAPHENE_DEFAULT_MAX_ASSERT_OPCODE                    1

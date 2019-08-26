@@ -1,6 +1,6 @@
 {
   "initial_timestamp": "2019-02-14T20:32:55",
-  "initial_max_core_supply": "1000000000000000",
+  "initial_max_core_supply": "5000000000000000",
   "initial_parameters": {
     "current_fees": {
         "parameters": [
@@ -223,8 +223,6 @@
     "max_authority_depth": 2,
     "extensions": []
   },
-  "initial_marketing_partner_account_name": "nathan",
-  "initial_charity_account_name": "nathan",
   "initial_accounts": [{
       "name": "init0",
       "owner_key": "BTS6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV",
@@ -291,7 +289,7 @@
   "initial_balances": [{
       "owner": "BTSFAbAx7yuxt725qSZvfwWqkdCwp9ZnUama",
       "asset_symbol": "BTS",
-      "amount": "1000000000000000"
+      "amount": "5000000000000000"
     }
   ],
   "initial_vesting_balances": [],

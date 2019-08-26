@@ -344,14 +344,14 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    // Create core asset
    const asset_dynamic_data_object& dyn_asset =
-      create<asset_dynamic_data_object>([&genesis_state](asset_dynamic_data_object& a) {
-         a.current_supply = genesis_state.initial_max_core_supply;
-         a.current_max_supply = genesis_state.initial_max_core_supply;
+      create<asset_dynamic_data_object>([](asset_dynamic_data_object& a) {
+         a.current_supply = GRAPHENE_INITIAL_MAX_SHARE_SUPPLY;
+         a.current_max_supply = GRAPHENE_INITIAL_MAX_SHARE_SUPPLY;
       });
    const asset_object& core_asset =
      create<asset_object>( [&genesis_state,&dyn_asset]( asset_object& a ) {
          a.symbol = GRAPHENE_SYMBOL;
-         a.options.initial_max_supply = genesis_state.initial_max_core_supply;
+         a.options.initial_max_supply = GRAPHENE_INITIAL_MAX_SHARE_SUPPLY;
          a.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
          a.options.flags = 0;
          a.options.issuer_permissions = 0;
