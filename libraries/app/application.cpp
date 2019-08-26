@@ -1056,7 +1056,6 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::get_withdraw_permissions_by_giver to set max limit value")
          ("api-limit-get-withdraw-permissions-by-recipient",boost::program_options::value<uint64_t>()->default_value(101),
           "For database_api_impl::get_withdraw_permissions_by_recipient to set max limit value")
-          "For database_api_impl::get_order_book to set its default limit value as 50")
          ("accept-incoming-connections", bpo::value<bool>()->implicit_value(true), "Accept incoming connections")
          ("connect-to-new-peers", bpo::value<bool>()->implicit_value(true), "Connect to new peers")
          ("advertise-peer-algorithm", bpo::value<string>()->implicit_value("all"),
