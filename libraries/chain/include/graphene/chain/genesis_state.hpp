@@ -112,7 +112,7 @@ struct genesis_state_type {
    vector<initial_witness_type>             initial_witness_candidates;
    vector<initial_committee_member_type>    initial_committee_candidates;
    vector<initial_worker_type>              initial_worker_candidates;
-   string                                   initial_marketing_partner_account_name;
+   string                                   initial_marketing_partner_account_name = GRAPHENE_DEFAULT_MARKETING_PARTNER_ACCOUNT_NAME;
    string                                   initial_charity_account_name;
 
    /**
