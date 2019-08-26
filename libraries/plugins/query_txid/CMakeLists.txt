@@ -21,4 +21,3 @@ if(LevelDB_INCLUDE_PATH AND LevelDB_LIBRARY AND Snappy_LIBRARY)
 else(LevelDB_INCLUDE_PATH AND LevelDB_LIBRARY AND Snappy_LIBRARY)
    message(FATAL_ERROR "You need leveldb and snappy")
 endif()
-

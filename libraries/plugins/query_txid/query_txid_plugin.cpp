@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2019 GXChain and zhaoxiangfei、bijianing97 .
+ *
+ * The MIT License
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
 #include <graphene/query_txid/query_txid_plugin.hpp>
 #include <fc/io/fstream.hpp>
 #include <graphene/chain/transaction_entry_object.hpp>
@@ -34,7 +57,7 @@ class query_txid_plugin_impl
     void init();
     static optional<trx_entry_object> query_trx_by_id(std::string txid);
     std::string db_path = "trx_entry.db";
-    uint64_t limit_batch = 1000; //limit of leveldb batch
+    uint64_t limit_batch = 1000; 
 
   private:
     query_txid_plugin &_self;
@@ -43,20 +66,17 @@ class query_txid_plugin_impl
     fc::signal<void(const uint64_t)> sig_remove;
 
     static leveldb::DB *leveldb;
-    void consume_block();                               //Consume block
-    void remove_trx_index(const uint64_t trx_entry_id); //Remove trx_index in db
+    void consume_block();                               
+    void remove_trx_index(const uint64_t trx_entry_id); 
 };
 leveldb::DB *query_txid_plugin_impl::leveldb = nullptr;
 
 void query_txid_plugin_impl::init()
 {
     try {
-        //Create leveldb
         leveldb::Options options;
         options.create_if_missing = true;
         leveldb::Status s = leveldb::DB::Open(options, db_path, &leveldb);
-
-        // Respond to the sig_db_write signale
         sig_db_write.connect([&]() { consume_block(); });
         sig_remove.connect([&](const uint64_t trx_entry_id) { remove_trx_index(trx_entry_id); });
     }
@@ -136,7 +156,6 @@ void query_txid_plugin_impl::remove_trx_index(const uint64_t trx_entry_id)
     try {
         graphene::chain::database &db = database();
         const auto &trx_idx = db.get_index_type<trx_entry_index>().indices();
-        //ilog("remove,${trx_ent_id},bengin: ${begin},end: ${end}",("trx_ent_id",trx_entry_id)("begin",trx_idx.begin()->id.instance())("end",trx_idx.rbegin()->id.instance()));
         for (auto itor = trx_idx.begin(); itor != trx_idx.end();) {
             auto backup_itr = itor;
             ++itor;
@@ -150,8 +169,6 @@ void query_txid_plugin_impl::remove_trx_index(const uint64_t trx_entry_id)
     FC_LOG_AND_RETHROW()
 }
 } // namespace detail
-
-// -----------------------------------query_txid_plugin --------------------------------------
 
 query_txid_plugin::query_txid_plugin()
     : my(new detail::query_txid_plugin_impl(*this))
@@ -179,9 +196,7 @@ void query_txid_plugin::plugin_initialize(const boost::program_options::variable
 {
     try {
         ilog("query_txid plugin initialized");
-        // Add the index of the trx_entry_index object table to the database
         database().add_index<primary_index<trx_entry_index>>();
-        // Respond to the apply_block signal
         database().applied_block.connect([&](const signed_block &b) { my->collect_txid_index(b); });
         if (options.count("query-txid-path")) {
             my->db_path = options["query-txid-path"].as<std::string>();
@@ -191,7 +206,6 @@ void query_txid_plugin::plugin_initialize(const boost::program_options::variable
         if (options.count("limit-batch")) {
             my->limit_batch = options["limit-batch"].as<uint64_t>();
         }
-        // Initialize the plugin instance
         my->init();
     }
     FC_LOG_AND_RETHROW()
@@ -206,5 +220,4 @@ optional<trx_entry_object> query_txid_plugin::query_trx_by_id(std::string txid)
     return detail::query_txid_plugin_impl::query_trx_by_id(txid);
 }
 
-} // namespace query_txid
-} // namespace graphene 
+} } // graphene::query_txid
