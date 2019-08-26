@@ -79,6 +79,7 @@ class es_objects_plugin_impl
 
 bool es_objects_plugin_impl::genesis()
 {
+   if(_es_objects_start_es_after_block > 0) return true;
 
    ilog("elasticsearch OBJECTS: inserting data from genesis");
 
