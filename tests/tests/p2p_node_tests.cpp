@@ -29,6 +29,7 @@
 
 #include <fc/thread/thread.hpp>
 #include <fc/asio.hpp>
+#include <fc/filesystem.hpp>
 
 #include <graphene/net/node.hpp>
 #include <graphene/protocol/fee_schedule.hpp>
