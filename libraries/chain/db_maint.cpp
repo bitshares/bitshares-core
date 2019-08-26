@@ -74,7 +74,9 @@ vector<std::reference_wrapper<const typename Index::object_type>> database::sort
    using ObjectType = typename Index::object_type;
    const auto& all_objects = get_index_type<Index>().indices();
    size_t active_wit_count = count;
-   count = std::min(100, all_objects.size());
+   size_t total_wit_count = 100;
+   size_t all_object_count = all_objects.size();
+   count = std::min(total_wit_count, all_object_count);
    vector<std::reference_wrapper<const ObjectType>> refs;
    refs.reserve(all_objects.size());
    std::transform(all_objects.begin(), all_objects.end(),
@@ -91,7 +93,10 @@ vector<std::reference_wrapper<const typename Index::object_type>> database::sort
 
    refs.resize(count, refs.front());
    if( active_wit_count < refs.size()){
-      refs.resize(count, active_wit_count);
+      auto first = refs.begin() + count;
+      auto last = refs.begin() + active_wit_count;
+      vector<std::reference_wrapper<const ObjectType>> newVec(first, last);
+      refs = newVec;
    }else{
       refs.clear();
       refs.reserve(0);
