@@ -93,7 +93,7 @@ try {
    // Alice puts a contract on the blockchain
    {
       graphene::chain::htlc_create_operation create_operation;
-      BOOST_TEST_MESSAGE("Alice (who has 100 coins, is transferring 2 coins to Bob");
+      BOOST_TEST_MESSAGE("Alice (who has 100 coins, is transferring 3 coins to Bob");
       create_operation.amount = graphene::chain::asset( 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 60;
