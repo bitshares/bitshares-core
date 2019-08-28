@@ -572,7 +572,7 @@ namespace graphene { namespace app {
          optional<htlc_order_object> get_htlc_offer(htlc_order_id_type id)const;
 
          /**
-          * @breif Get all stored objects of an account
+          * @breif Get all stored objects of an account in a particular catalog
           *
           * @param account Account name to get info from
           * @param catalog Category classification
@@ -726,6 +726,7 @@ FC_API(graphene::app::custom_operations_api,
        (get_account_htlc_offers)
        (get_active_htlc_offers)
        (get_htlc_offer)
+       (get_storage_info)
      )
 FC_API(graphene::app::login_api,
        (login)

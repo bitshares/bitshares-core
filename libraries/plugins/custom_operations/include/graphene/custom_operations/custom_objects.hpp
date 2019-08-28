@@ -38,7 +38,7 @@ enum types {
    account_contact = 0,
    create_htlc = 1,
    take_htlc = 2,
-   account_store = 3,
+   account_map = 3,
    account_list = 4
 };
 enum blockchains {
@@ -88,7 +88,7 @@ struct htlc_order_object : public abstract_object<htlc_order_object>
 struct account_storage_object : public abstract_object<account_storage_object>
 {
    static const uint8_t space_id = CUSTOM_OPERATIONS_SPACE_ID;
-   static const uint8_t type_id  = account_store;
+   static const uint8_t type_id  = account_map;
 
    account_id_type account;
    string catalog;
@@ -179,7 +179,7 @@ typedef generic_index<account_storage_object, account_storage_multi_index_type> 
 
 using account_contact_id_type = object_id<CUSTOM_OPERATIONS_SPACE_ID, account_contact>;
 using htlc_order_id_type = object_id<CUSTOM_OPERATIONS_SPACE_ID, create_htlc>;
-using account_storage_id_type = object_id<CUSTOM_OPERATIONS_SPACE_ID, account_store>;
+using account_storage_id_type = object_id<CUSTOM_OPERATIONS_SPACE_ID, account_map>;
 
 } } //graphene::custom_operations
 
@@ -192,6 +192,6 @@ FC_REFLECT_DERIVED( graphene::custom_operations::htlc_order_object, (graphene::d
                     (taker_blockchain_account)(close_time))
 FC_REFLECT_DERIVED( graphene::custom_operations::account_storage_object, (graphene::db::object),
                     (account)(catalog)(key)(value))
-FC_REFLECT_ENUM( graphene::custom_operations::types, (account_contact)(create_htlc)(take_htlc)(account_store)
+FC_REFLECT_ENUM( graphene::custom_operations::types, (account_contact)(create_htlc)(take_htlc)(account_map)
                 (account_list))
 FC_REFLECT_ENUM( graphene::custom_operations::blockchains, (eos)(bitcoin)(ripple)(ethereum) )

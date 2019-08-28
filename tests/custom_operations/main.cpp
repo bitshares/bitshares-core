@@ -499,7 +499,7 @@ try {
       store.extensions.value.catalog = "settings";
 
       auto packed = fc::raw::pack(store);
-      packed.insert(packed.begin(), types::account_store);
+      packed.insert(packed.begin(), types::account_map);
       packed.insert(packed.begin(), 0xFF);
 
       op.payer = nathan_id;
@@ -646,7 +646,7 @@ try {
       store.extensions.value.catalog = "settings";
 
       auto packed = fc::raw::pack(store);
-      packed.insert(packed.begin(), types::account_store);
+      packed.insert(packed.begin(), types::account_map);
       packed.insert(packed.begin(), 0xFF);
 
       op.payer = nathan_id;
@@ -687,7 +687,7 @@ try {
       store.extensions.value.catalog = "settings";
 
       auto packed = fc::raw::pack(store);
-      packed.insert(packed.begin(), types::account_store);
+      packed.insert(packed.begin(), types::account_map);
       packed.insert(packed.begin(), 0xFF);
 
       op.payer = nathan_id;
@@ -726,7 +726,7 @@ try {
       store.extensions.value.catalog = "settings";
 
       auto packed = fc::raw::pack(store);
-      packed.insert(packed.begin(), types::account_store);
+      packed.insert(packed.begin(), types::account_map);
       packed.insert(packed.begin(), 0xFF);
 
       op.payer = nathan_id;
@@ -774,7 +774,7 @@ try {
       store.extensions.value.catalog = "settings";
 
       auto packed = fc::raw::pack(store);
-      packed.insert(packed.begin(), types::account_store);
+      packed.insert(packed.begin(), types::account_map);
       packed.insert(packed.begin(), 0xFF);
 
       op.payer = nathan_id;
@@ -842,7 +842,7 @@ try {
       store.extensions.value.catalog = "random";
 
       auto packed = fc::raw::pack(store);
-      packed.insert(packed.begin(), types::account_store);
+      packed.insert(packed.begin(), types::account_map);
       packed.insert(packed.begin(), 0xFF);
 
       op.payer = alice_id;

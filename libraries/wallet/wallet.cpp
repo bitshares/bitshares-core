@@ -2051,6 +2051,64 @@ public:
       } FC_CAPTURE_AND_RETHROW( (account)(data)(broadcast) )
    }
 
+   signed_transaction account_store_map(string account, account_storage_map::ext map, bool broadcast)
+   {
+      try
+      {
+         FC_ASSERT( !self.is_locked() );
+
+         account_id_type account_id = get_account(account).id;
+
+         custom_operation op;
+         account_storage_map store;
+         store.extensions.value = map;
+
+         auto packed = fc::raw::pack(store);
+         packed.insert(packed.begin(), types::account_map);
+         packed.insert(packed.begin(), 0xFF);
+
+         op.payer = account_id;
+         op.data = packed;
+
+         signed_transaction tx;
+         tx.operations.push_back(op);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+         tx.validate();
+
+         return sign_transaction(tx, broadcast);
+
+      } FC_CAPTURE_AND_RETHROW( (account)(map)(broadcast) )
+   }
+
+   signed_transaction account_store_list(string account, account_storage_list::ext list, bool broadcast)
+   {
+      try
+      {
+         FC_ASSERT( !self.is_locked() );
+
+         account_id_type account_id = get_account(account).id;
+
+         custom_operation op;
+         account_storage_list store;
+         store.extensions.value = list;
+
+         auto packed = fc::raw::pack(store);
+         packed.insert(packed.begin(), types::account_list);
+         packed.insert(packed.begin(), 0xFF);
+
+         op.payer = account_id;
+         op.data = packed;
+
+         signed_transaction tx;
+         tx.operations.push_back(op);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+         tx.validate();
+
+         return sign_transaction(tx, broadcast);
+
+      } FC_CAPTURE_AND_RETHROW( (account)(list)(broadcast) )
+   }
+
    vector< vesting_balance_object_with_info > get_vesting_balances( string account_name )
    { try {
       fc::optional<vesting_balance_id_type> vbid = maybe_id<vesting_balance_id_type>( account_name );
@@ -5278,6 +5336,7 @@ order_book wallet_api::get_order_book( const string& base, const string& quote, 
    return( my->_remote_db->get_order_book( base, quote, limit ) );
 }
 
+// custom operations
 signed_transaction wallet_api::set_contact_information(string account, account_contact_operation::ext data,
       bool broadcast)
 {
@@ -5311,6 +5370,21 @@ vector<htlc_order_object> wallet_api::get_active_htlc_offers(uint16_t blockchain
          results.push_back(order);
    }
    return results;
+}
+
+signed_transaction wallet_api::account_store_map(string account, account_storage_map::ext map, bool broadcast)
+{
+   return my->account_store_map(account, map, broadcast);
+}
+
+signed_transaction wallet_api::account_store_list(string account, account_storage_list::ext list, bool broadcast)
+{
+   return my->account_store_list(account, list, broadcast);
+}
+
+vector<account_storage_object> wallet_api::get_account_storage(string account, string catalog)
+{
+   return my->_custom_operations->get_storage_info(account, catalog);
 }
 
 signed_block_with_info::signed_block_with_info( const signed_block& block )

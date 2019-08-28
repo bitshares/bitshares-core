@@ -2071,6 +2071,7 @@ class wallet_api
        *
        * @return The signed transaction
        */
+
       signed_transaction take_htlc_offer(string account, take_htlc_order_operation::ext data, bool broadcast);
 
       /**
@@ -2083,6 +2084,48 @@ class wallet_api
        * @return A list of \c htlc_order_object that are active and non expired in the selected blockchain.
        */
       vector<htlc_order_object> get_active_htlc_offers(uint16_t blockchain);
+
+      /**
+       * Manage account storage map(key->value) by using the custom operations plugin.
+       *
+       * Each account can optionally add random information in the form of a key-value map
+       * to be retrieved by any interested party.
+       *
+       * @param account The account ID or name that we are adding additional information to.
+       * @param data Storage data to be added. \c account_storage_map::ext
+       * @param broadcast true if you wish to broadcast the transaction
+       *
+       * @return The signed transaction
+       */
+      signed_transaction account_store_map(string account, account_storage_map::ext map, bool broadcast);
+
+      /**
+       * Manage a accounts list(values)by using the custom operations plugin.
+       *
+       * Each account can optionally add and delete data from a dedicated list
+       * to be retrieved by any interested party. Can be used as a whitelist, address book, etc.
+       *
+       * @param account The account ID or name that we are adding additional information to.
+       * @param data List data to be added. \c account_storage_list::ext
+       * @param broadcast true if you wish to broadcast the transaction
+       *
+       * @return The signed transaction
+       */
+      signed_transaction account_store_list(string account, account_storage_list::ext data, bool broadcast);
+
+      /**
+       * Get \c account_storage_object of an account by using the custom operations plugin.
+       *
+       * Storage data added to the map with @ref account_store_map and list data added by
+       * @ref account_list_accounts will be returned.
+       *
+       * @param account Account ID or name to get contact data from.
+       * @param catalog The catalog to retrieve.
+       *
+       * @return An \c account_storage_object or empty.
+       */
+      vector<account_storage_object> get_account_storage(string account, string catalog);
+
 };
 
 } }

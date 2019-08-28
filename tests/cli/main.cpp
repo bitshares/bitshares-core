@@ -1307,3 +1307,83 @@ BOOST_FIXTURE_TEST_CASE( htlc_orderbook, cli_fixture )
       throw;
    }
 }
+
+///////////////////
+// Test the general storage by custom operations plugin
+///////////////////
+BOOST_FIXTURE_TEST_CASE( general_storage, cli_fixture )
+{
+   try {
+      // create the taker account
+      INVOKE(create_new_account);
+
+      auto db = app1->chain_database();
+
+      BOOST_TEST_MESSAGE("Storing in a map.");
+
+      flat_map<string, string> pairs;
+      pairs["key1"] = "value1";
+      pairs["key2"] = "value2";
+
+      account_storage_map::ext map;
+
+      map.key_values = pairs;
+      map.catalog = "any";
+
+      con.wallet_api_ptr->account_store_map("nathan", map, true);
+
+      BOOST_TEST_MESSAGE("The system is generating a block.");
+      BOOST_CHECK(generate_block(app1));
+
+      BOOST_TEST_MESSAGE("Get current map for nathan.");
+      auto nathan_map = con.wallet_api_ptr->get_account_storage("nathan", "any");
+
+      BOOST_CHECK_EQUAL(nathan_map[0].id.instance(), 0);
+      BOOST_CHECK_EQUAL(nathan_map[0].account.instance.value, 17);
+      BOOST_CHECK_EQUAL(nathan_map[0].catalog, "any");
+      BOOST_CHECK_EQUAL(*nathan_map[0].key, "key1");
+      BOOST_CHECK_EQUAL(nathan_map[0].value, "value1");
+      BOOST_CHECK_EQUAL(nathan_map[1].id.instance(), 1);
+      BOOST_CHECK_EQUAL(nathan_map[1].account.instance.value, 17);
+      BOOST_CHECK_EQUAL(nathan_map[1].catalog, "any");
+      BOOST_CHECK_EQUAL(*nathan_map[1].key, "key2");
+      BOOST_CHECK_EQUAL(nathan_map[1].value, "value2");
+
+      BOOST_TEST_MESSAGE("Storing in a list.");
+
+      flat_set<string> favs;
+      favs.insert("chocolate");
+      favs.insert("milk");
+      favs.insert("banana");
+
+      account_storage_list::ext list;
+
+      list.values = favs;
+      list.catalog = "favourites";
+
+      con.wallet_api_ptr->account_store_list("nathan", list, true);
+
+      BOOST_TEST_MESSAGE("The system is generating a block.");
+      BOOST_CHECK(generate_block(app1));
+
+      BOOST_TEST_MESSAGE("Get current list for nathan.");
+      auto nathan_list = con.wallet_api_ptr->get_account_storage("nathan", "favourites");
+
+      BOOST_CHECK_EQUAL(nathan_list[0].id.instance(), 2);
+      BOOST_CHECK_EQUAL(nathan_list[0].account.instance.value, 17);
+      BOOST_CHECK_EQUAL(nathan_list[0].catalog, "favourites");
+      BOOST_CHECK_EQUAL(nathan_list[0].value, "banana");
+      BOOST_CHECK_EQUAL(nathan_list[1].id.instance(), 3);
+      BOOST_CHECK_EQUAL(nathan_list[1].account.instance.value, 17);
+      BOOST_CHECK_EQUAL(nathan_list[1].catalog, "favourites");
+      BOOST_CHECK_EQUAL(nathan_list[1].value, "chocolate");
+      BOOST_CHECK_EQUAL(nathan_list[2].id.instance(), 4);
+      BOOST_CHECK_EQUAL(nathan_list[2].account.instance.value, 17);
+      BOOST_CHECK_EQUAL(nathan_list[2].catalog, "favourites");
+      BOOST_CHECK_EQUAL(nathan_list[2].value, "milk");
+
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
