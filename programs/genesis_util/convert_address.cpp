@@ -27,6 +27,7 @@
  */
 
 #include <graphene/chain/pts_address.hpp>
+#include <graphene/chain/protocol/types.hpp>
 #include <graphene/chain/protocol/address.hpp>
 
 #include <iostream>
@@ -34,13 +35,16 @@
 
 using namespace graphene::chain;
 
-int main(int argc, char** argv)
+int main( int argc, char** argv )
 {
-   // grab 0 or more whitespace-delimited PTS addresses from stdin
-   std::string s;
-   while( std::cin >> s )
+   for( int i=1; i<argc; i++ )
    {
-      std::cout << std::string( address( pts_address( s ) ) ) << std::endl;
+      std::string arg = argv[i];
+      graphene::chain::public_key_type temp_key = graphene::chain::public_key_type(arg);
+      
+      std::cout << "Public address from public key: \n";  
+      std::cout << std::string( graphene::chain::address( temp_key ));
+      std::cout << "\n";  
    }
    return 0;
 }
