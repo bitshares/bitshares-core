@@ -99,7 +99,7 @@ void query_txid_plugin_impl::collect_txid_index(const signed_block &b)
 {
    try {
       graphene::chain::database &db = database();
-      for (auto idx = 0; idx < b.transactions.size(); idx++) {
+      for (unsigned int idx = 0; idx < b.transactions.size(); idx++) {
          db.create<trx_entry_object>([&](trx_entry_object &obj) {
             obj.txid = b.transactions[idx].id();
             obj.block_num = b.block_num();
@@ -122,13 +122,13 @@ void query_txid_plugin_impl::consume_block()
       if (trx_idx.begin() == trx_idx.end()) return;
       auto itor_begin = trx_bn_idx.begin();
       auto itor_end = trx_bn_idx.lower_bound(irr_num);
-      auto number = std::distance(itor_begin,itor_end);
-      auto backupnum = number;
+      uint64_t number = std::distance(itor_begin,itor_end);
+      uint64_t backupnum = number;
       auto put_index = itor_begin->id.instance();
       while (number > limit_batch) {
          leveldb::WriteBatch batch;
          auto itor_backup = itor_begin;
-         for (auto idx = 0; idx < limit_batch; idx++) {
+         for (uint64_t idx = 0; idx < limit_batch; idx++) {
             auto serialize = fc::raw::pack(*itor_begin);
             std::string txid(itor_begin->txid);
             batch.Put(txid, {serialize.data(), serialize.size()});
