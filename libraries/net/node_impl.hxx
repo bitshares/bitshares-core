@@ -275,11 +275,8 @@ class node_impl : public peer_connection_delegate
       // in use.
       fc::ip::endpoint     _actual_listening_endpoint;
 
-      /// we determine whether we're firewalled by asking other nodes.  Store the result here:
-      firewalled_state     _is_firewalled;
       /// if we're behind NAT, our listening endpoint address will appear different to the rest of the world.  store it here.
       fc::optional<fc::ip::endpoint> _publicly_visible_listening_endpoint;
-      fc::time_point       _last_firewall_check_message_sent;
 
       /// used by the task that manages connecting to peers
       // @{

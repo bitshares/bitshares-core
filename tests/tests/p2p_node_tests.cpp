@@ -299,15 +299,6 @@ BOOST_AUTO_TEST_CASE( set_nothing_advertise_algorithm )
       std::shared_ptr<graphene::net::message> msg = peer3_ptr->message_received;
       test_address_message( msg, 0 );
    }
-
-   // attempt a firewall check, which should return "unable_to_check"
-   {
-      graphene::net::check_firewall_message req;
-      req.endpoint_to_check = fc::ip::endpoint::from_string("127.0.0.1:8080");
-      node1.on_message( peer3_ptr, req );
-      std::shared_ptr<graphene::net::message> msg = peer3_ptr->message_received;
-      test_firewall_message( msg );
-   }
 }
 
 BOOST_AUTO_TEST_CASE( advertise_list_test )

@@ -241,7 +241,6 @@ int main(int argc, char** argv)
           {
              graphene::net::address_info this_node_info;
              this_node_info.direction = graphene::net::peer_connection_direction::outbound;
-             this_node_info.firewalled = graphene::net::firewalled_state::not_firewalled;
              this_node_info.remote_endpoint = probe->_remote;
              this_node_info.node_id = probe->_node_id;
 
@@ -253,7 +252,6 @@ int main(int argc, char** argv)
           for (const graphene::net::address_info& info : probe->_peers)
           {
              if (nodes_already_visited.find(info.remote_endpoint) == nodes_already_visited.end() &&
-                 info.firewalled == graphene::net::firewalled_state::not_firewalled &&
                  nodes_to_visit_set.find(info.remote_endpoint) == nodes_to_visit_set.end())
              {
                 nodes_to_visit.push(info.remote_endpoint);
@@ -276,8 +274,7 @@ int main(int argc, char** argv)
   {
     if (address_info_for_node.second.remote_endpoint == seed_node1)
       seed_node_id = address_info_for_node.first;
-    if (address_info_for_node.second.firewalled == graphene::net::firewalled_state::not_firewalled)
-      non_firewalled_nodes_set.insert(address_info_for_node.first);
+   non_firewalled_nodes_set.insert(address_info_for_node.first);
   }
   std::set<graphene::net::node_id_t> seed_node_connections;
   for (const graphene::net::address_info& info : connections_by_node_id[seed_node_id])
@@ -304,8 +301,7 @@ int main(int argc, char** argv)
   for (const auto& address_info_for_node : address_info_by_node_id)
   {
     dot_stream << "  \"" << fc::variant( address_info_for_node.first, 1 ).as_string() << "\"[label=\"" << (std::string)address_info_for_node.second.remote_endpoint << "\"";
-    if (address_info_for_node.second.firewalled != graphene::net::firewalled_state::not_firewalled)
-      dot_stream << ",shape=rectangle";
+    dot_stream << ",shape=rectangle";
     dot_stream << "];\n";
   }
   for (auto& node_and_connections : connections_by_node_id)
