@@ -12,11 +12,12 @@ set( INSTALLER_APP_ID "68ad7005-8eee-49c9-95ce-9eed97e5b347" )
 set( CMAKE_CXX_STANDARD 14 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
 
-if( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
+if( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR
+    "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" )
   set( CMAKE_CXX_EXTENSIONS ON ) # for __int128 support
-else( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
+else()
   set( CMAKE_CXX_EXTENSIONS OFF )
-endif( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
+endif()
 
 # http://stackoverflow.com/a/18369825
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -46,6 +47,9 @@ macro(FIND_CURL)
       find_package(CURL REQUIRED)
    endif (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
 endmacro()
+
+# Save the old value of CMAKE_REQUIRED_FLAGS
+set( TEMP_REQUIRED_FLAGS ${CMAKE_REQUIRED_FLAGS} )
 
 # Fortify source
 if (CMAKE_COMPILER_IS_GNUCXX)
@@ -108,6 +112,8 @@ else()
 	endif()
 endif()
 
+set(CMAKE_REQUIRED_FLAGS ${TEMP_REQUIRED_FLAGS} )
+
 # position independent executetable (PIE)
 # position independent code (PIC)
 add_definitions (-fPIC)
@@ -148,6 +154,14 @@ IF( WIN32 )
   SET(BOOST_ROOT $ENV{BOOST_ROOT})
   set(Boost_USE_MULTITHREADED ON)
   set(BOOST_ALL_DYN_LINK OFF) # force dynamic linking for all libraries
+ELSE( WIN32 )
+   IF( APPLE )
+      set( CMAKE_THREAD_LIBS_INIT "-lpthread" )
+      set( CMAKE_HAVE_THREADS_LIBRARY 1 )
+      set( CMAKE_USE_WIN32_THREADS_INIT 0 )
+      set( CMAKE_USE_PTHREADS_INIT 1 )
+      set( THREADS_PREFER_PTHREAD_FLAG ON )
+   ENDIF( APPLE )
 ENDIF(WIN32)
 
 FIND_PACKAGE(Boost 1.57 REQUIRED COMPONENTS ${BOOST_COMPONENTS})
@@ -202,13 +216,19 @@ else( WIN32 ) # Apple AND Linux
         message( STATUS "Configuring BitShares on OS X" )
         set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -stdlib=libc++ -Wall" )
     else( APPLE )
-        # Linux Specific Options Here
-        message( STATUS "Configuring BitShares on Linux" )
+        if ( "${CMAKE_SYSTEM_NAME}" STREQUAL "OpenBSD" )
+            # OpenBSD Specific Options
+            message( STATUS "Configuring BitShares on OpenBSD" )
+        else()
+            # Linux Specific Options Here
+            message( STATUS "Configuring BitShares on Linux" )
+            set( rt_library rt )
+        endif()
+        # Common Linux & OpenBSD Options
         set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -Wall" )
         if(USE_PROFILER)
             set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg" )
         endif( USE_PROFILER )
-        set( rt_library rt )
         set( pthread_library pthread)
         if ( NOT DEFINED crypto_library )
           # I'm not sure why this is here, I guess someone has openssl and can't detect it with find_package()?

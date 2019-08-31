@@ -439,7 +439,7 @@ void database::initialize_budget_record( fc::time_point_sec now, budget_record& 
    //   be able to use the entire reserve
    budget_u128 += ((uint64_t(1) << GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS) - 1);
    budget_u128 >>= GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS;
-   if( budget_u128 < reserve.value )
+   if( budget_u128 < static_cast<fc::uint128_t>(reserve.value) )
       rec.total_budget = share_type(static_cast<uint64_t>(budget_u128));
    else
       rec.total_budget = reserve;
@@ -492,7 +492,7 @@ void database::process_budget()
       worker_budget_u128 /= 60*60*24;
 
       share_type worker_budget;
-      if( worker_budget_u128 >= available_funds.value )
+      if( worker_budget_u128 >= static_cast<fc::uint128_t>(available_funds.value) )
          worker_budget = available_funds;
       else
          worker_budget = static_cast<uint64_t>(worker_budget_u128);

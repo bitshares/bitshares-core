@@ -28,7 +28,6 @@
 #include <graphene/utilities/tempdir.hpp>
 
 #include <graphene/account_history/account_history_plugin.hpp>
-#include <graphene/witness/witness.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
 #include <graphene/custom_operations/custom_operations_plugin.hpp>
 #include <graphene/egenesis/egenesis.hpp>
@@ -50,9 +49,10 @@
    #include <winsock2.h>
    #include <WS2tcpip.h>
 #else
-   #include <sys/socket.h>
-   #include <netinet/ip.h>
    #include <sys/types.h>
+   #include <sys/socket.h>
+   #include <netinet/in.h>
+   #include <netinet/ip.h>
 #endif
 #include <thread>
 
@@ -148,9 +148,10 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    std::shared_ptr<graphene::app::application> app1(new graphene::app::application{});
 
    app1->register_plugin<graphene::account_history::account_history_plugin>(true);
-   app1->register_plugin< graphene::market_history::market_history_plugin >(true);
-   app1->register_plugin< graphene::witness_plugin::witness_plugin >(true);
-   app1->register_plugin< graphene::custom_operations::custom_operations_plugin>(true);
+   app1->register_plugin<graphene::market_history::market_history_plugin>(true);
+   app1->register_plugin<graphene::custom_operations::custom_operations_plugin>(true);
+   app1->register_plugin<graphene::grouped_orders::grouped_orders_plugin>(true);
+
    app1->startup_plugins();
    boost::program_options::variables_map cfg;
 #ifdef _WIN32
