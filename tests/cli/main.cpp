@@ -1129,11 +1129,18 @@ BOOST_FIXTURE_TEST_CASE( cli_sign_message, cli_fixture )
    msg.message = "123";
 
    // change account, verify failure
+   // nonexistent account:
    msg.meta.account = "dan";
    BOOST_REQUIRE_THROW( con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block,
                                                             msg.meta.time, *msg.signature ), fc::assert_exception );
    BOOST_REQUIRE_THROW( con.wallet_api_ptr->verify_signed_message( msg ), fc::assert_exception );
    BOOST_REQUIRE_THROW( con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ), fc::assert_exception);
+   // existing, but wrong account:
+   msg.meta.account = "committee-account";
+   BOOST_CHECK( !con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block,
+                                                     msg.meta.time, *msg.signature ) );
+   BOOST_CHECK( !con.wallet_api_ptr->verify_signed_message( msg ) );
+   BOOST_CHECK( !con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
    msg.meta.account = "nathan";
 
    // change key, verify failure
