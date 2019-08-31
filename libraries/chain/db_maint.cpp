@@ -78,6 +78,12 @@ vector<std::reference_wrapper<const typename Index::object_type>> database::sort
    size_t all_object_count = all_objects.size();
    count = std::min(total_wit_count, all_object_count);
    vector<std::reference_wrapper<const ObjectType>> refs;
+
+   if(all_objects.size() <= active_wit_count){
+      refs.reserve(0);
+      return refs;
+   }
+   
    refs.reserve(all_objects.size());
    std::transform(all_objects.begin(), all_objects.end(),
                   std::back_inserter(refs),
@@ -92,16 +98,14 @@ vector<std::reference_wrapper<const typename Index::object_type>> database::sort
    });
 
    refs.resize(count, refs.front());
-   if( active_wit_count < refs.size()){
-      auto first = refs.begin() + count;
-      auto last = refs.begin() + active_wit_count;
-      vector<std::reference_wrapper<const ObjectType>> newVec(first, last);
-      refs = newVec;
-   }else{
-      refs.clear();
-      refs.reserve(0);
-   }
-   return refs;
+
+   auto first = refs.begin() + active_wit_count + 1;
+   auto last = refs.begin() + count;
+   vector<std::reference_wrapper<const ObjectType>> standby_wits;
+   standby_wits.reserve(count - active_wit_count);
+   std::copy(first, last, standby_wits.begin());
+
+   return standby_wits;
 }
 
 void database::handle_core_inflation()
