@@ -77,9 +77,18 @@ namespace fc { \
 template<> struct reflector<TYPE> {\
     typedef TYPE type; \
     typedef std::true_type is_defined; \
+    using native_members = \
+       typename typelist::builder<>::type \
+          BOOST_PP_SEQ_FOR_EACH_I( FC_CONCAT_MEMBER_REFLECTION, TYPE, MEMBERS ) ::finalize; \
+    using inherited_members = \
+       typename typelist::builder<>::type \
+          BOOST_PP_SEQ_FOR_EACH( FC_CONCAT_BASE_MEMBER_REFLECTIONS, TYPE, INHERITS ) ::finalize; \
+    using members = typename typelist::concat<inherited_members, native_members>::type; \
+    using base_classes = typename typelist::builder<>::type \
+          BOOST_PP_SEQ_FOR_EACH( FC_CONCAT_TYPE, x, INHERITS ) ::finalize; \
     enum  member_count_enum {  \
-      local_member_count = 0  BOOST_PP_SEQ_FOR_EACH( FC_REFLECT_MEMBER_COUNT, +, MEMBERS ),\
-      total_member_count = local_member_count BOOST_PP_SEQ_FOR_EACH( FC_REFLECT_BASE_MEMBER_COUNT, +, INHERITS )\
+      local_member_count = typelist::length<native_members>(), \
+      total_member_count = typelist::length<members>() \
     }; \
     FC_REFLECT_DERIVED_IMPL_INLINE( TYPE, INHERITS, MEMBERS ) \
 }; \
