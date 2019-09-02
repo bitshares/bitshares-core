@@ -1958,7 +1958,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_collateral_bids) {
 
       // this sell order is designed to trigger a black swan
 
-      create_sell_order( borrower2_id(db), swan(db).amount(1), back(db).amount(3) )->id;
+      create_sell_order( borrower2_id(db), swan(db).amount(1), back(db).amount(3) );
       BOOST_CHECK( swan(db).bitasset_data(db).has_settlement() );
       //making 3 collateral bids
       for (int i=0; i<3; i++) {
