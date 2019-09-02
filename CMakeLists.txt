@@ -12,11 +12,12 @@ set( INSTALLER_APP_ID "68ad7005-8eee-49c9-95ce-9eed97e5b347" )
 set( CMAKE_CXX_STANDARD 14 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
 
-if( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
+if( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR
+    "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" )
   set( CMAKE_CXX_EXTENSIONS ON ) # for __int128 support
-else( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
+else()
   set( CMAKE_CXX_EXTENSIONS OFF )
-endif( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
+endif()
 
 # http://stackoverflow.com/a/18369825
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -113,10 +114,8 @@ endif()
 add_definitions (-fPIC)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS "ON")
-set(GRAPHENE_EGENESIS_JSON "${CMAKE_CURRENT_SOURCE_DIR}/libraries/egenesis/genesis.json" )
-
-#set (ENABLE_INSTALLER 1)
-#set (USE_PCH 1)
+set( GRAPHENE_EGENESIS_JSON "${CMAKE_CURRENT_SOURCE_DIR}/libraries/egenesis/genesis.json"
+     CACHE STRING "Path to embedded genesis file" )
 
 if (USE_PCH)
   include (cotire)
