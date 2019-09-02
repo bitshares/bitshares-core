@@ -31,7 +31,6 @@
 #include <fc/io/stdio.hpp>
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/cli.hpp>
-#include <fc/rpc/http_api.hpp>
 #include <fc/rpc/websocket_api.hpp>
 
 #include <graphene/app/api.hpp>
@@ -183,17 +182,6 @@ int main( int argc, char** argv )
       setup_logging(options.at("logs-rpc-console-level").as<string>(),options.at("logs-rpc-file").as<bool>(),
             options.at("logs-rpc-file-level").as<string>(), options.at("logs-rpc-file-name").as<string>());
 
-      // key generation
-      fc::ecc::private_key committee_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
-
-      idump( (key_to_wif( committee_private_key ) ) );
-
-      fc::ecc::private_key nathan_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
-      public_key_type nathan_pub_key = nathan_private_key.get_public_key();
-      idump( (nathan_pub_key) );
-      idump( (key_to_wif( nathan_private_key ) ) );
-
-      //
       // TODO:  We read wallet_data twice, once in main() to grab the
       //    socket info, again in wallet_api when we do
       //    load_wallet_file().  Seems like this could be better
@@ -309,9 +297,11 @@ int main( int argc, char** argv )
          for( auto& name_formatter : wapiptr->get_result_formatters() )
             wallet_cli->format_result( name_formatter.first, name_formatter.second );
 
+         std::cout << "\nType \"help\" for a list of available commands.\n";
+         std::cout << "Type \"gethelp <command>\" for info about individual commands.\n\n";
          if( wapiptr->is_new() )
          {
-            std::cout << "Please use the set_password method to initialize a new wallet before continuing\n";
+            std::cout << "Please use the \"set_password\" method to initialize a new wallet before continuing\n";
             wallet_cli->set_prompt( "new >>> " );
          }
          else
@@ -358,7 +348,7 @@ int main( int argc, char** argv )
       }
       else
       {
-         fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
+         fc::promise<int>::ptr exit_promise = fc::promise<int>::create("UNIX Signal Handler");
 
          fc::set_signal_handler( [&exit_promise](int signal) {
             ilog( "Captured SIGINT in daemon mode, exiting" );

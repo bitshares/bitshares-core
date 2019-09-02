@@ -26,10 +26,11 @@
 #include <boost/multiprecision/cpp_int.hpp>
 
 #include <fc/io/raw.hpp>
+#include <fc/uint128.hpp>
 
 namespace graphene { namespace protocol {
-      typedef boost::multiprecision::uint128_t uint128_t;
-      typedef boost::multiprecision::int128_t  int128_t;
+      using fc::uint128_t;
+      using fc::int128_t;
 
       bool operator == ( const price& a, const price& b )
       {
@@ -62,14 +63,14 @@ namespace graphene { namespace protocol {
             FC_ASSERT( b.base.amount.value > 0 );
             uint128_t result = (uint128_t(a.amount.value) * b.quote.amount.value)/b.base.amount.value;
             FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
-            return asset( result.convert_to<int64_t>(), b.quote.asset_id );
+            return asset( static_cast<int64_t>(result), b.quote.asset_id );
          }
          else if( a.asset_id == b.quote.asset_id )
          {
             FC_ASSERT( b.quote.amount.value > 0 );
             uint128_t result = (uint128_t(a.amount.value) * b.base.amount.value)/b.quote.amount.value;
             FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
-            return asset( result.convert_to<int64_t>(), b.base.asset_id );
+            return asset( static_cast<int64_t>(result), b.base.asset_id );
          }
          FC_THROW_EXCEPTION( fc::assert_exception, "invalid asset * price", ("asset",a)("price",b) );
       }
@@ -82,14 +83,14 @@ namespace graphene { namespace protocol {
             FC_ASSERT( b.base.amount.value > 0 );
             uint128_t result = (uint128_t(a.amount.value) * b.quote.amount.value + b.base.amount.value - 1)/b.base.amount.value;
             FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
-            return asset( result.convert_to<int64_t>(), b.quote.asset_id );
+            return asset( static_cast<int64_t>(result), b.quote.asset_id );
          }
          else if( a.asset_id == b.quote.asset_id )
          {
             FC_ASSERT( b.quote.amount.value > 0 );
             uint128_t result = (uint128_t(a.amount.value) * b.base.amount.value + b.quote.amount.value - 1)/b.quote.amount.value;
             FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
-            return asset( result.convert_to<int64_t>(), b.base.asset_id );
+            return asset( static_cast<int64_t>(result), b.base.asset_id );
          }
          FC_THROW_EXCEPTION( fc::assert_exception, "invalid asset::multiply_and_round_up(price)", ("asset",a)("price",b) );
       }
@@ -170,8 +171,8 @@ namespace graphene { namespace protocol {
             }
          }
 
-         price np = asset( cp.numerator().convert_to<int64_t>(), p.base.asset_id )
-                  / asset( cp.denominator().convert_to<int64_t>(), p.quote.asset_id );
+         price np = asset( static_cast<int64_t>(cp.numerator()), p.base.asset_id )
+                  / asset( static_cast<int64_t>(cp.denominator()), p.quote.asset_id );
 
          if( shrinked || using_max )
          {
@@ -217,8 +218,8 @@ namespace graphene { namespace protocol {
          while( cp.numerator() > GRAPHENE_MAX_SHARE_SUPPLY || cp.denominator() > GRAPHENE_MAX_SHARE_SUPPLY )
             cp = boost::rational<int128_t>( (cp.numerator() >> 1)+1, (cp.denominator() >> 1)+1 );
 
-         return  (  asset( cp.denominator().convert_to<int64_t>(), collateral.asset_id )
-                  / asset( cp.numerator().convert_to<int64_t>(), debt.asset_id ) );
+         return  (  asset( static_cast<int64_t>(cp.denominator()), collateral.asset_id )
+                  / asset( static_cast<int64_t>(cp.numerator()), debt.asset_id ) );
       } FC_CAPTURE_AND_RETHROW( (debt)(collateral)(collateral_ratio) ) }
 
       bool price::is_null() const
@@ -276,8 +277,8 @@ namespace graphene { namespace protocol {
             cp = boost::rational<int128_t>( (cp.numerator() >> 1)+(cp.numerator()&1),
                                             (cp.denominator() >> 1)+(cp.denominator()&1) );
 
-         return (  asset( cp.numerator().convert_to<int64_t>(), settlement_price.base.asset_id )
-                 / asset( cp.denominator().convert_to<int64_t>(), settlement_price.quote.asset_id ) );
+         return (  asset( static_cast<int64_t>(cp.numerator()), settlement_price.base.asset_id )
+                 / asset( static_cast<int64_t>(cp.denominator()), settlement_price.quote.asset_id ) );
       }
 
       price price_feed::max_short_squeeze_price()const

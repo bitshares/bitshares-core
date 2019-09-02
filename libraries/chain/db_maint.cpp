@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include <boost/multiprecision/integer.hpp>
-
 #include <fc/uint128.hpp>
 
 #include <graphene/protocol/market.hpp>
@@ -184,10 +182,10 @@ void database::pay_workers( share_type& budget )
       // Note: if there is a good chance that passed_time_count == day_count,
       //       for better performance, can avoid the 128 bit calculation by adding a check.
       //       Since it's not the case on BitShares mainnet, we're not using a check here.
-      fc::uint128 pay(requested_pay.value);
+      fc::uint128_t pay = requested_pay.value;
       pay *= passed_time_count;
       pay /= day_count;
-      requested_pay = pay.to_uint64();
+      requested_pay = static_cast<uint64_t>(pay);
 
       share_type actual_pay = std::min(budget, requested_pay);
       //ilog(" ==> Paying ${a} to worker ${w}", ("w", active_worker.id)("a", actual_pay));
@@ -442,7 +440,7 @@ void database::initialize_budget_record( fc::time_point_sec now, budget_record& 
    budget_u128 += ((uint64_t(1) << GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS) - 1);
    budget_u128 >>= GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS;
    if( budget_u128 < reserve.value )
-      rec.total_budget = share_type(budget_u128.to_uint64());
+      rec.total_budget = share_type(static_cast<uint64_t>(budget_u128));
    else
       rec.total_budget = reserve;
 
@@ -497,7 +495,7 @@ void database::process_budget()
       if( worker_budget_u128 >= available_funds.value )
          worker_budget = available_funds;
       else
-         worker_budget = worker_budget_u128.to_uint64();
+         worker_budget = static_cast<uint64_t>(worker_budget_u128);
       rec.worker_budget = worker_budget;
       available_funds -= worker_budget;
 
@@ -637,12 +635,12 @@ void split_fba_balance(
    fc::uint128_t buyback_amount_128 = fba.accumulated_fba_fees.value;
    buyback_amount_128 *= designated_asset_buyback_pct;
    buyback_amount_128 /= GRAPHENE_100_PERCENT;
-   share_type buyback_amount = buyback_amount_128.to_uint64();
+   share_type buyback_amount = static_cast<uint64_t>(buyback_amount_128);
 
    fc::uint128_t issuer_amount_128 = fba.accumulated_fba_fees.value;
    issuer_amount_128 *= designated_asset_issuer_pct;
    issuer_amount_128 /= GRAPHENE_100_PERCENT;
-   share_type issuer_amount = issuer_amount_128.to_uint64();
+   share_type issuer_amount = static_cast<uint64_t>(issuer_amount_128);
 
    // this assert should never fail
    FC_ASSERT( buyback_amount + issuer_amount <= fba.accumulated_fba_fees );
