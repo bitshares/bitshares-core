@@ -130,7 +130,6 @@ namespace graphene { namespace db {
          }
 
          virtual void               inspect_all_objects(std::function<void(const object&)> inspector)const = 0;
-         virtual fc::uint128        hash()const = 0;
          virtual void               add_observer( const shared_ptr<index_observer>& ) = 0;
 
          virtual void               object_from_variant( const fc::variant& var, object& obj, uint32_t max_depth )const = 0;

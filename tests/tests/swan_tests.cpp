@@ -380,7 +380,7 @@ BOOST_AUTO_TEST_CASE( recollateralize )
       bid_collateral( borrower2(), back().amount(2100), swan().amount(1399) );
 
       // check get_collateral_bids
-      graphene::app::database_api db_api(db);
+      graphene::app::database_api db_api( db, &( app.get_options() ));
       GRAPHENE_REQUIRE_THROW( db_api.get_collateral_bids(back().symbol, 100, 0), fc::assert_exception );
       auto swan_symbol = _swan(db).symbol;
       vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 1);
@@ -525,7 +525,7 @@ BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
       // revive
       wait_for_maintenance();
       BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
-      graphene::app::database_api db_api(db);
+      graphene::app::database_api db_api( db, &( app.get_options() ));
       auto swan_symbol = _swan(db).symbol;
       vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
       BOOST_CHECK( bids.empty() );

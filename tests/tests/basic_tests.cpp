@@ -231,7 +231,7 @@ BOOST_AUTO_TEST_CASE( price_test )
     more_than_min.base.amount = 11;
     BOOST_CHECK( more_than_min * ratio_type(1,7) == price(asset(1),asset(more_than_min.quote.amount*7/11,asset_id_type(1))) );
     more_than_min.base.amount = 64823;
-    BOOST_CHECK( more_than_min * ratio_type(31672,102472047) == price(asset(1),asset((fc::uint128(more_than_min.quote.amount.value)*102472047/(64823*31672)).to_uint64(),asset_id_type(1))) );
+    BOOST_CHECK( more_than_min * ratio_type(31672,102472047) == price(asset(1),asset(static_cast<uint64_t>(fc::uint128_t(more_than_min.quote.amount.value)*102472047/(64823*31672)),asset_id_type(1))) );
     more_than_min.base.amount = 13;
     BOOST_CHECK( more_than_min * ratio_type(202472059,3) == price(asset((int64_t(13)*202472059)>>1),asset((more_than_min.quote.amount.value*3)>>1,asset_id_type(1))) ); // after >>1, quote = max*1.5, but gcd = 3, so quote/=3 = max/2, less than max
 
