@@ -24,10 +24,10 @@
 #include <graphene/app/application.hpp>
 #include <graphene/app/plugin.hpp>
 
+#include <graphene/utilities/key_conversion.hpp>
 #include <graphene/utilities/tempdir.hpp>
 
 #include <graphene/account_history/account_history_plugin.hpp>
-#include <graphene/witness/witness.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
 #include <graphene/egenesis/egenesis.hpp>
 #include <graphene/wallet/wallet.hpp>
@@ -37,6 +37,7 @@
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/rpc/cli.hpp>
 #include <fc/crypto/base58.hpp>
+#include <fc/crypto/hex.hpp>
 
 #include <fc/crypto/aes.hpp>
 
@@ -47,9 +48,10 @@
    #include <winsock2.h>
    #include <WS2tcpip.h>
 #else
-   #include <sys/socket.h>
-   #include <netinet/ip.h>
    #include <sys/types.h>
+   #include <sys/socket.h>
+   #include <netinet/in.h>
+   #include <netinet/ip.h>
 #endif
 #include <thread>
 
@@ -122,7 +124,6 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 
    app1->register_plugin<graphene::account_history::account_history_plugin>(true);
    app1->register_plugin< graphene::market_history::market_history_plugin >(true);
-   app1->register_plugin< graphene::witness_plugin::witness_plugin >(true);
    app1->register_plugin< graphene::grouped_orders::grouped_orders_plugin>(true);
    app1->startup_plugins();
    boost::program_options::variables_map cfg;
@@ -1084,3 +1085,106 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
    }
    app1->shutdown();
 }
+
+static string encapsulate( const graphene::wallet::signed_message& msg )
+{
+   fc::stringstream encapsulated;
+   encapsulated << "-----BEGIN BITSHARES SIGNED MESSAGE-----\n"
+                << msg.message << '\n'
+                << "-----BEGIN META-----\n"
+                << "account=" << msg.meta.account << '\n'
+                << "memokey=" << std::string( msg.meta.memo_key ) << '\n'
+                << "block=" << msg.meta.block << '\n'
+                << "timestamp=" << msg.meta.time << '\n'
+                << "-----BEGIN SIGNATURE-----\n"
+                << fc::to_hex( (const char*)msg.signature->data(), msg.signature->size() ) << '\n'
+                << "-----END BITSHARES SIGNED MESSAGE-----";
+   return encapsulated.str();
+}
+
+/******
+ * Check signing/verifying a message with a memo key
+ */
+BOOST_FIXTURE_TEST_CASE( cli_sign_message, cli_fixture )
+{ try {
+   const auto nathan_priv = *wif_to_key( nathan_keys[0] );
+   const public_key_type nathan_pub( nathan_priv.get_public_key() );
+
+   // account does not exist
+   BOOST_REQUIRE_THROW( con.wallet_api_ptr->sign_message( "dan", "123" ), fc::assert_exception );
+
+   // success
+   graphene::wallet::signed_message msg = con.wallet_api_ptr->sign_message( "nathan", "123" );
+   BOOST_CHECK_EQUAL( "123", msg.message );
+   BOOST_CHECK_EQUAL( "nathan", msg.meta.account );
+   BOOST_CHECK_EQUAL( std::string( nathan_pub ), std::string( msg.meta.memo_key ) );
+   BOOST_CHECK( msg.signature.valid() );
+
+   // change message, verify failure
+   msg.message = "124";
+   BOOST_CHECK( !con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block, msg.meta.time,
+                                                     *msg.signature ) );
+   BOOST_CHECK( !con.wallet_api_ptr->verify_signed_message( msg ) );
+   BOOST_CHECK( !con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
+   msg.message = "123";
+
+   // change account, verify failure
+   // nonexistent account:
+   msg.meta.account = "dan";
+   BOOST_REQUIRE_THROW( con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block,
+                                                            msg.meta.time, *msg.signature ), fc::assert_exception );
+   BOOST_REQUIRE_THROW( con.wallet_api_ptr->verify_signed_message( msg ), fc::assert_exception );
+   BOOST_REQUIRE_THROW( con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ), fc::assert_exception);
+   // existing, but wrong account:
+   msg.meta.account = "committee-account";
+   BOOST_CHECK( !con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block,
+                                                     msg.meta.time, *msg.signature ) );
+   BOOST_CHECK( !con.wallet_api_ptr->verify_signed_message( msg ) );
+   BOOST_CHECK( !con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
+   msg.meta.account = "nathan";
+
+   // change key, verify failure
+   ++msg.meta.memo_key.key_data.data()[1];
+   //BOOST_CHECK( !con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block, msg.meta.time,
+   //                                                  *msg.signature ) );
+   BOOST_CHECK( !con.wallet_api_ptr->verify_signed_message( msg ) );
+   BOOST_CHECK( !con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
+   --msg.meta.memo_key.key_data.data()[1];
+
+   // change block, verify failure
+   ++msg.meta.block;
+   BOOST_CHECK( !con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block, msg.meta.time,
+                                                     *msg.signature ) );
+   BOOST_CHECK( !con.wallet_api_ptr->verify_signed_message( msg ) );
+   BOOST_CHECK( !con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
+   --msg.meta.block;
+
+   // change time, verify failure
+   ++msg.meta.time[0];
+   BOOST_CHECK( !con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block, msg.meta.time,
+                                                     *msg.signature ) );
+   BOOST_CHECK( !con.wallet_api_ptr->verify_signed_message( msg ) );
+   BOOST_CHECK( !con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
+   --msg.meta.time[0];
+
+   // change signature, verify failure
+   ++msg.signature->data()[1];
+   try {
+      BOOST_CHECK( !con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block, msg.meta.time,
+                                                        *msg.signature ) );
+   } catch( const fc::assert_exception& ) {} // failure to reconstruct key from signature is ok as well
+   try {
+      BOOST_CHECK( !con.wallet_api_ptr->verify_signed_message( msg ) );
+   } catch( const fc::assert_exception& ) {} // failure to reconstruct key from signature is ok as well
+   try {
+      BOOST_CHECK( !con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
+   } catch( const fc::assert_exception& ) {} // failure to reconstruct key from signature is ok as well
+   --msg.signature->data()[1];
+
+   // verify success
+   BOOST_CHECK( con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block, msg.meta.time,
+                                                    *msg.signature ) );
+   BOOST_CHECK( con.wallet_api_ptr->verify_signed_message( msg ) );
+   BOOST_CHECK( con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
+
+} FC_LOG_AND_RETHROW() }

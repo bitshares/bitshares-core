@@ -32,11 +32,11 @@
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/exceptions.hpp>
 
+#include <fc/uint128.hpp>
+
 #include <boost/test/unit_test.hpp>
 
 #include "../common/database_fixture.hpp"
-
-#include <fc/uint128.hpp>
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
@@ -347,7 +347,7 @@ uint64_t pct( uint64_t percentage, uint64_t val )
    fc::uint128_t x = percentage;
    x *= val;
    x /= GRAPHENE_100_PERCENT;
-   return x.to_uint64();
+   return static_cast<uint64_t>(x);
 }
 
 uint64_t pct( uint64_t percentage0, uint64_t percentage1, uint64_t val )
@@ -763,7 +763,7 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
          // C++ -- The above commented out statement doesn't work, I don't know why
          // so we will use the following rather lengthy initialization instead
          {
-            flat_set< fee_parameters > new_fees;
+            fee_parameters::flat_set_type new_fees;
             {
                limit_order_create_operation::fee_parameters_type create_fee_params;
                create_fee_params.fee = order_create_fee;
@@ -880,7 +880,7 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
 
       generate_block( skip );
 
-      flat_set< fee_parameters > new_fees;
+      fee_parameters::flat_set_type new_fees;
       {
          limit_order_create_operation::fee_parameters_type create_fee_params;
          create_fee_params.fee = order_create_fee;
@@ -1266,7 +1266,7 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
 
       generate_block( skip );
 
-      flat_set< fee_parameters > new_fees;
+      fee_parameters::flat_set_type new_fees;
       {
          limit_order_create_operation::fee_parameters_type create_fee_params;
          create_fee_params.fee = order_create_fee;
@@ -1772,9 +1772,9 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
 
       generate_block( skip );
 
-      flat_set< fee_parameters > new_fees;
-      flat_set< fee_parameters > new_fees1;
-      flat_set< fee_parameters > new_fees2;
+      fee_parameters::flat_set_type new_fees;
+      fee_parameters::flat_set_type new_fees1;
+      fee_parameters::flat_set_type new_fees2;
       {
          limit_order_create_operation::fee_parameters_type create_fee_params;
          create_fee_params.fee = order_create_fee;
@@ -2329,7 +2329,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       generate_block( skip );
 
-      flat_set< fee_parameters > new_fees;
+      fee_parameters::flat_set_type new_fees;
       {
          limit_order_create_operation::fee_parameters_type create_fee_params;
          create_fee_params.fee = order_create_fee;
