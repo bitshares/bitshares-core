@@ -353,7 +353,7 @@ struct database_fixture {
     * finish creating a block
     */
    void enable_fees();
-   void change_fees( const flat_set< fee_parameters >& new_params, uint32_t new_scale = 0 );
+   void change_fees( const fee_parameters::flat_set_type& new_params, uint32_t new_scale = 0 );
    void upgrade_to_lifetime_member( account_id_type account );
    void upgrade_to_lifetime_member( const account_object& account );
    void upgrade_to_annual_member( account_id_type account );
