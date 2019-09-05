@@ -42,9 +42,9 @@ RUN \
     git clone https://github.com/google/snappy.git && \
     cd snappy && \
     mkdir build && \
-    cd build && cmake ../ &&\
-    sudo make install &&\
-    pwd && \
+    cd build && cmake ../ && \
+    sudo make install && \
+    cd /bitshares-core && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ADD . /bitshares-core
