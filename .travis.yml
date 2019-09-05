@@ -25,7 +25,7 @@ install:
  - mkdir build
  - cd build && cmake ../ 
  - sudo make install
- - cd .....
+ - cd /home/travis/build/bitshares/bitshares-core
 addons:
   sonarcloud:
     organization: "flwyiq7go36p6lipr64tbesy5jayad3q"
