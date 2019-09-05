@@ -20,3 +20,4 @@ Folder                             | Name                     | Description     
 [market_history](market_history)   | Market History           | Save market history data                                                    | Market data    | Stable        | 5
 [snapshot](snapshot)               | Snapshot                 | Get a json of all objects in blockchain at a specificed time or block       | Debug          | Stable        | 
 [witness](witness)                 | Witness                  | Generate and sign blocks                                                    | Block producer | Stable        | 
+[query_txid](query_txid)           | Query_txid               | Get the transaction data by transaction id                                  | Data           | Experimental  | 8

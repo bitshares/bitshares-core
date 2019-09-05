@@ -30,6 +30,20 @@ RUN \
       fish \
     && \
     apt-get clean && \
+    wget https://github.com/google/leveldb/archive/v1.20.tar.gz && \
+    tar xvf v1.20.tar.gz && \
+    rm -f v1.20.tar.gz && \
+    cd leveldb-1.20 && \
+    make && \
+    sudo cp -r out-static/lib* out-shared/lib* "/usr/local/lib" && \
+    cd include && \
+    sudo cp -r leveldb /usr/local/include && \
+    sudo ldconfig && \
+    git clone https://github.com/google/snappy.git && \
+    cd snappy && \
+    mkdir build && \
+    cd build && cmake ../ &&\
+    sudo make install &&\
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ADD . /bitshares-core

@@ -28,12 +28,28 @@
 
 namespace graphene { namespace chain {
 
+   struct query_trx_info : public graphene::protocol::processed_transaction
+   {
+      query_trx_info( const signed_transaction& trx = signed_transaction())
+         : processed_transaction(trx){}
+
+      virtual ~query_trx_info() = default;
+
+      uint64_t query_txid_block_number = 0;
+      uint64_t query_txid_trx_in_block = 0;
+   };
+   #ifndef QUERY_TXID_SPACE_ID
+   #define QUERY_TXID_SPACE_ID 8
+   #endif
+   enum query_txid_object_type
+   {
+      transaction_position_object_type = 0
+   };
    class trx_entry_object : public abstract_object<trx_entry_object>
    {
       public:
-         static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_trx_entry_history_object_type;
-
+         static const uint8_t space_id = QUERY_TXID_SPACE_ID;
+         static const uint8_t type_id  = transaction_position_object_type;
          trx_entry_object(){}
 
          transaction_id_type    txid;
@@ -60,3 +76,5 @@ namespace graphene { namespace chain {
 
 FC_REFLECT_DERIVED( graphene::chain::trx_entry_object, (graphene::chain::object),
                     (txid)(block_num)(trx_in_block)) 
+FC_REFLECT_DERIVED( graphene::chain::query_trx_info, (graphene::protocol::processed_transaction),
+                    (query_txid_block_number)(query_txid_trx_in_block))

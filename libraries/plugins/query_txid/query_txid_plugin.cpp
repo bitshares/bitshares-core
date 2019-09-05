@@ -23,7 +23,7 @@
  */
 #include <graphene/query_txid/query_txid_plugin.hpp>
 #include <fc/io/fstream.hpp>
-#include <graphene/chain/transaction_entry_object.hpp>
+#include <graphene/query_txid/transaction_entry_object.hpp>
 #include <queue>
 #include <thread>
 #include <mutex>
@@ -58,11 +58,8 @@ class query_txid_plugin_impl
       static optional<trx_entry_object> query_trx_by_id(std::string txid);
       std::string db_path = "trx_entry.db";
       uint64_t limit_batch = 1000; 
-
    private:
       query_txid_plugin &_self;
-
-      fc::signal<void()> sig_db_write;
       fc::signal<void(const uint64_t)> sig_remove;
 
       static leveldb::DB *leveldb;
@@ -76,9 +73,9 @@ void query_txid_plugin_impl::init()
    try {
       leveldb::Options options;
       options.create_if_missing = true;
+      db_path = database().get_data_dir().string() + db_path;
       leveldb::Status s = leveldb::DB::Open(options, db_path, &leveldb);
-      sig_db_write.connect([&]() { consume_block(); });
-      sig_remove.connect([&](const uint64_t trx_entry_id) { remove_trx_index(trx_entry_id); });
+      sig_remove.connect([this](const uint64_t trx_entry_id) { remove_trx_index(trx_entry_id); });
    }
    FC_LOG_AND_RETHROW()
 }
@@ -90,8 +87,7 @@ optional<trx_entry_object> query_txid_plugin_impl::query_trx_by_id(std::string t
       leveldb::Status s = leveldb->Get(leveldb::ReadOptions(), txid, &value);
       if (!s.ok()) return optional<trx_entry_object>();
       std::vector<char> data(value.begin(), value.end());
-      auto result = fc::raw::unpack<trx_entry_object>(data);
-      return result;
+      return fc::raw::unpack<trx_entry_object>(data);
    }
    FC_LOG_AND_RETHROW()
 }
@@ -100,13 +96,13 @@ void query_txid_plugin_impl::collect_txid_index(const signed_block &b)
    try {
       graphene::chain::database &db = database();
       for (unsigned int idx = 0; idx < b.transactions.size(); idx++) {
-         db.create<trx_entry_object>([&](trx_entry_object &obj) {
+         db.create<trx_entry_object>([&b,&idx](trx_entry_object &obj) {
             obj.txid = b.transactions[idx].id();
             obj.block_num = b.block_num();
             obj.trx_in_block = idx;
         });
       }
-      sig_db_write();
+      consume_block();
    }
    FC_LOG_AND_RETHROW()
 }
@@ -200,7 +196,7 @@ void query_txid_plugin::plugin_initialize(const boost::program_options::variable
    try {
       ilog("query_txid plugin initialized");
       database().add_index<primary_index<trx_entry_index>>();
-      database().applied_block.connect([&](const signed_block &b) { my->collect_txid_index(b); });
+      database().applied_block.connect([this](const signed_block &b) { my->collect_txid_index(b); });
       if (options.count("query-txid-path")) {
          my->db_path = options["query-txid-path"].as<std::string>();
          if (!fc::exists(my->db_path))
