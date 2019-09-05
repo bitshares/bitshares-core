@@ -44,6 +44,7 @@ RUN \
     mkdir build && \
     cd build && cmake ../ &&\
     sudo make install &&\
+    pwd && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ADD . /bitshares-core
