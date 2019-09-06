@@ -10,22 +10,7 @@ dist: xenial
 sudo: true
 
 install:
- - sudo apt-get install --allow-unauthenticated libboost-thread-dev libboost-iostreams-dev libboost-date-time-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libboost-chrono-dev libboost-test-dev libboost-context-dev libboost-regex-dev libboost-coroutine-dev cmake parallel
- - wget https://github.com/google/leveldb/archive/v1.20.tar.gz
- - tar xvf v1.20.tar.gz
- - rm -f v1.20.tar.gz
- - cd leveldb-1.20
- - make 
- - sudo cp -r out-static/lib* out-shared/lib* "/usr/local/lib"
- - cd include
- - sudo cp -r leveldb /usr/local/include
- - sudo ldconfig
- - git clone https://github.com/google/snappy.git
- - cd snappy
- - mkdir build
- - cd build && cmake ../ 
- - sudo make install
- - cd /home/travis/build/bitshares/bitshares-core
+ - sudo apt-get install --allow-unauthenticated libboost-thread-dev libboost-iostreams-dev libboost-date-time-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libboost-chrono-dev libboost-test-dev libboost-context-dev libboost-regex-dev libboost-coroutine-dev libleveldb-dev libsnappy-dev cmake parallel
 addons:
   sonarcloud:
     organization: "flwyiq7go36p6lipr64tbesy5jayad3q"

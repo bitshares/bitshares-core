@@ -19,7 +19,7 @@ else()
   set( CMAKE_CXX_EXTENSIONS OFF )
 endif()
 
-option(LOAD_QUERY_TXID_PLUGIN "Build with query_txid plugin." ON)
+set(LOAD_QUERY_TXID_PLUGIN OFF CACHE BOOL "query_txid plugin is off normal state")
 if(${LOAD_QUERY_TXID_PLUGIN} STREQUAL "ON")
    add_definitions(-DQUERY_TXID_PLUGIN_ABLE)
    set( QUERY_TXID graphene_query_txid)

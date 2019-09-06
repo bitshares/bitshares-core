@@ -26,25 +26,12 @@ RUN \
       libboost-coroutine-dev \
       libtool \
       doxygen \
+      libleveldb-dev \
+      libsnappy-dev \
       ca-certificates \
       fish \
     && \
     apt-get clean && \
-    wget https://github.com/google/leveldb/archive/v1.20.tar.gz && \
-    tar xvf v1.20.tar.gz && \
-    rm -f v1.20.tar.gz && \
-    cd leveldb-1.20 && \
-    make && \
-    sudo cp -r out-static/lib* out-shared/lib* "/usr/local/lib" && \
-    cd include && \
-    sudo cp -r leveldb /usr/local/include && \
-    sudo ldconfig && \
-    git clone https://github.com/google/snappy.git && \
-    cd snappy && \
-    mkdir build && \
-    cd build && cmake ../ && \
-    sudo make install && \
-    cd /bitshares-core && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ADD . /bitshares-core
@@ -62,6 +49,7 @@ RUN \
     git submodule update --init --recursive && \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
+        -DLOAD_QUERY_TXID_PLUGIN=ON \
 	-DGRAPHENE_DISABLE_UNITY_BUILD=ON \
         . && \
     make witness_node cli_wallet get_dev_key && \

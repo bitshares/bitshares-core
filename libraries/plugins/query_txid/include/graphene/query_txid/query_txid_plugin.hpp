@@ -23,7 +23,7 @@
  */
 #pragma once
 #include <graphene/app/plugin.hpp>
-#include <graphene/query_txid/transaction_entry_object.hpp>
+#include <graphene/query_txid_object/transaction_entry_object.hpp>
 #include <graphene/chain/database.hpp>
 namespace graphene
 {

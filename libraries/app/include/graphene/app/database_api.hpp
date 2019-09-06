@@ -41,9 +41,9 @@
 #include <fc/variant_object.hpp>
 
 #include <fc/network/ip.hpp>
-#ifdef QUERY_TXID_PLUGIN_ABLE
-#include <graphene/query_txid/transaction_entry_object.hpp>
-#endif 
+
+#include <graphene/query_txid_object/transaction_entry_object.hpp>
+
 #include <boost/container/flat_set.hpp>
 
 #include <functional>

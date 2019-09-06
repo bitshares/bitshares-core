@@ -8,7 +8,7 @@ find_library(LevelDB_LIBRARY NAMES libleveldb.a)
 find_library(Snappy_LIBRARY NAMES libsnappy.a)
 
 if(LevelDB_INCLUDE_PATH AND LevelDB_LIBRARY AND Snappy_LIBRARY)
-   target_link_libraries( graphene_query_txid graphene_chain graphene_app ${LevelDB_LIBRARY} ${Snappy_LIBRARY})
+   target_link_libraries( graphene_query_txid graphene_chain graphene_app ${LevelDB_LIBRARY} ${Snappy_LIBRARY} )
    target_include_directories( graphene_query_txid
                               PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" ${LevelDB_INCLUDE_PATH})
    install( TARGETS

@@ -23,7 +23,7 @@
  */
 #include <graphene/query_txid/query_txid_plugin.hpp>
 #include <fc/io/fstream.hpp>
-#include <graphene/query_txid/transaction_entry_object.hpp>
+#include <graphene/query_txid_object/transaction_entry_object.hpp>
 #include <queue>
 #include <thread>
 #include <mutex>
