@@ -79,10 +79,6 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
       if( before_core_hardfork_342 )
       {
          pays = call_itr->get_debt() * settlement_price; // round down, in favor of call order
-
-         // Be here, the call order can be paying nothing
-         if( pays.amount == 0 && !bitasset.is_prediction_market ) // TODO remove this warning after hard fork core-342
-            wlog( "Something for nothing issue (#184, variant E) occurred at block #${block}", ("block",head_block_num()) );
       }
       else
          pays = call_itr->get_debt().multiply_and_round_up( settlement_price ); // round up, in favor of global settlement fund
@@ -705,14 +701,12 @@ asset database::match( const call_order_object& call,
       {
          if( call_receives == call_debt ) // the call order is smaller than or equal to the settle order
          {
-            wlog( "Something for nothing issue (#184, variant C-1) handled at block #${block}", ("block",head_block_num()) );
             call_pays.amount = 1;
          }
          else
          {
             if( call_receives == settle.balance ) // the settle order is smaller
             {
-               wlog( "Something for nothing issue (#184, variant C-2) handled at block #${block}", ("block",head_block_num()) );
                cancel_settle_order( settle );
             }
             // else do nothing: neither order will be completely filled, perhaps due to max_settlement too small
@@ -720,8 +714,7 @@ asset database::match( const call_order_object& call,
             return asset( 0, settle.balance.asset_id );
          }
       }
-      else // TODO remove this warning after hard fork core-184
-         wlog( "Something for nothing issue (#184, variant C) occurred at block #${block}", ("block",head_block_num()) );
+
    }
    else // the call order is not paying nothing, but still possible it's paying more than minimum required due to rounding
    {
@@ -767,8 +760,6 @@ asset database::match( const call_order_object& call,
    if( before_core_hardfork_342 )
    {
       auto call_collateral = call.get_collateral();
-      if( call_pays == call_collateral ) // TODO remove warning after hard fork core-342
-         wlog( "Incorrectly captured black swan event at block #${block}", ("block",head_block_num()) );
       GRAPHENE_ASSERT( call_pays < call_collateral, black_swan_exception, "" );
 
       assert( settle_pays == settle_for_sale || call_receives == call.get_debt() );
@@ -1097,10 +1088,6 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
           if( before_core_hardfork_342 )
           {
              order_receives = usd_to_buy * match_price; // round down, in favor of call order
-
-             // Be here, the limit order would be paying something for nothing
-             if( order_receives.amount == 0 ) // TODO remove warning after hard fork core-342
-                wlog( "Something for nothing issue (#184, variant D) occurred at block #${block}", ("block",head_num) );
           }
           else
              order_receives = usd_to_buy.multiply_and_round_up( match_price ); // round up, in favor of limit order
@@ -1109,9 +1096,8 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
           if( usd_to_buy == usd_for_sale )
              filled_limit = true;
-          else if( filled_limit && maint_time <= HARDFORK_CORE_453_TIME ) // TODO remove warning after hard fork core-453
+          else if( filled_limit && maint_time <= HARDFORK_CORE_453_TIME )
           {
-             wlog( "Multiple limit match problem (issue 453) occurred at block #${block}", ("block",head_num) );
              if( before_hardfork_615 )
                 _issue_453_affected_assets.insert( bitasset.asset_id );
           }

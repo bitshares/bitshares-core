@@ -206,7 +206,7 @@ object_id_type proposal_create_evaluator::do_apply(const proposal_create_operati
          top.to = GRAPHENE_RELAXED_COMMITTEE_ACCOUNT;
          top.amount = asset( GRAPHENE_MAX_SHARE_SUPPLY );
          proposal.proposed_transaction.operations.emplace_back( top );
-         wlog( "Issue 1479: ${p}", ("p",proposal) );
+         wlog( "Issue 1479: ${p}", ("p",proposal) ); // Note: This happened on mainnet 1.10.17503
       }
    });
 

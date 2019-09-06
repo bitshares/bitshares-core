@@ -877,7 +877,6 @@ void update_call_orders_hf_343( database& db )
 void update_call_orders_hf_1270( database& db )
 {
    // Update call_price
-   wlog( "Updating all call orders for hardfork core-1270 at block ${n}", ("n",db.head_block_num()) );
    for( const auto& call_obj : db.get_index_type<call_order_index>().indices().get<by_id>() )
    {
       db.modify( call_obj, []( call_order_object& call ) {
@@ -885,7 +884,6 @@ void update_call_orders_hf_1270( database& db )
          call.call_price.quote.amount = 1;
       });
    }
-   wlog( "Done updating all call orders for hardfork core-1270 at block ${n}", ("n",db.head_block_num()) );
 }
 
 /// Match call orders for all bitAssets, including PMs.
@@ -949,7 +947,6 @@ void database::process_bitassets()
 void process_hf_1465( database& db )
 {
    const auto head_num = db.head_block_num();
-   wlog( "Processing hard fork core-1465 at block ${n}", ("n",head_num) );
    // for each market issued asset
    const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
    for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
@@ -1010,7 +1007,6 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
    const auto next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
    const auto head_time = db.head_block_time();
    const auto head_num = db.head_block_num();
-   wlog( "Processing hard fork core-868-890 at block ${n}", ("n",head_num) );
    // for each market issued asset
    const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
    for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
@@ -1059,13 +1055,6 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
          }
       } // end loop of each feed
 
-      // if any feed was modified, print a warning message
-      if( feeds_changed )
-      {
-         wlog( "Found invalid feed for asset ${asset_sym} (${asset_id}) during hardfork core-868-890",
-               ("asset_sym", current_asset.symbol)("asset_id", current_asset.id) );
-      }
-
       // always update the median feed due to https://github.com/bitshares/bitshares-core/issues/890
       db.modify( bitasset_data, [head_time,next_maint_time]( asset_bitasset_data_object &obj ) {
          obj.update_median_feeds( head_time, next_maint_time );
@@ -1073,11 +1062,6 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
 
       bool median_changed = ( old_feed.settlement_price != bitasset_data.current_feed.settlement_price );
       bool median_feed_changed = ( !( old_feed == bitasset_data.current_feed ) );
-      if( median_feed_changed )
-      {
-         wlog( "Median feed for asset ${asset_sym} (${asset_id}) changed during hardfork core-868-890",
-               ("asset_sym", current_asset.symbol)("asset_id", current_asset.id) );
-      }
 
       // Note: due to bitshares-core issue #935, the check below (using median_changed) is incorrect.
       //       However, `skip_check_call_orders` will likely be true in both testnet and mainnet,
@@ -1094,7 +1078,6 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
                ("asset_sym", current_asset.symbol)("asset_id", current_asset.id) );
       }
    } // for each market issued asset
-   wlog( "Done processing hard fork core-868-890 at block ${n}", ("n",head_num) );
 }
 
 /******
