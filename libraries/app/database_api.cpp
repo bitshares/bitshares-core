@@ -1927,26 +1927,7 @@ try{
    }
 FC_CAPTURE_AND_RETHROW((txid));  
 }
-/*#ifdef QUERY_TXID_PLUGIN_ABLE
-    auto &txid_index = _db.get_index_type<trx_entry_index>().indices().get<by_txid>();
-    auto itor = txid_index.find(txid);
-    auto trx_entry = *itor;
-    if (itor == txid_index.end()) {
-        std::string txid_str(txid);
-        auto result = query_txid::query_txid_plugin::query_trx_by_id(txid_str);
-        if (result) {
-            trx_entry = *result;
-        }
-    } 
-   auto opt_block = _db.fetch_block_by_number(trx_entry.block_num);
-   FC_ASSERT(opt_block);
-   FC_ASSERT(opt_block->transactions.size() > trx_entry.trx_in_block);
-   optional<query_trx_info> res = opt_block->transactions[trx_entry.trx_in_block];
-   res->query_txid_block_number = trx_entry.block_num;
-   res->query_txid_trx_in_block = trx_entry.trx_in_block;
-   return res;
-#endif
-*/
+
 std::string database_api_impl::get_transaction_hex_without_sig(
    const signed_transaction &trx) const
 {
