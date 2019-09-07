@@ -570,4 +570,257 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    BOOST_CHECK_THROW(PUSH_TX(db, transfer), tx_missing_active_auth);
 } FC_LOG_AND_RETHROW() }
 
+
+   // Test of authorization and revocation of one account (Alice) authorizing multiple other accounts (Bob and Charlie)
+   // to transfer out of her account
+   BOOST_AUTO_TEST_CASE(selective_custom_auths) {
+      try {
+         //////
+         // Initialize the test
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+         ACTORS((alice)(bob)(charlie)(diana))
+         fund(alice, asset(1000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+         fund(bob, asset(1000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+
+
+         //////
+         // Bob attempts to transfer 100 CORE from Alice's account to Charlie
+         // This attempt should fail because Alice has not authorized anyone to transfer from her account
+         //////
+         transfer_operation bob_transfers_from_alice_to_charlie;
+         bob_transfers_from_alice_to_charlie.to = charlie.get_id();
+         bob_transfers_from_alice_to_charlie.from = alice.get_id();
+         bob_transfers_from_alice_to_charlie.amount.amount = 100 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         trx.operations = {bob_transfers_from_alice_to_charlie};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+         //////
+         // Bob attempts to transfer 100 CORE from Alice's account to Diana
+         // This attempt should fail because Alice has not authorized anyone to transfer from her account
+         //////
+         transfer_operation bob_transfers_from_alice_to_diana;
+         bob_transfers_from_alice_to_diana.to = diana.get_id();
+         bob_transfers_from_alice_to_diana.from = alice.get_id();
+         bob_transfers_from_alice_to_diana.amount.amount = 60 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         trx.operations = {bob_transfers_from_alice_to_diana};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+         //////
+         // Charlie attempts to transfer 100 CORE from Alice's account to Diana
+         // This attempt should fail because Alice has not authorized anyone to transfer from her account
+         //////
+         transfer_operation charlie_transfers_from_alice_to_diana;
+         charlie_transfers_from_alice_to_diana.to = diana.get_id();
+         charlie_transfers_from_alice_to_diana.from = alice.get_id();
+         charlie_transfers_from_alice_to_diana.amount.amount = 25 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         trx.operations = {charlie_transfers_from_alice_to_diana};
+         sign(trx, charlie_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+         //////
+         // Create a custom authority where Bob is authorized to transfer from Alice's account to Charlie
+         //////
+         custom_authority_create_operation op;
+         op.account = alice.get_id();
+         op.auth.add_authority(bob.get_id(), 1);
+         op.auth.weight_threshold = 1;
+         op.enabled = true;
+         op.valid_to = db.head_block_time() + 1000;
+         op.operation_type = operation::tag<transfer_operation>::value;
+         auto to_index = member_index<transfer_operation>("to");
+         vector<restriction> restrictions;
+         restrictions.emplace_back(to_index, FUNC(eq), charlie.get_id());
+         op.restrictions = restrictions;
+         //[
+         //  {
+         //    "member_index": 2,
+         //    "restriction_type": 0,
+         //    "argument": [
+         //      7,
+         //      "1.2.18"
+         //    ],
+         //    "extensions": []
+         //  }
+         //]
+
+         // Alice publishes the custom authority
+         trx.clear();
+         trx.operations = {op};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+         custom_authority_id_type ca_bob_transfers_from_alice_to_charlie =
+                 db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(alice_id)->id;
+
+         //////
+         // Bob attempts to transfer 100 CORE from Alice's account to Charlie
+         // This attempt should succeed because it is attempted after the custom authority is published
+         //////
+         trx.clear();
+         trx.operations = {bob_transfers_from_alice_to_charlie};
+         sign(trx, bob_private_key);
+         PUSH_TX(db, trx);
+
+         //////
+         // Bob attempts to transfer 100 CORE from Alice's account to Diana
+         // This attempt should fail because Alice has not authorized Bob to transfer to Diana
+         //////
+         trx.clear();
+         trx.operations = {bob_transfers_from_alice_to_diana};
+         sign(trx, charlie_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+         //////
+         // Charlie attempts to transfer 100 CORE from Alice's account to Charlie
+         // This attempt should fail because Alice has not authorized Charlie to transfer to Diana
+         //////
+         trx.clear();
+         trx.operations = {charlie_transfers_from_alice_to_diana};
+         sign(trx, charlie_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+
+         //////
+         // Advance the blockchain to generate distinctive hash IDs for the re-used transactions
+         //////
+         generate_blocks(1);
+
+         //////
+         // Create a custom authority where Charlie is authorized to transfer from Alice's account to Diana
+         //////
+         op = custom_authority_create_operation();
+         op.account = alice.get_id();
+         op.auth.add_authority(charlie.get_id(), 1);
+         op.auth.weight_threshold = 1;
+         op.enabled = true;
+         op.valid_to = db.head_block_time() + 1000;
+         op.operation_type = operation::tag<transfer_operation>::value;
+         restrictions.clear();
+         restrictions.emplace_back(to_index, FUNC(eq), diana.get_id());
+         op.restrictions = restrictions;
+         //[
+         //  {
+         //    "member_index": 2,
+         //    "restriction_type": 0,
+         //    "argument": [
+         //      7,
+         //      "1.2.19"
+         //    ],
+         //    "extensions": []
+         //  }
+         //]
+
+         // Alice publishes the additional custom authority
+         trx.clear();
+         trx.operations = {op};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+         // Note the additional custom authority
+         const auto &ca_index = db.get_index_type<custom_authority_index>().indices().get<by_account_custom>();
+
+         auto ca_alice_range = ca_index.equal_range(alice_id);
+         long nbr_alice_auths = std::distance(ca_alice_range.first, ca_alice_range.second);
+         BOOST_CHECK_EQUAL(2, nbr_alice_auths);
+         auto iter = ca_alice_range.first;
+         custom_authority_id_type *ca_charlie_transfers_from_alice_to_diana = nullptr;
+         while (iter != ca_index.end()) {
+            custom_authority_id_type ca_id = iter->id;
+            const custom_authority_object *ca = db.find<custom_authority_object>(ca_id);
+            flat_map<account_id_type, weight_type> ca_authorities = ca->auth.account_auths;
+            BOOST_CHECK_EQUAL(1, ca_authorities.size());
+            if (ca_authorities.find(charlie.get_id()) != ca_authorities.end()) {
+               ca_charlie_transfers_from_alice_to_diana = &ca_id;
+               break;
+            }
+
+            iter++;
+         }
+         BOOST_CHECK(ca_charlie_transfers_from_alice_to_diana != nullptr);
+
+         //////
+         // Charlie attempts to transfer 100 CORE from Alice's account to Diana
+         // This attempt should succeed because it is attempted after the custom authority is published
+         //////
+         trx.clear();
+         trx.operations = {charlie_transfers_from_alice_to_diana};
+         sign(trx, charlie_private_key);
+         PUSH_TX(db, trx);
+
+         //////
+         // Bob should still be able to transfer from Alice to Charlie
+         // Bob attempts to transfer 100 CORE from Alice's account to Charlie
+         // This attempt should succeed because it was previously authorized by Alice
+         //////
+         trx.clear();
+         trx.operations = {bob_transfers_from_alice_to_charlie};
+         sign(trx, bob_private_key);
+         PUSH_TX(db, trx);
+
+         //////
+         // Bob attempts to transfer 100 CORE from Alice's account to Diana
+         // This attempt should fail because Alice has not authorized Bob to transfer to Diana
+         //////
+         trx.clear();
+         trx.operations = {bob_transfers_from_alice_to_diana};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+
+         //////
+         // Advance the blockchain to generate distinctive hash IDs for the re-used transactions
+         //////
+         generate_blocks(1);
+
+         //////
+         // Alice revokes the custom authority for Bob
+         //////
+         custom_authority_delete_operation revoke_bob_authorization;
+         revoke_bob_authorization.account = alice.get_id();
+         revoke_bob_authorization.authority_to_delete = ca_bob_transfers_from_alice_to_charlie;
+         trx.clear();
+         trx.operations = {revoke_bob_authorization};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+         //////
+         // Bob attempts to transfer 100 CORE from Alice's account to Charlie
+         // This attempt should fail because Alice has revoked authorized for Bob to transfer from her account
+         //////
+         trx.clear();
+         trx.operations = {bob_transfers_from_alice_to_charlie};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+         //////
+         // Charlie attempts to transfer 100 CORE from Alice's account to Diana
+         // This attempt should succeed because Alice should still be authorized to transfer from Alice account
+         //////
+         trx.clear();
+         trx.operations = {charlie_transfers_from_alice_to_diana};
+         sign(trx, charlie_private_key);
+         PUSH_TX(db, trx);
+
+         //////
+         // Bob attempts to transfer 100 CORE from Alice's account to Diana
+         // This attempt should fail because Alice has not authorized Bob to transfer to Diana
+         //////
+         trx.clear();
+         trx.operations = {bob_transfers_from_alice_to_diana};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+      } FC_LOG_AND_RETHROW()
+   }
+
 BOOST_AUTO_TEST_SUITE_END()
