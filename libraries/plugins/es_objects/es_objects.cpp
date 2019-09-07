@@ -151,7 +151,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
       {
          switch( value.space_type() )
          {
-            case( proposal_object::space_id << 8 | proposal_object::type_id ):
+            case( proposal_object::space_type() ):
             {
                if( _es_objects_proposals ) {
                   auto obj = db.find_object(value);
@@ -165,7 +165,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
                }
                break;
             }
-            case( account_object::space_id << 8 | account_object::type_id ):
+            case( account_object::space_type() ):
             {
                if( _es_objects_accounts ) {
                   auto obj = db.find_object(value);
@@ -179,7 +179,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
                }
                break;
             }
-            case( asset_object::space_id << 8 | asset_object::type_id ):
+            case( asset_object::space_type() ):
             {
                if( _es_objects_assets ) {
                   auto obj = db.find_object(value);
@@ -193,7 +193,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
                }
                break;
             }
-            case( account_balance_object::space_id << 8 | account_balance_object::type_id ):
+            case( account_balance_object::space_type() ):
             {
                if( _es_objects_balances ) {
                   auto obj = db.find_object(value);
@@ -207,7 +207,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
                }
                break;
             }
-            case( limit_order_object::space_id << 8 | limit_order_object::type_id ):
+            case( limit_order_object::space_type() ):
             {
                if( _es_objects_limit_orders ) {
                   auto obj = db.find_object(value);
@@ -221,7 +221,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
                }
                break;
             }
-            case( asset_bitasset_data_object::space_id << 8 | asset_bitasset_data_object::type_id ):
+            case( asset_bitasset_data_object::space_type() ):
             {
                if( _es_objects_asset_bitasset ) {
                   auto obj = db.find_object(value);
@@ -235,7 +235,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
                }
                break;
             }
-            case( voting_statistics_object::space_id << 8 | voting_statistics_object::type_id ):
+            case( voting_statistics_object::space_type() ):
             {
                if( _es_objects_voting_statistics ) {
                   auto obj = db.find_object(value);
@@ -250,7 +250,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
                }
                break;
             }
-            case( voteable_statistics_object::space_id << 8 | voteable_statistics_object::type_id ):
+            case( voteable_statistics_object::space_type() ):
             {
                if( _es_objects_voteable_statistics ) {
                   auto obj = db.find_object(value);
