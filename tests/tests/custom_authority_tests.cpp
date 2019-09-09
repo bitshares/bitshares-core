@@ -390,6 +390,113 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    BOOST_CHECK(predicate(update) == true);
 } FC_LOG_AND_RETHROW() }
 
+   /**
+    * Test predicates containing logical ORs
+    * Test of authorization and revocation of one account (Alice) authorizing multiple other accounts (Bob and Charlie)
+    * to transfer out of her account by using a single custom active authority with two logical OR branches.
+    *
+    * This can alternatively be achieved by using two custom active authority authorizations
+    * as is done in multiple_transfer_custom_auths
+    */
+   BOOST_AUTO_TEST_CASE(logical_or_transfer_predicate_tests) {
+      try {
+         using namespace graphene::protocol;
+         //////
+         // Create a restriction that authorizes transfers only made to Account ID 12 or Account 15
+         //////
+         auto to_index = member_index<transfer_operation>("to");
+         vector<restriction> branch1 = vector<restriction>{restriction(to_index, FUNC(eq), account_id_type(12))};
+         vector<restriction> branch2 = vector<restriction>{restriction(to_index, FUNC(eq), account_id_type(15))};
+         unsigned_int dummy_index = 999;
+         vector<restriction> or_restrictions = {
+                 restriction(dummy_index, FUNC(logical_or), vector<vector<restriction>>{branch1, branch2})};
+         //[
+         //  {
+         //    "member_index": 999,
+         //    "restriction_type": 11,
+         //    "argument": [
+         //      40,
+         //      [
+         //        [
+         //          {
+         //            "member_index": 2,
+         //            "restriction_type": 0,
+         //            "argument": [
+         //              7,
+         //              "1.2.12"
+         //            ],
+         //            "extensions": []
+         //          }
+         //        ],
+         //        [
+         //          {
+         //            "member_index": 2,
+         //            "restriction_type": 0,
+         //            "argument": [
+         //              7,
+         //              "1.2.15"
+         //            ],
+         //            "extensions": []
+         //          }
+         //        ]
+         //      ]
+         //    ],
+         //    "extensions": []
+         //  }
+         //]
+         auto predicate = get_restriction_predicate(or_restrictions, operation::tag<transfer_operation>::value);
+
+         //////
+         // Create an operation that transfers to Account ID 12
+         // This should satisfy the restriction because Account ID 12 is authorized to transfer
+         //////
+         transfer_operation transfer_to_12 = transfer_operation();
+         transfer_to_12.to = account_id_type(12);
+         BOOST_CHECK_EQUAL(predicate(transfer_to_12).rejection_path.size(), 0);
+
+         //////
+         // Create an operation that transfers to Account ID 15
+         // This should satisfy the restriction because Account ID 12 is authorized to transfer
+         //////
+         transfer_operation transfer_to_15 = transfer_operation();
+         transfer_to_15.to = account_id_type(15);
+         BOOST_CHECK(predicate(transfer_to_15) == true);
+         BOOST_CHECK_EQUAL(predicate(transfer_to_15).rejection_path.size(), 0);
+
+         //////
+         // Create an operation that transfers to Account ID 1
+         // This should violate the restriction because Account 1 is not authorized to transfer
+         //////
+         transfer_operation transfer_to_1;
+         transfer_to_1.to = account_id_type(1);
+         BOOST_CHECK(predicate(transfer_to_1) == false);
+         BOOST_CHECK_EQUAL(predicate(transfer_to_1).rejection_path.size(), 2);
+         // Index 0 (the outer-most) rejection path refers to the first and only restriction
+         BOOST_CHECK(predicate(transfer_to_1).rejection_path[0].get<size_t>() == 0);
+         // Index 1 (the inner-most) rejection path refers to the first and only argument:
+         // the vector of branches each of which are one level deep
+         vector<predicate_result> branch_results = predicate(
+                 transfer_to_1).rejection_path[1].get<vector<predicate_result>>();
+         unsigned long nbr_branches = branch_results.size();
+         BOOST_CHECK_EQUAL(nbr_branches, 2);
+         for (unsigned long j = 0; j < nbr_branches; ++j) {
+            predicate_result &result = branch_results.at(j);
+            BOOST_CHECK_EQUAL(result.success, false);
+
+            BOOST_CHECK_EQUAL(result.rejection_path.size(), 2);
+            // Index 0 (the outer-most) rejection path refers to the first and only restriction
+            BOOST_CHECK_EQUAL(result.rejection_path[0].get<size_t>(), 0);
+            // Index 1 (the inner-most) rejection path refers to the first and only argument for an account ID:
+            // either 1.2.12 or 1.2.15
+            BOOST_CHECK(result.rejection_path[1].get<predicate_result::rejection_reason>() ==
+                        predicate_result::predicate_was_false);
+
+         }
+
+      } FC_LOG_AND_RETHROW()
+   }
+
+
 BOOST_AUTO_TEST_CASE(custom_auths) { try {
    //////
    // Initialize the test
@@ -571,9 +678,14 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 } FC_LOG_AND_RETHROW() }
 
 
-   // Test of authorization and revocation of one account (Alice) authorizing multiple other accounts (Bob and Charlie)
-   // to transfer out of her account
-   BOOST_AUTO_TEST_CASE(selective_custom_auths) {
+   /**
+    * Test of authorization and revocation of one account (Alice) authorizing multiple other accounts (Bob and Charlie)
+    * to transfer out of her account by using two distinct custom active authorities.
+    *
+    * This can alternatively be achieved by using a single custom active authority with two logical OR branches
+    * as is done in logical_or_transfer_predicate_tests
+    */
+   BOOST_AUTO_TEST_CASE(multiple_transfer_custom_auths) {
       try {
          //////
          // Initialize the test
