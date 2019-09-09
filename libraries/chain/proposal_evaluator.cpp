@@ -200,13 +200,13 @@ object_id_type proposal_create_evaluator::do_apply(const proposal_create_operati
                     "Cannot update/delete a proposal with a future id!" );
       else if( vtor_1479.nested_update_count > 0 && proposal.id.instance() <= vtor_1479.max_update_instance )
       {
+         // Note: This happened on mainnet, proposal 1.10.17503
          // prevent approval
          transfer_operation top;
          top.from = GRAPHENE_NULL_ACCOUNT;
          top.to = GRAPHENE_RELAXED_COMMITTEE_ACCOUNT;
          top.amount = asset( GRAPHENE_MAX_SHARE_SUPPLY );
          proposal.proposed_transaction.operations.emplace_back( top );
-         wlog( "Issue 1479: ${p}", ("p",proposal) ); // Note: This happened on mainnet 1.10.17503
       }
    });
 
