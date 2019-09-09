@@ -1,5 +1,5 @@
 {
-  "initial_timestamp": "2019-08-31T06:00:00",
+  "initial_timestamp": "2019-08-31T03:00:00",
   "initial_max_core_supply": "5000000000000000",
   "initial_parameters": {
     "current_fees": {
@@ -188,6 +188,8 @@
     "core_inflation_amount": 23782344,
     "worker_budget_per_day": "50000000000",
     "max_predicate_opcode": 1,
+    "fee_liquidation_threshold": 10000000,
+    "accounts_per_fee_scale": 1000,
     "account_fee_scale_bitshifts": 0,
     "max_authority_depth": 2,
     "extensions": []
