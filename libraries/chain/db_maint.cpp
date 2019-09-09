@@ -1080,52 +1080,6 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
    } // for each market issued asset
 }
 
-/******
- * @brief one-time data process for hard fork core-935
- *
- * Prior to hardfork 935, `check_call_orders` may be unintendedly skipped when
- * median price feed has changed. This method will run at the hardfork time, and
- * call `check_call_orders` for all markets.
- * https://github.com/bitshares/bitshares-core/issues/935
- *
- * @param db the database
- */
-// TODO: for better performance, this function can be removed if it actually updated nothing at hf time.
-//       * Also need to update related test cases
-//       * NOTE: perhaps the removal can't be applied to testnet
-void process_hf_935( database& db )
-{
-   bool changed_something = false;
-   const asset_bitasset_data_object* bitasset = nullptr;
-   bool settled_before_check_call;
-   bool settled_after_check_call;
-   // for each market issued asset
-   const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
-   for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
-   {
-      const auto& current_asset = *asset_itr;
-
-      if( !changed_something )
-      {
-         bitasset = &current_asset.bitasset_data( db );
-         settled_before_check_call = bitasset->has_settlement(); // whether already force settled
-      }
-
-      bool called_some = db.check_call_orders( current_asset );
-
-      if( !changed_something )
-      {
-         settled_after_check_call = bitasset->has_settlement(); // whether already force settled
-
-         if( settled_before_check_call != settled_after_check_call || called_some )
-         {
-            changed_something = true;
-            wlog( "process_hf_935 changed something" );
-         }
-      }
-   }
-}
-
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
 {
    const auto& gpo = get_global_properties();
@@ -1270,11 +1224,6 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    // Process inconsistent price feeds
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_868_890_TIME) && (next_maintenance_time > HARDFORK_CORE_868_890_TIME) )
       process_hf_868_890( *this, to_update_and_match_call_orders_for_hf_343 );
-
-   // Explicitly call check_call_orders of all markets
-   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_935_TIME) && (next_maintenance_time > HARDFORK_CORE_935_TIME)
-         && !to_update_and_match_call_orders_for_hf_343 )
-      process_hf_935( *this );
 
    // To reset call_price of all call orders, then match by new rule, for hard fork core-1270
    bool to_update_and_match_call_orders_for_hf_1270 = false;

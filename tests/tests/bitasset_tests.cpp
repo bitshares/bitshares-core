@@ -933,14 +933,9 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
       int blocks = 0;
       auto mi = db.get_global_properties().parameters.maintenance_interval;
 
-      if( i == 2 ) // go beyond hard fork 890
+      if( i == 2) // go beyond hard fork 890 (which is the same as 935 BTW)
       {
          generate_blocks( HARDFORK_CORE_868_890_TIME - mi, true, skip );
-         generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
-      }
-      else if( i == 4 ) // go beyond hard fork 935
-      {
-         generate_blocks( HARDFORK_CORE_935_TIME - mi, true, skip );
          generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
       }
       else if( i == 6 ) // go beyond hard fork 1270
