@@ -375,9 +375,6 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               accounts.insert( htlc_obj->transfer.to );
               break;
         }
-        /*
-            add voting and voteable here?
-        */
       }
    }
    else if( obj->id.space() == implementation_ids )
