@@ -30,12 +30,15 @@
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
-#include <graphene/chain/voting_statistics_object.hpp>
-#include <graphene/chain/voteable_statistics_object.hpp>
+#include <graphene/voting_stat/voting_statistics_object.hpp>
+#include <graphene/voting_stat/voteable_statistics_object.hpp>
 
 #include <graphene/utilities/elasticsearch.hpp>
 
 namespace graphene { namespace es_objects {
+
+using voting_stat::voting_statistics_object;
+using voting_stat::voteable_statistics_object;
 
 namespace detail
 {
