@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Blockchain Projects B.V.
+ * Copyright (c) 2019 Blockchain Projects BV.
  *
  * The MIT License
  *
@@ -22,20 +22,35 @@
  * THE SOFTWARE.
  */
 #pragma once
-
 #include <boost/range/numeric.hpp>
 #include <boost/range/adaptor/map.hpp>
+#include <boost/container/flat_map.hpp>
+#include <boost/container/flat_set.hpp>
+#include <boost/multi_index/composite_key.hpp>
 
 #include <fc/optional.hpp>
+
+#include <graphene/voting_stat/voting_stat_plugin.hpp>
 
 #include <graphene/protocol/types.hpp>
 #include <graphene/protocol/vote.hpp>
 
 #include <graphene/db/generic_index.hpp>
-#include <boost/multi_index/composite_key.hpp>
 
-namespace graphene { namespace chain {
+using graphene::chain::object_id_type;
+using graphene::chain::account_id_type;
+using graphene::chain::vote_id_type;
 
+using graphene::db::object;
+using graphene::db::abstract_object;
+using graphene::db::generic_index;
+using graphene::db::by_id;
+
+using namespace boost::multi_index;
+using boost::container::flat_map;
+using boost::container::flat_set;
+
+namespace graphene { namespace voting_stat {
    /**
     * @brief tracks the history of the voting stake for an account
     * @ingroup object
@@ -50,8 +65,8 @@ namespace graphene { namespace chain {
    class voting_statistics_object : public abstract_object<voting_statistics_object>
    {
    public:
-      static const uint8_t space_id = protocol_ids;
-      static const uint8_t type_id  = voting_statistics_object_type;
+      static const uint8_t space_id = VOTING_STAT_SPACE_ID;
+      static const uint8_t type_id  = voting_stat_object_type_ids::voting_statistics_object_type_id;
 
       voting_statistics_object(){}
 
@@ -65,6 +80,8 @@ namespace graphene { namespace chain {
       account_id_type proxy = GRAPHENE_PROXY_TO_SELF_ACCOUNT;
       /* the accounts which this account was a proxy for with the proxied stakes */
       flat_map< account_id_type, uint64_t > proxy_for;
+
+
       /* the vote_id's this account was voting for */
       flat_set<vote_id_type> votes;
 
@@ -75,7 +92,7 @@ namespace graphene { namespace chain {
          return boost::accumulate( proxy_for | boost::adaptors::map_values, init );
       }
 
-      inline bool has_proxy() const
+      bool has_proxy() const
       {
          return GRAPHENE_PROXY_TO_SELF_ACCOUNT != proxy;
       }
@@ -101,5 +118,5 @@ namespace graphene { namespace chain {
 
 }} // graphene::chain
 
-FC_REFLECT_DERIVED( graphene::chain::voting_statistics_object, (graphene::chain::object),
+FC_REFLECT_DERIVED( graphene::voting_stat::voting_statistics_object, (graphene::chain::object),
                     (block_number)(account)(stake)(proxy)(proxy_for)(votes) )
