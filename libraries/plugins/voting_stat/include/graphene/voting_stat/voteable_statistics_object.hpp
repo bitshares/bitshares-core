@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Blockchain Projects B.V.
+ * Copyright (c) 2019 Blockchain Projects BV.
  *
  * The MIT License
  *
@@ -22,22 +22,26 @@
  * THE SOFTWARE.
  */
 #pragma once
-
 #include <boost/range/numeric.hpp>
 #include <boost/range/adaptor/map.hpp>
 
 #include <fc/optional.hpp>
+
+#include <graphene/voting_stat/voting_stat_plugin.hpp>
 
 #include <graphene/protocol/types.hpp>
 #include <graphene/protocol/vote.hpp>
 
 #include <graphene/db/generic_index.hpp>
 
+using graphene::chain::account_id_type;
+using graphene::chain::vote_id_type;
+using graphene::db::generic_index;
 
-namespace graphene { namespace chain {
+namespace graphene { namespace voting_stat {
 
    /**
-    * @brief tracks the history of the voting stake for an account
+    * @brief tracks the history voting related data per account
     * @ingroup object
     * @ingroup implementation
     *
@@ -47,11 +51,11 @@ namespace graphene { namespace chain {
     * @note By default these objects are not tracked, the voting_stat_plugin must
     * be loaded for these objects to be maintained.
     */
-   class voteable_statistics_object : public abstract_object<voteable_statistics_object>
+   class voteable_statistics_object : public db::abstract_object<voteable_statistics_object>
    {
    public:
-      static const uint8_t space_id = protocol_ids;
-      static const uint8_t type_id  = voteable_statistics_object_type;
+      static const uint8_t space_id = VOTING_STAT_SPACE_ID;
+      static const uint8_t type_id  = voting_stat_object_type_ids::voteable_statistics_object_type_id;
 
       voteable_statistics_object(){}
 
@@ -70,7 +74,7 @@ namespace graphene { namespace chain {
    };
 
 
-   //struct by_block_number{}; // declared in voting_statistics_object just let it like this?
+   //struct by_block_number{}; // declared in voting_statistics_object
    typedef multi_index_container< voteable_statistics_object,
       indexed_by<
          ordered_unique< tag<by_id>,
@@ -85,11 +89,11 @@ namespace graphene { namespace chain {
       >
    > voteable_statistics_multi_index_type;
 
-   typedef generic_index< voteable_statistics_object,
+   typedef db::generic_index< voteable_statistics_object,
       voteable_statistics_multi_index_type
    > voteable_statistics_index;
 
 }} // graphene::chain
 
-FC_REFLECT_DERIVED( graphene::chain::voteable_statistics_object, (graphene::chain::object),
+FC_REFLECT_DERIVED( graphene::voting_stat::voteable_statistics_object, (graphene::chain::object),
                     (block_number)(vote_id)(voted_by) )
