@@ -1022,8 +1022,6 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
 
       // for each feed
       const asset_bitasset_data_object& bitasset_data = current_asset.bitasset_data(db);
-      // NOTE: We'll only need old_feed if HF343 hasn't rolled out yet
-      auto old_feed = bitasset_data.current_feed;
       auto itr = bitasset_data.feeds.begin();
       while( itr != bitasset_data.feeds.end() )
       {

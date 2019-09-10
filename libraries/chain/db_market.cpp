@@ -77,10 +77,7 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    while( call_itr != call_end )
    {
       if( before_core_hardfork_342 )
-      {
-         //Note: If here, the call order may be paying nothing (Yes, this happened)
          pays = call_itr->get_debt() * settlement_price; // round down, in favor of call order
-      }
       else
          pays = call_itr->get_debt().multiply_and_round_up( settlement_price ); // round up, in favor of global settlement fund
 
