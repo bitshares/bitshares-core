@@ -914,7 +914,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
 /*********
  * @brief Call check_call_orders after current_feed changed but not only settlement_price changed.
  */
-BOOST_AUTO_TEST_CASE( hf_935_test )
+BOOST_AUTO_TEST_CASE( hf_1270_test )
 { try {
    uint32_t skip = database::skip_witness_signature
                  | database::skip_transaction_signatures
