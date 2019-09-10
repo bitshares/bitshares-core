@@ -761,7 +761,6 @@ asset database::match( const call_order_object& call,
    if( before_core_hardfork_342 )
    {
       auto call_collateral = call.get_collateral();
-      // NOTE: incorrectly captured a black swan event. Unfortunately, this happened.
       GRAPHENE_ASSERT( call_pays < call_collateral, black_swan_exception, "" );
 
       assert( settle_pays == settle_for_sale || call_receives == call.get_debt() );
@@ -1089,7 +1088,6 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
           if( before_core_hardfork_342 )
           {
-             // NOTE: To be here, limit order could paying something for nothing (Yes, this happened)
              order_receives = usd_to_buy * match_price; // round down, in favor of call order
           }
           else

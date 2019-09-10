@@ -560,12 +560,7 @@ static bool update_bitasset_object_options(
       bdo.update_median_feeds( db.head_block_time(), next_maint_time );
 
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
-      if( after_hf_core_868_890 )
-      {
-         if( old_feed.settlement_price != bdo.current_feed.settlement_price ||
-               !( old_feed == bdo.current_feed ) )
-            return true;
-      }
+      return ( after_hf_core_868_890 && ! (old_feed == bdo.current_feed) );
    }
 
    return false;
