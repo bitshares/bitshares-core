@@ -27,7 +27,6 @@
 #include <graphene/chain/database.hpp>
 
 namespace graphene { namespace voting_stat {
-   using namespace chain;
 //
 // Plugins should #define their SPACE_ID's so plugins with
 // conflicting SPACE_ID assignments can be compiled into the
@@ -39,8 +38,14 @@ namespace graphene { namespace voting_stat {
 // time.
 //
 #ifndef VOTING_STAT_SPACE_ID
-#define VOTING_STAT_SPACE_ID 4
+#define VOTING_STAT_SPACE_ID 7
 #endif
+
+enum voting_stat_object_type_ids
+{
+   voting_statistics_object_type_id,
+   voteable_statistics_object_type_id
+};
 
 namespace detail
 {

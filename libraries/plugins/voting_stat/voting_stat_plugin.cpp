@@ -23,8 +23,8 @@
  */
 #include <graphene/voting_stat/voting_stat_plugin.hpp>
 
-#include <graphene/chain/voting_statistics_object.hpp>
-#include <graphene/chain/voteable_statistics_object.hpp>
+#include <graphene/voting_stat/voting_statistics_object.hpp>
+#include <graphene/voting_stat/voteable_statistics_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
@@ -37,6 +37,9 @@
 #include <memory>
 
 namespace graphene { namespace voting_stat {
+
+using namespace graphene::chain;
+using graphene::db::primary_index;
 
 namespace detail {
 
