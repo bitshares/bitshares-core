@@ -25,44 +25,22 @@
 
 namespace graphene { namespace custom_operations {
 
-void account_contact_operation::validate()const
-{
-}
-
-void create_htlc_order_operation::validate()const
-{
-   FC_ASSERT(extensions.value.bitshares_amount.valid());
-   FC_ASSERT(extensions.value.bitshares_amount->amount.value > 0);
-   FC_ASSERT(extensions.value.blockchain.valid());
-   FC_ASSERT(extensions.value.blockchain_account.valid());
-   FC_ASSERT(extensions.value.blockchain_asset.valid());
-   FC_ASSERT(extensions.value.blockchain_amount.valid());
-   FC_ASSERT(extensions.value.expiration.valid());
-}
-
-void take_htlc_order_operation::validate()const
-{
-   FC_ASSERT(extensions.value.blockchain_account.valid());
-   FC_ASSERT(extensions.value.htlc_order_id.valid());
-}
-
 void account_storage_map::validate()const
 {
    FC_ASSERT(extensions.value.catalog.valid());
    FC_ASSERT(extensions.value.key_values.valid());
    FC_ASSERT(extensions.value.key_values->size() <= 10);
+   FC_ASSERT(extensions.value.catalog->length() <= CUSTOM_OPERATIONS_MAX_KEY_SIZE);
 }
 void account_storage_list::validate()const
 {
    FC_ASSERT(extensions.value.catalog.valid());
    FC_ASSERT(extensions.value.values.valid());
    FC_ASSERT(extensions.value.values->size() <= 10);
+   FC_ASSERT(extensions.value.catalog->length() <= CUSTOM_OPERATIONS_MAX_KEY_SIZE);
 }
 
 } } //graphene::custom_operations
 
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::custom_operations::account_contact_operation )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::custom_operations::create_htlc_order_operation )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::custom_operations::take_htlc_order_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::custom_operations::account_storage_map )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::custom_operations::account_storage_list )

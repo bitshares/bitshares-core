@@ -34,55 +34,11 @@ using namespace chain;
 #define CUSTOM_OPERATIONS_SPACE_ID 7
 #endif
 
+#define CUSTOM_OPERATIONS_MAX_KEY_SIZE (200)
+
 enum types {
-   account_contact = 0,
-   create_htlc = 1,
-   take_htlc = 2,
-   account_map = 3,
-   account_list = 4
-};
-enum blockchains {
-   eos = 0,
-   bitcoin = 1,
-   ripple = 2,
-   ethereum = 3
-};
-
-struct account_contact_object : public abstract_object<account_contact_object>
-{
-   static const uint8_t space_id = CUSTOM_OPERATIONS_SPACE_ID;
-   static const uint8_t type_id  = account_contact;
-
-   account_id_type account;
-   optional<string> name;
-   optional<string> email;
-   optional<string> phone;
-   optional<string> address;
-   optional<string> company;
-   optional<string> url;
-};
-
-struct htlc_order_object : public abstract_object<htlc_order_object>
-{
-   static const uint8_t space_id = CUSTOM_OPERATIONS_SPACE_ID;
-   static const uint8_t type_id  = create_htlc;
-
-   account_id_type bitshares_account;
-   asset bitshares_amount;
-   blockchains blockchain;
-   string blockchain_account;
-   string blockchain_asset;
-   string blockchain_amount;
-   fc::time_point_sec expiration;
-   fc::time_point_sec order_time;
-   bool active;
-
-   optional<uint32_t> blockchain_asset_precision;
-   optional<string> token_contract;
-   optional<string> tag;
-   optional<account_id_type> taker_bitshares_account;
-   optional<string> taker_blockchain_account;
-   optional<fc::time_point_sec> close_time;
+   account_map = 0,
+   account_list = 1
 };
 
 struct account_storage_object : public abstract_object<account_storage_object>
@@ -93,50 +49,15 @@ struct account_storage_object : public abstract_object<account_storage_object>
    account_id_type account;
    string catalog;
    optional<string> key;
-   string value;
+   optional<string> subkey;
+   optional<variant> value;
 };
 
 struct by_custom_id;
 struct by_custom_account;
-typedef multi_index_container<
-      account_contact_object,
-      indexed_by<
-            ordered_non_unique< tag<by_custom_id>, member< object, object_id_type, &object::id > >,
-            ordered_unique< tag<by_custom_account>,
-                  member< account_contact_object, account_id_type, &account_contact_object::account > >
-      >
-> account_contact_multi_index_type;
-
-typedef generic_index<account_contact_object, account_contact_multi_index_type> account_contact_index;
-
-struct by_bitshares_account;
-struct by_active;
-typedef multi_index_container<
-      htlc_order_object,
-      indexed_by<
-            ordered_non_unique< tag<by_custom_id>, member< object, object_id_type, &object::id > >,
-            ordered_unique< tag<by_bitshares_account>,
-                  composite_key< htlc_order_object,
-                        member< htlc_order_object, account_id_type, &htlc_order_object::bitshares_account >,
-                        member< object, object_id_type, &object::id >
-                  >
-            >,
-            ordered_unique< tag<by_active>,
-                  composite_key< htlc_order_object,
-                        member< htlc_order_object, bool, &htlc_order_object::active >,
-                        member< htlc_order_object, fc::time_point_sec, &htlc_order_object::expiration >,
-                        member< object, object_id_type, &object::id >
-                  >
-            >
-      >
-> htlc_orderbook_multi_index_type;
-
-typedef generic_index<htlc_order_object, htlc_orderbook_multi_index_type> htlc_orderbook_index;
-
 struct by_account_catalog;
 struct by_account_catalog_key;
-struct by_account_catalog_value;
-struct by_account_catalog_key_value;
+struct by_account_catalog_subkey;
 
 typedef multi_index_container<
       account_storage_object,
@@ -157,19 +78,11 @@ typedef multi_index_container<
                         member< account_storage_object, optional<string>, &account_storage_object::key >
                   >
             >,
-            ordered_unique< tag<by_account_catalog_value>,
+            ordered_non_unique< tag<by_account_catalog_subkey>,
                   composite_key< account_storage_object,
                         member< account_storage_object, account_id_type, &account_storage_object::account >,
                         member< account_storage_object, string, &account_storage_object::catalog >,
-                        member< account_storage_object, string, &account_storage_object::value >
-                  >
-            >,
-            ordered_unique< tag<by_account_catalog_key_value>,
-                  composite_key< account_storage_object,
-                        member< account_storage_object, account_id_type, &account_storage_object::account >,
-                        member< account_storage_object, string, &account_storage_object::catalog >,
-                        member< account_storage_object, optional<string>, &account_storage_object::key >,
-                        member< account_storage_object, string, &account_storage_object::value >
+                        member< account_storage_object, optional<string>, &account_storage_object::subkey >
                   >
             >
       >
@@ -177,21 +90,10 @@ typedef multi_index_container<
 
 typedef generic_index<account_storage_object, account_storage_multi_index_type> account_storage_index;
 
-using account_contact_id_type = object_id<CUSTOM_OPERATIONS_SPACE_ID, account_contact>;
-using htlc_order_id_type = object_id<CUSTOM_OPERATIONS_SPACE_ID, create_htlc>;
 using account_storage_id_type = object_id<CUSTOM_OPERATIONS_SPACE_ID, account_map>;
 
 } } //graphene::custom_operations
 
-FC_REFLECT_DERIVED( graphene::custom_operations::account_contact_object, (graphene::db::object),
-                    (account)(name)(email)(phone)(address)(company)(url))
-FC_REFLECT_DERIVED( graphene::custom_operations::htlc_order_object, (graphene::db::object),
-                    (bitshares_account)(bitshares_amount)(blockchain)(blockchain_account)(blockchain_asset)
-                    (blockchain_amount)(expiration)(order_time)(active)
-                    (blockchain_asset_precision)(token_contract)(tag)(taker_bitshares_account)
-                    (taker_blockchain_account)(close_time))
 FC_REFLECT_DERIVED( graphene::custom_operations::account_storage_object, (graphene::db::object),
-                    (account)(catalog)(key)(value))
-FC_REFLECT_ENUM( graphene::custom_operations::types, (account_contact)(create_htlc)(take_htlc)(account_map)
-                (account_list))
-FC_REFLECT_ENUM( graphene::custom_operations::blockchains, (eos)(bitcoin)(ripple)(ethereum) )
+                    (account)(catalog)(key)(subkey)(value))
+FC_REFLECT_ENUM( graphene::custom_operations::types, (account_map)(account_list))

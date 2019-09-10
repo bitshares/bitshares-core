@@ -1212,104 +1212,6 @@ BOOST_FIXTURE_TEST_CASE( cli_sign_message, cli_fixture )
 } FC_LOG_AND_RETHROW() }
 
 ///////////////////
-// Test the contact information by custom operations plugin
-///////////////////
-BOOST_FIXTURE_TEST_CASE( account_contact_information, cli_fixture )
-{
-   try {
-      // just to fund nathan
-      INVOKE(upgrade_nathan_account);
-
-      BOOST_TEST_MESSAGE("Check account information.");
-      auto account_contact_info = con.wallet_api_ptr->get_contact_information("nathan");
-      BOOST_CHECK(!account_contact_info.valid()); // no info yet
-
-      BOOST_TEST_MESSAGE("About to add contact information.");
-
-      account_contact_operation::ext data;
-      data.name = "Nathan";
-      data.email = "nathan@nathan.com";
-      data.phone = "2121212121";
-      data.address = "Bv DD 22";
-      data.company = "";
-      data.url = "";
-
-      signed_transaction custom_tx = con.wallet_api_ptr->set_contact_information("nathan", data, true);
-
-      BOOST_TEST_MESSAGE("The system is generating a block.");
-      BOOST_CHECK(generate_block(app1));
-
-      BOOST_TEST_MESSAGE("Check account contact information.");
-      account_contact_info = con.wallet_api_ptr->get_contact_information("nathan");
-
-      BOOST_CHECK_EQUAL(account_contact_info->account.instance.value, 17 );
-      BOOST_CHECK_EQUAL(*account_contact_info->name, "Nathan");
-      BOOST_CHECK_EQUAL(*account_contact_info->email, "nathan@nathan.com");
-      BOOST_CHECK_EQUAL(*account_contact_info->phone, "2121212121");
-      BOOST_CHECK_EQUAL(*account_contact_info->address, "Bv DD 22");
-      BOOST_CHECK_EQUAL(*account_contact_info->company, "");
-      BOOST_CHECK_EQUAL(*account_contact_info->url, "");
-
-   } catch( fc::exception& e ) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
-///////////////////
-// Test the htlc offer orderbook by custom operations plugin
-///////////////////
-BOOST_FIXTURE_TEST_CASE( htlc_orderbook, cli_fixture )
-{
-   try {
-      // create the taker account
-      INVOKE(create_new_account);
-
-      auto db = app1->chain_database();
-
-      BOOST_TEST_MESSAGE("Adding an offer.");
-
-      create_htlc_order_operation::ext data_maker;
-      data_maker.blockchain = blockchains::bitcoin;
-      data_maker.blockchain_account = "nathan";
-      data_maker.bitshares_amount = asset(100);
-      data_maker.blockchain_asset = "BTC";
-      data_maker.blockchain_amount = "2000";
-      data_maker.expiration = db->head_block_time() + 7200;
-      data_maker.tag = "Some text, can be a memo";
-
-      signed_transaction custom_tx = con.wallet_api_ptr->create_htlc_offer("nathan", data_maker, true);
-
-      BOOST_TEST_MESSAGE("The system is generating a block.");
-      BOOST_CHECK(generate_block(app1));
-
-      BOOST_TEST_MESSAGE("Get active htlc offers.");
-      auto offers = con.wallet_api_ptr->get_active_htlc_offers(blockchains::bitcoin);
-      if(offers[0].blockchain == blockchains::bitcoin) {
-         BOOST_CHECK_EQUAL(offers[0].id.instance(), 0);
-      }
-
-      BOOST_TEST_MESSAGE("Taking the offfer.");
-      take_htlc_order_operation::ext data_taker;
-      data_taker.htlc_order_id = offers[0].id;
-      data_taker.blockchain_account = "nathan";
-
-      custom_tx = con.wallet_api_ptr->take_htlc_offer("jmjatlanta", data_taker, true);
-
-      BOOST_TEST_MESSAGE("The system is generating a block.");
-      BOOST_CHECK(generate_block(app1));
-
-      BOOST_TEST_MESSAGE("Get active htlc offers.");
-      offers = con.wallet_api_ptr->get_active_htlc_offers(blockchains::bitcoin);
-      BOOST_CHECK_EQUAL(offers.size(), 0);
-
-   } catch( fc::exception& e ) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
-///////////////////
 // Test the general storage by custom operations plugin
 ///////////////////
 BOOST_FIXTURE_TEST_CASE( general_storage, cli_fixture )
@@ -1323,8 +1225,8 @@ BOOST_FIXTURE_TEST_CASE( general_storage, cli_fixture )
       BOOST_TEST_MESSAGE("Storing in a map.");
 
       flat_map<string, string> pairs;
-      pairs["key1"] = "value1";
-      pairs["key2"] = "value2";
+      pairs["key1"] = fc::json::to_string("value1");
+      pairs["key2"] = fc::json::to_string("value2");
 
       account_storage_map::ext map;
 
@@ -1343,12 +1245,12 @@ BOOST_FIXTURE_TEST_CASE( general_storage, cli_fixture )
       BOOST_CHECK_EQUAL(nathan_map[0].account.instance.value, 17);
       BOOST_CHECK_EQUAL(nathan_map[0].catalog, "any");
       BOOST_CHECK_EQUAL(*nathan_map[0].key, "key1");
-      BOOST_CHECK_EQUAL(nathan_map[0].value, "value1");
+      BOOST_CHECK_EQUAL(nathan_map[0].value->as_string(), "value1");
       BOOST_CHECK_EQUAL(nathan_map[1].id.instance(), 1);
       BOOST_CHECK_EQUAL(nathan_map[1].account.instance.value, 17);
       BOOST_CHECK_EQUAL(nathan_map[1].catalog, "any");
       BOOST_CHECK_EQUAL(*nathan_map[1].key, "key2");
-      BOOST_CHECK_EQUAL(nathan_map[1].value, "value2");
+      BOOST_CHECK_EQUAL(nathan_map[1].value->as_string(), "value2");
 
       BOOST_TEST_MESSAGE("Storing in a list.");
 
@@ -1373,15 +1275,15 @@ BOOST_FIXTURE_TEST_CASE( general_storage, cli_fixture )
       BOOST_CHECK_EQUAL(nathan_list[0].id.instance(), 2);
       BOOST_CHECK_EQUAL(nathan_list[0].account.instance.value, 17);
       BOOST_CHECK_EQUAL(nathan_list[0].catalog, "favourites");
-      BOOST_CHECK_EQUAL(nathan_list[0].value, "banana");
+      BOOST_CHECK_EQUAL(*nathan_list[0].subkey, "banana");
       BOOST_CHECK_EQUAL(nathan_list[1].id.instance(), 3);
       BOOST_CHECK_EQUAL(nathan_list[1].account.instance.value, 17);
       BOOST_CHECK_EQUAL(nathan_list[1].catalog, "favourites");
-      BOOST_CHECK_EQUAL(nathan_list[1].value, "chocolate");
+      BOOST_CHECK_EQUAL(*nathan_list[1].subkey, "chocolate");
       BOOST_CHECK_EQUAL(nathan_list[2].id.instance(), 4);
       BOOST_CHECK_EQUAL(nathan_list[2].account.instance.value, 17);
       BOOST_CHECK_EQUAL(nathan_list[2].catalog, "favourites");
-      BOOST_CHECK_EQUAL(nathan_list[2].value, "milk");
+      BOOST_CHECK_EQUAL(*nathan_list[2].subkey, "milk");
 
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));

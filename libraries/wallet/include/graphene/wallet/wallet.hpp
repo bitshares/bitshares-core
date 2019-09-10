@@ -2016,76 +2016,6 @@ class wallet_api
       void encrypt_keys();
 
       /**
-       * Add account contact data by using the custom operations plugin.
-       *
-       * Each account can optionally add personal information into the blockchain
-       * to be retrieved by any interested party.
-       *
-       * @param account The account ID or name that we are adding additional information to.
-       * @param data Contact data to be added. \c account_contact_operation::ext
-       * @param broadcast true if you wish to broadcast the transaction
-       *
-       * @return The signed transaction
-       */
-      signed_transaction set_contact_information(string account, account_contact_operation::ext data, bool broadcast);
-
-      /**
-       * Get contact data of an account by using the custom operations plugin.
-       *
-       * If the account added contact data with @ref set_contact_information an \c account_contact_object will be
-       * returned.
-       *
-       * @param account Account ID or name to get contact data from.
-       *
-       * @return An \c account_contact_object or empty if account had not provided contact info yet.
-       */
-      optional<account_contact_object> get_contact_information(string account);
-
-      /**
-       * Create an HTLC offer using the custom operations plugin.
-       *
-       * The \c custom_operations_plugin maintain a list of HTLC offers to facilitate the exchange
-       * of tokens between bitshares and another blockchain.
-       * Applications and individuals can create HTLC offers by the use of this command.
-       *
-       * @param account The account in the bitshares side.
-       * @param data Data to create an HTLC offer. \c create_htlc_order_operation::ext
-       * @param broadcast true if you wish to broadcast the transaction
-       *
-       * @return The signed transaction
-       */
-      signed_transaction create_htlc_offer(string account, create_htlc_order_operation::ext data, bool broadcast);
-
-      /**
-       * Take an HTLC offer using the custom operation plugin.
-       *
-       * The \c custom_operations_plugin maintain a list of HTLC offers to facilitate the exchange
-       * of tokens between bitshares and another blockchain.
-       * Applications and individuals can take existing HTLC offers by the use of this command.
-       * Object state will change from active to inactive after the order is taken and will not be displayed by
-       * @ref get_active_htlc_offers call anymore.
-       *
-       * @param account The account of the taker in the bitshares side.
-       * @param data Data to take an already created and active HTLC offer. \c take_htlc_order_operation::ext data
-       * @param broadcast true if you wish to broadcast the transaction
-       *
-       * @return The signed transaction
-       */
-
-      signed_transaction take_htlc_offer(string account, take_htlc_order_operation::ext data, bool broadcast);
-
-      /**
-       * Get active HTLC offers by using the custom operation plugin.
-       *
-       * Get the list of offers available at this time to initialize HTLC exchange with another blockchain.
-       *
-       * @param blockchain eos = 0 , bitcoin = 1, ripple = 2, ethereum = 3
-       *
-       * @return A list of \c htlc_order_object that are active and non expired in the selected blockchain.
-       */
-      vector<htlc_order_object> get_active_htlc_offers(uint16_t blockchain);
-
-      /**
        * Manage account storage map(key->value) by using the custom operations plugin.
        *
        * Each account can optionally add random information in the form of a key-value map
@@ -2333,7 +2263,8 @@ FC_API( graphene::wallet::wallet_api,
         (blind_history)
         (receive_blind_transfer)
         (get_order_book)
-        (set_contact_information)
-        (get_contact_information)
+        (account_store_map)
+        (account_store_list)
+        (get_account_storage)
         (quit)
       )

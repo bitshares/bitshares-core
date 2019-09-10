@@ -332,9 +332,8 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       ahiplugin->plugin_startup();
    }
 
-   if(current_test_name == "custom_operations_account_contact_test" ||
-      current_test_name == "custom_operations_htlc_bitshares_eos_test" ||
-      current_test_name == "custom_operations_account_storage_test") {
+   if(current_test_name == "custom_operations_account_storage_map_test" ||
+      current_test_name == "custom_operations_account_storage_list_test") {
       auto custom_operations_plugin = app.register_plugin<graphene::custom_operations::custom_operations_plugin>();
       custom_operations_plugin->plugin_set_app(&app);
       custom_operations_plugin->plugin_initialize(options);

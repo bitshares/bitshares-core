@@ -113,8 +113,6 @@ void custom_operations_plugin::plugin_set_program_options(
 
 void custom_operations_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
-   database().add_index< primary_index< account_contact_index  > >();
-   database().add_index< primary_index< htlc_orderbook_index  > >();
    database().add_index< primary_index< account_storage_index  > >();
 
    database().applied_block.connect( [this]( const signed_block& b) {

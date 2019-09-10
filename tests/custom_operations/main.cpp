@@ -40,432 +40,61 @@ using namespace graphene::custom_operations;
 
 BOOST_FIXTURE_TEST_SUITE( custom_operation_tests, database_fixture )
 
-BOOST_AUTO_TEST_CASE(custom_operations_account_contact_test)
+void map_operation(flat_map<string, string>& pairs, bool remove, string& catalog, account_id_type& account,
+      private_key& pk, database& db)
 {
-try {
-   ACTORS((nathan)(alice));
-
-   app.enable_plugin("custom_operations");
-   custom_operations_api custom_operations_api(app);
-
-   generate_block();
-   fc::usleep(fc::milliseconds(200));
-
-   enable_fees();
    signed_transaction trx;
    set_expiration(db, trx);
 
-   int64_t init_balance(10000 * GRAPHENE_BLOCKCHAIN_PRECISION);
+   custom_operation op;
+   account_storage_map store;
+   account_storage_map::ext data;
 
-   transfer(committee_account, nathan_id, asset(init_balance));
-   transfer(committee_account, alice_id, asset(init_balance));
+   store.extensions.value.key_values = pairs;
+   store.extensions.value.remove = remove;
+   store.extensions.value.catalog = catalog;
 
-   // nathan adds account data via custom operation
-   {
-      custom_operation op;
-      account_contact_operation contact;
-      account_contact_operation::ext data;
+   auto packed = fc::raw::pack(store);
+   packed.insert(packed.begin(), types::account_map);
+   packed.insert(packed.begin(), 0xFF);
 
-      data.name = "Nathan";
-      data.email = "nathan@nathan.com";
-      data.phone = "+1 434343434343";
-      data.address = "";
-      data.company = "Bitshares";
-      data.url = "http://nathan.com/";
-
-      contact.extensions.value = data;
-
-      auto packed = fc::raw::pack(contact);
-      packed.insert(packed.begin(), types::account_contact);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = nathan_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, nathan_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
-   // alice adds account data via custom operation
-   {
-      custom_operation op;
-      account_contact_operation contact;
-
-      account_contact_operation::ext data;
-      data.name = "Alice";
-      data.email = "alice@alice.com";
-      data.phone = "";
-      data.address = "Some Street 456, Somewhere";
-      data.company = "";
-      data.url = "http://alice.com/";
-
-      contact.extensions.value = data;
-
-      auto packed = fc::raw::pack(contact);
-      packed.insert(packed.begin(), types::account_contact);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = alice_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, alice_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
-   generate_block();
-   fc::usleep(fc::milliseconds(200));
-
-   // check nathan account data with the api
-   account_contact_object contact_results_nathan = *custom_operations_api.get_contact_info("nathan");
-   BOOST_CHECK_EQUAL(contact_results_nathan.account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*contact_results_nathan.name, "Nathan");
-   BOOST_CHECK_EQUAL(*contact_results_nathan.email, "nathan@nathan.com");
-   BOOST_CHECK_EQUAL(*contact_results_nathan.phone, "+1 434343434343");
-   BOOST_CHECK_EQUAL(*contact_results_nathan.address, "");
-   BOOST_CHECK_EQUAL(*contact_results_nathan.company, "Bitshares");
-   BOOST_CHECK_EQUAL(*contact_results_nathan.url, "http://nathan.com/");
-
-   // check alice account data with the api
-   account_contact_object contact_results_alice = *custom_operations_api.get_contact_info("alice");
-   BOOST_CHECK_EQUAL(contact_results_alice.account.instance.value, 17 );
-   BOOST_CHECK_EQUAL(*contact_results_alice.name, "Alice");
-   BOOST_CHECK_EQUAL(*contact_results_alice.email, "alice@alice.com");
-   BOOST_CHECK_EQUAL(*contact_results_alice.phone, "");
-   BOOST_CHECK_EQUAL(*contact_results_alice.address, "Some Street 456, Somewhere");
-   BOOST_CHECK_EQUAL(*contact_results_alice.company, "");
-   BOOST_CHECK_EQUAL(*contact_results_alice.url, "http://alice.com/");
-
-   // alice update her data
-   {
-      custom_operation op;
-      account_contact_operation contact;
-
-      account_contact_operation::ext data;
-      data.name = "Alice Smith";
-      data.email = "alicesmith@alice.com";
-      data.phone = "+1 1111 11 1111";
-      data.address = "Some Street 456, Somewhere";
-      data.company = "";
-      data.url = "http://alice.com/";
-
-      contact.extensions.value = data;
-
-      auto packed = fc::raw::pack(contact);
-      packed.insert(packed.begin(), types::account_contact);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = alice_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, alice_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
-   generate_block();
-   fc::usleep(fc::milliseconds(200));
-
-   // check alice account updates with the api
-   contact_results_alice = *custom_operations_api.get_contact_info("alice");
-   BOOST_CHECK_EQUAL(contact_results_alice.account.instance.value, 17 );
-   BOOST_CHECK_EQUAL(*contact_results_alice.name, "Alice Smith");
-   BOOST_CHECK_EQUAL(*contact_results_alice.email, "alicesmith@alice.com");
-   BOOST_CHECK_EQUAL(*contact_results_alice.phone, "+1 1111 11 1111");
-   BOOST_CHECK_EQUAL(*contact_results_alice.address, "Some Street 456, Somewhere");
-   BOOST_CHECK_EQUAL(*contact_results_alice.company, "");
-   BOOST_CHECK_EQUAL(*contact_results_alice.url, "http://alice.com/");
-
-   // alice try to update nathan data
-   {
-      custom_operation op;
-      account_contact_operation contact;
-
-      account_contact_operation::ext data;
-      data.name = "Not my account";
-      data.phone = "Fake phone";
-      data.email = "Fake email";
-      data.address = "Fake address";
-      data.company = "Fake company";
-      data.url = "http://fake.com";
-
-      contact.extensions.value = data;
-
-      auto packed = fc::raw::pack(contact);
-      packed.insert(packed.begin(), types::account_contact);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = alice_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, alice_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-   generate_block();
-   fc::usleep(fc::milliseconds(200));
-
-   // operation will pass but data will be unchanged, exception was produced in plug in
-   contact_results_nathan = *custom_operations_api.get_contact_info("nathan");
-   BOOST_CHECK(contact_results_nathan.account.instance.value == 16 );
-   BOOST_CHECK(*contact_results_nathan.name != "Not my account");
-   BOOST_CHECK(*contact_results_nathan.phone != "Fake phone");
-   BOOST_CHECK(*contact_results_nathan.email != "Fake email");
+   op.payer = account;
+   op.data = packed;
+   op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
+   trx.operations.push_back(op);
+   trx.sign(pk, db.get_chain_id());
+   PUSH_TX(db, trx, ~0);
+   trx.clear();
 }
-catch (fc::exception &e) {
-   edump((e.to_detail_string()));
-   throw;
-} }
 
-BOOST_AUTO_TEST_CASE(custom_operations_htlc_bitshares_eos_test)
-{ try {
-
-   ACTORS((nathan)(alice)(bob)(carol));
-
-   app.enable_plugin("custom_operations");
-   custom_operations_api custom_operations_api(app);
-
-   generate_block();
-   fc::usleep(fc::milliseconds(200));
-
-   enable_fees();
+void list_operation(flat_set<string>& list, bool remove, string& catalog, account_id_type& account,
+      private_key& pk, database& db)
+{
    signed_transaction trx;
    set_expiration(db, trx);
 
-   int64_t init_balance(10000 * GRAPHENE_BLOCKCHAIN_PRECISION);
+   custom_operation op;
+   account_storage_list storage_list;
+   account_storage_list::ext data;
 
-   transfer(committee_account, nathan_id, asset(init_balance));
-   transfer(committee_account, alice_id, asset(init_balance));
-   transfer(committee_account, bob_id, asset(init_balance));
-   transfer(committee_account, carol_id, asset(init_balance));
+   storage_list.extensions.value.values = list;
+   storage_list.extensions.value.remove = remove;
+   storage_list.extensions.value.catalog = "contact_list";
 
-   enable_fees();
+   auto packed = fc::raw::pack(storage_list);
+   packed.insert(packed.begin(), types::account_list);
+   packed.insert(packed.begin(), 0xFF);
 
-   // alice creates an order
-   {
-      custom_operation op;
-      create_htlc_order_operation htlc;
-
-      create_htlc_order_operation::ext data;
-      data.blockchain = blockchains::eos;
-      data.blockchain_account = "alice";
-      data.bitshares_amount = asset(10);
-      data.blockchain_asset = "EOS";
-      data.blockchain_amount = "10";
-      data.expiration = db.head_block_time() + fc::seconds(7200);
-
-      htlc.extensions.value = data;
-
-      auto packed = fc::raw::pack(htlc);
-      packed.insert(packed.begin(), types::create_htlc);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = alice_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, alice_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
-   // bob creates an order
-   {
-      custom_operation op;
-      create_htlc_order_operation htlc;
-
-      create_htlc_order_operation::ext data;
-      data.blockchain = blockchains::eos;
-      data.blockchain_account = "bob";
-      data.bitshares_amount = asset(100);
-      data.blockchain_asset = "EOS";
-      data.blockchain_amount = "100";
-      data.expiration = db.head_block_time() + fc::seconds(7200);
-      data.tag = "Some text, can be a memo";
-
-      htlc.extensions.value = data;
-
-      auto packed = fc::raw::pack(htlc);
-      packed.insert(packed.begin(), types::create_htlc);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = bob_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, bob_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
-   // carol creates an order with missing information (blockchain_amount), will fail in the validator
-   {
-      custom_operation op;
-      create_htlc_order_operation htlc;
-
-      create_htlc_order_operation::ext data;
-      data.blockchain = blockchains::eos;
-      data.blockchain_account = "carol";
-      data.bitshares_amount = asset(10);
-      data.blockchain_asset = "EOS";
-      data.expiration = db.head_block_time() + fc::seconds(7200);
-
-      htlc.extensions.value = data;
-
-      auto packed = fc::raw::pack(htlc);
-      packed.insert(packed.begin(), types::create_htlc);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = carol_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, carol_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
-   generate_block();
-   fc::usleep(fc::milliseconds(200));
-
-   // test the get_account_htlc_offers api call for alice
-   vector<htlc_order_object> htlc_offers_results_alice = custom_operations_api.get_account_htlc_offers("alice",
-         htlc_order_id_type(0), 100);
-   BOOST_CHECK_EQUAL(htlc_offers_results_alice.size(), 1);
-   BOOST_CHECK_EQUAL(htlc_offers_results_alice[0].id.instance(), 0);
-   BOOST_CHECK_EQUAL(htlc_offers_results_alice[0].bitshares_account.instance.value, 17);
-   BOOST_CHECK_EQUAL(htlc_offers_results_alice[0].blockchain_account, "alice" );
-   BOOST_CHECK_EQUAL(htlc_offers_results_alice[0].bitshares_amount.asset_id.instance.value, 0);
-   BOOST_CHECK_EQUAL(htlc_offers_results_alice[0].bitshares_amount.amount.value, 10);
-   BOOST_CHECK_EQUAL(htlc_offers_results_alice[0].blockchain_asset, "EOS");
-   BOOST_CHECK_EQUAL(htlc_offers_results_alice[0].blockchain_amount, "10");
-   BOOST_CHECK(htlc_offers_results_alice[0].active);
-
-   // test the get_htlc_offer api call with alice order
-   auto htlc_offer = custom_operations_api.get_htlc_offer(htlc_order_id_type(0));
-   BOOST_CHECK_EQUAL(htlc_offer->id.instance(), 0);
-   BOOST_CHECK_EQUAL(htlc_offer->bitshares_account.instance.value, 17);
-   BOOST_CHECK_EQUAL(htlc_offer->blockchain_account, "alice" );
-   BOOST_CHECK_EQUAL(htlc_offer->bitshares_amount.asset_id.instance.value, 0);
-   BOOST_CHECK_EQUAL(htlc_offer->bitshares_amount.amount.value, 10);
-   BOOST_CHECK_EQUAL(htlc_offer->blockchain_asset, "EOS");
-   BOOST_CHECK_EQUAL(htlc_offer->blockchain_amount, "10");
-   BOOST_CHECK(htlc_offer->active);
-
-   // test the get_account_htlc_offers api call for bob
-   vector<htlc_order_object> htlc_offers_results_bob = custom_operations_api.get_account_htlc_offers("bob",
-         htlc_order_id_type(0), 100);
-
-   BOOST_CHECK_EQUAL(htlc_offers_results_bob.size(), 1);
-   BOOST_CHECK_EQUAL(htlc_offers_results_bob[0].id.instance(), 1);
-   BOOST_CHECK_EQUAL(htlc_offers_results_bob[0].bitshares_account.instance.value, 18);
-   BOOST_CHECK_EQUAL(htlc_offers_results_bob[0].blockchain_account, "bob" );
-   BOOST_CHECK_EQUAL(htlc_offers_results_bob[0].bitshares_amount.asset_id.instance.value, 0);
-   BOOST_CHECK_EQUAL(htlc_offers_results_bob[0].bitshares_amount.amount.value, 100);
-   BOOST_CHECK_EQUAL(htlc_offers_results_bob[0].blockchain_asset, "EOS");
-   BOOST_CHECK_EQUAL(htlc_offers_results_bob[0].blockchain_amount, "100");
-   BOOST_CHECK(htlc_offers_results_bob[0].active);
-   if(htlc_offers_results_bob[0].tag.valid())
-      BOOST_CHECK_EQUAL(*htlc_offers_results_bob[0].tag, "Some text, can be a memo");
-
-   // get all active offers
-   vector<htlc_order_object> htlc_offers_results_active = custom_operations_api.get_active_htlc_offers(
-         htlc_order_id_type(0), 100);
-
-   BOOST_CHECK_EQUAL(htlc_offers_results_active.size(), 2);
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[0].id.instance(), 0);
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[0].bitshares_account.instance.value, 17);
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[0].blockchain_account, "alice" );
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[0].bitshares_amount.asset_id.instance.value, 0);
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[0].bitshares_amount.amount.value, 10);
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[0].blockchain_asset, "EOS");
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[0].blockchain_amount, "10");
-   BOOST_CHECK(htlc_offers_results_active[0].active);
-
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[1].id.instance(), 1);
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[1].bitshares_account.instance.value, 18);
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[1].blockchain_account, "bob" );
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[1].bitshares_amount.asset_id.instance.value, 0);
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[1].bitshares_amount.amount.value, 100);
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[1].blockchain_asset, "EOS");
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[1].blockchain_amount, "100");
-   BOOST_CHECK(htlc_offers_results_active[1].active);
-   if(htlc_offers_results_active[0].tag.valid())
-      BOOST_CHECK_EQUAL(*htlc_offers_results_active[0].tag, "Some text, can be a memo");
-
-   // nathan takes alice order
-   {
-      custom_operation op;
-      take_htlc_order_operation htlc;
-
-      take_htlc_order_operation::ext data;
-      data.htlc_order_id = htlc_offers_results_alice[0].id;
-      data.blockchain_account = "nathan";
-
-      htlc.extensions.value = data;
-
-      auto packed = fc::raw::pack(htlc);
-      packed.insert(packed.begin(), types::take_htlc);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = nathan_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, nathan_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-   generate_block();
-   fc::usleep(fc::milliseconds(200));
-
-   // check the taken object
-   htlc_offer = custom_operations_api.get_htlc_offer(htlc_order_id_type(0));
-   BOOST_CHECK_EQUAL(htlc_offer->id.instance(), 0);
-   BOOST_CHECK_EQUAL(htlc_offer->bitshares_account.instance.value, 17);
-   BOOST_CHECK_EQUAL(htlc_offer->blockchain_account, "alice" );
-   BOOST_CHECK_EQUAL(htlc_offer->bitshares_amount.asset_id.instance.value, 0);
-   BOOST_CHECK_EQUAL(htlc_offer->bitshares_amount.amount.value, 10);
-   BOOST_CHECK_EQUAL(htlc_offer->blockchain_asset, "EOS");
-   BOOST_CHECK_EQUAL(htlc_offer->blockchain_amount, "10");
-   BOOST_CHECK(!htlc_offer->active);
-   BOOST_CHECK_EQUAL(htlc_offer->taker_bitshares_account->instance.value, 16);
-   BOOST_CHECK_EQUAL(*htlc_offer->taker_blockchain_account, "nathan");
-
-   // alice order was taken, bob order still up for get_active_htlc_offers
-   htlc_offers_results_active = custom_operations_api.get_active_htlc_offers(htlc_order_id_type(0), 100);
-   BOOST_CHECK_EQUAL(htlc_offers_results_active.size(), 1);
-
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[0].id.instance(), 1);
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[0].bitshares_account.instance.value, 18);
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[0].blockchain_account, "bob");
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[0].bitshares_amount.asset_id.instance.value, 0);
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[0].bitshares_amount.amount.value, 100);
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[0].blockchain_asset, "EOS");
-   BOOST_CHECK_EQUAL(htlc_offers_results_active[0].blockchain_amount, "100");
-   BOOST_CHECK(htlc_offers_results_active[0].active);
-   if(htlc_offers_results_active[0].tag.valid())
-      BOOST_CHECK_EQUAL(*htlc_offers_results_active[0].tag, "Some text, can be a memo");
-
-   // make bob order expire
-   generate_blocks(7201);
-   fc::usleep(fc::milliseconds(200));
-
-   htlc_offers_results_active = custom_operations_api.get_active_htlc_offers(htlc_order_id_type(0), 100);
-   BOOST_CHECK_EQUAL(htlc_offers_results_active.size(), 0);
+   op.payer = account;
+   op.data = packed;
+   op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
+   trx.operations.push_back(op);
+   trx.sign(pk, db.get_chain_id());
+   PUSH_TX(db, trx, ~0);
+   trx.clear();
 }
 
-catch (fc::exception &e) {
-   edump((e.to_detail_string()));
-   throw;
-} }
-
-BOOST_AUTO_TEST_CASE(custom_operations_account_storage_test)
+BOOST_AUTO_TEST_CASE(custom_operations_account_storage_map_test)
 {
 try {
    ACTORS((nathan)(alice)(robert)(patty));
@@ -474,434 +103,281 @@ try {
    custom_operations_api custom_operations_api(app);
 
    generate_block();
-   fc::usleep(fc::milliseconds(200));
-
    enable_fees();
-   signed_transaction trx;
-   set_expiration(db, trx);
 
    int64_t init_balance(10000 * GRAPHENE_BLOCKCHAIN_PRECISION);
 
    transfer(committee_account, nathan_id, asset(init_balance));
    transfer(committee_account, alice_id, asset(init_balance));
 
-   // nathan adds key-value data via custom operation to a settings catalog
-   {
-      custom_operation op;
-      account_storage_map store;
-      account_storage_map::ext data;
-
-      flat_map<string, string> pairs;
-      pairs["language"] = "en";
-      pairs["image_url"] = "http://some.image.url/img.jpg";
-
-      store.extensions.value.key_values = pairs;
-      store.extensions.value.catalog = "settings";
-
-      auto packed = fc::raw::pack(store);
-      packed.insert(packed.begin(), types::account_map);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = nathan_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, nathan_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
+   // catalog is indexed so cant be too big(greater than CUSTOM_OPERATIONS_MAX_KEY_SIZE(200) is not allowed)
+   std::string catalog(201, 'a');
+   flat_map<string, string> pairs;
+   pairs["key"] = fc::json::to_string("value");
+   map_operation(pairs, false, catalog, nathan_id, nathan_private_key, db);
    generate_block();
-   fc::usleep(fc::milliseconds(200));
+
+   auto storage_results_nathan = custom_operations_api.get_storage_info("nathan", catalog);
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 0 );
+
+   // keys are indexed so they cant be too big(greater than CUSTOM_OPERATIONS_MAX_KEY_SIZE(200) is not allowed)
+   catalog = "whatever";
+   std::string key(201, 'a');
+   pairs.clear();
+   pairs[key] = fc::json::to_string("value");
+   map_operation(pairs, false, catalog, nathan_id, nathan_private_key, db);
+   generate_block();
+
+   storage_results_nathan = custom_operations_api.get_storage_info("nathan", catalog);
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 0 );
+
+   // nathan adds key-value data via custom operation to a settings catalog
+   catalog = "settings";
+   pairs.clear();
+   pairs["language"] = fc::json::to_string("en");
+   pairs["image_url"] = fc::json::to_string("http://some.image.url/img.jpg");
+   map_operation(pairs, false, catalog, nathan_id, nathan_private_key, db);
+   generate_block();
 
    // check nathan stored data with the api
-   vector<account_storage_object> storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
+   storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, "image_url");
-   BOOST_CHECK_EQUAL(storage_results_nathan[0].value, "http://some.image.url/img.jpg");
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].value->as_string(), "http://some.image.url/img.jpg");
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, "language");
-   BOOST_CHECK_EQUAL(storage_results_nathan[1].value, "en");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].value->as_string(), "en");
 
-   // nathan add a list of accounts to storage
-   {
-      custom_operation op;
-      account_storage_list list;
-      account_storage_list::ext data;
-
-      flat_set<string> accounts;
-      accounts.insert(alice.name);
-      accounts.insert(robert.name);
-
-      list.extensions.value.values = accounts;
-      list.extensions.value.catalog = "contact_list";
-
-      auto packed = fc::raw::pack(list);
-      packed.insert(packed.begin(), types::account_list);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = nathan_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, nathan_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
+   // edit some stuff and add new stuff
+   pairs.clear();
+   pairs["image_url"] = fc::json::to_string("http://new.image.url/newimg.jpg");
+   pairs["theme"] = fc::json::to_string("dark");
+   map_operation(pairs, false, catalog, nathan_id, nathan_private_key, db);
    generate_block();
-   fc::usleep(fc::milliseconds(200));
-
-   // get the account list for nathan, check alice and robert are there
-   storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
-   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
-   BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(storage_results_nathan[0].value, alice.name);
-   BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(storage_results_nathan[1].value, robert.name);
-
-   // add a value into account list already there
-   {
-      custom_operation op;
-      account_storage_list list;
-      account_storage_list::ext data;
-
-      flat_set<string> accounts;
-      accounts.insert(alice.name);
-
-      list.extensions.value.values = accounts;
-      list.extensions.value.catalog = "contact_list";
-
-      auto packed = fc::raw::pack(list);
-      packed.insert(packed.begin(), types::account_list);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = nathan_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, nathan_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
-   generate_block();
-   fc::usleep(fc::milliseconds(200));
-
-   // nothing changes
-   storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
-   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
-   BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(storage_results_nathan[0].value, alice.name);
-   BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(storage_results_nathan[1].value, robert.name);
-
-   // delete alice from the list
-   {
-      custom_operation op;
-      account_storage_list list;
-      account_storage_list::ext data;
-
-      flat_set<string> accounts;
-      accounts.insert(alice.name);
-
-      list.extensions.value.values = accounts;
-      list.extensions.value.remove = true;
-      list.extensions.value.catalog = "contact_list";
-
-      auto packed = fc::raw::pack(list);
-      packed.insert(packed.begin(), types::account_list);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = nathan_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, nathan_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
-   generate_block();
-   fc::usleep(fc::milliseconds(200));
-
-   // alice gone
-   storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
-   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 1 );
-   BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(storage_results_nathan[0].value, robert.name);
-
-   // add and edit more stuff to the storage
-   {
-      custom_operation op;
-      account_storage_map store;
-      account_storage_map::ext data;
-
-      flat_map<string, string> pairs;
-      pairs["image_url"] = "http://new.image.url/newimg.jpg";
-      pairs["theme"] = "dark";
-
-      store.extensions.value.key_values = pairs;
-      store.extensions.value.catalog = "settings";
-
-      auto packed = fc::raw::pack(store);
-      packed.insert(packed.begin(), types::account_map);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = nathan_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, nathan_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
-   generate_block();
-   fc::usleep(fc::milliseconds(200));
 
    // check old and new stuff
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 3 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, "image_url");
-   BOOST_CHECK_EQUAL(storage_results_nathan[0].value, "http://new.image.url/newimg.jpg");
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].value->as_string(), "http://new.image.url/newimg.jpg");
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, "language");
-   BOOST_CHECK_EQUAL(storage_results_nathan[1].value, "en");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].value->as_string(), "en");
    BOOST_CHECK_EQUAL(*storage_results_nathan[2].key, "theme");
-   BOOST_CHECK_EQUAL(storage_results_nathan[2].value, "dark");
+   BOOST_CHECK_EQUAL(storage_results_nathan[2].value->as_string(), "dark");
 
    // delete stuff from the storage
-   {
-      custom_operation op;
-      account_storage_map store;
-      account_storage_map::ext data;
-
-      flat_map<string, string> pairs;
-      pairs["theme"] = "dark";
-
-      store.extensions.value.key_values = pairs;
-      store.extensions.value.remove = true;
-      store.extensions.value.catalog = "settings";
-
-      auto packed = fc::raw::pack(store);
-      packed.insert(packed.begin(), types::account_map);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = nathan_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, nathan_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
+   pairs.clear();
+   pairs["theme"] = fc::json::to_string("dark");
+   map_operation(pairs, true, catalog, nathan_id, nathan_private_key, db);
    generate_block();
-   fc::usleep(fc::milliseconds(200));
 
    // theme is removed from the storage
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, "image_url");
-   BOOST_CHECK_EQUAL(storage_results_nathan[0].value, "http://new.image.url/newimg.jpg");
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].value->as_string(), "http://new.image.url/newimg.jpg");
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, "language");
-   BOOST_CHECK_EQUAL(storage_results_nathan[1].value, "en");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].value->as_string(), "en");
 
    // delete stuff that it is not there
-   {
-      custom_operation op;
-      account_storage_map store;
-      account_storage_map::ext data;
-
-      flat_map<string, string> pairs;
-      pairs["nothere"] = "nothere";
-
-      store.extensions.value.key_values = pairs;
-      store.extensions.value.remove = true;
-      store.extensions.value.catalog = "settings";
-
-      auto packed = fc::raw::pack(store);
-      packed.insert(packed.begin(), types::account_map);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = nathan_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, nathan_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
+   pairs.clear();
+   pairs["nothere"] = fc::json::to_string("nothere");
+   map_operation(pairs, true, catalog, nathan_id, nathan_private_key, db);
    generate_block();
-   fc::usleep(fc::milliseconds(200));
 
    // nothing changes
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, "image_url");
-   BOOST_CHECK_EQUAL(storage_results_nathan[0].value, "http://new.image.url/newimg.jpg");
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].value->as_string(), "http://new.image.url/newimg.jpg");
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, "language");
-   BOOST_CHECK_EQUAL(storage_results_nathan[1].value, "en");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].value->as_string(), "en");
 
    // add more than 10 storage items in 1 operation is not allowed
-   {
-      custom_operation op;
-      account_storage_map store;
-      account_storage_map::ext data;
+   pairs.clear();
+   pairs["key1"] = fc::json::to_string("value1");
+   pairs["key2"] = fc::json::to_string("value2");
+   pairs["key3"] = fc::json::to_string("value3");
+   pairs["key4"] = fc::json::to_string("value4");
+   pairs["key5"] = fc::json::to_string("value5");
+   pairs["key6"] = fc::json::to_string("value6");
+   pairs["key7"] = fc::json::to_string("value7");
+   pairs["key8"] = fc::json::to_string("value8");
+   pairs["key9"] = fc::json::to_string("value9");
+   pairs["key10"] = fc::json::to_string("value10");
+   pairs["key11"] = fc::json::to_string("value11");
 
-      flat_map<string, string> pairs;
-      pairs["key1"] = "value1";
-      pairs["key2"] = "value2";
-      pairs["key3"] = "value3";
-      pairs["key4"] = "value4";
-      pairs["key5"] = "value5";
-      pairs["key6"] = "value6";
-      pairs["key7"] = "value7";
-      pairs["key8"] = "value8";
-      pairs["key9"] = "value9";
-      pairs["key10"] = "value10";
-      pairs["key11"] = "value11";
-
-      store.extensions.value.key_values = pairs;
-      store.extensions.value.catalog = "settings";
-
-      auto packed = fc::raw::pack(store);
-      packed.insert(packed.begin(), types::account_map);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = nathan_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, nathan_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
+   map_operation(pairs, false, catalog, nathan_id, nathan_private_key, db);
    generate_block();
-   fc::usleep(fc::milliseconds(200));
-
-   // add more than 10 accounts to the list in 1 operation is not allowed
-   {
-      custom_operation op;
-      account_storage_list list;
-      account_storage_list::ext data;
-
-      flat_set<string> accounts;
-      accounts.insert("init0");
-      accounts.insert("init1");
-      accounts.insert("init2");
-      accounts.insert("init3");
-      accounts.insert("init4");
-      accounts.insert("init5");
-      accounts.insert("init6");
-      accounts.insert("init7");
-      accounts.insert("init8");
-      accounts.insert("init9");
-      accounts.insert("init10");
-
-      list.extensions.value.values = accounts;
-      list.extensions.value.catalog = "contact_list";
-      list.extensions.value.remove = true;
-
-      auto packed = fc::raw::pack(list);
-      packed.insert(packed.begin(), types::account_list);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = nathan_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, nathan_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
-   generate_block();
-   fc::usleep(fc::milliseconds(200));
 
    // alice, duplicated keys in storage, only second value will be added
-   {
-      custom_operation op;
-      account_storage_map store;
-      account_storage_map::ext data;
-
-      flat_map<string, string> pairs;
-      pairs["key1"] = "value1";
-      pairs["key1"] = "value2";
-
-      store.extensions.value.key_values = pairs;
-      store.extensions.value.catalog = "random";
-
-      auto packed = fc::raw::pack(store);
-      packed.insert(packed.begin(), types::account_map);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = alice_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, alice_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
+   pairs.clear();
+   catalog = "random";
+   pairs["key1"] = fc::json::to_string("value1");
+   pairs["key1"] = fc::json::to_string("value2");
+   map_operation(pairs, false, catalog, alice_id, alice_private_key, db);
    generate_block();
-   fc::usleep(fc::milliseconds(200));
 
    vector<account_storage_object> storage_results_alice = custom_operations_api.get_storage_info("alice", "random");
    BOOST_CHECK_EQUAL(storage_results_alice.size(), 1 );
    BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17 );
    BOOST_CHECK_EQUAL(*storage_results_alice[0].key, "key1");
-   BOOST_CHECK_EQUAL(storage_results_alice[0].value, "value2");
+   BOOST_CHECK_EQUAL(storage_results_alice[0].value->as_string(), "value2");
 
-   // duplicated accounts in the list, only 1 will be inserted
-   {
-      custom_operation op;
-      account_storage_list list;
-      account_storage_list::ext data;
-
-      flat_set<string> accounts;
-      accounts.insert(robert.name);
-      accounts.insert(robert.name);
-
-      list.extensions.value.values = accounts;
-      list.extensions.value.catalog = "contact_list";
-
-      auto packed = fc::raw::pack(list);
-      packed.insert(packed.begin(), types::account_list);
-      packed.insert(packed.begin(), 0xFF);
-
-      op.payer = alice_id;
-      op.data = packed;
-      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-      trx.operations.push_back(op);
-      sign(trx, alice_private_key);
-      PUSH_TX(db, trx, ~0);
-      trx.clear();
-   }
-
+   // add an object
+   pairs.clear();
+   catalog = "account_object";
+   pairs["nathan"] = fc::json::to_string(nathan);
+   map_operation(pairs, false, catalog, alice_id, alice_private_key, db);
    generate_block();
-   fc::usleep(fc::milliseconds(200));
 
-   storage_results_alice = custom_operations_api.get_storage_info("alice", "contact_list");
-   BOOST_CHECK_EQUAL(storage_results_alice.size(), 1 );
-   BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17 );
-   BOOST_CHECK_EQUAL(storage_results_alice[0].value, robert.name);
+   storage_results_alice = custom_operations_api.get_storage_info("alice", "account_object");
+   BOOST_CHECK_EQUAL(storage_results_alice.size(), 1);
+   BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17);
+   BOOST_CHECK_EQUAL(*storage_results_alice[0].key, "nathan");
+   BOOST_CHECK_EQUAL(storage_results_alice[0].value->as<account_object>(20).name, "nathan");
 
+   // add 2 more objects
+   pairs.clear();
+   catalog = "account_object";
+   pairs["robert"] = fc::json::to_string(robert);
+   pairs["patty"] = fc::json::to_string(patty);
+   map_operation(pairs, false, catalog, alice_id, alice_private_key, db);
+   generate_block();
+
+   storage_results_alice = custom_operations_api.get_storage_info("alice", "account_object");
+   BOOST_CHECK_EQUAL(storage_results_alice.size(), 3);
+   BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17);
+   BOOST_CHECK_EQUAL(*storage_results_alice[0].key, "nathan");
+   BOOST_CHECK_EQUAL(storage_results_alice[0].value->as<account_object>(20).name, "nathan");
+   BOOST_CHECK_EQUAL(storage_results_alice[1].account.instance.value, 17);
+   BOOST_CHECK_EQUAL(*storage_results_alice[1].key, "patty");
+   BOOST_CHECK_EQUAL(storage_results_alice[1].value->as<account_object>(20).name, "patty");
+   BOOST_CHECK_EQUAL(*storage_results_alice[2].key, "robert");
+   BOOST_CHECK_EQUAL(storage_results_alice[2].value->as<account_object>(20).name, "robert");
 }
 catch (fc::exception &e) {
    edump((e.to_detail_string()));
    throw;
 } }
 
+BOOST_AUTO_TEST_CASE(custom_operations_account_storage_list_test)
+{
+try {
+   ACTORS((nathan)(alice)(robert)(patty));
+
+   app.enable_plugin("custom_operations");
+   custom_operations_api custom_operations_api(app);
+
+   generate_block();
+   enable_fees();
+
+   int64_t init_balance(10000 * GRAPHENE_BLOCKCHAIN_PRECISION);
+
+   transfer(committee_account, nathan_id, asset(init_balance));
+   transfer(committee_account, alice_id, asset(init_balance));
+
+   // catalog is indexed so cant be too big(greater than CUSTOM_OPERATIONS_MAX_KEY_SIZE(200) is not allowed)
+   std::string catalog(201, 'a');
+   flat_set<string> accounts;
+   accounts.insert(robert.name);
+   list_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
+   generate_block();
+
+   auto storage_results_nathan = custom_operations_api.get_storage_info("nathan", catalog);
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 0 );
+
+   // keys are indexed so they cant be too big(greater than CUSTOM_OPERATIONS_MAX_KEY_SIZE(200) is not allowed)
+   catalog = "whatever";
+   std::string value(201, 'a');
+   accounts.clear();
+   accounts.insert(value);
+   list_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
+   generate_block();
+
+   storage_results_nathan = custom_operations_api.get_storage_info("nathan", catalog);
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 0 );
+
+   // nathan add a list of accounts to storage
+   accounts.clear();
+   accounts.insert(alice.name);
+   accounts.insert(robert.name);
+   catalog = "contact_list";
+   list_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
+   generate_block();
+
+   // get the account list for nathan, check alice and robert are there
+   storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(*storage_results_nathan[0].subkey, robert.name);
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(*storage_results_nathan[1].subkey, alice.name);
+
+   // add a value into account list already there
+   accounts.clear();
+   accounts.insert(alice.name);
+   list_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
+   generate_block();
+
+   // nothing changes
+   storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(*storage_results_nathan[0].subkey, robert.name);
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(*storage_results_nathan[1].subkey, alice.name);
+
+   // delete alice from the list
+   accounts.clear();
+   accounts.insert(alice.name);
+   list_operation(accounts, true, catalog, nathan_id, nathan_private_key, db);
+   generate_block();
+
+   // alice gone
+   storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 1 );
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(*storage_results_nathan[0].subkey, robert.name);
+
+   // add more than 10 accounts to the list in 1 operation is not allowed
+   accounts.clear();
+   accounts.insert("init0");
+   accounts.insert("init1");
+   accounts.insert("init2");
+   accounts.insert("init3");
+   accounts.insert("init4");
+   accounts.insert("init5");
+   accounts.insert("init6");
+   accounts.insert("init7");
+   accounts.insert("init8");
+   accounts.insert("init9");
+   accounts.insert("init10");
+   list_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
+   generate_block();
+
+   // duplicated accounts in the list, only 1 will be inserted
+   accounts.clear();
+   accounts.insert(robert.name);
+   accounts.insert(robert.name);
+   list_operation(accounts, false, catalog, alice_id, alice_private_key, db);
+   generate_block();
+
+   auto storage_results_alice = custom_operations_api.get_storage_info("alice", "contact_list");
+   BOOST_CHECK_EQUAL(storage_results_alice.size(), 1 );
+   BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17 );
+   BOOST_CHECK_EQUAL(*storage_results_alice[0].subkey, robert.name);
+}
+catch (fc::exception &e) {
+   edump((e.to_detail_string()));
+   throw;
+} }
 
 BOOST_AUTO_TEST_SUITE_END()

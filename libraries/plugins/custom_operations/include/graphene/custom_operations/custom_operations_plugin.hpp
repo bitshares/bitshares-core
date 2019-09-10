@@ -56,13 +56,7 @@ class custom_operations_plugin : public graphene::app::plugin
       std::unique_ptr<detail::custom_operations_plugin_impl> my;
 };
 
-typedef fc::static_variant<
-      account_contact_operation,
-      create_htlc_order_operation,
-      take_htlc_order_operation,
-      account_storage_map,
-      account_storage_list
-> custom_plugin_operation;
+typedef fc::static_variant<account_storage_map, account_storage_list> custom_plugin_operation;
 
 struct custom_operation_wrapper {
    uint8_t unused_data; // if first char of custom_op.data is 0xFF we unpack, this char is not used anymore then.

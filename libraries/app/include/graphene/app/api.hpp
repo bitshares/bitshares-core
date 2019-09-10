@@ -532,50 +532,10 @@ namespace graphene { namespace app {
                &(app.get_options()) ){}
 
          /**
-          * @breif Get contact information of an account
-          *
-          * @param account Account name to get info from
-          *
-          * @return The contact information of the account or empty
-          */
-         optional<account_contact_object> get_contact_info(std::string account)const;
-
-         /**
-          * @breif Get htlc offers from an account
-          *
-          * @param account Account name to get htlc offers from
-          * @param start ID of the most recent htlc offer to retrieve
-          * @param limit Maximum number of order objects to retrieve
-          *
-          * @return A vector of htlc offer objects from the account
-          */
-         vector<htlc_order_object> get_account_htlc_offers(std::string account, htlc_order_id_type start,
-               uint32_t limit)const;
-
-         /**
-          * @breif Get all active and non expired htlc offers
-          *
-          * @param start ID of the most recent htlc offer to retrieve
-          * @param limit Maximum number of order objects to retrieve
-          *
-          * @return A vector of active and non expired htlc offers
-          */
-         vector<htlc_order_object> get_active_htlc_offers(htlc_order_id_type start, uint32_t limit)const;
-
-         /**
-          * @breif Get htlc order offer by id
-          *
-          * @param id ID of the htlc order offer to retrieve
-          *
-          * @return A vector of active and non expired htlc offers
-          */
-         optional<htlc_order_object> get_htlc_offer(htlc_order_id_type id)const;
-
-         /**
           * @breif Get all stored objects of an account in a particular catalog
           *
           * @param account Account name to get info from
-          * @param catalog Category classification
+          * @param catalog Category classification. Each account can store multiple catalogs.
           *
           * @return The vector of objects of the account or empty
           */
@@ -722,10 +682,6 @@ FC_API(graphene::app::orders_api,
        (get_grouped_limit_orders)
      )
 FC_API(graphene::app::custom_operations_api,
-       (get_contact_info)
-       (get_account_htlc_offers)
-       (get_active_htlc_offers)
-       (get_htlc_offer)
        (get_storage_info)
      )
 FC_API(graphene::app::login_api,

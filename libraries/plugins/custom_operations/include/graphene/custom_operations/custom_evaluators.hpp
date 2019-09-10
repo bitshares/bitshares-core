@@ -34,11 +34,8 @@ class custom_generic_evaluator
       account_id_type _account;
       custom_generic_evaluator(database& db, const account_id_type account);
 
-      object_id_type do_apply(const account_contact_operation& o);
-      object_id_type do_apply(const create_htlc_order_operation& o);
-      object_id_type do_apply(const take_htlc_order_operation& o);
-      object_id_type do_apply(const account_storage_map& o);
-      object_id_type do_apply(const account_storage_list& o);
+      vector<object_id_type> do_apply(const account_storage_map& o);
+      vector<object_id_type> do_apply(const account_storage_list& o);
 };
 
 } }

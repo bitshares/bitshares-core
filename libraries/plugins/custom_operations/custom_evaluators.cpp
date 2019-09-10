@@ -35,144 +35,98 @@ custom_generic_evaluator::custom_generic_evaluator(database& db, const account_i
    _account = account;
 }
 
-void fill_contact_object(account_contact_object& aco, account_id_type account, const account_contact_operation& op)
-{
-   aco.account = account;
-   if(op.extensions.value.name.valid()) aco.name = *op.extensions.value.name;
-   if(op.extensions.value.email.valid()) aco.email = *op.extensions.value.email;
-   if(op.extensions.value.phone.valid()) aco.phone = *op.extensions.value.phone;
-   if(op.extensions.value.address.valid()) aco.address = *op.extensions.value.address;
-   if(op.extensions.value.company.valid()) aco.company = *op.extensions.value.company;
-   if(op.extensions.value.url.valid()) aco.url = *op.extensions.value.url;
-}
-
-object_id_type custom_generic_evaluator::do_apply(const account_contact_operation& op)
-{
-   auto &index = _db->get_index_type<account_contact_index>().indices().get<by_custom_account>();
-
-   auto itr = index.find(_account);
-   if( itr != index.end() )
-   {
-      _db->modify( *itr, [&op, this]( account_contact_object& aco ){
-         fill_contact_object(aco, _account, op);
-      });
-      return itr->id;
-   }
-   else
-   {
-      auto created = _db->create<account_contact_object>( [&op, this]( account_contact_object& aco ) {
-         fill_contact_object(aco, _account, op);
-      });
-      return created.id;
-   }
-}
-
-object_id_type custom_generic_evaluator::do_apply(const create_htlc_order_operation& op)
-{
-   FC_ASSERT(*op.extensions.value.expiration > _db->head_block_time() + fc::seconds(3600));
-
-   auto order_time = _db->head_block_time();
-   auto created = _db->create<htlc_order_object>( [&op, &order_time, this]( htlc_order_object& hoo ) {
-      hoo.bitshares_account = _account;
-      if(op.extensions.value.bitshares_amount.valid()) hoo.bitshares_amount = *op.extensions.value.bitshares_amount;
-      if(op.extensions.value.blockchain.valid()) hoo.blockchain = *op.extensions.value.blockchain;
-      if(op.extensions.value.blockchain_account.valid()) hoo.blockchain_account = *op.extensions.value.blockchain_account;
-      if(op.extensions.value.blockchain_asset.valid()) hoo.blockchain_asset = *op.extensions.value.blockchain_asset;
-      if(op.extensions.value.blockchain_asset_precision.valid()) hoo.blockchain_asset_precision =
-            *op.extensions.value.blockchain_asset_precision;
-      if(op.extensions.value.blockchain_amount.valid()) hoo.blockchain_amount = *op.extensions.value.blockchain_amount;
-      if(op.extensions.value.expiration.valid()) hoo.expiration = *op.extensions.value.expiration;
-      if(op.extensions.value.token_contract.valid()) hoo.token_contract = *op.extensions.value.token_contract;
-      if(op.extensions.value.tag.valid()) hoo.tag = *op.extensions.value.tag;
-
-      hoo.order_time = order_time;
-      hoo.active = true;
-   });
-   return created.id;
-}
-
-object_id_type custom_generic_evaluator::do_apply(const take_htlc_order_operation& op)
-{
-   auto &index = _db->get_index_type<htlc_orderbook_index>().indices().get<by_custom_id>();
-   htlc_order_id_type htlc_order_id;
-
-   if(op.extensions.value.htlc_order_id.valid()) {
-      htlc_order_id = *op.extensions.value.htlc_order_id;
-      auto itr = index.find(htlc_order_id);
-      if (itr != index.end()) {
-         auto close_time = _db->head_block_time();
-         _db->modify(*itr, [&op, &close_time, this](htlc_order_object &hoo) {
-            hoo.active = false;
-            hoo.taker_bitshares_account = _account;
-            if (op.extensions.value.blockchain_account.valid())
-               hoo.taker_blockchain_account = op.extensions.value.blockchain_account;
-            hoo.close_time = close_time;
-         });
-      }
-   }
-   return htlc_order_id;
-}
-
-object_id_type custom_generic_evaluator::do_apply(const account_storage_map& op)
+vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_map& op)
 {
    auto &index = _db->get_index_type<account_storage_index>().indices().get<by_account_catalog_key>();
+   vector<object_id_type> results;
 
    if (op.extensions.value.remove.valid() && *op.extensions.value.remove)
    {
       for(auto const& row: *op.extensions.value.key_values) {
          auto itr = index.find(make_tuple(_account, *op.extensions.value.catalog, row.first));
-         if(itr != index.end())
+         if(itr != index.end()) {
+            results.push_back(itr->id);
             _db->remove(*itr);
+         }
       }
    }
    else {
       for(auto const& row: *op.extensions.value.key_values) {
+         if(row.first.length() > CUSTOM_OPERATIONS_MAX_KEY_SIZE)
+         {
+            wlog("Key can't be bigger than ${max} characters", ("max", CUSTOM_OPERATIONS_MAX_KEY_SIZE));
+            continue;
+         }
          auto itr = index.find(make_tuple(_account, *op.extensions.value.catalog, row.first));
          if(itr == index.end())
          {
-            auto created = _db->create<account_storage_object>( [&op, this, &row]( account_storage_object& aso ) {
-               aso.catalog = *op.extensions.value.catalog;
-               aso.account = _account;
-               aso.key = row.first;
-               aso.value = row.second;
-            });
+            try {
+               auto created = _db->create<account_storage_object>( [&op, this, &row]( account_storage_object& aso ) {
+                  aso.catalog = *op.extensions.value.catalog;
+                  aso.account = _account;
+                  aso.key = row.first;
+                  aso.value = fc::json::from_string(row.second);
+               });
+               results.push_back(created.id);
+            }
+            catch(const fc::parse_error_exception& e) { wdump((e.to_detail_string())); }
+            catch(const fc::assert_exception& e) { wdump((e.to_detail_string())); }
          }
          else
          {
-            _db->modify(*itr, [&op, this, &row](account_storage_object &aso) {
-               aso.value = row.second;
-            });
+            try {
+               _db->modify(*itr, [&op, this, &row](account_storage_object &aso) {
+                  aso.value = fc::json::from_string(row.second);
+               });
+               results.push_back(itr->id);
+            }
+            catch(const fc::parse_error_exception& e) { wdump((e.to_detail_string())); }
+            catch(const fc::assert_exception& e) { wdump((e.to_detail_string())); }
          }
       }
    }
+   return results;
 }
-object_id_type custom_generic_evaluator::do_apply(const account_storage_list& op)
+vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_list& op)
 {
-   auto &index = _db->get_index_type<account_storage_index>().indices().get<by_account_catalog_value>();
+   auto &index = _db->get_index_type<account_storage_index>().indices().get<by_account_catalog_subkey>();
+   vector<object_id_type> results;
 
    if (op.extensions.value.remove.valid() && *op.extensions.value.remove)
    {
       for(auto const& list_value: *op.extensions.value.values) {
 
          auto itr = index.find(make_tuple(_account, *op.extensions.value.catalog, list_value));
-         if(itr != index.end())
+         if(itr != index.end()) {
+            results.push_back(itr->id);
             _db->remove(*itr);
-      }
-   }
-   else {
-
-      for(auto const& list_value: *op.extensions.value.values) {
-         auto itr = index.find(make_tuple(_account, *op.extensions.value.catalog, list_value));
-         if(itr == index.end())
-         {
-            auto created = _db->create<account_storage_object>( [&op, this, &list_value]( account_storage_object& aso ) {
-               aso.catalog = *op.extensions.value.catalog;
-               aso.account = _account;
-               aso.value = list_value;
-            });
          }
       }
    }
+   else {
+      for(auto const& list_value: *op.extensions.value.values) {
+         if(list_value.length() > 200)
+         {
+            wlog("List value can't be bigger than ${max} characters", ("max", CUSTOM_OPERATIONS_MAX_KEY_SIZE));
+            continue;
+         }
+         auto itr = index.find(make_tuple(_account, *op.extensions.value.catalog, list_value));
+         if(itr == index.end())
+         {
+            try {
+               auto created = _db->create<account_storage_object>(
+                     [&op, this, &list_value](account_storage_object &aso) {
+                        aso.catalog = *op.extensions.value.catalog;
+                        aso.account = _account;
+                        aso.subkey = list_value;
+                     });
+               results.push_back(itr->id);
+            }
+            catch(const fc::assert_exception& e) { wdump((e.to_detail_string())); }
+         }
+      }
+   }
+   return results;
 }
 
 } }
