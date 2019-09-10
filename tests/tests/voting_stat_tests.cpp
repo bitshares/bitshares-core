@@ -21,6 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <boost/test/unit_test.hpp>
 #include <boost/program_options.hpp>
 #include <boost/range.hpp>
 #include <boost/tuple/tuple.hpp>
@@ -28,47 +29,44 @@
 #include <fc/optional.hpp>
 
 #include <graphene/voting_stat/voting_stat_plugin.hpp>
-#include <graphene/es_objects/es_objects.hpp>
-#include <graphene/utilities/elasticsearch.hpp>
+//#include <graphene/es_objects/es_objects.hpp>
+//#include <graphene/utilities/elasticsearch.hpp>
 
 #include <graphene/app/api.hpp>
 
 #include <graphene/protocol/account.hpp>
 
-#include <graphene/chain/voting_statistics_object.hpp>
-#include <graphene/chain/voteable_statistics_object.hpp>
+#include <graphene/voting_stat/voting_statistics_object.hpp>
+#include <graphene/voting_stat/voteable_statistics_object.hpp>
 
 #include "../common/database_fixture.hpp"
-
-#define BOOST_TEST_MODULE Voting Statistics Plugin Test
-#include <boost/test/included/unit_test.hpp>
 
 using namespace fc;
 using namespace graphene::app;
 using namespace graphene::chain;
 using namespace graphene::chain::test;
 using namespace graphene::voting_stat;
-using namespace graphene::es_objects;
+//using namespace graphene::es_objects;
 using namespace graphene::utilities;
 namespace bpo = boost::program_options;
 
 struct voting_stat_fixture : public database_fixture
 {
     vote_id_type default_vote_id;
-    CURL *_curl;
-    ES _es;
+    // CURL *_curl;
+    // ES _es;
 
     voting_stat_fixture()
     {
         try
         {
-            _curl = curl_easy_init();
-            _es.curl = _curl;
-            _es.elasticsearch_url = "http://localhost:9200/";
-            _es.index_prefix = "objects-";
+            // _curl = curl_easy_init();
+            // _es.curl = _curl;
+            // _es.elasticsearch_url = "http://localhost:9200/";
+            // _es.index_prefix = "objects-";
 
             app.register_plugin<voting_stat_plugin>( true );
-            app.register_plugin<es_objects_plugin>( true );
+            //app.register_plugin<es_objects_plugin>( true );
         }
         catch(fc::exception &e)
         {
@@ -181,8 +179,8 @@ BOOST_AUTO_TEST_CASE( test_voting_statistics_with_proxy_delete_after_interval )
     auto voting_stat = app.get_plugin<voting_stat_plugin>("voting_stat");
     voting_stat->plugin_set_program_options( cli_vs, cfg );
 
-    auto es_objects = app.get_plugin<es_objects_plugin>("es_objects");
-    es_objects->plugin_set_program_options( cli_es, cfg );
+    //auto es_objects = app.get_plugin<es_objects_plugin>("es_objects");
+    //es_objects->plugin_set_program_options( cli_es, cfg );
 
     const char* const plugin_argv[]{ "voting_stat",
         "--voting-stat-track-every-x-maint",    "1",
@@ -191,14 +189,14 @@ BOOST_AUTO_TEST_CASE( test_voting_statistics_with_proxy_delete_after_interval )
         "--voting-stat-track-committee-votes",  "false",
         "--voting-stat-track-worker-votes",     "false",
 
-        "--es-objects-bulk-replay",             "1",
-        "--es-objects-proposals",               "false",
-        "--es-objects-accounts",                "false",
-        "--es-objects-assets",                  "false",
-        "--es-objects-balances",                "false",
-        "--es-objects-limit-orders",            "false",
-        "--es-objects-asset-bitasset",          "false",
-        "--es-objects-keep-only-current",       "true",
+        // "--es-objects-bulk-replay",             "1",
+        // "--es-objects-proposals",               "false",
+        // "--es-objects-accounts",                "false",
+        // "--es-objects-assets",                  "false",
+        // "--es-objects-balances",                "false",
+        // "--es-objects-limit-orders",            "false",
+        // "--es-objects-asset-bitasset",          "false",
+        // "--es-objects-keep-only-current",       "true",
     };
     int plugin_argc = sizeof(plugin_argv)/sizeof(char*);
 
@@ -206,9 +204,9 @@ BOOST_AUTO_TEST_CASE( test_voting_statistics_with_proxy_delete_after_interval )
     bpo::store( bpo::parse_command_line( plugin_argc, plugin_argv, cfg ), var_map );
     app.initialize_plugins( var_map );
 
-    auto objects_deleted = graphene::utilities::deleteAll(_es);
-    if( !objects_deleted )
-        BOOST_FAIL( "elastic search DB could not be deleted" );
+    // auto objects_deleted = graphene::utilities::deleteAll(_es);
+    // if( !objects_deleted )
+    //     BOOST_FAIL( "elastic search DB could not be deleted" );
 
 
     ACTORS( (alice)(bob)(charlie) );
@@ -313,13 +311,13 @@ BOOST_AUTO_TEST_CASE( test_voting_statistics_with_proxy_delete_after_interval )
         BOOST_CHECK( charlie_stat.get_total_voting_stake() == 222 );
     }
 
-    fc::usleep(fc::milliseconds(2000));
-    string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
-    _es.endpoint = _es.index_prefix + "*/data/_count";
-    _es.query = query;
-    auto res = graphene::utilities::simpleQuery(_es);
-    variant j = fc::json::from_string(res);
-    BOOST_CHECK( j["count"].as_int64() == 12 );
+    // fc::usleep(fc::milliseconds(2000));
+    // string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
+    // _es.endpoint = _es.index_prefix + "*/data/_count";
+    // _es.query = query;
+    // auto res = graphene::utilities::simpleQuery(_es);
+    // variant j = fc::json::from_string(res);
+    // BOOST_CHECK( j["count"].as_int64() == 12 );
 
 } FC_LOG_AND_RETHROW() }
 
@@ -335,8 +333,8 @@ BOOST_AUTO_TEST_CASE( test_voting_statistics_with_proxy_keep_after_interval )
     auto voting_stat = app.get_plugin<voting_stat_plugin>("voting_stat");
     voting_stat->plugin_set_program_options( cli_vs, cfg );
 
-    auto es_objects = app.get_plugin<es_objects_plugin>("es_objects");
-    es_objects->plugin_set_program_options( cli_es, cfg );
+    //auto es_objects = app.get_plugin<es_objects_plugin>("es_objects");
+    //es_objects->plugin_set_program_options( cli_es, cfg );
 
     const char* const plugin_argv[]{ "voting_stat",
         "--voting-stat-track-every-x-maint",    "1",
@@ -345,14 +343,14 @@ BOOST_AUTO_TEST_CASE( test_voting_statistics_with_proxy_keep_after_interval )
         "--voting-stat-track-committee-votes",  "false",
         "--voting-stat-track-worker-votes",     "false",
 
-        "--es-objects-bulk-replay",             "1",
-        "--es-objects-proposals",               "false",
-        "--es-objects-accounts",                "false",
-        "--es-objects-assets",                  "false",
-        "--es-objects-balances",                "false",
-        "--es-objects-limit-orders",            "false",
-        "--es-objects-asset-bitasset",          "false",
-        "--es-objects-keep-only-current",       "true",
+        // "--es-objects-bulk-replay",             "1",
+        // "--es-objects-proposals",               "false",
+        // "--es-objects-accounts",                "false",
+        // "--es-objects-assets",                  "false",
+        // "--es-objects-balances",                "false",
+        // "--es-objects-limit-orders",            "false",
+        // "--es-objects-asset-bitasset",          "false",
+        // "--es-objects-keep-only-current",       "true",
     };
     int plugin_argc = sizeof(plugin_argv)/sizeof(char*);
 
@@ -360,9 +358,9 @@ BOOST_AUTO_TEST_CASE( test_voting_statistics_with_proxy_keep_after_interval )
     bpo::store( bpo::parse_command_line( plugin_argc, plugin_argv, cfg ), var_map );
     app.initialize_plugins( var_map );
 
-    auto objects_deleted = graphene::utilities::deleteAll(_es);
-    if( !objects_deleted )
-        BOOST_FAIL( "elastic search DB could not be deleted" );
+    // auto objects_deleted = graphene::utilities::deleteAll(_es);
+    // if( !objects_deleted )
+    //     BOOST_FAIL( "elastic search DB could not be deleted" );
 
 
     ACTORS( (alice)(bob)(charlie) );
@@ -467,13 +465,13 @@ BOOST_AUTO_TEST_CASE( test_voting_statistics_with_proxy_keep_after_interval )
         BOOST_CHECK( charlie_stat.get_total_voting_stake() == 222 );
     }
 
-    fc::usleep(fc::milliseconds(2000));
-    string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
-    _es.endpoint = _es.index_prefix + "*/data/_count";
-    _es.query = query;
-    auto res = graphene::utilities::simpleQuery(_es);
-    variant j = fc::json::from_string(res);
-    BOOST_CHECK( j["count"].as_int64() == 12 );
+    // fc::usleep(fc::milliseconds(2000));
+    // string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
+    // _es.endpoint = _es.index_prefix + "*/data/_count";
+    // _es.query = query;
+    // auto res = graphene::utilities::simpleQuery(_es);
+    // variant j = fc::json::from_string(res);
+    // BOOST_CHECK( j["count"].as_int64() == 12 );
 
 } FC_LOG_AND_RETHROW() }
 
@@ -487,8 +485,8 @@ BOOST_AUTO_TEST_CASE( test_voteable_objects_tracking_with_es )
     auto voting_stat = app.get_plugin<voting_stat_plugin>("voting_stat");
     voting_stat->plugin_set_program_options( cli_vs, cfg );
 
-    auto es_objects = app.get_plugin<es_objects_plugin>("es_objects");
-    es_objects->plugin_set_program_options( cli_es, cfg );
+    // auto es_objects = app.get_plugin<es_objects_plugin>("es_objects");
+    // es_objects->plugin_set_program_options( cli_es, cfg );
 
     const char* const plugin_argv[]{ "voting_stat",
         "--voting-stat-track-every-x-maint",    "1",
@@ -497,18 +495,18 @@ BOOST_AUTO_TEST_CASE( test_voteable_objects_tracking_with_es )
         "--voting-stat-track-witness-votes",    "true",
         "--voting-stat-track-committee-votes",  "true",
 
-        "--es-objects-voting-statistics",       "true",
-        "--es-objects-voteable-statistics",     "true",
-        "--es-objects-statistics-delete-allowed", "false",
+        // "--es-objects-voting-statistics",       "true",
+        // "--es-objects-voteable-statistics",     "true",
+        // "--es-objects-statistics-delete-allowed", "false",
 
-        "--es-objects-bulk-replay",             "1",
-        "--es-objects-proposals",               "false",
-        "--es-objects-accounts",                "false",
-        "--es-objects-assets",                  "false",
-        "--es-objects-balances",                "false",
-        "--es-objects-limit-orders",            "false",
-        "--es-objects-asset-bitasset",          "false",
-        "--es-objects-keep-only-current",       "true",
+        // "--es-objects-bulk-replay",             "1",
+        // "--es-objects-proposals",               "false",
+        // "--es-objects-accounts",                "false",
+        // "--es-objects-assets",                  "false",
+        // "--es-objects-balances",                "false",
+        // "--es-objects-limit-orders",            "false",
+        // "--es-objects-asset-bitasset",          "false",
+        // "--es-objects-keep-only-current",       "true",
     };
     int plugin_argc = sizeof(plugin_argv)/sizeof(char*);
 
@@ -516,9 +514,9 @@ BOOST_AUTO_TEST_CASE( test_voteable_objects_tracking_with_es )
     bpo::store( bpo::parse_command_line( plugin_argc, plugin_argv, cfg ), var_map );
     app.initialize_plugins( var_map );
 
-    auto objects_deleted = graphene::utilities::deleteAll(_es);
-    if( !objects_deleted )
-        BOOST_FAIL( "elastic search DB could not be deleted" );
+    // auto objects_deleted = graphene::utilities::deleteAll(_es);
+    // if( !objects_deleted )
+    //     BOOST_FAIL( "elastic search DB could not be deleted" );
 
 
     ACTOR( alice );
@@ -553,16 +551,16 @@ BOOST_AUTO_TEST_CASE( test_voteable_objects_tracking_with_es )
     BOOST_CHECK( voteable_idx.size() == expected_voteables );
 
 
-    auto expected_objs_in_es = 2*(expected_voteables + 1);
+    // auto expected_objs_in_es = 2*(expected_voteables + 1);
 
-    fc::usleep(fc::milliseconds(2000));
-    string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
-    _es.endpoint = _es.index_prefix + "*/data/_count";
-    _es.query = query;
-    auto res = graphene::utilities::simpleQuery(_es);
-    variant j = fc::json::from_string(res);
-    uint64_t obj_count = j["count"].as_uint64();
-    BOOST_CHECK( obj_count == expected_objs_in_es );
+    // fc::usleep(fc::milliseconds(2000));
+    // string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
+    // _es.endpoint = _es.index_prefix + "*/data/_count";
+    // _es.query = query;
+    // auto res = graphene::utilities::simpleQuery(_es);
+    // variant j = fc::json::from_string(res);
+    // uint64_t obj_count = j["count"].as_uint64();
+    // BOOST_CHECK( obj_count == expected_objs_in_es );
 
 } FC_LOG_AND_RETHROW() }
 
@@ -621,25 +619,25 @@ BOOST_AUTO_TEST_CASE( test_delete_after_interval_and_pushed_to_es )
     auto voting_stat = app.get_plugin<voting_stat_plugin>("voting_stat");
     voting_stat->plugin_set_program_options( cli_vs, cfg );
 
-    auto es_objects = app.get_plugin<es_objects_plugin>("es_objects");
-    es_objects->plugin_set_program_options( cli_es, cfg );
+    //auto es_objects = app.get_plugin<es_objects_plugin>("es_objects");
+    //es_objects->plugin_set_program_options( cli_es, cfg );
 
     const char* const plugin_argv[]{ "voting_stat",
         "--voting-stat-track-every-x-maint",    "1",
         "--voting-stat-keep-objects-in-db",     "false",
 
-        "--es-objects-voting-statistics",       "true",
-        "--es-objects-voteable-statistics",     "false",
-        "--es-objects-statistics-delete-allowed", "false",
+        // "--es-objects-voting-statistics",       "true",
+        // "--es-objects-voteable-statistics",     "false",
+        // "--es-objects-statistics-delete-allowed", "false",
 
-        "--es-objects-bulk-replay",             "1",
-        "--es-objects-proposals",               "false",
-        "--es-objects-accounts",                "false",
-        "--es-objects-assets",                  "false",
-        "--es-objects-balances",                "false",
-        "--es-objects-limit-orders",            "false",
-        "--es-objects-asset-bitasset",          "false",
-        "--es-objects-keep-only-current",       "true",
+        // "--es-objects-bulk-replay",             "1",
+        // "--es-objects-proposals",               "false",
+        // "--es-objects-accounts",                "false",
+        // "--es-objects-assets",                  "false",
+        // "--es-objects-balances",                "false",
+        // "--es-objects-limit-orders",            "false",
+        // "--es-objects-asset-bitasset",          "false",
+        // "--es-objects-keep-only-current",       "true",
     };
     int plugin_argc = sizeof(plugin_argv)/sizeof(char*);
 
@@ -647,9 +645,9 @@ BOOST_AUTO_TEST_CASE( test_delete_after_interval_and_pushed_to_es )
     bpo::store( bpo::parse_command_line( plugin_argc, plugin_argv, cfg ), var_map );
     app.initialize_plugins( var_map );
 
-    auto objects_deleted = graphene::utilities::deleteAll(_es);
-    if( !objects_deleted )
-        BOOST_FAIL( "elastic search DB could not be deleted" );
+    // auto objects_deleted = graphene::utilities::deleteAll(_es);
+    // if( !objects_deleted )
+    //     BOOST_FAIL( "elastic search DB could not be deleted" );
 
 
     const auto& idx = db.get_index_type<voting_statistics_index>().indices().get<by_block_number>();
@@ -672,14 +670,14 @@ BOOST_AUTO_TEST_CASE( test_delete_after_interval_and_pushed_to_es )
     BOOST_CHECK( idx.size() == 1 );
 
 
-    fc::usleep(fc::milliseconds(2000));
-    string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
-    _es.endpoint = _es.index_prefix + "*/data/_count";
-    _es.query = query;
-    auto res = graphene::utilities::simpleQuery(_es);
-    variant j = fc::json::from_string(res);
-    int64_t obj_count = j["count"].as_int64();
-    BOOST_CHECK( obj_count == 3 );
+    // fc::usleep(fc::milliseconds(2000));
+    // string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
+    // _es.endpoint = _es.index_prefix + "*/data/_count";
+    // _es.query = query;
+    // auto res = graphene::utilities::simpleQuery(_es);
+    // variant j = fc::json::from_string(res);
+    // int64_t obj_count = j["count"].as_int64();
+    // BOOST_CHECK( obj_count == 3 );
 
 } FC_LOG_AND_RETHROW() }
 
