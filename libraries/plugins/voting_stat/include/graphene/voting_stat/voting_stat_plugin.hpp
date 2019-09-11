@@ -38,7 +38,7 @@ namespace graphene { namespace voting_stat {
 // time.
 //
 #ifndef VOTING_STAT_SPACE_ID
-#define VOTING_STAT_SPACE_ID 7
+#define VOTING_STAT_SPACE_ID 8
 #endif
 
 enum voting_stat_object_type_ids

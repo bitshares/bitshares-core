@@ -20,4 +20,4 @@ Folder                             | Name                     | Description     
 [market_history](market_history)   | Market History           | Save market history data                                                    | Market data    | Stable        | 5
 [snapshot](snapshot)               | Snapshot                 | Get a json of all objects in blockchain at a specificed time or block       | Debug          | Stable        |
 [witness](witness)                 | Witness                  | Generate and sign blocks                                                    | Block producer | Stable        |
-[voting_stat](voting_stat)         | Voting Statistics        | Generate objects from voting related data (works together with es objects)  | History        | Experimental  | 7
+[voting_stat](voting_stat)         | Voting Statistics        | Generate objects from voting related data (works together with es objects)  | History        | Experimental  | 8
