@@ -49,7 +49,6 @@ struct account_storage_object : public abstract_object<account_storage_object>
    account_id_type account;
    string catalog;
    optional<string> key;
-   optional<string> subkey;
    optional<variant> value;
 };
 
@@ -57,7 +56,6 @@ struct by_custom_id;
 struct by_custom_account;
 struct by_account_catalog;
 struct by_account_catalog_key;
-struct by_account_catalog_subkey;
 
 typedef multi_index_container<
       account_storage_object,
@@ -77,13 +75,6 @@ typedef multi_index_container<
                         member< account_storage_object, string, &account_storage_object::catalog >,
                         member< account_storage_object, optional<string>, &account_storage_object::key >
                   >
-            >,
-            ordered_non_unique< tag<by_account_catalog_subkey>,
-                  composite_key< account_storage_object,
-                        member< account_storage_object, account_id_type, &account_storage_object::account >,
-                        member< account_storage_object, string, &account_storage_object::catalog >,
-                        member< account_storage_object, optional<string>, &account_storage_object::subkey >
-                  >
             >
       >
 > account_storage_multi_index_type;
@@ -95,5 +86,5 @@ using account_storage_id_type = object_id<CUSTOM_OPERATIONS_SPACE_ID, account_ma
 } } //graphene::custom_operations
 
 FC_REFLECT_DERIVED( graphene::custom_operations::account_storage_object, (graphene::db::object),
-                    (account)(catalog)(key)(subkey)(value))
+                    (account)(catalog)(key)(value))
 FC_REFLECT_ENUM( graphene::custom_operations::types, (account_map)(account_list))

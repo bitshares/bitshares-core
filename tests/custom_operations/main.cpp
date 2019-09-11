@@ -327,9 +327,9 @@ try {
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[0].subkey, robert.name);
+   BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, robert.name);
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[1].subkey, alice.name);
+   BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, alice.name);
 
    // add a value into account list already there
    accounts.clear();
@@ -341,9 +341,9 @@ try {
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[0].subkey, robert.name);
+   BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, robert.name);
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[1].subkey, alice.name);
+   BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, alice.name);
 
    // delete alice from the list
    accounts.clear();
@@ -355,7 +355,7 @@ try {
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 1 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[0].subkey, robert.name);
+   BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, robert.name);
 
    // add more than 10 accounts to the list in 1 operation is not allowed
    accounts.clear();
@@ -383,7 +383,7 @@ try {
    auto storage_results_alice = custom_operations_api.get_storage_info("alice", "contact_list");
    BOOST_CHECK_EQUAL(storage_results_alice.size(), 1 );
    BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17 );
-   BOOST_CHECK_EQUAL(*storage_results_alice[0].subkey, robert.name);
+   BOOST_CHECK_EQUAL(*storage_results_alice[0].key, robert.name);
 }
 catch (fc::exception &e) {
    edump((e.to_detail_string()));

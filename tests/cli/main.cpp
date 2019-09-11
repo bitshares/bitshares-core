@@ -1275,15 +1275,15 @@ BOOST_FIXTURE_TEST_CASE( general_storage, cli_fixture )
       BOOST_CHECK_EQUAL(nathan_list[0].id.instance(), 2);
       BOOST_CHECK_EQUAL(nathan_list[0].account.instance.value, 17);
       BOOST_CHECK_EQUAL(nathan_list[0].catalog, "favourites");
-      BOOST_CHECK_EQUAL(*nathan_list[0].subkey, "banana");
+      BOOST_CHECK_EQUAL(*nathan_list[0].key, "banana");
       BOOST_CHECK_EQUAL(nathan_list[1].id.instance(), 3);
       BOOST_CHECK_EQUAL(nathan_list[1].account.instance.value, 17);
       BOOST_CHECK_EQUAL(nathan_list[1].catalog, "favourites");
-      BOOST_CHECK_EQUAL(*nathan_list[1].subkey, "chocolate");
+      BOOST_CHECK_EQUAL(*nathan_list[1].key, "chocolate");
       BOOST_CHECK_EQUAL(nathan_list[2].id.instance(), 4);
       BOOST_CHECK_EQUAL(nathan_list[2].account.instance.value, 17);
       BOOST_CHECK_EQUAL(nathan_list[2].catalog, "favourites");
-      BOOST_CHECK_EQUAL(*nathan_list[2].subkey, "milk");
+      BOOST_CHECK_EQUAL(*nathan_list[2].key, "milk");
 
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));

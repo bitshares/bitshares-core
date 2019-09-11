@@ -87,7 +87,7 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
 }
 vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_list& op)
 {
-   auto &index = _db->get_index_type<account_storage_index>().indices().get<by_account_catalog_subkey>();
+   auto &index = _db->get_index_type<account_storage_index>().indices().get<by_account_catalog_key>();
    vector<object_id_type> results;
 
    if (op.extensions.value.remove.valid() && *op.extensions.value.remove)
@@ -114,7 +114,7 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
             auto created = _db->create<account_storage_object>([&op, this, &list_value](account_storage_object &aso) {
                aso.catalog = *op.extensions.value.catalog;
                aso.account = _account;
-               aso.subkey = list_value;
+               aso.key = list_value;
             });
             results.push_back(itr->id);
          }
