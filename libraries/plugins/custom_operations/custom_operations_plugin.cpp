@@ -73,7 +73,7 @@ void custom_operations_plugin_impl::onBlock( const signed_block& b )
          unpacked.op.visit(vtor);
       }
       catch (fc::exception e) { // only api node will know if the unpack, validate or apply fails
-         wlog("Error: ${ex} in operation: ${op}", ("ex", e.to_detail_string())("op", fc::json::to_string(custom_op)));
+         dlog("Error: ${ex} in operation: ${op}", ("ex", e.to_detail_string())("op", fc::json::to_string(custom_op)));
          continue;
       }
    }

@@ -54,7 +54,7 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
       for(auto const& row: *op.extensions.value.key_values) {
          if(row.first.length() > CUSTOM_OPERATIONS_MAX_KEY_SIZE)
          {
-            wlog("Key can't be bigger than ${max} characters", ("max", CUSTOM_OPERATIONS_MAX_KEY_SIZE));
+            dlog("Key can't be bigger than ${max} characters", ("max", CUSTOM_OPERATIONS_MAX_KEY_SIZE));
             continue;
          }
          auto itr = index.find(make_tuple(_account, *op.extensions.value.catalog, row.first));
@@ -69,8 +69,7 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
                });
                results.push_back(created.id);
             }
-            catch(const fc::parse_error_exception& e) { wdump((e.to_detail_string())); }
-            catch(const fc::assert_exception& e) { wdump((e.to_detail_string())); }
+            catch(const fc::parse_error_exception& e) { dlog(e.to_detail_string()); }
          }
          else
          {
@@ -80,8 +79,7 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
                });
                results.push_back(itr->id);
             }
-            catch(const fc::parse_error_exception& e) { wdump((e.to_detail_string())); }
-            catch(const fc::assert_exception& e) { wdump((e.to_detail_string())); }
+            catch(const fc::parse_error_exception& e) { dlog((e.to_detail_string())); }
          }
       }
    }
@@ -107,22 +105,18 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
       for(auto const& list_value: *op.extensions.value.values) {
          if(list_value.length() > 200)
          {
-            wlog("List value can't be bigger than ${max} characters", ("max", CUSTOM_OPERATIONS_MAX_KEY_SIZE));
+            dlog("List value can't be bigger than ${max} characters", ("max", CUSTOM_OPERATIONS_MAX_KEY_SIZE));
             continue;
          }
          auto itr = index.find(make_tuple(_account, *op.extensions.value.catalog, list_value));
          if(itr == index.end())
          {
-            try {
-               auto created = _db->create<account_storage_object>(
-                     [&op, this, &list_value](account_storage_object &aso) {
-                        aso.catalog = *op.extensions.value.catalog;
-                        aso.account = _account;
-                        aso.subkey = list_value;
-                     });
-               results.push_back(itr->id);
-            }
-            catch(const fc::assert_exception& e) { wdump((e.to_detail_string())); }
+            auto created = _db->create<account_storage_object>([&op, this, &list_value](account_storage_object &aso) {
+               aso.catalog = *op.extensions.value.catalog;
+               aso.account = _account;
+               aso.subkey = list_value;
+            });
+            results.push_back(itr->id);
          }
       }
    }

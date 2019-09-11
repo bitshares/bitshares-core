@@ -131,6 +131,16 @@ try {
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", catalog);
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 0 );
 
+   // creating a map with bad json as value is not allowed
+   catalog = "whatever";
+   pairs.clear();
+   pairs["key"] = "value";
+   map_operation(pairs, false, catalog, nathan_id, nathan_private_key, db);
+   generate_block();
+
+   storage_results_nathan = custom_operations_api.get_storage_info("nathan", catalog);
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 0 );
+
    // nathan adds key-value data via custom operation to a settings catalog
    catalog = "settings";
    pairs.clear();
