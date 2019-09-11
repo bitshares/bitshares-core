@@ -40,10 +40,10 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
    auto &index = _db->get_index_type<account_storage_index>().indices().get<by_account_catalog_key>();
    vector<object_id_type> results;
 
-   if (op.extensions.value.remove.valid() && *op.extensions.value.remove)
+   if (op.remove)
    {
-      for(auto const& row: *op.extensions.value.key_values) {
-         auto itr = index.find(make_tuple(_account, *op.extensions.value.catalog, row.first));
+      for(auto const& row: op.key_values) {
+         auto itr = index.find(make_tuple(_account, op.catalog, row.first));
          if(itr != index.end()) {
             results.push_back(itr->id);
             _db->remove(*itr);
@@ -51,18 +51,18 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
       }
    }
    else {
-      for(auto const& row: *op.extensions.value.key_values) {
+      for(auto const& row: op.key_values) {
          if(row.first.length() > CUSTOM_OPERATIONS_MAX_KEY_SIZE)
          {
             dlog("Key can't be bigger than ${max} characters", ("max", CUSTOM_OPERATIONS_MAX_KEY_SIZE));
             continue;
          }
-         auto itr = index.find(make_tuple(_account, *op.extensions.value.catalog, row.first));
+         auto itr = index.find(make_tuple(_account, op.catalog, row.first));
          if(itr == index.end())
          {
             try {
                auto created = _db->create<account_storage_object>( [&op, this, &row]( account_storage_object& aso ) {
-                  aso.catalog = *op.extensions.value.catalog;
+                  aso.catalog = op.catalog;
                   aso.account = _account;
                   aso.key = row.first;
                   aso.value = fc::json::from_string(row.second);
@@ -90,11 +90,11 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
    auto &index = _db->get_index_type<account_storage_index>().indices().get<by_account_catalog_key>();
    vector<object_id_type> results;
 
-   if (op.extensions.value.remove.valid() && *op.extensions.value.remove)
+   if (op.remove)
    {
-      for(auto const& list_value: *op.extensions.value.values) {
+      for(auto const& list_value: op.values) {
 
-         auto itr = index.find(make_tuple(_account, *op.extensions.value.catalog, list_value));
+         auto itr = index.find(make_tuple(_account, op.catalog, list_value));
          if(itr != index.end()) {
             results.push_back(itr->id);
             _db->remove(*itr);
@@ -102,17 +102,17 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
       }
    }
    else {
-      for(auto const& list_value: *op.extensions.value.values) {
+      for(auto const& list_value: op.values) {
          if(list_value.length() > 200)
          {
             dlog("List value can't be bigger than ${max} characters", ("max", CUSTOM_OPERATIONS_MAX_KEY_SIZE));
             continue;
          }
-         auto itr = index.find(make_tuple(_account, *op.extensions.value.catalog, list_value));
+         auto itr = index.find(make_tuple(_account, op.catalog, list_value));
          if(itr == index.end())
          {
             auto created = _db->create<account_storage_object>([&op, this, &list_value](account_storage_object &aso) {
-               aso.catalog = *op.extensions.value.catalog;
+               aso.catalog = op.catalog;
                aso.account = _account;
                aso.key = list_value;
             });

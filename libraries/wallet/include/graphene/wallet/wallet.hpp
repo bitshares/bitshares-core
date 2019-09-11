@@ -2022,12 +2022,15 @@ class wallet_api
        * to be retrieved by any interested party.
        *
        * @param account The account ID or name that we are adding additional information to.
-       * @param data Storage data to be added. \c account_storage_map::ext
+       * @param catalog The name of the catalog the operation will insert data to.
+       * @param remove true if you want to remove stuff from a catalog.
+       * @param key_values The map to be inserted/removed to/from the catalog
        * @param broadcast true if you wish to broadcast the transaction
        *
        * @return The signed transaction
        */
-      signed_transaction account_store_map(string account, account_storage_map::ext map, bool broadcast);
+      signed_transaction account_store_map(string account, string catalog, bool remove,
+            flat_map<string, string> key_values, bool broadcast);
 
       /**
        * Manage a accounts list(values)by using the custom operations plugin.
@@ -2036,12 +2039,15 @@ class wallet_api
        * to be retrieved by any interested party. Can be used as a whitelist, address book, etc.
        *
        * @param account The account ID or name that we are adding additional information to.
-       * @param data List data to be added. \c account_storage_list::ext
+       * @param catalog The name of the catalog the operation will insert data to.
+       * @param remove true if you want to remove stuff from a catalog.
+       * @param values The list of strings to be inserted/removed to/from the catalog.
        * @param broadcast true if you wish to broadcast the transaction
        *
        * @return The signed transaction
        */
-      signed_transaction account_store_list(string account, account_storage_list::ext data, bool broadcast);
+      signed_transaction account_store_list(string account, string catalog, bool remove, flat_set<string> values,
+            bool broadcast);
 
       /**
        * Get \c account_storage_object of an account by using the custom operations plugin.

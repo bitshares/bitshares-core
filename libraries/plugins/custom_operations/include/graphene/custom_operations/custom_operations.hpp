@@ -34,42 +34,26 @@ using graphene::protocol::account_id_type;
 
 struct account_storage_map : chain::base_operation
 {
-   struct ext
-   {
-      optional<bool> remove;
-      optional<string> catalog;
-      optional<flat_map<string, string>> key_values;
-   };
-
-   graphene::protocol::extension<ext> extensions;
+   bool remove;
+   string catalog;
+   flat_map<string, string> key_values;
 
    void validate()const;
 };
 
 struct account_storage_list : chain::base_operation
 {
-   struct ext
-   {
-      optional<bool> remove;
-      optional<string> catalog;
-      optional<flat_set<string>> values;
-   };
-
-   graphene::protocol::extension<ext> extensions;
+   bool remove;
+   string catalog;
+   flat_set<string> values;
 
    void validate()const;
 };
 
-
 } } //graphene::custom_operations
 
-FC_REFLECT( graphene::custom_operations::account_storage_map::ext, (remove)(catalog)(key_values) )
-FC_REFLECT_TYPENAME( graphene::protocol::extension<graphene::custom_operations::account_storage_map::ext> )
-FC_REFLECT( graphene::custom_operations::account_storage_map, (extensions) )
-
-FC_REFLECT( graphene::custom_operations::account_storage_list::ext, (catalog)(values)(remove) )
-FC_REFLECT_TYPENAME( graphene::protocol::extension<graphene::custom_operations::account_storage_list::ext> )
-FC_REFLECT( graphene::custom_operations::account_storage_list, (extensions) )
+FC_REFLECT( graphene::custom_operations::account_storage_map, (remove)(catalog)(key_values) )
+FC_REFLECT( graphene::custom_operations::account_storage_list, (remove)(catalog)(values) )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::custom_operations::account_storage_map )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::custom_operations::account_storage_list )

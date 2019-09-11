@@ -48,11 +48,10 @@ void map_operation(flat_map<string, string>& pairs, bool remove, string& catalog
 
    custom_operation op;
    account_storage_map store;
-   account_storage_map::ext data;
 
-   store.extensions.value.key_values = pairs;
-   store.extensions.value.remove = remove;
-   store.extensions.value.catalog = catalog;
+   store.key_values = pairs;
+   store.remove = remove;
+   store.catalog = catalog;
 
    auto packed = fc::raw::pack(store);
    packed.insert(packed.begin(), types::account_map);
@@ -75,11 +74,10 @@ void list_operation(flat_set<string>& list, bool remove, string& catalog, accoun
 
    custom_operation op;
    account_storage_list storage_list;
-   account_storage_list::ext data;
 
-   storage_list.extensions.value.values = list;
-   storage_list.extensions.value.remove = remove;
-   storage_list.extensions.value.catalog = "contact_list";
+   storage_list.values = list;
+   storage_list.remove = remove;
+   storage_list.catalog = "contact_list";
 
    auto packed = fc::raw::pack(storage_list);
    packed.insert(packed.begin(), types::account_list);
@@ -153,10 +151,10 @@ try {
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].key, "image_url");
    BOOST_CHECK_EQUAL(storage_results_nathan[0].value->as_string(), "http://some.image.url/img.jpg");
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, "language");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].key, "language");
    BOOST_CHECK_EQUAL(storage_results_nathan[1].value->as_string(), "en");
 
    // edit some stuff and add new stuff
@@ -170,12 +168,12 @@ try {
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 3 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].key, "image_url");
    BOOST_CHECK_EQUAL(storage_results_nathan[0].value->as_string(), "http://new.image.url/newimg.jpg");
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, "language");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].key, "language");
    BOOST_CHECK_EQUAL(storage_results_nathan[1].value->as_string(), "en");
-   BOOST_CHECK_EQUAL(*storage_results_nathan[2].key, "theme");
+   BOOST_CHECK_EQUAL(storage_results_nathan[2].key, "theme");
    BOOST_CHECK_EQUAL(storage_results_nathan[2].value->as_string(), "dark");
 
    // delete stuff from the storage
@@ -188,10 +186,10 @@ try {
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].key, "image_url");
    BOOST_CHECK_EQUAL(storage_results_nathan[0].value->as_string(), "http://new.image.url/newimg.jpg");
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, "language");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].key, "language");
    BOOST_CHECK_EQUAL(storage_results_nathan[1].value->as_string(), "en");
 
    // delete stuff that it is not there
@@ -204,10 +202,10 @@ try {
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].key, "image_url");
    BOOST_CHECK_EQUAL(storage_results_nathan[0].value->as_string(), "http://new.image.url/newimg.jpg");
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, "language");
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].key, "language");
    BOOST_CHECK_EQUAL(storage_results_nathan[1].value->as_string(), "en");
 
    // add more than 10 storage items in 1 operation is not allowed
@@ -238,7 +236,7 @@ try {
    vector<account_storage_object> storage_results_alice = custom_operations_api.get_storage_info("alice", "random");
    BOOST_CHECK_EQUAL(storage_results_alice.size(), 1 );
    BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17 );
-   BOOST_CHECK_EQUAL(*storage_results_alice[0].key, "key1");
+   BOOST_CHECK_EQUAL(storage_results_alice[0].key, "key1");
    BOOST_CHECK_EQUAL(storage_results_alice[0].value->as_string(), "value2");
 
    // add an object
@@ -251,7 +249,7 @@ try {
    storage_results_alice = custom_operations_api.get_storage_info("alice", "account_object");
    BOOST_CHECK_EQUAL(storage_results_alice.size(), 1);
    BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17);
-   BOOST_CHECK_EQUAL(*storage_results_alice[0].key, "nathan");
+   BOOST_CHECK_EQUAL(storage_results_alice[0].key, "nathan");
    BOOST_CHECK_EQUAL(storage_results_alice[0].value->as<account_object>(20).name, "nathan");
 
    // add 2 more objects
@@ -265,12 +263,12 @@ try {
    storage_results_alice = custom_operations_api.get_storage_info("alice", "account_object");
    BOOST_CHECK_EQUAL(storage_results_alice.size(), 3);
    BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17);
-   BOOST_CHECK_EQUAL(*storage_results_alice[0].key, "nathan");
+   BOOST_CHECK_EQUAL(storage_results_alice[0].key, "nathan");
    BOOST_CHECK_EQUAL(storage_results_alice[0].value->as<account_object>(20).name, "nathan");
    BOOST_CHECK_EQUAL(storage_results_alice[1].account.instance.value, 17);
-   BOOST_CHECK_EQUAL(*storage_results_alice[1].key, "patty");
+   BOOST_CHECK_EQUAL(storage_results_alice[1].key, "patty");
    BOOST_CHECK_EQUAL(storage_results_alice[1].value->as<account_object>(20).name, "patty");
-   BOOST_CHECK_EQUAL(*storage_results_alice[2].key, "robert");
+   BOOST_CHECK_EQUAL(storage_results_alice[2].key, "robert");
    BOOST_CHECK_EQUAL(storage_results_alice[2].value->as<account_object>(20).name, "robert");
 }
 catch (fc::exception &e) {
@@ -327,9 +325,9 @@ try {
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, robert.name);
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].key, robert.name);
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, alice.name);
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].key, alice.name);
 
    // add a value into account list already there
    accounts.clear();
@@ -341,9 +339,9 @@ try {
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, robert.name);
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].key, robert.name);
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[1].key, alice.name);
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].key, alice.name);
 
    // delete alice from the list
    accounts.clear();
@@ -355,7 +353,7 @@ try {
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 1 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(*storage_results_nathan[0].key, robert.name);
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].key, robert.name);
 
    // add more than 10 accounts to the list in 1 operation is not allowed
    accounts.clear();
@@ -383,7 +381,7 @@ try {
    auto storage_results_alice = custom_operations_api.get_storage_info("alice", "contact_list");
    BOOST_CHECK_EQUAL(storage_results_alice.size(), 1 );
    BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17 );
-   BOOST_CHECK_EQUAL(*storage_results_alice[0].key, robert.name);
+   BOOST_CHECK_EQUAL(storage_results_alice[0].key, robert.name);
 }
 catch (fc::exception &e) {
    edump((e.to_detail_string()));

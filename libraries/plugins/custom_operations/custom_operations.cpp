@@ -27,17 +27,13 @@ namespace graphene { namespace custom_operations {
 
 void account_storage_map::validate()const
 {
-   FC_ASSERT(extensions.value.catalog.valid());
-   FC_ASSERT(extensions.value.key_values.valid());
-   FC_ASSERT(extensions.value.key_values->size() <= 10);
-   FC_ASSERT(extensions.value.catalog->length() <= CUSTOM_OPERATIONS_MAX_KEY_SIZE);
+   FC_ASSERT(key_values.size() <= 10);
+   FC_ASSERT(catalog.length() <= CUSTOM_OPERATIONS_MAX_KEY_SIZE && catalog.length() > 0);
 }
 void account_storage_list::validate()const
 {
-   FC_ASSERT(extensions.value.catalog.valid());
-   FC_ASSERT(extensions.value.values.valid());
-   FC_ASSERT(extensions.value.values->size() <= 10);
-   FC_ASSERT(extensions.value.catalog->length() <= CUSTOM_OPERATIONS_MAX_KEY_SIZE);
+   FC_ASSERT(values.size() <= 10);
+   FC_ASSERT(catalog.length() <= CUSTOM_OPERATIONS_MAX_KEY_SIZE && catalog.length() > 0);
 }
 
 } } //graphene::custom_operations

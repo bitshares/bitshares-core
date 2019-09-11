@@ -1961,7 +1961,8 @@ public:
       } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(seconds_to_add)(broadcast) )
    }
 
-   signed_transaction account_store_map(string account, account_storage_map::ext map, bool broadcast)
+   signed_transaction account_store_map(string account, string catalog, bool remove, flat_map<string, string> key_values,
+         bool broadcast)
    {
       try
       {
@@ -1971,7 +1972,9 @@ public:
 
          custom_operation op;
          account_storage_map store;
-         store.extensions.value = map;
+         store.catalog = catalog;
+         store.remove = remove;
+         store.key_values = key_values;
 
          auto packed = fc::raw::pack(store);
          packed.insert(packed.begin(), types::account_map);
@@ -1987,10 +1990,11 @@ public:
 
          return sign_transaction(tx, broadcast);
 
-      } FC_CAPTURE_AND_RETHROW( (account)(map)(broadcast) )
+      } FC_CAPTURE_AND_RETHROW( (account)(remove)(catalog)(key_values)(broadcast) )
    }
 
-   signed_transaction account_store_list(string account, account_storage_list::ext list, bool broadcast)
+   signed_transaction account_store_list(string account, string catalog, bool remove, flat_set<string> values,
+         bool broadcast)
    {
       try
       {
@@ -2000,7 +2004,9 @@ public:
 
          custom_operation op;
          account_storage_list store;
-         store.extensions.value = list;
+         store.remove = remove;
+         store.catalog = catalog;
+         store.values = values;
 
          auto packed = fc::raw::pack(store);
          packed.insert(packed.begin(), types::account_list);
@@ -2016,7 +2022,7 @@ public:
 
          return sign_transaction(tx, broadcast);
 
-      } FC_CAPTURE_AND_RETHROW( (account)(list)(broadcast) )
+      } FC_CAPTURE_AND_RETHROW( (account)(remove)(catalog)(values)(broadcast) )
    }
 
    vector< vesting_balance_object_with_info > get_vesting_balances( string account_name )
@@ -5247,14 +5253,16 @@ order_book wallet_api::get_order_book( const string& base, const string& quote, 
 }
 
 // custom operations
-signed_transaction wallet_api::account_store_map(string account, account_storage_map::ext map, bool broadcast)
+signed_transaction wallet_api::account_store_map(string account, string catalog, bool remove,
+      flat_map<string, string> key_values, bool broadcast)
 {
-   return my->account_store_map(account, map, broadcast);
+   return my->account_store_map(account, catalog, remove, key_values, broadcast);
 }
 
-signed_transaction wallet_api::account_store_list(string account, account_storage_list::ext list, bool broadcast)
+signed_transaction wallet_api::account_store_list(string account, string catalog, bool remove, flat_set<string> values,
+      bool broadcast)
 {
-   return my->account_store_list(account, list, broadcast);
+   return my->account_store_list(account, catalog, remove, values, broadcast);
 }
 
 vector<account_storage_object> wallet_api::get_account_storage(string account, string catalog)

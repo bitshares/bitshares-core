@@ -48,7 +48,7 @@ struct account_storage_object : public abstract_object<account_storage_object>
 
    account_id_type account;
    string catalog;
-   optional<string> key;
+   string key;
    optional<variant> value;
 };
 
@@ -73,7 +73,7 @@ typedef multi_index_container<
                   composite_key< account_storage_object,
                         member< account_storage_object, account_id_type, &account_storage_object::account >,
                         member< account_storage_object, string, &account_storage_object::catalog >,
-                        member< account_storage_object, optional<string>, &account_storage_object::key >
+                        member< account_storage_object, string, &account_storage_object::key >
                   >
             >
       >
