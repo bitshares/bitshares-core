@@ -70,12 +70,6 @@ int main(int argc, char** argv) {
                "Space-separated list of plugins to activate");
               ;
 
-      bpo::variables_map options;
-
-      bpo::options_description cli, cfg;
-      node.set_program_options(cli, cfg);
-      cfg_options.add(cfg);
-
       cfg_options.add_options()
               ("plugins", bpo::value<std::string>()->default_value("delayed_node account_history market_history"),
                "Space-separated list of plugins to activate");
@@ -85,6 +79,7 @@ int main(int argc, char** argv) {
       auto market_history_plug = node.register_plugin<market_history::market_history_plugin>();
 
       // add plugin options to config
+      bpo::variables_map options;
       try
       {
          bpo::options_description cli, cfg;
