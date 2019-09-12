@@ -54,9 +54,9 @@ namespace graphene { namespace chain { namespace detail {
 void database::globally_settle_asset( const asset_object& mia, const price& settlement_price )
 {
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
-   bool before_core_hardfork_1270 = ( maint_time <= HARDFORK_CORE_1270_TIME ); // call price caching issue
+   bool before_core_hardfork_1669 = ( maint_time <= HARDFORK_CORE_1669_TIME ); // whether to use call_price
 
-   if( before_core_hardfork_1270 )
+   if( before_core_hardfork_1669 )
    {
       globally_settle_asset_impl( mia, settlement_price,
                                   get_index_type<call_order_index>().indices().get<by_price>() );
