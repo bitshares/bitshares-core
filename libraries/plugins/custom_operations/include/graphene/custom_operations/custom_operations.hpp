@@ -36,16 +36,7 @@ struct account_storage_map : chain::base_operation
 {
    bool remove;
    string catalog;
-   flat_map<string, string> key_values;
-
-   void validate()const;
-};
-
-struct account_storage_list : chain::base_operation
-{
-   bool remove;
-   string catalog;
-   flat_set<string> values;
+   flat_map<string, optional<string>> key_values;
 
    void validate()const;
 };
@@ -53,7 +44,5 @@ struct account_storage_list : chain::base_operation
 } } //graphene::custom_operations
 
 FC_REFLECT( graphene::custom_operations::account_storage_map, (remove)(catalog)(key_values) )
-FC_REFLECT( graphene::custom_operations::account_storage_list, (remove)(catalog)(values) )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::custom_operations::account_storage_map )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::custom_operations::account_storage_list )

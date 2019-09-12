@@ -1224,7 +1224,7 @@ BOOST_FIXTURE_TEST_CASE( general_storage, cli_fixture )
 
       BOOST_TEST_MESSAGE("Storing in a map.");
 
-      flat_map<string, string> pairs;
+      flat_map<string, optional<string>> pairs;
       pairs["key1"] = fc::json::to_string("value1");
       pairs["key2"] = fc::json::to_string("value2");
 
@@ -1249,12 +1249,12 @@ BOOST_FIXTURE_TEST_CASE( general_storage, cli_fixture )
 
       BOOST_TEST_MESSAGE("Storing in a list.");
 
-      flat_set<string> favs;
-      favs.insert("chocolate");
-      favs.insert("milk");
-      favs.insert("banana");
+      flat_map<string, optional<string>> favs;
+      favs["chocolate"];
+      favs["milk"];
+      favs["banana"];
 
-      con.wallet_api_ptr->account_store_list("nathan", "favourites", false, favs, true);
+      con.wallet_api_ptr->account_store_map("nathan", "favourites", false, favs, true);
 
       BOOST_TEST_MESSAGE("The system is generating a block.");
       BOOST_CHECK(generate_block(app1));

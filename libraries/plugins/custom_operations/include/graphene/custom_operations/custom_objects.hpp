@@ -37,8 +37,7 @@ using namespace chain;
 #define CUSTOM_OPERATIONS_MAX_KEY_SIZE (200)
 
 enum types {
-   account_map = 0,
-   account_list = 1
+   account_map = 0
 };
 
 struct account_storage_object : public abstract_object<account_storage_object>
@@ -87,4 +86,4 @@ using account_storage_id_type = object_id<CUSTOM_OPERATIONS_SPACE_ID, account_ma
 
 FC_REFLECT_DERIVED( graphene::custom_operations::account_storage_object, (graphene::db::object),
                     (account)(catalog)(key)(value))
-FC_REFLECT_ENUM( graphene::custom_operations::types, (account_map)(account_list))
+FC_REFLECT_ENUM( graphene::custom_operations::types, (account_map))

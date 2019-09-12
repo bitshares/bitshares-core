@@ -35,7 +35,6 @@ class custom_generic_evaluator
       custom_generic_evaluator(database& db, const account_id_type account);
 
       vector<object_id_type> do_apply(const account_storage_map& o);
-      vector<object_id_type> do_apply(const account_storage_list& o);
 };
 
 } }

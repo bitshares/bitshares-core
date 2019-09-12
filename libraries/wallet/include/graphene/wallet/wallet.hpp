@@ -2030,24 +2030,7 @@ class wallet_api
        * @return The signed transaction
        */
       signed_transaction account_store_map(string account, string catalog, bool remove,
-            flat_map<string, string> key_values, bool broadcast);
-
-      /**
-       * Manage a accounts list(values)by using the custom operations plugin.
-       *
-       * Each account can optionally add and delete data from a dedicated list
-       * to be retrieved by any interested party. Can be used as a whitelist, address book, etc.
-       *
-       * @param account The account ID or name that we are adding additional information to.
-       * @param catalog The name of the catalog the operation will insert data to.
-       * @param remove true if you want to remove stuff from a catalog.
-       * @param values The list of strings to be inserted/removed to/from the catalog.
-       * @param broadcast true if you wish to broadcast the transaction
-       *
-       * @return The signed transaction
-       */
-      signed_transaction account_store_list(string account, string catalog, bool remove, flat_set<string> values,
-            bool broadcast);
+            flat_map<string, optional<string>> key_values, bool broadcast);
 
       /**
        * Get \c account_storage_object of an account by using the custom operations plugin.
@@ -2270,7 +2253,6 @@ FC_API( graphene::wallet::wallet_api,
         (receive_blind_transfer)
         (get_order_book)
         (account_store_map)
-        (account_store_list)
         (get_account_storage)
         (quit)
       )

@@ -40,7 +40,7 @@ using namespace graphene::custom_operations;
 
 BOOST_FIXTURE_TEST_SUITE( custom_operation_tests, database_fixture )
 
-void map_operation(flat_map<string, string>& pairs, bool remove, string& catalog, account_id_type& account,
+void map_operation(flat_map<string, optional<string>>& pairs, bool remove, string& catalog, account_id_type& account,
       private_key& pk, database& db)
 {
    signed_transaction trx;
@@ -55,31 +55,6 @@ void map_operation(flat_map<string, string>& pairs, bool remove, string& catalog
 
    auto packed = fc::raw::pack(store);
    packed.insert(packed.begin(), types::account_map);
-
-   op.payer = account;
-   op.data = packed;
-   op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
-   trx.operations.push_back(op);
-   trx.sign(pk, db.get_chain_id());
-   PUSH_TX(db, trx, ~0);
-   trx.clear();
-}
-
-void list_operation(flat_set<string>& list, bool remove, string& catalog, account_id_type& account,
-      private_key& pk, database& db)
-{
-   signed_transaction trx;
-   set_expiration(db, trx);
-
-   custom_operation op;
-   account_storage_list storage_list;
-
-   storage_list.values = list;
-   storage_list.remove = remove;
-   storage_list.catalog = "contact_list";
-
-   auto packed = fc::raw::pack(storage_list);
-   packed.insert(packed.begin(), types::account_list);
 
    op.payer = account;
    op.data = packed;
@@ -108,7 +83,7 @@ try {
 
    // catalog is indexed so cant be too big(greater than CUSTOM_OPERATIONS_MAX_KEY_SIZE(200) is not allowed)
    std::string catalog(201, 'a');
-   flat_map<string, string> pairs;
+   flat_map<string, optional<string>> pairs;
    pairs["key"] = fc::json::to_string("value");
    map_operation(pairs, false, catalog, nathan_id, nathan_private_key, db);
    generate_block();
@@ -292,9 +267,9 @@ try {
 
    // catalog is indexed so cant be too big(greater than CUSTOM_OPERATIONS_MAX_KEY_SIZE(200) is not allowed)
    std::string catalog(201, 'a');
-   flat_set<string> accounts;
-   accounts.insert(robert.name);
-   list_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
+   flat_map<string, optional<string>> accounts;
+   accounts[robert.name];
+   map_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
    generate_block();
 
    auto storage_results_nathan = custom_operations_api.get_storage_info("nathan", catalog);
@@ -304,8 +279,8 @@ try {
    catalog = "whatever";
    std::string value(201, 'a');
    accounts.clear();
-   accounts.insert(value);
-   list_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
+   accounts[value];
+   map_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
    generate_block();
 
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", catalog);
@@ -313,38 +288,38 @@ try {
 
    // nathan add a list of accounts to storage
    accounts.clear();
-   accounts.insert(alice.name);
-   accounts.insert(robert.name);
+   accounts[alice.name];
+   accounts[robert.name];
    catalog = "contact_list";
-   list_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
+   map_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
    generate_block();
 
    // get the account list for nathan, check alice and robert are there
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(storage_results_nathan[0].key, robert.name);
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].key, alice.name);
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(storage_results_nathan[1].key, alice.name);
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].key, robert.name);
 
    // add a value into account list already there
    accounts.clear();
-   accounts.insert(alice.name);
-   list_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
+   accounts[alice.name];
+   map_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
    generate_block();
 
    // nothing changes
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(storage_results_nathan[0].key, robert.name);
+   BOOST_CHECK_EQUAL(storage_results_nathan[0].key, alice.name);
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
-   BOOST_CHECK_EQUAL(storage_results_nathan[1].key, alice.name);
+   BOOST_CHECK_EQUAL(storage_results_nathan[1].key, robert.name);
 
    // delete alice from the list
    accounts.clear();
-   accounts.insert(alice.name);
-   list_operation(accounts, true, catalog, nathan_id, nathan_private_key, db);
+   accounts[alice.name];
+   map_operation(accounts, true, catalog, nathan_id, nathan_private_key, db);
    generate_block();
 
    // alice gone
@@ -355,25 +330,25 @@ try {
 
    // add more than 10 accounts to the list in 1 operation is not allowed
    accounts.clear();
-   accounts.insert("init0");
-   accounts.insert("init1");
-   accounts.insert("init2");
-   accounts.insert("init3");
-   accounts.insert("init4");
-   accounts.insert("init5");
-   accounts.insert("init6");
-   accounts.insert("init7");
-   accounts.insert("init8");
-   accounts.insert("init9");
-   accounts.insert("init10");
-   list_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
+   accounts["init0"];
+   accounts["init1"];
+   accounts["init2"];
+   accounts["init3"];
+   accounts["init4"];
+   accounts["init5"];
+   accounts["init6"];
+   accounts["init7"];
+   accounts["init8"];
+   accounts["init9"];
+   accounts["init10"];
+   map_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
    generate_block();
 
    // duplicated accounts in the list, only 1 will be inserted
    accounts.clear();
-   accounts.insert(robert.name);
-   accounts.insert(robert.name);
-   list_operation(accounts, false, catalog, alice_id, alice_private_key, db);
+   accounts[robert.name];
+   accounts[robert.name];
+   map_operation(accounts, false, catalog, alice_id, alice_private_key, db);
    generate_block();
 
    auto storage_results_alice = custom_operations_api.get_storage_info("alice", "contact_list");

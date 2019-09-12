@@ -65,7 +65,8 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
                   aso.catalog = op.catalog;
                   aso.account = _account;
                   aso.key = row.first;
-                  aso.value = fc::json::from_string(row.second);
+                  if(row.second.valid())
+                     aso.value = fc::json::from_string(*row.second);
                });
                results.push_back(created.id);
             }
@@ -75,48 +76,13 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
          {
             try {
                _db->modify(*itr, [&op, this, &row](account_storage_object &aso) {
-                  aso.value = fc::json::from_string(row.second);
+                  aso.key = row.first;
+                  if(row.second.valid())
+                     aso.value = fc::json::from_string(*row.second);
                });
                results.push_back(itr->id);
             }
             catch(const fc::parse_error_exception& e) { dlog((e.to_detail_string())); }
-         }
-      }
-   }
-   return results;
-}
-vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_list& op)
-{
-   auto &index = _db->get_index_type<account_storage_index>().indices().get<by_account_catalog_key>();
-   vector<object_id_type> results;
-
-   if (op.remove)
-   {
-      for(auto const& list_value: op.values) {
-
-         auto itr = index.find(make_tuple(_account, op.catalog, list_value));
-         if(itr != index.end()) {
-            results.push_back(itr->id);
-            _db->remove(*itr);
-         }
-      }
-   }
-   else {
-      for(auto const& list_value: op.values) {
-         if(list_value.length() > 200)
-         {
-            dlog("List value can't be bigger than ${max} characters", ("max", CUSTOM_OPERATIONS_MAX_KEY_SIZE));
-            continue;
-         }
-         auto itr = index.find(make_tuple(_account, op.catalog, list_value));
-         if(itr == index.end())
-         {
-            auto created = _db->create<account_storage_object>([&op, this, &list_value](account_storage_object &aso) {
-               aso.catalog = op.catalog;
-               aso.account = _account;
-               aso.key = list_value;
-            });
-            results.push_back(itr->id);
          }
       }
    }
