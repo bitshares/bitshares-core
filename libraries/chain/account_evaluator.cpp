@@ -185,6 +185,7 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
    {
          obj.registrar = o.registrar;
          obj.referrer = o.referrer;
+         obj.original_referrer = o.referrer;
          obj.lifetime_referrer = o.referrer(d).lifetime_referrer;
 
          const auto& params = global_properties.parameters;
@@ -424,6 +425,7 @@ void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator:
          // Upgrade to lifetime member. I don't care what the account was before.
          a.statistics(d).process_fees(a, d);
          a.membership_expiration_date = time_point_sec::maximum();
+         a.original_registrar = a.registrar;
          a.referrer = a.registrar = a.lifetime_referrer = a.get_id();
          a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - a.network_fee_percentage;
       } else if( a.is_annual_member(d.head_block_time()) ) {

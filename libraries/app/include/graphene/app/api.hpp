@@ -551,6 +551,8 @@ namespace graphene { namespace app {
           *       Other APIs may not be accessible until the client has sucessfully authenticated.
           */
          bool login(const string& user, const string& password);
+         bool login_signed(const string& b64_encoded_trx);
+
          /// @brief Retrieve the network block API
          fc::api<block_api> block()const;
          /// @brief Retrieve the network broadcast API
@@ -584,6 +586,9 @@ namespace graphene { namespace app {
          optional< fc::api<asset_api> > _asset_api;
          optional< fc::api<orders_api> > _orders_api;
          optional< fc::api<graphene::debug_witness::debug_api> > _debug_api;
+
+         bool verify_api_access_info_signed( const account_object& acc,
+            const api_access_info_signed& api_access_info );
    };
 
 }}  // graphene::app
@@ -661,4 +666,5 @@ FC_API(graphene::app::login_api,
        (asset)
        (orders)
        (debug)
+       (login_signed)
      )

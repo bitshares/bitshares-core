@@ -1,0 +1,65 @@
+{
+   "permission_map":
+   [
+      [
+         "*",
+         {
+               "password_hash_b64": "*",
+               "password_salt_b64": "*",
+               "allowed_apis": [
+                  "database_api",
+                  "network_broadcast_api",
+                  "history_api",
+                  "block_api",
+                  "asset_api",
+                  "orders_api"
+               ]
+         }
+      ]
+   ],
+   "permission_map_signed_default":
+   [
+      {
+         "required_lifetime_member": false,
+         "required_registrar": "registrar_name1",
+         "required_referrer": "",
+         "allowed_apis":
+         [
+            "database_api",
+            "history_api",
+            "block_api",
+            "orders_api"
+         ]
+      },
+      {
+         "required_lifetime_member": true,
+         "required_registrar": "registrar_name2",
+         "required_referrer": "",
+         "allowed_apis":
+         [
+            "database_api",
+            "history_api",
+            "block_api",
+            "orders_api"
+         ]
+      }
+   ],
+   "permission_map_signed_user":
+   [
+      [
+         "alice",
+         {
+            "required_lifetime_member": false,
+            "required_registrar": "",
+            "allowed_apis":
+            [
+               "database_api",
+               "history_api",
+               "block_api",
+               "asset_api",
+               "orders_api"
+            ]
+         }
+      ]
+   ]
+}

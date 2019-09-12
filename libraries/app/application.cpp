@@ -238,24 +238,32 @@ void application_impl::new_connection( const fc::http::websocket_connection_ptr&
 
    std::string username = "*";
    std::string password = "*";
-
     // Try to extract login information from "Authorization" header if present
    std::string auth = c->get_request_header("Authorization");
-   if( boost::starts_with(auth, "Basic ") ) {
-
-      FC_ASSERT( auth.size() > 6 );
-      auto user_pass = fc::base64_decode(auth.substr(6));
-
-      std::vector<std::string> parts;
-      boost::split( parts, user_pass, boost::is_any_of(":") );
-
-      FC_ASSERT(parts.size() == 2);
-
-      username = parts[0];
-      password = parts[1];
+   if( !boost::starts_with(auth, "Basic ") ) {
+      login->login(username, password);
+      return;
    }
 
-   login->login(username, password);
+   FC_ASSERT( auth.size() > 6 );
+   auto decoded_auth = fc::base64_decode(auth.substr(6));
+
+   std::vector<std::string> parts;
+   boost::split( parts, decoded_auth, boost::is_any_of(":") );
+
+   size_t parts_size = parts.size();
+   FC_ASSERT( parts_size == 2 );
+   if( parts[0] != "Signature" )
+   {
+      username = parts[0];
+      password = parts[1];
+      login->login( username, password );
+   }
+   else
+   {
+      string base64_encoded_trx = parts[1];
+      login->login_signed( base64_encoded_trx );
+   }
 }
 
 void application_impl::reset_websocket_server()
@@ -406,7 +414,7 @@ void application_impl::startup()
             modified_genesis = true;
 
             ilog(
-               "Used genesis timestamp:  ${timestamp} (PLEASE RECORD THIS)", 
+               "Used genesis timestamp:  ${timestamp} (PLEASE RECORD THIS)",
                ("timestamp", genesis.initial_timestamp.to_iso_string())
             );
          }
@@ -514,7 +522,7 @@ void application_impl::startup()
 
       fc::path api_access_file = _options->at("api-access").as<boost::filesystem::path>();
 
-      FC_ASSERT( fc::exists(api_access_file), 
+      FC_ASSERT( fc::exists(api_access_file),
             "Failed to load file from ${path}", ("path", api_access_file) );
 
       _apiaccess = fc::json::from_file( api_access_file ).as<api_access>( 20 );
@@ -554,9 +562,31 @@ optional< api_access_info > application_impl::get_api_access_info(const string& 
    return it->second;
 }
 
+optional< api_access_info_signed_variant > application_impl::get_api_access_info_signed(const string& username)const
+{
+   auto it = _apiaccess.permission_map_signed_user.find( username );
+   if( it != _apiaccess.permission_map_signed_user.end() )
+      return it->second;
+
+   if( !_apiaccess.permission_map_signed_default.empty() )
+      return _apiaccess.permission_map_signed_default;
+
+   return optional< api_access_info_signed_variant >();
+}
+
 void application_impl::set_api_access_info(const string& username, api_access_info&& permissions)
 {
    _apiaccess.permission_map.insert(std::make_pair(username, std::move(permissions)));
+}
+
+void application_impl::set_api_access_info_signed_default(vector<api_access_info_signed>&& permissions)
+{
+   _apiaccess.permission_map_signed_default = std::move( permissions );
+}
+
+void application_impl::set_api_access_info_signed_user(const string& username, api_access_info_signed&& permissions)
+{
+   _apiaccess.permission_map_signed_user.insert( std::make_pair(username, std::move(permissions) ) );
 }
 
 /**
@@ -998,8 +1028,6 @@ uint8_t application_impl::get_current_block_interval_in_seconds() const
    return _chain_db->get_global_properties().parameters.block_interval;
 }
 
-
-
 } } } // namespace graphene namespace app namespace detail
 
 namespace graphene { namespace app {
@@ -1180,9 +1208,24 @@ optional< api_access_info > application::get_api_access_info( const string& user
    return my->get_api_access_info( username );
 }
 
+optional< api_access_info_signed_variant > application::get_api_access_info_signed( const string& username )const
+{
+   return my->get_api_access_info_signed( username );
+}
+
 void application::set_api_access_info(const string& username, api_access_info&& permissions)
 {
    my->set_api_access_info(username, std::move(permissions));
+}
+
+void application::set_api_access_info_signed_default(vector<api_access_info_signed>&& permissions)
+{
+   my->set_api_access_info_signed_default( std::move(permissions) );
+}
+
+void application::set_api_access_info_signed_user(const string& username, api_access_info_signed&& permissions)
+{
+   my->set_api_access_info_signed_user( username, std::move(permissions) );
 }
 
 bool application::is_finished_syncing() const
