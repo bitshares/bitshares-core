@@ -64,13 +64,13 @@ void custom_operations_plugin_impl::onBlock( const signed_block& b )
 
       const custom_operation& custom_op = o_operation->op.get<custom_operation>();
 
-      if(custom_op.data.size() == 0 || uint8_t(custom_op.data.data()[0]) != 0xFF)
+      if(custom_op.data.size() == 0)
          continue;
 
       try {
-         auto unpacked = fc::raw::unpack<custom_operation_wrapper>(custom_op.data);
+         auto unpacked = fc::raw::unpack<custom_plugin_operation>(custom_op.data);
          custom_op_visitor vtor(db, custom_op.fee_payer());
-         unpacked.op.visit(vtor);
+         unpacked.visit(vtor);
       }
       catch (fc::exception e) { // only api node will know if the unpack, validate or apply fails
          dlog("Error: ${ex} in operation: ${op}", ("ex", e.to_detail_string())("op", fc::json::to_string(custom_op)));

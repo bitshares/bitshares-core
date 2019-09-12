@@ -1978,7 +1978,6 @@ public:
 
          auto packed = fc::raw::pack(store);
          packed.insert(packed.begin(), types::account_map);
-         packed.insert(packed.begin(), 0xFF);
 
          op.payer = account_id;
          op.data = packed;
@@ -2010,7 +2009,6 @@ public:
 
          auto packed = fc::raw::pack(store);
          packed.insert(packed.begin(), types::account_list);
-         packed.insert(packed.begin(), 0xFF);
 
          op.payer = account_id;
          op.data = packed;

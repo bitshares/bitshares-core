@@ -58,11 +58,6 @@ class custom_operations_plugin : public graphene::app::plugin
 
 typedef fc::static_variant<account_storage_map, account_storage_list> custom_plugin_operation;
 
-struct custom_operation_wrapper {
-   uint8_t unused_data; // if first char of custom_op.data is 0xFF we unpack, this char is not used anymore then.
-   custom_plugin_operation op;
-};
-
 struct custom_op_visitor
 {
    typedef void result_type;
@@ -82,4 +77,3 @@ struct custom_op_visitor
 } } //graphene::custom_operations
 
 FC_REFLECT_TYPENAME( graphene::custom_operations::custom_plugin_operation )
-FC_REFLECT( graphene::custom_operations::custom_operation_wrapper, (unused_data)(op) )

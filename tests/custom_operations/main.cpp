@@ -55,7 +55,6 @@ void map_operation(flat_map<string, string>& pairs, bool remove, string& catalog
 
    auto packed = fc::raw::pack(store);
    packed.insert(packed.begin(), types::account_map);
-   packed.insert(packed.begin(), 0xFF);
 
    op.payer = account;
    op.data = packed;
@@ -81,7 +80,6 @@ void list_operation(flat_set<string>& list, bool remove, string& catalog, accoun
 
    auto packed = fc::raw::pack(storage_list);
    packed.insert(packed.begin(), types::account_list);
-   packed.insert(packed.begin(), 0xFF);
 
    op.payer = account;
    op.data = packed;
