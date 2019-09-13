@@ -17,7 +17,7 @@ class application_runner
 {
    public:
    application_runner();
-   application_runner(std::shared_ptr<fc::path> dir) : application_runner() { _dir = dir; }
+   application_runner(std::shared_ptr<fc::path> dir, int port);
    void start();
    void start(const fc::path& data_path, const boost::filesystem::path& genesis_path);
    int rpc_port_number;

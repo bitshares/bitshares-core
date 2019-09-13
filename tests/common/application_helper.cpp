@@ -33,6 +33,12 @@ int sockQuit(void)
 
 namespace graphene { namespace test {
 
+application_runner::application_runner(std::shared_ptr<fc::path> dir, int port)  : application_runner() 
+{
+   _dir = dir;
+   if (port != 0) 
+      p2p_port_number = port; 
+}
 application_runner::application_runner()
 {
    _app = std::make_shared<graphene::app::application>();

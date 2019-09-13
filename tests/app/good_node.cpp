@@ -14,6 +14,7 @@ int main(int argc, char** argv)
    fc::temp_directory td;
    std::shared_ptr<fc::path> temp_dir = nullptr;
    std::string remote_node_ip;
+   std::string my_port = "0";
    for (int i = 1; i < argc; i++)
    {
       if (std::string(argv[i]) == "-d")
@@ -22,12 +23,14 @@ int main(int argc, char** argv)
       }
       if (std::string(argv[i]) == "-s")
          remote_node_ip = argv[i+1];
+      if (std::string(argv[i]) == "-p")
+         my_port = argv[i+1];
    }
    // we were not passed a temp directory, create one
    if (!temp_dir)
       temp_dir = std::make_shared<fc::path>( td.path() );
    // start node
-   graphene::test::application_runner app(temp_dir);
+   graphene::test::application_runner app(temp_dir, std::stoi(my_port));
    app.start();
    std::string p2p_address = "127.0.0.1:" + std::to_string( app.p2p_port_number );
 
