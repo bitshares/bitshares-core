@@ -256,19 +256,6 @@ void account_member_index::object_modified(const object& after)
 
 }
 
-void account_referrer_index::object_inserted( const object& obj )
-{
-}
-void account_referrer_index::object_removed( const object& obj )
-{
-}
-void account_referrer_index::about_to_modify( const object& before )
-{
-}
-void account_referrer_index::object_modified( const object& after  )
-{
-}
-
 const uint8_t  balances_by_account_index::bits = 20;
 const uint64_t balances_by_account_index::mask = (1ULL << balances_by_account_index::bits) - 1;
 
