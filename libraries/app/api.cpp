@@ -690,6 +690,9 @@ namespace graphene { namespace app {
    vector<account_storage_object> custom_operations_api::get_storage_info(std::string account_id_or_name,
          std::string catalog)const
    {
+      auto plugin = _app.get_plugin<graphene::custom_operations::custom_operations_plugin>("custom_operations");
+      FC_ASSERT( plugin );
+
       const auto account_id = database_api.get_account_id_from_string(account_id_or_name);
       vector<account_storage_object> results;
       auto &index = _app.chain_database()->get_index_type<account_storage_index>().indices().get<by_account_catalog>();
