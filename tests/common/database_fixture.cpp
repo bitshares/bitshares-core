@@ -59,6 +59,8 @@ namespace graphene { namespace chain {
 using std::cout;
 using std::cerr;
 
+namespace buf = boost::unit_test::framework;
+
 void clearable_block::clear()
 {
    _calculated_merkle_root = checksum_type();
@@ -70,16 +72,20 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    : app(), db( *app.chain_database() )
 {
    try {
-   int argc = boost::unit_test::framework::master_test_suite().argc;
-   char** argv = boost::unit_test::framework::master_test_suite().argv;
+   int argc = buf::master_test_suite().argc;
+   char** argv = buf::master_test_suite().argv;
    for( int i=1; i<argc; i++ )
    {
       const std::string arg = argv[i];
       if( arg == "--record-assert-trip" )
          fc::enable_record_assert_trip = true;
       if( arg == "--show-test-names" )
-         std::cout << "running test " << boost::unit_test::framework::current_test_case().p_name << std::endl;
+         std::cout << "running test " << buf::current_test_case().p_name << std::endl;
    }
+
+   const auto current_test_name = buf::current_test_case().p_name.value;
+   const auto current_test_suite_id = buf::current_test_case().p_parent_id;
+   const auto current_suite_name = buf::get<boost::unit_test::test_suite>(current_test_suite_id).p_name.value;
    auto mhplugin = app.register_plugin<graphene::market_history::market_history_plugin>();
    auto goplugin = app.register_plugin<graphene::grouped_orders::grouped_orders_plugin>();
    init_account_pub_key = init_account_priv_key.get_public_key();
@@ -88,7 +94,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
 
    genesis_state.initial_timestamp = initial_timestamp;
 
-   if(boost::unit_test::framework::current_test_case().p_name.value == "hf_935_test") {
+   if(current_test_name == "hf_935_test") {
       genesis_state.initial_active_witnesses = 20;
    }
    else {
@@ -125,10 +131,6 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    /**
     * Test specific settings
     */
-   const auto current_test_name = boost::unit_test::framework::current_test_case().p_name.value;
-   const auto current_test_suite_id = boost::unit_test::framework::current_test_case().p_parent_id;
-   const auto current_suite_name = boost::unit_test::framework::get<boost::unit_test::test_suite>(current_test_suite_id)
-                                        .p_name.value;
    if (current_test_name == "get_account_history_operations")
    {
       options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)75, false)));
@@ -273,8 +275,8 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       options.insert(std::make_pair("track-account", boost::program_options::variable_value(track_account, false)));
    }
    // standby votes tracking
-   if( boost::unit_test::framework::current_test_case().p_name.value == "track_votes_witnesses_disabled" ||
-       boost::unit_test::framework::current_test_case().p_name.value == "track_votes_committee_disabled") {
+   if( current_test_name == "track_votes_witnesses_disabled"
+          || current_test_name == "track_votes_committee_disabled") {
       app.chain_database()->enable_standby_votes_tracking( false );
    }
    if(current_test_name == "elasticsearch_account_history" || current_test_name == "elasticsearch_suite" ||
