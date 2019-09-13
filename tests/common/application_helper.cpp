@@ -5,6 +5,8 @@
 #include <graphene/witness/witness.hpp>
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 #include <boost/filesystem.hpp>
+#include <memory>
+#include <fstream>
 
 #ifdef _WIN32
    #ifndef _WIN32_WINNT
@@ -45,18 +47,34 @@ application_runner::application_runner()
 #endif
    rpc_port_number = get_available_port();
    p2p_port_number = get_available_port();
+   _dir = std::make_shared<fc::path>();
+}
+
+bool file_exists(std::string path)
+{
+   std::ifstream s(path);
+   if (s)
+      return true;
+   return false;
 }
 
 void application_runner::start()
 {
-   boost::program_options::variables_map cfg;
+   std::string genesis_path = _dir->generic_string() + "/genesis.json";
+   boost::filesystem::path genesis = boost::filesystem::path(genesis_path);
+   if (!file_exists(genesis_path))
+      genesis = create_genesis_file(*_dir);
+   start(*_dir, genesis);
+}
+void application_runner::start(const fc::path& data_path, const boost::filesystem::path& genesis  )
+{
    cfg.emplace(
       "rpc-endpoint", 
       boost::program_options::variable_value(std::string("127.0.0.1:" + std::to_string(rpc_port_number)), false)
    );
    cfg.emplace( "p2p-endpoint", 
          boost::program_options::variable_value(std::string("127.0.0.1:" + std::to_string(p2p_port_number)), false));
-   cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(_dir), false));
+   cfg.emplace("genesis-json", boost::program_options::variable_value( genesis, false ));
    std::string seed_node_string = "[";
    bool needs_comma = false;
    for(auto url : seed_nodes)
@@ -68,12 +86,11 @@ void application_runner::start()
    }
    seed_node_string += "]";
    cfg.emplace("seed-nodes", boost::program_options::variable_value(seed_node_string, false));
-   _app->initialize(_dir.path(), cfg);
+   _app->initialize(data_path, cfg);
 
    _app->initialize_plugins(cfg);
    _app->startup_plugins();
-
-   _app->startup();
+   _app->startup();  
    fc::usleep(fc::milliseconds(500));
 }
 
@@ -84,12 +101,18 @@ std::shared_ptr<graphene::app::application> application_runner::get_app()
 
 void application_runner::add_seed_node(std::string addr)
 {
-   /*
-   std::vector<fc::ip::endpoint> endpoints = graphene::app::application::resolve_string_to_ip_endpoints(addr);
-   for(const auto& ep : endpoints)
-      _app->p2p_node()->add_node(ep);
-   */
   seed_nodes.push_back(addr);
+}
+
+void application_runner::add_node(std::string addr)
+{
+   auto endpoints = application::resolve_string_to_ip_endpoints(addr);
+   if (endpoints.empty())
+   {
+      std::cerr << "Invalid node address passed\n";
+      return;
+   }
+   _app->p2p_node()->add_node( endpoints[0] );
 }
 
 uint32_t application_runner::get_connection_count()

@@ -17,19 +17,24 @@ class application_runner
 {
    public:
    application_runner();
+   application_runner(std::shared_ptr<fc::path> dir) : application_runner() { _dir = dir; }
    void start();
+   void start(const fc::path& data_path, const boost::filesystem::path& genesis_path);
    int rpc_port_number;
    int p2p_port_number;
    std::shared_ptr<graphene::app::application> get_app();
    // networking
    void add_seed_node(std::string addr);
+   void add_node(std::string addr);
    bool is_connected( std::string addr );
    uint32_t get_connection_count();
+
    private:
    std::shared_ptr<graphene::app::application> _app;
-   fc::temp_directory _dir;
+   std::shared_ptr<fc::path> _dir;
    static int get_available_port();
    std::vector<std::string> seed_nodes;
+   boost::program_options::variables_map cfg;
 };
 
 ///////////

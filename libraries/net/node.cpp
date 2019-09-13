@@ -1353,10 +1353,13 @@ namespace graphene { namespace net { namespace detail {
 
       user_data["node_id"] = fc::variant( _node_id, 1 );
 
-      item_hash_t head_block_id = _delegate->get_head_block_id();
-      user_data["last_known_block_hash"] = fc::variant( head_block_id, 1 );
-      user_data["last_known_block_number"] = _delegate->get_block_number(head_block_id);
-      user_data["last_known_block_time"] = _delegate->get_block_time(head_block_id);
+      if (!_delegate)
+      {
+         item_hash_t head_block_id = _delegate->get_head_block_id();
+         user_data["last_known_block_hash"] = fc::variant( head_block_id, 1 );
+         user_data["last_known_block_number"] = _delegate->get_block_number(head_block_id);
+         user_data["last_known_block_time"] = _delegate->get_block_time(head_block_id); 
+      }
 
       if (!_hard_fork_block_numbers.empty())
         user_data["last_known_fork_block_number"] = _hard_fork_block_numbers.back();
@@ -4184,6 +4187,7 @@ namespace graphene { namespace net { namespace detail {
 
     void node_impl::add_node(const fc::ip::endpoint& ep)
     {
+       dlog("Attempting to add node ${ip}", ("ip", ep));
       VERIFY_CORRECT_THREAD();
       // if we're connecting to them, we believe they're not firewalled
       potential_peer_record updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(ep);
