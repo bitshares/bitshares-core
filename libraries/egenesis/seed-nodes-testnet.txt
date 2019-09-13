@@ -4,3 +4,4 @@
 "23.92.53.25:11010",                // sahkan
 "139.162.242.253:1700",             // rnglab
 "btstestnet.roelandp.nl:1779",      // Roelandp
+"seed-test.liondani.com:1776",      // liondani
