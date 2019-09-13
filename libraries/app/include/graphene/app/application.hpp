@@ -128,6 +128,8 @@ namespace graphene { namespace app {
 
          bool is_plugin_enabled(const string& name) const;
 
+         static std::vector<fc::ip::endpoint> resolve_string_to_ip_endpoints(const std::string& endpoint_string);
+
          std::shared_ptr<fc::thread> elasticsearch_thread;
 
    private:
