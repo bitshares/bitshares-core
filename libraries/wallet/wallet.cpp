@@ -1976,8 +1976,8 @@ public:
          store.remove = remove;
          store.key_values = key_values;
 
-         auto packed = fc::raw::pack(store);
-         packed.insert(packed.begin(), types::account_map);
+         custom_plugin_operation custom_plugin_op(store);
+         auto packed = fc::raw::pack(custom_plugin_op);
 
          op.payer = account_id;
          op.data = packed;
