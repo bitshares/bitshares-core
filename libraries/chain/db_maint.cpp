@@ -1054,6 +1054,8 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
       // always update the median feed due to https://github.com/bitshares/bitshares-core/issues/890
       db.modify( bitasset_data, [head_time,next_maint_time]( asset_bitasset_data_object &obj ) {
          obj.update_median_feeds( head_time, next_maint_time );
+         // NOTE: Normally we should call check_call_orders() after called update_median_feeds(), but for
+         // mainnet actually check_call_orders() would do nothing, so we skipped it for better performance.
       });
 
    } // for each market issued asset
