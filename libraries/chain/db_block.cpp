@@ -132,7 +132,7 @@ bool database::_push_block(const signed_block& new_block)
 { try {
    uint32_t skip = get_node_properties().skip_flags;
 
-   if( _fork_db.head() && new_block.block_num() > 1 )
+   if( _fork_db.head() && new_block.timestamp.sec_since_epoch() > fc::time_point::now().sec_since_epoch() - 86400 )
    {
       // verify that the block signer is in the current set of active witnesses.
       shared_ptr<fork_item> prev_block = _fork_db.fetch_block( new_block.previous );
