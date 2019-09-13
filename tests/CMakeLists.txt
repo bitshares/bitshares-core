@@ -1,4 +1,4 @@
-file(GLOB COMMON_SOURCES "common/*.cpp")
+file(GLOB COMMON_SOURCES "common/database_fixture.cpp")
 
 find_package( Gperftools QUIET )
 if( GPERFTOOLS_FOUND )
@@ -31,9 +31,14 @@ target_link_libraries( chain_bench
                        graphene_es_objects graphene_egenesis_none graphene_api_helper_indexes
                        fc ${PLATFORM_SPECIFIC_LIBS} )
 
-file(GLOB APP_SOURCES "app/*.cpp")
+file(GLOB APP_SOURCES "app/main.cpp")
 add_executable( app_test ${APP_SOURCES} )
 target_link_libraries( app_test graphene_app graphene_account_history graphene_net graphene_witness graphene_chain graphene_egenesis_none fc ${PLATFORM_SPECIFIC_LIBS} )
+
+file(GLOB GOOD_NODE_SOURCES "common/application_helper.cpp" "app/good_node.cpp")
+add_executable( good_node ${GOOD_NODE_SOURCES} )
+target_include_directories( good_node PRIVATE "../libraries/plugins/witness/include" )
+target_link_libraries( good_node graphene_app graphene_account_history graphene_net graphene_witness graphene_chain graphene_egenesis_none fc ${PLATFORM_SPECIFIC_LIBS} )
 
 file(GLOB CLI_SOURCES "cli/*.cpp")
 add_executable( cli_test ${CLI_SOURCES} )

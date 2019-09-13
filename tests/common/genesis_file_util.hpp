@@ -1,5 +1,7 @@
 #pragma once
 
+#include <boost/filesystem/path.hpp>
+
 /////////
 /// @brief forward declaration, using as a hack to generate a genesis.json file
 /// for testing
