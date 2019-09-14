@@ -228,7 +228,7 @@ bool database::_push_block(const signed_block& new_block)
 
 void database::verify_signing_witness( const signed_block& new_block, const fork_item& fork_entry )const
 {
-   FC_ASSERT( new_block.timestamp > fork_entry.data.timestamp );
+   FC_ASSERT( new_block.timestamp >= fork_entry.next_block_time );
    uint32_t slot_num = ( new_block.timestamp - fork_entry.next_block_time ).to_seconds() / block_interval();
    uint64_t index = ( fork_entry.next_block_aslot + slot_num ) % fork_entry.scheduled_witnesses->size();
    const auto& scheduled_witness = (*fork_entry.scheduled_witnesses)[index];
