@@ -132,7 +132,8 @@ bool database::_push_block(const signed_block& new_block)
 { try {
    uint32_t skip = get_node_properties().skip_flags;
 
-   if( _fork_db.head() && new_block.timestamp.sec_since_epoch() > fc::time_point::now().sec_since_epoch() - 86400 )
+   const auto now = fc::time_point::now().sec_since_epoch();
+   if( _fork_db.head() && new_block.timestamp.sec_since_epoch() > now - 86400 )
    {
       // verify that the block signer is in the current set of active witnesses.
       shared_ptr<fork_item> prev_block = _fork_db.fetch_block( new_block.previous );
@@ -212,7 +213,8 @@ bool database::_push_block(const signed_block& new_block)
    try {
       auto session = _undo_db.start_undo_session();
       apply_block(new_block, skip);
-      update_witnesses( *new_head );
+      if( new_block.timestamp.sec_since_epoch() > now - 86400 )
+         update_witnesses( *new_head );
       _block_id_to_block.store(new_block.id(), new_block);
       session.commit();
    } catch ( const fc::exception& e ) {
