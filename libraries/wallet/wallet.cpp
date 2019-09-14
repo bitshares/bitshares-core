@@ -2770,7 +2770,7 @@ public:
          return ss.str();
       };
 
-      m["sign_message"] = [this](variant result, const fc::variants& a)
+      m["sign_message"] = [](variant result, const fc::variants& a)
       {
          auto r = result.as<signed_message>( GRAPHENE_MAX_NESTED_OBJECTS );
 

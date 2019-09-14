@@ -28,6 +28,7 @@
 #include <graphene/utilities/tempdir.hpp>
 
 #include <graphene/account_history/account_history_plugin.hpp>
+#include <graphene/api_helper_indexes/api_helper_indexes.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
 #include <graphene/custom_operations/custom_operations_plugin.hpp>
 #include <graphene/egenesis/egenesis.hpp>
@@ -124,9 +125,10 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    std::shared_ptr<graphene::app::application> app1(new graphene::app::application{});
 
    app1->register_plugin<graphene::account_history::account_history_plugin>(true);
-   app1->register_plugin<graphene::market_history::market_history_plugin>(true);
+   app1->register_plugin< graphene::market_history::market_history_plugin >(true);
+   app1->register_plugin< graphene::grouped_orders::grouped_orders_plugin>(true);
+   app1->register_plugin< graphene::api_helper_indexes::api_helper_indexes>(true);
    app1->register_plugin<graphene::custom_operations::custom_operations_plugin>(true);
-   app1->register_plugin<graphene::grouped_orders::grouped_orders_plugin>(true);
 
    app1->startup_plugins();
    boost::program_options::variables_map cfg;
@@ -1133,11 +1135,18 @@ BOOST_FIXTURE_TEST_CASE( cli_sign_message, cli_fixture )
    msg.message = "123";
 
    // change account, verify failure
+   // nonexistent account:
    msg.meta.account = "dan";
-   BOOST_REQUIRE_THROW( !con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block,
-                                                             msg.meta.time, *msg.signature ), fc::assert_exception );
-   BOOST_REQUIRE_THROW( !con.wallet_api_ptr->verify_signed_message( msg ), fc::assert_exception );
-   BOOST_REQUIRE_THROW( !con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ), fc::assert_exception);
+   BOOST_REQUIRE_THROW( con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block,
+                                                            msg.meta.time, *msg.signature ), fc::assert_exception );
+   BOOST_REQUIRE_THROW( con.wallet_api_ptr->verify_signed_message( msg ), fc::assert_exception );
+   BOOST_REQUIRE_THROW( con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ), fc::assert_exception);
+   // existing, but wrong account:
+   msg.meta.account = "committee-account";
+   BOOST_CHECK( !con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block,
+                                                     msg.meta.time, *msg.signature ) );
+   BOOST_CHECK( !con.wallet_api_ptr->verify_signed_message( msg ) );
+   BOOST_CHECK( !con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
    msg.meta.account = "nathan";
 
    // change key, verify failure
