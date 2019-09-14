@@ -55,6 +55,26 @@ namespace detail {
  * No more asset updates may be issued.
 */
 void database::globally_settle_asset( const asset_object& mia, const price& settlement_price )
+{
+   auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+   bool before_core_hardfork_1669 = ( maint_time <= HARDFORK_CORE_1669_TIME ); // whether to use call_price
+
+   if( before_core_hardfork_1669 )
+   {
+      globally_settle_asset_impl( mia, settlement_price,
+                                  get_index_type<call_order_index>().indices().get<by_price>() );
+   }
+   else
+   {
+      globally_settle_asset_impl( mia, settlement_price,
+                                  get_index_type<call_order_index>().indices().get<by_collateral>() );
+   }
+}
+
+template<typename IndexType>
+void database::globally_settle_asset_impl( const asset_object& mia,
+                                           const price& settlement_price,
+                                           const IndexType& call_index )
 { try {
    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
    FC_ASSERT( !bitasset.has_settlement(), "black swan already occurred, it should not happen again" );
@@ -65,34 +85,36 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    const asset_dynamic_data_object& mia_dyn = mia.dynamic_asset_data_id(*this);
    auto original_mia_supply = mia_dyn.current_supply;
 
-   const auto& call_price_index = get_index_type<call_order_index>().indices().get<by_price>();
-
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
 
    // cancel all call orders and accumulate it into collateral_gathered
-   auto call_itr = call_price_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
-   auto call_end = call_price_index.upper_bound( price::max( bitasset.options.short_backing_asset, mia.id ) );
+   auto call_itr = call_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
+   auto call_end = call_index.upper_bound( price::max( bitasset.options.short_backing_asset, mia.id ) );
+
    asset pays;
    while( call_itr != call_end )
    {
+      const call_order_object& order = *call_itr;
+      ++call_itr;
+
       if( before_core_hardfork_342 )
       {
-         pays = call_itr->get_debt() * settlement_price; // round down, in favor of call order
+         pays = order.get_debt() * settlement_price; // round down, in favor of call order
 
          // Be here, the call order can be paying nothing
          if( pays.amount == 0 && !bitasset.is_prediction_market ) // TODO remove this warning after hard fork core-342
-            wlog( "Something for nothing issue (#184, variant E) occurred at block #${block}", ("block",head_block_num()) );
+            wlog( "Something for nothing issue (#184, variant E) occurred at block #${block}",
+                  ("block",head_block_num()) );
       }
       else
-         pays = call_itr->get_debt().multiply_and_round_up( settlement_price ); // round up, in favor of global settlement fund
+         pays = order.get_debt().multiply_and_round_up( settlement_price ); // round up in favor of global-settle fund
 
-      if( pays > call_itr->get_collateral() )
-         pays = call_itr->get_collateral();
+      if( pays > order.get_collateral() )
+         pays = order.get_collateral();
 
       collateral_gathered += pays;
-      const auto&  order = *call_itr;
-      ++call_itr;
+
       FC_ASSERT( fill_call_order( order, pays, order.get_debt(), settlement_price, true ) ); // call order is maker
    }
 
