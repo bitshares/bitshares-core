@@ -26,6 +26,8 @@ RUN \
       libboost-coroutine-dev \
       libtool \
       doxygen \
+      libleveldb-dev \
+      libsnappy-dev \
       ca-certificates \
       fish \
     && \
@@ -47,6 +49,7 @@ RUN \
     git submodule update --init --recursive && \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
+        -DLOAD_QUERY_TXID_PLUGIN=ON \
 	-DGRAPHENE_DISABLE_UNITY_BUILD=ON \
         . && \
     make witness_node cli_wallet get_dev_key && \

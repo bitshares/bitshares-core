@@ -35,6 +35,10 @@
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 #include <graphene/api_helper_indexes/api_helper_indexes.hpp>
 
+#ifdef QUERY_TXID_PLUGIN_ABLE
+#include <graphene/query_txid/query_txid_plugin.hpp>
+#endif
+
 #include <fc/thread/thread.hpp>
 #include <fc/interprocess/signals.hpp>
 
@@ -96,6 +100,9 @@ int main(int argc, char** argv) {
       auto es_objects_plug = node->register_plugin<es_objects::es_objects_plugin>();
       auto grouped_orders_plug = node->register_plugin<grouped_orders::grouped_orders_plugin>();
       auto api_helper_indexes_plug = node->register_plugin<api_helper_indexes::api_helper_indexes>();
+      #ifdef QUERY_TXID_PLUGIN_ABLE
+      auto querytxid_plug = node->register_plugin<query_txid::query_txid_plugin>();
+      #endif
 
       // add plugin options to config
       try

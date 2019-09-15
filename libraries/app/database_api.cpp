@@ -35,7 +35,9 @@
 #include <boost/range/iterator_range.hpp>
 
 #include <cctype>
-
+#ifdef QUERY_TXID_PLUGIN_ABLE
+#include <graphene/query_txid/query_txid_plugin.hpp>
+#endif
 template class fc::api<graphene::app::database_api>;
 
 namespace graphene { namespace app {
@@ -244,7 +246,6 @@ processed_transaction database_api::get_transaction( uint32_t block_num, uint32_
 {
    return my->get_transaction( block_num, trx_in_block );
 }
-
 optional<signed_transaction> database_api::get_recent_transaction_by_id( const transaction_id_type& id )const
 {
    try {
@@ -1877,7 +1878,10 @@ std::string database_api::get_transaction_hex(const signed_transaction& trx)cons
 {
    return my->get_transaction_hex( trx );
 }
-
+optional<query_trx_info> database_api::get_transaction_by_txid(transaction_id_type txid)const
+{
+   return my->get_transaction_by_txid(txid);
+}
 std::string database_api_impl::get_transaction_hex(const signed_transaction& trx)const
 {
    return fc::to_hex(fc::raw::pack(trx));
@@ -1887,6 +1891,41 @@ std::string database_api::get_transaction_hex_without_sig(
    const signed_transaction &trx) const
 {
    return my->get_transaction_hex_without_sig(trx);
+}
+optional<query_trx_info> database_api_impl::get_transaction_by_txid(transaction_id_type txid)const
+{
+try{
+   #ifdef QUERY_TXID_PLUGIN_ABLE
+      auto &txid_index = _db.get_index_type<trx_entry_index>().indices().get<by_txid>();
+      auto itor = txid_index.find(txid);
+      if(itor != txid_index.end()){
+         auto trx_entry = *itor;
+         auto opt_block = _db.fetch_block_by_number(trx_entry.block_num);
+         FC_ASSERT(opt_block);
+         FC_ASSERT(opt_block->transactions.size() > trx_entry.trx_in_block);
+         optional<query_trx_info> res = opt_block->transactions[trx_entry.trx_in_block];
+         res->query_txid_block_number = trx_entry.block_num;
+         res->query_txid_trx_in_block = trx_entry.trx_in_block;
+         return res;
+      }
+      else{
+         std::string txid_str(txid);
+         auto result = query_txid::query_txid_plugin::query_trx_by_id(txid_str);
+         if(!result){
+            return{};
+         }
+         auto trx_entry = *result;
+         auto opt_block = _db.fetch_block_by_number(trx_entry.block_num);
+         FC_ASSERT(opt_block);
+         FC_ASSERT(opt_block->transactions.size() > trx_entry.trx_in_block);
+         optional<query_trx_info> res = opt_block->transactions[trx_entry.trx_in_block];
+         res->query_txid_block_number = trx_entry.block_num;
+         res->query_txid_trx_in_block = trx_entry.trx_in_block;
+         return res;
+      }
+   #endif
+   }
+FC_CAPTURE_AND_RETHROW((txid));  
 }
 
 std::string database_api_impl::get_transaction_hex_without_sig(

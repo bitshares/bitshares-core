@@ -19,6 +19,12 @@ else()
   set( CMAKE_CXX_EXTENSIONS OFF )
 endif()
 
+set(LOAD_QUERY_TXID_PLUGIN OFF CACHE BOOL "query_txid plugin is off normal state")
+if(${LOAD_QUERY_TXID_PLUGIN} STREQUAL "ON")
+   add_definitions(-DQUERY_TXID_PLUGIN_ABLE)
+   set( QUERY_TXID graphene_query_txid)
+endif()
+
 # http://stackoverflow.com/a/18369825
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8)
@@ -320,4 +326,5 @@ endif(ENABLE_INSTALLER)
 
 MESSAGE( STATUS "" )
 MESSAGE( STATUS "PROFILER: ${USE_PROFILER}" )
+MESSAGE( STATUS "LOAD_QUERY_TXID_PLUGIN: ${LOAD_QUERY_TXID_PLUGIN}")
 MESSAGE( STATUS "" )
