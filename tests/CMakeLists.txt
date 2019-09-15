@@ -10,7 +10,7 @@ file(GLOB UNIT_TESTS "tests/*.cpp")
 add_executable( chain_test ${COMMON_SOURCES} ${UNIT_TESTS} )
 target_link_libraries( chain_test
                        graphene_chain graphene_app graphene_witness graphene_account_history graphene_elasticsearch
-                       graphene_es_objects graphene_egenesis_none graphene_api_helper_indexes
+                       graphene_es_objects graphene_egenesis_none graphene_api_helper_indexes graphene_voting_stat
                        fc graphene_wallet ${PLATFORM_SPECIFIC_LIBS} )
 if(MSVC)
   set_source_files_properties( tests/serialization_tests.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )

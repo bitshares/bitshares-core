@@ -275,10 +275,10 @@ struct get_impacted_account_visitor
    }
    void operator()( const htlc_extend_operation& op )
    {
-      _impacted.insert( op.fee_payer() ); 
+      _impacted.insert( op.fee_payer() );
    }
-   void operator()( const htlc_refund_operation& op ) 
-   { 
+   void operator()( const htlc_refund_operation& op )
+   {
       _impacted.insert( op.fee_payer() );
    }
 };
@@ -455,7 +455,7 @@ void database::notify_on_pending_transaction( const signed_transaction& tx )
 
 void database::notify_changed_objects()
 { try {
-   if( _undo_db.enabled() ) 
+   if( _undo_db.enabled() )
    {
       const auto& head_undo = _undo_db.head();
 

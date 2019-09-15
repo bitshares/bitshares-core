@@ -217,6 +217,21 @@ namespace graphene { namespace chain {
           */
          fc::signal<void(const vector<object_id_type>&, const vector<const object*>&, const flat_set<account_id_type>&)>  removed_objects;
 
+         /**
+          * Emitted after the calculation of the voting_stake (occurs in the maintenance interval)
+          */
+         fc::signal<void(const account_object&, const account_object&, const uint64_t)> on_voting_stake_calculated;
+
+         /**
+          * Emitted after the beginning of the maintenance interval
+          */
+         fc::signal<void(uint32_t)> on_maintenance_begin;
+
+         /**
+          * Emitted after the end of the maintenance interval
+          */
+         fc::signal<void()> on_maintenance_end;
+
          //////////////////// db_witness_schedule.cpp ////////////////////
 
          /**
@@ -333,7 +348,7 @@ namespace graphene { namespace chain {
           * to newly created VBID and return it.
           *
           * Otherwise, credit amount to ovbid.
-          * 
+          *
           * @return ID of newly created VBO, but only if VBO was created.
           */
          optional< vesting_balance_id_type > deposit_lazy_vesting(

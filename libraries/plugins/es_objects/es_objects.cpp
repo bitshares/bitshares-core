@@ -30,10 +30,15 @@
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
+#include <graphene/voting_stat/voting_statistics_object.hpp>
+#include <graphene/voting_stat/voteable_statistics_object.hpp>
 
 #include <graphene/utilities/elasticsearch.hpp>
 
 namespace graphene { namespace es_objects {
+
+using voting_stat::voting_statistics_object;
+using voting_stat::voteable_statistics_object;
 
 namespace detail
 {
@@ -61,6 +66,10 @@ class es_objects_plugin_impl
       bool _es_objects_balances = true;
       bool _es_objects_limit_orders = true;
       bool _es_objects_asset_bitasset = true;
+      bool _es_objects_voting_statistics = true;
+      bool _es_objects_voteable_statistics = true;
+      bool _es_objects_statistics_delete_allowed = true;
+
       std::string _es_objects_index_prefix = "objects-";
       uint32_t _es_objects_start_es_after_block = 0;
       CURL *curl; // curl handler
@@ -141,61 +150,126 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
          limit_documents = _es_objects_bulk_replay;
 
 
-      for (auto const &value: ids) {
-         if (value.is<proposal_object>() && _es_objects_proposals) {
-            auto obj = db.find_object(value);
-            auto p = static_cast<const proposal_object *>(obj);
-            if (p != nullptr) {
-               if (action == "delete")
-                  remove_from_database(p->id, "proposal");
-               else
-                  prepareTemplate<proposal_object>(*p, "proposal");
+      for (auto const &value: ids)
+      {
+         switch( value.space_type() )
+         {
+            case( proposal_object::space_type() ):
+            {
+               if( _es_objects_proposals ) {
+                  auto obj = db.find_object(value);
+                  auto p = static_cast<const proposal_object *>(obj);
+                  if (p != nullptr) {
+                     if (action == "delete")
+                        remove_from_database(p->id, "proposal");
+                     else
+                        prepareTemplate<proposal_object>(*p, "proposal");
+                  }
+               }
+               break;
             }
-         } else if (value.is<account_object>() && _es_objects_accounts) {
-            auto obj = db.find_object(value);
-            auto a = static_cast<const account_object *>(obj);
-            if (a != nullptr) {
-               if (action == "delete")
-                  remove_from_database(a->id, "account");
-               else
-                  prepareTemplate<account_object>(*a, "account");
+            case( account_object::space_type() ):
+            {
+               if( _es_objects_accounts ) {
+                  auto obj = db.find_object(value);
+                  auto a = static_cast<const account_object *>(obj);
+                  if (a != nullptr) {
+                     if (action == "delete")
+                        remove_from_database(a->id, "account");
+                     else
+                        prepareTemplate<account_object>(*a, "account");
+                  }
+               }
+               break;
             }
-         } else if (value.is<asset_object>() && _es_objects_assets) {
-            auto obj = db.find_object(value);
-            auto a = static_cast<const asset_object *>(obj);
-            if (a != nullptr) {
-               if (action == "delete")
-                  remove_from_database(a->id, "asset");
-               else
-                  prepareTemplate<asset_object>(*a, "asset");
+            case( asset_object::space_type() ):
+            {
+               if( _es_objects_assets ) {
+                  auto obj = db.find_object(value);
+                  auto a = static_cast<const asset_object *>(obj);
+                  if (a != nullptr) {
+                     if (action == "delete")
+                        remove_from_database(a->id, "asset");
+                     else
+                        prepareTemplate<asset_object>(*a, "asset");
+                  }
+               }
+               break;
             }
-         } else if (value.is<account_balance_object>() && _es_objects_balances) {
-            auto obj = db.find_object(value);
-            auto b = static_cast<const account_balance_object *>(obj);
-            if (b != nullptr) {
-               if (action == "delete")
-                  remove_from_database(b->id, "balance");
-               else
-                  prepareTemplate<account_balance_object>(*b, "balance");
+            case( account_balance_object::space_type() ):
+            {
+               if( _es_objects_balances ) {
+                  auto obj = db.find_object(value);
+                  auto b = static_cast<const account_balance_object *>(obj);
+                  if (b != nullptr) {
+                     if (action == "delete")
+                        remove_from_database(b->id, "balance");
+                     else
+                        prepareTemplate<account_balance_object>(*b, "balance");
+                  }
+               }
+               break;
             }
-         } else if (value.is<limit_order_object>() && _es_objects_limit_orders) {
-            auto obj = db.find_object(value);
-            auto l = static_cast<const limit_order_object *>(obj);
-            if (l != nullptr) {
-               if (action == "delete")
-                  remove_from_database(l->id, "limitorder");
-               else
-                  prepareTemplate<limit_order_object>(*l, "limitorder");
+            case( limit_order_object::space_type() ):
+            {
+               if( _es_objects_limit_orders ) {
+                  auto obj = db.find_object(value);
+                  auto l = static_cast<const limit_order_object *>(obj);
+                  if (l != nullptr) {
+                     if (action == "delete")
+                        remove_from_database(l->id, "limitorder");
+                     else
+                        prepareTemplate<limit_order_object>(*l, "limitorder");
+                  }
+               }
+               break;
             }
-         } else if (value.is<asset_bitasset_data_object>() && _es_objects_asset_bitasset) {
-            auto obj = db.find_object(value);
-            auto ba = static_cast<const asset_bitasset_data_object *>(obj);
-            if (ba != nullptr) {
-               if (action == "delete")
-                  remove_from_database(ba->id, "bitasset");
-               else
-                  prepareTemplate<asset_bitasset_data_object>(*ba, "bitasset");
+            case( asset_bitasset_data_object::space_type() ):
+            {
+               if( _es_objects_asset_bitasset ) {
+                  auto obj = db.find_object(value);
+                  auto ba = static_cast<const asset_bitasset_data_object *>(obj);
+                  if (ba != nullptr) {
+                     if (action == "delete")
+                        remove_from_database(ba->id, "bitasset");
+                     else
+                        prepareTemplate<asset_bitasset_data_object>(*ba, "bitasset");
+                  }
+               }
+               break;
             }
+            case( voting_statistics_object::space_type() ):
+            {
+               if( _es_objects_voting_statistics ) {
+                  auto obj = db.find_object(value);
+                  auto vs = static_cast<const voting_statistics_object *>(obj);
+
+                  if (vs != nullptr) {
+                     if (action == "delete" && _es_objects_statistics_delete_allowed ) // TODO will lead to error when false
+                        remove_from_database(vs->id, "voting-statistics");
+                     else
+                        prepareTemplate<voting_statistics_object>(*vs, "voting-statistics");
+                  }
+               }
+               break;
+            }
+            case( voteable_statistics_object::space_type() ):
+            {
+               if( _es_objects_voteable_statistics ) {
+                  auto obj = db.find_object(value);
+                  auto vs = static_cast<const voteable_statistics_object *>(obj);
+
+                  if (vs != nullptr) {
+                     if (action == "delete" && _es_objects_statistics_delete_allowed ) // TODO will lead to error when false
+                        remove_from_database(vs->id, "voteable-statistics");
+                     else
+                        prepareTemplate<voteable_statistics_object>(*vs, "voteable-statistics");
+                  }
+               }
+               break;
+            }
+            default:
+               break;
          }
       }
 
@@ -308,12 +382,16 @@ void es_objects_plugin::plugin_set_program_options(
          ("es-objects-balances", boost::program_options::value<bool>(), "Store balances objects(true)")
          ("es-objects-limit-orders", boost::program_options::value<bool>(), "Store limit order objects(true)")
          ("es-objects-asset-bitasset", boost::program_options::value<bool>(), "Store feed data(true)")
+         ("es-objects-voting-statistics", boost::program_options::value<bool>(), "Store voting statistcs(true)")
+         ("es-objects-voteable-statistics", boost::program_options::value<bool>(), "Store voteable statistcs(true)")
+         ("es-objects-statistics-delete-allowed", boost::program_options::value<bool>(),
+            "Allows the deletion of statistics objects from es(true)")
          ("es-objects-index-prefix", boost::program_options::value<std::string>(),
-               "Add a prefix to the index(objects-)")
+            "Add a prefix to the index(objects-)")
          ("es-objects-keep-only-current", boost::program_options::value<bool>(),
-               "Keep only current state of the objects(true)")
+            "Keep only current state of the objects(true)")
          ("es-objects-start-es-after-block", boost::program_options::value<uint32_t>(),
-               "Start doing ES job after block(0)")
+            "Start doing ES job after block(0)")
          ;
    cfg.add(cli);
 }
@@ -349,6 +427,15 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
    }
    if (options.count("es-objects-asset-bitasset")) {
       my->_es_objects_asset_bitasset = options["es-objects-asset-bitasset"].as<bool>();
+   }
+   if (options.count("es-objects-voting-statistics")) {
+      my->_es_objects_voting_statistics = options["es-objects-voting-statistics"].as<bool>();
+   }
+   if (options.count("es-objects-voteable-statistics")) {
+      my->_es_objects_voteable_statistics = options["es-objects-voteable-statistics"].as<bool>();
+   }
+   if (options.count("es-objects-statistics-delete-allowed")) {
+      my->_es_objects_statistics_delete_allowed = options["es-objects-statistics-delete-allowed"].as<bool>();
    }
    if (options.count("es-objects-index-prefix")) {
       my->_es_objects_index_prefix = options["es-objects-index-prefix"].as<std::string>();

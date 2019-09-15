@@ -205,7 +205,7 @@ void database::update_active_witnesses()
    /// accounts that vote for 0 or 1 witness do not get to express an opinion on
    /// the number of witnesses to have (they abstain and are non-voting accounts)
 
-   share_type stake_tally = 0; 
+   share_type stake_tally = 0;
 
    size_t witness_count = 0;
    if( stake_target > 0 )
@@ -959,8 +959,8 @@ void process_hf_1465( database& db )
       graphene::chain::share_type max_supply = current_asset.options.max_supply;
       if (current_supply > max_supply && max_supply != GRAPHENE_MAX_SHARE_SUPPLY)
       {
-         wlog( "Adjusting max_supply of ${asset} because current_supply (${current_supply}) is greater than ${old}.", 
-               ("asset", current_asset.symbol) 
+         wlog( "Adjusting max_supply of ${asset} because current_supply (${current_supply}) is greater than ${old}.",
+               ("asset", current_asset.symbol)
                ("current_supply", current_supply.value)
                ("old", max_supply));
          db.modify<asset_object>( current_asset, [current_supply](asset_object& obj) {
@@ -1150,6 +1150,8 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    distribute_fba_balances(*this);
    create_buyback_orders(*this);
 
+   on_maintenance_begin( next_block.block_num() );
+
    struct vote_tally_helper {
       database& d;
       const global_property_object& props;
@@ -1178,6 +1180,8 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
             uint64_t voting_stake = stats.total_core_in_orders.value
                   + (stake_account.cashback_vb.valid() ? (*stake_account.cashback_vb)(d).balance.amount.value: 0)
                   + stats.core_in_balance.value;
+
+            d.on_voting_stake_calculated( stake_account, opinion_account, voting_stake );
 
             for( vote_id_type id : opinion_account.options.votes )
             {
@@ -1233,7 +1237,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    update_worker_votes();
 
    const auto& dgpo = get_dynamic_global_properties();
-   
+
    modify(gpo, [&dgpo](global_property_object& p) {
       // Remove scaling of account registration fee
       p.parameters.get_mutable_fees().get<account_create_operation>().basic_fee >>= p.parameters.account_fee_scale_bitshifts *
@@ -1327,6 +1331,8 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    // process_budget needs to run at the bottom because
    //   it needs to know the next_maintenance_time
    process_budget();
+
+   on_maintenance_end();
 }
 
 } }
