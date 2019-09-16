@@ -3,6 +3,7 @@
 #include <fc/log/logger_config.hpp>
 #include <thread>
 #include <memory>
+#include <csignal>
 
 namespace fc {
    extern std::unordered_map<std::string,logger>& get_logger_map();
@@ -15,16 +16,17 @@ int main(int argc, char** argv)
    std::shared_ptr<fc::path> temp_dir = nullptr;
    std::string remote_node_ip;
    std::string my_port = "0";
+   int timeout = -1;
    for (int i = 1; i < argc; i++)
    {
       if (std::string(argv[i]) == "-d")
-      {
          temp_dir = std::make_shared<fc::path>( fc::path(argv[i+1]));
-      }
       if (std::string(argv[i]) == "-s")
          remote_node_ip = argv[i+1];
       if (std::string(argv[i]) == "-p")
          my_port = argv[i+1];
+      if (std::string(argv[i]) == "-t")
+         timeout = std::stoi(argv[i+1]);
    }
    // we were not passed a temp directory, create one
    if (!temp_dir)
@@ -52,8 +54,16 @@ int main(int argc, char** argv)
       app.add_node(remote_node_ip);
    }
 
-   std::cout << "Press e [enter] to exit" << std::endl;
-   char c = 0;
-   while( c != 'e' )
-      std::cin >> c;
+   if (timeout == -1)
+   {
+      std::cout << "Press e [enter] to exit" << std::endl;
+      char c = 0;
+      while( c != 'e' )
+         std::cin >> c;   
+   }
+   else
+   {
+      std::this_thread::sleep_for(std::chrono::seconds(timeout));
+      ::raise(SIGINT);      
+   }   
 }

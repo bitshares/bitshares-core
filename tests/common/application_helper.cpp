@@ -97,7 +97,7 @@ void application_runner::start(const fc::path& data_path, const boost::filesyste
    _app->initialize_plugins(cfg);
    _app->startup_plugins();
    _app->startup();  
-   fc::usleep(fc::milliseconds(500));
+   fc::usleep(fc::milliseconds(250));
 }
 
 std::shared_ptr<graphene::app::application> application_runner::get_app()
