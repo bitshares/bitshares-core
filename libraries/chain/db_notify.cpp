@@ -19,7 +19,7 @@
 #include <graphene/chain/impacted.hpp>
 
 using namespace fc;
-using namespace graphene::chain;
+namespace graphene { namespace chain { namespace detail {
 
 // TODO:  Review all of these, especially no-ops
 struct get_impacted_account_visitor
@@ -283,13 +283,15 @@ struct get_impacted_account_visitor
    }
 };
 
-void graphene::chain::operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result )
+} // detail
+
+void operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result )
 {
-  get_impacted_account_visitor vtor = get_impacted_account_visitor( result );
+  detail::get_impacted_account_visitor vtor( result );
   op.visit( vtor );
 }
 
-void graphene::chain::transaction_get_impacted_accounts( const transaction& tx, flat_set<account_id_type>& result )
+void transaction_get_impacted_accounts( const transaction& tx, flat_set<account_id_type>& result )
 {
   for( const auto& op : tx.operations )
     operation_get_impacted_accounts( op, result );
@@ -440,8 +442,6 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
       }
    }
 } // end get_relevant_accounts( const object* obj, flat_set<account_id_type>& accounts )
-
-namespace graphene { namespace chain {
 
 void database::notify_applied_block( const signed_block& block )
 {
