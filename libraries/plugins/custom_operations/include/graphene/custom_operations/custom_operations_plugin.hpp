@@ -58,22 +58,6 @@ class custom_operations_plugin : public graphene::app::plugin
 
 typedef fc::static_variant<account_storage_map> custom_plugin_operation;
 
-struct custom_op_visitor
-{
-   typedef void result_type;
-   account_id_type _fee_payer;
-   database* _db;
-
-   custom_op_visitor(database& db, account_id_type fee_payer) { _db = &db; _fee_payer = fee_payer; };
-
-   template<typename T>
-   void operator()(T &v) const {
-      v.validate();
-      custom_generic_evaluator evaluator(*_db, _fee_payer);
-      evaluator.do_apply(v);
-   }
-};
-
 } } //graphene::custom_operations
 
 FC_REFLECT_TYPENAME( graphene::custom_operations::custom_plugin_operation )

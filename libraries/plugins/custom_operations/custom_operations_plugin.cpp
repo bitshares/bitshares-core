@@ -53,6 +53,22 @@ class custom_operations_plugin_impl
 
 };
 
+struct custom_op_visitor
+{
+   typedef void result_type;
+   account_id_type _fee_payer;
+   database* _db;
+
+   custom_op_visitor(database& db, account_id_type fee_payer) { _db = &db; _fee_payer = fee_payer; };
+
+   template<typename T>
+   void operator()(T &v) const {
+      v.validate();
+      custom_generic_evaluator evaluator(*_db, _fee_payer);
+      evaluator.do_apply(v);
+   }
+};
+
 void custom_operations_plugin_impl::onBlock( const signed_block& b )
 {
    graphene::chain::database& db = database();
