@@ -27,7 +27,6 @@ namespace graphene { namespace custom_operations {
 
 void account_storage_map::validate()const
 {
-   FC_ASSERT(key_values.size() <= 10);
    FC_ASSERT(catalog.length() <= CUSTOM_OPERATIONS_MAX_KEY_SIZE && catalog.length() > 0);
 }
 

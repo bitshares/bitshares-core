@@ -73,7 +73,8 @@ void custom_operations_plugin_impl::onBlock( const signed_block& b )
          unpacked.visit(vtor);
       }
       catch (fc::exception e) { // only api node will know if the unpack, validate or apply fails
-         dlog("Error: ${ex} in operation: ${op}", ("ex", e.to_detail_string())("op", fc::json::to_string(custom_op)));
+         dlog("Custom operations plugin serializing error: ${ex} in operation: ${op}",
+               ("ex", e.to_detail_string())("op", fc::json::to_string(custom_op)));
          continue;
       }
    }
@@ -101,7 +102,7 @@ std::string custom_operations_plugin::plugin_name()const
 }
 std::string custom_operations_plugin::plugin_description()const
 {
-   return "custom_operations description";
+   return "Stores arbitrary data for accounts by creating specially crafted custom operations.";
 }
 
 void custom_operations_plugin::plugin_set_program_options(

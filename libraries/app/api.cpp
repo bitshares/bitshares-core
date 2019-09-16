@@ -695,9 +695,10 @@ namespace graphene { namespace app {
 
       const auto account_id = database_api.get_account_id_from_string(account_id_or_name);
       vector<account_storage_object> results;
-      auto &index = _app.chain_database()->get_index_type<account_storage_index>().indices().get<by_account_catalog>();
-      auto itr = index.lower_bound(make_tuple(account_id, catalog));
-      while(itr != index.end() && itr->account == account_id && itr->catalog == catalog) {
+      const auto& storage_index = _app.chain_database()->get_index_type<account_storage_index>();
+      const auto& by_account_catalog_idx = storage_index.indices().get<by_account_catalog>();
+      auto itr = by_account_catalog_idx.lower_bound(make_tuple(account_id, catalog));
+      while(itr != by_account_catalog_idx.end() && itr->account == account_id && itr->catalog == catalog) {
          results.push_back(*itr);
          ++itr;
       }

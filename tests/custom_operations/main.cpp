@@ -181,23 +181,6 @@ try {
    BOOST_CHECK_EQUAL(storage_results_nathan[1].key, "language");
    BOOST_CHECK_EQUAL(storage_results_nathan[1].value->as_string(), "en");
 
-   // add more than 10 storage items in 1 operation is not allowed
-   pairs.clear();
-   pairs["key1"] = fc::json::to_string("value1");
-   pairs["key2"] = fc::json::to_string("value2");
-   pairs["key3"] = fc::json::to_string("value3");
-   pairs["key4"] = fc::json::to_string("value4");
-   pairs["key5"] = fc::json::to_string("value5");
-   pairs["key6"] = fc::json::to_string("value6");
-   pairs["key7"] = fc::json::to_string("value7");
-   pairs["key8"] = fc::json::to_string("value8");
-   pairs["key9"] = fc::json::to_string("value9");
-   pairs["key10"] = fc::json::to_string("value10");
-   pairs["key11"] = fc::json::to_string("value11");
-
-   map_operation(pairs, false, catalog, nathan_id, nathan_private_key, db);
-   generate_block();
-
    // alice, duplicated keys in storage, only second value will be added
    pairs.clear();
    catalog = "random";
@@ -327,22 +310,6 @@ try {
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 1 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].key, robert.name);
-
-   // add more than 10 accounts to the list in 1 operation is not allowed
-   accounts.clear();
-   accounts["init0"];
-   accounts["init1"];
-   accounts["init2"];
-   accounts["init3"];
-   accounts["init4"];
-   accounts["init5"];
-   accounts["init6"];
-   accounts["init7"];
-   accounts["init8"];
-   accounts["init9"];
-   accounts["init10"];
-   map_operation(accounts, false, catalog, nathan_id, nathan_private_key, db);
-   generate_block();
 
    // duplicated accounts in the list, only 1 will be inserted
    accounts.clear();

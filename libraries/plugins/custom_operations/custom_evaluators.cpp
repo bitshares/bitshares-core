@@ -67,6 +67,8 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
                   aso.key = row.first;
                   if(row.second.valid())
                      aso.value = fc::json::from_string(*row.second);
+                  else
+                     aso.value.reset();
                });
                results.push_back(created.id);
             }

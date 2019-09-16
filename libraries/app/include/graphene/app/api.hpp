@@ -532,7 +532,7 @@ namespace graphene { namespace app {
                &(app.get_options()) ){}
 
          /**
-          * @breif Get all stored objects of an account in a particular catalog
+          * @brief Get all stored objects of an account in a particular catalog
           *
           * @param account Account name to get info from
           * @param catalog Category classification. Each account can store multiple catalogs.
