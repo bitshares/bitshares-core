@@ -29,7 +29,7 @@
 namespace graphene { namespace protocol {
 
 restriction_predicate_function get_restriction_predicate(vector<restriction> rs, operation::tag_type op_type) {
-   return typelist::runtime::dispatch(operation::list(), op_type, [&rs](auto t) -> restriction_predicate_function {
+   auto f = typelist::runtime::dispatch(operation::list(), op_type, [&rs](auto t) -> restriction_predicate_function {
       using Op = typename decltype(t)::type;
       if (typelist::contains<operation_list_1::list, Op>())
          return get_restriction_predicate_list_1(typelist::index_of<operation_list_1::list, Op>(), std::move(rs));
@@ -55,6 +55,24 @@ restriction_predicate_function get_restriction_predicate(vector<restriction> rs,
                          "LOGIC ERROR: Operation type not handled by custom authorities implementation. "
                          "Please report this error.");
    });
+
+   // Wrap function in a layer that, if the function returns an error, reverses the order of the rejection path. This
+   // is because the order the path is created in, from the top of the call stack to the bottom, is counterintuitive.
+   return [f=std::move(f)](const operation& op) { return f(op).reverse_path(); };
+}
+
+predicate_result& predicate_result::reverse_path() {
+   if (success == true)
+      return *this;
+   auto reverse_subpaths = [](rejection_indicator& indicator) {
+      if (indicator.is_type<vector<predicate_result>>()) {
+         auto& results = indicator.get<vector<predicate_result>>();
+         for (predicate_result& result : results) result.reverse_path();
+      }
+   };
+   std::reverse(rejection_path.begin(), rejection_path.end());
+   std::for_each(rejection_path.begin(), rejection_path.end(), reverse_subpaths);
+   return *this;
 }
 
 // These are some compile-time tests of the metafunctions and predicate type analysis. They are turned off to make

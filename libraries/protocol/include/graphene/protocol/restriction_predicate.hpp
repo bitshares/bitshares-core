@@ -45,7 +45,7 @@ struct predicate_result {
    /// An indicator of what rejection occurred at a particular restriction -- either an index to a sub-restriction, a
    /// list of rejection results from the branches of a logical OR, or the immediate reason for rejection
    using rejection_indicator = static_variant<size_t, vector<predicate_result>, rejection_reason>;
-   /// Failure indicators, from specific (restriction at point of rejection) to general (outermost restriction)
+   /// Failure indicators, ordered from the outermost restriction to the innermost (the location of the rejection)
    vector<rejection_indicator> rejection_path;
 
    static predicate_result Rejection(rejection_reason reason) { return {false, {reason}}; }
@@ -53,10 +53,12 @@ struct predicate_result {
    static predicate_result Success() { return {true, {}}; }
 
    operator bool() const { return success; }
+
+   /// Reverse the order of the rejection path. Returns a reference to this object
+   predicate_result& reverse_path();
 };
 
-/// A restriction predicate is a function accepting an operation and returning a boolean which indicates whether the
-/// operation complies with the restrictions or not
+/// A restriction predicate is a function accepting an operation and returning a predicate_result
 using restriction_predicate_function = std::function<predicate_result(const operation&)>;
 
 /**
