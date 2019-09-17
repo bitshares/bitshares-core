@@ -528,7 +528,7 @@ namespace graphene { namespace app {
    class custom_operations_api
    {
       public:
-         custom_operations_api(application& app):_app(app), database_api( std::ref(*app.chain_database()),
+         custom_operations_api(application& app):_app(app), database_api( *app.chain_database(),
                &(app.get_options()) ){}
 
          /**
