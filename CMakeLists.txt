@@ -144,6 +144,9 @@ endif(USE_PCH)
 
 option(USE_PROFILER "Build with GPROF support(Linux)." OFF)
 
+# Use Boost config file from fc
+set(Boost_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libraries/fc/CMakeModules/Boost")
+
 list( APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/libraries/fc/GitVersionGen" )
 include( GetGitRevisionDescription )
 get_git_head_revision( GIT_REFSPEC GIT_SHA2 )
