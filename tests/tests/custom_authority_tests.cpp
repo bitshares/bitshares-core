@@ -34,6 +34,18 @@
 using namespace graphene::chain;
 using namespace graphene::chain::test;
 
+namespace graphene { namespace protocol {
+bool operator==(const restriction& a, const restriction& b) {
+   if (std::tie(a.member_index, a.restriction_type) != std::tie(b.member_index, b.restriction_type))
+      return false;
+   if (a.argument.is_type<void_t>())
+      return b.argument.is_type<void_t>();
+   using Value_Argument = static_variant<fc::typelist::slice<restriction::argument_type::list, 1>>;
+   return Value_Argument::import_from(a.argument) == Value_Argument::import_from(b.argument);
+}
+} }
+
+
 BOOST_FIXTURE_TEST_SUITE(custom_authority_tests, database_fixture)
 
 #define FUNC(TYPE) BOOST_PP_CAT(restriction::func_, TYPE)
@@ -54,7 +66,7 @@ void expect_exception_string(const string& s, Expression e) {
       e();
       FC_THROW_EXCEPTION(fc::assert_exception, "Expected exception with string ${s}, but no exception thrown",
                          ("s", s));
-   } catch (fc::exception e) {
+   } catch (const fc::exception& e) {
       FC_ASSERT(e.to_detail_string().find(s) != string::npos, "Did not find expected string ${s} in exception: ${e}",
                 ("s", s)("e", e));
    }
