@@ -22,6 +22,8 @@
  * THE SOFTWARE.
  */
 
+#include <boost/test/unit_test.hpp>
+
 #include <graphene/app/api.hpp>
 #include <graphene/utilities/tempdir.hpp>
 #include <fc/crypto/digest.hpp>
@@ -31,7 +33,6 @@
 #include "../common/database_fixture.hpp"
 
 #define BOOST_TEST_MODULE Custom operations plugin tests
-#include <boost/test/included/unit_test.hpp>
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
