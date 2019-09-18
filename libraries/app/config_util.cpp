@@ -209,7 +209,7 @@ static void load_config_file(const fc::path& config_ini_path, const bpo::options
                              bpo::variables_map& options )
 {
    deduplicator dedup;
-   bpo::options_description unique_options("Graphene Witness Node");
+   bpo::options_description unique_options("Bitshares Witness Node");
    for( const boost::shared_ptr<bpo::option_description> opt : cfg_options.options() )
    {
       const boost::shared_ptr<bpo::option_description> od = dedup.next(opt);
