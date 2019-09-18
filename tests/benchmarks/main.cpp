@@ -21,6 +21,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#define BOOST_TEST_MODULE "C++ Benchmarks for Bitshares Blockchain Database"
+#define BOOST_TEST_MODULE "C++ Benchmarks for BitShares Blockchain Database"
 #include <boost/test/included/unit_test.hpp>
 

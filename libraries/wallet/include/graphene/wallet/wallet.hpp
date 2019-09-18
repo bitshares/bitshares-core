@@ -1225,7 +1225,7 @@ class wallet_api
 
       /** Place a limit order attempting to sell one asset for another.
        *
-       * Buying and selling are the same operation on Bitshares; if you want to buy BTS
+       * Buying and selling are the same operation on BitShares; if you want to buy BTS
        * with USD, you should sell USD for BTS.
        *
        * The blockchain will attempt to sell the \c symbol_to_sell for as
