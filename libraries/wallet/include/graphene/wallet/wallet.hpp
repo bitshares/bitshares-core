@@ -798,7 +798,7 @@ class wallet_api
        */
       string  gethelp(const string& method)const;
 
-      /** Loads a specified Bitshares wallet.
+      /** Loads a specified BitShares wallet.
        *
        * The current wallet is closed before the new wallet is loaded.
        *

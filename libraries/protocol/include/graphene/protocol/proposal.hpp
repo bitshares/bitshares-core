@@ -27,7 +27,7 @@
 
 namespace graphene { namespace protocol { 
    /**
-     * @defgroup proposed_transactions  The Bitshares Transaction Proposal Protocol
+     * @defgroup proposed_transactions  The BitShares Transaction Proposal Protocol
      * @ingroup operations
      *
      * BitShares allows users to propose a transaction which requires approval of multiple accounts in order to execute.
