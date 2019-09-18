@@ -494,7 +494,8 @@ public:
         _remote_api(rapi),
         _remote_db(rapi->database()),
         _remote_net_broadcast(rapi->network_broadcast()),
-        _remote_hist(rapi->history())
+        _remote_hist(rapi->history()),
+        _custom_operations(rapi->custom())
    {
       chain_id_type remote_chain_id = _remote_db->get_chain_id();
       if( remote_chain_id != _chain_id )
@@ -1960,6 +1961,37 @@ public:
       } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(seconds_to_add)(broadcast) )
    }
 
+   signed_transaction account_store_map(string account, string catalog, bool remove,
+         flat_map<string, optional<string>> key_values, bool broadcast)
+   {
+      try
+      {
+         FC_ASSERT( !self.is_locked() );
+
+         account_id_type account_id = get_account(account).id;
+
+         custom_operation op;
+         account_storage_map store;
+         store.catalog = catalog;
+         store.remove = remove;
+         store.key_values = key_values;
+
+         custom_plugin_operation custom_plugin_op(store);
+         auto packed = fc::raw::pack(custom_plugin_op);
+
+         op.payer = account_id;
+         op.data = packed;
+
+         signed_transaction tx;
+         tx.operations.push_back(op);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+         tx.validate();
+
+         return sign_transaction(tx, broadcast);
+
+      } FC_CAPTURE_AND_RETHROW( (account)(remove)(catalog)(key_values)(broadcast) )
+   }
+
    vector< vesting_balance_object_with_info > get_vesting_balances( string account_name )
    { try {
       fc::optional<vesting_balance_id_type> vbid = maybe_id<vesting_balance_id_type>( account_name );
@@ -3087,6 +3119,7 @@ public:
    fc::api<database_api>   _remote_db;
    fc::api<network_broadcast_api>   _remote_net_broadcast;
    fc::api<history_api>    _remote_hist;
+   fc::api<custom_operations_api>    _custom_operations;
    optional< fc::api<network_node_api> > _remote_net_node;
    optional< fc::api<graphene::debug_witness::debug_api> > _remote_debug;
 
@@ -5184,6 +5217,18 @@ vector<blind_receipt> wallet_api::blind_history( string key_or_account )
 order_book wallet_api::get_order_book( const string& base, const string& quote, unsigned limit )
 {
    return( my->_remote_db->get_order_book( base, quote, limit ) );
+}
+
+// custom operations
+signed_transaction wallet_api::account_store_map(string account, string catalog, bool remove,
+      flat_map<string, optional<string>> key_values, bool broadcast)
+{
+   return my->account_store_map(account, catalog, remove, key_values, broadcast);
+}
+
+vector<account_storage_object> wallet_api::get_account_storage(string account, string catalog)
+{
+   return my->_custom_operations->get_storage_info(account, catalog);
 }
 
 signed_block_with_info::signed_block_with_info( const signed_block& block )

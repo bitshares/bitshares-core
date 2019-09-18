@@ -533,6 +533,7 @@ void application_impl::startup()
       wild_access.allowed_apis.push_back( "network_broadcast_api" );
       wild_access.allowed_apis.push_back( "history_api" );
       wild_access.allowed_apis.push_back( "orders_api" );
+      wild_access.allowed_apis.push_back( "custom_operations_api" );
       _apiaccess.permission_map["*"] = wild_access;
    }
 
