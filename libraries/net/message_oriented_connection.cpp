@@ -52,6 +52,7 @@ namespace graphene { namespace net {
       message_oriented_connection* _self;
       message_oriented_connection_delegate *_delegate;
       stcp_socket _sock;
+      fc::promise<void>::ptr _ready_for_sending;
       fc::future<void> _read_loop_done;
       uint64_t _bytes_received;
       uint64_t _bytes_sent;
@@ -95,6 +96,7 @@ namespace graphene { namespace net {
                                                                        message_oriented_connection_delegate* delegate)
     : _self(self),
       _delegate(delegate),
+      _ready_for_sending(fc::promise<void>::create()),
       _bytes_received(0),
       _bytes_sent(0),
       _send_message_in_progress(false)
@@ -121,6 +123,7 @@ namespace graphene { namespace net {
       _sock.accept();
       assert(!_read_loop_done.valid()); // check to be sure we never launch two read loops
       _read_loop_done = fc::async([=](){ read_loop(); }, "message read_loop");
+      _ready_for_sending->set_value();
     }
 
     void message_oriented_connection_impl::connect_to(const fc::ip::endpoint& remote_endpoint)
@@ -129,6 +132,7 @@ namespace graphene { namespace net {
       _sock.connect_to(remote_endpoint);
       assert(!_read_loop_done.valid()); // check to be sure we never launch two read loops
       _read_loop_done = fc::async([=](){ read_loop(); }, "message read_loop");
+      _ready_for_sending->set_value();
     }
 
     void message_oriented_connection_impl::bind(const fc::ip::endpoint& local_endpoint)
@@ -251,6 +255,7 @@ namespace graphene { namespace net {
         }
         ~verify_no_send_in_progress() { var = false; }
       } _verify_no_send_in_progress(_send_message_in_progress);
+      _ready_for_sending->wait();
 
       try
       {
@@ -301,6 +306,7 @@ namespace graphene { namespace net {
       {
         wlog( "Exception thrown while canceling message_oriented_connection's read_loop, ignoring" );
       }
+      _ready_for_sending->set_exception( std::make_shared<fc::canceled_exception>() );
     }
 
     uint64_t message_oriented_connection_impl::get_total_bytes_sent() const
