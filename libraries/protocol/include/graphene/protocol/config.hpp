@@ -133,6 +133,8 @@
 #define GRAPHENE_TEMP_ACCOUNT (graphene::protocol::account_id_type(4))
 /// Represents the canonical account for specifying you will vote directly (as opposed to a proxy)
 #define GRAPHENE_PROXY_TO_SELF_ACCOUNT (graphene::protocol::account_id_type(5))
+/// Represents the canonical account for specifying you will vote per referendum category
+#define GRAPHENE_PROXY_PER_CATEGORY_ACCOUNT (graphene::protocol::account_id_type(6))
 /// Sentinel value used in the scheduler.
 #define GRAPHENE_NULL_WITNESS (graphene::protocol::witness_id_type(0))
 ///@}
