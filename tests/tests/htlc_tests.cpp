@@ -63,7 +63,7 @@ void generate_random_preimage(uint16_t key_size, std::vector<char>& vec)
 	return;
 }
 
-void advance_past_hardfork(database_fixture* db_fixture)
+void advance_past_htlc_first_hardfork(database_fixture* db_fixture)
 {
    db_fixture->generate_blocks(HARDFORK_CORE_1468_TIME);
    set_expiration(db_fixture->db, db_fixture->trx);
@@ -80,7 +80,7 @@ try {
 
    transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
 
-   advance_past_hardfork(this);
+   advance_past_htlc_first_hardfork(this);
 
    uint16_t preimage_size = 256;
    std::vector<char> pre_image(256);
@@ -97,15 +97,10 @@ try {
       create_operation.amount = graphene::chain::asset( 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 60;
-      create_operation.preimage_hash = hash_it<fc::hash160>( pre_image );
+      create_operation.preimage_hash = hash_it<fc::sha256>( pre_image );
       create_operation.preimage_size = preimage_size;
       create_operation.from = alice_id;
       create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
-      create_operation.extensions.value.memo = memo_data();
-      create_operation.extensions.value.memo->from = alice_public_key;
-      create_operation.extensions.value.memo->to = bob_public_key;
-      create_operation.extensions.value.memo->set_message(
-            alice_private_key, bob_public_key, "Dear Bob,\n\nMoney!\n\nLove, Alice");
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
       PUSH_TX(db, trx, ~0);
@@ -182,6 +177,145 @@ try {
 } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( htlc_hf_bsip64 )
+{
+try {
+   ACTORS((alice)(bob)(joker));
+
+   int64_t init_balance(100 * GRAPHENE_BLOCKCHAIN_PRECISION);
+
+   transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
+   transfer( committee_account, joker_id, graphene::chain::asset(init_balance) );
+
+   advance_past_htlc_first_hardfork(this);
+
+   uint16_t preimage_size = 256;
+   std::vector<char> pre_image(256);
+   generate_random_preimage(preimage_size, pre_image);
+
+   graphene::chain::htlc_id_type alice_htlc_id;
+   // cler everything out
+   generate_block();
+   trx.clear();
+   // Alice attempts to put a contract on the blockchain with HASH160
+   {
+      graphene::chain::htlc_create_operation create_operation;
+      BOOST_TEST_MESSAGE("Alice (who has 100 coins, is transferring 3 coins to Bob");
+      create_operation.amount = graphene::chain::asset( 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
+      create_operation.to = bob_id;
+      create_operation.claim_period_seconds = 60;
+      create_operation.preimage_hash = hash_it<fc::hash160>( pre_image );
+      create_operation.preimage_size = preimage_size;
+      create_operation.from = alice_id;
+      create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
+      trx.operations.push_back(create_operation);
+      sign(trx, alice_private_key);
+      // this try/catch is just to get some console output to verify the exception
+      try {
+         PUSH_TX(db, trx, ~0);
+         BOOST_TEST_FAIL("crate_operation should have failed due to the HASH160 hash");
+      } catch(fc::exception& ex) {
+         if ( ex.to_string().find("HASH160 unavailable") == std::string::npos )
+            BOOST_TEST_FAIL("create_operation failed but not due to the hash160 function");
+       }
+      trx.clear();
+   }
+
+   // Alice attempts to put a contract on the blockchain with a memo
+   {
+      graphene::chain::htlc_create_operation create_operation;
+      BOOST_TEST_MESSAGE("Alice (who has 100 coins, is transferring 3 coins to Bob");
+      create_operation.amount = graphene::chain::asset( 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
+      create_operation.to = bob_id;
+      create_operation.claim_period_seconds = 60;
+      create_operation.preimage_hash = hash_it<fc::sha256>( pre_image );
+      create_operation.preimage_size = preimage_size;
+      create_operation.from = alice_id;
+      create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
+      create_operation.extensions.value.memo = memo_data();
+      create_operation.extensions.value.memo->from = alice_public_key;
+      create_operation.extensions.value.memo->to = bob_public_key;
+      create_operation.extensions.value.memo->set_message(
+            alice_private_key, bob_public_key, "Dear Bob,\n\nMoney!\n\nLove, Alice");
+      trx.operations.push_back(create_operation);
+      sign(trx, alice_private_key);
+      try {
+         PUSH_TX(db, trx, ~0);
+         BOOST_TEST_FAIL("crate_operation should have failed due to the memo field");
+      } catch(fc::exception& ex) {
+         if (ex.to_string().find("Memo unavailable") == std::string::npos )
+            BOOST_TEST_FAIL("create_operation failed but not due to the memo field.");
+      }
+      trx.clear();
+   }
+
+   // fast forward to after the hardfork
+   generate_blocks( HARDFORK_CORE_BSIP64_TIME + 60 );
+   set_expiration( db, trx );
+
+   // Alice attempts to put a contract on the blockchain that is correct (and preimage size of 0)
+   {
+      graphene::chain::htlc_create_operation create_operation;
+      BOOST_TEST_MESSAGE("Alice (who has 100 coins, is transferring 3 coins to Bob");
+      create_operation.amount = graphene::chain::asset( 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
+      create_operation.to = bob_id;
+      create_operation.claim_period_seconds = 60;
+      create_operation.preimage_hash = hash_it<fc::sha256>( pre_image );
+      create_operation.preimage_size = 0;
+      create_operation.from = alice_id;
+      create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
+      create_operation.extensions.value.memo = memo_data();
+      create_operation.extensions.value.memo->from = alice_public_key;
+      create_operation.extensions.value.memo->to = bob_public_key;
+      create_operation.extensions.value.memo->set_message(
+            alice_private_key, bob_public_key, "Dear Bob,\n\nMoney!\n\nLove, Alice");
+      trx.operations.push_back(create_operation);
+      sign(trx, alice_private_key);
+      PUSH_TX(db, trx, ~0);
+      trx.clear();
+      graphene::chain::signed_block blk = generate_block();
+      processed_transaction alice_trx = blk.transactions[0];
+      alice_htlc_id = alice_trx.operation_results[0].get<object_id_type>();
+      generate_block();
+   }
+
+   // verify funds on hold... 100 - 3 = 97, minus the 4 coin fee = 93
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 93 * GRAPHENE_BLOCKCHAIN_PRECISION );
+
+   // make sure Bob (or anyone) can see the details of the transaction
+   graphene::app::database_api db_api(db);
+   auto obj = db_api.get_objects( {alice_htlc_id }).front();
+   graphene::chain::htlc_object htlc = obj.template as<graphene::chain::htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS);
+
+   // grab number of history objects to make sure everyone gets notified
+   size_t alice_num_history = get_operation_history(alice_id).size();
+   size_t bob_num_history = get_operation_history(bob_id).size();
+   size_t joker_num_history = get_operation_history(joker_id).size();
+
+   // joker sends a redeem operation to claim the funds for bob
+   {
+      graphene::chain::htlc_redeem_operation update_operation;
+      update_operation.redeemer = joker_id;
+      update_operation.htlc_id = alice_htlc_id;
+      update_operation.preimage = pre_image;
+      update_operation.fee = db.current_fee_schedule().calculate_fee( update_operation );
+      trx.operations.push_back( update_operation );
+      sign(trx, joker_private_key);
+      PUSH_TX( db, trx, ~0 );
+      generate_block();
+      trx.clear();
+   }
+   // verify funds end up in Bob's account (3)
+   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
+   // verify funds remain out of Alice's acount ( 100 - 3 - 4 )
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 93 * GRAPHENE_BLOCKCHAIN_PRECISION );
+   // verify all three get notified
+   BOOST_CHECK_EQUAL( get_operation_history(alice_id).size(), alice_num_history + 1);
+   BOOST_CHECK_EQUAL( get_operation_history(bob_id).size(), bob_num_history + 1);
+   BOOST_CHECK_EQUAL( get_operation_history(joker_id).size(), joker_num_history + 1);
+} FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 {
 try {
@@ -193,7 +327,7 @@ try {
    transfer( committee_account, bob_id, graphene::chain::asset(init_balance) );
    transfer( committee_account, joker_id, graphene::chain::asset(init_balance) );
 
-   advance_past_hardfork(this);
+   advance_past_htlc_first_hardfork(this);
    
    uint16_t preimage_size = 256;
    std::vector<char> pre_image(preimage_size);
@@ -276,7 +410,7 @@ try {
 BOOST_AUTO_TEST_CASE( other_peoples_money )
 {
 try {
-   advance_past_hardfork(this);
+   advance_past_htlc_first_hardfork(this);
 	
    ACTORS((alice)(bob));
 
@@ -393,7 +527,7 @@ BOOST_AUTO_TEST_CASE( htlc_hardfork_test )
 
       // now things should start working...
       BOOST_TEST_MESSAGE("Advancing to HTLC hardfork time.");
-      advance_past_hardfork(this);
+      advance_past_htlc_first_hardfork(this);
 
       proposal_id_type good_proposal_id;
       BOOST_TEST_MESSAGE( "Creating a proposal to change the max_preimage_size to 2048 and set higher fees" );
@@ -638,7 +772,7 @@ try {
    fund( alice, graphene::chain::asset(init_balance) );
    fund( bob, graphene::chain::asset(init_balance) );
 
-   advance_past_hardfork(this);
+   advance_past_htlc_first_hardfork(this);
 
    // blacklist bob
    {

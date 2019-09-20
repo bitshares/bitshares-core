@@ -48,6 +48,13 @@ namespace graphene {
          FC_ASSERT( o.preimage_size <= htlc_options->max_preimage_size, "HTLC preimage length exceeds allowed length" );
          // make sure the sender has the funds for the HTLC
          FC_ASSERT( d.get_balance( o.from, o.amount.asset_id) >= (o.amount), "Insufficient funds") ;
+         // memo field added at harfork BSIP64
+         // NOTE: this check can be removed after hardfork time
+         FC_ASSERT( d.head_block_time() > HARDFORK_CORE_BSIP64_TIME || !o.extensions.value.memo.valid(), 
+               "Memo unavailable until after HARDFORK BSIP64");
+         // HASH160 added at hardfork BSIP64
+         FC_ASSERT( d.head_block_time() > HARDFORK_CORE_BSIP64_TIME || o.preimage_hash.which() != 
+               htlc_hash(fc::hash160()).which(), "HASH160 unavailable until after HARDFORK BSIP64" );
          const auto& asset_to_transfer = o.amount.asset_id( d );
          const auto& from_account = o.from( d );
          const auto& to_account = o.to( d );
@@ -102,8 +109,11 @@ namespace graphene {
       void_result htlc_redeem_evaluator::do_evaluate(const htlc_redeem_operation& o)
       {
          htlc_obj = &db().get<htlc_object>(o.htlc_id);
-
-         FC_ASSERT(o.preimage.size() == htlc_obj->conditions.hash_lock.preimage_size, "Preimage size mismatch.");
+         // TODO: The hardfork portion of this check can be removed if no HTLC redemptions are 
+         // attempted on an HTLC with a 0 preimage size before the hardfork date.
+         if ( htlc_obj->conditions.hash_lock.preimage_size > 0U || 
+               db().head_block_time() <= HARDFORK_CORE_BSIP64_TIME )
+            FC_ASSERT(o.preimage.size() == htlc_obj->conditions.hash_lock.preimage_size, "Preimage size mismatch.");
          const htlc_redeem_visitor vtor( o.preimage );
          FC_ASSERT( htlc_obj->conditions.hash_lock.preimage_hash.visit( vtor ), 
                "Provided preimage does not generate correct hash.");
