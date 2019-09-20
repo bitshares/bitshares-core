@@ -26,8 +26,10 @@
 #include <boost/test/unit_test.hpp>
 #include <fc/exception/exception.hpp>
 #include <graphene/protocol/restriction_predicate.hpp>
+#include <graphene/protocol/market.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/custom_authority_object.hpp>
+#include <graphene/chain/market_object.hpp>
 
 #include "../common/database_fixture.hpp"
 
@@ -929,6 +931,191 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //////
          trx.clear();
          trx.operations = {bob_transfers_from_alice_to_diana};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+      } FC_LOG_AND_RETHROW()
+   }
+
+   /**
+    * Test of authorization and revocation of one account (Alice) authorizing another account (Bob)
+    * to trade with her account but not to transfer out of her account
+    */
+   BOOST_AUTO_TEST_CASE(authorized_trader_custom_auths) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Define a market-issued asset called USDBIT
+         //////
+         ACTORS((feedproducer));
+         const auto &bitusd = create_bitasset("USDBIT", feedproducer_id);
+         const auto &core = asset_id_type()(db);
+         update_feed_producers(bitusd, {feedproducer.id});
+
+         price_feed current_feed;
+         current_feed.maintenance_collateral_ratio = 1750;
+         current_feed.maximum_short_squeeze_ratio = 1100;
+         current_feed.settlement_price = bitusd.amount(1) / core.amount(5);
+         publish_feed(bitusd, feedproducer, current_feed);
+
+
+         //////
+         // Initialize: Fund some accounts
+         //////
+         ACTORS((alice)(bob)(charlie)(diana))
+         fund(alice, asset(5000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+         fund(bob, asset(100 * GRAPHENE_BLOCKCHAIN_PRECISION));
+
+
+         //////
+         // Bob attempts to create a limit order on behalf of Alice
+         // This should fail because Bob is not authorized to trade with her account
+         //////
+         set_expiration( db, trx );
+         trx.operations.clear();
+
+         limit_order_create_operation buy_order;
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = core.amount(59);
+         buy_order.min_to_receive = bitusd.amount(7);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // Alice authorizes Bob to place limit orders that offer the core asset for sale
+         //////
+         custom_authority_create_operation authorize_limit_orders;
+         authorize_limit_orders.account = alice.get_id();
+         authorize_limit_orders.auth.add_authority(bob.get_id(), 1);
+         authorize_limit_orders.auth.weight_threshold = 1;
+         authorize_limit_orders.enabled = true;
+         authorize_limit_orders.valid_to = db.head_block_time() + 1000;
+         authorize_limit_orders.operation_type = operation::tag<limit_order_create_operation>::value;
+         trx.clear();
+         trx.operations = {authorize_limit_orders};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+         auto caa =
+                 db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(alice.get_id());
+         custom_authority_id_type auth_id = caa->id;
+
+         custom_authority_create_operation authorize_limit_order_cancellations;
+         authorize_limit_order_cancellations.account = alice.get_id();
+         authorize_limit_order_cancellations.auth.add_authority(bob.get_id(), 1);
+         authorize_limit_order_cancellations.auth.weight_threshold = 1;
+         authorize_limit_order_cancellations.enabled = true;
+         authorize_limit_order_cancellations.valid_to = db.head_block_time() + 1000;
+         authorize_limit_order_cancellations.operation_type = operation::tag<limit_order_cancel_operation>::value;
+         trx.clear();
+         trx.operations = {authorize_limit_order_cancellations};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the buy order transaction
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Bob attempts to create a limit order on behalf of Alice
+         // This should succeed because Bob is authorized to create limit orders
+         //////
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, bob_private_key);
+         auto processed_buy = PUSH_TX(db, trx);
+         const limit_order_object *buy_order_object = db.find<limit_order_object>( processed_buy.operation_results[0].get<object_id_type>() );
+
+
+         //////
+         // Bob attempts to cancel the limit order on behalf of Alice
+         // This should succeed because Bob is authorized to cancel limit orders
+         //////
+         limit_order_cancel_operation cancel_order;
+         cancel_order.fee_paying_account = alice_id;
+         cancel_order.order = buy_order_object->id;
+         trx.clear();
+         trx.operations = {cancel_order};
+         sign(trx, bob_private_key);
+         auto processed_cancelled = PUSH_TX(db, trx);
+
+         //////
+         // Bob attempts to transfer funds out of Alice's account
+         // This should fail because Bob is not authorized to transfer funds out of her account
+         //////
+         transfer_operation top;
+         top.to = bob.get_id();
+         top.from = alice.get_id();
+         top.amount.amount = 99 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         trx.operations = {top};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the buy order transaction
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Alice attempts to create her own limit order
+         // This should succeed because Alice has not relinquished her own authority to trade
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = core.amount(59);
+         buy_order.min_to_receive = bitusd.amount(7);
+         buy_order.expiration = time_point_sec::maximum();
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Alice revokes/disables the authorization to create limit orders
+         //////
+         custom_authority_update_operation disable_authorizations;
+         disable_authorizations.account = alice.get_id();
+         disable_authorizations.authority_to_update = auth_id;
+         disable_authorizations.new_enabled = false;
+         trx.clear();
+         trx.operations = {disable_authorizations};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the buy order transaction
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Bob attempts to create a limit order on behalf of Alice
+         // This should fail because Bob is not authorized to trade with her account
+         //////
+         trx.clear();
+         trx.operations = {buy_order};
          sign(trx, bob_private_key);
          BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
 
