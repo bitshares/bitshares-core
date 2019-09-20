@@ -301,6 +301,11 @@ public:
    {
       return "SHA256 " + hash.str();
    }
+
+   result_type operator()( const fc::hash160& hash )const
+   {
+      return "HASH160 " + hash.str();
+   }
 };
 
 /* meta contains lines of the form "key=value".
@@ -3405,6 +3410,8 @@ fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
          { return convert("SHA1", obj.str()); }
          result_type operator()(const fc::sha256& obj)const
          { return convert("SHA256", obj.str()); }
+         result_type operator()(const fc::hash160& obj)const
+         { return convert("HASH160", obj.str()); }
          private:
          result_type convert(const std::string& type, const std::string& hash)const
          {

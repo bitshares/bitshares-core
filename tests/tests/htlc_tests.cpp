@@ -97,7 +97,7 @@ try {
       create_operation.amount = graphene::chain::asset( 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 60;
-      create_operation.preimage_hash = hash_it<fc::sha256>( pre_image );
+      create_operation.preimage_hash = hash_it<fc::hash160>( pre_image );
       create_operation.preimage_size = preimage_size;
       create_operation.from = alice_id;
       create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);

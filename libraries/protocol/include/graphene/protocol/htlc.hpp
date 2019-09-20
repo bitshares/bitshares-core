@@ -33,11 +33,13 @@ namespace graphene { namespace protocol {
       typedef fc::ripemd160    htlc_algo_ripemd160;
       typedef fc::sha1         htlc_algo_sha1;
       typedef fc::sha256       htlc_algo_sha256;
+      typedef fc::hash160      htlc_algo_hash160;
 
       typedef fc::static_variant<
          htlc_algo_ripemd160,
          htlc_algo_sha1,
-         htlc_algo_sha256
+         htlc_algo_sha256,
+         htlc_algo_hash160
       > htlc_hash;
 
       struct htlc_create_operation : public base_operation 

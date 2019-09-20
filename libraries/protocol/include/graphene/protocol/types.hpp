@@ -44,6 +44,7 @@
 #include <fc/crypto/sha1.hpp>
 #include <fc/crypto/sha224.hpp>
 #include <fc/crypto/sha256.hpp>
+#include <fc/crypto/hash160.hpp>
 #include <fc/crypto/elliptic.hpp>
 #include <fc/reflect/reflect.hpp>
 #include <fc/reflect/variant.hpp>
