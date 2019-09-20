@@ -101,6 +101,11 @@ try {
       create_operation.preimage_size = preimage_size;
       create_operation.from = alice_id;
       create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
+      create_operation.extensions.value.memo = memo_data();
+      create_operation.extensions.value.memo->from = alice_public_key;
+      create_operation.extensions.value.memo->to = bob_public_key;
+      create_operation.extensions.value.memo->set_message(
+            alice_private_key, bob_public_key, "Dear Bob,\n\nMoney!\n\nLove, Alice");
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
       PUSH_TX(db, trx, ~0);

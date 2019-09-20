@@ -74,6 +74,8 @@ namespace graphene {
                esc.conditions.hash_lock.preimage_hash = o.preimage_hash;
                esc.conditions.hash_lock.preimage_size = o.preimage_size;
                esc.conditions.time_lock.expiration    = dbase.head_block_time() + o.claim_period_seconds;
+               if ( o.extensions.value.memo.valid() )
+                  esc.memo = o.extensions.value.memo;
             });
             return  esc.id;
 
