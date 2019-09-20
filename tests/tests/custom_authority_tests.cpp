@@ -1122,4 +1122,176 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
       } FC_LOG_AND_RETHROW()
    }
 
+
+   /**
+    * Test of authorization of one account (feedproducer) authorizing another account (Bob)
+    * to publish feeds. The authorization remains associated with account even when the account changes its keys.
+    */
+   BOOST_AUTO_TEST_CASE(feed_publisher_authorizes_other_account) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Define a market-issued asset called USDBIT
+         //////
+         ACTORS((feedproducer));
+         const auto &bitusd = create_bitasset("USDBIT", feedproducer_id);
+         const auto &core = asset_id_type()(db);
+         update_feed_producers(bitusd, {feedproducer.id});
+
+         price_feed current_feed;
+         current_feed.maintenance_collateral_ratio = 1750;
+         current_feed.maximum_short_squeeze_ratio = 1100;
+         current_feed.settlement_price = bitusd.amount(1) / core.amount(5);
+         publish_feed(bitusd, feedproducer, current_feed);
+
+
+         //////
+         // Initialize: Fund other accounts
+         //////
+         ACTORS((bob))
+         fund(bob, asset(100 * GRAPHENE_BLOCKCHAIN_PRECISION));
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the publish feed transaction
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Bob attempts to publish feed of USDBIT on behalf of feedproducer
+         // This should fail because Bob is not authorized to publish the feed
+         //////
+         asset_publish_feed_operation pop;
+         pop.publisher = feedproducer.id;
+         pop.asset_id = bitusd.id;
+         pop.feed = current_feed;
+         if (pop.feed.core_exchange_rate.is_null())
+            pop.feed.core_exchange_rate = pop.feed.settlement_price;
+         trx.clear();
+         trx.operations.emplace_back(std::move(pop));
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // feedproducer authorizes Bob to publish feeds on its behalf
+         //////
+         custom_authority_create_operation authorize_feed_publishing;
+         authorize_feed_publishing.account = feedproducer.get_id();
+         authorize_feed_publishing.auth.add_authority(bob.get_id(), 1);
+         authorize_feed_publishing.auth.weight_threshold = 1;
+         authorize_feed_publishing.enabled = true;
+         authorize_feed_publishing.valid_to = db.head_block_time() + 1000;
+         authorize_feed_publishing.operation_type = operation::tag<asset_publish_feed_operation>::value;
+         trx.clear();
+         trx.operations = {authorize_feed_publishing};
+         sign(trx, feedproducer_private_key);
+         PUSH_TX(db, trx);
+
+         custom_authority_id_type auth_id =
+                 db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(feedproducer.id)->id;
+
+         //////
+         // Bob attempts to publish feed of USDBIT on behalf of feedproducer
+         // This should succeed because Bob is authorized by feedproducer to publish the feed
+         //////
+         trx.clear();
+         trx.operations.emplace_back(std::move(pop));
+         sign(trx, bob_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the publish feed transaction
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Bob creates a new key
+         //////
+         fc::ecc::private_key new_bob_private_key = generate_private_key("new Bob key");
+         public_key_type new_bob_public_key = public_key_type(new_bob_private_key.get_public_key());
+
+
+         //////
+         // Bob attempts to publish feed of USDBIT on behalf of feedproducer with new key
+         // This should fail because the new key is not associated with Bob on the blockchain
+         //////
+         trx.clear();
+         trx.operations.emplace_back(std::move(pop));
+         sign(trx, new_bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the publish feed transaction
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Bob changes his account's active key
+         //////
+         account_update_operation uop;
+         uop.account = bob.get_id();
+         uop.active = authority(1, new_bob_public_key, 1);
+         trx.clear();
+         trx.operations.emplace_back(std::move(uop));
+         sign(trx, bob_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Bob attempts to publish feed of USDBIT on behalf of feedproducer
+         // This should succeed because Bob's new key is associated with Bob's authorized account.
+         //////
+         trx.clear();
+         trx.operations.emplace_back(std::move(pop));
+         sign(trx, new_bob_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Alice revokes/disables the authorization by disabling
+         //////
+         custom_authority_update_operation disable_authorizations;
+         disable_authorizations.account = feedproducer.get_id();
+         disable_authorizations.authority_to_update = auth_id;
+         disable_authorizations.new_enabled = false;
+         trx.clear();
+         trx.operations = {disable_authorizations};
+         sign(trx, feedproducer_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the publish feed transaction
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Bob attempts to publish feed of USDBIT on behalf of feedproducer with new key
+         // This should fail because Bob's account is no longer authorized by Alice
+         //////
+         trx.clear();
+         trx.operations.emplace_back(std::move(pop));
+         sign(trx, new_bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+      } FC_LOG_AND_RETHROW()
+   }
+
 BOOST_AUTO_TEST_SUITE_END()
