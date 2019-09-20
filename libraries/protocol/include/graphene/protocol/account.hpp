@@ -36,6 +36,10 @@ namespace graphene { namespace protocol {
       optional<account_id_type> committee_voting_account;
       optional<account_id_type> witness_voting_account;
       optional<account_id_type> worker_voting_account;
+
+      optional<flat_set<vote_id_type>> committee_votes;
+      optional<flat_set<vote_id_type>> witness_votes;
+      optional<flat_set<vote_id_type>> worker_votes;
    };
    typedef extension<additional_account_options> additional_account_options_t;
 
@@ -277,7 +281,8 @@ namespace graphene { namespace protocol {
 
 } } // graphene::protocol
 
-FC_REFLECT( graphene::protocol::additional_account_options, (committee_voting_account)(witness_voting_account)(worker_voting_account) )
+FC_REFLECT( graphene::protocol::additional_account_options,
+        (committee_voting_account)(witness_voting_account)(worker_voting_account)(committee_votes)(witness_votes)(worker_votes))
 FC_REFLECT(graphene::protocol::account_options, (memo_key)(voting_account)(num_witness)(num_committee)(votes)(extensions))
 FC_REFLECT_ENUM( graphene::protocol::account_whitelist_operation::account_listing,
                 (no_listing)(white_listed)(black_listed)(white_and_black_listed))
