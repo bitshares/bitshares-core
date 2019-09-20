@@ -518,7 +518,8 @@ void elasticsearch_plugin::plugin_startup()
       FC_THROW_EXCEPTION(fc::exception, "ES database is not up in url ${url}", ("url", my->_elasticsearch_node_url));
 
    const auto es_version = graphene::utilities::getVersion(es);
-   if(std::stoi(es_version.substr(0,1)) >= 7)
+   auto dot_pos = es_version.find('.');
+   if(std::stoi(es_version.substr(0,dot_pos)) >= 7)
       my->esge7 = true;
 
    ilog("elasticsearch ACCOUNT HISTORY: plugin_startup() begin");

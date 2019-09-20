@@ -408,7 +408,8 @@ void es_objects_plugin::plugin_startup()
    ilog("elasticsearch OBJECTS: plugin_startup() begin");
 
    const auto es_version = graphene::utilities::getVersion(es);
-   if(std::stoi(es_version.substr(0,1)) >= 7)
+   auto dot_pos = es_version.find('.');
+   if(std::stoi(es_version.substr(0,dot_pos)) >= 7)
       my->esge7 = true;
 }
 
