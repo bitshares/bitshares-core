@@ -31,6 +31,13 @@
 #include <graphene/protocol/vote.hpp>
 
 namespace graphene { namespace protocol {
+   struct additional_account_options
+   {
+      optional<account_id_type> committee_voting_account;
+      optional<account_id_type> witness_voting_account;
+      optional<account_id_type> worker_voting_account;
+   };
+   typedef extension<additional_account_options> additional_account_options_t;
 
    bool is_valid_name( const string& s );
    bool is_cheap_name( const string& n );
@@ -56,7 +63,7 @@ namespace graphene { namespace protocol {
       /// This is the list of vote IDs this account votes for. The weight of these votes is determined by this
       /// account's balance of core asset.
       flat_set<vote_id_type> votes;
-      extensions_type        extensions;
+      additional_account_options_t extensions;
 
       /// Whether this account is voting
       inline bool is_voting() const
@@ -270,6 +277,7 @@ namespace graphene { namespace protocol {
 
 } } // graphene::protocol
 
+FC_REFLECT( graphene::protocol::additional_account_options, (committee_voting_account)(witness_voting_account)(worker_voting_account) )
 FC_REFLECT(graphene::protocol::account_options, (memo_key)(voting_account)(num_witness)(num_committee)(votes)(extensions))
 FC_REFLECT_ENUM( graphene::protocol::account_whitelist_operation::account_listing,
                 (no_listing)(white_listed)(black_listed)(white_and_black_listed))
@@ -301,6 +309,7 @@ FC_REFLECT( graphene::protocol::account_transfer_operation::fee_parameters_type,
 
 FC_REFLECT( graphene::protocol::account_transfer_operation, (fee)(account_id)(new_owner)(extensions) )
 
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::additional_account_options )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_options )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_whitelist_operation::fee_parameters_type )
