@@ -1,16 +1,3 @@
-if( MINGW )
-    # MinGW requires a specific order of included libraries ( CURL before ZLib )
-    find_package( ZLIB REQUIRED )
-    SET( CURL_ADDITIONAL_LIBS ${ZLIB_LIBRARY} pthread )
-endif( MINGW )
-if ( MSVC )
-    SET( CURL_ADDITIONAL_LIBS Wldap32 )
-endif( MSVC )
-
-if( WIN32 )
-    LIST( APPEND CURL_ADDITIONAL_LIBS ${PLATFORM_SPECIFIC_LIBS} )
-endif( WIN32 )
-
 add_subdirectory( fc )
 add_subdirectory( db )
 add_subdirectory( chain )

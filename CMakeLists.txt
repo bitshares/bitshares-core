@@ -58,9 +58,19 @@ macro(FIND_CURL)
       find_package(CURL REQUIRED)
    endif (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
 
-   if(MINGW)
-       list(APPEND CURL_LIBRARIES pthread)
-   endif(MINGW)
+   if( WIN32 )
+     if ( MSVC )
+       list( APPEND CURL_LIBRARIES Wldap32 )
+     endif( MSVC )
+
+     if( MINGW )
+       # MinGW requires a specific order of included libraries ( CURL before ZLib )
+       find_package( ZLIB REQUIRED )
+       list( APPEND CURL_LIBRARIES ${ZLIB_LIBRARY} pthread )
+     endif( MINGW )
+
+     list( APPEND CURL_LIBRARIES ${PLATFORM_SPECIFIC_LIBS} )
+   endif( WIN32 )
 endmacro()
 
 # Save the old value of CMAKE_REQUIRED_FLAGS
