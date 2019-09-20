@@ -71,6 +71,7 @@ class es_objects_plugin_impl
 
       uint32_t block_number;
       fc::time_point_sec block_time;
+      bool esge7 = false;
 
    private:
       template<typename T>
@@ -224,7 +225,8 @@ void es_objects_plugin_impl::remove_from_database( object_id_type id, std::strin
       fc::mutable_variant_object delete_line;
       delete_line["_id"] = string(id);
       delete_line["_index"] = _es_objects_index_prefix + index;
-      delete_line["_type"] = "data";
+      if(!esge7)
+         delete_line["_type"] = "data";
       fc::mutable_variant_object final_delete_line;
       final_delete_line["delete"] = delete_line;
       prepare.push_back(fc::json::to_string(final_delete_line));
@@ -238,7 +240,8 @@ void es_objects_plugin_impl::prepareTemplate(T blockchain_object, string index_n
 {
    fc::mutable_variant_object bulk_header;
    bulk_header["_index"] = _es_objects_index_prefix + index_name;
-   bulk_header["_type"] = "data";
+   if(!esge7)
+      bulk_header["_type"] = "data";
    if(_es_objects_keep_only_current)
    {
       bulk_header["_id"] = string(blockchain_object.id);
@@ -403,6 +406,10 @@ void es_objects_plugin::plugin_startup()
    if(!graphene::utilities::checkES(es))
       FC_THROW_EXCEPTION(fc::exception, "ES database is not up in url ${url}", ("url", my->_es_objects_elasticsearch_url));
    ilog("elasticsearch OBJECTS: plugin_startup() begin");
+
+   const auto es_version = graphene::utilities::getVersion(es);
+   if(std::stoi(es_version.substr(0,1)) >= 7)
+      my->esge7 = true;
 }
 
 } }

@@ -74,6 +74,7 @@ class elasticsearch_plugin_impl
       std::string bulk_line;
       std::string index_name;
       bool is_sync = false;
+      bool esge7 = false;
    private:
       bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const uint32_t block_number );
       const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
@@ -286,6 +287,7 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    const auto &stats_obj = getStatsObject(account_id);
    const auto &ath = addNewEntry(stats_obj, account_id, oho);
    growStats(stats_obj, ath);
+
    if(block_number > _elasticsearch_start_es_after_block)  {
       createBulkLine(ath);
       prepareBulk(ath.id);
@@ -354,7 +356,8 @@ void elasticsearch_plugin_impl::prepareBulk(const account_transaction_history_id
    const std::string _id = fc::json::to_string(ath_id);
    fc::mutable_variant_object bulk_header;
    bulk_header["_index"] = index_name;
-   bulk_header["_type"] = "data";
+   if(!esge7)
+      bulk_header["_type"] = "data";
    bulk_header["_id"] = fc::to_string(ath_id.space_id) + "." + fc::to_string(ath_id.type_id) + "."
                       + fc::to_string(ath_id.instance.value);
    prepare = graphene::utilities::createBulk(bulk_header, std::move(bulk_line));
@@ -513,6 +516,11 @@ void elasticsearch_plugin::plugin_startup()
 
    if(!graphene::utilities::checkES(es))
       FC_THROW_EXCEPTION(fc::exception, "ES database is not up in url ${url}", ("url", my->_elasticsearch_node_url));
+
+   const auto es_version = graphene::utilities::getVersion(es);
+   if(std::stoi(es_version.substr(0,1)) >= 7)
+      my->esge7 = true;
+
    ilog("elasticsearch ACCOUNT HISTORY: plugin_startup() begin");
 }
 
