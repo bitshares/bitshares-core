@@ -270,9 +270,9 @@ else( WIN32 ) # Apple AND Linux
 
 endif( WIN32 )
 
-if ( FULL_STATIC_BUILD )
+if ( NOT MSVC AND FULL_STATIC_BUILD )
     set( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -static-libstdc++ -static-libgcc" )
-endif ( FULL_STATIC_BUILD )
+endif ( NOT MSVC AND FULL_STATIC_BUILD )
 
 set(ENABLE_COVERAGE_TESTING FALSE CACHE BOOL "Build BitShares for code coverage analysis")
 
