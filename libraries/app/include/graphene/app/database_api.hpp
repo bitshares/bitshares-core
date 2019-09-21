@@ -539,9 +539,13 @@ class database_api
        * @brief Returns the ticker for the market assetA:assetB
        * @param base symbol name or ID of the base asset
        * @param quote symbol name or ID of the quote asset
+       * @param subscribe @a true to subscribe to the queried HTLC objects; @a false to not subscribe;
+       *                  @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                  (see @ref set_auto_subscription)
        * @return The market ticker for the past 24 hours.
        */
-      market_ticker get_ticker( const string& base, const string& quote )const;
+      market_ticker get_ticker( const string& base, const string& quote,
+                                optional<bool> subscribe = optional<bool>() )const;
 
       /**
        * @brief Returns the 24 hour volume for the market assetA:assetB

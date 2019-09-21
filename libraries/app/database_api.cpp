@@ -1253,12 +1253,13 @@ void database_api_impl::unsubscribe_from_market(const std::string& a, const std:
    _market_subscriptions.erase(std::make_pair(asset_a_id,asset_b_id));
 }
 
-market_ticker database_api::get_ticker( const string& base, const string& quote )const
+market_ticker database_api::get_ticker( const string& base, const string& quote, optional<bool> subscribe )const
 {
-    return my->get_ticker( base, quote );
+    return my->get_ticker( base, quote, false, subscribe );
 }
 
-market_ticker database_api_impl::get_ticker( const string& base, const string& quote, bool skip_order_book )const
+market_ticker database_api_impl::get_ticker( const string& base, const string& quote, bool skip_order_book,
+                                             optional<bool> subscribe )const
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
@@ -1266,6 +1267,8 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
 
    FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
    FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
+
+   bool to_subscribe = get_whether_to_subscribe( subscribe );
 
    auto base_id = assets[0]->id;
    auto quote_id = assets[1]->id;
@@ -1280,6 +1283,9 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
       {
          orders = get_order_book(assets[0]->symbol, assets[1]->symbol, 1);
       }
+      if( to_subscribe )
+         subscribe_to_item( itr->id );
+
       return market_ticker(*itr, now, *assets[0], *assets[1], orders);
    }
    // if no ticker is found for this market we return an empty ticker
@@ -1294,7 +1300,7 @@ market_volume database_api::get_24_volume( const string& base, const string& quo
 
 market_volume database_api_impl::get_24_volume( const string& base, const string& quote )const
 {
-   const auto& ticker = get_ticker( base, quote, true );
+   const auto& ticker = get_ticker( base, quote, true, false );
 
    market_volume result;
    result.time = ticker.time;

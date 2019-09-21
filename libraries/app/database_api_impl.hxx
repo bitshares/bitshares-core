@@ -122,7 +122,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       void unsubscribe_from_market(const std::string& a, const std::string& b);
 
       market_ticker                      get_ticker( const string& base, const string& quote,
-                                                     bool skip_order_book = false )const;
+                                                     bool skip_order_book,
+                                                     optional<bool> subscribe )const;
       market_volume                      get_24_volume( const string& base, const string& quote )const;
       order_book                         get_order_book( const string& base, const string& quote,
                                                          unsigned limit = 50 )const;
