@@ -1294,4 +1294,85 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
       } FC_LOG_AND_RETHROW()
    }
 
+
+   /**
+    * Test of authorization of one account (feedproducer) authorizing another key
+    * to publish feeds
+    */
+   BOOST_AUTO_TEST_CASE(authorized_feed_publisher_other_key_custom_auths) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Define a market-issued asset called USDBIT
+         //////
+         ACTORS((feedproducer));
+         const auto &bitusd = create_bitasset("USDBIT", feedproducer_id);
+         const auto &core = asset_id_type()(db);
+         update_feed_producers(bitusd, {feedproducer.id});
+
+         price_feed current_feed;
+         current_feed.maintenance_collateral_ratio = 1750;
+         current_feed.maximum_short_squeeze_ratio = 1100;
+         current_feed.settlement_price = bitusd.amount(1) / core.amount(5);
+         // publish_feed(bitusd, feedproducer, current_feed);
+         asset_publish_feed_operation pop;
+         pop.publisher = feedproducer.id;
+         pop.asset_id = bitusd.id;
+         pop.feed = current_feed;
+         if (pop.feed.core_exchange_rate.is_null())
+            pop.feed.core_exchange_rate = pop.feed.settlement_price;
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the publish feed transaction
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Define a key that can be authorized
+         // This can be a new key or an existing key. The existing key may even be the active key of an account.
+         //////
+         fc::ecc::private_key some_private_key = generate_private_key("some key");
+         public_key_type some_public_key = public_key_type(some_private_key.get_public_key());
+
+
+         //////
+         // feedproducer authorizes a key to publish feeds on its behalf
+         //////
+         custom_authority_create_operation authorize_feed_publishing;
+         authorize_feed_publishing.account = feedproducer.get_id();
+         authorize_feed_publishing.auth.add_authority(some_public_key, 1);
+         authorize_feed_publishing.auth.weight_threshold = 1;
+         authorize_feed_publishing.enabled = true;
+         authorize_feed_publishing.valid_to = db.head_block_time() + 1000;
+         authorize_feed_publishing.operation_type = operation::tag<asset_publish_feed_operation>::value;
+         trx.clear();
+         trx.operations = {authorize_feed_publishing};
+         sign(trx, feedproducer_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Any software client with this key attempts to publish feed of USDBIT on behalf of feedproducer
+         // This should succeed because the pusher of this transaction signs the transaction with the authorized key
+         //////
+         trx.clear();
+         trx.operations.emplace_back(std::move(pop));
+         sign(trx, some_private_key);
+         PUSH_TX(db, trx);
+
+      } FC_LOG_AND_RETHROW()
+   }
+
 BOOST_AUTO_TEST_SUITE_END()
