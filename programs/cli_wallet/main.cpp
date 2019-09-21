@@ -126,7 +126,7 @@ int main( int argc, char** argv )
 {
    try {
 
-      boost::program_options::options_description opts;
+      boost::program_options::options_description opts("Command Line BitShares Wallet\n\nOptions");
          opts.add_options()
          ("help,h", "Print this help message and exit.")
          ("server-rpc-endpoint,s", bpo::value<string>()->implicit_value("ws://127.0.0.1:8090"), "Server websocket RPC endpoint")

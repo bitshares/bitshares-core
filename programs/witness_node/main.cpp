@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
    app::application* node = new app::application();
    fc::oexception unhandled_exception;
    try {
-      bpo::options_description app_options("BitShares Witness Node");
+      bpo::options_description app_options("BitShares Witness Node\n\nOptions");
       bpo::options_description cfg_options("BitShares Witness Node");
       app_options.add_options()
             ("help,h", "Print this help message and exit.")
