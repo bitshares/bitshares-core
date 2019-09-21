@@ -1375,4 +1375,153 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
       } FC_LOG_AND_RETHROW()
    }
 
+
+   /**
+    * Test of authorization of one account (faucet) authorizing another key
+    * to register accounts
+    */
+   BOOST_AUTO_TEST_CASE(authorized_faucet_other_key_custom_auths) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: faucet account
+         //////
+         ACTORS((faucet)(charlie));
+         fund(faucet, asset(500000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+         account_upgrade_operation uop;
+         uop.account_to_upgrade = faucet.get_id();
+         uop.upgrade_to_lifetime_member = true;
+         trx.clear();
+         trx.operations.emplace_back(std::move(uop));
+         sign(trx, faucet_private_key);
+         PUSH_TX(db, trx);
+
+         // Lambda for creating account
+         auto create_account_by_name = [&](const string &name, const account_object& registrar) {
+            account_create_operation create_op;
+            create_op.name = name;
+            public_key_type new_key = public_key_type(generate_private_key(name + " seed").get_public_key());
+            create_op.registrar = registrar.id;
+            create_op.owner = authority(1, new_key, 1);
+            create_op.active = authority(1, new_key, 1);
+            create_op.options.memo_key = new_key;
+            create_op.options.voting_account = GRAPHENE_PROXY_TO_SELF_ACCOUNT;
+
+            return create_op;
+         };
+
+
+         //////
+         // Attempt to register an account with this key
+         // This should succeed because faucet is a lifetime member account
+         //////
+         string name = "account1";
+         account_create_operation create_op = create_account_by_name(name, faucet);
+         trx.clear();
+         trx.operations = {create_op};
+         sign(trx, faucet_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Define a key that can be authorized
+         // This can be a new key or an existing key. The existing key may even be the active key of an account.
+         //////
+         fc::ecc::private_key some_private_key = generate_private_key("some key");
+         public_key_type some_public_key = public_key_type(some_private_key.get_public_key());
+
+
+         //////
+         // Attempt to register an account with this key
+         // This should fail because the key is not authorized to register any accounts
+         //////
+         name = "account2";
+         create_op = create_account_by_name(name, faucet);
+         trx.clear();
+         trx.operations = {create_op};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // faucet authorizes a key to register accounts on its behalf
+         //////
+         custom_authority_create_operation authorize_account_registration;
+         authorize_account_registration.account = faucet.get_id();
+         authorize_account_registration.auth.add_authority(some_public_key, 1);
+         authorize_account_registration.auth.weight_threshold = 1;
+         authorize_account_registration.enabled = true;
+         authorize_account_registration.valid_to = db.head_block_time() + 1000;
+         authorize_account_registration.operation_type = operation::tag<account_create_operation>::value;
+         trx.clear();
+         trx.operations = {authorize_account_registration};
+         sign(trx, faucet_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the account registration transaction
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Attempt to register an account with this key
+         // This should succeed because the key is authorized to register any accounts
+         //////
+         trx.clear();
+         trx.operations.emplace_back(std::move(create_op));
+         sign(trx, some_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Attempt to register an account with this key
+         // This should succeed because the key is authorized to register any accounts
+         //////
+         create_op = create_account_by_name("account3", faucet);
+         trx.clear();
+         trx.operations = {create_op};
+         sign(trx, some_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Attempt to transfer funds out of the faucet account
+         // This should fail because the key is not authorized to top from the faucet account
+         //////
+         transfer_operation top;
+         top.amount.amount = 99 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         top.from = faucet.get_id();
+         top.to = charlie.get_id();
+         top.fee.asset_id = asset_id_type(1);
+         trx.clear();
+         trx.operations = {top};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // Attempt to register an account with this key
+         // This should succeed because the key is authorized to register any accounts
+         //////
+         create_op = create_account_by_name("account4", faucet);
+         trx.clear();
+         trx.operations = {create_op};
+         sign(trx, some_private_key);
+         PUSH_TX(db, trx);
+
+      } FC_LOG_AND_RETHROW()
+   }
+
 BOOST_AUTO_TEST_SUITE_END()
