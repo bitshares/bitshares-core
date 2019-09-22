@@ -150,8 +150,8 @@ namespace graphene { namespace net {
     public:
       explicit no_parallel_execution_guard(std::atomic_bool* flag) : _flag(flag)
       {
-         FC_ASSERT(*flag == false, "Only one thread at time can visit it");
-         *flag = true;
+         bool expected = false;
+         FC_ASSERT( flag->compare_exchange_strong( expected, true ), "Only one thread at time can visit it");
       }
       ~no_parallel_execution_guard()
       {
