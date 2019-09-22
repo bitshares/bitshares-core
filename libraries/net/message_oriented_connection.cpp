@@ -64,7 +64,7 @@ namespace graphene { namespace net {
       fc::time_point _last_message_sent_time;
 
       bool _send_message_in_progress;
-      std::atomic_bool readLoopInProgress;
+      std::atomic_bool _read_loop_in_progress;
 #ifndef NDEBUG
       fc::thread* _thread;
 #endif
@@ -102,7 +102,7 @@ namespace graphene { namespace net {
       _bytes_received(0),
       _bytes_sent(0),
       _send_message_in_progress(false),
-      readLoopInProgress(false)
+      _read_loop_in_progress(false)
 #ifndef NDEBUG
       ,_thread(&fc::thread::current())
 #endif
@@ -144,18 +144,18 @@ namespace graphene { namespace net {
       _sock.bind(local_endpoint);
     }
 
-    class THelper final
+    class no_parallel_execution_guard final
     {
-      std::atomic_bool* Flag;
+      std::atomic_bool* _flag;
     public:
-      explicit THelper(std::atomic_bool* flag) : Flag(flag)
+      explicit no_parallel_execution_guard(std::atomic_bool* flag) : _flag(flag)
       {
-      FC_ASSERT(*flag == false, "Only one thread at time can visit it");
-      *flag = true;
+         FC_ASSERT(*flag == false, "Only one thread at time can visit it");
+         *flag = true;
       }
-      ~THelper()
+      ~no_parallel_execution_guard()
       {
-         *Flag = false;
+         *_flag = false;
       }
     };
 
@@ -166,7 +166,7 @@ namespace graphene { namespace net {
       const int LEFTOVER = BUFFER_SIZE - sizeof(message_header);
       static_assert(BUFFER_SIZE >= sizeof(message_header), "insufficient buffer");
 
-      THelper helper(&this->readLoopInProgress);
+      no_parallel_execution_guard guard( &_read_loop_in_progress );
 
       _connected_time = fc::time_point::now();
 
