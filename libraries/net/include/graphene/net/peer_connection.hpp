@@ -263,13 +263,12 @@ namespace graphene { namespace net
       fc::future<void> accept_or_connect_task_done;
 
       firewall_check_state_data *firewall_check_state = nullptr;
-#ifndef NDEBUG
     private:
+#ifndef NDEBUG
       fc::thread* _thread = nullptr;
       unsigned _send_message_queue_tasks_running = 0; // temporary debugging
 #endif
       bool _currently_handling_message = false; // true while we're in the middle of handling a message from the remote system
-    private:
       peer_connection(peer_connection_delegate* delegate);
       void destroy();
     public:
