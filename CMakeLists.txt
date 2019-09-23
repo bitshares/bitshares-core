@@ -28,6 +28,17 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 3.3)
         message(FATAL_ERROR "Clang version must be at least 3.3!")
     endif()
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+    if ("${CMAKE_CXX_COMPILER_VERSION}" VERSION_LESS "19.0")
+      message(FATAL_ERROR "MSVC version must be at least 19.0 (Visual Studio 2015 Update 1)!")
+    endif()
+
+    # allow MSVC VS2015 with Update 1, other 2015 versions are not supported
+    if ("${CMAKE_CXX_COMPILER_VERSION}" VERSION_EQUAL "19.0")
+        if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL "19.0.23506.0")
+            message(FATAL_ERROR "Your version ${CMAKE_CXX_COMPILER_VERSION} of MSVC is not supported, use version 19.0.23506.0 (Visual Studio 2015 Update 1)!")
+        endif()
+    endif()
 endif()
 
 list( APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules" )
@@ -46,6 +57,20 @@ macro(FIND_CURL)
    else (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
       find_package(CURL REQUIRED)
    endif (NOT WIN32 AND NOT APPLE AND CURL_STATICLIB)
+
+   if( WIN32 )
+     if ( MSVC )
+       list( APPEND CURL_LIBRARIES Wldap32 )
+     endif( MSVC )
+
+     if( MINGW )
+       # MinGW requires a specific order of included libraries ( CURL before ZLib )
+       find_package( ZLIB REQUIRED )
+       list( APPEND CURL_LIBRARIES ${ZLIB_LIBRARY} pthread )
+     endif( MINGW )
+
+     list( APPEND CURL_LIBRARIES ${PLATFORM_SPECIFIC_LIBS} )
+   endif( WIN32 )
 endmacro()
 
 # Save the old value of CMAKE_REQUIRED_FLAGS
@@ -54,24 +79,24 @@ set( TEMP_REQUIRED_FLAGS ${CMAKE_REQUIRED_FLAGS} )
 # Fortify source
 if (CMAKE_COMPILER_IS_GNUCXX)
 	if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-		message ("-- Setting optimizations for clang++")
+		message (STATUS "Setting optimizations for clang++")
 		set(CMAKE_CXX_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2 -O3 -DNDEBUG=1")
 		set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-D_FORTIFY_SOURCE=2 -O3 -DNDEBUG=1 -g")
 
 		# check and add data execution prevention
-		message ("-- Enabling data execution prevention")
+		message (STATUS "Enabling data execution prevention")
 		add_linker_flag("-fsanitize=safe-stack")
 
 		# check and add Stack-based buffer overrun detection
 		set(CMAKE_REQUIRED_FLAGS "-fstack-protector")
 		check_c_compiler_flag("" HAVE_STACKPROTECTOR)
 		if(HAVE_STACKPROTECTOR)
-			message ("-- Enabling stack-based buffer overrun detection")
+			message (STATUS "Enabling stack-based buffer overrun detection")
 			add_flag_append(CMAKE_C_FLAGS "-fstack-protector")
 			add_flag_append(CMAKE_CXX_FLAGS "-fstack-protector")
 		endif()
 	else ()
-		message ("-- Setting optimizations for g++")
+		message (STATUS "Setting optimizations for g++")
 		set(CMAKE_CXX_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2 -O3 -DNDEBUG=1")
 		set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-D_FORTIFY_SOURCE=2 -O3 -DNDEBUG=1 -g")
 
@@ -79,7 +104,7 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 		set(CMAKE_REQUIRED_FLAGS "-Wl,-znoexecstack")
 		check_c_compiler_flag("" HAVE_NOEXECSTACK)
 		if(HAVE_NOEXECSTACK)
-			message ("-- Enabling data execution prevention")
+			message (STATUS "Enabling data execution prevention")
 			add_linker_flag("-znoexecstack")
 		endif()
 
@@ -87,7 +112,7 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 		set(CMAKE_REQUIRED_FLAGS "-fstack-protector-strong")
 		check_c_compiler_flag("" HAVE_STACKPROTECTOR)
 		if(HAVE_STACKPROTECTOR)
-			message ("-- Enabling stack-based buffer overrun detection")
+			message (STATUS "Enabling stack-based buffer overrun detection")
 			add_flag_append(CMAKE_C_FLAGS "-fstack-protector-strong")
 			add_flag_append(CMAKE_CXX_FLAGS "-fstack-protector-strong")
 		endif()
@@ -99,7 +124,7 @@ endif ()
 set(CMAKE_REQUIRED_FLAGS "-Wl,-zrelro,-znow")
 check_c_compiler_flag("" HAVE_RELROFULL)
 if(HAVE_RELROFULL)
-	message ("-- Enabling full data relocation and protection")
+	message (STATUS "Enabling full data relocation and protection")
 	add_linker_flag("-zrelro")
 	add_linker_flag("-znow")
 else()
@@ -107,7 +132,7 @@ else()
 	set(CMAKE_REQUIRED_FLAGS "-Wl,-zrelro")
 	check_c_compiler_flag("" HAVE_RELROPARTIAL)
 	if(HAVE_RELROPARTIAL)
-		message ("-- Enabling partial data relocation and protection")
+		message (STATUS "Enabling partial data relocation and protection")
 		add_linker_flag("-zrelro")
 	endif()
 endif()
@@ -116,7 +141,9 @@ set(CMAKE_REQUIRED_FLAGS ${TEMP_REQUIRED_FLAGS} )
 
 # position independent executetable (PIE)
 # position independent code (PIC)
-add_definitions (-fPIC)
+if (NOT MSVC)
+    add_definitions (-fPIC)
+endif(NOT MSVC)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS "ON")
 set( GRAPHENE_EGENESIS_JSON "${CMAKE_CURRENT_SOURCE_DIR}/libraries/egenesis/genesis.json"
@@ -128,9 +155,9 @@ endif(USE_PCH)
 
 option(USE_PROFILER "Build with GPROF support(Linux)." OFF)
 
-IF( NOT WIN32 )
-  list( APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/libraries/fc/CMakeModules" )
-ENDIF( NOT WIN32 )
+# Use Boost config file from fc
+set(Boost_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libraries/fc/CMakeModules/Boost")
+
 list( APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/libraries/fc/GitVersionGen" )
 include( GetGitRevisionDescription )
 get_git_head_revision( GIT_REFSPEC GIT_SHA2 )
@@ -144,14 +171,20 @@ LIST(APPEND BOOST_COMPONENTS thread
                              program_options
                              chrono
                              unit_test_framework
-                             context)
+                             context
+                             coroutine
+                             regex)
 # boost::endian is also required, but FindBoost can't handle header-only libs
 SET( Boost_USE_STATIC_LIBS ON CACHE STRING "ON or OFF" )
 
-IF( WIN32 )
-  SET(BOOST_ROOT $ENV{BOOST_ROOT})
+IF(WIN32)
+   if($ENV{BOOST_ROOT})
+       SET(BOOST_ROOT $ENV{BOOST_ROOT})
+   endif($ENV{BOOST_ROOT})
   set(Boost_USE_MULTITHREADED ON)
   set(BOOST_ALL_DYN_LINK OFF) # force dynamic linking for all libraries
+  add_definitions("-DCURL_STATICLIB")
+  list(APPEND PLATFORM_SPECIFIC_LIBS ws2_32 crypt32 mswsock userenv )
 ELSE( WIN32 )
    IF( APPLE )
       set( CMAKE_THREAD_LIBS_INIT "-lpthread" )
@@ -162,28 +195,36 @@ ELSE( WIN32 )
    ENDIF( APPLE )
 ENDIF(WIN32)
 
-FIND_PACKAGE(Boost 1.57 REQUIRED COMPONENTS ${BOOST_COMPONENTS})
-# For Boost 1.53 on windows, coroutine was not in BOOST_LIBRARYDIR and do not need it to build,  but if boost versin >= 1.54, find coroutine otherwise will cause link errors
-IF(NOT "${Boost_VERSION}" MATCHES "1.53(.*)")
-   SET(BOOST_LIBRARIES_TEMP ${Boost_LIBRARIES})
-   FIND_PACKAGE(Boost 1.54 REQUIRED COMPONENTS coroutine)
-   LIST(APPEND BOOST_COMPONENTS coroutine)
-   SET(Boost_LIBRARIES ${BOOST_LIBRARIES_TEMP} ${Boost_LIBRARIES})
-ENDIF()
+FIND_PACKAGE(Boost CONFIG REQUIRED COMPONENTS ${BOOST_COMPONENTS})
+
+# enforce more strict compiler warnings and errors
+add_compiler_flag_if_available("-Wall")
+add_compiler_flag_if_available("-Wclobbered")
+add_compiler_flag_if_available("-Wempty-body")
+add_compiler_flag_if_available("-Wformat-security")
+add_compiler_flag_if_available("-Wignored-qualifiers")
+add_compiler_flag_if_available("-Wimplicit-fallthrough=5")
+add_compiler_flag_if_available("-Wmissing-field-initializers")
+add_compiler_flag_if_available("-Wpointer-arith")
+add_compiler_flag_if_available("-Wshift-negative-value")
+add_compiler_flag_if_available("-Wtype-limits")
+add_compiler_flag_if_available("-Wunused-but-set-parameter")
 
 if( WIN32 )
 
     message( STATUS "Configuring BitShares on WIN32")
-    set( DB_VERSION 60 )
-    set( BDB_STATIC_LIBS 1 )
 
-    set( ZLIB_LIBRARIES "" )
+    if ( MINGW )
+        message( STATUS "Windows build using MinGW" )
+        set( FULL_STATIC_BUILD TRUE )
+    else( MINGW )
+        set( ZLIB_LIBRARIES "" )
+    endif( MINGW )
+
     SET( DEFAULT_EXECUTABLE_INSTALL_DIR bin/ )
 
-    set(CRYPTO_LIB)
-
     if( MSVC )
-	add_definitions(-DWIN32_LEAN_AND_MEAN)
+        add_definitions(-DWIN32_LEAN_AND_MEAN)
         #looks like this flag can have different default on some machines.
         SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /SAFESEH:NO")
         SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SAFESEH:NO")
@@ -191,21 +232,6 @@ if( WIN32 )
         # Probably cmake has a bug and vcxproj generated for executable in Debug conf. has disabled debug info
         set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /DEBUG")
     endif ( MSVC )
-
-    # On windows tcl should be installed to the directory pointed by setenv.bat script
-    SET(TCL_INCLUDE_PATH $ENV{TCL_ROOT}/include)
-    MESSAGE(STATUS "tcl INCLUDE PATH: ${TCL_INCLUDE_PATH}")
-
-    FIND_PACKAGE(TCL)
-    MESSAGE(STATUS "tcl_library: ${TCL_LIBRARY}")
-
-    SET(TCL_LIBS "optimized;${TCL_LIBRARY};debug;")
-    get_filename_component(TCL_LIB_PATH "${TCL_LIBRARY}" PATH)
-    get_filename_component(TCL_LIB_NAME "${TCL_LIBRARY}" NAME_WE)
-    get_filename_component(TCL_LIB_EXT "${TCL_LIBRARY}" EXT)
-
-    SET(TCL_LIBS "${TCL_LIBS}${TCL_LIB_PATH}/${TCL_LIB_NAME}g${TCL_LIB_EXT}")
-    SET(TCL_LIBRARY ${TCL_LIBS})
 
 else( WIN32 ) # Apple AND Linux
 
@@ -233,9 +259,6 @@ else( WIN32 ) # Apple AND Linux
           # if you have a normal install, you can define crypto_library to the empty string to avoid a build error
           set( crypto_library crypto)
         endif ()
-        if ( FULL_STATIC_BUILD )
-          set( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
-        endif ( FULL_STATIC_BUILD )
     endif( APPLE )
 
     if( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
@@ -257,6 +280,10 @@ else( WIN32 ) # Apple AND Linux
     # set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -gdwarf-2 -g3" )
 
 endif( WIN32 )
+
+if ( NOT MSVC AND FULL_STATIC_BUILD )
+    set( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -static-libstdc++ -static-libgcc" )
+endif ( NOT MSVC AND FULL_STATIC_BUILD )
 
 set(ENABLE_COVERAGE_TESTING FALSE CACHE BOOL "Build BitShares for code coverage analysis")
 

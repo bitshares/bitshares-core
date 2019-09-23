@@ -78,13 +78,13 @@ if(MSVC)
   set_source_files_properties( db_init.cpp db_block.cpp database.cpp block_database.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
 endif(MSVC)
 
-# Support for CMake < 3.7
-if (${CMAKE_VERSION} VERSION_LESS "3.7.0")
-    MESSAGE(STATUS "Configuring for legacy CMake (CMake version ${CMAKE_VERSION} older than 3.7.0)")
+# Support for CMake < 3.4
+if (${CMAKE_VERSION} VERSION_LESS "3.4.0")
+    MESSAGE(STATUS "Configuring for legacy CMake (CMake version ${CMAKE_VERSION} older than 3.4.0)")
     MESSAGE(STATUS "  Target propertes not supported (SOURCE_DIR, BINARY_DIR)")
 
-    set(GRAPHENE_CHAIN_BIN_LEGACY "${PROJECT_BINARY_DIR}")
-    set(GRAPHENE_CHAIN_SOURCE_LEGACY "${PROJECT_SOURCE_DIR}")
+    set(GRAPHENE_CHAIN_BIN_LEGACY "${PROJECT_BINARY_DIR}/libraries/chain" CACHE STRING "Path to fc chain")
+    set(GRAPHENE_CHAIN_SOURCE_LEGACY "${PROJECT_SOURCE_DIR}/libraries/chain" CACHE STRING "Path to fc chain")
 endif ()
 
 INSTALL( TARGETS
