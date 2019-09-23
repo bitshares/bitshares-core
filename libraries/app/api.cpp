@@ -48,6 +48,7 @@ template class fc::api<graphene::app::history_api>;
 template class fc::api<graphene::app::crypto_api>;
 template class fc::api<graphene::app::asset_api>;
 template class fc::api<graphene::app::orders_api>;
+template class fc::api<graphene::app::custom_operations_api>;
 template class fc::api<graphene::debug_witness::debug_api>;
 template class fc::api<graphene::app::login_api>;
 
@@ -118,6 +119,11 @@ namespace graphene { namespace app {
        else if( api_name == "orders_api" )
        {
           _orders_api = std::make_shared< orders_api >( std::ref( _app ) );
+       }
+       else if( api_name == "custom_operations_api" )
+       {
+          if( _app.get_plugin( "custom_operations" ) )
+             _custom_operations_api = std::make_shared< custom_operations_api >( std::ref( _app ) );
        }
        else if( api_name == "debug_api" )
        {
@@ -294,6 +300,12 @@ namespace graphene { namespace app {
     {
        FC_ASSERT(_debug_api);
        return *_debug_api;
+    }
+
+    fc::api<custom_operations_api> login_api::custom() const
+    {
+       FC_ASSERT(_custom_operations_api);
+       return *_custom_operations_api;
     }
 
     vector<order_history_object> history_api::get_fill_order_history( std::string asset_a, std::string asset_b, uint32_t limit  )const
@@ -672,6 +684,25 @@ namespace graphene { namespace app {
          ++itr;
       }
       return result;
+   }
+
+   // custom operations api
+   vector<account_storage_object> custom_operations_api::get_storage_info(std::string account_id_or_name,
+         std::string catalog)const
+   {
+      auto plugin = _app.get_plugin<graphene::custom_operations::custom_operations_plugin>("custom_operations");
+      FC_ASSERT( plugin );
+
+      const auto account_id = database_api.get_account_id_from_string(account_id_or_name);
+      vector<account_storage_object> results;
+      const auto& storage_index = _app.chain_database()->get_index_type<account_storage_index>();
+      const auto& by_account_catalog_idx = storage_index.indices().get<by_account_catalog>();
+      auto itr = by_account_catalog_idx.lower_bound(make_tuple(account_id, catalog));
+      while(itr != by_account_catalog_idx.end() && itr->account == account_id && itr->catalog == catalog) {
+         results.push_back(*itr);
+         ++itr;
+      }
+      return results;
    }
 
 } } // graphene::app

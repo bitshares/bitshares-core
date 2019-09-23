@@ -798,7 +798,7 @@ class wallet_api
        */
       string  gethelp(const string& method)const;
 
-      /** Loads a specified Graphene wallet.
+      /** Loads a specified BitShares wallet.
        *
        * The current wallet is closed before the new wallet is loaded.
        *
@@ -1225,7 +1225,7 @@ class wallet_api
 
       /** Place a limit order attempting to sell one asset for another.
        *
-       * Buying and selling are the same operation on Graphene; if you want to buy BTS
+       * Buying and selling are the same operation on BitShares; if you want to buy BTS
        * with USD, you should sell USD for BTS.
        *
        * The blockchain will attempt to sell the \c symbol_to_sell for as
@@ -2014,6 +2014,37 @@ class wallet_api
       fc::signal<void(bool)> lock_changed;
       std::shared_ptr<detail::wallet_api_impl> my;
       void encrypt_keys();
+
+      /**
+       * Manage account storage map(key->value) by using the custom operations plugin.
+       *
+       * Each account can optionally add random information in the form of a key-value map
+       * to be retrieved by any interested party.
+       *
+       * @param account The account ID or name that we are adding additional information to.
+       * @param catalog The name of the catalog the operation will insert data to.
+       * @param remove true if you want to remove stuff from a catalog.
+       * @param key_values The map to be inserted/removed to/from the catalog
+       * @param broadcast true if you wish to broadcast the transaction
+       *
+       * @return The signed transaction
+       */
+      signed_transaction account_store_map(string account, string catalog, bool remove,
+            flat_map<string, optional<string>> key_values, bool broadcast);
+
+      /**
+       * Get \c account_storage_object of an account by using the custom operations plugin.
+       *
+       * Storage data added to the map with @ref account_store_map and list data added by
+       * @ref account_list_accounts will be returned.
+       *
+       * @param account Account ID or name to get contact data from.
+       * @param catalog The catalog to retrieve.
+       *
+       * @return An \c account_storage_object or empty.
+       */
+      vector<account_storage_object> get_account_storage(string account, string catalog);
+
 };
 
 } }
@@ -2221,5 +2252,7 @@ FC_API( graphene::wallet::wallet_api,
         (blind_history)
         (receive_blind_transfer)
         (get_order_book)
+        (account_store_map)
+        (get_account_storage)
         (quit)
       )

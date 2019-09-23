@@ -21,7 +21,14 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <boost/test/unit_test.hpp>
+
+#include <boost/test/included/unit_test.hpp>
+
+boost::unit_test::test_suite* init_unit_test_suite(int argc, char* argv[]) {
+   std::srand(time(NULL));
+   std::cout << "Random number generator seeded to " << time(NULL) << std::endl;
+   return nullptr;
+}
 
 #include <graphene/chain/database.hpp>
 
@@ -208,11 +215,3 @@ BOOST_AUTO_TEST_CASE( one_hundred_k_benchmark )
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
-
-#include <boost/test/included/unit_test.hpp>
-
-boost::unit_test::test_suite* init_unit_test_suite(int argc, char* argv[]) {
-   std::srand(time(NULL));
-   std::cout << "Random number generator seeded to " << time(NULL) << std::endl;
-   return nullptr;
-}

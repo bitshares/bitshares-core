@@ -1342,6 +1342,8 @@ namespace graphene { namespace net { namespace detail {
       user_data["fc_git_revision_unix_timestamp"] = fc::git_revision_unix_timestamp;
 #if defined( __APPLE__ )
       user_data["platform"] = "osx";
+#elif defined( __OpenBSD__ )
+      user_data["platform"] = "obsd";
 #elif defined( __linux__ )
       user_data["platform"] = "linux";
 #elif defined( _MSC_VER )

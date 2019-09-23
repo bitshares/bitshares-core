@@ -34,6 +34,7 @@
 #include <graphene/es_objects/es_objects.hpp>
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 #include <graphene/api_helper_indexes/api_helper_indexes.hpp>
+#include <graphene/custom_operations/custom_operations_plugin.hpp>
 
 #include <fc/thread/thread.hpp>
 #include <fc/interprocess/signals.hpp>
@@ -62,8 +63,8 @@ int main(int argc, char** argv) {
    app::application* node = new app::application();
    fc::oexception unhandled_exception;
    try {
-      bpo::options_description app_options("Graphene Witness Node");
-      bpo::options_description cfg_options("Graphene Witness Node");
+      bpo::options_description app_options("BitShares Witness Node");
+      bpo::options_description cfg_options("BitShares Witness Node");
       app_options.add_options()
             ("help,h", "Print this help message and exit.")
             ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("witness_node_data_dir"),
@@ -96,6 +97,7 @@ int main(int argc, char** argv) {
       auto es_objects_plug = node->register_plugin<es_objects::es_objects_plugin>();
       auto grouped_orders_plug = node->register_plugin<grouped_orders::grouped_orders_plugin>();
       auto api_helper_indexes_plug = node->register_plugin<api_helper_indexes::api_helper_indexes>();
+      auto custom_operations_plug = node->register_plugin<custom_operations::custom_operations_plugin>();
 
       // add plugin options to config
       try
