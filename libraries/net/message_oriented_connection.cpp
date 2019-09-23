@@ -277,9 +277,8 @@ namespace graphene { namespace net {
 
         memcpy(padded_message.get(), (char*)&message_to_send, sizeof(message_header));
         memcpy(padded_message.get() + sizeof(message_header), message_to_send.data.data(), message_to_send.size.value() );
-        char* paddingSpace = padded_message.get() + sizeof(message_header) + message_to_send.size.value();
-        size_t toClean = size_with_padding - size_of_message_and_header;
-        memset(paddingSpace, 0, toClean);
+        char* padding_space = padded_message.get() + sizeof(message_header) + message_to_send.size.value();
+        memset(padding_space, 0, size_with_padding - size_of_message_and_header);
         _sock.write(padded_message.get(), size_with_padding);
         _sock.flush();
         _bytes_sent += size_with_padding;
