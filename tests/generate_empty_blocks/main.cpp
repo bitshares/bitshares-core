@@ -30,7 +30,6 @@
 #include <fc/io/fstream.hpp>
 #include <fc/io/json.hpp>
 #include <fc/io/stdio.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 #include <graphene/app/api.hpp>
 #include <graphene/egenesis/egenesis.hpp>
@@ -58,7 +57,7 @@ int main( int argc, char** argv )
 {
    try
    {
-      bpo::options_description cli_options("Graphene empty blocks");
+      bpo::options_description cli_options("BitShares empty blocks");
       cli_options.add_options()
             ("help,h", "Print this help message and exit.")
             ("data-dir", bpo::value<boost::filesystem::path>()->default_value("empty_blocks_data_dir"), "Directory containing generator database")
@@ -132,14 +131,14 @@ int main( int argc, char** argv )
          signed_block b = db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot), nathan_priv_key, database::skip_nothing);
          FC_ASSERT( db.head_block_id() == b.id() );
          fc::sha256 h = b.digest();
-         uint64_t rand = h._hash[0];
+         uint64_t rand = h._hash[0].value();
          slot = 1;
          while(true)
          {
             if( (rand % 100) < miss_rate )
             {
                slot++;
-               rand = (rand/100) ^ h._hash[slot&3];
+               rand = (rand/100) ^ h._hash[slot&3].value();
                missed++;
             }
             else

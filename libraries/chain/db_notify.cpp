@@ -1,23 +1,25 @@
 #include <fc/container/flat.hpp>
 
-#include <graphene/chain/protocol/authority.hpp>
-#include <graphene/chain/protocol/operations.hpp>
-#include <graphene/chain/protocol/transaction.hpp>
+#include <graphene/protocol/authority.hpp>
+#include <graphene/protocol/operations.hpp>
+#include <graphene/protocol/transaction.hpp>
+
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/confidential_object.hpp>
+#include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
-#include <graphene/chain/transaction_object.hpp>
+#include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/impacted.hpp>
 
 using namespace fc;
-using namespace graphene::chain;
+namespace graphene { namespace chain { namespace detail {
 
 // TODO:  Review all of these, especially no-ops
 struct get_impacted_account_visitor
@@ -256,15 +258,40 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // account_id
    }
+   void operator()( const htlc_create_operation& op )
+   {
+      _impacted.insert( op.fee_payer() );
+      _impacted.insert( op.to );
+   }
+   void operator()( const htlc_redeem_operation& op )
+   {
+      _impacted.insert( op.fee_payer() );
+   }
+   void operator()( const htlc_redeemed_operation& op )
+   {
+      _impacted.insert( op.from );
+      if ( op.to != op.redeemer )
+         _impacted.insert( op.to );
+   }
+   void operator()( const htlc_extend_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); 
+   }
+   void operator()( const htlc_refund_operation& op ) 
+   { 
+      _impacted.insert( op.fee_payer() );
+   }
 };
 
-void graphene::chain::operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result )
+} // detail
+
+void operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result )
 {
-  get_impacted_account_visitor vtor = get_impacted_account_visitor( result );
+  detail::get_impacted_account_visitor vtor( result );
   op.visit( vtor );
 }
 
-void graphene::chain::transaction_get_impacted_accounts( const transaction& tx, flat_set<account_id_type>& result )
+void transaction_get_impacted_accounts( const transaction& tx, flat_set<account_id_type>& result )
 {
   for( const auto& op : tx.operations )
     operation_get_impacted_accounts( op, result );
@@ -278,7 +305,6 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
       {
         case null_object_type:
         case base_object_type:
-        case OBJECT_TYPE_COUNT:
            return;
         case account_object_type:{
            accounts.insert( obj->id );
@@ -344,6 +370,12 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
         } case balance_object_type:{
            /** these are free from any accounts */
            break;
+        } case htlc_object_type:{
+              const auto& htlc_obj = dynamic_cast<const htlc_object*>(obj);
+              FC_ASSERT( htlc_obj != nullptr );
+              accounts.insert( htlc_obj->transfer.from );
+              accounts.insert( htlc_obj->transfer.to );
+              break;
         }
       }
    }
@@ -357,9 +389,9 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               break;
              case impl_reserved0_object_type:
               break;
-             case impl_asset_dynamic_data_type:
+             case impl_asset_dynamic_data_object_type:
               break;
-             case impl_asset_bitasset_data_type:
+             case impl_asset_bitasset_data_object_type:
               break;
              case impl_account_balance_object_type:{
               const auto& aobj = dynamic_cast<const account_balance_object*>(obj);
@@ -371,8 +403,8 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               FC_ASSERT( aobj != nullptr );
               accounts.insert( aobj->owner );
               break;
-           } case impl_transaction_object_type:{
-              const auto& aobj = dynamic_cast<const transaction_object*>(obj);
+           } case impl_transaction_history_object_type:{
+              const auto& aobj = dynamic_cast<const transaction_history_object*>(obj);
               FC_ASSERT( aobj != nullptr );
               transaction_get_impacted_accounts( aobj->trx, accounts );
               break;
@@ -393,7 +425,7 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               break;
              case impl_witness_schedule_object_type:
               break;
-             case impl_reserved1_object_type:
+             case impl_budget_record_object_type:
               break;
              case impl_special_authority_object_type:
               break;
@@ -410,8 +442,6 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
       }
    }
 } // end get_relevant_accounts( const object* obj, flat_set<account_id_type>& accounts )
-
-namespace graphene { namespace chain {
 
 void database::notify_applied_block( const signed_block& block )
 {

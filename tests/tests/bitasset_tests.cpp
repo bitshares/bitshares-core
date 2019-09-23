@@ -30,6 +30,7 @@
 #include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/balance_object.hpp>
+#include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
@@ -191,7 +192,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
    std::vector<account_id_type> active_witnesses;
    for(const witness_id_type& wit_id : global_props.active_witnesses)
       active_witnesses.push_back(wit_id(db).witness_account);
-   BOOST_REQUIRE_EQUAL(active_witnesses.size(), 10lu);
+   BOOST_REQUIRE_EQUAL(active_witnesses.size(), INITIAL_WITNESS_COUNT);
 
    {
       BOOST_TEST_MESSAGE("Adding price feed 1");
@@ -447,11 +448,14 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
                  | database::skip_transaction_dupe_check
                  | database::skip_block_size_check
                  | database::skip_tapos_check
-                 | database::skip_authority_check
                  | database::skip_merkle_check
                  ;
    generate_blocks(HARDFORK_615_TIME, true, skip); // get around Graphene issue #615 feed expiration bug
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
+
+   auto hf_time = HARDFORK_CORE_868_890_TIME;
+   if(hf1270)
+      hf_time = HARDFORK_CORE_1270_TIME;
 
    for( int i=0; i<2; ++i )
    {
@@ -460,7 +464,7 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
 
       if( i == 1 ) // go beyond hard fork
       {
-         blocks += generate_blocks(HARDFORK_CORE_868_890_TIME - mi, true, skip);
+         blocks += generate_blocks(hf_time - mi, true, skip);
          blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
       }
       set_expiration( db, trx );
@@ -526,7 +530,7 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
          ba_op.asset_to_update = usd_id;
          ba_op.issuer = asset_to_update.issuer;
          ba_op.new_options = asset_to_update.bitasset_data(db).options;
-         ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_868_890_TIME.sec_since_epoch()
+         ba_op.new_options.feed_lifetime_sec = hf_time.sec_since_epoch()
                                              - db.head_block_time().sec_since_epoch()
                                              + mi
                                              + 1800;
@@ -542,7 +546,7 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
          BOOST_CHECK( db.find<limit_order_object>( sell_id ) );
 
          // go beyond hard fork
-         blocks += generate_blocks(HARDFORK_CORE_868_890_TIME - mi, true, skip);
+         blocks += generate_blocks(hf_time - mi, true, skip);
          blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
       }
 
@@ -644,7 +648,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
 
    // this should pass
    BOOST_TEST_MESSAGE( "Evaluating a good operation" );
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
 
    // test with a market issued asset
    BOOST_TEST_MESSAGE( "Sending a non-bitasset." );
@@ -673,25 +677,25 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    // back by self
    BOOST_TEST_MESSAGE( "Message should contain: op.new_options.short_backing_asset == asset_obj.get_id()" );
    op.new_options.short_backing_asset = bit_usd_id;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    op.new_options.short_backing_asset = correct_asset_id;
 
    // prediction market with different precision
    BOOST_TEST_MESSAGE( "Message should contain: for a PM, asset_obj.precision != new_backing_asset.precision" );
    op.asset_to_update = asset_objs.prediction;
    op.issuer = asset_objs.prediction(db).issuer;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    op.asset_to_update = bit_usd_id;
    op.issuer = asset_objs.bit_usd(db).issuer;
 
    // checking old backing asset instead of new backing asset
    BOOST_TEST_MESSAGE( "Message should contain: to be backed by an asset which is not market issued asset nor CORE" );
    op.new_options.short_backing_asset = asset_objs.six_precision;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    BOOST_TEST_MESSAGE( "Message should contain: modified a blockchain-controlled market asset to be backed by an asset "
          "which is not backed by CORE" );
    op.new_options.short_backing_asset = asset_objs.prediction;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    op.new_options.short_backing_asset = correct_asset_id;
 
    // CHILDUSER is a non-committee asset backed by PARENT which is backed by CORE
@@ -703,15 +707,15 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    op.issuer = asset_objs.bit_parent(db).issuer;
    op.new_options.short_backing_asset = asset_objs.bit_usdbacked;
    // this should generate a warning in the log, but not fail.
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    // changing the backing asset to a UIA should work
    BOOST_TEST_MESSAGE( "Switching to a backing asset that is a UIA should work. No warning should be produced." );
    op.new_options.short_backing_asset = asset_objs.user_issued;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    // A -> B -> C, change B to be backed by A (circular backing)
    BOOST_TEST_MESSAGE( "Message should contain: A cannot be backed by B which is backed by A." );
    op.new_options.short_backing_asset = asset_objs.bit_child_bitasset;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    op.new_options.short_backing_asset = asset_objs.user_issued;
    BOOST_TEST_MESSAGE( "Message should contain: but this asset is a backing asset for a committee-issued asset." );
    // CHILDCOMMITTEE is a committee asset backed by PARENT which is backed by CORE
@@ -720,7 +724,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    create_bitasset( "CHILDCOMMITTEE", GRAPHENE_COMMITTEE_ACCOUNT, 100, charge_market_fee, 2,
          asset_objs.bit_parent );
    // it should again work, generating 2 warnings in the log. 1 for the above, and 1 new one.
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    op.asset_to_update = asset_objs.bit_usd;
    op.issuer = asset_objs.bit_usd(db).issuer;
    op.new_options.short_backing_asset = correct_asset_id;
@@ -734,7 +738,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    op.asset_to_update = asset_objs.bit_usdbacked2;
    op.issuer = asset_objs.bit_usdbacked2(db).issuer;
    op.new_options.short_backing_asset = asset_objs.bit_usdbacked;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    // set everything to a more normal state
    op.asset_to_update = asset_objs.bit_usdbacked;
    op.issuer = asset_objs.bit_usd(db).issuer;
@@ -744,25 +748,25 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    BOOST_TEST_MESSAGE( "Message should contain: op.new_options.feed_lifetime_sec <= chain_parameters.block_interval" );
    const auto good_feed_lifetime = op.new_options.feed_lifetime_sec;
    op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    BOOST_TEST_MESSAGE( "Message should contain: op.new_options.feed_lifetime_sec <= chain_parameters.block_interval" );
    op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    op.new_options.feed_lifetime_sec = good_feed_lifetime;
 
    // Force settlement delay must exceed block interval.
    BOOST_TEST_MESSAGE( "Message should contain: op.new_options.force_settlement_delay_sec <= chain_parameters.block_interval" );
    const auto good_force_settlement_delay_sec = op.new_options.force_settlement_delay_sec;
    op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    BOOST_TEST_MESSAGE( "Message should contain: op.new_options.force_settlement_delay_sec <= chain_parameters.block_interval" );
    op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    op.new_options.force_settlement_delay_sec = good_force_settlement_delay_sec;
 
    // this should pass
    BOOST_TEST_MESSAGE( "We should be all good again." );
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
 }
 
 /******
@@ -790,7 +794,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
 
    // this should pass
    BOOST_TEST_MESSAGE( "Evaluating a good operation" );
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
 
    // test with a market issued asset
    BOOST_TEST_MESSAGE( "Sending a non-bitasset." );
@@ -849,13 +853,13 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
    // changing the backing asset to a UIA should work
    BOOST_TEST_MESSAGE( "Switching to a backing asset that is a UIA should work." );
    op.new_options.short_backing_asset = asset_objs.user_issued;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    // A -> B -> C, change B to be backed by A (circular backing)
    BOOST_TEST_MESSAGE( "Check for circular backing. This should generate an exception" );
    op.new_options.short_backing_asset = asset_objs.bit_child_bitasset;
    REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "'A' backed by 'B' backed by 'A'" );
    op.new_options.short_backing_asset = asset_objs.user_issued;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    BOOST_TEST_MESSAGE( "Creating CHILDCOMMITTEE" );
    // CHILDCOMMITTEE is a committee asset backed by PARENT which is backed by CORE
    // Cannot change PARENT's backing asset from CORE to something else because that will make CHILDCOMMITTEE
@@ -903,7 +907,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
 
    // this should pass
    BOOST_TEST_MESSAGE( "We should be all good again." );
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
 
 }
 
@@ -917,14 +921,13 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
                  | database::skip_transaction_dupe_check
                  | database::skip_block_size_check
                  | database::skip_tapos_check
-                 | database::skip_authority_check
                  | database::skip_merkle_check
                  ;
    generate_blocks( HARDFORK_615_TIME, true, skip ); // get around Graphene issue #615 feed expiration bug
    generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
    generate_block( skip );
 
-   for( int i = 0; i < 6; ++i )
+   for( int i = 0; i < 8; ++i )
    {
       idump( (i) );
       int blocks = 0;
@@ -938,6 +941,11 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
       else if( i == 4 ) // go beyond hard fork 935
       {
          generate_blocks( HARDFORK_CORE_935_TIME - mi, true, skip );
+         generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
+      }
+      else if( i == 6 ) // go beyond hard fork 1270
+      {
+         generate_blocks( HARDFORK_CORE_1270_TIME - mi, true, skip );
          generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
       }
       set_expiration( db, trx );
@@ -1050,7 +1058,7 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
          ba_op.asset_to_update = usd_id;
          ba_op.issuer = asset_to_update.issuer;
          ba_op.new_options = asset_to_update.bitasset_data(db).options;
-         ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_935_TIME.sec_since_epoch()
+         ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_1270_TIME.sec_since_epoch()
                                              + mi * 3 + 86400 * 2
                                              - db.head_block_time().sec_since_epoch();
          trx.operations.push_back(ba_op);
@@ -1103,22 +1111,39 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
          blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
       }
 
-      // after hard fork 935, the limit order should be filled
+      // after hard fork 935, the limit order is filled only for the MSSR test
+      if( db.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_935_TIME &&
+          db.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_1270_TIME)
       {
          // check median
          BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
-         if( i % 2 == 0 ) // MCR test, median MCR should be 350%
-            BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
-         else // MSSR test, MSSR should be 125%
-            BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1250 );
-         // the limit order should have been filled
-         // TODO FIXME this test case is failing for MCR test,
-         //            because call_order's call_price didn't get updated after MCR changed
-         // BOOST_CHECK( !db.find<limit_order_object>( sell_id ) );
-         if( i % 2 == 1 ) // MSSR test
-            BOOST_CHECK( !db.find<limit_order_object>( sell_id ) );
+         if( i % 2 == 0) { // MCR test, median MCR should be 350% and order will not be filled except when i = 0
+            BOOST_CHECK_EQUAL(usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500);
+            if( affected_by_hf_343 )
+               BOOST_CHECK(!db.find<limit_order_object>(sell_id));
+            else
+               BOOST_CHECK(db.find<limit_order_object>(sell_id)); // MCR bug, order still there
+         }
+         else { // MSSR test, MSSR should be 125% and order is filled
+            BOOST_CHECK_EQUAL(usd_id(db).bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1250);
+            BOOST_CHECK(!db.find<limit_order_object>(sell_id)); // order filled
+         }
+
+         // go beyond hard fork 1270
+         blocks += generate_blocks(HARDFORK_CORE_1270_TIME - mi, true, skip);
+         blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
       }
 
+      // after hard fork 1270, the limit order should be filled for MCR test
+      if( db.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_1270_TIME)
+      {
+         // check median
+         BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+         if( i % 2 == 0 ) { // MCR test, order filled
+            BOOST_CHECK_EQUAL(usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500);
+            BOOST_CHECK(!db.find<limit_order_object>(sell_id));
+         }
+      }
 
       // undo above tx's and reset
       generate_block( skip );
@@ -1376,5 +1401,11 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_switching_to_witness_fed )
    }
 }
 */
+BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(hf_890_test);
+
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

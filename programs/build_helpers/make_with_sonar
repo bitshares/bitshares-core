@@ -1,0 +1,8 @@
+#!/bin/sh
+
+OUT_DIR="$1"
+shift
+if which build-wrapper-linux-x86-64 >/dev/null; then
+    exec build-wrapper-linux-x86-64 --out-dir "$OUT_DIR" make "$@"
+fi
+exec make "$@"

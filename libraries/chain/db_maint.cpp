@@ -22,10 +22,9 @@
  * THE SOFTWARE.
  */
 
-#include <boost/multiprecision/integer.hpp>
-
-#include <fc/smart_ref_impl.hpp>
 #include <fc/uint128.hpp>
+
+#include <graphene/protocol/market.hpp>
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/fba_accumulator_id.hpp>
@@ -33,6 +32,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/buyback_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
@@ -131,33 +131,6 @@ struct worker_pay_visitor
       }
 };
 
-/// @brief A budget record struct to be used in initialize_budget_record and process_budget
-struct budget_record
-{
-    uint64_t time_since_last_budget = 0;
-
-    // sources of budget
-    share_type from_initial_reserve = 0;
-    share_type from_accumulated_fees = 0;
-    share_type from_unused_witness_budget = 0;
-
-    // witness budget requested by the committee
-    share_type requested_witness_budget = 0;
-
-    // funds that can be released from reserve at maximum rate
-    share_type total_budget = 0;
-
-    // sinks of budget, should sum up to total_budget
-    share_type witness_budget = 0;
-    share_type worker_budget = 0;
-
-    // unused budget
-    share_type leftover_worker_funds = 0;
-
-    // change in supply due to budget operations
-    share_type supply_delta = 0;
-};
-
 void database::update_worker_votes()
 {
    const auto& idx = get_index_type<worker_index>().indices().get<by_account>();
@@ -209,10 +182,10 @@ void database::pay_workers( share_type& budget )
       // Note: if there is a good chance that passed_time_count == day_count,
       //       for better performance, can avoid the 128 bit calculation by adding a check.
       //       Since it's not the case on BitShares mainnet, we're not using a check here.
-      fc::uint128 pay(requested_pay.value);
+      fc::uint128_t pay = requested_pay.value;
       pay *= passed_time_count;
       pay /= day_count;
-      requested_pay = pay.to_uint64();
+      requested_pay = static_cast<uint64_t>(pay);
 
       share_type actual_pay = std::min(budget, requested_pay);
       //ilog(" ==> Paying ${a} to worker ${w}", ("w", active_worker.id)("a", actual_pay));
@@ -331,14 +304,14 @@ void database::update_active_committee_members()
    assert( _committee_count_histogram_buffer.size() > 0 );
    share_type stake_target = (_total_voting_stake-_committee_count_histogram_buffer[0]) / 2;
 
-   /// accounts that vote for 0 or 1 witness do not get to express an opinion on
-   /// the number of witnesses to have (they abstain and are non-voting accounts)
-   uint64_t stake_tally = 0; // _committee_count_histogram_buffer[0];
+   /// accounts that vote for 0 or 1 committee member do not get to express an opinion on
+   /// the number of committee members to have (they abstain and are non-voting accounts)
+   share_type stake_tally = 0;
    size_t committee_member_count = 0;
    if( stake_target > 0 )
    {
       while( (committee_member_count < _committee_count_histogram_buffer.size() - 1)
-             && (stake_tally <= stake_target) )
+             && (stake_tally <= stake_target.value) )
       {
          stake_tally += _committee_count_histogram_buffer[++committee_member_count];
       }
@@ -466,8 +439,8 @@ void database::initialize_budget_record( fc::time_point_sec now, budget_record& 
    //   be able to use the entire reserve
    budget_u128 += ((uint64_t(1) << GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS) - 1);
    budget_u128 >>= GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS;
-   if( budget_u128 < reserve.value )
-      rec.total_budget = share_type(budget_u128.to_uint64());
+   if( budget_u128 < static_cast<fc::uint128_t>(reserve.value) )
+      rec.total_budget = share_type(static_cast<uint64_t>(budget_u128));
    else
       rec.total_budget = reserve;
 
@@ -519,10 +492,10 @@ void database::process_budget()
       worker_budget_u128 /= 60*60*24;
 
       share_type worker_budget;
-      if( worker_budget_u128 >= available_funds.value )
+      if( worker_budget_u128 >= static_cast<fc::uint128_t>(available_funds.value) )
          worker_budget = available_funds;
       else
-         worker_budget = worker_budget_u128.to_uint64();
+         worker_budget = static_cast<uint64_t>(worker_budget_u128);
       rec.worker_budget = worker_budget;
       available_funds -= worker_budget;
 
@@ -560,6 +533,12 @@ void database::process_budget()
          _dpo.last_budget_time = now;
       });
 
+      create< budget_record_object >( [&]( budget_record_object& _rec )
+      {
+         _rec.time = head_block_time();
+         _rec.record = rec;
+      });
+
       // available_funds is money we could spend, but don't want to.
       // we simply let it evaporate back into the reserve.
    }
@@ -574,11 +553,11 @@ void visit_special_authorities( const database& db, Visitor visit )
    for( const special_authority_object& sao : sa_idx )
    {
       const account_object& acct = sao.account(db);
-      if( acct.owner_special_authority.which() != special_authority::tag< no_special_authority >::value )
+      if( !acct.owner_special_authority.is_type< no_special_authority >() )
       {
          visit( acct, true, acct.owner_special_authority );
       }
-      if( acct.active_special_authority.which() != special_authority::tag< no_special_authority >::value )
+      if( !acct.active_special_authority.is_type< no_special_authority >() )
       {
          visit( acct, false, acct.active_special_authority );
       }
@@ -590,7 +569,7 @@ void update_top_n_authorities( database& db )
    visit_special_authorities( db,
    [&]( const account_object& acct, bool is_owner, const special_authority& auth )
    {
-      if( auth.which() == special_authority::tag< top_holders_special_authority >::value )
+      if( auth.is_type< top_holders_special_authority >() )
       {
          // use index to grab the top N holders of the asset and vote_counter to obtain the weights
 
@@ -656,12 +635,12 @@ void split_fba_balance(
    fc::uint128_t buyback_amount_128 = fba.accumulated_fba_fees.value;
    buyback_amount_128 *= designated_asset_buyback_pct;
    buyback_amount_128 /= GRAPHENE_100_PERCENT;
-   share_type buyback_amount = buyback_amount_128.to_uint64();
+   share_type buyback_amount = static_cast<uint64_t>(buyback_amount_128);
 
    fc::uint128_t issuer_amount_128 = fba.accumulated_fba_fees.value;
    issuer_amount_128 *= designated_asset_issuer_pct;
    issuer_amount_128 /= GRAPHENE_100_PERCENT;
-   share_type issuer_amount = issuer_amount_128.to_uint64();
+   share_type issuer_amount = static_cast<uint64_t>(issuer_amount_128);
 
    // this assert should never fail
    FC_ASSERT( buyback_amount + issuer_amount <= fba.accumulated_fba_fees );
@@ -713,7 +692,7 @@ void distribute_fba_balances( database& db )
 void create_buyback_orders( database& db )
 {
    const auto& bbo_idx = db.get_index_type< buyback_index >().indices().get<by_id>();
-   const auto& bal_idx = db.get_index_type< account_balance_index >().indices().get< by_account_asset >();
+   const auto& bal_idx = db.get_index_type< primary_index< account_balance_index > >().get_secondary_index< balances_by_account_index >();
 
    for( const buyback_object& bbo : bbo_idx )
    {
@@ -721,7 +700,6 @@ void create_buyback_orders( database& db )
       assert( asset_to_buy.buyback_account.valid() );
 
       const account_object& buyback_account = (*(asset_to_buy.buyback_account))(db);
-      asset_id_type next_asset = asset_id_type();
 
       if( !buyback_account.allowed_assets.valid() )
       {
@@ -729,16 +707,11 @@ void create_buyback_orders( database& db )
          continue;
       }
 
-      while( true )
+      for( const auto& entry : bal_idx.get_account_balances( buyback_account.id ) )
       {
-         auto it = bal_idx.lower_bound( boost::make_tuple( buyback_account.id, next_asset ) );
-         if( it == bal_idx.end() )
-            break;
-         if( it->owner != buyback_account.id )
-            break;
+         const auto* it = entry.second;
          asset_id_type asset_to_sell = it->asset_type;
          share_type amount_to_sell = it->balance;
-         next_asset = asset_to_sell + 1;
          if( asset_to_sell == asset_to_buy.id )
             continue;
          if( amount_to_sell == 0 )
@@ -834,11 +807,14 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    while( covered < bdd.current_supply && itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == to_revive_id )
    {
       const collateral_bid_object& bid = *itr;
-      asset total_collateral = bid.inv_swan_price.quote * bad.settlement_price;
+      asset debt_in_bid = bid.inv_swan_price.quote;
+      if( debt_in_bid.amount > bdd.current_supply )
+         debt_in_bid.amount = bdd.current_supply;
+      asset total_collateral = debt_in_bid * bad.settlement_price;
       total_collateral += bid.inv_swan_price.base;
-      price call_price = price::call_price( bid.inv_swan_price.quote, total_collateral, bad.current_feed.maintenance_collateral_ratio );
+      price call_price = price::call_price( debt_in_bid, total_collateral, bad.current_feed.maintenance_collateral_ratio );
       if( ~call_price >= bad.current_feed.settlement_price ) break;
-      covered += bid.inv_swan_price.quote.amount;
+      covered += debt_in_bid.amount;
       ++itr;
    }
    if( covered < bdd.current_supply ) return;
@@ -850,9 +826,12 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    {
       const collateral_bid_object& bid = *itr;
       ++itr;
-      share_type debt = bid.inv_swan_price.quote.amount;
-      share_type collateral = (bid.inv_swan_price.quote * bad.settlement_price).amount;
-      if( bid.inv_swan_price.quote.amount >= to_cover )
+      asset debt_in_bid = bid.inv_swan_price.quote;
+      if( debt_in_bid.amount > bdd.current_supply )
+         debt_in_bid.amount = bdd.current_supply;
+      share_type debt = debt_in_bid.amount;
+      share_type collateral = (debt_in_bid * bad.settlement_price).amount;
+      if( debt >= to_cover )
       {
          debt = to_cover;
          collateral = remaining_fund;
@@ -867,7 +846,9 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    _cancel_bids_and_revive_mpa( to_revive, bad );
 }
 
-void update_and_match_call_orders( database& db )
+/// Reset call_price of all call orders according to their remaining collateral and debt.
+/// Do not update orders of prediction markets because we're sure they're up to date.
+void update_call_orders_hf_343( database& db )
 {
    // Update call_price
    wlog( "Updating all call orders for hardfork core-343 at block ${n}", ("n",db.head_block_num()) );
@@ -888,7 +869,30 @@ void update_and_match_call_orders( database& db )
                                                 abd->current_feed.maintenance_collateral_ratio );
       });
    }
+   wlog( "Done updating all call orders for hardfork core-343 at block ${n}", ("n",db.head_block_num()) );
+}
+
+/// Reset call_price of all call orders to (1,1) since it won't be used in the future.
+/// Update PMs as well.
+void update_call_orders_hf_1270( database& db )
+{
+   // Update call_price
+   wlog( "Updating all call orders for hardfork core-1270 at block ${n}", ("n",db.head_block_num()) );
+   for( const auto& call_obj : db.get_index_type<call_order_index>().indices().get<by_id>() )
+   {
+      db.modify( call_obj, []( call_order_object& call ) {
+         call.call_price.base.amount = 1;
+         call.call_price.quote.amount = 1;
+      });
+   }
+   wlog( "Done updating all call orders for hardfork core-1270 at block ${n}", ("n",db.head_block_num()) );
+}
+
+/// Match call orders for all bitAssets, including PMs.
+void match_call_orders( database& db )
+{
    // Match call orders
+   wlog( "Matching call orders at block ${n}", ("n",db.head_block_num()) );
    const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
    auto itr = asset_idx.lower_bound( true /** market issued */ );
    while( itr != asset_idx.end() )
@@ -898,7 +902,7 @@ void update_and_match_call_orders( database& db )
       // be here, next_maintenance_time should have been updated already
       db.check_call_orders( a, true, false ); // allow black swan, and call orders are taker
    }
-   wlog( "Done updating all call orders for hardfork core-343 at block ${n}", ("n",db.head_block_num()) );
+   wlog( "Done matching call orders at block ${n}", ("n",db.head_block_num()) );
 }
 
 void database::process_bitassets()
@@ -939,6 +943,49 @@ void database::process_bitassets()
    }
 }
 
+/****
+ * @brief a one-time data process to correct max_supply
+ */
+void process_hf_1465( database& db )
+{
+   const auto head_num = db.head_block_num();
+   wlog( "Processing hard fork core-1465 at block ${n}", ("n",head_num) );
+   // for each market issued asset
+   const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
+   for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
+   {
+      const auto& current_asset = *asset_itr;
+      graphene::chain::share_type current_supply = current_asset.dynamic_data(db).current_supply;
+      graphene::chain::share_type max_supply = current_asset.options.max_supply;
+      if (current_supply > max_supply && max_supply != GRAPHENE_MAX_SHARE_SUPPLY)
+      {
+         wlog( "Adjusting max_supply of ${asset} because current_supply (${current_supply}) is greater than ${old}.", 
+               ("asset", current_asset.symbol) 
+               ("current_supply", current_supply.value)
+               ("old", max_supply));
+         db.modify<asset_object>( current_asset, [current_supply](asset_object& obj) {
+            obj.options.max_supply = graphene::chain::share_type(std::min(current_supply.value, GRAPHENE_MAX_SHARE_SUPPLY));
+         });
+      }
+   }
+}
+
+void update_median_feeds(database& db)
+{
+   time_point_sec head_time = db.head_block_time();
+   time_point_sec next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
+
+   const auto update_bitasset = [head_time, next_maint_time]( asset_bitasset_data_object &o )
+   {
+      o.update_median_feeds( head_time, next_maint_time );
+   };
+
+   for( const auto& d : db.get_index_type<asset_bitasset_data_index>().indices() )
+   {
+      db.modify( d, update_bitasset );
+   }
+}
+
 /******
  * @brief one-time data process for hard fork core-868-890
  *
@@ -960,6 +1007,7 @@ void database::process_bitassets()
 //       * NOTE: the removal can't be applied to testnet
 void process_hf_868_890( database& db, bool skip_check_call_orders )
 {
+   const auto next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
    const auto head_time = db.head_block_time();
    const auto head_num = db.head_block_num();
    wlog( "Processing hard fork core-868-890 at block ${n}", ("n",head_num) );
@@ -1019,8 +1067,8 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
       }
 
       // always update the median feed due to https://github.com/bitshares/bitshares-core/issues/890
-      db.modify( bitasset_data, [&head_time]( asset_bitasset_data_object &obj ) {
-         obj.update_median_feeds( head_time );
+      db.modify( bitasset_data, [head_time,next_maint_time]( asset_bitasset_data_object &obj ) {
+         obj.update_median_feeds( head_time, next_maint_time );
       });
 
       bool median_changed = ( old_feed.settlement_price != bitasset_data.current_feed.settlement_price );
@@ -1184,11 +1232,11 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    update_active_committee_members();
    update_worker_votes();
 
-   const dynamic_global_property_object& dgpo = get_dynamic_global_properties();
-
+   const auto& dgpo = get_dynamic_global_properties();
+   
    modify(gpo, [&dgpo](global_property_object& p) {
       // Remove scaling of account registration fee
-      p.parameters.current_fees->get<account_create_operation>().basic_fee >>= p.parameters.account_fee_scale_bitshifts *
+      p.parameters.get_mutable_fees().get<account_create_operation>().basic_fee >>= p.parameters.account_fee_scale_bitshifts *
             (dgpo.accounts_registered_this_interval / p.parameters.accounts_per_fee_scale);
 
       if( p.pending_parameters )
@@ -1231,28 +1279,48 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    if( (dgpo.next_maintenance_time < HARDFORK_613_TIME) && (next_maintenance_time >= HARDFORK_613_TIME) )
       deprecate_annual_members(*this);
 
-   // To reset call_price of all call orders, then match by new rule
-   bool to_update_and_match_call_orders = false;
+   // To reset call_price of all call orders, then match by new rule, for hard fork core-343
+   bool to_update_and_match_call_orders_for_hf_343 = false;
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_343_TIME) && (next_maintenance_time > HARDFORK_CORE_343_TIME) )
-      to_update_and_match_call_orders = true;
+      to_update_and_match_call_orders_for_hf_343 = true;
 
    // Process inconsistent price feeds
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_868_890_TIME) && (next_maintenance_time > HARDFORK_CORE_868_890_TIME) )
-      process_hf_868_890( *this, to_update_and_match_call_orders );
+      process_hf_868_890( *this, to_update_and_match_call_orders_for_hf_343 );
 
    // Explicitly call check_call_orders of all markets
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_935_TIME) && (next_maintenance_time > HARDFORK_CORE_935_TIME)
-         && !to_update_and_match_call_orders )
+         && !to_update_and_match_call_orders_for_hf_343 )
       process_hf_935( *this );
+
+   // To reset call_price of all call orders, then match by new rule, for hard fork core-1270
+   bool to_update_and_match_call_orders_for_hf_1270 = false;
+   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_1270_TIME) && (next_maintenance_time > HARDFORK_CORE_1270_TIME) )
+      to_update_and_match_call_orders_for_hf_1270 = true;
+
+   // make sure current_supply is less than or equal to max_supply
+   if ( dgpo.next_maintenance_time <= HARDFORK_CORE_1465_TIME && next_maintenance_time > HARDFORK_CORE_1465_TIME )
+      process_hf_1465(*this);
 
    modify(dgpo, [next_maintenance_time](dynamic_global_property_object& d) {
       d.next_maintenance_time = next_maintenance_time;
       d.accounts_registered_this_interval = 0;
    });
 
-   // We need to do it after updated next_maintenance_time, to apply new rules here
-   if( to_update_and_match_call_orders )
-      update_and_match_call_orders(*this);
+   // We need to do it after updated next_maintenance_time, to apply new rules here, for hard fork core-343
+   if( to_update_and_match_call_orders_for_hf_343 )
+   {
+      update_call_orders_hf_343(*this);
+      match_call_orders(*this);
+   }
+
+   // We need to do it after updated next_maintenance_time, to apply new rules here, for hard fork core-1270.
+   if( to_update_and_match_call_orders_for_hf_1270 )
+   {
+      update_call_orders_hf_1270(*this);
+      update_median_feeds(*this);
+      match_call_orders(*this);
+   }
 
    process_bitassets();
 

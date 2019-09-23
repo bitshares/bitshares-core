@@ -80,11 +80,9 @@ struct pending_transactions_restorer
       {
          try {
             if( !_db.is_known_transaction( tx.id() ) ) {
-               // since push_transaction() takes a signed_transaction,
-               // the operation_results field will be ignored.
                _db._push_transaction( tx );
             }
-         } catch ( const fc::exception&  ) {
+         } catch ( const fc::exception& ) { // ignore invalid transactions
          }
       }
       _db._popped_tx.clear();
@@ -93,17 +91,11 @@ struct pending_transactions_restorer
          try
          {
             if( !_db.is_known_transaction( tx.id() ) ) {
-               // since push_transaction() takes a signed_transaction,
-               // the operation_results field will be ignored.
                _db._push_transaction( tx );
             }
          }
-         catch( const fc::exception& e )
-         {
-            /*
-            wlog( "Pending transaction became invalid after switching to block ${b}  ${t}", ("b", _db.head_block_id())("t",_db.head_block_time()) );
-            wlog( "The invalid pending transaction caused exception ${e}", ("e", e.to_detail_string() ) );
-            */
+         catch( const fc::exception& )
+         { // ignore invalid transactions
          }
       }
    }

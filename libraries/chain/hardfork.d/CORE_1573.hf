@@ -1,0 +1,4 @@
+// bitshares-core issue #1573 check transaction size
+#ifndef HARDFORK_CORE_1573_TIME
+#define HARDFORK_CORE_1573_TIME (fc::time_point_sec( 1556028120 ) ) // 2019-04-23T14:02:00Z
+#endif

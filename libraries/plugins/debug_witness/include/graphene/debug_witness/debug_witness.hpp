@@ -25,7 +25,7 @@
 
 #include <graphene/app/plugin.hpp>
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/types.hpp>
 
 #include <fc/thread/future.hpp>
 #include <fc/container/flat.hpp>
@@ -58,7 +58,7 @@ private:
 
    boost::program_options::variables_map _options;
 
-   std::map<chain::public_key_type, fc::ecc::private_key> _private_keys;
+   std::map<chain::public_key_type, fc::ecc::private_key, chain::pubkey_comparator> _private_keys;
 
    std::shared_ptr< std::ofstream > _json_object_stream;
    boost::signals2::scoped_connection _applied_block_conn;

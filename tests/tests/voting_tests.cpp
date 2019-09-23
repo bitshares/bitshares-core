@@ -26,6 +26,7 @@
 
 #include <graphene/app/database_api.hpp>
 #include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <iostream>
 
@@ -37,12 +38,53 @@ using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE(voting_tests, database_fixture)
 
+BOOST_FIXTURE_TEST_CASE( committee_account_initialization_test, database_fixture )
+{ try {
+   // Check current default committee
+   // By default chain is configured with INITIAL_COMMITTEE_MEMBER_COUNT=9 members
+   const auto &committee_members = db.get_global_properties().active_committee_members;
+   const auto &committee = committee_account(db);
+
+   BOOST_CHECK_EQUAL(committee_members.size(), INITIAL_COMMITTEE_MEMBER_COUNT);
+   BOOST_CHECK_EQUAL(committee.active.num_auths(), INITIAL_COMMITTEE_MEMBER_COUNT);
+
+   generate_blocks(HARDFORK_533_TIME);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   generate_block();
+   set_expiration(db, trx);
+
+   // Check that committee not changed after 533 hardfork
+   // vote counting method changed, but any votes are absent
+   const auto &committee_members_after_hf533 = db.get_global_properties().active_committee_members;
+   const auto &committee_after_hf533 = committee_account(db);
+   BOOST_CHECK_EQUAL(committee_members_after_hf533.size(), INITIAL_COMMITTEE_MEMBER_COUNT);
+   BOOST_CHECK_EQUAL(committee_after_hf533.active.num_auths(), INITIAL_COMMITTEE_MEMBER_COUNT);
+
+   // You can't use uninitialized committee after 533 hardfork
+   // when any user with stake created (create_account method automatically set up votes for committee)
+   // committee is incomplete and consist of random active members
+   ACTOR(alice);
+   fund(alice);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   const auto &committee_after_hf533_with_stake = committee_account(db);
+   BOOST_CHECK_LT(committee_after_hf533_with_stake.active.num_auths(), INITIAL_COMMITTEE_MEMBER_COUNT);
+
+   // Initialize committee by voting for each memeber and for desired count
+   vote_for_committee_and_witnesses(INITIAL_COMMITTEE_MEMBER_COUNT, INITIAL_WITNESS_COUNT);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   const auto &committee_members_after_hf533_and_init = db.get_global_properties().active_committee_members;
+   const auto &committee_after_hf533_and_init = committee_account(db);
+   BOOST_CHECK_EQUAL(committee_members_after_hf533_and_init.size(), INITIAL_COMMITTEE_MEMBER_COUNT);
+   BOOST_CHECK_EQUAL(committee_after_hf533_and_init.active.num_auths(), INITIAL_COMMITTEE_MEMBER_COUNT);
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE(put_my_witnesses)
 {
    try
    {
-      graphene::app::database_api db_api1(db);
-
       ACTORS( (witness0)
               (witness1)
               (witness2)
@@ -90,7 +132,7 @@ BOOST_AUTO_TEST_CASE(put_my_witnesses)
       const witness_id_type witness12_witness_id = create_witness(witness12_id, witness12_private_key).id;
       const witness_id_type witness13_witness_id = create_witness(witness13_id, witness13_private_key).id;
 
-      // Create a vector with private key of all witnesses, will be used to activate 11 witnesses at a time
+      // Create a vector with private key of all witnesses, will be used to activate 9 witnesses at a time
       const vector <fc::ecc::private_key> private_keys = {
             witness0_private_key,
             witness1_private_key,
@@ -109,7 +151,7 @@ BOOST_AUTO_TEST_CASE(put_my_witnesses)
 
       };
 
-      // create a map with account id and witness id of the first 11 witnesses
+      // create a map with account id and witness id
       const flat_map <account_id_type, witness_id_type> witness_map = {
             {witness0_id, witness0_witness_id},
             {witness1_id, witness1_witness_id},
@@ -127,19 +169,18 @@ BOOST_AUTO_TEST_CASE(put_my_witnesses)
             {witness13_id, witness13_witness_id}
       };
 
-      // Check current default witnesses, default chain is configured with 10 witnesses
+      // Check current default witnesses, default chain is configured with 9 witnesses
       auto witnesses = db.get_global_properties().active_witnesses;
-      BOOST_CHECK_EQUAL(witnesses.size(), 10);
-      BOOST_CHECK_EQUAL(witnesses.begin()[0].instance.value, 1);
-      BOOST_CHECK_EQUAL(witnesses.begin()[1].instance.value, 2);
-      BOOST_CHECK_EQUAL(witnesses.begin()[2].instance.value, 3);
-      BOOST_CHECK_EQUAL(witnesses.begin()[3].instance.value, 4);
-      BOOST_CHECK_EQUAL(witnesses.begin()[4].instance.value, 5);
-      BOOST_CHECK_EQUAL(witnesses.begin()[5].instance.value, 6);
-      BOOST_CHECK_EQUAL(witnesses.begin()[6].instance.value, 7);
-      BOOST_CHECK_EQUAL(witnesses.begin()[7].instance.value, 8);
-      BOOST_CHECK_EQUAL(witnesses.begin()[8].instance.value, 9);
-      BOOST_CHECK_EQUAL(witnesses.begin()[9].instance.value, 10);
+      BOOST_CHECK_EQUAL(witnesses.size(), INITIAL_WITNESS_COUNT);
+      BOOST_CHECK_EQUAL(witnesses.begin()[0].instance.value, 1u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[1].instance.value, 2u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[2].instance.value, 3u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[3].instance.value, 4u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[4].instance.value, 5u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[5].instance.value, 6u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[6].instance.value, 7u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[7].instance.value, 8u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[8].instance.value, 9u);
 
       // Activate all witnesses
       // Each witness is voted with incremental stake so last witness created will be the ones with more votes
@@ -168,18 +209,16 @@ BOOST_AUTO_TEST_CASE(put_my_witnesses)
 
       // Check my witnesses are now in control of the system
       witnesses = db.get_global_properties().active_witnesses;
-      BOOST_CHECK_EQUAL(witnesses.size(), 11);
-      BOOST_CHECK_EQUAL(witnesses.begin()[0].instance.value, 14);
-      BOOST_CHECK_EQUAL(witnesses.begin()[1].instance.value, 15);
-      BOOST_CHECK_EQUAL(witnesses.begin()[2].instance.value, 16);
-      BOOST_CHECK_EQUAL(witnesses.begin()[3].instance.value, 17);
-      BOOST_CHECK_EQUAL(witnesses.begin()[4].instance.value, 18);
-      BOOST_CHECK_EQUAL(witnesses.begin()[5].instance.value, 19);
-      BOOST_CHECK_EQUAL(witnesses.begin()[6].instance.value, 20);
-      BOOST_CHECK_EQUAL(witnesses.begin()[7].instance.value, 21);
-      BOOST_CHECK_EQUAL(witnesses.begin()[8].instance.value, 22);
-      BOOST_CHECK_EQUAL(witnesses.begin()[9].instance.value, 23);
-      BOOST_CHECK_EQUAL(witnesses.begin()[10].instance.value, 24);
+      BOOST_CHECK_EQUAL(witnesses.size(), INITIAL_WITNESS_COUNT);
+      BOOST_CHECK_EQUAL(witnesses.begin()[0].instance.value, 16u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[1].instance.value, 17u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[2].instance.value, 18u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[3].instance.value, 19u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[4].instance.value, 20u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[5].instance.value, 21u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[6].instance.value, 22u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[7].instance.value, 23u);
+      BOOST_CHECK_EQUAL(witnesses.begin()[8].instance.value, 24u);
 
    } FC_LOG_AND_RETHROW()
 }
@@ -194,7 +233,7 @@ BOOST_AUTO_TEST_CASE(track_votes_witnesses_enabled)
 
       const account_id_type witness1_id= get_account("witness1").id;
       auto witness1_object = db_api1.get_witness_by_account(witness1_id(db).name);
-      BOOST_CHECK_EQUAL(witness1_object->total_votes, 111);
+      BOOST_CHECK_EQUAL(witness1_object->total_votes, 111u);
 
    } FC_LOG_AND_RETHROW()
 }
@@ -209,7 +248,7 @@ BOOST_AUTO_TEST_CASE(track_votes_witnesses_disabled)
 
       const account_id_type witness1_id= get_account("witness1").id;
       auto witness1_object = db_api1.get_witness_by_account(witness1_id(db).name);
-      BOOST_CHECK_EQUAL(witness1_object->total_votes, 0);
+      BOOST_CHECK_EQUAL(witness1_object->total_votes, 0u);
 
    } FC_LOG_AND_RETHROW()
 }
@@ -218,8 +257,6 @@ BOOST_AUTO_TEST_CASE(put_my_committee_members)
 {
    try
    {
-      graphene::app::database_api db_api1(db);
-
       ACTORS( (committee0)
               (committee1)
               (committee2)
@@ -267,7 +304,7 @@ BOOST_AUTO_TEST_CASE(put_my_committee_members)
       const committee_member_id_type committee12_committee_id = create_committee_member(committee12_id(db)).id;
       const committee_member_id_type committee13_committee_id = create_committee_member(committee13_id(db)).id;
 
-      // Create a vector with private key of all witnesses, will be used to activate 11 witnesses at a time
+      // Create a vector with private key of all committee members, will be used to activate 9 members at a time
       const vector <fc::ecc::private_key> private_keys = {
             committee0_private_key,
             committee1_private_key,
@@ -285,7 +322,7 @@ BOOST_AUTO_TEST_CASE(put_my_committee_members)
             committee13_private_key
       };
 
-      // create a map with account id and committee id of the first 11 witnesses
+      // create a map with account id and committee member id
       const flat_map <account_id_type, committee_member_id_type> committee_map = {
             {committee0_id, committee0_committee_id},
             {committee1_id, committee1_committee_id},
@@ -303,23 +340,22 @@ BOOST_AUTO_TEST_CASE(put_my_committee_members)
             {committee13_id, committee13_committee_id}
       };
 
-      // Check current default witnesses, default chain is configured with 10 witnesses
+      // Check current default committee, default chain is configured with 9 committee members
       auto committee_members = db.get_global_properties().active_committee_members;
 
-      BOOST_CHECK_EQUAL(committee_members.size(), 10);
-      BOOST_CHECK_EQUAL(committee_members.begin()[0].instance.value, 0);
-      BOOST_CHECK_EQUAL(committee_members.begin()[1].instance.value, 1);
-      BOOST_CHECK_EQUAL(committee_members.begin()[2].instance.value, 2);
-      BOOST_CHECK_EQUAL(committee_members.begin()[3].instance.value, 3);
-      BOOST_CHECK_EQUAL(committee_members.begin()[4].instance.value, 4);
-      BOOST_CHECK_EQUAL(committee_members.begin()[5].instance.value, 5);
-      BOOST_CHECK_EQUAL(committee_members.begin()[6].instance.value, 6);
-      BOOST_CHECK_EQUAL(committee_members.begin()[7].instance.value, 7);
-      BOOST_CHECK_EQUAL(committee_members.begin()[8].instance.value, 8);
-      BOOST_CHECK_EQUAL(committee_members.begin()[9].instance.value, 9);
+      BOOST_CHECK_EQUAL(committee_members.size(), INITIAL_COMMITTEE_MEMBER_COUNT);
+      BOOST_CHECK_EQUAL(committee_members.begin()[0].instance.value, 0u);
+      BOOST_CHECK_EQUAL(committee_members.begin()[1].instance.value, 1u);
+      BOOST_CHECK_EQUAL(committee_members.begin()[2].instance.value, 2u);
+      BOOST_CHECK_EQUAL(committee_members.begin()[3].instance.value, 3u);
+      BOOST_CHECK_EQUAL(committee_members.begin()[4].instance.value, 4u);
+      BOOST_CHECK_EQUAL(committee_members.begin()[5].instance.value, 5u);
+      BOOST_CHECK_EQUAL(committee_members.begin()[6].instance.value, 6u);
+      BOOST_CHECK_EQUAL(committee_members.begin()[7].instance.value, 7u);
+      BOOST_CHECK_EQUAL(committee_members.begin()[8].instance.value, 8u);
 
       // Activate all committee
-      // Each witness is voted with incremental stake so last witness created will be the ones with more votes
+      // Each committee is voted with incremental stake so last member created will be the ones with more votes
       int c = 0;
       for (auto committee : committee_map) {
          int stake = 100 + c + 10;
@@ -329,7 +365,10 @@ BOOST_AUTO_TEST_CASE(put_my_committee_members)
             account_update_operation op;
             op.account = committee.first;
             op.new_options = committee.first(db).options;
+
+            op.new_options->votes.clear();
             op.new_options->votes.insert(committee.second(db).vote_id);
+            op.new_options->num_committee = 1;
 
             trx.operations.push_back(op);
             sign(trx, private_keys.at(c));
@@ -345,21 +384,21 @@ BOOST_AUTO_TEST_CASE(put_my_committee_members)
 
       // Check my witnesses are now in control of the system
       committee_members = db.get_global_properties().active_committee_members;
-      BOOST_CHECK_EQUAL(committee_members.size(), 11);
+      std::sort(committee_members.begin(), committee_members.end());
 
-      /* TODO we are not in full control, seems to committee members have votes by default
-      BOOST_CHECK_EQUAL(committee_members.begin()[0].instance.value, 14);
-      BOOST_CHECK_EQUAL(committee_members.begin()[1].instance.value, 15);
-      BOOST_CHECK_EQUAL(committee_members.begin()[2].instance.value, 16);
-      BOOST_CHECK_EQUAL(committee_members.begin()[3].instance.value, 17);
-      BOOST_CHECK_EQUAL(committee_members.begin()[4].instance.value, 18);
-      BOOST_CHECK_EQUAL(committee_members.begin()[5].instance.value, 19);
-      BOOST_CHECK_EQUAL(committee_members.begin()[6].instance.value, 20);
-      BOOST_CHECK_EQUAL(committee_members.begin()[7].instance.value, 21);
-      BOOST_CHECK_EQUAL(committee_members.begin()[8].instance.value, 22);
-      BOOST_CHECK_EQUAL(committee_members.begin()[9].instance.value, 23);
-      BOOST_CHECK_EQUAL(committee_members.begin()[10].instance.value, 24);
-      */
+      BOOST_CHECK_EQUAL(committee_members.size(), INITIAL_COMMITTEE_MEMBER_COUNT);
+
+      // Check my committee members are now in control of the system
+      BOOST_CHECK_EQUAL(committee_members.begin()[0].instance.value, 15);
+      BOOST_CHECK_EQUAL(committee_members.begin()[1].instance.value, 16);
+      BOOST_CHECK_EQUAL(committee_members.begin()[2].instance.value, 17);
+      BOOST_CHECK_EQUAL(committee_members.begin()[3].instance.value, 18);
+      BOOST_CHECK_EQUAL(committee_members.begin()[4].instance.value, 19);
+      BOOST_CHECK_EQUAL(committee_members.begin()[5].instance.value, 20);
+      BOOST_CHECK_EQUAL(committee_members.begin()[6].instance.value, 21);
+      BOOST_CHECK_EQUAL(committee_members.begin()[7].instance.value, 22);
+      BOOST_CHECK_EQUAL(committee_members.begin()[8].instance.value, 23);
+
    } FC_LOG_AND_RETHROW()
 }
 
@@ -373,7 +412,7 @@ BOOST_AUTO_TEST_CASE(track_votes_committee_enabled)
 
       const account_id_type committee1_id= get_account("committee1").id;
       auto committee1_object = db_api1.get_committee_member_by_account(committee1_id(db).name);
-      BOOST_CHECK_EQUAL(committee1_object->total_votes, 111);
+      BOOST_CHECK_EQUAL(committee1_object->total_votes, 111u);
 
    } FC_LOG_AND_RETHROW()
 }
@@ -388,7 +427,7 @@ BOOST_AUTO_TEST_CASE(track_votes_committee_disabled)
 
       const account_id_type committee1_id= get_account("committee1").id;
       auto committee1_object = db_api1.get_committee_member_by_account(committee1_id(db).name);
-      BOOST_CHECK_EQUAL(committee1_object->total_votes, 0);
+      BOOST_CHECK_EQUAL(committee1_object->total_votes, 0u);
 
    } FC_LOG_AND_RETHROW()
 }
@@ -411,6 +450,130 @@ BOOST_AUTO_TEST_CASE(invalid_voting_account)
       sign(trx, alice_private_key);
 
       GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   } FC_LOG_AND_RETHROW()
+}
+BOOST_AUTO_TEST_CASE(last_voting_date)
+{
+   try
+   {
+      ACTORS((alice));
+
+      transfer(committee_account, alice_id, asset(100));
+
+      // we are going to vote for this witness
+      auto witness1 = witness_id_type(1)(db);
+
+      auto stats_obj = db.get_account_stats_by_owner(alice_id);
+      BOOST_CHECK_EQUAL(stats_obj.last_vote_time.sec_since_epoch(), 0u);
+
+      // alice votes
+      graphene::chain::account_update_operation op;
+      op.account = alice_id;
+      op.new_options = alice.options;
+      op.new_options->votes.insert(witness1.vote_id);
+      trx.operations.push_back(op);
+      sign(trx, alice_private_key);
+      PUSH_TX( db, trx, ~0 );
+
+      auto now = db.head_block_time().sec_since_epoch();
+
+      // last_vote_time is updated for alice
+      stats_obj = db.get_account_stats_by_owner(alice_id);
+      BOOST_CHECK_EQUAL(stats_obj.last_vote_time.sec_since_epoch(), now);
+
+   } FC_LOG_AND_RETHROW()
+}
+BOOST_AUTO_TEST_CASE(last_voting_date_proxy)
+{
+   try
+   {
+      ACTORS((alice)(proxy)(bob));
+
+      transfer(committee_account, alice_id, asset(100));
+      transfer(committee_account, bob_id, asset(200));
+      transfer(committee_account, proxy_id, asset(300));
+
+      generate_block();
+
+      // witness to vote for
+      auto witness1 = witness_id_type(1)(db);
+
+      // round1: alice changes proxy, this is voting activity
+      {
+         graphene::chain::account_update_operation op;
+         op.account = alice_id;
+         op.new_options = alice_id(db).options;
+         op.new_options->voting_account = proxy_id;
+         trx.operations.push_back(op);
+         sign(trx, alice_private_key);
+         PUSH_TX( db, trx, ~0 );
+      }
+      // alice last_vote_time is updated
+      auto alice_stats_obj = db.get_account_stats_by_owner(alice_id);
+      auto round1 = db.head_block_time().sec_since_epoch();
+      BOOST_CHECK_EQUAL(alice_stats_obj.last_vote_time.sec_since_epoch(), round1);
+
+      generate_block();
+
+      // round 2: alice update account but no proxy or voting changes are done
+      {
+         graphene::chain::account_update_operation op;
+         op.account = alice_id;
+         op.new_options = alice_id(db).options;
+         trx.operations.push_back(op);
+         sign(trx, alice_private_key);
+         set_expiration( db, trx );
+         PUSH_TX( db, trx, ~0 );
+      }
+      // last_vote_time is not updated
+      alice_stats_obj = db.get_account_stats_by_owner(alice_id);
+      BOOST_CHECK_EQUAL(alice_stats_obj.last_vote_time.sec_since_epoch(), round1);
+
+      generate_block();
+
+      // round 3: bob votes
+      {
+         graphene::chain::account_update_operation op;
+         op.account = bob_id;
+         op.new_options = bob_id(db).options;
+         op.new_options->votes.insert(witness1.vote_id);
+         trx.operations.push_back(op);
+         sign(trx, bob_private_key);
+         set_expiration( db, trx );
+         PUSH_TX(db, trx, ~0);
+      }
+
+      // last_vote_time for bob is updated as he voted
+      auto round3 = db.head_block_time().sec_since_epoch();
+      auto bob_stats_obj = db.get_account_stats_by_owner(bob_id);
+      BOOST_CHECK_EQUAL(bob_stats_obj.last_vote_time.sec_since_epoch(), round3);
+
+      generate_block();
+
+      // round 4: proxy votes
+      {
+         graphene::chain::account_update_operation op;
+         op.account = proxy_id;
+         op.new_options = proxy_id(db).options;
+         op.new_options->votes.insert(witness1.vote_id);
+         trx.operations.push_back(op);
+         sign(trx, proxy_private_key);
+         PUSH_TX(db, trx, ~0);
+      }
+
+      // proxy just voted so the last_vote_time is updated
+      auto round4 = db.head_block_time().sec_since_epoch();
+      auto proxy_stats_obj = db.get_account_stats_by_owner(proxy_id);
+      BOOST_CHECK_EQUAL(proxy_stats_obj.last_vote_time.sec_since_epoch(), round4);
+
+      // alice haves proxy, proxy votes but last_vote_time is not updated for alice
+      alice_stats_obj = db.get_account_stats_by_owner(alice_id);
+      BOOST_CHECK_EQUAL(alice_stats_obj.last_vote_time.sec_since_epoch(), round1);
+
+      // bob haves nothing to do with proxy so last_vote_time is not updated
+      bob_stats_obj = db.get_account_stats_by_owner(bob_id);
+      BOOST_CHECK_EQUAL(bob_stats_obj.last_vote_time.sec_since_epoch(), round3);
 
    } FC_LOG_AND_RETHROW()
 }

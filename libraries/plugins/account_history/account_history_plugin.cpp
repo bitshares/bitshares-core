@@ -34,7 +34,6 @@
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 
-#include <fc/smart_ref_impl.hpp>
 #include <fc/thread/thread.hpp>
 
 namespace graphene { namespace account_history {
@@ -66,7 +65,7 @@ class account_history_plugin_impl
       flat_set<account_id_type> _tracked_accounts;
       bool _partial_operations = false;
       primary_index< operation_history_index >* _oho_index;
-      uint32_t _max_ops_per_account = -1;
+      uint64_t _max_ops_per_account = -1;
    private:
       /** add one history record, then check and remove the earliest history record */
       void add_account_history( const account_id_type account_id, const operation_history_id_type op_id );
@@ -131,7 +130,7 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
       vector<authority> other;
       operation_get_required_authorities( op.op, impacted, impacted, other ); // fee_payer is added here
 
-      if( op.op.which() == operation::tag< account_create_operation >::value )
+      if( op.op.is_type< account_create_operation >() )
          impacted.insert( op.result.get<object_id_type>() );
       else
          graphene::chain::operation_get_impacted_accounts( op.op, impacted );
@@ -282,7 +281,7 @@ void account_history_plugin::plugin_set_program_options(
    cli.add_options()
          ("track-account", boost::program_options::value<std::vector<std::string>>()->composing()->multitoken(), "Account ID to track history for (may specify multiple times)")
          ("partial-operations", boost::program_options::value<bool>(), "Keep only those operations in memory that are related to account history tracking")
-         ("max-ops-per-account", boost::program_options::value<uint32_t>(), "Maximum number of operations per account will be kept in memory")
+         ("max-ops-per-account", boost::program_options::value<uint64_t>(), "Maximum number of operations per account will be kept in memory")
          ;
    cfg.add(cli);
 }
@@ -298,7 +297,7 @@ void account_history_plugin::plugin_initialize(const boost::program_options::var
        my->_partial_operations = options["partial-operations"].as<bool>();
    }
    if (options.count("max-ops-per-account")) {
-       my->_max_ops_per_account = options["max-ops-per-account"].as<uint32_t>();
+       my->_max_ops_per_account = options["max-ops-per-account"].as<uint64_t>();
    }
 }
 

@@ -22,14 +22,12 @@
  * THE SOFTWARE.
  */
 #include <graphene/chain/exceptions.hpp>
-#include <graphene/chain/protocol/confidential.hpp>
+#include <graphene/protocol/confidential.hpp>
 #include <graphene/chain/confidential_evaluator.hpp>
 #include <graphene/chain/confidential_object.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/fba_accumulator_id.hpp>
 #include <graphene/chain/hardfork.hpp>
-
-#include <fc/smart_ref_impl.hpp>
 
 namespace graphene { namespace chain {
 

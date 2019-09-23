@@ -27,14 +27,14 @@
 #include <graphene/net/message.hpp>
 #include <graphene/net/peer_database.hpp>
 
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/types.hpp>
 
 #include <list>
 
 namespace graphene { namespace net {
 
   using fc::variant_object;
-  using graphene::chain::chain_id_type;
+  using graphene::protocol::chain_id_type;
 
   namespace detail
   {
@@ -193,7 +193,7 @@ namespace graphene { namespace net {
    {
       public:
         node(const std::string& user_agent);
-        ~node();
+        virtual ~node();
 
         void close();
 
@@ -272,8 +272,8 @@ namespace graphene { namespace net {
 
         void set_advanced_node_parameters(const fc::variant_object& params);
         fc::variant_object get_advanced_node_parameters();
-        message_propagation_data get_transaction_propagation_data(const graphene::chain::transaction_id_type& transaction_id);
-        message_propagation_data get_block_propagation_data(const graphene::chain::block_id_type& block_id);
+        message_propagation_data get_transaction_propagation_data(const graphene::protocol::transaction_id_type& transaction_id);
+        message_propagation_data get_block_propagation_data(const graphene::protocol::block_id_type& block_id);
         node_id_t get_node_id() const;
         void set_allowed_peers(const std::vector<node_id_t>& allowed_peers);
 

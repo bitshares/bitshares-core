@@ -30,10 +30,9 @@
 #include <fc/io/fstream.hpp>
 #include <fc/io/json.hpp>
 #include <fc/io/stdio.hpp>
-#include <fc/smart_ref_impl.hpp>
 
 #include <graphene/app/api.hpp>
-#include <graphene/chain/protocol/address.hpp>
+#include <graphene/protocol/address.hpp>
 #include <graphene/egenesis/egenesis.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 
@@ -59,7 +58,7 @@ int main( int argc, char** argv )
 {
    try
    {
-      bpo::options_description cli_options("Graphene empty blocks");
+      bpo::options_description cli_options("BitShares empty blocks");
       cli_options.add_options()
             ("help,h", "Print this help message and exit.")
             ("genesis-json,g", bpo::value<boost::filesystem::path>(), "File to read genesis state from")

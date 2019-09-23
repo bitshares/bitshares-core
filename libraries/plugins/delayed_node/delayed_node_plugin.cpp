@@ -23,15 +23,13 @@
  */
 
 #include <graphene/delayed_node/delayed_node_plugin.hpp>
-#include <graphene/chain/protocol/types.hpp>
+#include <graphene/protocol/types.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/app/api.hpp>
 
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/api.hpp>
-#include <fc/smart_ref_impl.hpp>
-
 
 namespace graphene { namespace delayed_node {
 namespace bpo = boost::program_options;
@@ -58,14 +56,16 @@ delayed_node_plugin::~delayed_node_plugin()
 void delayed_node_plugin::plugin_set_program_options(bpo::options_description& cli, bpo::options_description& cfg)
 {
    cli.add_options()
-         ("trusted-node", boost::program_options::value<std::string>(), "RPC endpoint of a trusted validating node (required)")
+         ("trusted-node", boost::program_options::value<std::string>(), "RPC endpoint of a trusted validating node (required for delayed_node)")
          ;
    cfg.add(cli);
 }
 
 void delayed_node_plugin::connect()
 {
-   my->client_connection = std::make_shared<fc::rpc::websocket_api_connection>(*my->client.connect(my->remote_endpoint), GRAPHENE_NET_MAX_NESTED_OBJECTS);
+   my->client_connection = std::make_shared<fc::rpc::websocket_api_connection>(
+                              my->client.connect(my->remote_endpoint),
+                              GRAPHENE_NET_MAX_NESTED_OBJECTS );
    my->database_api = my->client_connection->get_remote_api<graphene::app::database_api>(0);
    my->client_connection_closed = my->client_connection->closed.connect([this] {
       connection_failed();
@@ -103,8 +103,10 @@ void delayed_node_plugin::sync_with_trusted_node()
       while( remote_dpo.last_irreversible_block_num > db.head_block_num() )
       {
          fc::optional<graphene::chain::signed_block> block = my->database_api->get_block( db.head_block_num()+1 );
+         // TODO: during sync, decouple requesting blocks from preprocessing + applying them
          FC_ASSERT(block, "Trusted node claims it has blocks it doesn't actually have.");
          ilog("Pushing block #${n}", ("n", block->block_num()));
+         db.precompute_parallel( *block, graphene::chain::database::skip_nothing ).wait();
          db.push_block(*block);
          synced_blocks++;
       }

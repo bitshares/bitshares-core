@@ -31,13 +31,16 @@
 #include <graphene/chain/operation_history_object.hpp>
 
 #include <graphene/chain/proposal_object.hpp>
-#include <graphene/chain/transaction_object.hpp>
+#include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/witness_object.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/evaluator.hpp>
+#include <graphene/chain/witness_schedule_object.hpp>
 
-#include <fc/smart_ref_impl.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
+
+#include <fc/io/raw.hpp>
+#include <fc/thread/parallel.hpp>
 
 namespace graphene { namespace chain {
 
@@ -76,7 +79,6 @@ optional<signed_block> database::fetch_block_by_number( uint32_t num )const
       return results[0]->data;
    else
       return _block_id_to_block.fetch_by_number(num);
-   return optional<signed_block>();
 }
 
 const signed_transaction& database::get_recent_transaction(const transaction_id_type& trx_id) const
@@ -129,95 +131,129 @@ bool database::push_block(const signed_block& new_block, uint32_t skip)
 bool database::_push_block(const signed_block& new_block)
 { try {
    uint32_t skip = get_node_properties().skip_flags;
-   if( !(skip&skip_fork_db) )
+
+   const auto now = fc::time_point::now().sec_since_epoch();
+   if( _fork_db.head() && new_block.timestamp.sec_since_epoch() > now - 86400 )
    {
-      /// TODO: if the block is greater than the head block and before the next maitenance interval
       // verify that the block signer is in the current set of active witnesses.
+      shared_ptr<fork_item> prev_block = _fork_db.fetch_block( new_block.previous );
+      GRAPHENE_ASSERT( prev_block, unlinkable_block_exception, "block does not link to known chain" );
+      if( prev_block->scheduled_witnesses && !(skip&(skip_witness_schedule_check|skip_witness_signature)) )
+         verify_signing_witness( new_block, *prev_block );
+   }
 
-      shared_ptr<fork_item> new_head = _fork_db.push_block(new_block);
-      //If the head block from the longest chain does not build off of the current head, we need to switch forks.
-      if( new_head->data.previous != head_block_id() )
+   const shared_ptr<fork_item> new_head = _fork_db.push_block(new_block);
+   //If the head block from the longest chain does not build off of the current head, we need to switch forks.
+   if( new_head->data.previous != head_block_id() )
+   {
+      //If the newly pushed block is the same height as head, we get head back in new_head
+      //Only switch forks if new_head is actually higher than head
+      if( new_head->data.block_num() > head_block_num() )
       {
-         //If the newly pushed block is the same height as head, we get head back in new_head
-         //Only switch forks if new_head is actually higher than head
-         if( new_head->data.block_num() > head_block_num() )
+         wlog( "Switching to fork: ${id}", ("id",new_head->data.id()) );
+         auto branches = _fork_db.fetch_branch_from(new_head->data.id(), head_block_id());
+
+         // pop blocks until we hit the forked block
+         while( head_block_id() != branches.second.back()->data.previous )
          {
-            wlog( "Switching to fork: ${id}", ("id",new_head->data.id()) );
-            auto branches = _fork_db.fetch_branch_from(new_head->data.id(), head_block_id());
-
-            // pop blocks until we hit the forked block
-            while( head_block_id() != branches.second.back()->data.previous )
-            {
-               ilog( "popping block #${n} ${id}", ("n",head_block_num())("id",head_block_id()) );
-               pop_block();
-            }
-
-            // push all blocks on the new fork
-            for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr )
-            {
-                ilog( "pushing block from fork #${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
-                optional<fc::exception> except;
-                try {
-                   undo_database::session session = _undo_db.start_undo_session();
-                   apply_block( (*ritr)->data, skip );
-                   _block_id_to_block.store( (*ritr)->id, (*ritr)->data );
-                   session.commit();
-                }
-                catch ( const fc::exception& e ) { except = e; }
-                if( except )
-                {
-                   wlog( "exception thrown while switching forks ${e}", ("e",except->to_detail_string() ) );
-                   // remove the rest of branches.first from the fork_db, those blocks are invalid
-                   while( ritr != branches.first.rend() )
-                   {
-                      ilog( "removing block from fork_db #${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
-                      _fork_db.remove( (*ritr)->id );
-                      ++ritr;
-                   }
-                   _fork_db.set_head( branches.second.front() );
-
-                   // pop all blocks from the bad fork
-                   while( head_block_id() != branches.second.back()->data.previous )
-                   {
-                      ilog( "popping block #${n} ${id}", ("n",head_block_num())("id",head_block_id()) );
-                      pop_block();
-                   }
-
-                   ilog( "Switching back to fork: ${id}", ("id",branches.second.front()->data.id()) );
-                   // restore all blocks from the good fork
-                   for( auto ritr2 = branches.second.rbegin(); ritr2 != branches.second.rend(); ++ritr2 )
-                   {
-                      ilog( "pushing block #${n} ${id}", ("n",(*ritr2)->data.block_num())("id",(*ritr2)->id) );
-                      auto session = _undo_db.start_undo_session();
-                      apply_block( (*ritr2)->data, skip );
-                      _block_id_to_block.store( (*ritr2)->id, (*ritr2)->data );
-                      session.commit();
-                   }
-                   throw *except;
-                }
-            }
-            return true;
+            ilog( "popping block #${n} ${id}", ("n",head_block_num())("id",head_block_id()) );
+            pop_block();
          }
-         else return false;
+
+         // push all blocks on the new fork
+         for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr )
+         {
+               ilog( "pushing block from fork #${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
+               optional<fc::exception> except;
+               try {
+                  undo_database::session session = _undo_db.start_undo_session();
+                  apply_block( (*ritr)->data, skip );
+                  update_witnesses( **ritr );
+                  _block_id_to_block.store( (*ritr)->id, (*ritr)->data );
+                  session.commit();
+               }
+               catch ( const fc::exception& e ) { except = e; }
+               if( except )
+               {
+                  wlog( "exception thrown while switching forks ${e}", ("e",except->to_detail_string() ) );
+                  // remove the rest of branches.first from the fork_db, those blocks are invalid
+                  while( ritr != branches.first.rend() )
+                  {
+                     ilog( "removing block from fork_db #${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
+                     _fork_db.remove( (*ritr)->id );
+                     ++ritr;
+                  }
+                  _fork_db.set_head( branches.second.front() );
+
+                  // pop all blocks from the bad fork
+                  while( head_block_id() != branches.second.back()->data.previous )
+                  {
+                     ilog( "popping block #${n} ${id}", ("n",head_block_num())("id",head_block_id()) );
+                     pop_block();
+                  }
+
+                  ilog( "Switching back to fork: ${id}", ("id",branches.second.front()->data.id()) );
+                  // restore all blocks from the good fork
+                  for( auto ritr2 = branches.second.rbegin(); ritr2 != branches.second.rend(); ++ritr2 )
+                  {
+                     ilog( "pushing block #${n} ${id}", ("n",(*ritr2)->data.block_num())("id",(*ritr2)->id) );
+                     auto session = _undo_db.start_undo_session();
+                     apply_block( (*ritr2)->data, skip );
+                     _block_id_to_block.store( (*ritr2)->id, (*ritr2)->data );
+                     session.commit();
+                  }
+                  throw *except;
+               }
+         }
+         return true;
       }
+      else return false;
    }
 
    try {
       auto session = _undo_db.start_undo_session();
       apply_block(new_block, skip);
+      if( new_block.timestamp.sec_since_epoch() > now - 86400 )
+         update_witnesses( *new_head );
       _block_id_to_block.store(new_block.id(), new_block);
       session.commit();
    } catch ( const fc::exception& e ) {
       elog("Failed to push new block:\n${e}", ("e", e.to_detail_string()));
-      if( !(skip&skip_fork_db) )
-      {
-         _fork_db.remove( new_block.id() );
-      }
+      _fork_db.remove( new_block.id() );
       throw;
    }
 
    return false;
 } FC_CAPTURE_AND_RETHROW( (new_block) ) }
+
+void database::verify_signing_witness( const signed_block& new_block, const fork_item& fork_entry )const
+{
+   FC_ASSERT( new_block.timestamp >= fork_entry.next_block_time );
+   uint32_t slot_num = ( new_block.timestamp - fork_entry.next_block_time ).to_seconds() / block_interval();
+   uint64_t index = ( fork_entry.next_block_aslot + slot_num ) % fork_entry.scheduled_witnesses->size();
+   const auto& scheduled_witness = (*fork_entry.scheduled_witnesses)[index];
+   FC_ASSERT( new_block.witness == scheduled_witness.first, "Witness produced block at wrong time",
+              ("block witness",new_block.witness)("scheduled",scheduled_witness)("slot_num",slot_num) );
+   FC_ASSERT( new_block.validate_signee( scheduled_witness.second ) );
+}
+
+void database::update_witnesses( fork_item& fork_entry )const
+{
+   if( fork_entry.scheduled_witnesses ) return;
+
+   const dynamic_global_property_object& dpo = get_dynamic_global_properties();
+   fork_entry.next_block_aslot = dpo.current_aslot + 1;
+   fork_entry.next_block_time = get_slot_time( 1 );
+
+   const witness_schedule_object& wso = get_witness_schedule_object();
+   fork_entry.scheduled_witnesses = std::make_shared< vector< pair< witness_id_type, public_key_type > > >();
+   fork_entry.scheduled_witnesses->reserve( wso.current_shuffled_witnesses.size() );
+   for( size_t i = 0; i < wso.current_shuffled_witnesses.size(); ++i )
+   {
+       const auto& witness = wso.current_shuffled_witnesses[i](*this);
+       fork_entry.scheduled_witnesses->emplace_back( wso.current_shuffled_witnesses[i], witness.signing_key );
+   }
+}
 
 /**
  * Attempts to push the transaction into the pending queue
@@ -228,8 +264,10 @@ bool database::_push_block(const signed_block& new_block)
  * queues full as well, it will be kept in the queue to be propagated later when a new block flushes out the pending
  * queues.
  */
-processed_transaction database::push_transaction( const signed_transaction& trx, uint32_t skip )
+processed_transaction database::push_transaction( const precomputable_transaction& trx, uint32_t skip )
 { try {
+   // see https://github.com/bitshares/bitshares-core/issues/1573
+   FC_ASSERT( fc::raw::pack_size( trx ) < (1024 * 1024), "Transaction exceeds maximum transaction size." );
    processed_transaction result;
    detail::with_skip_flags( *this, skip, [&]()
    {
@@ -238,7 +276,7 @@ processed_transaction database::push_transaction( const signed_transaction& trx,
    return result;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }
 
-processed_transaction database::_push_transaction( const signed_transaction& trx )
+processed_transaction database::_push_transaction( const precomputable_transaction& trx )
 {
    // If this is the first transaction pushed after applying a block, start a new undo session.
    // This allows us to quickly rewind to the clean state of the head block, in case a new block arrives.
@@ -466,15 +504,17 @@ signed_block database::_generate_block(
 void database::pop_block()
 { try {
    _pending_tx_session.reset();
-   auto head_id = head_block_id();
-   optional<signed_block> head_block = fetch_block_by_id( head_id );
-   GRAPHENE_ASSERT( head_block.valid(), pop_empty_chain, "there are no blocks to pop" );
-
-   _fork_db.pop_block();
+   auto fork_db_head = _fork_db.head();
+   FC_ASSERT( fork_db_head, "Trying to pop() from empty fork database!?" );
+   if( fork_db_head->id == head_block_id() )
+      _fork_db.pop_block();
+   else
+   {
+      fork_db_head = _fork_db.fetch_block( head_block_id() );
+      FC_ASSERT( fork_db_head, "Trying to pop() block that's not in fork database!?" );
+   }
    pop_undo();
-
-   _popped_tx.insert( _popped_tx.begin(), head_block->transactions.begin(), head_block->transactions.end() );
-
+   _popped_tx.insert( _popped_tx.begin(), fork_db_head->data.transactions.begin(), fork_db_head->data.transactions.end() );
 } FC_CAPTURE_AND_RETHROW() }
 
 void database::clear_pending()
@@ -555,6 +595,12 @@ void database::_apply_block( const signed_block& next_block )
    const auto& dynamic_global_props = get_dynamic_global_properties();
    bool maint_needed = (dynamic_global_props.next_maintenance_time <= next_block.timestamp);
 
+   // trx_in_block starts from 0.
+   // For real operations which are explicitly included in a transaction, op_in_trx starts from 0, virtual_op is 0.
+   // For virtual operations that are derived directly from a real operation,
+   //     use the real operation's (block_num,trx_in_block,op_in_trx), virtual_op starts from 1.
+   // For virtual operations created after processed all transactions,
+   //     trx_in_block = the_block.trsanctions.size(), op_in_trx is 0, virtual_op starts from 0.
    _current_block_num    = next_block_num;
    _current_trx_in_block = 0;
 
@@ -572,6 +618,9 @@ void database::_apply_block( const signed_block& next_block )
       ++_current_trx_in_block;
    }
 
+   _current_op_in_trx    = 0;
+   _current_virtual_op   = 0;
+
    const uint32_t missed = update_witness_missed_blocks( next_block );
    update_global_dynamic_data( next_block, missed );
    update_signing_witness(signing_witness, next_block);
@@ -585,6 +634,7 @@ void database::_apply_block( const signed_block& next_block )
    clear_expired_transactions();
    clear_expired_proposals();
    clear_expired_orders();
+   clear_expired_htlcs();
    update_expired_feeds();       // this will update expired feeds and some core exchange rates
    update_core_exchange_rates(); // this will update remaining core exchange rates
    update_withdraw_permissions();
@@ -622,23 +672,31 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
 { try {
    uint32_t skip = get_node_properties().skip_flags;
 
-   if( true || !(skip&skip_validate) )   /* issue #505 explains why this skip_flag is disabled */
-      trx.validate();
+   trx.validate();
 
    auto& trx_idx = get_mutable_index_type<transaction_index>();
    const chain_id_type& chain_id = get_chain_id();
-   auto trx_id = trx.id();
-   FC_ASSERT( (skip & skip_transaction_dupe_check) ||
-              trx_idx.indices().get<by_trx_id>().find(trx_id) == trx_idx.indices().get<by_trx_id>().end() );
+   if( !(skip & skip_transaction_dupe_check) )
+   {
+      GRAPHENE_ASSERT( trx_idx.indices().get<by_trx_id>().find(trx.id()) == trx_idx.indices().get<by_trx_id>().end(),
+                       duplicate_transaction,
+                       "Transaction '${txid}' is already in the database",
+                       ("txid",trx.id()) );
+   }
    transaction_evaluation_state eval_state(this);
    const chain_parameters& chain_parameters = get_global_properties().parameters;
    eval_state._trx = &trx;
 
-   if( !(skip & (skip_transaction_signatures | skip_authority_check) ) )
+   if( !(skip & skip_transaction_signatures) )
    {
+      bool allow_non_immediate_owner = ( head_block_time() >= HARDFORK_CORE_584_TIME );
       auto get_active = [&]( account_id_type id ) { return &id(*this).active; };
       auto get_owner  = [&]( account_id_type id ) { return &id(*this).owner;  };
-      trx.verify_authority( chain_id, get_active, get_owner, get_global_properties().parameters.max_authority_depth );
+      trx.verify_authority( chain_id,
+                            get_active,
+                            get_owner,
+                            allow_non_immediate_owner,
+                            get_global_properties().parameters.max_authority_depth );
    }
 
    //Skip all manner of expiration and TaPoS checking if we're on block 1; It's impossible that the transaction is
@@ -650,7 +708,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
          const auto& tapos_block_summary = block_summary_id_type( trx.ref_block_num )(*this);
 
          //Verify TaPoS block summary has correct ID prefix, and that this block's time is not past the expiration
-         FC_ASSERT( trx.ref_block_prefix == tapos_block_summary.block_id._hash[1] );
+         FC_ASSERT( trx.ref_block_prefix == tapos_block_summary.block_id._hash[1].value() );
       }
 
       fc::time_point_sec now = head_block_time();
@@ -658,13 +716,17 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
       FC_ASSERT( trx.expiration <= now + chain_parameters.maximum_time_until_expiration, "",
                  ("trx.expiration",trx.expiration)("now",now)("max_til_exp",chain_parameters.maximum_time_until_expiration));
       FC_ASSERT( now <= trx.expiration, "", ("now",now)("trx.exp",trx.expiration) );
+      if ( !(skip & skip_block_size_check ) ) // don't waste time on replay
+         FC_ASSERT( head_block_time() <= HARDFORK_CORE_1573_TIME
+               || trx.get_packed_size() <= chain_parameters.maximum_transaction_size,
+               "Transaction exceeds maximum transaction size." );
    }
 
    //Insert transaction into unique transactions database.
    if( !(skip & skip_transaction_dupe_check) )
    {
-      create<transaction_object>([&](transaction_object& transaction) {
-         transaction.trx_id = trx_id;
+      create<transaction_history_object>([&trx](transaction_history_object& transaction) {
+         transaction.trx_id = trx.id();
          transaction.trx = trx;
       });
    }
@@ -676,18 +738,11 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    _current_op_in_trx = 0;
    for( const auto& op : ptrx.operations )
    {
+      _current_virtual_op = 0;
       eval_state.operation_results.emplace_back(apply_operation(eval_state, op));
       ++_current_op_in_trx;
    }
    ptrx.operation_results = std::move(eval_state.operation_results);
-
-   if( head_block_time() < HARDFORK_CORE_1040_TIME ) // TODO totally remove this code block after hard fork
-   {
-      //Make sure the temp account has no non-zero balances
-      const auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
-      auto range = index.equal_range( boost::make_tuple( GRAPHENE_TEMP_ACCOUNT ) );
-      std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
-   }
 
    return ptrx;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }
@@ -746,6 +801,69 @@ void database::add_checkpoints( const flat_map<uint32_t,block_id_type>& checkpts
 bool database::before_last_checkpoint()const
 {
    return (_checkpoints.size() > 0) && (_checkpoints.rbegin()->first >= head_block_num());
+}
+
+
+static const uint32_t skip_expensive = database::skip_transaction_signatures | database::skip_witness_signature
+                                       | database::skip_merkle_check | database::skip_transaction_dupe_check;
+
+template<typename Trx>
+void database::_precompute_parallel( const Trx* trx, const size_t count, const uint32_t skip )const
+{
+   for( size_t i = 0; i < count; ++i, ++trx )
+   {
+      trx->validate(); // TODO - parallelize wrt confidential operations
+      if ( !(skip & skip_block_size_check) )
+         trx->get_packed_size();
+      if( !(skip&skip_transaction_dupe_check) )
+         trx->id();
+      if( !(skip&skip_transaction_signatures) )
+         trx->get_signature_keys( get_chain_id() );
+   }
+}
+
+fc::future<void> database::precompute_parallel( const signed_block& block, const uint32_t skip )const
+{ try {
+   std::vector<fc::future<void>> workers;
+   if( !block.transactions.empty() )
+   {
+      if( (skip & skip_expensive) == skip_expensive )
+         _precompute_parallel( &block.transactions[0], block.transactions.size(), skip );
+      else
+      {
+         uint32_t chunks = fc::asio::default_io_service_scope::get_num_threads();
+         uint32_t chunk_size = ( block.transactions.size() + chunks - 1 ) / chunks;
+         workers.reserve( chunks + 1 );
+         for( size_t base = 0; base < block.transactions.size(); base += chunk_size )
+            workers.push_back( fc::do_parallel( [this,&block,base,chunk_size,skip] () {
+               _precompute_parallel( &block.transactions[base],
+                                     base + chunk_size < block.transactions.size() ? chunk_size : block.transactions.size() - base,
+                                     skip );
+            }) );
+      }
+   }
+
+   if( !(skip&skip_witness_signature) )
+      workers.push_back( fc::do_parallel( [&block] () { block.signee(); } ) );
+   if( !(skip&skip_merkle_check) )
+      block.calculate_merkle_root();
+   block.id();
+
+   if( workers.empty() )
+      return fc::future< void >( fc::promise< void >::create( true ) );
+
+   auto first = workers.begin();
+   auto worker = first;
+   while( ++worker != workers.end() )
+      worker->wait();
+   return *first;
+} FC_LOG_AND_RETHROW() }
+
+fc::future<void> database::precompute_parallel( const precomputable_transaction& trx )const
+{
+   return fc::do_parallel([this,&trx] () {
+      _precompute_parallel( &trx, 1, skip_nothing );
+   });
 }
 
 } }

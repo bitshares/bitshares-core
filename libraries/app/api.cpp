@@ -29,16 +29,29 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/get_config.hpp>
 #include <graphene/utilities/key_conversion.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 #include <graphene/chain/confidential_object.hpp>
 #include <graphene/chain/market_object.hpp>
-#include <graphene/chain/transaction_object.hpp>
+#include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 
+#include <fc/crypto/base64.hpp>
 #include <fc/crypto/hex.hpp>
-#include <fc/smart_ref_impl.hpp>
+#include <fc/rpc/api_connection.hpp>
 #include <fc/thread/future.hpp>
+
+template class fc::api<graphene::app::block_api>;
+template class fc::api<graphene::app::network_broadcast_api>;
+template class fc::api<graphene::app::network_node_api>;
+template class fc::api<graphene::app::history_api>;
+template class fc::api<graphene::app::crypto_api>;
+template class fc::api<graphene::app::asset_api>;
+template class fc::api<graphene::app::orders_api>;
+template class fc::api<graphene::app::custom_operations_api>;
+template class fc::api<graphene::debug_witness::debug_api>;
+template class fc::api<graphene::app::login_api>;
+
 
 namespace graphene { namespace app {
 
@@ -101,11 +114,16 @@ namespace graphene { namespace app {
        }
        else if( api_name == "asset_api" )
        {
-          _asset_api = std::make_shared< asset_api >( std::ref( *_app.chain_database() ) );
+          _asset_api = std::make_shared< asset_api >( _app );
        }
        else if( api_name == "orders_api" )
        {
           _orders_api = std::make_shared< orders_api >( std::ref( _app ) );
+       }
+       else if( api_name == "custom_operations_api" )
+       {
+          if( _app.get_plugin( "custom_operations" ) )
+             _custom_operations_api = std::make_shared< custom_operations_api >( std::ref( _app ) );
        }
        else if( api_name == "debug_api" )
        {
@@ -159,18 +177,18 @@ namespace graphene { namespace app {
        }
     }
 
-    void network_broadcast_api::broadcast_transaction(const signed_transaction& trx)
+    void network_broadcast_api::broadcast_transaction(const precomputable_transaction& trx)
     {
-       trx.validate();
+       _app.chain_database()->precompute_parallel( trx ).wait();
        _app.chain_database()->push_transaction(trx);
        if( _app.p2p_node() != nullptr )
           _app.p2p_node()->broadcast_transaction(trx);
     }
 
-    fc::variant network_broadcast_api::broadcast_transaction_synchronous(const signed_transaction& trx)
+    fc::variant network_broadcast_api::broadcast_transaction_synchronous(const precomputable_transaction& trx)
     {
-       fc::promise<fc::variant>::ptr prom( new fc::promise<fc::variant>() );
-       broadcast_transaction_with_callback( [=]( const fc::variant& v ){
+       fc::promise<fc::variant>::ptr prom = fc::promise<fc::variant>::create();
+       broadcast_transaction_with_callback( [prom]( const fc::variant& v ){
         prom->set_value(v);
        }, trx );
 
@@ -179,14 +197,15 @@ namespace graphene { namespace app {
 
     void network_broadcast_api::broadcast_block( const signed_block& b )
     {
+       _app.chain_database()->precompute_parallel( b ).wait();
        _app.chain_database()->push_block(b);
        if( _app.p2p_node() != nullptr )
           _app.p2p_node()->broadcast( net::block_message( b ));
     }
 
-    void network_broadcast_api::broadcast_transaction_with_callback(confirmation_callback cb, const signed_transaction& trx)
+    void network_broadcast_api::broadcast_transaction_with_callback(confirmation_callback cb, const precomputable_transaction& trx)
     {
-       trx.validate();
+       _app.chain_database()->precompute_parallel( trx ).wait();
        _callbacks[trx.id()] = cb;
        _app.chain_database()->push_transaction(trx);
        if( _app.p2p_node() != nullptr )
@@ -283,10 +302,18 @@ namespace graphene { namespace app {
        return *_debug_api;
     }
 
-    vector<order_history_object> history_api::get_fill_order_history( asset_id_type a, asset_id_type b, uint32_t limit  )const
+    fc::api<custom_operations_api> login_api::custom() const
+    {
+       FC_ASSERT(_custom_operations_api);
+       return *_custom_operations_api;
+    }
+
+    vector<order_history_object> history_api::get_fill_order_history( std::string asset_a, std::string asset_b, uint32_t limit  )const
     {
        FC_ASSERT(_app.chain_database());
        const auto& db = *_app.chain_database();
+       asset_id_type a = database_api.get_asset_id_from_string( asset_a );
+       asset_id_type b = database_api.get_asset_id_from_string( asset_b );
        if( a > b ) std::swap(a,b);
        const auto& history_idx = db.get_index_type<graphene::market_history::history_index>().indices().get<by_key>();
        history_key hkey;
@@ -315,7 +342,8 @@ namespace graphene { namespace app {
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
-       FC_ASSERT( limit <= 100 );
+       uint64_t api_limit_get_account_history=_app.get_options().api_limit_get_account_history;
+       FC_ASSERT( limit <= api_limit_get_account_history );
        vector<operation_history_object> result;
        account_id_type account;
        try {
@@ -324,6 +352,18 @@ namespace graphene { namespace app {
           if(start == operation_history_id_type() || start.instance.value > node.operation_id.instance.value)
              start = node.operation_id;
        } catch(...) { return result; }
+
+       if(_app.is_plugin_enabled("elasticsearch")) {
+          auto es = _app.get_plugin<elasticsearch::elasticsearch_plugin>("elasticsearch");
+          if(es.get()->get_running_mode() != elasticsearch::mode::only_save) {
+             if(!_app.elasticsearch_thread)
+                _app.elasticsearch_thread= std::make_shared<fc::thread>("elasticsearch");
+
+             return _app.elasticsearch_thread->async([&es, &account, &stop, &limit, &start]() {
+                return es->get_account_history(account, stop, limit, start);
+             }, "thread invoke for method " BOOST_PP_STRINGIZE(method_name)).wait();
+          }
+       }
 
        const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
        const auto& by_op_idx = hist_idx.indices().get<by_op>();
@@ -344,14 +384,15 @@ namespace graphene { namespace app {
     }
 
     vector<operation_history_object> history_api::get_account_history_operations( const std::string account_id_or_name,
-                                                                       int operation_id,
+                                                                       int operation_type,
                                                                        operation_history_id_type start,
                                                                        operation_history_id_type stop,
                                                                        unsigned limit) const
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
-       FC_ASSERT( limit <= 100 );
+       uint64_t api_limit_get_account_history_operations=_app.get_options().api_limit_get_account_history_operations;
+       FC_ASSERT(limit <= api_limit_get_account_history_operations);
        vector<operation_history_object> result;
        account_id_type account;
        try {
@@ -367,30 +408,31 @@ namespace graphene { namespace app {
        {
           if( node->operation_id.instance.value <= start.instance.value ) {
 
-             if(node->operation_id(db).op.which() == operation_id)
+             if(node->operation_id(db).op.which() == operation_type)
                result.push_back( node->operation_id(db) );
-             }
+          }
           if( node->next == account_transaction_history_id_type() )
              node = nullptr;
           else node = &node->next(db);
        }
        if( stop.instance.value == 0 && result.size() < limit ) {
-          const account_transaction_history_object head = account_transaction_history_id_type()(db);
-          if( head.account == account && head.operation_id(db).op.which() == operation_id )
-             result.push_back(head.operation_id(db));
+          auto head = db.find(account_transaction_history_id_type());
+          if (head != nullptr && head->account == account && head->operation_id(db).op.which() == operation_type)
+            result.push_back(head->operation_id(db));
        }
        return result;
     }
 
 
     vector<operation_history_object> history_api::get_relative_account_history( const std::string account_id_or_name,
-                                                                                uint32_t stop,
+                                                                                uint64_t stop,
                                                                                 unsigned limit,
-                                                                                uint32_t start) const
+                                                                                uint64_t start) const
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
-       FC_ASSERT(limit <= 100);
+       uint64_t api_limit_get_relative_account_history=_app.get_options().api_limit_get_relative_account_history;
+       FC_ASSERT(limit <= api_limit_get_relative_account_history);
        vector<operation_history_object> result;
        account_id_type account;
        try {
@@ -400,7 +442,7 @@ namespace graphene { namespace app {
        if( start == 0 )
           start = stats.total_ops;
        else
-          start = min( stats.total_ops, start );
+          start = std::min( stats.total_ops, start );
 
        if( start >= stop && start > stats.removed_ops && limit > 0 )
        {
@@ -429,7 +471,8 @@ namespace graphene { namespace app {
 
     history_operation_detail history_api::get_account_history_by_operations(const std::string account_id_or_name, vector<uint16_t> operation_types, uint32_t start, unsigned limit)
     {
-       FC_ASSERT(limit <= 100);
+       uint64_t api_limit_get_account_history_by_operations=_app.get_options().api_limit_get_account_history_by_operations;
+       FC_ASSERT(limit <= api_limit_get_account_history_by_operations);
        history_operation_detail result;
        vector<operation_history_object> objs = get_relative_account_history(account_id_or_name, start, limit, limit + start - 1);
        std::for_each(objs.begin(), objs.end(), [&](const operation_history_object &o) {
@@ -442,11 +485,13 @@ namespace graphene { namespace app {
         return result;
     }
 
-    vector<bucket_object> history_api::get_market_history( asset_id_type a, asset_id_type b,
+    vector<bucket_object> history_api::get_market_history( std::string asset_a, std::string asset_b,
                                                            uint32_t bucket_seconds, fc::time_point_sec start, fc::time_point_sec end )const
     { try {
        FC_ASSERT(_app.chain_database());
        const auto& db = *_app.chain_database();
+       asset_id_type a = database_api.get_asset_id_from_string( asset_a );
+       asset_id_type b = database_api.get_asset_id_from_string( asset_b );
        vector<bucket_object> result;
        result.reserve(200);
 
@@ -466,7 +511,7 @@ namespace graphene { namespace app {
           ++itr;
        }
        return result;
-    } FC_CAPTURE_AND_RETHROW( (a)(b)(bucket_seconds)(start)(end) ) }
+    } FC_CAPTURE_AND_RETHROW( (asset_a)(asset_b)(bucket_seconds)(start)(end) ) }
 
     crypto_api::crypto_api(){};
 
@@ -525,77 +570,80 @@ namespace graphene { namespace app {
     }
 
     // asset_api
-    asset_api::asset_api(graphene::chain::database& db) : _db(db) { }
+    asset_api::asset_api(graphene::app::application& app) :
+          _app(app),
+          _db( *app.chain_database()),
+          database_api( std::ref(*app.chain_database()), &(app.get_options())
+          ) { }
     asset_api::~asset_api() { }
 
-    vector<account_asset_balance> asset_api::get_asset_holders( asset_id_type asset_id, uint32_t start, uint32_t limit ) const {
-      FC_ASSERT(limit <= 100);
+    vector<account_asset_balance> asset_api::get_asset_holders( std::string asset, uint32_t start, uint32_t limit ) const {
+       uint64_t api_limit_get_asset_holders=_app.get_options().api_limit_get_asset_holders;
+       FC_ASSERT(limit <= api_limit_get_asset_holders);
+       asset_id_type asset_id = database_api.get_asset_id_from_string( asset );
+       const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+       auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
-      const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
-      auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+       vector<account_asset_balance> result;
 
-      vector<account_asset_balance> result;
+       uint32_t index = 0;
+       for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
+       {
+          if( result.size() >= limit )
+             break;
 
-      uint32_t index = 0;
-      for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
-      {
-        if( result.size() >= limit )
-            break;
+          if( bal.balance.value == 0 )
+             continue;
 
-        if( bal.balance.value == 0 )
-            continue;
+          if( index++ < start )
+             continue;
 
-        if( index++ < start )
-            continue;
+          const auto account = _db.find(bal.owner);
 
-        const auto account = _db.find(bal.owner);
+          account_asset_balance aab;
+          aab.name       = account->name;
+          aab.account_id = account->id;
+          aab.amount     = bal.balance.value;
 
-        account_asset_balance aab;
-        aab.name       = account->name;
-        aab.account_id = account->id;
-        aab.amount     = bal.balance.value;
+          result.push_back(aab);
+       }
 
-        result.push_back(aab);
-      }
-
-      return result;
+       return result;
     }
     // get number of asset holders.
-    int asset_api::get_asset_holders_count( asset_id_type asset_id ) const {
+    int asset_api::get_asset_holders_count( std::string asset ) const {
+       const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+       asset_id_type asset_id = database_api.get_asset_id_from_string( asset );
+       auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
-      const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
-      auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+       int count = boost::distance(range) - 1;
 
-      int count = boost::distance(range) - 1;
-
-      return count;
+       return count;
     }
     // function to get vector of system assets with holders count.
     vector<asset_holders> asset_api::get_all_asset_holders() const {
+       vector<asset_holders> result;
+       vector<asset_id_type> total_assets;
+       for( const asset_object& asset_obj : _db.get_index_type<asset_index>().indices() )
+       {
+          const auto& dasset_obj = asset_obj.dynamic_asset_data_id(_db);
 
-      vector<asset_holders> result;
+          asset_id_type asset_id;
+          asset_id = dasset_obj.id;
 
-      vector<asset_id_type> total_assets;
-      for( const asset_object& asset_obj : _db.get_index_type<asset_index>().indices() )
-      {
-        const auto& dasset_obj = asset_obj.dynamic_asset_data_id(_db);
+          const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+          auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
-        asset_id_type asset_id;
-        asset_id = dasset_obj.id;
+          int count = boost::distance(range) - 1;
 
-        const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
-        auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+          asset_holders ah;
+          ah.asset_id       = asset_id;
+          ah.count     = count;
 
-        int count = boost::distance(range) - 1;
+          result.push_back(ah);
+       }
 
-        asset_holders ah;
-        ah.asset_id       = asset_id;
-        ah.count     = count;
-
-        result.push_back(ah);
-      }
-
-      return result;
+       return result;
     }
 
    // orders_api
@@ -606,17 +654,21 @@ namespace graphene { namespace app {
       return plugin->tracked_groups();
    }
 
-   vector< limit_order_group > orders_api::get_grouped_limit_orders( asset_id_type base_asset_id,
-                                                               asset_id_type quote_asset_id,
+   vector< limit_order_group > orders_api::get_grouped_limit_orders( std::string base_asset,
+                                                               std::string quote_asset,
                                                                uint16_t group,
                                                                optional<price> start,
                                                                uint32_t limit )const
    {
-      FC_ASSERT( limit <= 101 );
-      auto plugin = _app.get_plugin<grouped_orders_plugin>( "grouped_orders" );
+      uint64_t api_limit_get_grouped_limit_orders=_app.get_options().api_limit_get_grouped_limit_orders;
+      FC_ASSERT( limit <= api_limit_get_grouped_limit_orders );
+      auto plugin = _app.get_plugin<graphene::grouped_orders::grouped_orders_plugin>( "grouped_orders" );
       FC_ASSERT( plugin );
       const auto& limit_groups = plugin->limit_order_groups();
       vector< limit_order_group > result;
+
+      asset_id_type base_asset_id = database_api.get_asset_id_from_string( base_asset );
+      asset_id_type quote_asset_id = database_api.get_asset_id_from_string( quote_asset );
 
       price max_price = price::max( base_asset_id, quote_asset_id );
       price min_price = price::min( base_asset_id, quote_asset_id );
@@ -632,6 +684,25 @@ namespace graphene { namespace app {
          ++itr;
       }
       return result;
+   }
+
+   // custom operations api
+   vector<account_storage_object> custom_operations_api::get_storage_info(std::string account_id_or_name,
+         std::string catalog)const
+   {
+      auto plugin = _app.get_plugin<graphene::custom_operations::custom_operations_plugin>("custom_operations");
+      FC_ASSERT( plugin );
+
+      const auto account_id = database_api.get_account_id_from_string(account_id_or_name);
+      vector<account_storage_object> results;
+      const auto& storage_index = _app.chain_database()->get_index_type<account_storage_index>();
+      const auto& by_account_catalog_idx = storage_index.indices().get<by_account_catalog>();
+      auto itr = by_account_catalog_idx.lower_bound(make_tuple(account_id, catalog));
+      while(itr != by_account_catalog_idx.end() && itr->account == account_id && itr->catalog == catalog) {
+         results.push_back(*itr);
+         ++itr;
+      }
+      return results;
    }
 
 } } // graphene::app
