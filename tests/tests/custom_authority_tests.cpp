@@ -1524,4 +1524,172 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
       } FC_LOG_AND_RETHROW()
    }
 
+   /**
+    * Test of authorization of a key to transfer one asset type (USDBIT) from one account (coldwallet)
+    * to another account (hotwallet)
+    */
+   BOOST_AUTO_TEST_CASE(authorized_cold_wallet_key_custom_auths) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Accounts
+         ACTORS((feedproducer)(coldwallet)(hotwallet)(hacker));
+         int64_t init_balance(100 * GRAPHENE_BLOCKCHAIN_PRECISION);
+
+         //////
+         // Initialize: Define a market-issued asset called USDBIT
+         //////
+         // Define core asset
+         const auto &core = asset_id_type()(db);
+         asset_id_type core_id = core.id;
+
+         // Create a smart asset
+         const asset_object &bitusd = create_bitasset("USDBIT", feedproducer_id);
+         asset_id_type usd_id = bitusd.id;
+         update_feed_producers(bitusd, {feedproducer.id});
+         price_feed current_feed;
+         current_feed.maintenance_collateral_ratio = 1750;
+         current_feed.maximum_short_squeeze_ratio = 1100;
+         current_feed.settlement_price = bitusd.amount(1) / core.amount(5);
+         publish_feed(bitusd, feedproducer, current_feed);
+
+
+         //////
+         // Fund coldwallet with core asset
+         //////
+         fund(coldwallet, asset(init_balance));
+         // coldwallet will borrow 1000 bitUSD
+         borrow(coldwallet, bitusd.amount(1000), asset(15000));
+         int64_t alice_balance_usd_before_offer = get_balance(coldwallet_id, usd_id);
+         BOOST_CHECK_EQUAL( 1000,  alice_balance_usd_before_offer);
+         int64_t coldwallet_balance_core_before_offer = get_balance(coldwallet_id, core_id);
+         BOOST_CHECK_EQUAL( init_balance - 15000, coldwallet_balance_core_before_offer );
+
+
+         //////
+         // Define a key that can be authorized
+         // This can be a new key or an existing key. The existing key may even be the active key of an account.
+         //////
+         fc::ecc::private_key some_private_key = generate_private_key("some key");
+         public_key_type some_public_key = public_key_type(some_private_key.get_public_key());
+
+
+         //////
+         // Create a custom authority where the key is authorized to transfer from the coldwallet account
+         // if and only if the transfer asset type is USDBIT and the recipient account is hotwallet.
+         //////
+         custom_authority_create_operation op;
+         op.account = coldwallet.get_id();
+         op.auth.add_authority(some_public_key, 1);
+         op.auth.weight_threshold = 1;
+         op.enabled = true;
+         op.valid_to = db.head_block_time() + 1000;
+
+         op.operation_type = operation::tag<transfer_operation>::value;
+
+         auto to_index = member_index<transfer_operation>("to");
+         op.restrictions.emplace_back(to_index, FUNC(eq), hotwallet_id);
+
+         auto transfer_amount_index = member_index<transfer_operation>("amount");
+         auto assed_id_index = member_index<asset>("asset_id");
+         op.restrictions.emplace_back(restriction(transfer_amount_index, restriction::func_attr, vector<restriction>{
+                 restriction(assed_id_index, restriction::func_eq, usd_id)}));
+         //[
+         //  {
+         //    "member_index": 2,
+         //    "restriction_type": 0,
+         //    "argument": [
+         //      7,
+         //      "1.2.18"
+         //    ],
+         //    "extensions": []
+         //  },
+         //  {
+         //    "member_index": 3,
+         //    "restriction_type": 10,
+         //    "argument": [
+         //      39,
+         //      [
+         //        {
+         //          "member_index": 1,
+         //          "restriction_type": 0,
+         //          "argument": [
+         //            8,
+         //            "1.3.2"
+         //          ],
+         //          "extensions": []
+         //        }
+         //      ]
+         //    ],
+         //    "extensions": []
+         //  }
+         //]
+
+         // Publish the new custom authority
+         trx.clear();
+         trx.operations = {op};
+         sign(trx, coldwallet_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Attempt to transfer USDBIT asset out of the coldwallet to the hacker account
+         // This should fail because the key is not authorized to transfer to the hacker account
+         //////
+         transfer_operation top;
+         top.from = coldwallet.get_id();
+         top.to = hacker.get_id();
+         top.amount.asset_id = usd_id;
+         top.amount.amount = 99;
+         top.fee.asset_id = core_id;
+         trx.clear();
+         trx.operations = {top};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // Attempt to transfer CORE asset out of the coldwallet to the hotwallet account
+         // This should fail because the key is not authorized to transfer core asset to the hotwallet account
+         //////
+         top = transfer_operation();
+         top.from = coldwallet.get_id();
+         top.to = hotwallet.get_id();
+         top.amount.asset_id = core_id;
+         top.amount.amount = 99;
+         top.fee.asset_id = core_id;
+         trx.clear();
+         trx.operations = {top};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // Attempt to transfer USDBIT asset out of the coldwallet to the hotwallet account
+         // This should succeed because the key is authorized to transfer USDBIT asset to the hotwallet account
+         //////
+         top = transfer_operation();
+         top.from = coldwallet.get_id();
+         top.to = hotwallet.get_id();
+         top.amount.asset_id = usd_id;
+         top.amount.amount = 99;
+         top.fee.asset_id = core_id;
+         trx.clear();
+         trx.operations = {top};
+         sign(trx, some_private_key);
+         PUSH_TX(db, trx);
+
+      } FC_LOG_AND_RETHROW()
+   }
+
 BOOST_AUTO_TEST_SUITE_END()
