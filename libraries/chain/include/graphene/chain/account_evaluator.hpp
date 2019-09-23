@@ -69,4 +69,15 @@ public:
    const account_object* listed_account;
 };
 
+class account_update_votes_evaluator: public evaluator<account_update_votes_evaluator>
+{
+public:
+   typedef account_update_votes_operation operation_type;
+
+   void_result do_evaluate( const account_update_votes_operation& o);
+   void_result do_apply( const account_update_votes_operation& o);
+
+   const account_object* account;
+};
+
 } } // graphene::chain

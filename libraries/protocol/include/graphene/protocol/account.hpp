@@ -279,6 +279,40 @@ namespace graphene { namespace protocol {
       void        validate()const;
    };
 
+   /*
+    * @brief
+    */
+   struct account_update_votes_operation : public base_operation
+   {
+      struct fee_parameters_type { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
+      asset fee;
+
+      /// The account to update
+      account_id_type account;
+
+      /// New account options
+      flat_set<vote_id_type> votes_to_add;
+      flat_set<vote_id_type> votes_to_remove;
+
+      // A new voting account to set
+      optional<account_id_type> committee_voting_account;
+      optional<account_id_type> witness_voting_account;
+      optional<account_id_type> worker_voting_account;
+
+      // A new number of witness_votes to set
+      optional<uint16_t> num_witness;
+
+      // A new number of committee_votes to set
+      optional<uint16_t> num_committee;
+
+      // For future extensions (see account_update_operation)
+      extensions_type extensions;
+
+      account_id_type fee_payer()const { return account; }
+      void        validate()const;
+   };
+
 } } // graphene::protocol
 
 FC_REFLECT( graphene::protocol::additional_account_options,
@@ -311,8 +345,13 @@ FC_REFLECT( graphene::protocol::account_whitelist_operation::fee_parameters_type
 FC_REFLECT( graphene::protocol::account_update_operation::fee_parameters_type, (fee)(price_per_kbyte) )
 FC_REFLECT( graphene::protocol::account_upgrade_operation::fee_parameters_type, (membership_annual_fee)(membership_lifetime_fee) )
 FC_REFLECT( graphene::protocol::account_transfer_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::account_update_votes_operation::fee_parameters_type, (fee) )
 
 FC_REFLECT( graphene::protocol::account_transfer_operation, (fee)(account_id)(new_owner)(extensions) )
+FC_REFLECT( graphene::protocol::account_update_votes_operation, (fee)(account)(votes_to_add)(votes_to_remove)
+                                                                (committee_voting_account)(witness_voting_account)
+                                                                (worker_voting_account)(num_witness)(num_committee)
+                                                                (extensions))
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::additional_account_options )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_options )
@@ -321,8 +360,10 @@ GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_whitelist_o
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_upgrade_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_transfer_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_votes_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_whitelist_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_upgrade_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_transfer_operation )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_votes_operation )

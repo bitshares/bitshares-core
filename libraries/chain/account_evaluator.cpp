@@ -445,4 +445,18 @@ void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator:
    return {};
 } FC_RETHROW_EXCEPTIONS( error, "Unable to upgrade account '${a}'", ("a",o.account_to_upgrade(db()).name) ) }
 
+void_result account_update_votes_evaluator::do_evaluate(const account_update_votes_operation& o)
+{ try {
+   database& d = db();
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+void_result account_update_votes_evaluator::do_apply(const account_update_votes_operation& o)
+{ try {
+   database& d = db();
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
 } } // graphene::chain

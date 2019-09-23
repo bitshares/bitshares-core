@@ -178,6 +178,7 @@ void database::initialize_evaluators()
    register_evaluator<htlc_create_evaluator>();
    register_evaluator<htlc_redeem_evaluator>();
    register_evaluator<htlc_extend_evaluator>();
+   register_evaluator<account_update_votes_evaluator>();
 }
 
 void database::initialize_indexes()
