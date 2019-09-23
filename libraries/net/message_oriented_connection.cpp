@@ -63,7 +63,7 @@ namespace graphene { namespace net {
       fc::time_point _last_message_received_time;
       fc::time_point _last_message_sent_time;
 
-      bool _send_message_in_progress;
+      std::atomic_bool _send_message_in_progress;
       std::atomic_bool _read_loop_in_progress;
 #ifndef NDEBUG
       fc::thread* _thread;
@@ -263,17 +263,7 @@ namespace graphene { namespace net {
       } send_message_scope_logger(remote_endpoint);
 #endif
 #endif
-      struct verify_no_send_in_progress {
-        bool& var;
-        verify_no_send_in_progress(bool& var) : var(var)
-        {
-          if (var)
-            elog("Error: two tasks are calling message_oriented_connection::send_message() at the same time");
-          assert(!var);
-          var = true;
-        }
-        ~verify_no_send_in_progress() { var = false; }
-      } _verify_no_send_in_progress(_send_message_in_progress);
+      no_parallel_execution_guard guard( &_send_message_in_progress );
       _ready_for_sending->wait();
 
       try
