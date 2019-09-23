@@ -63,12 +63,12 @@ bool is_valid_name( const string& name )
 
    if( len < GRAPHENE_MIN_ACCOUNT_NAME_LENGTH )
    {
-       return false;
+      return false;
    }
 
    if( len > GRAPHENE_MAX_ACCOUNT_NAME_LENGTH )
    {
-       return false;
+      return false;
    }
 
    size_t begin = 0;
