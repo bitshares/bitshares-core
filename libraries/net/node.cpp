@@ -528,7 +528,6 @@ namespace graphene { namespace net { namespace detail {
           std::map<peer_connection_ptr, std::vector<item_hash_t> > sync_item_requests_to_send;
 
           {
-            ASSERT_TASK_NOT_PREEMPTED();
             std::set<item_hash_t> sync_items_to_request;
 
             // for each idle peer that we're syncing with
@@ -830,19 +829,18 @@ namespace graphene { namespace net { namespace detail {
       // them (but they won't have sent us anything since they aren't getting blocks either).
       // This might not be so bad because it could make us initiate more connections and
       // reconnect with the rest of the network, or it might just futher isolate us.
-      {
-        // As usual, the first step is to walk through all our peers and figure out which
-        // peers need action (disconneting, sending keepalives, etc), then we walk through 
-        // those lists yielding at our leisure later.
-        ASSERT_TASK_NOT_PREEMPTED();
+      // As usual, the first step is to walk through all our peers and figure out which
+      // peers need action (disconneting, sending keepalives, etc), then we walk through 
+      // those lists yielding at our leisure later.
 
-        uint32_t handshaking_timeout = _peer_inactivity_timeout;
-        fc::time_point handshaking_disconnect_threshold = fc::time_point::now() - fc::seconds(handshaking_timeout);
-        {
+      uint32_t handshaking_timeout = _peer_inactivity_timeout;
+      fc::time_point handshaking_disconnect_threshold = fc::time_point::now() - fc::seconds(handshaking_timeout);
+      {
          fc::scoped_lock<fc::mutex> lock(_handshaking_connections.get_mutex());
          for( const peer_connection_ptr handshaking_peer : _handshaking_connections )
+         {
             if( handshaking_peer->connection_initiation_time < handshaking_disconnect_threshold &&
-                 handshaking_peer->get_last_message_received_time() < handshaking_disconnect_threshold &&
+                  handshaking_peer->get_last_message_received_time() < handshaking_disconnect_threshold &&
                handshaking_peer->get_last_message_sent_time() < handshaking_disconnect_threshold )
             {
                wlog( "Forcibly disconnecting from handshaking peer ${peer} due to inactivity of at least ${timeout} seconds",
@@ -858,28 +856,29 @@ namespace graphene { namespace net { namespace detail {
                      ("status", handshaking_peer->negotiation_status)
                      ("sent", handshaking_peer->get_total_bytes_sent())
                      ("received", handshaking_peer->get_total_bytes_received())));
-            peers_to_disconnect_forcibly.push_back( handshaking_peer );
-          }
-        }
-        // timeout for any active peers is two block intervals
-        uint32_t active_disconnect_timeout = 10 * _recent_block_interval_in_seconds;
-        uint32_t active_send_keepalive_timeout = active_disconnect_timeout / 2;
-        
-        // set the ignored request time out to 1 second.  When we request a block
-        // or transaction from a peer, this timeout determines how long we wait for them
-        // to reply before we give up and ask another peer for the item.
-        // Ideally this should be significantly shorter than the block interval, because
-        // we'd like to realize the block isn't coming and fetch it from a different 
-        // peer before the next block comes in.  At the current target of 3 second blocks,
-        // 1 second seems reasonable.  When we get closer to our eventual target of 1 second 
-        // blocks, this will need to be re-evaluated (i.e., can we set the timeout to 500ms
-        // and still handle normal network & processing delays without excessive disconnects)
-        fc::microseconds active_ignored_request_timeout = fc::seconds(1);
+               peers_to_disconnect_forcibly.push_back( handshaking_peer );
+            } // if
+         } // for
+      } // scoped_lock
+      // timeout for any active peers is two block intervals
+      uint32_t active_disconnect_timeout = 10 * _recent_block_interval_in_seconds;
+      uint32_t active_send_keepalive_timeout = active_disconnect_timeout / 2;
+      
+      // set the ignored request time out to 1 second.  When we request a block
+      // or transaction from a peer, this timeout determines how long we wait for them
+      // to reply before we give up and ask another peer for the item.
+      // Ideally this should be significantly shorter than the block interval, because
+      // we'd like to realize the block isn't coming and fetch it from a different 
+      // peer before the next block comes in.  At the current target of 3 second blocks,
+      // 1 second seems reasonable.  When we get closer to our eventual target of 1 second 
+      // blocks, this will need to be re-evaluated (i.e., can we set the timeout to 500ms
+      // and still handle normal network & processing delays without excessive disconnects)
+      fc::microseconds active_ignored_request_timeout = fc::seconds(1);
 
-        fc::time_point active_disconnect_threshold = fc::time_point::now() - fc::seconds(active_disconnect_timeout);
-        fc::time_point active_send_keepalive_threshold = fc::time_point::now() - fc::seconds(active_send_keepalive_timeout);
-        fc::time_point active_ignored_request_threshold = fc::time_point::now() - active_ignored_request_timeout;
-        {
+      fc::time_point active_disconnect_threshold = fc::time_point::now() - fc::seconds(active_disconnect_timeout);
+      fc::time_point active_send_keepalive_threshold = fc::time_point::now() - fc::seconds(active_send_keepalive_timeout);
+      fc::time_point active_ignored_request_threshold = fc::time_point::now() - active_ignored_request_timeout;
+      {
          fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
 
          for( const peer_connection_ptr& active_peer : _active_connections )
@@ -949,12 +948,13 @@ namespace graphene { namespace net { namespace detail {
                }
             } // else
          } // for
-        } // scoped_lock
+      } // scoped_lock
 
-        fc::time_point closing_disconnect_threshold = fc::time_point::now() - fc::seconds(GRAPHENE_NET_PEER_DISCONNECT_TIMEOUT);
-        {
+      fc::time_point closing_disconnect_threshold = fc::time_point::now() - fc::seconds(GRAPHENE_NET_PEER_DISCONNECT_TIMEOUT);
+      {
          fc::scoped_lock<fc::mutex> lock(_closing_connections.get_mutex());
          for( const peer_connection_ptr& closing_peer : _closing_connections )
+         {
             if( closing_peer->connection_closed_time < closing_disconnect_threshold )
             {
                // we asked this peer to close their connectoin to us at least GRAPHENE_NET_PEER_DISCONNECT_TIMEOUT
@@ -963,26 +963,29 @@ namespace graphene { namespace net { namespace detail {
                      ( "peer", closing_peer->get_remote_endpoint() ) );
                peers_to_disconnect_forcibly.push_back( closing_peer );
             }
-        }
-        uint32_t failed_terminate_timeout_seconds = 120;
-        fc::time_point failed_terminate_threshold = fc::time_point::now() - fc::seconds(failed_terminate_timeout_seconds);
-        {
+         } // for
+      } // scoped_lock
+      uint32_t failed_terminate_timeout_seconds = 120;
+      fc::time_point failed_terminate_threshold = fc::time_point::now() - fc::seconds(failed_terminate_timeout_seconds);
+      {
          fc::scoped_lock<fc::mutex> lock(_terminating_connections.get_mutex());
          for (const peer_connection_ptr& peer : _terminating_connections )
+         {
             if (peer->get_connection_terminated_time() != fc::time_point::min() &&
                peer->get_connection_terminated_time() < failed_terminate_threshold)
             {
                wlog("Terminating connection with peer ${peer}, closing the connection didn't work", ("peer", peer->get_remote_endpoint()));
                peers_to_terminate.push_back(peer);
             }
-        }
-        // That's the end of the sorting step; now all peers that require further processing are now in one of the
-        // lists peers_to_disconnect_gently,  peers_to_disconnect_forcibly, peers_to_send_keep_alive, or peers_to_terminate
+         }
+      } // scoped_lock
+      // That's the end of the sorting step; now all peers that require further processing are now in one of the
+      // lists peers_to_disconnect_gently,  peers_to_disconnect_forcibly, peers_to_send_keep_alive, or peers_to_terminate
 
-        // if we've decided to delete any peers, do it now; in its current implementation this doesn't yield,
-        // and once we start yielding, we may find that we've moved that peer to another list (closed or active)
-        // and that triggers assertions, maybe even errors
-        {
+      // if we've decided to delete any peers, do it now; in its current implementation this doesn't yield,
+      // and once we start yielding, we may find that we've moved that peer to another list (closed or active)
+      // and that triggers assertions, maybe even errors
+      {
          fc::scoped_lock<fc::mutex> lock(_terminating_connections.get_mutex());
          for (const peer_connection_ptr& peer : peers_to_terminate )
          {
@@ -990,19 +993,18 @@ namespace graphene { namespace net { namespace detail {
             _terminating_connections.erase(peer);
             schedule_peer_for_deletion(peer);
          }
-        }
-        peers_to_terminate.clear();
+      } // scoped_lock
+      peers_to_terminate.clear();
 
-        // if we're going to abruptly disconnect anyone, do it here 
-        // (it doesn't yield).  I don't think there would be any harm if this were 
-        // moved to the yielding section
-        for( const peer_connection_ptr& peer : peers_to_disconnect_forcibly )
-        {
-          move_peer_to_terminating_list(peer);
-          peer->close_connection();
-        }
-        peers_to_disconnect_forcibly.clear();
-      } // end ASSERT_TASK_NOT_PREEMPTED()
+      // if we're going to abruptly disconnect anyone, do it here 
+      // (it doesn't yield).  I don't think there would be any harm if this were 
+      // moved to the yielding section
+      for( const peer_connection_ptr& peer : peers_to_disconnect_forcibly )
+      {
+         move_peer_to_terminating_list(peer);
+         peer->close_connection();
+      }
+      peers_to_disconnect_forcibly.clear();
 
       // Now process the peers that we need to do yielding functions with (disconnect sends a message with the
       // disconnect reason, so it may yield)
@@ -2658,7 +2660,6 @@ namespace graphene { namespace net { namespace detail {
 
             for (const peer_connection_ptr& peer : _active_connections)
             {
-               ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
                bool disconnecting_this_peer = false;
                if (is_fork_block)
                {
@@ -2733,8 +2734,6 @@ namespace graphene { namespace net { namespace detail {
         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
         for (const peer_connection_ptr& peer : _active_connections)
         {
-          ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
-
           if (peer->ids_of_items_being_processed.find(block_message_to_send.block_id) != peer->ids_of_items_being_processed.end())
           {
             if (discontinue_fetching_blocks_from_peer)
@@ -2837,7 +2836,6 @@ namespace graphene { namespace net { namespace detail {
             fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
             for (const peer_connection_ptr& peer : _active_connections)
             {
-               ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
                if (!peer->ids_of_items_to_get.empty() &&
                      peer->ids_of_items_to_get.front() == received_block_iter->block_id)
                {
@@ -3000,8 +2998,6 @@ namespace graphene { namespace net { namespace detail {
          fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for (const peer_connection_ptr& peer : _active_connections)
          {
-            ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
-
             auto iter = peer->inventory_peer_advertised_to_us.find(block_message_item_id);
             if (iter != peer->inventory_peer_advertised_to_us.end())
             {
@@ -3389,8 +3385,6 @@ namespace graphene { namespace net { namespace detail {
       fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
       for (const peer_connection_ptr& peer : _active_connections)
       {
-        ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
-
         current_connection_data data_for_this_peer;
         data_for_this_peer.connection_duration = now.sec_since_epoch() - peer->connection_initiation_time.sec_since_epoch();
         if (peer->get_remote_endpoint()) // should always be set for anyone we're actively connected to
@@ -4464,8 +4458,6 @@ namespace graphene { namespace net { namespace detail {
       fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
       for (const peer_connection_ptr& peer : _active_connections)
       {
-        ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
-
         peer_status this_peer_status;
         this_peer_status.version = 0;
         fc::optional<fc::ip::endpoint> endpoint = peer->get_remote_endpoint();
