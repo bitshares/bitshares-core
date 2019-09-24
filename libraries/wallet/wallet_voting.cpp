@@ -23,6 +23,10 @@
  */
 #include <graphene/wallet/wallet_api_impl.hpp>
 
+/****
+ * Methods to handle voting / workers / committee
+ */
+
 namespace graphene { namespace wallet { namespace detail {
    
    signed_transaction wallet_api_impl::update_worker_votes(
@@ -88,5 +92,311 @@ namespace graphene { namespace wallet { namespace detail {
 
       return sign_transaction( tx, broadcast );
    }
+
+
+
+   signed_transaction wallet_api_impl::create_committee_member(string owner_account, string url, 
+         bool broadcast )
+   { try {
+
+      committee_member_create_operation committee_member_create_op;
+      committee_member_create_op.committee_member_account = get_account_id(owner_account);
+      committee_member_create_op.url = url;
+      if (_remote_db->get_committee_member_by_account(owner_account))
+         FC_THROW("Account ${owner_account} is already a committee_member", ("owner_account", owner_account));
+
+      signed_transaction tx;
+      tx.operations.push_back( committee_member_create_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (owner_account)(broadcast) ) }
+
+   witness_object wallet_api_impl::get_witness(string owner_account)
+   {
+      try
+      {
+         fc::optional<witness_id_type> witness_id = maybe_id<witness_id_type>(owner_account);
+         if (witness_id)
+         {
+            std::vector<witness_id_type> ids_to_get;
+            ids_to_get.push_back(*witness_id);
+            std::vector<fc::optional<witness_object>> witness_objects = _remote_db->get_witnesses(ids_to_get);
+            if (witness_objects.front())
+               return *witness_objects.front();
+            FC_THROW("No witness is registered for id ${id}", ("id", owner_account));
+         }
+         else
+         {
+            // then maybe it's the owner account
+            try
+            {
+               std::string owner_account_id = account_id_to_string(get_account_id(owner_account));
+               fc::optional<witness_object> witness = _remote_db->get_witness_by_account(owner_account_id);
+               if (witness)
+                  return *witness;
+               else
+                  FC_THROW("No witness is registered for account ${account}", ("account", owner_account));
+            }
+            catch (const fc::exception&)
+            {
+               FC_THROW("No account or witness named ${account}", ("account", owner_account));
+            }
+         }
+      }
+      FC_CAPTURE_AND_RETHROW( (owner_account) )
+   }
+
+   committee_member_object wallet_api_impl::get_committee_member(string owner_account)
+   {
+      try
+      {
+         fc::optional<committee_member_id_type> committee_member_id =
+               maybe_id<committee_member_id_type>(owner_account);
+         if (committee_member_id)
+         {
+            std::vector<committee_member_id_type> ids_to_get;
+            ids_to_get.push_back(*committee_member_id);
+            std::vector<fc::optional<committee_member_object>> committee_member_objects =
+                  _remote_db->get_committee_members(ids_to_get);
+            if (committee_member_objects.front())
+               return *committee_member_objects.front();
+            FC_THROW("No committee_member is registered for id ${id}", ("id", owner_account));
+         }
+         else
+         {
+            // then maybe it's the owner account
+            try
+            {
+               fc::optional<committee_member_object> committee_member =
+                     _remote_db->get_committee_member_by_account(owner_account);
+               if (committee_member)
+                  return *committee_member;
+               else
+                  FC_THROW("No committee_member is registered for account ${account}", ("account", owner_account));
+            }
+            catch (const fc::exception&)
+            {
+               FC_THROW("No account or committee_member named ${account}", ("account", owner_account));
+            }
+         }
+      }
+      FC_CAPTURE_AND_RETHROW( (owner_account) )
+   }
+
+   signed_transaction wallet_api_impl::create_witness(string owner_account,
+         string url, bool broadcast /* = false */)
+   { try {
+      account_object witness_account = get_account(owner_account);
+      fc::ecc::private_key active_private_key = get_private_key_for_account(witness_account);
+      int witness_key_index = find_first_unused_derived_key_index(active_private_key);
+      fc::ecc::private_key witness_private_key =
+            derive_private_key(key_to_wif(active_private_key), witness_key_index);
+      graphene::chain::public_key_type witness_public_key = witness_private_key.get_public_key();
+
+      witness_create_operation witness_create_op;
+      witness_create_op.witness_account = witness_account.id;
+      witness_create_op.block_signing_key = witness_public_key;
+      witness_create_op.url = url;
+
+      if (_remote_db->get_witness_by_account(account_id_to_string(witness_create_op.witness_account)))
+         FC_THROW("Account ${owner_account} is already a witness", ("owner_account", owner_account));
+
+      signed_transaction tx;
+      tx.operations.push_back( witness_create_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+      tx.validate();
+
+      _wallet.pending_witness_registrations[owner_account] = key_to_wif(witness_private_key);
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (owner_account)(broadcast) ) }
+
+   signed_transaction wallet_api_impl::update_witness(string witness_name, string url,
+         string block_signing_key, bool broadcast )
+   { try {
+      witness_object witness = get_witness(witness_name);
+      account_object witness_account = get_account( witness.witness_account );
+
+      witness_update_operation witness_update_op;
+      witness_update_op.witness = witness.id;
+      witness_update_op.witness_account = witness_account.id;
+      if( url != "" )
+         witness_update_op.new_url = url;
+      if( block_signing_key != "" )
+         witness_update_op.new_signing_key = public_key_type( block_signing_key );
+
+      signed_transaction tx;
+      tx.operations.push_back( witness_update_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (witness_name)(url)(block_signing_key)(broadcast) ) }
+
+   signed_transaction wallet_api_impl::create_worker( string owner_account, time_point_sec work_begin_date,
+         time_point_sec work_end_date, share_type daily_pay, string name, string url,
+         variant worker_settings, bool broadcast)
+   {
+      worker_initializer init;
+      std::string wtype = worker_settings["type"].get_string();
+
+      // TODO:  Use introspection to do this dispatch
+      if( wtype == "burn" )
+         init = _create_worker_initializer< burn_worker_initializer >( worker_settings );
+      else if( wtype == "refund" )
+         init = _create_worker_initializer< refund_worker_initializer >( worker_settings );
+      else if( wtype == "vesting" )
+         init = _create_worker_initializer< vesting_balance_worker_initializer >( worker_settings );
+      else
+      {
+         FC_ASSERT( false, "unknown worker[\"type\"] value" );
+      }
+
+      worker_create_operation op;
+      op.owner = get_account( owner_account ).id;
+      op.work_begin_date = work_begin_date;
+      op.work_end_date = work_end_date;
+      op.daily_pay = daily_pay;
+      op.name = name;
+      op.url = url;
+      op.initializer = init;
+
+      signed_transaction tx;
+      tx.operations.push_back( op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   }
+
+   signed_transaction wallet_api_impl::vote_for_committee_member(string voting_account,
+         string committee_member, bool approve, bool broadcast )
+   { try {
+      account_object voting_account_object = get_account(voting_account);
+      fc::optional<committee_member_object> committee_member_obj =
+            _remote_db->get_committee_member_by_account(committee_member);
+      if (!committee_member_obj)
+         FC_THROW("Account ${committee_member} is not registered as a committee_member",
+                  ("committee_member", committee_member));
+      if (approve)
+      {
+         auto insert_result = voting_account_object.options.votes.insert(committee_member_obj->vote_id);
+         if (!insert_result.second)
+            FC_THROW("Account ${account} was already voting for committee_member ${committee_member}",
+                     ("account", voting_account)("committee_member", committee_member));
+      }
+      else
+      {
+         unsigned votes_removed = voting_account_object.options.votes.erase(committee_member_obj->vote_id);
+         if (!votes_removed)
+            FC_THROW("Account ${account} is already not voting for committee_member ${committee_member}",
+                     ("account", voting_account)("committee_member", committee_member));
+      }
+      account_update_operation account_update_op;
+      account_update_op.account = voting_account_object.id;
+      account_update_op.new_options = voting_account_object.options;
+
+      signed_transaction tx;
+      tx.operations.push_back( account_update_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (voting_account)(committee_member)(approve)(broadcast) ) }
+
+   signed_transaction wallet_api_impl::vote_for_witness(string voting_account, string witness,
+         bool approve, bool broadcast )
+   { try {
+      account_object voting_account_object = get_account(voting_account);
+
+      fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(witness);
+      if (!witness_obj)
+         FC_THROW("Account ${witness} is not registered as a witness", ("witness", witness));
+      if (approve)
+      {
+         auto insert_result = voting_account_object.options.votes.insert(witness_obj->vote_id);
+         if (!insert_result.second)
+            FC_THROW("Account ${account} was already voting for witness ${witness}",
+                     ("account", voting_account)("witness", witness));
+      }
+      else
+      {
+         unsigned votes_removed = voting_account_object.options.votes.erase(witness_obj->vote_id);
+         if (!votes_removed)
+            FC_THROW("Account ${account} is already not voting for witness ${witness}",
+                     ("account", voting_account)("witness", witness));
+      }
+      account_update_operation account_update_op;
+      account_update_op.account = voting_account_object.id;
+      account_update_op.new_options = voting_account_object.options;
+
+      signed_transaction tx;
+      tx.operations.push_back( account_update_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (voting_account)(witness)(approve)(broadcast) ) }
+
+   signed_transaction wallet_api_impl::set_voting_proxy(string account_to_modify, 
+         optional<string> voting_account, bool broadcast )
+   { try {
+      account_object account_object_to_modify = get_account(account_to_modify);
+      if (voting_account)
+      {
+         account_id_type new_voting_account_id = get_account_id(*voting_account);
+         if (account_object_to_modify.options.voting_account == new_voting_account_id)
+            FC_THROW("Voting proxy for ${account} is already set to ${voter}",
+                     ("account", account_to_modify)("voter", *voting_account));
+         account_object_to_modify.options.voting_account = new_voting_account_id;
+      }
+      else
+      {
+         if (account_object_to_modify.options.voting_account == GRAPHENE_PROXY_TO_SELF_ACCOUNT)
+            FC_THROW("Account ${account} is already voting for itself", ("account", account_to_modify));
+         account_object_to_modify.options.voting_account = GRAPHENE_PROXY_TO_SELF_ACCOUNT;
+      }
+
+      account_update_operation account_update_op;
+      account_update_op.account = account_object_to_modify.id;
+      account_update_op.new_options = account_object_to_modify.options;
+
+      signed_transaction tx;
+      tx.operations.push_back( account_update_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (account_to_modify)(voting_account)(broadcast) ) }
+
+   signed_transaction wallet_api_impl::set_desired_witness_and_committee_member_count(
+         string account_to_modify, uint16_t desired_number_of_witnesses, uint16_t desired_number_of_committee_members,
+         bool broadcast )
+   { try {
+      account_object account_object_to_modify = get_account(account_to_modify);
+
+      if (account_object_to_modify.options.num_witness == desired_number_of_witnesses &&
+          account_object_to_modify.options.num_committee == desired_number_of_committee_members)
+         FC_THROW("Account ${account} is already voting for ${witnesses} witnesses"
+                  " and ${committee_members} committee_members",
+                  ("account", account_to_modify)("witnesses", desired_number_of_witnesses)
+                  ("committee_members",desired_number_of_witnesses));
+      account_object_to_modify.options.num_witness = desired_number_of_witnesses;
+      account_object_to_modify.options.num_committee = desired_number_of_committee_members;
+
+      account_update_operation account_update_op;
+      account_update_op.account = account_object_to_modify.id;
+      account_update_op.new_options = account_object_to_modify.options;
+
+      signed_transaction tx;
+      tx.operations.push_back( account_update_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (account_to_modify)(desired_number_of_witnesses)
+                             (desired_number_of_committee_members)(broadcast) ) }
 
 }}} // namespace graphene::wallet::detail

@@ -24,9 +24,29 @@
 #include <graphene/wallet/wallet_api_impl.hpp>
 #include <graphene/wallet/wallet.hpp>
 
+/***
+ * Methods to handle transfers / exchange orders
+ */
+
 namespace graphene { namespace wallet { namespace detail {
 
-signed_transaction wallet_api_impl::transfer(string from, string to, string amount,
+   /***
+    * @brief a helper method to create an htlc_hash from an algo/hash combination
+    */
+   htlc_hash wallet_api_impl::do_hash( const string& algorithm, const std::string& hash )
+   {
+      string name_upper;
+      std::transform( algorithm.begin(), algorithm.end(), std::back_inserter(name_upper), ::toupper);
+      if( name_upper == "RIPEMD160" )
+         return fc::ripemd160( hash );
+      if( name_upper == "SHA256" )
+         return fc::sha256( hash );
+      if( name_upper == "SHA1" )
+         return fc::sha1( hash );
+      FC_THROW_EXCEPTION( fc::invalid_arg_exception, "Unknown algorithm '${a}'", ("a",algorithm) );
+   }
+
+   signed_transaction wallet_api_impl::transfer(string from, string to, string amount,
                                string asset_symbol, string memo, bool broadcast )
    { try {
       FC_ASSERT( !self.is_locked() );
@@ -61,7 +81,7 @@ signed_transaction wallet_api_impl::transfer(string from, string to, string amou
       return sign_transaction(tx, broadcast);
    } FC_CAPTURE_AND_RETHROW( (from)(to)(amount)(asset_symbol)(memo)(broadcast) ) }
 
-signed_transaction wallet_api_impl::htlc_create( string source, string destination, string amount, string asset_symbol,
+   signed_transaction wallet_api_impl::htlc_create( string source, string destination, string amount, string asset_symbol,
          string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
          const uint32_t claim_period_seconds, bool broadcast )
    {
@@ -138,5 +158,86 @@ signed_transaction wallet_api_impl::htlc_create( string source, string destinati
          return sign_transaction(tx, broadcast);
       } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(seconds_to_add)(broadcast) )
    }
+
+   signed_transaction wallet_api_impl::sell_asset(string seller_account, string amount_to_sell,
+         string symbol_to_sell, string min_to_receive, string symbol_to_receive,
+         uint32_t timeout_sec, bool fill_or_kill, bool broadcast )
+   {
+      account_object seller   = get_account( seller_account );
+
+      limit_order_create_operation op;
+      op.seller = seller.id;
+      op.amount_to_sell = get_asset(symbol_to_sell).amount_from_string(amount_to_sell);
+      op.min_to_receive = get_asset(symbol_to_receive).amount_from_string(min_to_receive);
+      if( timeout_sec )
+         op.expiration = fc::time_point::now() + fc::seconds(timeout_sec);
+      op.fill_or_kill = fill_or_kill;
+
+      signed_transaction tx;
+      tx.operations.push_back(op);
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   }
+
+   signed_transaction wallet_api_impl::borrow_asset(string seller_name, string amount_to_borrow, 
+         string asset_symbol, string amount_of_collateral, bool broadcast )
+   {
+      account_object seller = get_account(seller_name);
+      asset_object mia = get_asset(asset_symbol);
+      FC_ASSERT(mia.is_market_issued());
+      asset_object collateral = get_asset(get_object(*mia.bitasset_data_id).options.short_backing_asset);
+
+      call_order_update_operation op;
+      op.funding_account = seller.id;
+      op.delta_debt   = mia.amount_from_string(amount_to_borrow);
+      op.delta_collateral = collateral.amount_from_string(amount_of_collateral);
+
+      signed_transaction trx;
+      trx.operations = {op};
+      set_operation_fees( trx, _remote_db->get_global_properties().parameters.get_current_fees());
+      trx.validate();
+
+      return sign_transaction(trx, broadcast);
+   }
+
+   signed_transaction wallet_api_impl::borrow_asset_ext( string seller_name, string amount_to_borrow, 
+         string asset_symbol, string amount_of_collateral,
+         call_order_update_operation::extensions_type extensions, bool broadcast )
+   {
+      account_object seller = get_account(seller_name);
+      asset_object mia = get_asset(asset_symbol);
+      FC_ASSERT(mia.is_market_issued());
+      asset_object collateral = get_asset(get_object(*mia.bitasset_data_id).options.short_backing_asset);
+
+      call_order_update_operation op;
+      op.funding_account = seller.id;
+      op.delta_debt   = mia.amount_from_string(amount_to_borrow);
+      op.delta_collateral = collateral.amount_from_string(amount_of_collateral);
+      op.extensions = extensions;
+
+      signed_transaction trx;
+      trx.operations = {op};
+      set_operation_fees( trx, _remote_db->get_global_properties().parameters.get_current_fees());
+      trx.validate();
+
+      return sign_transaction(trx, broadcast);
+   }
+
+   signed_transaction wallet_api_impl::cancel_order(limit_order_id_type order_id, bool broadcast )
+   { try {
+         FC_ASSERT(!is_locked());
+         signed_transaction trx;
+
+         limit_order_cancel_operation op;
+         op.fee_paying_account = get_object(order_id).seller;
+         op.order = order_id;
+         trx.operations = {op};
+         set_operation_fees( trx, _remote_db->get_global_properties().parameters.get_current_fees());
+
+         trx.validate();
+         return sign_transaction(trx, broadcast);
+   } FC_CAPTURE_AND_RETHROW((order_id)) }
 
 }}} // namespace graphene::wallet::detail

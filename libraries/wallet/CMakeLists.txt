@@ -33,11 +33,13 @@ file(GLOB HEADERS "include/graphene/wallet/*.hpp")
 
 set(sources
    wallet.cpp
+   wallet_asset.cpp
    wallet_voting.cpp
    wallet_transfer.cpp
    wallet_sign.cpp
    wallet_results.cpp
    wallet_account.cpp
+   wallet_network.cpp
    operation_printer.cpp
    reflect_util.cpp
    ${HEADERS})

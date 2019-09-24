@@ -27,6 +27,27 @@
 
 namespace graphene { namespace wallet { namespace detail {
 
+class htlc_hash_to_string_visitor
+{
+public:
+   typedef std::string result_type;
+
+   result_type operator()( const fc::ripemd160& hash )const
+   {
+      return "RIPEMD160 " + hash.str();
+   }
+
+   result_type operator()( const fc::sha1& hash )const
+   {
+      return "SHA1 " + hash.str();
+   }
+
+   result_type operator()( const fc::sha256& hash )const
+   {
+      return "SHA256 " + hash.str();
+   }
+};
+
 std::string operation_printer::fee(const graphene::protocol::asset& a)const {
    out << "   (Fee: " << wallet.get_asset(a.asset_id).amount_to_pretty_string(a) << ")";
    return "";

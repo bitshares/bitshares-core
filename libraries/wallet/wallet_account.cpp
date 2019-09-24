@@ -129,4 +129,130 @@ signed_transaction wallet_api_impl::account_store_map(string account, string cat
    } FC_CAPTURE_AND_RETHROW( (account)(remove)(catalog)(key_values)(broadcast) )
 }
 
+void wallet_api_impl::claim_registered_account(const graphene::chain::account_object& account)
+{
+   bool import_keys = false;
+   auto it = _wallet.pending_account_registrations.find( account.name );
+   FC_ASSERT( it != _wallet.pending_account_registrations.end() );
+   for (const std::string& wif_key : it->second) {
+      if( !import_key( account.name, wif_key ) )
+      {
+         // somebody else beat our pending registration, there is
+         //    nothing we can do except log it and move on
+         elog( "account ${name} registered by someone else first!",
+               ("name", account.name) );
+         // might as well remove it from pending regs,
+         //    because there is now no way this registration
+         //    can become valid (even in the extremely rare
+         //    possibility of migrating to a fork where the
+         //    name is available, the user can always
+         //    manually re-register)
+      } else {
+         import_keys = true;
+      }
+   }
+   _wallet.pending_account_registrations.erase( it );
+
+   if( import_keys ) {
+      save_wallet_file();
+   }
+}
+
+// after a witness registration succeeds, this saves the private key in the wallet permanently
+//
+void wallet_api_impl::claim_registered_witness(const std::string& witness_name)
+{
+   auto iter = _wallet.pending_witness_registrations.find(witness_name);
+   FC_ASSERT(iter != _wallet.pending_witness_registrations.end());
+   std::string wif_key = iter->second;
+
+   // get the list key id this key is registered with in the chain
+   fc::optional<fc::ecc::private_key> witness_private_key = wif_to_key(wif_key);
+   FC_ASSERT(witness_private_key);
+
+   auto pub_key = witness_private_key->get_public_key();
+   _keys[pub_key] = wif_key;
+   _wallet.pending_witness_registrations.erase(iter);
+}
+
+account_object wallet_api_impl::get_account(account_id_type id) const
+{
+   std::string account_id = account_id_to_string(id);
+
+   auto rec = _remote_db->get_accounts({account_id}, {}).front();
+   FC_ASSERT(rec);
+   return *rec;
+}
+
+account_object wallet_api_impl::get_account(string account_name_or_id) const
+{
+   FC_ASSERT( account_name_or_id.size() > 0 );
+
+   if( auto id = maybe_id<account_id_type>(account_name_or_id) )
+   {
+      // It's an ID
+      return get_account(*id);
+   } else {
+      auto rec = _remote_db->lookup_account_names({account_name_or_id}).front();
+      FC_ASSERT( rec && rec->name == account_name_or_id );
+      return *rec;
+   }
+}
+
+account_id_type wallet_api_impl::get_account_id(string account_name_or_id) const
+{
+   return get_account(account_name_or_id).get_id();
+}
+
+signed_transaction wallet_api_impl::create_account_with_private_key(fc::ecc::private_key owner_privkey,
+      string account_name, string registrar_account, string referrer_account, bool broadcast,
+      bool save_wallet )
+{ try {
+      int active_key_index = find_first_unused_derived_key_index(owner_privkey);
+      fc::ecc::private_key active_privkey = derive_private_key( key_to_wif(owner_privkey), active_key_index);
+
+      int memo_key_index = find_first_unused_derived_key_index(active_privkey);
+      fc::ecc::private_key memo_privkey = derive_private_key( key_to_wif(active_privkey), memo_key_index);
+
+      graphene::chain::public_key_type owner_pubkey = owner_privkey.get_public_key();
+      graphene::chain::public_key_type active_pubkey = active_privkey.get_public_key();
+      graphene::chain::public_key_type memo_pubkey = memo_privkey.get_public_key();
+
+      account_create_operation account_create_op;
+
+      // TODO:  process when pay_from_account is ID
+
+      account_object registrar_account_object = get_account( registrar_account );
+
+      account_id_type registrar_account_id = registrar_account_object.id;
+
+      account_object referrer_account_object = get_account( referrer_account );
+      account_create_op.referrer = referrer_account_object.id;
+      account_create_op.referrer_percent = referrer_account_object.referrer_rewards_percentage;
+
+      account_create_op.registrar = registrar_account_id;
+      account_create_op.name = account_name;
+      account_create_op.owner = authority(1, owner_pubkey, 1);
+      account_create_op.active = authority(1, active_pubkey, 1);
+      account_create_op.options.memo_key = memo_pubkey;
+
+      // current_fee_schedule()
+      // find_account(pay_from_account)
+
+      // account_create_op.fee = account_create_op.calculate_fee(db.current_fee_schedule());
+
+      signed_transaction tx;
+      tx.operations.push_back( account_create_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+      tx.validate();
+
+      // we do not insert owner_privkey here because
+      //    it is intended to only be used for key recovery
+      _wallet.pending_account_registrations[account_name].push_back(key_to_wif( active_privkey ));
+      _wallet.pending_account_registrations[account_name].push_back(key_to_wif( memo_privkey ));
+      if( save_wallet )
+         save_wallet_file();
+      return sign_transaction(tx, broadcast);
+} FC_CAPTURE_AND_RETHROW( (account_name)(registrar_account)(referrer_account)(broadcast) ) }
+
 }}} // namespace graphene::wallet::detail
