@@ -38,6 +38,7 @@
 
 #include <fc/thread/thread.hpp>
 #include <fc/interprocess/signals.hpp>
+#include <fc/stacktrace.hpp>
 
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -60,6 +61,7 @@ using namespace graphene;
 namespace bpo = boost::program_options;
 
 int main(int argc, char** argv) {
+   fc::print_stacktrace_on_segfault();
    app::application* node = new app::application();
    fc::oexception unhandled_exception;
    try {

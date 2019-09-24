@@ -34,6 +34,7 @@
 #include <fc/log/file_appender.hpp>
 #include <fc/log/logger.hpp>
 #include <fc/log/logger_config.hpp>
+#include <fc/stacktrace.hpp>
 
 #include <boost/filesystem.hpp>
 
@@ -59,6 +60,7 @@ void write_default_logging_config_to_stream(std::ostream& out);
 fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::path& config_ini_filename);
 
 int main(int argc, char** argv) {
+   fc::print_stacktrace_on_segfault();
    try {
       app::application node;
       bpo::options_description app_options("Graphene Delayed Node");
