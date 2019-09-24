@@ -59,71 +59,71 @@ namespace graphene { namespace protocol {
  */
 bool is_valid_name( const string& name )
 { try {
-    const size_t len = name.size();
+   const size_t len = name.size();
 
-    if( len < GRAPHENE_MIN_ACCOUNT_NAME_LENGTH )
-    {
-        return false;
-    }
+   if( len < GRAPHENE_MIN_ACCOUNT_NAME_LENGTH )
+   {
+      return false;
+   }
 
-    if( len > GRAPHENE_MAX_ACCOUNT_NAME_LENGTH )
-    {
-        return false;
-    }
+   if( len > GRAPHENE_MAX_ACCOUNT_NAME_LENGTH )
+   {
+      return false;
+   }
 
-    size_t begin = 0;
-    while( true )
-    {
-       size_t end = name.find_first_of( '.', begin );
-       if( end == std::string::npos )
-          end = len;
-       if( (end - begin) < GRAPHENE_MIN_ACCOUNT_NAME_LENGTH )
-       {
-          return false;
-       }
-       switch( name[begin] )
-       {
-          case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h':
-          case 'i': case 'j': case 'k': case 'l': case 'm': case 'n': case 'o': case 'p':
-          case 'q': case 'r': case 's': case 't': case 'u': case 'v': case 'w': case 'x':
-          case 'y': case 'z':
-             break;
-          default:
-             return false;
-       }
-       switch( name[end-1] )
-       {
-          case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h':
-          case 'i': case 'j': case 'k': case 'l': case 'm': case 'n': case 'o': case 'p':
-          case 'q': case 'r': case 's': case 't': case 'u': case 'v': case 'w': case 'x':
-          case 'y': case 'z':
-          case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7':
-          case '8': case '9':
-             break;
-          default:
-             return false;
-       }
-       for( size_t i=begin+1; i<end-1; i++ )
-       {
-          switch( name[i] )
-          {
-             case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h':
-             case 'i': case 'j': case 'k': case 'l': case 'm': case 'n': case 'o': case 'p':
-             case 'q': case 'r': case 's': case 't': case 'u': case 'v': case 'w': case 'x':
-             case 'y': case 'z':
-             case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7':
-             case '8': case '9':
-             case '-':
-                break;
-             default:
-                return false;
-          }
-       }
-       if( end == len )
-          break;
-       begin = end+1;
-    }
-    return true;
+   size_t begin = 0;
+   while( true )
+   {
+      size_t end = name.find_first_of( '.', begin );
+      if( end == std::string::npos )
+         end = len;
+      if( (end - begin) < GRAPHENE_MIN_ACCOUNT_NAME_LENGTH )
+      {
+         return false;
+      }
+      switch( name[begin] )
+      {
+         case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h':
+         case 'i': case 'j': case 'k': case 'l': case 'm': case 'n': case 'o': case 'p':
+         case 'q': case 'r': case 's': case 't': case 'u': case 'v': case 'w': case 'x':
+         case 'y': case 'z':
+            break;
+         default:
+            return false;
+      }
+      switch( name[end-1] )
+      {
+         case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h':
+         case 'i': case 'j': case 'k': case 'l': case 'm': case 'n': case 'o': case 'p':
+         case 'q': case 'r': case 's': case 't': case 'u': case 'v': case 'w': case 'x':
+         case 'y': case 'z':
+         case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7':
+         case '8': case '9':
+            break;
+         default:
+            return false;
+      }
+      for( size_t i=begin+1; i<end-1; i++ )
+      {
+         switch( name[i] )
+         {
+            case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h':
+            case 'i': case 'j': case 'k': case 'l': case 'm': case 'n': case 'o': case 'p':
+            case 'q': case 'r': case 's': case 't': case 'u': case 'v': case 'w': case 'x':
+            case 'y': case 'z':
+            case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7':
+            case '8': case '9':
+            case '-':
+               break;
+            default:
+               return false;
+         }
+      }
+      if( end == len )
+         break;
+      begin = end+1;
+   }
+   return true;
 } FC_CAPTURE_AND_RETHROW( (name) ) }
 
 bool is_cheap_name( const string& n )
@@ -178,7 +178,6 @@ share_type account_create_operation::calculate_fee( const fee_parameters_type& k
    return core_fee_required;
 }
 
-
 void account_create_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
@@ -188,8 +187,8 @@ void account_create_operation::validate()const
    FC_ASSERT( owner.address_auths.size() == 0 );
    FC_ASSERT( active.num_auths() != 0 );
    FC_ASSERT( active.address_auths.size() == 0 );
-   FC_ASSERT( !owner.is_impossible(), "cannot create an account with an imposible owner authority threshold" );
-   FC_ASSERT( !active.is_impossible(), "cannot create an account with an imposible active authority threshold" );
+   FC_ASSERT( !owner.is_impossible(), "cannot create an account with an impossible owner authority threshold" );
+   FC_ASSERT( !active.is_impossible(), "cannot create an account with an impossible active authority threshold" );
    options.validate();
    if( extensions.value.owner_special_authority.valid() )
       validate_special_authority( *extensions.value.owner_special_authority );
@@ -209,9 +208,6 @@ void account_create_operation::validate()const
       }
    }
 }
-
-
-
 
 share_type account_update_operation::calculate_fee( const fee_parameters_type& k )const
 {
@@ -241,13 +237,13 @@ void account_update_operation::validate()const
    {
       FC_ASSERT( owner->num_auths() != 0 );
       FC_ASSERT( owner->address_auths.size() == 0 );
-      FC_ASSERT( !owner->is_impossible(), "cannot update an account with an imposible owner authority threshold" );
+      FC_ASSERT( !owner->is_impossible(), "cannot update an account with an impossible owner authority threshold" );
    }
    if( active )
    {
       FC_ASSERT( active->num_auths() != 0 );
       FC_ASSERT( active->address_auths.size() == 0 );
-      FC_ASSERT( !active->is_impossible(), "cannot update an account with an imposible active authority threshold" );
+      FC_ASSERT( !active->is_impossible(), "cannot update an account with an impossible active authority threshold" );
    }
 
    if( new_options )
@@ -265,7 +261,6 @@ share_type account_upgrade_operation::calculate_fee(const fee_parameters_type& k
    return k.membership_annual_fee;
 }
 
-
 void account_upgrade_operation::validate() const
 {
    FC_ASSERT( fee.amount >= 0 );
@@ -275,7 +270,6 @@ void account_transfer_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
 }
-
 
 } } // graphene::protocol
 
