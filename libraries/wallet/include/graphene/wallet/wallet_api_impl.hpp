@@ -220,24 +220,20 @@ public:
    transaction_handle_type begin_builder_transaction();
    void add_operation_to_builder_transaction(transaction_handle_type transaction_handle, const operation& op);
    void replace_operation_in_builder_transaction(transaction_handle_type handle,
-                                                 uint32_t operation_index,
-                                                 const operation& new_op);
+         uint32_t operation_index, const operation& new_op);
    asset set_fees_on_builder_transaction(transaction_handle_type handle, string fee_asset = GRAPHENE_SYMBOL);
    transaction preview_builder_transaction(transaction_handle_type handle);
    signed_transaction sign_builder_transaction(transaction_handle_type transaction_handle, bool broadcast = true);
 
    pair<transaction_id_type,signed_transaction> broadcast_transaction(signed_transaction tx);
 
-   signed_transaction propose_builder_transaction(
-      transaction_handle_type handle,
-      time_point_sec expiration = time_point::now() + fc::minutes(1),
-      uint32_t review_period_seconds = 0, bool broadcast = true);
+   signed_transaction propose_builder_transaction( transaction_handle_type handle,
+         time_point_sec expiration = time_point::now() + fc::minutes(1),
+         uint32_t review_period_seconds = 0, bool broadcast = true);
 
-   signed_transaction propose_builder_transaction2(
-      transaction_handle_type handle,
-      string account_name_or_id,
-      time_point_sec expiration = time_point::now() + fc::minutes(1),
-      uint32_t review_period_seconds = 0, bool broadcast = true);
+   signed_transaction propose_builder_transaction2( transaction_handle_type handle,
+         string account_name_or_id, time_point_sec expiration = time_point::now() + fc::minutes(1),
+         uint32_t review_period_seconds = 0, bool broadcast = true);
 
    void remove_builder_transaction(transaction_handle_type handle);
 
@@ -245,7 +241,6 @@ public:
          string  registrar_account, string  referrer_account, uint32_t referrer_percent,
          bool broadcast = false);
    
-
    signed_transaction upgrade_account(string name, bool broadcast);
 
    signed_transaction create_account_with_private_key(fc::ecc::private_key owner_privkey,
@@ -255,67 +250,38 @@ public:
    signed_transaction create_account_with_brain_key(string brain_key, string account_name, string registrar_account,
          string referrer_account, bool broadcast = false, bool save_wallet = true);
 
-   signed_transaction create_asset(string issuer,
-                                   string symbol,
-                                   uint8_t precision,
-                                   asset_options common,
-                                   fc::optional<bitasset_options> bitasset_opts,
-                                   bool broadcast = false);
+   signed_transaction create_asset(string issuer, string symbol, uint8_t precision, asset_options common,
+         fc::optional<bitasset_options> bitasset_opts, bool broadcast = false);
 
-   signed_transaction update_asset(string symbol,
-                                   optional<string> new_issuer,
-                                   asset_options new_options,
-                                   bool broadcast /* = false */);
+   signed_transaction update_asset(string symbol, optional<string> new_issuer, asset_options new_options,
+         bool broadcast );
 
-   signed_transaction update_asset_issuer(string symbol,
-                                   string new_issuer,
-                                   bool broadcast /* = false */);
+   signed_transaction update_asset_issuer(string symbol, string new_issuer, bool broadcast );
 
-   signed_transaction update_bitasset(string symbol,
-                                      bitasset_options new_options,
-                                      bool broadcast /* = false */);
+   signed_transaction update_bitasset(string symbol, bitasset_options new_options, bool broadcast );
 
-   signed_transaction update_asset_feed_producers(string symbol,
-                                                  flat_set<string> new_feed_producers,
-                                                  bool broadcast /* = false */);
+   signed_transaction update_asset_feed_producers(string symbol, flat_set<string> new_feed_producers,
+         bool broadcast );
 
-   signed_transaction publish_asset_feed(string publishing_account,
-                                         string symbol,
-                                         price_feed feed,
-                                         bool broadcast /* = false */);
+   signed_transaction publish_asset_feed(string publishing_account, string symbol, price_feed feed,
+         bool broadcast );
 
-   signed_transaction fund_asset_fee_pool(string from,
-                                          string symbol,
-                                          string amount,
-                                          bool broadcast /* = false */);
+   signed_transaction fund_asset_fee_pool(string from, string symbol, string amount, bool broadcast );
 
-   signed_transaction claim_asset_fee_pool(string symbol,
-                                           string amount,
-                                           bool broadcast /* = false */);
+   signed_transaction claim_asset_fee_pool(string symbol, string amount, bool broadcast );
 
-   signed_transaction reserve_asset(string from,
-                                 string amount,
-                                 string symbol,
-                                 bool broadcast /* = false */);
+   signed_transaction reserve_asset(string from, string amount, string symbol, bool broadcast );
 
-   signed_transaction global_settle_asset(string symbol,
-                                          price settle_price,
-                                          bool broadcast /* = false */);
+   signed_transaction global_settle_asset(string symbol, price settle_price, bool broadcast );
 
-   signed_transaction settle_asset(string account_to_settle,
-                                   string amount_to_settle,
-                                   string symbol,
-                                   bool broadcast /* = false */);
+   signed_transaction settle_asset(string account_to_settle, string amount_to_settle, string symbol,
+         bool broadcast );
 
-   signed_transaction bid_collateral(string bidder_name,
-                                     string debt_amount, string debt_symbol,
-                                     string additional_collateral,
-                                     bool broadcast );
+   signed_transaction bid_collateral(string bidder_name, string debt_amount, string debt_symbol,
+         string additional_collateral, bool broadcast );
 
-   signed_transaction whitelist_account(string authorizing_account,
-                                        string account_to_list,
-                                        account_whitelist_operation::account_listing new_listing_status,
-                                        bool broadcast /* = false */);
+   signed_transaction whitelist_account(string authorizing_account, string account_to_list,
+         account_whitelist_operation::account_listing new_listing_status, bool broadcast );
 
    signed_transaction create_committee_member(string owner_account, string url, bool broadcast );
 
@@ -356,7 +322,7 @@ public:
    vector< vesting_balance_object_with_info > get_vesting_balances( string account_name );
 
    signed_transaction withdraw_vesting( string witness_name, string amount, string asset_symbol,
-      bool broadcast = false );
+         bool broadcast = false );
 
    signed_transaction vote_for_committee_member(string voting_account, string committee_member,
          bool approve, bool broadcast );
@@ -407,27 +373,18 @@ public:
          string asset_symbol, string memo, bool broadcast = false);
 
    signed_transaction issue_asset(string to_account, string amount, string symbol,
-                                  string memo, bool broadcast = false);
+         string memo, bool broadcast = false);
 
    std::map<string,std::function<string(fc::variant,const fc::variants&)>> get_result_formatters() const;
 
-   signed_transaction propose_parameter_change(
-      const string& proposing_account,
-      fc::time_point_sec expiration_time,
-      const variant_object& changed_values,
-      bool broadcast = false);
+   signed_transaction propose_parameter_change( const string& proposing_account, fc::time_point_sec expiration_time,
+         const variant_object& changed_values, bool broadcast = false);
 
-   signed_transaction propose_fee_change(
-      const string& proposing_account,
-      fc::time_point_sec expiration_time,
-      const variant_object& changed_fees,
-      bool broadcast = false);
+   signed_transaction propose_fee_change( const string& proposing_account, fc::time_point_sec expiration_time,
+         const variant_object& changed_fees, bool broadcast = false);
 
-   signed_transaction approve_proposal(
-      const string& fee_paying_account,
-      const string& proposal_id,
-      const approval_delta& delta,
-      bool broadcast = false);
+   signed_transaction approve_proposal( const string& fee_paying_account, const string& proposal_id,
+         const approval_delta& delta, bool broadcast = false);
 
    void dbg_make_uia(string creator, string symbol);
 
