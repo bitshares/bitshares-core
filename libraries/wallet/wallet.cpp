@@ -59,6 +59,7 @@
 #include <fc/thread/mutex.hpp>
 #include <fc/thread/scoped_lock.hpp>
 #include <fc/crypto/base58.hpp>
+#include <fc/crypto/aes.hpp>
 
 #include <graphene/app/api.hpp>
 #include <graphene/app/util.hpp>

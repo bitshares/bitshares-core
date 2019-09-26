@@ -1,4 +1,8 @@
+#include <boost/algorithm/string/replace.hpp>
+
 #include <fc/rpc/api_connection.hpp>
+#include <fc/popcount.hpp>
+#include <fc/git_revision.hpp>
 
 #include <graphene/wallet/wallet.hpp>
 #include <graphene/wallet/wallet_api_impl.hpp>

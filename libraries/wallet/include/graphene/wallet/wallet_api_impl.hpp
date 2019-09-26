@@ -22,23 +22,9 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <string>
-#include <iomanip>
 
-#include <boost/range/adaptors.hpp>
-#include <fc/crypto/aes.hpp>
 #include <fc/thread/mutex.hpp>
-#include <fc/thread/scoped_lock.hpp>
-#include <fc/api.hpp>
-#include <fc/popcount.hpp>
-#include <fc/git_revision.hpp>
-#include <fc/io/fstream.hpp>
-#include <fc/io/sstream.hpp>
 
-#include <boost/container/flat_map.hpp>
-#include <boost/algorithm/string/replace.hpp>
-
-#include <graphene/protocol/base.hpp>
 #include <graphene/protocol/address.hpp>
 #include <graphene/app/api_objects.hpp>
 #include <graphene/app/api.hpp>
@@ -49,11 +35,6 @@
 #include "api_documentation.hpp"
 #include "wallet_structs.hpp"
 #include "reflect_util.hpp"
-
-#ifndef WIN32
-# include <sys/types.h>
-# include <sys/stat.h>
-#endif
 
 namespace graphene { namespace wallet { 
 
