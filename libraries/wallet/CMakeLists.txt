@@ -31,20 +31,9 @@ endif()
 
 file(GLOB HEADERS "include/graphene/wallet/*.hpp")
 
-set(sources
-   wallet.cpp
-   wallet_asset.cpp
-   wallet_voting.cpp
-   wallet_transfer.cpp
-   wallet_sign.cpp
-   wallet_results.cpp
-   wallet_account.cpp
-   wallet_network.cpp
-   operation_printer.cpp
-   reflect_util.cpp
-   ${HEADERS})
+file (GLOB SOURCES "*.cpp" ${HEADERS})
 
-add_library( graphene_wallet ${sources} ${CMAKE_CURRENT_BINARY_DIR}/api_documentation.cpp ${HEADERS} )
+add_library( graphene_wallet ${SOURCES} ${CMAKE_CURRENT_BINARY_DIR}/api_documentation.cpp ${HEADERS} )
 target_link_libraries( graphene_wallet PRIVATE graphene_app graphene_net graphene_chain graphene_utilities fc ${CMAKE_DL_LIBS} ${PLATFORM_SPECIFIC_LIBS} )
 target_include_directories( graphene_db PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 

@@ -58,7 +58,6 @@
 #include <fc/crypto/hex.hpp>
 #include <fc/thread/mutex.hpp>
 #include <fc/thread/scoped_lock.hpp>
-#include <fc/rpc/api_connection.hpp>
 #include <fc/crypto/base58.hpp>
 
 #include <graphene/app/api.hpp>
@@ -78,11 +77,6 @@
 #include <graphene/wallet/wallet_api_impl.hpp>
 #include <graphene/wallet/operation_printer.hpp>
 #include <graphene/wallet/reflect_util.hpp>
-
-// explicit instantiation for later use
-namespace fc {
-	template class api<graphene::wallet::wallet_api, identity_member_with_optionals>;
-}
 
 #define BRAIN_KEY_WORD_COUNT 16
 #define RANGE_PROOF_MANTISSA 49 // Minimum mantissa bits to "hide" in the range proof.
