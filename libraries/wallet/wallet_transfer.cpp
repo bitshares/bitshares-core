@@ -159,6 +159,18 @@ namespace graphene { namespace wallet { namespace detail {
       } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(seconds_to_add)(broadcast) )
    }
 
+   fc::optional<htlc_object> wallet_api_impl::get_htlc(string htlc_id) const
+   {
+      htlc_id_type id;
+      fc::from_variant(htlc_id, id);
+      auto obj = _remote_db->get_objects( { id }, {}).front();
+      if ( !obj.is_null() )
+      {
+         return fc::optional<htlc_object>(obj.template as<htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS));
+      }
+      return fc::optional<htlc_object>();
+   }
+
    signed_transaction wallet_api_impl::sell_asset(string seller_account, string amount_to_sell,
          string symbol_to_sell, string min_to_receive, string symbol_to_receive,
          uint32_t timeout_sec, bool fill_or_kill, bool broadcast )
@@ -239,5 +251,33 @@ namespace graphene { namespace wallet { namespace detail {
          trx.validate();
          return sign_transaction(trx, broadcast);
    } FC_CAPTURE_AND_RETHROW((order_id)) }
+
+   signed_transaction wallet_api_impl::withdraw_vesting( string witness_name, string amount, string asset_symbol,
+         bool broadcast )
+   { try {
+      asset_object asset_obj = get_asset( asset_symbol );
+      fc::optional<vesting_balance_id_type> vbid = maybe_id<vesting_balance_id_type>(witness_name);
+      if( !vbid )
+      {
+         witness_object wit = get_witness( witness_name );
+         FC_ASSERT( wit.pay_vb );
+         vbid = wit.pay_vb;
+      }
+
+      vesting_balance_object vbo = get_object( *vbid );
+      vesting_balance_withdraw_operation vesting_balance_withdraw_op;
+
+      vesting_balance_withdraw_op.vesting_balance = *vbid;
+      vesting_balance_withdraw_op.owner = vbo.owner;
+      vesting_balance_withdraw_op.amount = asset_obj.amount_from_string(amount);
+
+      signed_transaction tx;
+      tx.operations.push_back( vesting_balance_withdraw_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees() );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (witness_name)(amount) )
+   }
 
 }}} // namespace graphene::wallet::detail

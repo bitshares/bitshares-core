@@ -36,8 +36,6 @@ namespace graphene { namespace wallet {
 
 typedef uint16_t transaction_handle_type;
 
-
-
 struct plain_keys
 {
    map<public_key_type, string>  keys;

@@ -138,6 +138,127 @@ namespace graphene { namespace wallet { namespace detail {
       return meta.substr( start, lf - start );
    }
 
+   void wallet_api_impl::resync()
+   {
+      fc::scoped_lock<fc::mutex> lock(_resync_mutex);
+      // this method is used to update wallet_data annotations
+      //   e.g. wallet has been restarted and was not notified
+      //   of events while it was down
+      //
+      // everything that is done "incremental style" when a push
+      //   notification is received, should also be done here
+      //   "batch style" by querying the blockchain
+
+      if( !_wallet.pending_account_registrations.empty() )
+      {
+         // make a vector of the account names pending registration
+         std::vector<string> pending_account_names =
+               boost::copy_range<std::vector<string> >(boost::adaptors::keys(_wallet.pending_account_registrations));
+
+         // look those up on the blockchain
+         std::vector<fc::optional<graphene::chain::account_object >>
+               pending_account_objects = _remote_db->lookup_account_names( pending_account_names );
+
+         // if any of them exist, claim them
+         for( const fc::optional<graphene::chain::account_object>& optional_account : pending_account_objects )
+            if( optional_account )
+               claim_registered_account(*optional_account);
+      }
+
+      if (!_wallet.pending_witness_registrations.empty())
+      {
+         // make a vector of the owner accounts for witnesses pending registration
+         std::vector<string> pending_witness_names =
+               boost::copy_range<std::vector<string> >(boost::adaptors::keys(_wallet.pending_witness_registrations));
+
+         // look up the owners on the blockchain
+         std::vector<fc::optional<graphene::chain::account_object>> owner_account_objects =
+               _remote_db->lookup_account_names(pending_witness_names);
+
+         // if any of them have registered witnesses, claim them
+         for( const fc::optional<graphene::chain::account_object>& optional_account : owner_account_objects )
+            if (optional_account)
+            {
+               std::string account_id = account_id_to_string(optional_account->id);
+               fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(account_id);
+               if (witness_obj)
+                  claim_registered_witness(optional_account->name);
+            }
+      }
+   }
+
+   void wallet_api_impl::enable_umask_protection()
+   {
+#ifdef __unix__
+      _old_umask = umask( S_IRWXG | S_IRWXO );
+#endif
+   }
+
+   void wallet_api_impl::disable_umask_protection()
+   {
+#ifdef __unix__
+      umask( _old_umask );
+#endif
+   }
+
+   bool wallet_api_impl::copy_wallet_file( string destination_filename )
+   {
+      fc::path src_path = get_wallet_filename();
+      if( !fc::exists( src_path ) )
+         return false;
+      fc::path dest_path = destination_filename + _wallet_filename_extension;
+      int suffix = 0;
+      while( fc::exists(dest_path) )
+      {
+         ++suffix;
+         dest_path = destination_filename + "-" + to_string( suffix ) + _wallet_filename_extension;
+      }
+      wlog( "backing up wallet ${src} to ${dest}",
+            ("src", src_path)
+            ("dest", dest_path) );
+
+      fc::path dest_parent = fc::absolute(dest_path).parent_path();
+      try
+      {
+         enable_umask_protection();
+         if( !fc::exists( dest_parent ) )
+            fc::create_directories( dest_parent );
+         fc::copy( src_path, dest_path );
+         disable_umask_protection();
+      }
+      catch(...)
+      {
+         disable_umask_protection();
+         throw;
+      }
+      return true;
+   }
+
+   /***
+    * @brief returns true if the wallet is unlocked
+    */
+   bool wallet_api_impl::is_locked()const
+   {
+      return _checksum == fc::sha512();
+   }
+
+   void wallet_api_impl::encrypt_keys()
+   {
+      if( !is_locked() )
+      {
+         plain_keys data;
+         data.keys = _keys;
+         data.checksum = _checksum;
+         auto plain_txt = fc::raw::pack(data);
+         _wallet.cipher_keys = fc::aes_encrypt( data.checksum, plain_txt );
+      }
+   }
+
+   string wallet_api_impl::get_wallet_filename() const
+   {
+      return _wallet_filename;
+   }
+
    memo_data wallet_api_impl::sign_memo(string from, string to, string memo)
    {
       FC_ASSERT( !self.is_locked() );
@@ -683,6 +804,16 @@ namespace graphene { namespace wallet { namespace detail {
          disable_umask_protection();
          throw;
       }
+   }
+
+   flat_set<public_key_type> wallet_api_impl::get_transaction_signers(const signed_transaction &tx) const
+   {
+      return tx.get_signature_keys(_chain_id);
+   }
+
+   vector<flat_set<account_id_type>> wallet_api_impl::get_key_references(const vector<public_key_type> &keys) const
+   {
+       return _remote_db->get_key_references(keys);
    }
 
 }}} // namespace graphene::wallet::detail

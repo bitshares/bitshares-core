@@ -93,8 +93,6 @@ namespace graphene { namespace wallet { namespace detail {
       return sign_transaction( tx, broadcast );
    }
 
-
-
    signed_transaction wallet_api_impl::create_committee_member(string owner_account, string url, 
          bool broadcast )
    { try {
@@ -398,5 +396,145 @@ namespace graphene { namespace wallet { namespace detail {
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (account_to_modify)(desired_number_of_witnesses)
                              (desired_number_of_committee_members)(broadcast) ) }
+
+   signed_transaction wallet_api_impl::propose_parameter_change( const string& proposing_account,
+         fc::time_point_sec expiration_time, const variant_object& changed_values, bool broadcast )
+   {
+      FC_ASSERT( !changed_values.contains("current_fees") );
+
+      const chain_parameters& current_params = get_global_properties().parameters;
+      chain_parameters new_params = current_params;
+      fc::reflector<chain_parameters>::visit(
+         fc::from_variant_visitor<chain_parameters>( changed_values, new_params, GRAPHENE_MAX_NESTED_OBJECTS )
+         );
+
+      committee_member_update_global_parameters_operation update_op;
+      update_op.new_parameters = new_params;
+
+      proposal_create_operation prop_op;
+
+      prop_op.expiration_time = expiration_time;
+      prop_op.review_period_seconds = current_params.committee_proposal_review_period;
+      prop_op.fee_paying_account = get_account(proposing_account).id;
+
+      prop_op.proposed_ops.emplace_back( update_op );
+      current_params.get_current_fees().set_fee( prop_op.proposed_ops.back().op );
+
+      signed_transaction tx;
+      tx.operations.push_back(prop_op);
+      set_operation_fees(tx, current_params.get_current_fees());
+      tx.validate();
+
+      return sign_transaction(tx, broadcast);
+   }
+
+   signed_transaction wallet_api_impl::propose_fee_change( const string& proposing_account,
+         fc::time_point_sec expiration_time, const variant_object& changed_fees, bool broadcast )
+   {
+      const chain_parameters& current_params = get_global_properties().parameters;
+      const fee_schedule_type& current_fees = current_params.get_current_fees();
+
+      flat_map< int, fee_parameters > fee_map;
+      fee_map.reserve( current_fees.parameters.size() );
+      for( const fee_parameters& op_fee : current_fees.parameters )
+         fee_map[ op_fee.which() ] = op_fee;
+      uint32_t scale = current_fees.scale;
+
+      for( const auto& item : changed_fees )
+      {
+         const string& key = item.key();
+         if( key == "scale" )
+         {
+            int64_t _scale = item.value().as_int64();
+            FC_ASSERT( _scale >= 0 );
+            FC_ASSERT( _scale <= std::numeric_limits<uint32_t>::max() );
+            scale = uint32_t( _scale );
+            continue;
+         }
+         // is key a number?
+         auto is_numeric = [&key]() -> bool
+         {
+            size_t n = key.size();
+            for( size_t i=0; i<n; i++ )
+            {
+               if( !isdigit( key[i] ) )
+                  return false;
+            }
+            return true;
+         };
+
+         int which;
+         if( is_numeric() )
+            which = std::stoi( key );
+         else
+         {
+            const auto& n2w = _operation_which_map.name_to_which;
+            auto it = n2w.find( key );
+            FC_ASSERT( it != n2w.end(), "unknown operation" );
+            which = it->second;
+         }
+
+         fee_parameters fp = from_which_variant< fee_parameters >( which, item.value(), GRAPHENE_MAX_NESTED_OBJECTS );
+         fee_map[ which ] = fp;
+      }
+
+      fee_schedule_type new_fees;
+
+      for( const std::pair< int, fee_parameters >& item : fee_map )
+         new_fees.parameters.insert( item.second );
+      new_fees.scale = scale;
+
+      chain_parameters new_params = current_params;
+      new_params.get_mutable_fees() = new_fees;
+
+      committee_member_update_global_parameters_operation update_op;
+      update_op.new_parameters = new_params;
+
+      proposal_create_operation prop_op;
+
+      prop_op.expiration_time = expiration_time;
+      prop_op.review_period_seconds = current_params.committee_proposal_review_period;
+      prop_op.fee_paying_account = get_account(proposing_account).id;
+
+      prop_op.proposed_ops.emplace_back( update_op );
+      current_params.get_current_fees().set_fee( prop_op.proposed_ops.back().op );
+
+      signed_transaction tx;
+      tx.operations.push_back(prop_op);
+      set_operation_fees(tx, current_params.get_current_fees());
+      tx.validate();
+
+      return sign_transaction(tx, broadcast);
+   }
+
+   signed_transaction wallet_api_impl::approve_proposal( const string& fee_paying_account, const string& proposal_id,
+         const approval_delta& delta, bool broadcast )
+   {
+      proposal_update_operation update_op;
+
+      update_op.fee_paying_account = get_account(fee_paying_account).id;
+      update_op.proposal = fc::variant(proposal_id, 1).as<proposal_id_type>( 1 );
+      // make sure the proposal exists
+      get_object( update_op.proposal );
+
+      for( const std::string& name : delta.active_approvals_to_add )
+         update_op.active_approvals_to_add.insert( get_account( name ).id );
+      for( const std::string& name : delta.active_approvals_to_remove )
+         update_op.active_approvals_to_remove.insert( get_account( name ).id );
+      for( const std::string& name : delta.owner_approvals_to_add )
+         update_op.owner_approvals_to_add.insert( get_account( name ).id );
+      for( const std::string& name : delta.owner_approvals_to_remove )
+         update_op.owner_approvals_to_remove.insert( get_account( name ).id );
+      for( const std::string& k : delta.key_approvals_to_add )
+         update_op.key_approvals_to_add.insert( public_key_type( k ) );
+      for( const std::string& k : delta.key_approvals_to_remove )
+         update_op.key_approvals_to_remove.insert( public_key_type( k ) );
+
+      signed_transaction tx;
+      tx.operations.push_back(update_op);
+      set_operation_fees(tx, get_global_properties().parameters.get_current_fees());
+      tx.validate();
+      return sign_transaction(tx, broadcast);
+   }
 
 }}} // namespace graphene::wallet::detail
