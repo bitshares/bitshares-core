@@ -25,12 +25,7 @@
 
 #include <fc/thread/mutex.hpp>
 
-#include <graphene/protocol/address.hpp>
-#include <graphene/app/api_objects.hpp>
 #include <graphene/app/api.hpp>
-#include <graphene/chain/operation_history_object.hpp>
-#include <graphene/utilities/key_conversion.hpp>
-#include <graphene/utilities/git_revision.hpp>
 
 #include "api_documentation.hpp"
 #include "wallet_structs.hpp"
@@ -42,19 +37,6 @@ typedef uint16_t transaction_handle_type;
 class wallet_api;
 
 namespace detail {
-
-using std::ostream;
-using std::stringstream;
-using std::to_string;
-using std::setprecision;
-using std::fixed;
-using std::ios;
-using std::setiosflags;
-using std::setw;
-using std::endl;
-using std::string;
-
-using boost::container::flat_map;
 
 using namespace graphene::protocol;
 using namespace graphene::chain;

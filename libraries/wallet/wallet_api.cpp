@@ -6,6 +6,7 @@
 
 #include <graphene/wallet/wallet.hpp>
 #include <graphene/wallet/wallet_api_impl.hpp>
+#include <graphene/utilities/git_revision.hpp>
 
 // explicit instantiation for later use
 namespace fc {

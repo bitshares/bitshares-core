@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 #include <graphene/wallet/wallet_api_impl.hpp>
+#include <graphene/utilities/key_conversion.hpp>
 
 /****
  * Methods to handle voting / workers / committee
