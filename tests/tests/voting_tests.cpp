@@ -578,4 +578,84 @@ BOOST_AUTO_TEST_CASE(last_voting_date_proxy)
    } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE(account_update_votes_operation)
+{
+   try
+   {
+      ACTORS((alice)(proxycommittee)(proxywitness)(proxyworker));
+
+      transfer(committee_account, alice_id, asset(100));
+      transfer(committee_account, proxycommittee_id, asset(200));
+      transfer(committee_account, proxywitness_id, asset(300));
+      transfer(committee_account, proxyworker_id, asset(300));
+
+      generate_block();
+
+      // a few votable witnesses
+      auto witness1 = witness_id_type(1)(db);
+      auto witness2 = witness_id_type(2)(db);
+      auto witness3 = witness_id_type(3)(db);
+
+      auto alice_object = alice_id(db);
+
+      // add votes
+      {
+         flat_set<vote_id_type> add;
+         add.insert(witness1.vote_id);
+         add.insert(witness2.vote_id);
+         add.insert(witness3.vote_id);
+
+         graphene::chain::account_update_votes_operation op;
+         op.account = alice_id;
+         op.committee_voting_account = proxycommittee_id;
+         op.witness_voting_account = proxywitness_id;
+         op.worker_voting_account = proxyworker_id;
+         op.num_committee = 15;
+         op.num_witness = 10;
+         op.votes_to_add = add;
+         trx.operations.push_back(op);
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx, ~0);
+      }
+
+      generate_block();
+      alice_object = alice_id(db);
+
+      BOOST_CHECK_EQUAL(alice_object.options.extensions.value.committee_voting_account->instance.value,
+            proxycommittee_id.instance.value);
+      BOOST_CHECK_EQUAL(alice_object.options.extensions.value.witness_voting_account->instance.value,
+            proxywitness_id.instance.value);
+      BOOST_CHECK_EQUAL(alice_object.options.extensions.value.worker_voting_account->instance.value,
+            proxyworker_id.instance.value);
+
+      BOOST_CHECK_EQUAL(alice_object.options.voting_account.instance.value, 6);
+
+      BOOST_CHECK_EQUAL(alice_object.options.votes.size(), 7); // 4 votes are already added by default
+
+      trx.clear();
+      set_expiration( db, trx );
+
+      // remove votes
+      {
+         flat_set<vote_id_type> remove;
+         remove.insert(witness2.vote_id);
+
+         graphene::chain::account_update_votes_operation op;
+         op.account = alice_id;
+         op.votes_to_remove = remove;
+         trx.operations.push_back(op);
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx, ~0);
+      }
+
+      generate_block();
+
+      alice_object = alice_id(db);
+
+      BOOST_CHECK_EQUAL(alice_object.options.voting_account.instance.value, 6);
+      BOOST_CHECK_EQUAL(alice_object.options.votes.size(), 6);
+
+   } FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_SUITE_END()
