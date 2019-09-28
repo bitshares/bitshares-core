@@ -589,7 +589,8 @@ BOOST_AUTO_TEST_CASE(account_update_votes_operation)
       transfer(committee_account, proxywitness_id, asset(300));
       transfer(committee_account, proxyworker_id, asset(300));
 
-      generate_block();
+      generate_blocks(HARDFORK_BSIP_47_TIME);
+      set_expiration( db, trx );
 
       // a few votable witnesses
       auto witness1 = witness_id_type(1)(db);
@@ -597,6 +598,7 @@ BOOST_AUTO_TEST_CASE(account_update_votes_operation)
       auto witness3 = witness_id_type(3)(db);
 
       auto alice_object = alice_id(db);
+      BOOST_CHECK_EQUAL(alice_object.options.votes.size(), 4); // 4 votes added by default
 
       // add votes
       {
@@ -630,7 +632,7 @@ BOOST_AUTO_TEST_CASE(account_update_votes_operation)
 
       BOOST_CHECK_EQUAL(alice_object.options.voting_account.instance.value, 6);
 
-      BOOST_CHECK_EQUAL(alice_object.options.votes.size(), 7); // 4 votes are already added by default
+      BOOST_CHECK_EQUAL(alice_object.options.votes.size(), 7); // 3 added by us
 
       trx.clear();
       set_expiration( db, trx );
@@ -653,7 +655,7 @@ BOOST_AUTO_TEST_CASE(account_update_votes_operation)
       alice_object = alice_id(db);
 
       BOOST_CHECK_EQUAL(alice_object.options.voting_account.instance.value, 6);
-      BOOST_CHECK_EQUAL(alice_object.options.votes.size(), 6);
+      BOOST_CHECK_EQUAL(alice_object.options.votes.size(), 6); // 1 gone
 
    } FC_LOG_AND_RETHROW()
 }

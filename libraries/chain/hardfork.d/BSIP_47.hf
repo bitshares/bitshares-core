@@ -1,0 +1,4 @@
+// BSIP47 - Vote Proxies for Different Referendum Categories and explicit voting operation
+#ifndef HARDFORK_BSIP_47_TIME
+#define HARDFORK_BSIP_47_TIME (fc::time_point_sec( 1600000000 ) ) // Sep 2020
+#endif

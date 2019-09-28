@@ -448,8 +448,8 @@ void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator:
 void_result account_update_votes_evaluator::do_evaluate(const account_update_votes_operation& o)
 { try {
    database& d = db();
+   FC_ASSERT(d.head_block_time() >= HARDFORK_BSIP_47_TIME, "Not allowed until BSIP47 HARDFORK"); // can be removed after HF date pass
    account = &o.account(d);
-
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
