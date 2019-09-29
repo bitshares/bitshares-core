@@ -200,6 +200,68 @@ BOOST_AUTO_TEST_CASE( update_account )
    }
 }
 
+BOOST_AUTO_TEST_CASE( reward_split_test )
+{ try {
+   //const asset_dynamic_data_object& core_dd = get_core_dynamic_data();
+   //generate_block();
+   vector<witness_id_type> wids;
+   wids.reserve(79);
+   for( int i = 0; i < 100; ++i )
+   {
+      uint32_t skip = database::skip_witness_signature
+                 | database::skip_transaction_signatures
+                 | database::skip_transaction_dupe_check
+                 | database::skip_block_size_check
+                 | database::skip_tapos_check
+                 | database::skip_merkle_check
+                 ;       
+      auto name = "shills" + fc::to_string(i);
+      fc::ecc::private_key private_key = generate_private_key(name);
+      graphene::chain::public_key_type public_key = private_key.get_public_key();
+      const auto account = create_account(name, public_key);
+      //graphene::chain::account_id_type a_id = account.id; (void)a_id;
+      upgrade_to_lifetime_member(account);
+      // create witness
+      witness_object wo = create_witness(account, private_key, skip);
+      witness_id_type id = wo.id;
+      wo.total_votes = 2;
+      if(i>21){
+         wo.total_votes = 1;
+         wids.push_back(id);
+      }
+   }
+ 
+   const global_property_object& gpo = db.get_global_properties();
+
+   db.modify( gpo, [&wids]( global_property_object& gp )
+   {
+      gp.parameters.witness_pay_per_block = 50;
+      gp.standby_witnesses.clear();
+      gp.standby_witnesses.reserve(wids.size());
+      auto first = wids.begin();
+      auto last = wids.begin() + wids.size() - 1;
+      std::copy(first, last, gp.standby_witnesses.begin());
+      
+      /*for(int i = 0; i < wids.size(); i++){
+         gp.standby_witnesses[i] = wids[i];
+      }*/
+   
+      //gp.standby_witnesses = wids;
+     /* gp.standby_witnesses.clear();
+      gp.standby_witnesses.reserve(wids.size());
+      std::transform(wids.begin(), wids.end(),
+                     std::inserter(gp.standby_witnesses, gp.standby_witnesses.end()),
+                     [](const witness_object& w) {
+         return w.id;
+      });*/
+   });
+  
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   //BOOST_CHECK_EQUAL(, 4096u);
+} FC_LOG_AND_RETHROW() }
+
+
+
 BOOST_AUTO_TEST_CASE( transfer_core_asset )
 {
    try {
