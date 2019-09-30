@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <graphene/wallet/wallet_api_impl.hpp>
+#include "wallet_api_impl.hpp"
 #include <graphene/wallet/wallet.hpp>
 
 /***

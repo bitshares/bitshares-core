@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 #include <fc/io/sstream.hpp>
-#include <graphene/wallet/wallet_api_impl.hpp>
-#include <graphene/wallet/operation_printer.hpp>
+#include "wallet_api_impl.hpp"
+#include "operation_printer.hpp"
 
 namespace graphene { namespace wallet { namespace detail {
 

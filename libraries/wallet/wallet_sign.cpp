@@ -30,7 +30,7 @@
 #include <fc/thread/scoped_lock.hpp>
 #include <fc/io/fstream.hpp>
 
-#include <graphene/wallet/wallet_api_impl.hpp>
+#include "wallet_api_impl.hpp"
 #include <graphene/wallet/wallet.hpp>
 #include <graphene/protocol/pts_address.hpp>
 

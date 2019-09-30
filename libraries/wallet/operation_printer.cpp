@@ -21,9 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <graphene/wallet/operation_printer.hpp>
+#include "operation_printer.hpp"
 #include <graphene/protocol/base.hpp>
-#include <graphene/wallet/wallet_api_impl.hpp>
+#include "wallet_api_impl.hpp"
 #include <graphene/utilities/key_conversion.hpp>
 
 namespace graphene { namespace wallet { namespace detail {

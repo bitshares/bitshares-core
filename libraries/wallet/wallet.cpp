@@ -72,11 +72,10 @@
 #include <graphene/utilities/words.hpp>
 #include <graphene/wallet/wallet.hpp>
 #include <graphene/wallet/api_documentation.hpp>
-#include <graphene/wallet/wallet_api_impl.hpp>
+#include "wallet_api_impl.hpp"
 #include <graphene/debug_witness/debug_api.hpp>
 
-#include <graphene/wallet/wallet_api_impl.hpp>
-#include <graphene/wallet/operation_printer.hpp>
+#include "operation_printer.hpp"
 #include <graphene/wallet/reflect_util.hpp>
 
 #define BRAIN_KEY_WORD_COUNT 16

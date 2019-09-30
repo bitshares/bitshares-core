@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <graphene/wallet/wallet_api_impl.hpp>
+#include "wallet_api_impl.hpp"
 #include <graphene/utilities/key_conversion.hpp>
 
 /****
@@ -29,6 +29,14 @@
  */
 
 namespace graphene { namespace wallet { namespace detail {
+
+   template<typename WorkerInit>
+   static WorkerInit _create_worker_initializer( const variant& worker_settings )
+   {
+      WorkerInit result;
+      from_variant( worker_settings, result, GRAPHENE_MAX_NESTED_OBJECTS );
+      return result;
+   }
    
    signed_transaction wallet_api_impl::update_worker_votes(
       string account,

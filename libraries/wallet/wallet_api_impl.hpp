@@ -27,13 +27,12 @@
 
 #include <graphene/app/api.hpp>
 
-#include "api_documentation.hpp"
-#include "wallet_structs.hpp"
-#include "reflect_util.hpp"
+#include <graphene/wallet/api_documentation.hpp>
+#include <graphene/wallet/wallet_structs.hpp>
+#include <graphene/wallet/reflect_util.hpp>
 
 namespace graphene { namespace wallet { 
 
-typedef uint16_t transaction_handle_type;
 class wallet_api;
 
 namespace detail {
@@ -138,11 +137,7 @@ public:
     * @param tx the transaction
     * @param s the fee schedule
     */
-   void set_operation_fees( signed_transaction& tx, const fee_schedule& s  )
-   {
-      for( auto& op : tx.operations )
-         s.set_fee(op);
-   }
+   void set_operation_fees( signed_transaction& tx, const fee_schedule& s  );
 
    /***
     * @brief return basic info about the chain
@@ -294,14 +289,6 @@ public:
    signed_transaction update_witness(string witness_name, string url, string block_signing_key,
          bool broadcast );
 
-   template<typename WorkerInit>
-   static WorkerInit _create_worker_initializer( const variant& worker_settings )
-   {
-      WorkerInit result;
-      from_variant( worker_settings, result, GRAPHENE_MAX_NESTED_OBJECTS );
-      return result;
-   }
-
    signed_transaction create_worker( string owner_account, time_point_sec work_begin_date,
          time_point_sec work_end_date, share_type daily_pay, string name, string url,
          variant worker_settings, bool broadcast );
@@ -408,13 +395,7 @@ public:
 
    void flood_network(string prefix, uint32_t number_of_transactions);
 
-   operation get_prototype_operation( string operation_name )
-   {
-      auto it = _prototype_ops.find( operation_name );
-      if( it == _prototype_ops.end() )
-         FC_THROW("Unsupported operation: \"${operation_name}\"", ("operation_name", operation_name));
-      return it->second;
-   }
+   operation get_prototype_operation( string operation_name );
 
    string                  _wallet_filename;
    wallet_data             _wallet;
@@ -459,16 +440,7 @@ private:
    fc::mutex _resync_mutex;
    void resync();
 
-   void init_prototype_ops()
-   {
-      operation op;
-      for( int t=0; t<op.count(); t++ )
-      {
-         op.set_which( t );
-         op.visit( op_prototype_visitor(t, _prototype_ops) );
-      }
-      return;
-   }
+   void init_prototype_ops();
 
    map<transaction_handle_type, signed_transaction> _builder_transactions;
 

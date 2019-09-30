@@ -28,7 +28,7 @@
 #include <fc/git_revision.hpp>
 
 #include <graphene/wallet/wallet.hpp>
-#include <graphene/wallet/wallet_api_impl.hpp>
+#include "wallet_api_impl.hpp"
 #include <graphene/utilities/git_revision.hpp>
 
 // explicit instantiation for later use
@@ -156,19 +156,6 @@ namespace graphene { namespace wallet { namespace detail {
       throw fc::canceled_exception();
    }
 
-   pair<transaction_id_type,signed_transaction> wallet_api_impl::broadcast_transaction(signed_transaction tx)
-   {
-       try {
-           _remote_net_broadcast->broadcast_transaction(tx);
-       }
-       catch (const fc::exception& e) {
-           elog("Caught exception while broadcasting tx ${id}:  ${e}",
-                ("id", tx.id().str())("e", e.to_detail_string()));
-           throw;
-       }
-       return std::make_pair(tx.id(),tx);
-   }   
-
    chain_property_object wallet_api_impl::get_chain_properties() const
    {
       return _remote_db->get_chain_properties();
@@ -185,6 +172,62 @@ namespace graphene { namespace wallet { namespace detail {
    void wallet_api_impl::on_block_applied( const variant& block_id )
    {
       fc::async([this]{resync();}, "Resync after block");
+   }
+
+   void wallet_api_impl::set_operation_fees( signed_transaction& tx, const fee_schedule& s  )
+   {
+      for( auto& op : tx.operations )
+         s.set_fee(op);
+   }
+
+   operation wallet_api_impl::get_prototype_operation( string operation_name )
+   {
+      auto it = _prototype_ops.find( operation_name );
+      if( it == _prototype_ops.end() )
+         FC_THROW("Unsupported operation: \"${operation_name}\"", ("operation_name", operation_name));
+      return it->second;
+   }
+
+   void wallet_api_impl::init_prototype_ops()
+   {
+      operation op;
+      for( int t=0; t<op.count(); t++ )
+      {
+         op.set_which( t );
+         op.visit( op_prototype_visitor(t, _prototype_ops) );
+      }
+      return;
+   }
+
+   int wallet_api_impl::find_first_unused_derived_key_index(const fc::ecc::private_key& parent_key)
+   {
+      int first_unused_index = 0;
+      int number_of_consecutive_unused_keys = 0;
+      for (int key_index = 0; ; ++key_index)
+      {
+         fc::ecc::private_key derived_private_key = derive_private_key(key_to_wif(parent_key), key_index);
+         graphene::chain::public_key_type derived_public_key = derived_private_key.get_public_key();
+         if( _keys.find(derived_public_key) == _keys.end() )
+         {
+            if (number_of_consecutive_unused_keys)
+            {
+               ++number_of_consecutive_unused_keys;
+               if (number_of_consecutive_unused_keys > 5)
+                  return first_unused_index;
+            }
+            else
+            {
+               first_unused_index = key_index;
+               number_of_consecutive_unused_keys = 1;
+            }
+         }
+         else
+         {
+            // key_index is used
+            first_unused_index = 0;
+            number_of_consecutive_unused_keys = 0;
+         }
+      }
    }
 
 }}} // namespace graphene::wallet::detail

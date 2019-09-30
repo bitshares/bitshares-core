@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <graphene/wallet/wallet_api_impl.hpp>
+#include "wallet_api_impl.hpp"
 #include <graphene/wallet/wallet.hpp>
 
 namespace graphene { namespace wallet { namespace detail {
@@ -32,37 +32,6 @@ namespace graphene { namespace wallet { namespace detail {
                                + "." + fc::to_string(id.type_id)
                                + "." + fc::to_string(id.instance.value);
       return account_id;
-   }
-
-   int wallet_api_impl::find_first_unused_derived_key_index(const fc::ecc::private_key& parent_key)
-   {
-      int first_unused_index = 0;
-      int number_of_consecutive_unused_keys = 0;
-      for (int key_index = 0; ; ++key_index)
-      {
-         fc::ecc::private_key derived_private_key = derive_private_key(key_to_wif(parent_key), key_index);
-         graphene::chain::public_key_type derived_public_key = derived_private_key.get_public_key();
-         if( _keys.find(derived_public_key) == _keys.end() )
-         {
-            if (number_of_consecutive_unused_keys)
-            {
-               ++number_of_consecutive_unused_keys;
-               if (number_of_consecutive_unused_keys > 5)
-                  return first_unused_index;
-            }
-            else
-            {
-               first_unused_index = key_index;
-               number_of_consecutive_unused_keys = 1;
-            }
-         }
-         else
-         {
-            // key_index is used
-            first_unused_index = 0;
-            number_of_consecutive_unused_keys = 0;
-         }
-      }
    }
 
    signed_transaction wallet_api_impl::register_account(string name, public_key_type owner,
@@ -332,30 +301,5 @@ namespace graphene { namespace wallet { namespace detail {
       return result;
    } FC_CAPTURE_AND_RETHROW( (account_name) )
    }
-
-   signed_transaction wallet_api_impl::bid_collateral(string bidder_name, string debt_amount, string debt_symbol,
-         string additional_collateral, bool broadcast )
-   { try {
-      optional<asset_object> debt_asset = find_asset(debt_symbol);
-      if (!debt_asset)
-        FC_THROW("No asset with that symbol exists!");
-
-      FC_ASSERT(debt_asset->bitasset_data_id.valid(), "Not a bitasset, bidding not possible.");
-      const asset_object& collateral =
-            get_asset(get_object(*debt_asset->bitasset_data_id).options.short_backing_asset);
-
-      bid_collateral_operation op;
-      op.bidder = get_account_id(bidder_name);
-      op.debt_covered = debt_asset->amount_from_string(debt_amount);
-      op.additional_collateral = collateral.amount_from_string(additional_collateral);
-
-      signed_transaction tx;
-      tx.operations.push_back( op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
-      tx.validate();
-
-      return sign_transaction( tx, broadcast );
-   } FC_CAPTURE_AND_RETHROW( (bidder_name)(debt_amount)(debt_symbol)(additional_collateral)(broadcast) ) }
-
 
 }}} // namespace graphene::wallet::detail
