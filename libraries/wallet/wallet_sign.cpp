@@ -21,23 +21,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <boost/range/adaptors.hpp>
-#include <boost/range/algorithm_ext/erase.hpp>
-#include <boost/range/algorithm/unique.hpp>
-#include <boost/range/algorithm/sort.hpp>
 
 #include <fc/crypto/aes.hpp>
-#include <fc/thread/scoped_lock.hpp>
-#include <fc/io/fstream.hpp>
 
 #include "wallet_api_impl.hpp"
 #include <graphene/wallet/wallet.hpp>
-#include <graphene/protocol/pts_address.hpp>
-
-#ifndef WIN32
-# include <sys/types.h>
-# include <sys/stat.h>
-#endif
 
 /***
  * These methods handle signing and keys

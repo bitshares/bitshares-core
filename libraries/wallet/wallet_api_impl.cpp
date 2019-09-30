@@ -22,14 +22,22 @@
  * THE SOFTWARE.
  */
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/range/adaptors.hpp>
 
 #include <fc/rpc/api_connection.hpp>
 #include <fc/popcount.hpp>
 #include <fc/git_revision.hpp>
+#include <fc/thread/scoped_lock.hpp>
+#include <fc/io/fstream.hpp>
 
 #include <graphene/wallet/wallet.hpp>
 #include "wallet_api_impl.hpp"
 #include <graphene/utilities/git_revision.hpp>
+
+#ifndef WIN32
+# include <sys/types.h>
+# include <sys/stat.h>
+#endif
 
 // explicit instantiation for later use
 namespace fc {
@@ -404,71 +412,6 @@ namespace graphene { namespace wallet { namespace detail {
       return true;
    }
 
-   void wallet_api_impl::save_wallet_file(string wallet_filename)
-   {
-      //
-      // Serialize in memory, then save to disk
-      //
-      // This approach lessens the risk of a partially written wallet
-      // if exceptions are thrown in serialization
-      //
-
-      encrypt_keys();
-
-      if( wallet_filename == "" )
-         wallet_filename = _wallet_filename;
-
-      wlog( "saving wallet to file ${fn}", ("fn", wallet_filename) );
-
-      string data = fc::json::to_pretty_string( _wallet );
-
-      try
-      {
-         enable_umask_protection();
-         //
-         // Parentheses on the following declaration fails to compile,
-         // due to the Most Vexing Parse.  Thanks, C++
-         //
-         // http://en.wikipedia.org/wiki/Most_vexing_parse
-         //
-         std::string tmp_wallet_filename = wallet_filename + ".tmp";
-         fc::ofstream outfile{ fc::path( tmp_wallet_filename ) };
-         outfile.write( data.c_str(), data.length() );
-         outfile.flush();
-         outfile.close();
-
-         wlog( "saved successfully wallet to tmp file ${fn}", ("fn", tmp_wallet_filename) );
-
-         std::string wallet_file_content;
-         fc::read_file_contents(tmp_wallet_filename, wallet_file_content);
-
-         if (wallet_file_content == data) {
-            wlog( "validated successfully tmp wallet file ${fn}", ("fn", tmp_wallet_filename) );
-
-            fc::rename( tmp_wallet_filename, wallet_filename );
-
-            wlog( "renamed successfully tmp wallet file ${fn}", ("fn", tmp_wallet_filename) );
-         }
-         else
-         {
-            FC_THROW("tmp wallet file cannot be validated ${fn}", ("fn", tmp_wallet_filename) );
-         }
-
-         wlog( "successfully saved wallet to file ${fn}", ("fn", wallet_filename) );
-
-         disable_umask_protection();
-      }
-      catch(...)
-      {
-         string ws_password = _wallet.ws_password;
-         _wallet.ws_password = "";
-         wlog("wallet file content is next: ${data}", ("data", fc::json::to_pretty_string( _wallet ) ) );
-         _wallet.ws_password = ws_password;
-
-         disable_umask_protection();
-         throw;
-      }
-   }
    void wallet_api_impl::save_wallet_file(string wallet_filename)
    {
       //

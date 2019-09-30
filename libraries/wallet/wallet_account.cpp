@@ -21,8 +21,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <boost/range/algorithm_ext/erase.hpp>
+#include <boost/range/algorithm/unique.hpp>
+#include <boost/range/algorithm/sort.hpp>
+
 #include "wallet_api_impl.hpp"
 #include <graphene/wallet/wallet.hpp>
+#include <graphene/protocol/pts_address.hpp>
 
 /****
  * Wallet API methods to handle accounts
