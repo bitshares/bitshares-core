@@ -1003,6 +1003,10 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     if( !mia.is_market_issued() ) return false;
 
     const asset_bitasset_data_object& bitasset = ( bitasset_ptr ? *bitasset_ptr : mia.bitasset_data(*this) );
+    
+    // previously, price feeds could cause black swan in prediction market
+    if ( maint_time >= HARDFORK_CORE_460_TIME && bitasset.is_prediction_market )
+       return false;
 
     if( check_for_blackswan( mia, enable_black_swan, &bitasset ) )
        return false;

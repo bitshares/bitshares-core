@@ -840,6 +840,70 @@ BOOST_AUTO_TEST_CASE( prediction_market_resolves_to_0 )
    }
 }
 
+/***
+ * Prediction markets should not suffer a black swan (Issue #460)
+ */
+BOOST_AUTO_TEST_CASE( prediction_market_black_swan )
+{ 
+   try {
+      ACTORS((judge)(dan)(nathan));
+
+      // progress to recent hardfork
+      generate_blocks( HARDFORK_CORE_1270_TIME );
+      set_expiration( db, trx );
+
+      const auto& pmark = create_prediction_market("PMARK", judge_id);
+
+      int64_t init_balance(1000000);
+      transfer(committee_account, judge_id, asset(init_balance));
+      transfer(committee_account, dan_id, asset(init_balance));
+
+      update_feed_producers( pmark, { judge_id });
+      price_feed feed;
+      feed.settlement_price = asset( 1, pmark.id ) / asset( 1 );
+      publish_feed( pmark, judge, feed );
+
+      borrow( dan, pmark.amount(1000), asset(1000) );
+
+      // feed a price that will cause a black swan
+      feed.settlement_price = asset( 1, pmark.id ) / asset( 1000 );
+      publish_feed( pmark, judge, feed );
+
+      // verify a black swan happened
+      GRAPHENE_REQUIRE_THROW(borrow( dan, pmark.amount(1000), asset(1000) ), fc::exception);
+
+      // interestingly, PMARKII cannot be created without dan force_settling
+      force_settle( dan, pmark.amount(1000) );
+
+      // progress past hardfork
+      generate_blocks( HARDFORK_CORE_460_TIME );
+      set_expiration( db, trx );
+
+      // create another prediction market to test the hardfork
+      const auto& pmark2 = create_prediction_market("PMARKII", judge_id);
+      update_feed_producers( pmark2, { judge_id });
+      price_feed feed2;
+      feed2.settlement_price = asset( 1, pmark2.id ) / asset( 1 );
+      publish_feed( pmark2, judge, feed2 );
+
+      borrow( dan, pmark2.amount(1000), asset(1000) );
+
+      // feed a price that would have caused a black swan
+      feed2.settlement_price = asset( 1, pmark2.id ) / asset( 1000 );
+      publish_feed( pmark2, judge, feed2 );
+
+      // verify a black swan did not happen
+      borrow( dan, pmark2.amount(1000), asset(1000) );
+
+      generate_block(~database::skip_transaction_dupe_check);
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      generate_block();
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( create_account_test )
 {
    try {
