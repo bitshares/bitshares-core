@@ -874,7 +874,7 @@ BOOST_AUTO_TEST_CASE( prediction_market_black_swan )
       trx.clear();
 
       // progress past hardfork
-      generate_blocks( HARDFORK_CORE_460_TIME );
+      generate_blocks( HARDFORK_CORE_460_TIME + db.get_global_properties().parameters.maintenance_interval );
       set_expiration( db, trx );
 
       // create another prediction market to test the hardfork
