@@ -871,9 +871,7 @@ BOOST_AUTO_TEST_CASE( prediction_market_black_swan )
 
       // verify a black swan happened
       GRAPHENE_REQUIRE_THROW(borrow( dan, pmark.amount(1000), asset(1000) ), fc::exception);
-
-      // interestingly, PMARKII cannot be created without dan force_settling
-      force_settle( dan, pmark.amount(1000) );
+      trx.clear();
 
       // progress past hardfork
       generate_blocks( HARDFORK_CORE_460_TIME );
