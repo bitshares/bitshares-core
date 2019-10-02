@@ -116,4 +116,22 @@ namespace graphene { namespace wallet { namespace detail {
        return std::make_pair(tx.id(),tx);
    }   
 
+   void wallet_api_impl::use_network_node_api()
+   {
+      if( _remote_net_node )
+         return;
+      try
+      {
+         _remote_net_node = _remote_api->network_node();
+      }
+      catch( const fc::exception& e )
+      {
+         std::cerr << "\nCouldn't get network node API.  You probably are not configured\n"
+         "to access the network API on the witness_node you are\n"
+         "connecting to.  Please follow the instructions in README.md to set up an apiaccess file.\n"
+         "\n";
+         throw;
+      }
+   }
+
 }}} // namespace graphene::wallet::detail

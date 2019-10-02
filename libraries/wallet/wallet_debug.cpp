@@ -72,24 +72,6 @@ namespace graphene { namespace wallet { namespace detail {
       (*_remote_debug)->debug_stream_json_objects_flush();
    }
 
-   void wallet_api_impl::use_network_node_api()
-   {
-      if( _remote_net_node )
-         return;
-      try
-      {
-         _remote_net_node = _remote_api->network_node();
-      }
-      catch( const fc::exception& e )
-      {
-         std::cerr << "\nCouldn't get network node API.  You probably are not configured\n"
-         "to access the network API on the witness_node you are\n"
-         "connecting to.  Please follow the instructions in README.md to set up an apiaccess file.\n"
-         "\n";
-         throw;
-      }
-   }
-
    void wallet_api_impl::use_debug_api()
    {
       if( _remote_debug )
