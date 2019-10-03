@@ -326,16 +326,35 @@ BOOST_AUTO_TEST_CASE( inflation_test )
 
 BOOST_AUTO_TEST_CASE( witness_pay_test )
 { try {
-   const asset_object* core = &asset_id_type()(db);
-   BOOST_TEST_MESSAGE( printf("current_max_supply = %lu. current_supply = %lu, reserved = %lu", 
-   core->dynamic_data(db).current_max_supply.value, 
-   core->dynamic_data(db).current_supply.value, 
-   core->reserved(db).value) );
-   const share_type prec = asset::scaled_precision( asset_id_type()(db).precision );
+   auto schedule_maint = [&]()
+   {
+      // Do maintenance at next generated block
+      db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& _dpo )
+      {
+         _dpo.next_maintenance_time = db.head_block_time() + 1;
+      } );
+   };
 
+   db.modify( db.get_global_properties(), [&]( global_property_object& _gpo )
+   {
+      // Will exhaust the reserve.
+      _gpo.parameters.witness_pay_per_block = 1000;
+      _gpo.parameters.maintenance_interval = 100 * _gpo.parameters.block_interval;
+   } );
+
+   schedule_maint();
    // there is an immediate maintenance interval in the first block
    //   which will initialize last_budget_time
    generate_block();
+
+   const auto witness_ppb = db.get_global_properties().parameters.witness_pay_per_block.value;
+
+   const asset_object* core = &asset_id_type()(db);
+
+   const share_type prec = asset::scaled_precision( asset_id_type()(db).precision );
+
+   generate_block();
+
    BOOST_TEST_MESSAGE( printf("current_max_supply = %lu. current_supply = %lu, reserved = %lu", 
    core->dynamic_data(db).current_max_supply.value, 
    core->dynamic_data(db).current_supply.value, 
@@ -347,6 +366,8 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    transfer(account_id_type()(db), get_account("init3"), asset(20*prec));
    generate_block();
 
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0);
+
    auto last_witness_vbo_balance = [&]() -> share_type
    {
       const witness_object& wit = db.fetch_block_by_number(db.head_block_num())->witness(db);
@@ -356,6 +377,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    };
 
    const auto block_interval = db.get_global_properties().parameters.block_interval;
+
    //const asset_object* core = &asset_id_type()(db);
    const account_object* nathan = &get_account("nathan");
    enable_fees();
@@ -364,28 +386,12 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    // Charity takes anoth 10%
    BOOST_CHECK_EQUAL( db.current_fee_schedule().get<account_upgrade_operation>().membership_lifetime_fee *.6, 600000000u );
    BOOST_CHECK_GT(db.current_fee_schedule().get<account_upgrade_operation>().membership_lifetime_fee, 0);
-   // Based on the size of the reserve fund later in the test, the witness budget will be set to this value
-   const uint64_t ref_budget =
-      ((uint64_t( db.current_fee_schedule().get<account_upgrade_operation>().membership_lifetime_fee *.6 )
-         * GRAPHENE_CORE_ASSET_CYCLE_RATE * 30
-         * block_interval
-       ) + ((uint64_t(1) << GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS)-1)
-      ) >> GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS
-      ;
+   
+   // Actual budget should be = witness_pay_per_block * blocks_generated per interval
+   const uint64_t ref_budget = 100 * witness_ppb;
 
    // change this if ref_budget changes
-   BOOST_CHECK_EQUAL( ref_budget, 357u );
-   const uint64_t witness_ppb = ref_budget * 10 / 23 + 1;
-   // change this if ref_budget changes
-   BOOST_CHECK_EQUAL( witness_ppb, 156u );
-   // following two inequalities need to hold for maximal code coverage
-   BOOST_CHECK_LT( witness_ppb * 2, ref_budget );
-   BOOST_CHECK_GT( witness_ppb * 3, ref_budget );
-
-   db.modify( db.get_global_properties(), [&]( global_property_object& _gpo )
-   {
-      _gpo.parameters.witness_pay_per_block = witness_ppb;
-   } );
+   BOOST_CHECK_EQUAL( ref_budget, 100000u );
    
    BOOST_CHECK_EQUAL(core->dynamic_asset_data_id(db).accumulated_fees.value, 0);
    BOOST_TEST_MESSAGE( "Upgrading account" );
@@ -403,18 +409,12 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    BOOST_CHECK( get_balance(*nathan, *core) == 20000*prec - account_upgrade_operation::fee_parameters_type().membership_lifetime_fee );;
 
    generate_block();
+
    nathan = &get_account("nathan");
    core = &asset_id_type()(db);
    BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
 
-   auto schedule_maint = [&]()
-   {
-      // now we do maintenance
-      db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& _dpo )
-      {
-         _dpo.next_maintenance_time = db.head_block_time() + 1;
-      } );
-   };
    BOOST_TEST_MESSAGE( "Generating some blocks" );
 
    // generate 23 blocks
@@ -423,12 +423,16 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
       generate_block();
       BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
    }
+
    BOOST_CHECK_EQUAL( db.head_block_time().sec_since_epoch() - pay_fee_time, 24u * block_interval );
    schedule_maint();
-   // The 50% lifetime referral fee went to the committee account, which burned it. Check that it's here.
-   BOOST_CHECK( core->reserved(db).value == 5000*prec );
+
+   // The 40% lifetime referral fee went to the committee account, which burned it. Check that it's here.
+   auto reserve = core->reserved(db).value;
+   BOOST_CHECK_EQUAL( reserve, (4000*prec).value );
    generate_block();
-   BOOST_CHECK_EQUAL( core->reserved(db).value, 599999643 );
+
+   BOOST_CHECK_EQUAL( core->reserved(db).value, 499900000 );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, (int64_t)ref_budget );
    // first witness paid from old budget (so no pay)
    BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
@@ -442,14 +446,13 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, (int64_t)(ref_budget - 2 * witness_ppb) );
 
    generate_block();
-   BOOST_CHECK_LT( last_witness_vbo_balance().value, (int64_t)witness_ppb );
-   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)(ref_budget - 2 * witness_ppb) );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
+   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)witness_ppb );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, (int64_t)(ref_budget - 3 * witness_ppb) );
 
    generate_block();
-   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
-      BOOST_CHECK_EQUAL(core->reserved(db).value, 599999643 );
+   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)witness_ppb );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, (int64_t)(ref_budget - 4 * witness_ppb) );
+   BOOST_CHECK_EQUAL(core->reserved(db).value, 499900000 );
 
 } FC_LOG_AND_RETHROW() }
 
