@@ -918,6 +918,41 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
    }
 } FC_LOG_AND_RETHROW() }
 
+BOOST_FIXTURE_TEST_CASE( proposal_delete_multisig, database_fixture )
+{
+   try
+   {
+      ACTORS( (alice) (bob) );
+      // create a new multisig account
+      graphene::wallet::brain_key_info bki1 = con.wallet_api_ptr->suggest_brain_key();
+      graphene::wallet::brain_key_info bki2 = con.wallet_api_ptr->suggest_brain_key();
+      graphene::wallet::brain_key_info bki3 = con.wallet_api_ptr->suggest_brain_key();
+      graphene::wallet::brain_key_info bki4 = con.wallet_api_ptr->suggest_brain_key();
+      BOOST_CHECK(!bki1.brain_priv_key.empty());
+      BOOST_CHECK(!bki2.brain_priv_key.empty());
+      BOOST_CHECK(!bki3.brain_priv_key.empty());
+      BOOST_CHECK(!bki4.brain_priv_key.empty());
+
+      signed_transaction create_multisig_acct_tx;
+      account_create_operation account_create_op;
+
+      account_create_op.referrer = nathan_acct_after_upgrade.id;
+      account_create_op.referrer_percent = nathan_acct_after_upgrade.referrer_rewards_percentage;
+      account_create_op.registrar = nathan_acct_after_upgrade.id;
+      account_create_op.name = "cifer.test";
+      account_create_op.owner = authority(1, bki1.pub_key, 1);
+      account_create_op.active = authority(2, bki2.pub_key, 1, bki3.pub_key, 1);
+      account_create_op.options.memo_key = bki4.pub_key;
+      account_create_op.fee = asset(1000000);  // should be enough for creating account
+
+      create_multisig_acct_tx.operations.push_back(account_create_op);
+      con.wallet_api_ptr->sign_transaction(create_multisig_acct_tx, true);
+   // create a proposal
+   // attempt to delete without the required signatures
+   // attempt to delete with the required signatures
+   } FC_LOG_AND_RETHROW() 
+}
+
 BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
 {
    try
