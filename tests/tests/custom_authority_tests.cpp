@@ -109,7 +109,7 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    BOOST_CHECK_EQUAL(restriction::restriction_count(restrictions), 1);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
                .rejection_path.size() == 2);
-   // Index 0 (the outer-most) rejection path refers to the first and only restriction
+   // Index 0 (the outer-most) rejection path refers to the first and only outer-most sub-restriction
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
                .rejection_path[0].get<size_t>() == 0);
    // Index 1 (the inner-most) rejection path refers to the first and only argument for an account ID of 1.2.12
@@ -233,13 +233,14 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    // The rejection path will reference portions of the restrictions
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
                .rejection_path.size() == 3);
-   // Index 0 (the outer-most) rejection path refers to the first and only restriction
+   // Index 0 (the outer-most) rejection path refers to the first and only outer-most sub-restriction
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
                .rejection_path[0].get<size_t>() == 0);
-   // Index 1 rejection path refers to the first and only argument of the restriction
+   // Index 1 rejection path refers to the first and only attribute of the restriction
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
                .rejection_path[1].get<size_t>() == 0);
-   // Index 2 (the inner-most) rejection path refers to the first and only argument
+   // Index 2 (the inner-most) rejection path refers to the expected rejection reason
+   // The rejection reason should be that the predicate was false
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
                .rejection_path[2].get<predicate_result::rejection_reason>() == predicate_result::predicate_was_false);
 
@@ -299,7 +300,7 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    // The rejection path will reference portions of the restrictions
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
                .rejection_path.size() == 2);
-   // Index 0 (the outer-most) rejection path refers to the first and only restriction
+   // Index 0 (the outer-most) rejection path refers to the first and only outer-most sub-restriction
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
                .rejection_path[0].get<size_t>() == 1);
    // Index 1 (the inner-most) rejection path refers to the first and only argument
@@ -342,7 +343,7 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    // Create an account update operation without any owner_special_authority extension
    //////
    account_update_operation update;
-   // The transfer operation should violate the restriction because it does not have an ext field
+   // The transfer operation should violate the restriction
    BOOST_CHECK_THROW(predicate(transfer), fc::assert_exception);
    // The update operation should satisfy the restriction
    BOOST_CHECK(predicate(update) == true);
@@ -357,9 +358,10 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    BOOST_CHECK_EQUAL(predicate(update).rejection_path.size(), 3);
    // Index 0 (the outer-most) rejection path refers to the first and only restriction
    BOOST_CHECK(predicate(update).rejection_path[0].get<size_t>() == 0);
-   // Index 1 rejection path refers to the first and only argument of the restriction
+   // Index 1 rejection path refers to the first and only attribute of the restriction
    BOOST_CHECK(predicate(update).rejection_path[1].get<size_t>() == 0);
-   // Index 2 (the inner-most) rejection path refers to the first and only argument
+   // Index 2 (the inner-most) rejection path refers to the expected rejection reason
+   // The rejection reason should be that the predicate was false
    BOOST_CHECK(predicate(update).rejection_path[2].get<predicate_result::rejection_reason>() ==
                predicate_result::predicate_was_false);
 
@@ -498,6 +500,7 @@ BOOST_AUTO_TEST_CASE(container_in_not_in_checks) { try {
          //////
          transfer_operation transfer_to_12 = transfer_operation();
          transfer_to_12.to = account_id_type(12);
+         BOOST_CHECK_EQUAL(predicate(transfer_to_12).success, true);
          BOOST_CHECK_EQUAL(predicate(transfer_to_12).rejection_path.size(), 0);
 
          //////
@@ -517,7 +520,7 @@ BOOST_AUTO_TEST_CASE(container_in_not_in_checks) { try {
          transfer_to_1.to = account_id_type(1);
          BOOST_CHECK(predicate(transfer_to_1) == false);
          BOOST_CHECK_EQUAL(predicate(transfer_to_1).rejection_path.size(), 2);
-         // Index 0 (the outer-most) rejection path refers to the first and only restriction
+         // Index 0 (the outer-most) rejection path refers to  and only outer-most sub-restriction
          BOOST_CHECK(predicate(transfer_to_1).rejection_path[0].get<size_t>() == 0);
          // Index 1 (the inner-most) rejection path refers to the first and only argument:
          // the vector of branches each of which are one level deep
@@ -695,8 +698,8 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
    //////
    // Bob attempts to transfer 100 CORE from Alice's account AGAIN
-   // This attempt should succeed because there are no limits to the transfer size nor quantity
-   // besides the available CORE in Alice's account
+   // This attempt should succeed because there are no limits to the quantity of transfers
+   // besides potentially depleting the CORE in Alice's account
    //////
    trx.expiration += 5;
    trx.clear_signatures();
@@ -838,7 +841,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
 
          //////
-         // Charlie attempts to transfer 100 CORE from Alice's account to Charlie
+         // Charlie attempts to transfer 100 CORE from Alice's account to Diana
          // This attempt should fail because Alice has not authorized Charlie to transfer to Diana
          //////
          trx.clear();
@@ -1044,7 +1047,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
          //////
-         // Alice authorizes Bob to place limit orders that offer the core asset for sale
+         // Alice authorizes Bob to place limit orders that offer the any asset for sale
          //////
          custom_authority_create_operation authorize_limit_orders;
          authorize_limit_orders.account = alice.get_id();
