@@ -22,6 +22,14 @@
  * THE SOFTWARE.
  */
 
+/**
+ * Readers of these custom active authority (CAA) tests may benefit by reviewing
+ *
+ * - rejection_indicator variant in restriction_predicate.hpp
+ * - function_type enum in restriction.hpp
+ * - GRAPHENE_OP_RESTRICTION_ARGUMENTS_VARIADIC in restriction.hpp
+ */
+
 #include <string>
 #include <boost/test/unit_test.hpp>
 #include <fc/exception/exception.hpp>
@@ -519,6 +527,47 @@ BOOST_AUTO_TEST_CASE(container_in_not_in_checks) { try {
          transfer_operation transfer_to_1;
          transfer_to_1.to = account_id_type(1);
          BOOST_CHECK(predicate(transfer_to_1) == false);
+
+         // JSON-formatted Rejection path
+         //[ // A vector of predicate results
+         //  [
+         //    0, // Index 0 (the outer-most) rejection path
+         //    0  // The first and only outer-most sub-restriction
+         //  ],
+         //  [
+         //    1,  // Index 1 (the inner-most) rejection path
+         //    [  // A vector of predicate results
+         //      {
+         //        "success": false,
+         //        "rejection_path": [
+         //          [
+         //            0, // Index 0 (the outer-most) rejection path
+         //            0  // Restriction 1 along this branch
+         //          ],
+         //          [
+         //            2, // Rejection reason
+         //            "predicate_was_false"
+         //          ]
+         //        ]
+         //      },
+         //      {
+         //        "success": false,
+         //        "rejection_path": [
+         //          [
+         //            0, // Index 0 (the outer-most) rejection path
+         //            0  // Restriction 1 along this branch
+         //          ],
+         //          [
+         //            2, // Rejection reason
+         //            "predicate_was_false"
+         //          ]
+         //        ]
+         //      }
+         //    ]
+         //  ]
+         //]
+
+         // C++ style check of the rejection path
          BOOST_CHECK_EQUAL(predicate(transfer_to_1).rejection_path.size(), 2);
          // Index 0 (the outer-most) rejection path refers to  and only outer-most sub-restriction
          BOOST_CHECK(predicate(transfer_to_1).rejection_path[0].get<size_t>() == 0);
@@ -839,6 +888,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          trx.operations = {bob_transfers_from_alice_to_diana};
          sign(trx, charlie_private_key);
          BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should indicate the rejection path
+         // {"success":false,"rejection_path":[[0,0],[2,"predicate_was_false"]]}
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
 
          //////
          // Charlie attempts to transfer 100 CORE from Alice's account to Diana
@@ -848,7 +900,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          trx.operations = {charlie_transfers_from_alice_to_diana};
          sign(trx, charlie_private_key);
          BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
-
+         // The failure should indicate the rejection path
+         // {"success":false,"rejection_path":[[0,0],[2,"predicate_was_false"]]}
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
 
 
          //////
@@ -936,7 +990,12 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          trx.operations = {bob_transfers_from_alice_to_diana};
          sign(trx, bob_private_key);
          BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
-
+         // The failure should indicate the rejection path for the first custom authority
+         // "rejected_custom_auths":[["1.17.0",[0,{"success":false,"rejection_path":[[0,0],[2,"predicate_was_false"]]}]]]
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         // Check for reference to the second CAA 1.17.0
+         // "rejected_custom_auths":[["1.17.0",[0,{"success":false,"rejection_path":[[0,0],[2,"predicate_was_false"]]}]]]
+         EXPECT_EXCEPTION_STRING("1.17.0", [&] {PUSH_TX(db, trx);});
 
 
          //////
@@ -962,7 +1021,13 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          trx.clear();
          trx.operations = {bob_transfers_from_alice_to_charlie};
          sign(trx, bob_private_key);
+         // General check of the exception
          BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // Check the rejection path
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         // Check for reference to the second CAA 1.17.1
+         // "rejected_custom_auths":[["1.17.1",[0,{"success":false,"rejection_path":[[0,0],[2,"predicate_was_false"]]}]]]
+         EXPECT_EXCEPTION_STRING("1.17.1", [&] {PUSH_TX(db, trx);});
 
          //////
          // Charlie attempts to transfer 100 CORE from Alice's account to Diana
@@ -981,6 +1046,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          trx.operations = {bob_transfers_from_alice_to_diana};
          sign(trx, bob_private_key);
          BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+         // "rejected_custom_auths":[]
+         EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
 
       } FC_LOG_AND_RETHROW()
    }
@@ -1044,6 +1112,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          trx.operations = {buy_order};
          sign(trx, bob_private_key);
          BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+         // "rejected_custom_auths":[]
+         EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
 
 
          //////
@@ -1118,6 +1189,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          trx.operations = {top};
          sign(trx, bob_private_key);
          BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+         // "rejected_custom_auths":[]
+         EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
 
 
          //////
@@ -1168,6 +1242,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          trx.operations = {buy_order};
          sign(trx, bob_private_key);
          BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+         // "rejected_custom_auths":[]
+         EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
 
       } FC_LOG_AND_RETHROW()
    }
@@ -1561,6 +1638,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          trx.operations = {top};
          sign(trx, some_private_key);
          BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+         // "rejected_custom_auths":[]
+         EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
 
 
          //////
@@ -1709,6 +1789,11 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          trx.operations = {top};
          sign(trx, some_private_key);
          BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should indicate the rejection path
+         // "rejection_path":[[0,0],[2,"predicate_was_false"]
+         // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for Restriction 1
+         // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
 
 
          //////
@@ -1725,6 +1810,12 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          trx.operations = {top};
          sign(trx, some_private_key);
          BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should indicate the rejection path
+         // "rejection_path":[[0,1],[0,0],[2,"predicate_was_false"]
+         // [0,1]: 0 is the rejection_indicator for an index to a sub-restriction; 1 is the index value for Restriction 2
+         // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for the only argument
+         // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,1],[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
 
 
          //////
