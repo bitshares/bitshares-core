@@ -547,7 +547,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    }
 
    const auto& idx = get_index_type<asset_index>().indices().get<by_symbol>();
-   auto it = idx.begin();
 
    // Save tallied supplies
    for( const auto& item : total_supplies )

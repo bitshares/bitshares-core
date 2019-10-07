@@ -98,7 +98,7 @@
 // ********** Fee split settings
 // The below settings define how the overall chain fees get split
 #define GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE               (10*GRAPHENE_1_PERCENT)
-#define GRAPHENE_DEFAULT_LIFETIME_REFERRER_PERCENT_OF_FEE     (30*GRAPHENE_1_PERCENT)
+#define GRAPHENE_DEFAULT_LIFETIME_REFERRER_PERCENT_OF_FEE     (10*GRAPHENE_1_PERCENT)
 #define GRAPHENE_DEFAULT_BURN_PERCENT_OF_FEE                  (20*GRAPHENE_1_PERCENT)
 
 // These two are not initially votable by the committee
