@@ -76,15 +76,11 @@ namespace graphene { namespace chain {
    /**
     * @ingroup operations
     * Used to update an existing limit order.
-    *
-    * Charges a higher fee if @ref delta_amount_to_sell is set, as this requires updating
-    * the account balance as well as the order object.
     */
    struct limit_order_update_operation : public base_operation
    {
        struct fee_parameters_type {
-           uint64_t price_fee = GRAPHENE_BLOCKCHAIN_PRECISION / 2;
-           uint64_t amount_fee = GRAPHENE_BLOCKCHAIN_PRECISION;
+           uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION / 2;
        };
 
        asset fee;
@@ -99,7 +95,7 @@ namespace graphene { namespace chain {
        account_id_type fee_payer() const { return seller; }
        void validate() const;
        share_type calculate_fee(const fee_parameters_type& k) const {
-           return delta_amount_to_sell? k.amount_fee : k.price_fee;
+           return k.fee;
        }
    };
 
@@ -248,7 +244,7 @@ namespace graphene { namespace chain {
 } } // graphene::chain
 
 FC_REFLECT( graphene::chain::limit_order_create_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::chain::limit_order_update_operation::fee_parameters_type, (price_fee)(amount_fee) )
+FC_REFLECT( graphene::chain::limit_order_update_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::limit_order_cancel_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::call_order_update_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::bid_collateral_operation::fee_parameters_type, (fee) )
