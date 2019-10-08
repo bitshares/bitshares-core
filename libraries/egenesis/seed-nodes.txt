@@ -6,9 +6,5 @@
 "bts-seed1.abit-more.com:62015",     // abit         (China)
 "node.blckchnd.com:4243",            // blckchnd     (Germany)
 "seed.roelandp.nl:1776",             // roelandp     (Canada)
-"seed04.bts-nodes.net:1776",         // Thom         (Australia)
-"seed05.bts-nodes.net:1776",         // Thom         (USA)
-"seed06.bts-nodes.net:1776",         // Thom         (USA)
-"seed07.bts-nodes.net:1776",         // Thom         (Singapore)
 "seed.bts.bangzi.info:55501",        // Bangzi       (Germany)
-"seeds.bitshares.eu:1776",           // pc           (http://seeds.quisquis.de/bitshares.html)
+"seeds.bitshares.eu:1776",           // pc
