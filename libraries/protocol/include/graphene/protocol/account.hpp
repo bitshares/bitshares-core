@@ -33,9 +33,9 @@
 namespace graphene { namespace protocol {
    struct additional_account_options
    {
-      optional<account_id_type> committee_voting_account;
-      optional<account_id_type> witness_voting_account;
-      optional<account_id_type> worker_voting_account;
+      optional<account_id_type> committee_voting_account = GRAPHENE_PROXY_TO_SELF_ACCOUNT;
+      optional<account_id_type> witness_voting_account = GRAPHENE_PROXY_TO_SELF_ACCOUNT;
+      optional<account_id_type> worker_voting_account = GRAPHENE_PROXY_TO_SELF_ACCOUNT;
    };
    typedef extension<additional_account_options> additional_account_options_t;
 

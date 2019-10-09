@@ -1184,8 +1184,8 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
             // If the stake account has specified a voting_account, that account is the one specifying the opinions.
             // If the stake account has specified a committee_voting_account, witness_voting_account or
             // worker_voting_account, those will be the accounts voting for the corresponding referendum category.
-            // A user specifying 1 or 2 category voting accounts will not be voting for any referendum in the categories
-            // not specified.
+            // A user specifying 1 or 2 category voting accounts will delegate opinion only for specified referendums
+            // while can express own opinions in the others.
 
             const auto& dgpo = d.get_dynamic_global_properties();
             const auto& opinion_account = (stake_account.options.voting_account == GRAPHENE_PROXY_TO_SELF_ACCOUNT) ?
@@ -1199,15 +1199,18 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
                   stake_account.options.voting_account == GRAPHENE_PROXY_PER_CATEGORY_ACCOUNT) {
                const auto& extensions = stake_account.options.extensions.value;
                if (extensions.committee_voting_account.valid()) {
-                  auto committee_voting_account = d.get(*extensions.committee_voting_account);
+                  auto committee_voting_account = *extensions.committee_voting_account == GRAPHENE_PROXY_TO_SELF_ACCOUNT ?
+                        stake_account : d.get(*extensions.committee_voting_account);
                   fill_buffer(committee_voting_account.options.votes, voting_stake, vote_id_type::committee);
                }
                if (extensions.witness_voting_account.valid()) {
-                  auto witness_voting_account = d.get(*extensions.witness_voting_account);
+                  auto witness_voting_account = *extensions.witness_voting_account == GRAPHENE_PROXY_TO_SELF_ACCOUNT ?
+                        stake_account : d.get(*extensions.witness_voting_account);
                   fill_buffer(witness_voting_account.options.votes, voting_stake, vote_id_type::witness);
                }
                if (extensions.worker_voting_account.valid()) {
-                  auto worker_voting_account = d.get(*extensions.worker_voting_account);
+                  auto worker_voting_account = *extensions.worker_voting_account == GRAPHENE_PROXY_TO_SELF_ACCOUNT ?
+                        stake_account : d.get(*extensions.worker_voting_account);
                   fill_buffer(worker_voting_account.options.votes, voting_stake, vote_id_type::worker);
                }
             }

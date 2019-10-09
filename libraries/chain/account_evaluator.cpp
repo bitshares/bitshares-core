@@ -473,25 +473,22 @@ void_result account_update_votes_evaluator::do_apply(const account_update_votes_
       if(o.committee_voting_account.valid())
          a.options.extensions.value.committee_voting_account = *o.committee_voting_account;
 
-      if(a.options.voting_account == GRAPHENE_PROXY_TO_SELF_ACCOUNT)
-      {
-         if(o.num_witness.valid())
-            a.options.num_witness = std::min(*o.num_witness, chain_parameters.maximum_witness_count);
-         if(o.num_committee.valid())
-            a.options.num_committee = std::min(*o.num_committee, chain_parameters.maximum_committee_count);
+      if(o.num_witness.valid())
+         a.options.num_witness = std::min(*o.num_witness, chain_parameters.maximum_witness_count);
+      if(o.num_committee.valid())
+         a.options.num_committee = std::min(*o.num_committee, chain_parameters.maximum_committee_count);
 
-         auto current_votes = a.options.votes;
-         if(o.votes_to_add.valid()) {
-            for(auto const& add: *o.votes_to_add) {
-               current_votes.insert(add);
-               a.options.votes = current_votes;
-            }
+      auto current_votes = a.options.votes;
+      if(o.votes_to_add.valid()) {
+         for(auto const& add: *o.votes_to_add) {
+            current_votes.insert(add);
+            a.options.votes = current_votes;
          }
-         if(o.votes_to_remove.valid()) {
-            for (auto const &remove: *o.votes_to_remove) {
-               current_votes.erase(remove);
-               a.options.votes = current_votes;
-            }
+      }
+      if(o.votes_to_remove.valid()) {
+         for (auto const &remove: *o.votes_to_remove) {
+            current_votes.erase(remove);
+            a.options.votes = current_votes;
          }
       }
    });
