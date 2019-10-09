@@ -587,7 +587,7 @@ BOOST_AUTO_TEST_CASE(simple_account_update_votes_operation)
       generate_block();
       set_expiration( db, trx );
 
-      ACTORS((alice));
+      ACTORS((alice)(bob));
       fund(alice);
 
       auto alice_object = get_account("alice");
@@ -673,6 +673,21 @@ BOOST_AUTO_TEST_CASE(simple_account_update_votes_operation)
 
       BOOST_CHECK_EQUAL(alice_object.options.voting_account.instance.value, 5);
 
+      // change voting account
+      {
+         graphene::chain::account_update_votes_operation op;
+         op.account = alice_id;
+         op.voting_account = bob_id;
+         trx.operations.push_back(op);
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx, ~0);
+         trx.clear();
+      }
+      generate_block();
+
+      alice_object = get_account("alice");
+
+      BOOST_CHECK_EQUAL(alice_object.options.voting_account.instance.value, bob_id.instance.value);
    } FC_LOG_AND_RETHROW()
 }
 

@@ -321,7 +321,7 @@ namespace graphene { namespace protocol {
 } } // graphene::protocol
 
 FC_REFLECT( graphene::protocol::additional_account_options,
-        (committee_voting_account)(witness_voting_account)(worker_voting_account))
+            (committee_voting_account)(witness_voting_account)(worker_voting_account))
 FC_REFLECT(graphene::protocol::account_options, (memo_key)(voting_account)(num_witness)(num_committee)(votes)(extensions))
 FC_REFLECT_ENUM( graphene::protocol::account_whitelist_operation::account_listing,
                 (no_listing)(white_listed)(black_listed)(white_and_black_listed))
