@@ -1163,6 +1163,18 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
          d._total_voting_stake = 0;
       }
 
+      void fill_buffer(flat_set<vote_id_type> votes, uint64_t stake, optional<vote_id_type> type = {})
+      {
+         for (vote_id_type id : votes) {
+            if (!type.valid() || (type.valid() && id.type() == type->type())) {
+               uint32_t offset = id.instance();
+               // if they somehow managed to specify an illegal offset, ignore it.
+               if (offset < d._vote_tally_buffer.size())
+                  d._vote_tally_buffer[offset] += stake;
+            }
+         }
+      }
+
       void operator()( const account_object& stake_account, const account_statistics_object& stats )
       {
          if( props.parameters.count_non_member_votes || stake_account.is_member(d.head_block_time()) )
@@ -1170,21 +1182,36 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
             // There may be a difference between the account whose stake is voting and the one specifying opinions.
             // Usually they're the same, but if the stake account has specified a voting_account, that account is the one
             // specifying the opinions.
-            const account_object& opinion_account =
-                  (stake_account.options.voting_account ==
-                   GRAPHENE_PROXY_TO_SELF_ACCOUNT)? stake_account
-                                     : d.get(stake_account.options.voting_account);
+
+            const auto& dgpo = d.get_dynamic_global_properties();
+            const auto& opinion_account = (stake_account.options.voting_account == GRAPHENE_PROXY_TO_SELF_ACCOUNT) ?
+                  stake_account : d.get(stake_account.options.voting_account);
 
             uint64_t voting_stake = stats.total_core_in_orders.value
                   + (stake_account.cashback_vb.valid() ? (*stake_account.cashback_vb)(d).balance.amount.value: 0)
                   + stats.core_in_balance.value;
 
-            for( vote_id_type id : opinion_account.options.votes )
-            {
-               uint32_t offset = id.instance();
-               // if they somehow managed to specify an illegal offset, ignore it.
-               if( offset < d._vote_tally_buffer.size() )
-                  d._vote_tally_buffer[offset] += voting_stake;
+            if(dgpo.next_maintenance_time >= HARDFORK_BSIP_47_TIME) {
+               if (stake_account.options.voting_account == GRAPHENE_PROXY_PER_CATEGORY_ACCOUNT) {
+                  if (stake_account.options.extensions.value.committee_voting_account.valid()) {
+                     auto committee_voting_account = d.get(*stake_account.options.extensions.value.committee_voting_account);
+                     fill_buffer(committee_voting_account.options.votes, voting_stake, vote_id_type::committee);
+                  }
+                  if (stake_account.options.extensions.value.witness_voting_account.valid()) {
+                     auto witness_voting_account = d.get(*stake_account.options.extensions.value.witness_voting_account);
+                     fill_buffer(witness_voting_account.options.votes, voting_stake, vote_id_type::witness);
+                  }
+                  if (stake_account.options.extensions.value.worker_voting_account.valid()) {
+                     auto worker_voting_account = d.get(*stake_account.options.extensions.value.worker_voting_account);
+                     fill_buffer(worker_voting_account.options.votes, voting_stake, vote_id_type::worker);
+                  }
+               }
+               else {
+                  fill_buffer(stake_account.options.votes, voting_stake);
+               }
+            }
+            else {
+               fill_buffer(opinion_account.options.votes, voting_stake);
             }
 
             if( opinion_account.options.num_witness <= props.parameters.maximum_witness_count )

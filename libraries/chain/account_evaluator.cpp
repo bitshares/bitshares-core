@@ -456,33 +456,40 @@ void_result account_update_votes_evaluator::do_evaluate(const account_update_vot
 void_result account_update_votes_evaluator::do_apply(const account_update_votes_operation& o)
 { try {
    database& d = db();
+   const auto& chain_parameters = d.get_global_properties().parameters;
 
-   d.modify(*account, [o](account_object& a) {
-      a.options.extensions.value.worker_voting_account = o.worker_voting_account;
-      a.options.extensions.value.witness_voting_account = o.witness_voting_account;
-      a.options.extensions.value.committee_voting_account = o.committee_voting_account;
+   d.modify(*account, [o, chain_parameters](account_object& a) {
+      if(o.worker_voting_account.valid())
+         a.options.extensions.value.worker_voting_account = *o.worker_voting_account;
+      if(o.witness_voting_account.valid())
+         a.options.extensions.value.witness_voting_account = *o.witness_voting_account;
+      if(o.committee_voting_account.valid())
+         a.options.extensions.value.committee_voting_account = *o.committee_voting_account;
 
       if(o.committee_voting_account.valid() || o.witness_voting_account.valid() || o.worker_voting_account.valid())
          a.options.voting_account = GRAPHENE_PROXY_PER_CATEGORY_ACCOUNT;
 
-      if(o.num_witness.valid())
-         a.options.num_witness = *o.num_witness;
-      if(o.num_committee.valid())
-         a.options.num_committee = *o.num_committee;
+      if(a.options.voting_account == GRAPHENE_PROXY_TO_SELF_ACCOUNT)
+      {
+         if(o.num_witness.valid())
+            a.options.num_witness = std::min(*o.num_witness, chain_parameters.maximum_witness_count);
+         if(o.num_committee.valid())
+            a.options.num_committee = std::min(*o.num_committee, chain_parameters.maximum_committee_count);
 
-      auto current_votes = a.options.votes;
+         auto current_votes = a.options.votes;
 
-      if(o.votes_to_add.valid()) {
-         for(auto const& add: *o.votes_to_add) {
-            current_votes.insert(add);
-            a.options.votes = current_votes;
+         if(o.votes_to_add.valid()) {
+            for(auto const& add: *o.votes_to_add) {
+               current_votes.insert(add);
+               a.options.votes = current_votes;
+            }
          }
-      }
 
-      if(o.votes_to_remove.valid()) {
-         for (auto const &remove: *o.votes_to_remove) {
-            current_votes.erase(remove);
-            a.options.votes = current_votes;
+         if(o.votes_to_remove.valid()) {
+            for (auto const &remove: *o.votes_to_remove) {
+               current_votes.erase(remove);
+               a.options.votes = current_votes;
+            }
          }
       }
    });
