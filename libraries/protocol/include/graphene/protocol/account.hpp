@@ -300,7 +300,7 @@ namespace graphene { namespace protocol {
       // A new voting account
       optional<account_id_type> voting_account;
 
-      // Voting account by referendum category
+      // Voting accounts by referendum category
       optional<account_id_type> committee_voting_account;
       optional<account_id_type> witness_voting_account;
       optional<account_id_type> worker_voting_account;

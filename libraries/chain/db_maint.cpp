@@ -1180,8 +1180,12 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
          if( props.parameters.count_non_member_votes || stake_account.is_member(d.head_block_time()) )
          {
             // There may be a difference between the account whose stake is voting and the one specifying opinions.
-            // Usually they're the same, but if the stake account has specified a voting_account, that account is the one
-            // specifying the opinions.
+            // Furthermore after BSIP47 users can delegate opinions for each referendum category
+            // If the stake account has specified a voting_account, that account is the one specifying the opinions.
+            // If the stake account has specified a committee_voting_account, witness_voting_account or
+            // worker_voting_account, those will be the accounts voting for the corresponding referendum category.
+            // A user specifying 1 or 2 category voting accounts will not be voting for any referendum in the categories
+            // not specified.
 
             const auto& dgpo = d.get_dynamic_global_properties();
             const auto& opinion_account = (stake_account.options.voting_account == GRAPHENE_PROXY_TO_SELF_ACCOUNT) ?
@@ -1191,24 +1195,20 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
                   + (stake_account.cashback_vb.valid() ? (*stake_account.cashback_vb)(d).balance.amount.value: 0)
                   + stats.core_in_balance.value;
 
-            if(dgpo.next_maintenance_time >= HARDFORK_BSIP_47_TIME) {
-               if (stake_account.options.voting_account == GRAPHENE_PROXY_PER_CATEGORY_ACCOUNT) {
-                  const auto& extensions = stake_account.options.extensions.value;
-                  if (extensions.committee_voting_account.valid()) {
-                     auto committee_voting_account = d.get(*extensions.committee_voting_account);
-                     fill_buffer(committee_voting_account.options.votes, voting_stake, vote_id_type::committee);
-                  }
-                  if (extensions.witness_voting_account.valid()) {
-                     auto witness_voting_account = d.get(*extensions.witness_voting_account);
-                     fill_buffer(witness_voting_account.options.votes, voting_stake, vote_id_type::witness);
-                  }
-                  if (extensions.worker_voting_account.valid()) {
-                     auto worker_voting_account = d.get(*extensions.worker_voting_account);
-                     fill_buffer(worker_voting_account.options.votes, voting_stake, vote_id_type::worker);
-                  }
+            if(dgpo.next_maintenance_time >= HARDFORK_BSIP_47_TIME &&
+                  stake_account.options.voting_account == GRAPHENE_PROXY_PER_CATEGORY_ACCOUNT) {
+               const auto& extensions = stake_account.options.extensions.value;
+               if (extensions.committee_voting_account.valid()) {
+                  auto committee_voting_account = d.get(*extensions.committee_voting_account);
+                  fill_buffer(committee_voting_account.options.votes, voting_stake, vote_id_type::committee);
                }
-               else {
-                  fill_buffer(stake_account.options.votes, voting_stake);
+               if (extensions.witness_voting_account.valid()) {
+                  auto witness_voting_account = d.get(*extensions.witness_voting_account);
+                  fill_buffer(witness_voting_account.options.votes, voting_stake, vote_id_type::witness);
+               }
+               if (extensions.worker_voting_account.valid()) {
+                  auto worker_voting_account = d.get(*extensions.worker_voting_account);
+                  fill_buffer(worker_voting_account.options.votes, voting_stake, vote_id_type::worker);
                }
             }
             else {
