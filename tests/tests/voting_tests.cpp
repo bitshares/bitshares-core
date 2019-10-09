@@ -595,11 +595,10 @@ BOOST_AUTO_TEST_CASE(simple_account_update_votes_operation)
       BOOST_CHECK_EQUAL(alice_object.options.num_witness , 0);
       BOOST_CHECK_EQUAL(alice_object.options.num_committee , alice_object.options.votes.size());
 
-      // a few votable witnesses
+      // a few votable objects
       auto witness1 = witness_id_type(1)(db);
       auto witness2 = witness_id_type(2)(db);
       auto witness3 = witness_id_type(3)(db);
-
       auto committee1 = committee_member_id_type(1)(db);
 
       // add votes
@@ -620,11 +619,11 @@ BOOST_AUTO_TEST_CASE(simple_account_update_votes_operation)
          PUSH_TX(db, trx, ~0);
          trx.clear();
       }
-
       generate_block();
-      BOOST_CHECK_EQUAL(alice_object.options.voting_account.instance.value, 5);
 
       alice_object = get_account("alice");
+
+      BOOST_CHECK_EQUAL(alice_object.options.voting_account.instance.value, 5);
 
       auto itr = alice_object.options.votes.find(witness1.vote_id);
       BOOST_CHECK(itr != alice_object.options.votes.end());
@@ -656,7 +655,6 @@ BOOST_AUTO_TEST_CASE(simple_account_update_votes_operation)
          PUSH_TX(db, trx, ~0);
          trx.clear();
       }
-
       generate_block();
 
       alice_object = get_account("alice");

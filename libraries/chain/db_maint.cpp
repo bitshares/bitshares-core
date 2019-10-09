@@ -1193,16 +1193,17 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
 
             if(dgpo.next_maintenance_time >= HARDFORK_BSIP_47_TIME) {
                if (stake_account.options.voting_account == GRAPHENE_PROXY_PER_CATEGORY_ACCOUNT) {
-                  if (stake_account.options.extensions.value.committee_voting_account.valid()) {
-                     auto committee_voting_account = d.get(*stake_account.options.extensions.value.committee_voting_account);
+                  const auto& extensions = stake_account.options.extensions.value;
+                  if (extensions.committee_voting_account.valid()) {
+                     auto committee_voting_account = d.get(*extensions.committee_voting_account);
                      fill_buffer(committee_voting_account.options.votes, voting_stake, vote_id_type::committee);
                   }
-                  if (stake_account.options.extensions.value.witness_voting_account.valid()) {
-                     auto witness_voting_account = d.get(*stake_account.options.extensions.value.witness_voting_account);
+                  if (extensions.witness_voting_account.valid()) {
+                     auto witness_voting_account = d.get(*extensions.witness_voting_account);
                      fill_buffer(witness_voting_account.options.votes, voting_stake, vote_id_type::witness);
                   }
-                  if (stake_account.options.extensions.value.worker_voting_account.valid()) {
-                     auto worker_voting_account = d.get(*stake_account.options.extensions.value.worker_voting_account);
+                  if (extensions.worker_voting_account.valid()) {
+                     auto worker_voting_account = d.get(*extensions.worker_voting_account);
                      fill_buffer(worker_voting_account.options.votes, voting_stake, vote_id_type::worker);
                   }
                }

@@ -276,7 +276,13 @@ namespace graphene { namespace protocol {
    };
 
    /*
-    * @brief
+    * @brief explicit operation for voting
+    * @ingroup operations
+    *
+    * Vote for the 3 referendum categories(committee, witness, worker), the number of witnesses
+    * and committee members the blockchain can have, update your proxy.
+    *
+    * Additionally the operation will allow the user to select specific proxies for each of the 3 referendum categories.
     */
    struct account_update_votes_operation : public base_operation
    {
@@ -287,22 +293,25 @@ namespace graphene { namespace protocol {
       /// The account to update
       account_id_type account;
 
-      /// New account options
+      /// Votes to add or remove
       optional<flat_set<vote_id_type>> votes_to_add;
       optional<flat_set<vote_id_type>> votes_to_remove;
 
-      // A new voting account to set
+      // A new voting account
+      optional<account_id_type> voting_account;
+
+      // Voting account by referendum category
       optional<account_id_type> committee_voting_account;
       optional<account_id_type> witness_voting_account;
       optional<account_id_type> worker_voting_account;
 
-      // A new number of witness_votes to set
+      // A new number of witness
       optional<uint16_t> num_witness;
 
-      // A new number of committee_votes to set
+      // A new number of committee member
       optional<uint16_t> num_committee;
 
-      // For future extensions (see account_update_operation)
+      // For future extensions
       extensions_type extensions;
 
       account_id_type fee_payer()const { return account; }
@@ -344,7 +353,8 @@ FC_REFLECT( graphene::protocol::account_transfer_operation::fee_parameters_type,
 FC_REFLECT( graphene::protocol::account_update_votes_operation::fee_parameters_type, (fee) )
 
 FC_REFLECT( graphene::protocol::account_transfer_operation, (fee)(account_id)(new_owner)(extensions) )
-FC_REFLECT( graphene::protocol::account_update_votes_operation, (fee)(account)(votes_to_add)(votes_to_remove)
+FC_REFLECT( graphene::protocol::account_update_votes_operation, (fee)(account)(votes_to_add)
+                                                                (votes_to_remove)(voting_account)
                                                                 (committee_voting_account)(witness_voting_account)
                                                                 (worker_voting_account)(num_witness)(num_committee)
                                                                 (extensions))
