@@ -56,9 +56,9 @@ class elasticsearch_plugin_impl
       bool _elasticsearch_visitor = false;
       std::string _elasticsearch_basic_auth = "";
       std::string _elasticsearch_index_prefix = "bitshares-";
-      bool _elasticsearch_operation_object = false;
+      bool _elasticsearch_operation_object = true;
       uint32_t _elasticsearch_start_es_after_block = 0;
-      bool _elasticsearch_operation_string = true;
+      bool _elasticsearch_operation_string = false;
       mode _elasticsearch_mode = mode::only_save;
       CURL *curl; // curl handler
       vector <string> bulk_lines; //  vector of op lines
@@ -441,11 +441,11 @@ void elasticsearch_plugin::plugin_set_program_options(
          ("elasticsearch-index-prefix", boost::program_options::value<std::string>(),
                "Add a prefix to the index(bitshares-)")
          ("elasticsearch-operation-object", boost::program_options::value<bool>(),
-               "Save operation as object(false)")
+               "Save operation as object(true)")
          ("elasticsearch-start-es-after-block", boost::program_options::value<uint32_t>(),
                "Start doing ES job after block(0)")
          ("elasticsearch-operation-string", boost::program_options::value<bool>(),
-               "Save operation as string. Needed to serve history api calls(true)")
+               "Save operation as string. Needed to serve history api calls(false)")
          ("elasticsearch-mode", boost::program_options::value<uint16_t>(),
                "Mode of operation: only_save(0), only_query(1), all(2) - Default: 0")
          ;
