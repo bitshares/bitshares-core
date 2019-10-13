@@ -80,7 +80,6 @@ vector<std::reference_wrapper<const typename Index::object_type>> database::sort
    vector<std::reference_wrapper<const ObjectType>> refs;
 
    if(all_objects.size() <= active_wit_count){
-      refs.reserve(0);
       return refs;
    }
    
