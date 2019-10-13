@@ -96,13 +96,11 @@ vector<std::reference_wrapper<const typename Index::object_type>> database::sort
       return a.vote_id < b.vote_id;
    });
 
-   refs.resize(count, refs.front());
-
-   auto first = refs.begin() + active_wit_count + 1;
+   auto first = refs.begin() + active_wit_count;
    auto last = refs.begin() + count;
    vector<std::reference_wrapper<const ObjectType>> standby_wits;
    standby_wits.reserve(count - active_wit_count);
-   std::copy(first, last, standby_wits.begin());
+   std::copy(first, last, std::inserter(standby_wits, standby_wits.end()));
 
    return standby_wits;
 }

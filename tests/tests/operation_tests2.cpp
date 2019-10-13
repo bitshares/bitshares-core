@@ -1750,38 +1750,6 @@ BOOST_AUTO_TEST_CASE( top_n_special )
 // Modified test from witness_create above
 BOOST_AUTO_TEST_CASE( reward_split_test )
 { try {
-
-   uint32_t skip = database::skip_witness_signature
-                 | database::skip_transaction_signatures
-                 | database::skip_transaction_dupe_check
-                 | database::skip_block_size_check
-                 | database::skip_tapos_check
-                 | database::skip_merkle_check
-                 ;
-   generate_block(skip);
-
-   auto wtplugin = app.register_plugin<graphene::witness_plugin::witness_plugin>();
-   wtplugin->plugin_set_app(&app);
-   boost::program_options::variables_map options;
-
-   // init witness key cahce
-   std::set< witness_id_type > caching_witnesses;
-   std::vector< std::string > witness_ids;
-   for( uint64_t i = 22; ; ++i )
-   {
-      witness_id_type wid(i);
-      caching_witnesses.insert( wid );
-      string wid_str = "\"" + std::string(object_id_type(wid)) + "\"";
-      witness_ids.push_back( wid_str );
-      if( !db.find(wid) )
-         break;
-   }
-   options.insert( std::make_pair( "witness-id", boost::program_options::variable_value( witness_ids, false ) ) );
-   wtplugin->plugin_initialize(options);
-   wtplugin->plugin_startup();
-
-   const auto& wit_key_cache = wtplugin->get_witness_key_cache();
-
    // setup test account
    ACTOR(nathan);
    ACTOR(nathan1);
@@ -1832,35 +1800,81 @@ BOOST_AUTO_TEST_CASE( reward_split_test )
    trx.clear();
 
    // create witness
-   witness_id_type nathan_witness_id = create_witness(nathan_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness1_id = create_witness(nathan1_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness2_id = create_witness(nathan2_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness3_id = create_witness(nathan3_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness4_id = create_witness(nathan4_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness5_id = create_witness(nathan5_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness6_id = create_witness(nathan6_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness7_id = create_witness(nathan7_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness8_id = create_witness(nathan8_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness9_id = create_witness(nathan9_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness10_id = create_witness(nathan10_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness11_id = create_witness(nathan11_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness12_id = create_witness(nathan12_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness13_id = create_witness(nathan13_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness14_id = create_witness(nathan14_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness15_id = create_witness(nathan15_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness16_id = create_witness(nathan16_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness17_id = create_witness(nathan17_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness18_id = create_witness(nathan18_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness19_id = create_witness(nathan19_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness20_id = create_witness(nathan20_id, nathan_private_key, skip).id;
-   witness_id_type nathan_witness21_id = create_witness(nathan21_id, nathan_private_key, skip).id;
+   witness_id_type nathan_witness_id = create_witness(nathan_id, nathan_private_key).id;
+   witness_id_type nathan_witness1_id = create_witness(nathan1_id, nathan1_private_key).id;
+   witness_id_type nathan_witness2_id = create_witness(nathan2_id, nathan2_private_key).id;
+   witness_id_type nathan_witness3_id = create_witness(nathan3_id, nathan3_private_key).id;
+   witness_id_type nathan_witness4_id = create_witness(nathan4_id, nathan4_private_key).id;
+   witness_id_type nathan_witness5_id = create_witness(nathan5_id, nathan5_private_key).id;
+   witness_id_type nathan_witness6_id = create_witness(nathan6_id, nathan6_private_key).id;
+   witness_id_type nathan_witness7_id = create_witness(nathan7_id, nathan7_private_key).id;
+   witness_id_type nathan_witness8_id = create_witness(nathan8_id, nathan8_private_key).id;
+   witness_id_type nathan_witness9_id = create_witness(nathan9_id, nathan9_private_key).id;
+   witness_id_type nathan_witness10_id = create_witness(nathan10_id, nathan10_private_key).id;
+   witness_id_type nathan_witness11_id = create_witness(nathan11_id, nathan11_private_key).id;
+   witness_id_type nathan_witness12_id = create_witness(nathan12_id, nathan12_private_key).id;
+   witness_id_type nathan_witness13_id = create_witness(nathan13_id, nathan13_private_key).id;
+   witness_id_type nathan_witness14_id = create_witness(nathan14_id, nathan14_private_key).id;
+   witness_id_type nathan_witness15_id = create_witness(nathan15_id, nathan15_private_key).id;
+   witness_id_type nathan_witness16_id = create_witness(nathan16_id, nathan16_private_key).id;
+   witness_id_type nathan_witness17_id = create_witness(nathan17_id, nathan17_private_key).id;
+   witness_id_type nathan_witness18_id = create_witness(nathan18_id, nathan18_private_key).id;
+   witness_id_type nathan_witness19_id = create_witness(nathan19_id, nathan19_private_key).id;
+   witness_id_type nathan_witness20_id = create_witness(nathan20_id, nathan20_private_key).id;
+   witness_id_type nathan_witness21_id = create_witness(nathan21_id, nathan21_private_key).id;
 
-   // nathan should be in the cache
-   BOOST_CHECK_EQUAL( caching_witnesses.count(nathan_witness_id), 1u );
+   // Create a vector with private key of all witnesses, will be used to activate 11 witnesses at a time
+   const vector <fc::ecc::private_key> private_keys = {
+         nathan_private_key,
+         nathan1_private_key,
+         nathan2_private_key,
+         nathan3_private_key,
+         nathan4_private_key,
+         nathan5_private_key,
+         nathan6_private_key,
+         nathan7_private_key,
+         nathan8_private_key,
+         nathan9_private_key,
+         nathan10_private_key,
+         nathan11_private_key,
+         nathan12_private_key,
+         nathan13_private_key,
+         nathan14_private_key,
+         nathan15_private_key,
+         nathan16_private_key,
+         nathan17_private_key,
+         nathan18_private_key,
+         nathan19_private_key,
+         nathan20_private_key,
+         nathan21_private_key
+   };
 
-   // nathan's key in the cache should still be null before a new block is generated
-   auto nathan_itr = wit_key_cache.find( nathan_witness_id );
-   BOOST_CHECK( nathan_itr != wit_key_cache.end() && !nathan_itr->second.valid() );
+   // create a map with account id and witness id of the first 11 witnesses
+      const flat_map <account_id_type, witness_id_type> witness_map = {
+            {nathan_id,  nathan_witness_id},
+            {nathan1_id, nathan_witness1_id},
+            {nathan2_id, nathan_witness2_id},
+            {nathan3_id, nathan_witness3_id},
+            {nathan4_id, nathan_witness4_id},
+            {nathan5_id, nathan_witness5_id},
+            {nathan6_id, nathan_witness6_id},
+            {nathan7_id, nathan_witness7_id},
+            {nathan8_id, nathan_witness8_id},
+            {nathan9_id, nathan_witness9_id},
+            {nathan10_id, nathan_witness10_id},
+            {nathan11_id, nathan_witness11_id},
+            {nathan12_id, nathan_witness12_id},
+            {nathan13_id, nathan_witness13_id},
+            {nathan14_id, nathan_witness14_id},
+            {nathan15_id, nathan_witness15_id},
+            {nathan16_id, nathan_witness16_id},
+            {nathan17_id, nathan_witness17_id},
+            {nathan18_id, nathan_witness18_id},
+            {nathan19_id, nathan_witness19_id},
+            {nathan20_id, nathan_witness20_id},
+            {nathan21_id, nathan_witness21_id}
+      };
+
 
    // Give nathan some voting stake
    transfer(committee_account, nathan_id, asset(10000000));
@@ -1885,27 +1899,80 @@ BOOST_AUTO_TEST_CASE( reward_split_test )
    transfer(committee_account, nathan19_id, asset(10000000));
    transfer(committee_account, nathan20_id, asset(10000000));
    transfer(committee_account, nathan21_id, asset(9999999));
-   generate_block(skip);
+
+   // Activate all witnesses
+   // Each witness is voted with incremental stake so last witness created will be the ones with more votes
+   int c = 0;
+   for (auto l : witness_map) {
+      int stake = 100 + c + 10;
+      transfer(committee_account, l.first, asset(stake));
+      {
+         set_expiration(db, trx);
+         account_update_operation op;
+         op.account = l.first;
+         op.new_options = l.first(db).options;
+         op.new_options->votes.insert(l.second(db).vote_id);
+
+         trx.operations.push_back(op);
+         sign(trx, private_keys.at(c));
+         PUSH_TX(db, trx);
+         trx.clear();
+      }
+      ++c;
+   }
+   
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   generate_block();
 
    // nathan should be a witness now
    BOOST_REQUIRE( db.find( nathan_witness_id ) );
-   // nathan's key in the cache should have been stored now
-   nathan_itr = wit_key_cache.find( nathan_witness_id );
-   BOOST_CHECK( nathan_itr != wit_key_cache.end() && nathan_itr->second.valid()
-                && *nathan_itr->second == nathan_private_key.get_public_key() );
-
    
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    const auto& witnesses = db.get_global_properties().active_witnesses;
    const auto& standby_witnesses = db.get_global_properties().standby_witnesses;
 
-   // make sure we're in active_witnesses
-   auto itr = std::find(witnesses.begin(), witnesses.end(), nathan_witness_id);
-   BOOST_CHECK(itr != witnesses.end());
+   // Because the new witnesses created were voted in, the last ones voted in
+   // become the active witnesses and all the initial witnesses get pusehd
+   // out and become standby witnesses
+   BOOST_CHECK_EQUAL(witnesses.size(), 11u);
+   BOOST_CHECK_EQUAL(witnesses.begin()[0].instance.value, nathan_witness11_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[1].instance.value, nathan_witness12_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[2].instance.value, nathan_witness13_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[3].instance.value, nathan_witness14_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[4].instance.value, nathan_witness15_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[5].instance.value, nathan_witness16_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[6].instance.value, nathan_witness17_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[7].instance.value, nathan_witness18_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[8].instance.value, nathan_witness19_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[9].instance.value, nathan_witness20_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[10].instance.value, nathan_witness21_id.instance.value);
 
-   // make sure we're in active_witnesses
-   auto itr_2 = std::find(standby_witnesses.begin(), standby_witnesses.end(), nathan_witness21_id);
-   BOOST_CHECK(itr_2 != standby_witnesses.end());
+   BOOST_CHECK_EQUAL(standby_witnesses.size(), 21u);
+
+   // Check that new witnesses are in standby
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[0].instance.value, nathan_witness10_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[1].instance.value, nathan_witness9_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[2].instance.value, nathan_witness8_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[3].instance.value, nathan_witness7_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[4].instance.value, nathan_witness6_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[5].instance.value, nathan_witness5_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[6].instance.value, nathan_witness4_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[7].instance.value, nathan_witness3_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[8].instance.value, nathan_witness2_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[9].instance.value, nathan_witness1_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[10].instance.value, nathan_witness_id.instance.value);
+
+   // Check that initial witnesses are in standby
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[11].instance.value, 1u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[12].instance.value, 2u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[13].instance.value, 3u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[14].instance.value, 4u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[15].instance.value, 5u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[16].instance.value, 6u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[17].instance.value, 7u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[18].instance.value, 8u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[19].instance.value, 9u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[20].instance.value, 10u);
 
 } FC_LOG_AND_RETHROW() }
 
