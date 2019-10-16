@@ -1656,6 +1656,186 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
       } FC_LOG_AND_RETHROW()
    }
 
+
+   /**
+    * Test of not equal (ne) restriction on an operation field
+    * Test of CAA for asset_issue_operation
+    *
+    * Scenario: Test of authorization of one account (alice) authorizing another account (bob)
+    * to issue an asset (ALICECOIN) to any account except a banned account (banned1)
+    */
+   BOOST_AUTO_TEST_CASE(authorized_asset_issue_exceptions_1) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Accounts
+         //////
+         ACTORS((alice)(bob)(allowed1)(allowed2)(banned1)(allowed3));
+         fund(alice, asset(500000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+
+
+         // Lambda for issuing an asset to an account
+         auto issue_amount_to = [&](const account_id_type &issuer, const asset &amount, const account_id_type &to) {
+            asset_issue_operation op;
+            op.issuer = issuer;
+            op.asset_to_issue = amount;
+            op.issue_to_account = to;
+
+            return op;
+         };
+
+         //////
+         // Create a UIA
+         //////
+         upgrade_to_lifetime_member(alice);
+         const asset_object &alicecoin = create_user_issued_asset("ALICECOIN", alice, white_list);
+         const asset_object &specialcoin = create_user_issued_asset( "SPECIALCOIN", alice,  white_list );
+         const asset_id_type alicecoin_id = alicecoin.id;
+
+
+         //////
+         // Attempt to issue the UIA to an account with the Alice key
+         // This should succeed because Alice is the issuer
+         //////
+         asset_issue_operation issue_op = issue_amount_to(alice.get_id(), asset(100, alicecoin_id), allowed1.get_id());
+         trx.clear();
+         trx.operations = {issue_op};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Bob attempts to issue the UIA to an allowed account
+         // This should fail because Bob is not authorized to issue any ALICECOIN
+         //////
+         issue_op = issue_amount_to(alice.get_id(), asset(100, alicecoin_id), allowed2.get_id());
+         trx.clear();
+         trx.operations = {issue_op};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+         // "rejected_custom_auths":[]
+         EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+
+
+         //////
+         // Alice authorizes Bob to issue assets on its behalf
+         // except for accounts bad1, bad2, and bad3
+         //////
+         custom_authority_create_operation authorize_to_issue;
+         authorize_to_issue.account = alice.get_id();
+         authorize_to_issue.auth.add_authority(bob.get_id(), 1);
+         authorize_to_issue.auth.weight_threshold = 1;
+         authorize_to_issue.enabled = true;
+         authorize_to_issue.valid_to = db.head_block_time() + 1000;
+         authorize_to_issue.operation_type = operation::tag<asset_issue_operation>::value;
+
+         auto asset_index = member_index<asset_issue_operation>("asset_to_issue");
+         auto asset_id_index = member_index<asset>("asset_id");
+         authorize_to_issue.restrictions.emplace_back(restriction(asset_index, restriction::func_attr, vector<restriction>{
+                 restriction(asset_id_index, restriction::func_eq, alicecoin_id)}));
+         auto issue_to_index = member_index<asset_issue_operation>("issue_to_account");
+         authorize_to_issue.restrictions.emplace_back(issue_to_index, FUNC(ne), banned1.get_id());
+         //[
+         //  {
+         //    "member_index": 2,
+         //    "restriction_type": 10,
+         //    "argument": [
+         //      39,
+         //      [
+         //        {
+         //          "member_index": 1,
+         //          "restriction_type": 0,
+         //          "argument": [
+         //            8,
+         //            "1.3.2"
+         //          ],
+         //          "extensions": []
+         //        }
+         //      ]
+         //    ],
+         //    "extensions": []
+         //  },
+         //  {
+         //    "member_index": 3,
+         //    "restriction_type": 1,
+         //    "argument": [
+         //      7,
+         //      "1.2.20"
+         //    ],
+         //    "extensions": []
+         //  }
+         //]
+
+         trx.clear();
+         trx.operations = {authorize_to_issue};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the reused operation
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Bob attempts to issue the UIA to an allowed account
+         // This should succeed because Bob is now authorized to issue ALICECOIN
+         //////
+         trx.clear();
+         trx.operations.emplace_back(std::move(issue_op));
+         sign(trx, bob_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Bob attempts to issue the special coin to an allowed account
+         // This should fail because Bob is not authorized to issue SPECIALCOIN to any account
+         //////
+         issue_op = issue_amount_to(alice.get_id(), asset(100, specialcoin.id), allowed3.get_id());
+         trx.clear();
+         trx.operations = {issue_op};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should indicate the rejection path
+         // "rejection_path":[[0,0],[0,0],[2,"predicate_was_false"]
+         // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for Restriction 1
+         // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for the only argument
+         // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+
+
+         //////
+         // Bob attempts to issue the UIA to a banned account with the Bob's key
+         // This should fail because Bob is not authorized to issue ALICECOIN to the banned account
+         //////
+         issue_op = issue_amount_to(alice.get_id(), asset(100, alicecoin_id), banned1.get_id());
+         trx.clear();
+         trx.operations = {issue_op};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should indicate the rejection path
+         // "rejection_path":[[0,1],[2,"predicate_was_false"]
+         // [0,1]: 0 is the rejection_indicator for an index to a sub-restriction; 1 is the index value for Restriction 2
+         // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,1],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+
+
+      } FC_LOG_AND_RETHROW()
+   }
+
+
    /**
     * Test of authorization of a key to transfer one asset type (USDBIT) from one account (coldwallet)
     * to another account (hotwallet)
