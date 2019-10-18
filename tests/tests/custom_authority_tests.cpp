@@ -458,7 +458,7 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
 
          //////
          // Create an operation that transfers to Account ID 15
-         // This should satisfy the restriction because Account ID 12 is authorized to transfer
+         // This should satisfy the restriction because Account ID 15 is authorized to transfer
          //////
          transfer_operation transfer_to_15 = transfer_operation();
          transfer_to_15.to = account_id_type(15);
@@ -909,7 +909,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
          //////
          // Bob attempts to transfer 100 CORE from Alice's account to Charlie
-         // This attempt should fail because Alice has revoked authorized for Bob to transfer from her account
+         // This attempt should fail because Alice has revoked authorization for Bob to transfer from her account
          //////
          trx.clear();
          trx.operations = {bob_transfers_from_alice_to_charlie};
@@ -1264,7 +1264,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
          //////
-         // Alice revokes/disables the authorization by disabling
+         // Feedproducer revokes/disables the authorization by disabling it
          //////
          custom_authority_update_operation disable_authorizations;
          disable_authorizations.account = feedproducer.get_id();
@@ -1284,7 +1284,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
          //////
          // Bob attempts to publish feed of USDBIT on behalf of feedproducer with new key
-         // This should fail because Bob's account is no longer authorized by Alice
+         // This should fail because Bob's account is no longer authorized by feedproducer
          //////
          trx.clear();
          trx.operations.emplace_back(std::move(pop));
@@ -1498,7 +1498,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
          //////
          // Attempt to transfer funds out of the faucet account
-         // This should fail because the key is not authorized to top from the faucet account
+         // This should fail because the key is not authorized to transfer from the faucet account
          //////
          transfer_operation top;
          top.amount.amount = 99 * GRAPHENE_BLOCKCHAIN_PRECISION;
