@@ -283,13 +283,12 @@ template<typename FieldContainer, typename ArgumentElement>
 struct predicate_has_all<FieldContainer, flat_set<ArgumentElement>,
                          std::enable_if_t<is_container<FieldContainer> && !is_flat_set<FieldContainer> &&
                                           comparable_types<typename FieldContainer::value_type, ArgumentElement>>> {
-   predicate_has_all<flat_set<typename FieldContainer::value_type>, flat_set<ArgumentElement>> inner;
    // Field is other container; convert to flat_set
    constexpr static bool valid = true;
    bool operator()(const FieldContainer& f, const flat_set<ArgumentElement>& a) const {
       if (f.size() < a.size()) return false;
-      flat_set<typename FieldContainer::value_type> fs(f.begin(), f.end());
-      return inner(fs, a);
+      std::set<typename FieldContainer::value_type> fs(f.begin(), f.end());
+      return std::includes(fs.begin(), fs.end(), a.begin(), a.end());
    }
 };
 template<typename OptionalType, typename Argument>
@@ -319,12 +318,10 @@ template<typename FieldContainer, typename ArgumentElement>
 struct predicate_has_none<FieldContainer, flat_set<ArgumentElement>,
                           std::enable_if_t<is_container<FieldContainer> && !is_flat_set<FieldContainer> &&
                                            comparable_types<typename FieldContainer::value_type, ArgumentElement>>> {
-   predicate_has_none<flat_set<typename FieldContainer::value_type>, flat_set<ArgumentElement>> inner;
-   // Field is other container; convert to flat_set
+   // Field is other container
    constexpr static bool valid = true;
    bool operator()(const FieldContainer& f, const flat_set<ArgumentElement>& a) const {
-      flat_set<typename FieldContainer::value_type> fs(f.begin(), f.end());
-      return inner(fs, a);
+      return !std::any_of(f.begin(), f.end(), [&a](const auto& fe) { return a.count(fe) > 0; });
    }
 };
 template<typename OptionalType, typename Argument>

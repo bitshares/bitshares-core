@@ -48,15 +48,21 @@ void_result custom_authority_create_evaluator::do_evaluate(const custom_authorit
    bool operation_forked_in = hardfork_visitor(now).visit((operation::tag_type)op.operation_type.value);
    FC_ASSERT(operation_forked_in, "Cannot create custom authority for operation which is not valid yet");
 
+   auto restriction_count = std::for_each(op.restrictions.begin(), op.restrictions.end(), restriction::adder()).sum;
+   FC_ASSERT(restriction_count <= config->max_custom_authority_restrictions,
+             "Custom authority has more than the maximum number of restrictions");
+
    for (const auto& account_weight_pair : op.auth.account_auths)
       account_weight_pair.first(d);
 
    const auto& index = d.get_index_type<custom_authority_index>().indices().get<by_account_custom>();
    auto range = index.equal_range(op.account);
    FC_ASSERT(std::distance(range.first, range.second) < config->max_custom_authorities_per_account,
-             "Cannot create custom authority for account: account already has maximum number");
+             "Cannot create custom authority: account already has maximum number");
+   range = index.equal_range(boost::make_tuple(op.account, op.operation_type));
+   FC_ASSERT(std::distance(range.first, range.second) < config->max_custom_authorities_per_account_op,
+             "Cannot create custom authority: account already has maximum number for this operation type");
 
-   get_restriction_predicate(op.restrictions, op.operation_type);
    return void_result();
 } FC_CAPTURE_AND_RETHROW((op)) }
 
@@ -74,9 +80,6 @@ object_id_type custom_authority_create_evaluator::do_apply(const custom_authorit
       std::for_each(op.restrictions.begin(), op.restrictions.end(), [&obj](const restriction& r) mutable {
          obj.restrictions.insert(std::make_pair(obj.restriction_counter++, r));
       });
-
-      // Update the predicate cache
-      obj.update_predicate_cache();
    }).id;
 } FC_CAPTURE_AND_RETHROW((op)) }
 
@@ -84,11 +87,9 @@ void_result custom_authority_update_evaluator::do_evaluate(const custom_authorit
 { try {
    const database& d = db();
    auto now = d.head_block_time();
-   FC_ASSERT(HARDFORK_BSIP_40_PASSED(now), "Custom active authorities are not yet enabled");
    old_object = &op.authority_to_update(d);
    FC_ASSERT(old_object->account == op.account, "Cannot update a different account's custom authority");
 
-   op.account(d);
    if (op.new_enabled)
       FC_ASSERT(*op.new_enabled != old_object->enabled,
                 "Custom authority update specifies an enabled flag, but flag is not changed");
@@ -131,6 +132,17 @@ void_result custom_authority_update_evaluator::do_evaluate(const custom_authorit
                 "Unable to add restrictions: causes wraparound of restriction IDs");
    }
 
+   // Add up the restriction counts for all old restrictions not being removed, and all new ones
+   size_t restriction_count = 0;
+   for (const auto& restriction_pair : old_object->restrictions)
+      if (op.restrictions_to_remove.count(restriction_pair.first) == 0)
+         restriction_count += restriction_pair.second.restriction_count();
+   restriction_count += std::for_each(op.restrictions_to_add.begin(), op.restrictions_to_add.end(),
+                                      restriction::adder()).sum;
+   // Check restriction count against limit
+   FC_ASSERT(restriction_count <= config->max_custom_authority_restrictions,
+             "Cannot update custom authority: updated authority would exceed the maximum number of restrictions");
+
    get_restriction_predicate(op.restrictions_to_add, old_object->operation_type);
    return void_result();
 } FC_CAPTURE_AND_RETHROW((op)) }
@@ -152,8 +164,8 @@ void_result custom_authority_update_evaluator::do_apply(const custom_authority_u
          obj.restrictions.insert(std::make_pair(obj.restriction_counter++, r));
       });
 
-      // Update the predicate cache
-      obj.update_predicate_cache();
+      // Clear the predicate cache
+      obj.clear_predicate_cache();
    });
 
    return void_result();
@@ -162,9 +174,7 @@ void_result custom_authority_update_evaluator::do_apply(const custom_authority_u
 void_result custom_authority_delete_evaluator::do_evaluate(const custom_authority_delete_operation& op)
 { try {
    const database& d = db();
-   FC_ASSERT(HARDFORK_BSIP_40_PASSED(d.head_block_time()), "Custom active authorities are not yet enabled");
 
-   op.account(d);
    old_object = &op.authority_to_delete(d);
    FC_ASSERT(old_object->account == op.account, "Cannot delete a different account's custom authority");
 

@@ -39,7 +39,7 @@ namespace graphene { namespace chain {
    class custom_authority_object : public abstract_object<custom_authority_object> {
       /// Unreflected field to store a cache of the predicate function
       /// Note that this cache can be modified when the object is const!
-      optional<restriction_predicate_function> predicate_cache;
+      mutable optional<restriction_predicate_function> predicate_cache;
 
    public:
       static const uint8_t space_id = protocol_ids;
@@ -66,16 +66,17 @@ namespace graphene { namespace chain {
       }
       /// Get predicate, from cache if possible, and update cache if not (modifies const object!)
       restriction_predicate_function get_predicate() const {
-         if (predicate_cache.valid())
-            return *predicate_cache;
+         if (!predicate_cache.valid())
+            update_predicate_cache();
 
-         const_cast<custom_authority_object*>(this)->update_predicate_cache();
          return *predicate_cache;
       }
       /// Regenerate predicate function and update predicate cache
-      void update_predicate_cache() {
+      void update_predicate_cache() const {
          predicate_cache = get_restriction_predicate(get_restrictions(), operation_type);
       }
+      /// Clear the cache of the predicate function
+      void clear_predicate_cache() { predicate_cache.reset(); }
    };
 
    struct by_account_custom;
