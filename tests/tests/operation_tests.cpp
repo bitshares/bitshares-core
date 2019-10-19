@@ -286,10 +286,6 @@ BOOST_AUTO_TEST_CASE( old_call_order_update_test_after_hardfork_583 )
 
 BOOST_AUTO_TEST_CASE( asset_settle_cancel_operation_test_after_hf588 )
 {
-   // fast jump to hardfork time
-   generate_blocks( HARDFORK_CORE_588_TIME );
-   // one more block to pass hardfork time
-   generate_block();
    set_expiration( db, trx );
 
    BOOST_TEST_MESSAGE( "Creating a proposal containing a asset_settle_cancel_operation" );
@@ -1211,7 +1207,14 @@ BOOST_AUTO_TEST_CASE( update_uia )
          PUSH_TX( db, trx, ~0 );
       }
 
-      BOOST_TEST_MESSAGE( "Make sure white_list can't be re-enabled" );
+      asset_issue_operation issue_op;
+      issue_op.issuer = op.issuer;
+      issue_op.asset_to_issue =  asset(5000000,op.asset_to_update);
+      issue_op.issue_to_account = nathan.get_id();
+      trx.operations.push_back(issue_op);
+      PUSH_TX(db, trx, ~0);
+      
+      BOOST_TEST_MESSAGE( "Make sure white_list can't be re-enabled (after tokens issued)" );
       op.new_options.issuer_permissions = test.options.issuer_permissions;
       op.new_options.flags = test.options.flags;
       BOOST_CHECK(!(test.options.issuer_permissions & white_list));

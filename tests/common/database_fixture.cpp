@@ -95,7 +95,8 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
 
    genesis_state.initial_timestamp = initial_timestamp;
 
-   if(current_test_name == "hf_935_test") {
+   if(current_test_name == "hf_1270_test")
+   {
       genesis_state.initial_active_witnesses = 20;
    }
    else {

@@ -29,17 +29,6 @@
 #include <graphene/chain/hardfork.hpp>
 
 namespace graphene { namespace chain {
-namespace detail {
-   // TODO review and remove code below and links to it after hf_1268
-   void check_vesting_balance_policy_hf_1268(const fc::time_point_sec& block_time, const vesting_policy_initializer& policy)
-   {
-      if( block_time < HARDFORK_1268_TIME )
-      {
-         FC_ASSERT( !policy.is_type<instant_vesting_policy_initializer>(),
-           "Instant vesting policy is only available after HARDFORK_1268_TIME!");
-      }
-   }
-}
 
 void_result vesting_balance_create_evaluator::do_evaluate( const vesting_balance_create_operation& op )
 { try {
@@ -53,8 +42,6 @@ void_result vesting_balance_create_evaluator::do_evaluate( const vesting_balance
    FC_ASSERT( op.amount.amount > 0 );
    FC_ASSERT( d.get_balance( creator_account.id, op.amount.asset_id ) >= op.amount );
    FC_ASSERT( !op.amount.asset_id(d).is_transfer_restricted() );
-
-   detail::check_vesting_balance_policy_hf_1268(d.head_block_time(), op.policy);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
