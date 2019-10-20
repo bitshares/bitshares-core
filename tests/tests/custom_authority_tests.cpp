@@ -1002,8 +1002,10 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //////
          // Initialize: Define a market-issued asset called USDBIT
          //////
-         ACTORS((feedproducer));
-         const auto &bitusd = create_bitasset("USDBIT", feedproducer_id);
+         ACTORS((feedproducer))
+         create_bitasset("USDBIT", feedproducer_id);
+         generate_blocks(1);
+         const auto& bitusd = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("USDBIT");
          const auto &core = asset_id_type()(db);
          update_feed_producers(bitusd, {feedproducer.id});
 
@@ -1189,7 +1191,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Initialize: Define a market-issued asset called USDBIT
          //////
          ACTORS((feedproducer));
-         const auto &bitusd = create_bitasset("USDBIT", feedproducer_id);
+         create_bitasset("USDBIT", feedproducer_id);
+         generate_blocks(1);
+         const auto& bitusd = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("USDBIT");
          const auto &core = asset_id_type()(db);
          update_feed_producers(bitusd, {feedproducer.id});
 
