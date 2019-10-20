@@ -396,6 +396,45 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    BOOST_CHECK(predicate(update) == true);
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE(container_in_not_in_checks) { try {
+   vector<restriction> restrictions;
+   restrictions.emplace_back(member_index<asset_update_feed_producers_operation>("new_feed_producers"), FUNC(in),
+                             flat_set<account_id_type>{account_id_type(5), account_id_type(6), account_id_type(7)});
+   auto pred = get_restriction_predicate(restrictions, operation::tag<asset_update_feed_producers_operation>::value);
+
+   asset_update_feed_producers_operation op;
+   BOOST_CHECK(pred(op));
+   op.new_feed_producers = {account_id_type(1)};
+   BOOST_CHECK(!pred(op));
+   op.new_feed_producers = {account_id_type(5)};
+   BOOST_CHECK(pred(op));
+   op.new_feed_producers = {account_id_type(5), account_id_type(6)};
+   BOOST_CHECK(pred(op));
+   op.new_feed_producers = {account_id_type(5), account_id_type(6), account_id_type(7)};
+   BOOST_CHECK(pred(op));
+   op.new_feed_producers = {account_id_type(1), account_id_type(5), account_id_type(6), account_id_type(7)};
+   BOOST_CHECK(!pred(op));
+   op.new_feed_producers = {account_id_type(5), account_id_type(6), account_id_type(7), account_id_type(8)};
+   BOOST_CHECK(!pred(op));
+
+   restrictions.front().restriction_type = FUNC(not_in);
+   pred = get_restriction_predicate(restrictions, operation::tag<asset_update_feed_producers_operation>::value);
+   op.new_feed_producers.clear();
+   BOOST_CHECK(pred(op));
+   op.new_feed_producers = {account_id_type(1)};
+   BOOST_CHECK(pred(op));
+   op.new_feed_producers = {account_id_type(5)};
+   BOOST_CHECK(!pred(op));
+   op.new_feed_producers = {account_id_type(5), account_id_type(6)};
+   BOOST_CHECK(!pred(op));
+   op.new_feed_producers = {account_id_type(5), account_id_type(6), account_id_type(7)};
+   BOOST_CHECK(!pred(op));
+   op.new_feed_producers = {account_id_type(1), account_id_type(5), account_id_type(6), account_id_type(7)};
+   BOOST_CHECK(!pred(op));
+   op.new_feed_producers = {account_id_type(5), account_id_type(6), account_id_type(7), account_id_type(8)};
+   BOOST_CHECK(!pred(op));
+} FC_LOG_AND_RETHROW() }
+
    /**
     * Test predicates containing logical ORs
     * Test of authorization and revocation of one account (Alice) authorizing multiple other accounts (Bob and Charlie)

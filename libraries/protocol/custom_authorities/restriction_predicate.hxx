@@ -261,10 +261,47 @@ struct predicate_in<fc::optional<Field>, flat_set<Element>, std::enable_if_t<com
        return c.count(*f) != 0;
    }
 };
+template<typename Container, typename Element>
+struct predicate_in<Container, flat_set<Element>,
+                    std::enable_if_t<is_container<Container> &&
+                                     comparable_types<typename Container::value_type, Element>>> {
+   // Check all values in container are in argument
+   constexpr static bool valid = true;
+   // Unsorted container
+   template<typename C = Container, std::enable_if_t<!is_flat_set<C>, bool> = true>
+   bool operator()(const Container& c, const flat_set<Element>& a) const {
+      return std::all_of(c.begin(), c.end(), [&a](const auto& ce) { return a.count(ce) > 0; });
+   }
+   // Sorted container
+   template<typename C = Container, std::enable_if_t<is_flat_set<C>, bool> = true>
+   bool operator()(const Container& c, const flat_set<Element>& a) const {
+      return std::includes(a.begin(), a.end(), c.begin(), c.end());
+   }
+};
 // Field-not-in-list is just field-in-list wrapped in a negator
-template<typename Field, typename Container> struct predicate_not_in : predicate_in<Field, Container> {
+template<typename Field, typename Container, typename=void> struct predicate_not_in : predicate_in<Field, Container> {
    using base = predicate_in<Field, Container>;
    bool operator()(const Field& f, const Container& c) const { return !base::operator()(f, c); }
+};
+// Container-field-not-in-list is not a simple negation of predicate_in, specialize here
+template<typename Container, typename Element>
+struct predicate_not_in<Container, flat_set<Element>,
+                        std::enable_if_t<is_container<Container> &&
+                                         comparable_types<typename Container::value_type, Element>>> {
+   constexpr static bool valid = true;
+   // Unsorted container
+   template<typename C = Container, std::enable_if_t<!is_flat_set<C>, bool> = true>
+   bool operator()(const Container& c, const flat_set<Element>& a) const {
+      return std::none_of(c.begin(), c.end(), [&a](const auto& ce) { return a.count(ce) > 0; });
+   }
+   // Sorted container
+   template<typename C = Container, std::enable_if_t<is_flat_set<C>, bool> = true>
+   bool operator()(const Container& c, const flat_set<Element>& a) const {
+      flat_set<typename Container::value_type> intersection;
+      std::set_intersection(c.begin(), c.end(), a.begin(), a.end(),
+                            std::inserter(intersection, intersection.begin()));
+      return intersection.empty();
+   }
 };
 
 // List-contains-list predicate
