@@ -2727,4 +2727,226 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
       } FC_LOG_AND_RETHROW()
    }
 
+
+   /**
+    * Test of has all (has_all) restriction on a container field
+    * Test of CAA for asset_update_feed_producers_operation
+    *
+    * Scenario: Test of authorization of one account (alice) authorizing another account (bob)
+    * to update an asset's feed producers as long as the list
+    * always includes trusted producers (trusted1, trusted2, trusted3)
+    */
+   BOOST_AUTO_TEST_CASE(authorized_feed_producers_2) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Accounts
+         //////
+         ACTORS((alice)(bob));
+         ACTORS((trusted1)(trusted2)(trusted3));
+         ACTORS((unknown1)(unknown2)(unknown3)(unknown4)(unknown5)(unknown6)(unknown7)(unknown8)(unknown9));
+         fund(alice, asset(500000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+
+
+         // Lambda for update asset feed producers
+         auto create_producers_op = [&](const account_id_type &issuer, const asset_id_type &asset, const flat_set<account_id_type> &new_producers) {
+            asset_update_feed_producers_operation op;
+
+            op.issuer = issuer;
+            op.asset_to_update = asset;
+            op.new_feed_producers = new_producers;
+
+            return op;
+         };
+
+
+         //////
+         // Create user-issued assets
+         //////
+         upgrade_to_lifetime_member(alice);
+         const asset_object &alicecoin = create_bitasset("ALICECOIN", alice.get_id());
+
+
+         //////
+         // Alice attempts to update the feed producers for ALICECOIN
+         // This should succeed because Alice can update her own asset
+         //////
+         flat_set<account_id_type> new_producers = {trusted1.get_id(), trusted2.get_id(), trusted3.get_id()};
+         asset_update_feed_producers_operation producers_op
+                 = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         trx.clear();
+         trx.operations = {producers_op};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the same transaction
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Bob attempts to update the feed producers for ALICECOIN with the required feed producers
+         // and an extra account
+         // This should fail because Bob is not authorized to update feed producers for ALICECOIN
+         //////
+         new_producers = {trusted1.get_id(), trusted2.get_id(), trusted3.get_id(), unknown1.get_id()};
+         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         trx.clear();
+         trx.operations = {producers_op};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+         // "rejected_custom_auths":[]
+         EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+
+
+         //////
+         // Alice authorizes Bob to update the feed producers
+         // but must not select untrusted1, untrusted2, untrusted3
+         //////
+         custom_authority_create_operation authorize_to_update_feed_producers;
+         authorize_to_update_feed_producers.account = alice.get_id();
+         authorize_to_update_feed_producers.auth.add_authority(bob.get_id(), 1);
+         authorize_to_update_feed_producers.auth.weight_threshold = 1;
+         authorize_to_update_feed_producers.enabled = true;
+         authorize_to_update_feed_producers.valid_to = db.head_block_time() + 1000;
+
+         authorize_to_update_feed_producers.operation_type = operation::tag<asset_update_feed_producers_operation>::value;
+         flat_set<account_id_type> trusted_producers = {trusted1.get_id(), trusted2.get_id(), trusted3.get_id()};
+         auto new_feed_producers_index = member_index<asset_update_feed_producers_operation>("new_feed_producers");
+         authorize_to_update_feed_producers.restrictions
+                 .emplace_back(new_feed_producers_index, FUNC(has_all), trusted_producers);
+         //[
+         //  {
+         //    "member_index": 3,
+         //    "restriction_type": 8,
+         //    "argument": [
+         //      26,
+         //      [
+         //        "1.2.18",
+         //        "1.2.19",
+         //        "1.2.20"
+         //      ]
+         //    ],
+         //    "extensions": []
+         //  }
+         //]
+         trx.clear();
+         trx.operations = {authorize_to_update_feed_producers};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the same transaction
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Bob attempts to update the feed producers for ALICECOIN with the required feed producers
+         // and an extra account
+         // This should succeed because Bob is now authorized to update the feed producers
+         // and because the all of the required feed producers are included
+         //////
+         trx.clear();
+         trx.operations = {producers_op};
+         sign(trx, bob_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Bob attempts to update the feed producers for ALICECOIN with none of the required feed producers
+         // This should fail not all of the required feed producers are included
+         //////
+         new_producers = {unknown2.get_id(), unknown3.get_id()};
+         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         trx.clear();
+         trx.operations = {producers_op};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should indicate the rejection path
+         // "rejection_path":[[0,0],[2,"predicate_was_false"]
+         // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for Restriction 1
+         // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+
+
+         //////
+         // Bob attempts to update the feed producers for ALICECOIN with only 1 of the required feed producers
+         // and extra accounts
+         // This should fail not all of the required feed producers are included
+         //////
+         new_producers = {trusted1.get_id(), unknown2.get_id(), unknown3.get_id()};
+         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         trx.clear();
+         trx.operations = {producers_op};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should indicate the rejection path
+         // "rejection_path":[[0,0],[2,"predicate_was_false"]
+         // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for Restriction 1
+         // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+
+
+         //////
+         // Bob attempts to update the feed producers for ALICECOIN with only 2 of the required feed producers
+         // and extra accounts
+         // This should fail not all of the required feed producers are included
+         //////
+         new_producers = {trusted1.get_id(), unknown2.get_id(), unknown3.get_id(), trusted2.get_id()};
+         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         trx.clear();
+         trx.operations = {producers_op};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should indicate the rejection path
+         // "rejection_path":[[0,0],[2,"predicate_was_false"]
+         // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for Restriction 1
+         // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+
+
+         //////
+         // Bob attempts to update the feed producers for ALICECOIN with all of the required feed producers
+         // and extra accounts
+         // This should succeed because Bob is now authorized to update the feed producers
+         // and because the all of the required feed producers are included
+         //////
+         new_producers = {trusted1.get_id(), unknown2.get_id(), unknown3.get_id(), trusted2.get_id(), trusted3.get_id()};
+         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         trx.clear();
+         trx.operations = {producers_op};
+         sign(trx, bob_private_key);
+         PUSH_TX(db, trx);
+
+         //////
+         // Bob attempts to update the feed producers for ALICECOIN with all of the required feed producers
+         // in a different order
+         // This should succeed because Bob is now authorized to update the feed producers
+         // and because the all of the required feed producers are included
+         //////
+         new_producers = {trusted3.get_id(), trusted2.get_id(), trusted1.get_id()};
+         producers_op = create_producers_op(alice.get_id(), alicecoin.id, new_producers);
+         trx.clear();
+         trx.operations = {producers_op};
+         sign(trx, bob_private_key);
+         PUSH_TX(db, trx);
+
+      } FC_LOG_AND_RETHROW()
+   }
+
 BOOST_AUTO_TEST_SUITE_END()
