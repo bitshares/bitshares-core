@@ -1747,9 +1747,11 @@ BOOST_AUTO_TEST_CASE( top_n_special )
    // } FC_LOG_AND_RETHROW()
 }
 
-// Modified test from witness_create above
-BOOST_AUTO_TEST_CASE( reward_split_test )
+BOOST_AUTO_TEST_CASE( standby_witnesses )
 { try {
+   // Create 21 new witnesses, vote them in, make sure they push the existing witnesses
+   // into standby. Make sure there's 10 of the new witnesses in standby as well.
+
    // setup test account
    ACTOR(nathan);
    ACTOR(nathan1);
