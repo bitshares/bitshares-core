@@ -52,9 +52,6 @@ BOOST_FIXTURE_TEST_SUITE(custom_authority_tests, database_fixture)
 
 #define FUNC(TYPE) BOOST_PP_CAT(restriction::func_, TYPE)
 
-size_t restriction_count(const vector<restriction>& rs) {
-   return std::for_each(rs.begin(), rs.end(), restriction::adder()).sum;
-}
 template<typename Object>
 unsigned_int member_index(string name) {
    unsigned_int index;
@@ -109,7 +106,7 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    //    "extensions": []
    //  }
    //]
-   BOOST_CHECK_EQUAL(restriction_count(restrictions), 1);
+   BOOST_CHECK_EQUAL(restriction::restriction_count(restrictions), 1);
    BOOST_CHECK(get_restriction_predicate(restrictions, operation::tag<transfer_operation>::value)(transfer)
                .rejection_path.size() == 2);
    // Index 0 (the outer-most) rejection path refers to the first and only restriction
@@ -226,7 +223,7 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    //  }
    //]
 
-   BOOST_CHECK_EQUAL(restriction_count(restrictions), 2);
+   BOOST_CHECK_EQUAL(restriction::restriction_count(restrictions), 2);
    //////
    // Check the transfer operation that pays the fee with Asset ID 0 against the restriction.
    // This should violate the restriction.
@@ -280,7 +277,7 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    //    "extensions": []
    //  }
    //]
-   BOOST_CHECK_EQUAL(restriction_count(restrictions), 3);
+   BOOST_CHECK_EQUAL(restriction::restriction_count(restrictions), 3);
 
    //////
    // Create a transfer operation that authorizes transfer to Account ID 12
@@ -338,7 +335,7 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
    //    "extensions": []
    //  }
    //]
-   BOOST_CHECK_EQUAL(restriction_count(restrictions), 2);
+   BOOST_CHECK_EQUAL(restriction::restriction_count(restrictions), 2);
    auto predicate = get_restriction_predicate(restrictions, operation::tag<account_update_operation>::value);
 
    //////
@@ -453,7 +450,7 @@ BOOST_AUTO_TEST_CASE(restriction_predicate_tests) { try {
          //    "extensions": []
          //  }
          //]
-         BOOST_CHECK_EQUAL(restriction_count(or_restrictions), 3);
+         BOOST_CHECK_EQUAL(restriction::restriction_count(or_restrictions), 3);
          auto predicate = get_restriction_predicate(or_restrictions, operation::tag<transfer_operation>::value);
 
          //////
@@ -570,7 +567,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    //    "extensions": []
    //  }
    //]
-   BOOST_CHECK_EQUAL(restriction_count(op.restrictions), 3);
+   BOOST_CHECK_EQUAL(restriction::restriction_count(op.restrictions), 3);
 
 
    //////
@@ -1643,7 +1640,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //    "extensions": []
          //  }
          //]
-         BOOST_CHECK_EQUAL(restriction_count(op.restrictions), 3);
+         BOOST_CHECK_EQUAL(restriction::restriction_count(op.restrictions), 3);
 
          // Publish the new custom authority
          trx.clear();

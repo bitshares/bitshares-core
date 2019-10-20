@@ -16,6 +16,7 @@ list(APPEND SOURCES account.cpp
                     asset.cpp
                     authority.cpp
                     special_authority.cpp
+                    restriction.cpp
                     custom_authority.cpp
                     committee_member.cpp
                     custom.cpp

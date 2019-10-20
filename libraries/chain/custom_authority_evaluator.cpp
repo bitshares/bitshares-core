@@ -48,7 +48,7 @@ void_result custom_authority_create_evaluator::do_evaluate(const custom_authorit
    bool operation_forked_in = hardfork_visitor(now).visit((operation::tag_type)op.operation_type.value);
    FC_ASSERT(operation_forked_in, "Cannot create custom authority for operation which is not valid yet");
 
-   auto restriction_count = std::for_each(op.restrictions.begin(), op.restrictions.end(), restriction::adder()).sum;
+   auto restriction_count = restriction::restriction_count(op.restrictions);
    FC_ASSERT(restriction_count <= config->max_custom_authority_restrictions,
              "Custom authority has more than the maximum number of restrictions");
 
@@ -137,8 +137,7 @@ void_result custom_authority_update_evaluator::do_evaluate(const custom_authorit
    for (const auto& restriction_pair : old_object->restrictions)
       if (op.restrictions_to_remove.count(restriction_pair.first) == 0)
          restriction_count += restriction_pair.second.restriction_count();
-   restriction_count += std::for_each(op.restrictions_to_add.begin(), op.restrictions_to_add.end(),
-                                      restriction::adder()).sum;
+   restriction_count += restriction::restriction_count(op.restrictions_to_add);
    // Check restriction count against limit
    FC_ASSERT(restriction_count <= config->max_custom_authority_restrictions,
              "Cannot update custom authority: updated authority would exceed the maximum number of restrictions");
