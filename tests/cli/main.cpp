@@ -1080,7 +1080,7 @@ BOOST_FIXTURE_TEST_CASE( sales_transaction, cli_fixture )
       auto jmjatlanta_balances = con.wallet_api_ptr->list_account_balances( "jmjatlanta" );
       for (auto b : jmjatlanta_balances) {
          if (b.asset_id == asset_id_type()) {
-            BOOST_ASSERT(b == asset(500000));
+            BOOST_CHECK_EQUAL(b.amount.value, 50000000000u); // 5 decimal places of precision
          }
       }
 
@@ -1095,7 +1095,7 @@ BOOST_FIXTURE_TEST_CASE( sales_transaction, cli_fixture )
       con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
 
       BOOST_CHECK(generate_block(app1));
-
+      
       // Attempt to perform a sale between jmjatlanta and bob
       BOOST_TEST_MESSAGE("Performing sale of 500000 tusc from jmjatlanta to bob");
       signed_transaction sale_tx = con.wallet_api_ptr->sale(
@@ -1107,14 +1107,119 @@ BOOST_FIXTURE_TEST_CASE( sales_transaction, cli_fixture )
       auto bob_balances = con.wallet_api_ptr->list_account_balances( "bob" );
       for (auto b : bob_balances) {
          if (b.asset_id == asset_id_type()) {
-            BOOST_ASSERT(b == asset(497500));
+            BOOST_CHECK_EQUAL(b.amount.value, 49750000000u); // 5 decimal places of precision
          }
       }
 
       jmjatlanta_balances = con.wallet_api_ptr->list_account_balances( "jmjatlanta" );
       for (auto b : jmjatlanta_balances) {
          if (b.asset_id == asset_id_type()) {
-            BOOST_ASSERT(b == asset(0));
+            BOOST_CHECK_EQUAL(b.amount.value, 0u);
+         }
+      }
+      
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_FIXTURE_TEST_CASE( sales_transaction_memo_length, cli_fixture )
+{
+   try
+   {
+      INVOKE(create_new_account);
+
+      // Give jmjatlanta some more TUSC
+      BOOST_TEST_MESSAGE("Transferring 490000 tusc from Nathan to jmjatlanta.");
+
+      signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", "490000",
+                                             "1.3.0", "Here are some CORE token for your new account", true);
+
+      BOOST_CHECK(generate_block(app1));
+
+      BOOST_TEST_MESSAGE("jmjatlanta should have a total of 500000 tusc.");
+
+      auto jmjatlanta_balances = con.wallet_api_ptr->list_account_balances( "jmjatlanta" );
+      for (auto b : jmjatlanta_balances) {
+         if (b.asset_id == asset_id_type()) {
+            BOOST_CHECK_EQUAL(b.amount.value, 50000000000u); // 5 decimal places of precision
+         }
+      }
+
+      // create another new account
+      graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
+      BOOST_CHECK(!bki.brain_priv_key.empty());
+      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(
+         bki.brain_priv_key, "bob", "nathan", "nathan", true
+      );
+      // save the private key for this new account in the wallet file
+      BOOST_CHECK(con.wallet_api_ptr->import_key("bob", bki.wif_priv_key));
+      con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
+
+      BOOST_CHECK(generate_block(app1));
+      
+      // Attempt to perform a sale between jmjatlanta and bob
+      BOOST_TEST_MESSAGE("Attempting a sale of 500000 tusc from jmjatlanta to bob with a memo that's too large");
+
+      BOOST_CHECK_THROW(con.wallet_api_ptr->sale(
+         "jmjatlanta", "bob", "500000", "1.3.0", 
+         "This memo is over 1kb and should fail validation. This memo is over 1kb and should fail validation. "
+         "This memo is over 1kb and should fail validation. This memo is over 1kb and should fail validation. "
+         "This memo is over 1kb and should fail validation. This memo is over 1kb and should fail validation. "
+         "This memo is over 1kb and should fail validation. This memo is over 1kb and should fail validation. "
+         "This memo is over 1kb and should fail validation. This memo is over 1kb and should fail validation. "
+         "This memo is over 1kb and should fail validation. This memo is over 1kb and should fail validation. "
+         "This memo is over 1kb and should fail validation. This memo is over 1kb and should fail validation. "
+         "This memo is over 1kb and should fail validation. This memo is over 1kb and should fail validation. "
+         "This memo is over 1kb and should fail validation. This memo is over 1kb and should fail validation. "
+         "This memo is over 1kb and should fail validation. This memo is over 1kb and should fail validation. ", true
+      ), fc::exception);
+      
+      BOOST_CHECK(generate_block(app1));
+
+      auto bob_balances = con.wallet_api_ptr->list_account_balances( "bob" );
+      for (auto b : bob_balances) {
+         if (b.asset_id == asset_id_type()) {
+            BOOST_CHECK_EQUAL(b.amount.value, 0u);
+         }
+      }
+
+      jmjatlanta_balances = con.wallet_api_ptr->list_account_balances( "jmjatlanta" );
+      for (auto b : jmjatlanta_balances) {
+         if (b.asset_id == asset_id_type()) {
+            BOOST_CHECK_EQUAL(b.amount.value, 50000000000u); // 5 decimal places of precision
+         }
+      }
+
+      // Attempt to perform a sale between jmjatlanta and bob
+      BOOST_TEST_MESSAGE("Attempting a sale of 500000 tusc from jmjatlanta to bob with a memo that's just barely small enough");
+      signed_transaction sale_tx = con.wallet_api_ptr->sale(
+         "jmjatlanta", "bob", "500000", "1.3.0", 
+         "This memo is under 1kb and should pass validation. This memo is under 1kb and should pass validation. "
+         "This memo is under 1kb and should pass validation. This memo is under 1kb and should pass validation. "
+         "This memo is under 1kb and should pass validation. This memo is under 1kb and should pass validation. "
+         "This memo is under 1kb and should pass validation. This memo is under 1kb and should pass validation. "
+         "This memo is under 1kb and should pass validation. This memo is under 1kb and should pass validation. "
+         "This memo is under 1kb and should pass validation. This memo is under 1kb and should pass validation. "
+         "This memo is under 1kb and should pass validation. This memo is under 1kb and should pass validation. "
+         "This memo is under 1kb and should pass validation. This memo is under 1kb and should pass validation. "
+         "This memo is under 1kb and should pass validation. This memo is under 1kb ", true
+      );
+      
+      BOOST_CHECK(generate_block(app1));
+
+      bob_balances = con.wallet_api_ptr->list_account_balances( "bob" );
+      for (auto b : bob_balances) {
+         if (b.asset_id == asset_id_type()) {
+            BOOST_CHECK_EQUAL(b.amount.value, 49750000000u); // 5 decimal places of precision
+         }
+      }
+
+      jmjatlanta_balances = con.wallet_api_ptr->list_account_balances( "jmjatlanta" );
+      for (auto b : jmjatlanta_balances) {
+         if (b.asset_id == asset_id_type()) {
+            BOOST_CHECK_EQUAL(b.amount.value, 0u);
          }
       }
       
