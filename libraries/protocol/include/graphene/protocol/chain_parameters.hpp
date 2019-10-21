@@ -35,6 +35,14 @@ namespace graphene { namespace protocol {
       uint32_t max_preimage_size;
    };
 
+   struct custom_authority_options_type
+   {
+      uint32_t max_custom_authority_lifetime_seconds = GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS;
+      uint32_t max_custom_authorities_per_account = GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITIES_PER_ACCOUNT;
+      uint32_t max_custom_authorities_per_account_op = GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITIES_PER_ACCOUNT_OP;
+      uint32_t max_custom_authority_restrictions = GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_RESTRICTIONS;
+   };
+
    struct chain_parameters
    {
       /** using a shared_ptr breaks the circular dependency created between operations and the fee schedule */
@@ -74,6 +82,7 @@ namespace graphene { namespace protocol {
       struct ext
       {
          optional< htlc_options > updatable_htlc_options;
+         optional< custom_authority_options_type > custom_authority_options;
       };
 
       extension<ext> extensions;
@@ -98,8 +107,16 @@ FC_REFLECT( graphene::protocol::htlc_options,
       (max_preimage_size)
 )
 
+FC_REFLECT( graphene::protocol::custom_authority_options_type,
+      (max_custom_authority_lifetime_seconds)
+      (max_custom_authorities_per_account)
+      (max_custom_authorities_per_account_op)
+      (max_custom_authority_restrictions)
+)
+
 FC_REFLECT( graphene::protocol::chain_parameters::ext,
       (updatable_htlc_options)
+      (custom_authority_options)
 )
 
 FC_REFLECT( graphene::protocol::chain_parameters,

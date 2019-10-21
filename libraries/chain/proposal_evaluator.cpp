@@ -100,6 +100,16 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_redeem_operation>());
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_extend_operation>());
       }
+      if (!HARDFORK_BSIP_40_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.extensions.value.custom_authority_options.valid(),
+                   "Unable to set Custom Authority Options before hardfork BSIP 40");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<custom_authority_create_operation>(),
+                   "Unable to define fees for custom authority operations prior to hardfork BSIP 40");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<custom_authority_update_operation>(),
+                   "Unable to define fees for custom authority operations prior to hardfork BSIP 40");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<custom_authority_delete_operation>(),
+                   "Unable to define fees for custom authority operations prior to hardfork BSIP 40");
+      }
    }
    void operator()(const graphene::chain::htlc_create_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
@@ -109,6 +119,15 @@ struct proposal_operation_hardfork_visitor
    }
    void operator()(const graphene::chain::htlc_extend_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
+   }
+   void operator()(const graphene::chain::custom_authority_create_operation&) const {
+      FC_ASSERT( HARDFORK_BSIP_40_PASSED(block_time), "Not allowed until hardfork BSIP 40" );
+   }
+   void operator()(const graphene::chain::custom_authority_update_operation&) const {
+      FC_ASSERT( HARDFORK_BSIP_40_PASSED(block_time), "Not allowed until hardfork BSIP 40" );
+   }
+   void operator()(const graphene::chain::custom_authority_delete_operation&) const {
+      FC_ASSERT( HARDFORK_BSIP_40_PASSED(block_time), "Not allowed until hardfork BSIP 40" );
    }
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {

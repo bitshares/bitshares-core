@@ -16,6 +16,7 @@
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/transaction_history_object.hpp>
+#include <graphene/chain/custom_authority_object.hpp>
 #include <graphene/chain/impacted.hpp>
 #include <graphene/chain/hardfork.hpp>
 
@@ -289,6 +290,21 @@ struct get_impacted_account_visitor
    { 
       _impacted.insert( op.fee_payer() );
    }
+   void operator()( const custom_authority_create_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+      add_authority_accounts( _impacted, op.auth );
+   }
+   void operator()( const custom_authority_update_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+      if ( op.new_auth )
+         add_authority_accounts(_impacted, *op.new_auth);
+   }
+   void operator()( const custom_authority_delete_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+   }
 };
 
 void graphene::chain::operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result, bool ignore_custom_operation_required_auths ) {
@@ -381,6 +397,11 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               accounts.insert( htlc_obj->transfer.from );
               accounts.insert( htlc_obj->transfer.to );
               break;
+        } case custom_authority_object_type:{
+           const auto* cust_auth_obj = dynamic_cast<const custom_authority_object*>( obj );
+           FC_ASSERT( cust_auth_obj != nullptr );
+           accounts.insert( cust_auth_obj->account );
+           add_authority_accounts( accounts, cust_auth_obj->auth );
         }
       }
    }

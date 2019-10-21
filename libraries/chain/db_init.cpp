@@ -47,6 +47,7 @@
 #include <graphene/chain/witness_schedule_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
+#include <graphene/chain/custom_authority_object.hpp>
 
 #include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/asset_evaluator.hpp>
@@ -63,6 +64,7 @@
 #include <graphene/chain/witness_evaluator.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
 #include <graphene/chain/htlc_evaluator.hpp>
+#include <graphene/chain/custom_authority_evaluator.hpp>
 
 #include <fc/crypto/digest.hpp>
 
@@ -127,6 +129,8 @@ const uint8_t worker_object::type_id;
 const uint8_t htlc_object::space_id;
 const uint8_t htlc_object::type_id;
 
+const uint8_t custom_authority_object::space_id;
+const uint8_t custom_authority_object::type_id;
 
 void database::initialize_evaluators()
 {
@@ -178,6 +182,9 @@ void database::initialize_evaluators()
    register_evaluator<htlc_create_evaluator>();
    register_evaluator<htlc_redeem_evaluator>();
    register_evaluator<htlc_extend_evaluator>();
+   register_evaluator<custom_authority_create_evaluator>();
+   register_evaluator<custom_authority_update_evaluator>();
+   register_evaluator<custom_authority_delete_evaluator>();
 }
 
 void database::initialize_indexes()
@@ -207,6 +214,7 @@ void database::initialize_indexes()
    add_index< primary_index<balance_index> >();
    add_index< primary_index<blinded_balance_index> >();
    add_index< primary_index< htlc_index> >();
+   add_index< primary_index< custom_authority_index> >();
 
    //Implementation object indexes
    add_index< primary_index<transaction_index                             > >();
