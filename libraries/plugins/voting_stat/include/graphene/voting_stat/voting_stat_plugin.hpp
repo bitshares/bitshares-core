@@ -44,7 +44,8 @@ namespace graphene { namespace voting_stat {
 enum voting_stat_object_type_ids
 {
    voting_statistics_object_type_id,
-   voteable_statistics_object_type_id
+   voteable_statistics_object_type_id,
+   maintenance_counter_object_type_id
 };
 
 namespace detail

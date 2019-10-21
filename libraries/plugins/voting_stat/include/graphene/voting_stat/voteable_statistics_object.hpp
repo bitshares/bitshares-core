@@ -43,7 +43,7 @@ namespace graphene { namespace voting_stat {
    /**
     * @brief tracks the history voting related data per account
     * @ingroup object
-    * @ingroup implementation
+    * @ingroup voting_stat_plugin
     *
     * The calculation of the voting stake, performed in the maintenance interval, results
     * in the creation or, if present, in the update of a voting_statistics_object.

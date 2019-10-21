@@ -25,6 +25,8 @@
 
 #include <graphene/voting_stat/voting_statistics_object.hpp>
 #include <graphene/voting_stat/voteable_statistics_object.hpp>
+#include <graphene/voting_stat/maintenance_counter_object.hpp>
+
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
@@ -52,13 +54,10 @@ public:
    boost::signals2::connection _on_voting_stake_calc_conn;
    std::unique_ptr<boost::signals2::shared_connection_block> _on_voting_stake_calc_block;
 
-   uint16_t _maint_counter = 0;
-
    /**
     * plugin parameters
     */
    bool     _keep_objects_in_db     = true;
-   uint16_t _track_every_x_maint    = 12;
    bool     _track_worker_votes     = true;
    bool     _track_witness_votes    = true;
    bool     _track_committee_votes  = true;
@@ -108,14 +107,14 @@ void voting_stat_plugin_impl::on_maintenance_begin(uint32_t block_num)
    if( !_keep_objects_in_db )
       delete_all_statistics_objects();
 
-   if( _maint_counter == _track_every_x_maint )
+   auto& db = database();
+   const auto& maint_counter_obj = *db.get_index_type<maintenance_counter_index>().indices().get<by_id>().begin();
+   if( maint_counter_obj.counter_reached( db ) )
    {
       _on_voting_stake_calc_block->unblock();
-      _maint_counter = 0;
       _maint_block = block_num;
       _create_voteable = true;
    }
-   ++_maint_counter;
 }
 
 void voting_stat_plugin_impl::on_maintenance_end()
@@ -147,8 +146,6 @@ void voting_stat_plugin_impl::create_voteable_statistics_objects()
 {
    auto& db = database();
 
-   // TODO secondary index for workers where current_time < worker_end_time
-   // will reduce the iteration time
    if( _track_worker_votes )
    {
       const auto& worker_idx = db.get_index_type<worker_index>().indices().get<by_id>();
@@ -326,13 +323,8 @@ void voting_stat_plugin::plugin_initialize(const boost::program_options::variabl
    auto& db = database();
    db.add_index< primary_index<voting_statistics_index> >();
    db.add_index< primary_index<voteable_statistics_index> >();
+   db.add_index< primary_index<maintenance_counter_index> >();
 
-   if( options.count("voting-stat-track-every-x-maint") ){
-      my->_track_every_x_maint = options["voting-stat-track-every-x-maint"].as<uint16_t>();
-      if( my->_track_every_x_maint == 0 )
-         my->_track_every_x_maint = 1;
-      my->_maint_counter = my->_track_every_x_maint;
-   }
    if( options.count("voting-stat-keep-objects-in-db") ){
       my->_keep_objects_in_db = options["voting-stat-keep-objects-in-db"].as<bool>();
    }
@@ -344,6 +336,31 @@ void voting_stat_plugin::plugin_initialize(const boost::program_options::variabl
    }
    if( options.count("voting-stat-track-committee-votes") ){
       my->_track_committee_votes = options["voting-stat-track-committee-votes"].as<bool>();
+   }
+   uint16_t track_every_x_maint = 12;
+   if( options.count("voting-stat-track-every-x-maint") )
+   {
+      track_every_x_maint = options["voting-stat-track-every-x-maint"].as<uint16_t>();
+      if( track_every_x_maint == 0 )
+         track_every_x_maint = 1;
+   }
+   const auto& maint_counter_idx = db.get_index_type<maintenance_counter_index>().indices().get<by_id>();
+   if( maint_counter_idx.empty() )
+   {
+      db.create<maintenance_counter_object>( [track_every_x_maint]( maintenance_counter_object& o ) {
+         o.max_counter = track_every_x_maint;
+         o.counter     = track_every_x_maint;
+      });
+   }
+   else
+   {
+      db.modify<maintenance_counter_object>( *maint_counter_idx.begin(),
+         [track_every_x_maint]( maintenance_counter_object& o )
+         {
+            o.max_counter = track_every_x_maint;
+            o.counter     = track_every_x_maint;
+         }
+      );
    }
 
    my->_on_voting_stake_calc_conn = db.on_voting_stake_calculated.connect(
