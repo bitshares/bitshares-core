@@ -2066,6 +2066,321 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
    /**
+    * Test of in (in) restriction on an operation field
+    * Test of CAA for override_transfer_operation
+    *
+    * Scenario: Test of authorization of one account (alice) authorizing another account (bob)
+    * to override transfer an asset (ALICECOIN) from only 2 accounts (suspicious1, suspicious2)
+    */
+   BOOST_AUTO_TEST_CASE(authorized_override_transfer) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Accounts
+         //////
+         ACTORS((alice)(bob)(allowed1)(allowed2)(suspicious1)(suspicious2)(allowed3)(arbitrator));
+         fund(alice, asset(500000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+
+
+         // Lambda for issuing an asset to an account
+         auto issue_amount_to = [&](const account_id_type &issuer, const asset &amount, const account_id_type &to) {
+            asset_issue_operation op;
+            op.issuer = issuer;
+            op.asset_to_issue = amount;
+            op.issue_to_account = to;
+
+            return op;
+         };
+
+         // Lambda for reserving an asset from an account
+         auto create_override = [&](const account_id_type &issuer, const account_id_type &from, const asset &amount,
+                                      const account_id_type &to) {
+            override_transfer_operation op;
+            op.issuer = issuer;
+            op.from = from;
+            op.amount = amount;
+            op.to = to;
+
+            return op;
+         };
+
+         //////
+         // Initialize: Create user-issued assets
+         //////
+         upgrade_to_lifetime_member(alice);
+         create_user_issued_asset("ALICECOIN", alice, UIA_ASSET_ISSUER_PERMISSION_MASK);
+         create_user_issued_asset( "SPECIALCOIN", alice,  UIA_ASSET_ISSUER_PERMISSION_MASK);
+         generate_blocks(1);
+         const asset_object &alicecoin = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("ALICECOIN");
+         const asset_object &specialcoin
+                 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SPECIALCOIN");
+
+         //////
+         // Initialize: Alice issues her two coins to different accounts
+         //////
+         asset_issue_operation issue_alice_to_allowed1_op
+                 = issue_amount_to(alice.get_id(), asset(100, alicecoin.id), allowed1.get_id());
+         asset_issue_operation issue_alice_to_allowed2_op
+                 = issue_amount_to(alice.get_id(), asset(200, alicecoin.id), allowed2.get_id());
+         asset_issue_operation issue_alice_to_allowed3_op
+                 = issue_amount_to(alice.get_id(), asset(300, alicecoin.id), allowed3.get_id());
+         asset_issue_operation issue_alice_to_suspicious1_op
+                 = issue_amount_to(alice.get_id(), asset(100, alicecoin.id), suspicious1.get_id());
+         asset_issue_operation issue_alice_to_suspicious2_op
+                 = issue_amount_to(alice.get_id(), asset(200, alicecoin.id), suspicious2.get_id());
+
+         asset_issue_operation issue_special_to_allowed1_op
+                 = issue_amount_to(alice.get_id(), asset(1000, specialcoin.id), allowed1.get_id());
+         asset_issue_operation issue_special_to_allowed2_op
+                 = issue_amount_to(alice.get_id(), asset(2000, specialcoin.id), allowed2.get_id());
+         asset_issue_operation issue_special_to_allowed3_op
+                 = issue_amount_to(alice.get_id(), asset(3000, specialcoin.id), allowed3.get_id());
+         asset_issue_operation issue_special_to_suspicious1_op
+                 = issue_amount_to(alice.get_id(), asset(1000, specialcoin.id), suspicious1.get_id());
+         asset_issue_operation issue_special_to_suspicious2_op
+                 = issue_amount_to(alice.get_id(), asset(2000, specialcoin.id), suspicious2.get_id());
+         trx.clear();
+         trx.operations = {issue_alice_to_allowed1_op, issue_alice_to_allowed2_op, issue_alice_to_allowed3_op,
+                 issue_alice_to_suspicious1_op, issue_alice_to_suspicious2_op,
+                 issue_special_to_allowed1_op, issue_special_to_allowed2_op, issue_special_to_allowed3_op,
+                 issue_special_to_suspicious1_op, issue_special_to_suspicious2_op};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Alice attempts to override some ALICECOIN from some account
+         // This should succeed because Alice is the issuer
+         //////
+         override_transfer_operation override_op
+                 = create_override(alice.get_id(), allowed1.get_id(), asset(20, alicecoin.id), arbitrator.get_id());
+         trx.clear();
+         trx.operations = {override_op};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+         int64_t allowed1_balance_alicecoin_after_override1 = get_balance(allowed1.get_id(), alicecoin.get_id());
+         BOOST_CHECK_EQUAL(allowed1_balance_alicecoin_after_override1, 80);
+
+         override_op
+                 = create_override(alice.get_id(), suspicious1.get_id(), asset(20, alicecoin.id), arbitrator.get_id());
+         trx.clear();
+         trx.operations = {override_op};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+         int64_t suspicious1_balance_alicecoin_after_override1
+                 = get_balance(suspicious1.get_id(), alicecoin.get_id());
+         BOOST_CHECK_EQUAL(suspicious1_balance_alicecoin_after_override1, 80);
+
+         override_op
+                 = create_override(alice.get_id(), allowed1.get_id(), asset(200, specialcoin.id), arbitrator.get_id());
+         trx.clear();
+         trx.operations = {override_op};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+         int64_t allowed1_balance_specialcoin_after_override1 = get_balance(allowed1.get_id(), specialcoin.id);
+         BOOST_CHECK_EQUAL(allowed1_balance_specialcoin_after_override1, 800);
+
+         override_op
+                 = create_override(alice.get_id(), suspicious1.get_id(), asset(200, specialcoin.id), arbitrator.get_id());
+         trx.clear();
+         trx.operations = {override_op};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+         int64_t suspicious1_balance_specialcoin_after_override1 = get_balance(suspicious1.get_id(), specialcoin.id);
+         BOOST_CHECK_EQUAL(suspicious1_balance_specialcoin_after_override1, 800);
+
+
+         //////
+         // Bob attempts to override some ALICECOIN and SPECIAL from some accounts
+         // This should fail because Bob is not authorized to override any ALICECOIN nor SPECIALCOIN
+         //////
+         override_op = create_override(alice.get_id(), allowed1.get_id(), asset(25, alicecoin.id), arbitrator.get_id());
+         trx.clear();
+         trx.operations = {override_op};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+         // "rejected_custom_auths":[]
+         EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+
+         override_op = create_override(alice.get_id(), allowed1.get_id(), asset(25, specialcoin.id), arbitrator.get_id());
+         trx.clear();
+         trx.operations = {override_op};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+         // "rejected_custom_auths":[]
+         EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+
+
+         //////
+         // Alice authorizes Bob to override transfer ALICECOIN on its behalf
+         // only for accounts suspicious1, and suspicious2
+         //////
+         custom_authority_create_operation authorize_to_override;
+         authorize_to_override.account = alice.get_id();
+         authorize_to_override.auth.add_authority(bob.get_id(), 1);
+         authorize_to_override.auth.weight_threshold = 1;
+         authorize_to_override.enabled = true;
+         authorize_to_override.valid_to = db.head_block_time() + 1000;
+         authorize_to_override.operation_type = operation::tag<override_transfer_operation>::value;
+
+         auto amount_index = member_index<override_transfer_operation>("amount");
+         auto asset_id_index = member_index<asset>("asset_id");
+         authorize_to_override.restrictions
+                 .emplace_back(restriction(amount_index, restriction::func_attr, vector<restriction>{
+                 restriction(asset_id_index, restriction::func_eq, alicecoin.get_id())}));
+         auto from_index = member_index<override_transfer_operation>("from");
+         authorize_to_override.restrictions
+                 .emplace_back(from_index, FUNC(in),
+                               flat_set<account_id_type>{suspicious1.get_id(), suspicious2.get_id()});
+         //[
+         //  {
+         //    "member_index": 4,
+         //    "restriction_type": 10,
+         //    "argument": [
+         //      39,
+         //      [
+         //        {
+         //          "member_index": 1,
+         //          "restriction_type": 0,
+         //          "argument": [
+         //            8,
+         //            "1.3.2"
+         //          ],
+         //          "extensions": []
+         //        }
+         //      ]
+         //    ],
+         //    "extensions": []
+         //  },
+         //  {
+         //    "member_index": 2,
+         //    "restriction_type": 6,
+         //    "argument": [
+         //      26,
+         //      [
+         //        "1.2.20",
+         //        "1.2.21"
+         //      ]
+         //    ],
+         //    "extensions": []
+         //  }
+         //]
+
+         trx.clear();
+         trx.operations = {authorize_to_override};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the reused operation
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Bob attempts to override transfer some ALICECOIN from a suspicious account
+         // This should succeed because Bob is now authorized to override ALICECOIN from some accounts
+         //////
+         override_op = create_override(alice.get_id(), suspicious1.get_id(), asset(25, alicecoin.id), arbitrator.get_id());
+         trx.clear();
+         trx.operations = {override_op};
+         sign(trx, bob_private_key);
+         PUSH_TX(db, trx);
+         int64_t suspicious1_balance_alicecoin_after_override2
+                 = get_balance(suspicious1.get_id(), alicecoin.get_id());
+         BOOST_CHECK_EQUAL(suspicious1_balance_alicecoin_after_override2, suspicious1_balance_alicecoin_after_override1 - 25);
+
+
+         //////
+         // Bob attempts to override transfer some SPECIALCOIN from a suspicious account
+         // This should fail because Bob is not authorized to override SPECIALCOIN from any accounts
+         //////
+         override_op = create_override(alice.get_id(), suspicious1.get_id(), asset(250, specialcoin.id), arbitrator.get_id());
+         trx.clear();
+         trx.operations = {override_op};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should indicate the rejection path
+         // "rejection_path":[[0,0],[0,0],[2,"predicate_was_false"]
+         // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for Restriction 1
+         // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for the only argument
+         // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+
+
+         //////
+         // Bob attempts to override transfer some SPECIALCOIN from an allowed account
+         // This should fail because Bob is not authorized to override SPECIALCOIN from any accounts
+         //////
+         override_op = create_override(alice.get_id(), allowed3.get_id(), asset(250, specialcoin.id), arbitrator.get_id());
+         trx.clear();
+         trx.operations = {override_op};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should indicate the rejection path
+         // "rejection_path":[[0,0],[0,0],[2,"predicate_was_false"]
+         // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for Restriction 1
+         // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for the only argument
+         // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+
+
+         //////
+         // Bob attempts to override transfer some ALICECOIN from an allowed account
+         // This should fail because Bob is only authorized to override ALICECOIN from suspicious accounts
+         //////
+         override_op = create_override(alice.get_id(), allowed2.get_id(), asset(20, alicecoin.id), arbitrator.get_id());
+         trx.clear();
+         trx.operations = {override_op};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should indicate the rejection path
+         // "rejection_path":[[0,1],[2,"predicate_was_false"]
+         // [0,1]: 0 is the rejection_indicator for an index to a sub-restriction; 1 is the index value for Restriction 2
+         // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,1],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         int64_t allowed2_balance_alicecoin_after_no_override
+                 = get_balance(allowed2.get_id(), alicecoin.get_id());
+         BOOST_CHECK_EQUAL(allowed2_balance_alicecoin_after_no_override, 200);
+         int64_t allowed2_balance_specialcoin_no_override
+                 = get_balance(allowed2.get_id(), specialcoin.get_id());
+         BOOST_CHECK_EQUAL(allowed2_balance_specialcoin_no_override, 2000);
+
+
+         //////
+         // Alice attempts to override transfer of SPECIAL COIN from an allowed account
+         // This should succeed because Alice has not revoked her own authorities as issuer
+         //////
+         override_op = create_override(alice.get_id(), allowed3.get_id(), asset(500, specialcoin.id), arbitrator.get_id());
+         trx.clear();
+         trx.operations = {override_op};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+         int64_t allowed3_balance_alicecoin_after_no_override
+                 = get_balance(allowed3.get_id(), alicecoin.get_id());
+         BOOST_CHECK_EQUAL(allowed3_balance_alicecoin_after_no_override, 300);
+         int64_t allowed3_balance_specialcoin_after_override1
+                 = get_balance(allowed3.get_id(), specialcoin.get_id());
+         BOOST_CHECK_EQUAL(allowed3_balance_specialcoin_after_override1, 3000 - 500);
+
+      } FC_LOG_AND_RETHROW()
+   }
+
+
+   /**
     * Test of authorization of a key to transfer one asset type (USDBIT) from one account (coldwallet)
     * to another account (hotwallet)
     */
