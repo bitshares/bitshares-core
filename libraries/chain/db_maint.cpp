@@ -878,7 +878,6 @@ void update_call_orders_hf_343( database& db )
 void update_call_orders_hf_1270( database& db )
 {
    // Update call_price
-   wlog( "Updating all call orders for hardfork core-1270 at block ${n}", ("n",db.head_block_num()) );
    for( const auto& call_obj : db.get_index_type<call_order_index>().indices().get<by_id>() )
    {
       db.modify( call_obj, []( call_order_object& call ) {
@@ -886,7 +885,6 @@ void update_call_orders_hf_1270( database& db )
          call.call_price.quote.amount = 1;
       });
    }
-   wlog( "Done updating all call orders for hardfork core-1270 at block ${n}", ("n",db.head_block_num()) );
 }
 
 /// Match call orders for all bitAssets, including PMs.
@@ -946,11 +944,12 @@ void database::process_bitassets()
 
 /****
  * @brief a one-time data process to correct max_supply
+ * 
+ * NOTE: while exceeding max_supply happened in mainnet, it seemed to have corrected
+ * itself before HF 1465. But this method must remain to correct some assets in testnet
  */
 void process_hf_1465( database& db )
 {
-   const auto head_num = db.head_block_num();
-   wlog( "Processing hard fork core-1465 at block ${n}", ("n",head_num) );
    // for each market issued asset
    const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
    for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
@@ -1003,15 +1002,12 @@ void update_median_feeds(database& db)
  * @param db the database
  * @param skip_check_call_orders true if check_call_orders() should not be called
  */
-// TODO: for better performance, this function can be removed if it actually updated nothing at hf time.
-//       * Also need to update related test cases
-//       * NOTE: the removal can't be applied to testnet
+// NOTE: Unable to remove this function for testnet nor mainnet. Unfortunately, bad
+//       feeds were found.
 void process_hf_868_890( database& db, bool skip_check_call_orders )
 {
    const auto next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
    const auto head_time = db.head_block_time();
-   const auto head_num = db.head_block_num();
-   wlog( "Processing hard fork core-868-890 at block ${n}", ("n",head_num) );
    // for each market issued asset
    const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
    for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
@@ -1027,9 +1023,6 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
 
       // for each feed
       const asset_bitasset_data_object& bitasset_data = current_asset.bitasset_data(db);
-      // NOTE: We'll only need old_feed if HF343 hasn't rolled out yet
-      auto old_feed = bitasset_data.current_feed;
-      bool feeds_changed = false; // did any feed change
       auto itr = bitasset_data.feeds.begin();
       while( itr != bitasset_data.feeds.end() )
       {
@@ -1037,7 +1030,6 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
          if ( itr->second.second.settlement_price.quote.asset_id != bitasset_data.options.short_backing_asset
                && ( is_witness_or_committee_fed || itr->second.second.settlement_price != price() ) )
          {
-            feeds_changed = true;
             db.modify( bitasset_data, [&itr, is_witness_or_committee_fed]( asset_bitasset_data_object& obj )
             {
                if( is_witness_or_committee_fed )
@@ -1060,88 +1052,14 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
          }
       } // end loop of each feed
 
-      // if any feed was modified, print a warning message
-      if( feeds_changed )
-      {
-         wlog( "Found invalid feed for asset ${asset_sym} (${asset_id}) during hardfork core-868-890",
-               ("asset_sym", current_asset.symbol)("asset_id", current_asset.id) );
-      }
-
       // always update the median feed due to https://github.com/bitshares/bitshares-core/issues/890
       db.modify( bitasset_data, [head_time,next_maint_time]( asset_bitasset_data_object &obj ) {
          obj.update_median_feeds( head_time, next_maint_time );
+         // NOTE: Normally we should call check_call_orders() after called update_median_feeds(), but for
+         // mainnet actually check_call_orders() would do nothing, so we skipped it for better performance.
       });
 
-      bool median_changed = ( old_feed.settlement_price != bitasset_data.current_feed.settlement_price );
-      bool median_feed_changed = ( !( old_feed == bitasset_data.current_feed ) );
-      if( median_feed_changed )
-      {
-         wlog( "Median feed for asset ${asset_sym} (${asset_id}) changed during hardfork core-868-890",
-               ("asset_sym", current_asset.symbol)("asset_id", current_asset.id) );
-      }
-
-      // Note: due to bitshares-core issue #935, the check below (using median_changed) is incorrect.
-      //       However, `skip_check_call_orders` will likely be true in both testnet and mainnet,
-      //         so effectively the incorrect code won't make a difference.
-      //       Additionally, we have code to update all call orders again during hardfork core-935
-      // TODO cleanup after hard fork
-      if( !skip_check_call_orders && median_changed ) // check_call_orders should be called
-      {
-         db.check_call_orders( current_asset );
-      }
-      else if( !skip_check_call_orders && median_feed_changed )
-      {
-         wlog( "Incorrectly skipped check_call_orders for asset ${asset_sym} (${asset_id}) during hardfork core-868-890",
-               ("asset_sym", current_asset.symbol)("asset_id", current_asset.id) );
-      }
    } // for each market issued asset
-   wlog( "Done processing hard fork core-868-890 at block ${n}", ("n",head_num) );
-}
-
-/******
- * @brief one-time data process for hard fork core-935
- *
- * Prior to hardfork 935, `check_call_orders` may be unintendedly skipped when
- * median price feed has changed. This method will run at the hardfork time, and
- * call `check_call_orders` for all markets.
- * https://github.com/bitshares/bitshares-core/issues/935
- *
- * @param db the database
- */
-// TODO: for better performance, this function can be removed if it actually updated nothing at hf time.
-//       * Also need to update related test cases
-//       * NOTE: perhaps the removal can't be applied to testnet
-void process_hf_935( database& db )
-{
-   bool changed_something = false;
-   const asset_bitasset_data_object* bitasset = nullptr;
-   bool settled_before_check_call;
-   bool settled_after_check_call;
-   // for each market issued asset
-   const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
-   for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
-   {
-      const auto& current_asset = *asset_itr;
-
-      if( !changed_something )
-      {
-         bitasset = &current_asset.bitasset_data( db );
-         settled_before_check_call = bitasset->has_settlement(); // whether already force settled
-      }
-
-      bool called_some = db.check_call_orders( current_asset );
-
-      if( !changed_something )
-      {
-         settled_after_check_call = bitasset->has_settlement(); // whether already force settled
-
-         if( settled_before_check_call != settled_after_check_call || called_some )
-         {
-            changed_something = true;
-            wlog( "process_hf_935 changed something" );
-         }
-      }
-   }
 }
 
 /**
@@ -1299,11 +1217,6 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    // Process inconsistent price feeds
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_868_890_TIME) && (next_maintenance_time > HARDFORK_CORE_868_890_TIME) )
       process_hf_868_890( *this, to_update_and_match_call_orders_for_hf_343 );
-
-   // Explicitly call check_call_orders of all markets
-   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_935_TIME) && (next_maintenance_time > HARDFORK_CORE_935_TIME)
-         && !to_update_and_match_call_orders_for_hf_343 )
-      process_hf_935( *this );
 
    // To reset call_price of all call orders, then match by new rule, for hard fork core-1270
    bool to_update_and_match_call_orders_for_hf_1270 = false;

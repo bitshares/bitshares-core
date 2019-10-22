@@ -27,7 +27,7 @@ struct reward_database_fixture : database_fixture
    using whitelist_market_fee_sharing_t = fc::optional<flat_set<account_id_type>>;
 
    reward_database_fixture()
-      : database_fixture(HARDFORK_1268_TIME - 100)
+      : database_fixture()
    {
    }
 
@@ -90,12 +90,6 @@ struct reward_database_fixture : database_fixture
       PUSH_TX( db, tx);
    }
 
-   void generate_blocks_past_hf1268()
-   {
-      database_fixture::generate_blocks( HARDFORK_1268_TIME );
-      database_fixture::generate_block();
-   }
-
    asset core_asset(int64_t x )
    {
        return asset( x*core_precision );
@@ -114,38 +108,11 @@ struct reward_database_fixture : database_fixture
 
 BOOST_FIXTURE_TEST_SUITE( fee_sharing_tests, reward_database_fixture )
 
-BOOST_AUTO_TEST_CASE(cannot_create_asset_with_additional_options_before_hf)
-{
-   try
-   {
-      ACTOR(issuer);
-
-      price price(asset(1, asset_id_type(1)), asset(1));
-      uint16_t market_fee_percent = 100;
-
-      additional_asset_options_t options;
-      options.value.reward_percent = 100;
-      options.value.whitelist_market_fee_sharing = flat_set<account_id_type>{issuer_id};
-
-      GRAPHENE_CHECK_THROW(create_user_issued_asset("USD",
-                                                    issuer,
-                                                    charge_market_fee,
-                                                    price,
-                                                    2,
-                                                    market_fee_percent,
-                                                    options),
-                           fc::assert_exception);
-   }
-   FC_LOG_AND_RETHROW()
-}
-
 BOOST_AUTO_TEST_CASE(create_asset_with_additional_options_after_hf)
 {
    try
    {
       ACTOR(issuer);
-
-      generate_blocks_past_hf1268();
 
       uint16_t reward_percent = GRAPHENE_100_PERCENT + 1; // 100.01%
       flat_set<account_id_type> whitelist = {issuer_id};
@@ -193,22 +160,6 @@ BOOST_AUTO_TEST_CASE(create_asset_with_additional_options_after_hf)
    FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE(cannot_update_additional_options_before_hf)
-{
-   try
-   {
-      ACTOR(issuer);
-
-      asset_object usd_asset = create_user_issued_asset("USD", issuer, charge_market_fee);
-
-      flat_set<account_id_type> whitelist = {issuer_id};
-      GRAPHENE_CHECK_THROW(
-                  update_asset(issuer_id, issuer_private_key, usd_asset.get_id(), 40, whitelist),
-                  fc::assert_exception );
-   }
-   FC_LOG_AND_RETHROW()
-}
-
 BOOST_AUTO_TEST_CASE(update_additional_options_after_hf)
 {
    try
@@ -216,8 +167,6 @@ BOOST_AUTO_TEST_CASE(update_additional_options_after_hf)
       ACTOR(issuer);
 
       asset_object usd_asset = create_user_issued_asset("USD", issuer, charge_market_fee);
-
-      generate_blocks_past_hf1268();
 
       uint16_t reward_percent = GRAPHENE_100_PERCENT + 1; // 100.01%
       flat_set<account_id_type> whitelist = {issuer_id};
@@ -245,6 +194,10 @@ BOOST_AUTO_TEST_CASE(asset_rewards_test)
 {
    try
    {
+      // handle small percentages
+      generate_blocks(HARDFORK_453_TIME + 10);
+      set_expiration(db, trx);
+
       ACTORS((registrar)(alicereferrer)(bobreferrer)(izzy)(jill));
 
       auto register_account = [&](const string& name, const account_object& referrer) -> const account_object&
@@ -279,8 +232,6 @@ BOOST_AUTO_TEST_CASE(asset_rewards_test)
 
       asset_id_type izzycoin_id = create_bitasset( "IZZYCOIN", izzy_id, izzycoin_market_percent ).id;
       asset_id_type jillcoin_id = create_bitasset( "JILLCOIN", jill_id, jillcoin_market_percent ).id;
-
-      generate_blocks_past_hf1268();
 
       update_asset(izzy_id, izzy_private_key, izzycoin_id, izzycoin_reward_percent);
       update_asset(jill_id, jill_private_key, jillcoin_id, jillcoin_reward_percent);
@@ -378,7 +329,6 @@ BOOST_AUTO_TEST_CASE(asset_claim_reward_test)
       transfer( committee_account, bob.get_id(),   core_asset(1000) );
       transfer( committee_account, izzy.get_id(),  core_asset(1000) );
 
-      generate_blocks_past_hf1268();
       // update_asset: set referrer percent
       update_asset(jill_id, jill_private_key, jillcoin.get_id(), jillcoin_reward_percent);
 
@@ -449,7 +399,6 @@ BOOST_AUTO_TEST_CASE(white_list_is_empty_test)
    {
       INVOKE(create_actors);
 
-      generate_blocks_past_hf1268();
       GET_ACTOR(jill);
 
       constexpr auto jillcoin_reward_percent = 2*GRAPHENE_1_PERCENT;
@@ -483,7 +432,6 @@ BOOST_AUTO_TEST_CASE(white_list_contains_registrar_test)
    {
       INVOKE(create_actors);
 
-      generate_blocks_past_hf1268();
       GET_ACTOR(jill);
 
       constexpr auto jillcoin_reward_percent = 2*GRAPHENE_1_PERCENT;
@@ -518,7 +466,6 @@ BOOST_AUTO_TEST_CASE(white_list_contains_referrer_test)
    {
       INVOKE(create_actors);
 
-      generate_blocks_past_hf1268();
       GET_ACTOR(jill);
 
       constexpr auto jillcoin_reward_percent = 2*GRAPHENE_1_PERCENT;
@@ -551,7 +498,6 @@ BOOST_AUTO_TEST_CASE(white_list_doesnt_contain_registrar_test)
    {
       INVOKE(create_actors);
 
-      generate_blocks_past_hf1268();
       GET_ACTOR(jill);
 
       constexpr auto jillcoin_reward_percent = 2*GRAPHENE_1_PERCENT;
@@ -609,17 +555,6 @@ BOOST_AUTO_TEST_CASE(create_asset_via_proposal_test)
       prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
 
       {
-         signed_transaction tx;
-         tx.operations.push_back( prop );
-         db.current_fee_schedule().set_fee( tx.operations.back() );
-         set_expiration( db, tx );
-         sign( tx, issuer_private_key );
-         GRAPHENE_CHECK_THROW(PUSH_TX( db, tx ), fc::exception);
-      }
-
-      generate_blocks_past_hf1268();
-
-      {
          prop.expiration_time =  db.head_block_time() + fc::days(1);
          signed_transaction tx;
          tx.operations.push_back( prop );
@@ -657,17 +592,6 @@ BOOST_AUTO_TEST_CASE(update_asset_via_proposal_test)
       prop.proposed_ops.emplace_back( update_op );
       prop.expiration_time =  db.head_block_time() + fc::days(1);
       prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
-
-      {
-         signed_transaction tx;
-         tx.operations.push_back( prop );
-         db.current_fee_schedule().set_fee( tx.operations.back() );
-         set_expiration( db, tx );
-         sign( tx, issuer_private_key );
-         GRAPHENE_CHECK_THROW(PUSH_TX( db, tx ), fc::exception);
-      }
-
-      generate_blocks_past_hf1268();
 
       {
          prop.expiration_time =  db.head_block_time() + fc::days(1);
@@ -738,8 +662,6 @@ BOOST_AUTO_TEST_CASE(accumulated_fees_after_hf_test)
    {
       INVOKE(issue_asset);
 
-      generate_blocks_past_hf1268();
-
       const asset_object &jillcoin = get_asset("JILLCOIN");
       const asset_object &izzycoin = get_asset("IZZYCOIN");
 
@@ -763,8 +685,6 @@ BOOST_AUTO_TEST_CASE(accumulated_fees_with_additional_options_after_hf_test)
    try
    {
       INVOKE(issue_asset);
-
-      generate_blocks_past_hf1268();
 
       GET_ACTOR(jill);
       GET_ACTOR(izzy);
@@ -791,36 +711,11 @@ BOOST_AUTO_TEST_CASE(accumulated_fees_with_additional_options_after_hf_test)
    FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE( create_vesting_balance_with_instant_vesting_policy_before_hf1268_test )
+BOOST_AUTO_TEST_CASE( create_vesting_balance_with_instant_vesting_policy_test )
 { try {
 
    ACTOR(alice);
    fund(alice);
-
-   const asset_object& core = asset_id_type()(db);
-
-   vesting_balance_create_operation op;
-   op.fee = core.amount( 0 );
-   op.creator = alice_id;
-   op.owner = alice_id;
-   op.amount = core.amount( 100 );
-   op.policy = instant_vesting_policy_initializer{};
-
-   trx.operations.push_back(op);
-   set_expiration( db, trx );
-   sign(trx, alice_private_key);
-
-   GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
-
-} FC_LOG_AND_RETHROW() }
-
-BOOST_AUTO_TEST_CASE( create_vesting_balance_with_instant_vesting_policy_after_hf1268_test )
-{ try {
-
-   ACTOR(alice);
-   fund(alice);
-
-   generate_blocks_past_hf1268();
 
    const asset_object& core = asset_id_type()(db);
 
@@ -881,17 +776,6 @@ BOOST_AUTO_TEST_CASE( create_vesting_balance_with_instant_vesting_policy_via_pro
    prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
 
    {
-      signed_transaction tx;
-      tx.operations.push_back( prop );
-      db.current_fee_schedule().set_fee( tx.operations.back() );
-      set_expiration( db, tx );
-      sign( tx, actor_private_key );
-      GRAPHENE_CHECK_THROW(PUSH_TX( db, tx ), fc::exception);
-   }
-
-   generate_blocks_past_hf1268();
-
-   {
       prop.expiration_time =  db.head_block_time() + fc::days(1);
       signed_transaction tx;
       tx.operations.push_back( prop );
@@ -938,8 +822,6 @@ BOOST_AUTO_TEST_CASE(white_list_asset_rewards_test)
       // Alice and Bob create some coins
       issue_uia( alice, izzycoin_id(db).amount( 200000 ) );
       issue_uia( bob, jillcoin_id(db).amount( 200000 ) );
-
-      generate_blocks_past_hf1268();
 
       constexpr auto izzycoin_reward_percent = 50*GRAPHENE_1_PERCENT;
       constexpr auto jillcoin_reward_percent = 50*GRAPHENE_1_PERCENT;
