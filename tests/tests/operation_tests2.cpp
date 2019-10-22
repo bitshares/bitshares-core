@@ -2027,13 +2027,19 @@ BOOST_AUTO_TEST_CASE( block_reward_split )
    // That means the overall funds distributed to standby witnesses should be
    // 4000 * .2 = 800, split among 21 standbys.
    // First standby gets 40, all others get 38.
-   for (auto standby_witness : standby_witnesses) {
+   for (int i = 0; i< standby_witnesses.size();i++) {
+      auto standby_witness = standby_witnesses[i];
+
       BOOST_CHECK_EQUAL(standby_witness(db).pay_vb.valid(), true);
       
       if( standby_witness(db).pay_vb.valid() )
       {
          auto vb = (*standby_witness(db).pay_vb)(db).balance.amount.value;
-         BOOST_CHECK_EQUAL(vb, 0u);
+         if(i == 0){
+            BOOST_CHECK_EQUAL(vb, 40u);
+         }else{
+            BOOST_CHECK_EQUAL(vb, 38u);
+         }
       }
    }
 } FC_LOG_AND_RETHROW() }
