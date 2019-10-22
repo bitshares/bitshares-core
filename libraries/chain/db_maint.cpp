@@ -168,16 +168,8 @@ void database::handle_block_reward_payout()
    share_type marketing_partner_reward = dpo.marketing_partner_reward_split_fund;
    share_type standby_witness_reward = dpo.standby_witness_reward_split_fund;
 
-   // get all standby witness objects
-   vector<optional<witness_object>> standby_witnesses; standby_witnesses.reserve(standby_witnesses_ids.size());
-   std::transform(standby_witnesses_ids.begin(), standby_witnesses_ids.end(), std::back_inserter(standby_witnesses),
-                  [this](witness_id_type id) -> optional<witness_object> {
-      if(auto o = find(id))
-         return *o;
-      return {};
-   });
-
-   if(standby_witnesses.size() == 0){
+   share_type standby_wit_count = standby_witnesses_ids.size();
+   if(standby_wit_count < 1){
       return;
    }
 
@@ -205,16 +197,16 @@ void database::handle_block_reward_payout()
    modify( core_dd, [&]( asset_dynamic_data_object& _core_dd )
    {
       _core_dd.current_max_supply += network_reward;
+      _core_dd.current_supply -= network_reward;
    } );
 
    // payout all standby witnesses
-   share_type wit_count = standby_witnesses.size();
-   share_type share = standby_witness_reward / wit_count;
-   share_type first_wit_share = standby_witness_reward - ( share * ( wit_count -1 ));
-   for (std::size_t i = 0; i != wit_count; ++i)
+   share_type share = standby_witness_reward / standby_wit_count;
+   share_type first_wit_share = standby_witness_reward - ( share * ( standby_wit_count -1 ));
+   for (std::size_t i = 0; i != standby_wit_count; ++i)
    {
      share_type current_share = i == 0 ? first_wit_share : share;
-     deposit_witness_pay( *standby_witnesses[i], current_share );
+     deposit_witness_pay( standby_witnesses_ids[i](*this), current_share );
    }
 
    // clear all reward accumulators 

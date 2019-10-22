@@ -2013,8 +2013,6 @@ BOOST_AUTO_TEST_CASE( block_reward_split )
    const auto& standby_witnesses = db.get_global_properties().standby_witnesses;
    BOOST_CHECK_EQUAL(standby_witnesses.size(), 21u);
 
-   const flat_map <account_id_type, witness_id_type> standby_witness_vbo_map;
-
    for (auto standby_witness : standby_witnesses) {
       BOOST_CHECK_EQUAL(standby_witness(db).pay_vb.valid(), false);
    }
@@ -2023,17 +2021,14 @@ BOOST_AUTO_TEST_CASE( block_reward_split )
    generate_block();
    generate_block();
    schedule_maint();
-
-   // For some reason, at this point, it runs into a segmentation fault while trying to payout the 
-   // Standby witnesses.
-   generate_block();
    generate_block();
    
-
+   // 4 blocks got created, with witness pay at 1000 per block. 
+   // That means the overall funds distributed to standby witnesses should be
+   // 4000 * .2 = 800, split among 21 standbys.
+   // First standby gets 40, all others get 38.
    for (auto standby_witness : standby_witnesses) {
-      BOOST_TEST_MESSAGE( printf("Standby witness = %s", "test" ) );
       BOOST_CHECK_EQUAL(standby_witness(db).pay_vb.valid(), true);
-
       
       if( standby_witness(db).pay_vb.valid() )
       {
