@@ -160,14 +160,13 @@ void database::handle_charity_fees()
 
 void database::handle_block_reward_payout()
 {
-   
    const global_property_object& gpo = get_global_properties();
    const dynamic_global_property_object& dpo = get_dynamic_global_properties();
    vector<witness_id_type> standby_witnesses_ids = gpo.standby_witnesses;
    const asset_dynamic_data_object& core_dd = get_core_dynamic_data();
-   share_type network_reward = dpo.network_fund;
-   share_type marketing_partner_reward = dpo.marketing_partner_fund;
-   share_type standby_witness_reward = dpo.standby_witness_fund;
+   share_type network_reward = dpo.network_reward_split_fund;
+   share_type marketing_partner_reward = dpo.marketing_partner_reward_split_fund;
+   share_type standby_witness_reward = dpo.standby_witness_reward_split_fund;
 
    // get all standby witness objects
    vector<optional<witness_object>> standby_witnesses; standby_witnesses.reserve(standby_witnesses_ids.size());
@@ -194,13 +193,18 @@ void database::handle_block_reward_payout()
       {
          // payout marketing partner
          adjust_balance(marketing_partner_itr->id,  marketing_partner_reward);
+
+         modify( dpo, [&]( dynamic_global_property_object& _dpo )
+         {
+            _dpo.marketing_partner_reward_split_fund = 0;
+         } );
       }
    }
    
    // payout network
    modify( core_dd, [&]( asset_dynamic_data_object& _core_dd )
    {
-      _core_dd.current_supply += network_reward;
+      _core_dd.current_max_supply += network_reward;
    } );
 
    // payout all standby witnesses
@@ -216,11 +220,9 @@ void database::handle_block_reward_payout()
    // clear all reward accumulators 
    modify( dpo, [&]( dynamic_global_property_object& _dpo )
    {
-      _dpo.standby_witness_fund = 0;
-      _dpo.marketing_partner_fund = 0;
-      _dpo.network_fund = 0;
+      _dpo.standby_witness_reward_split_fund = 0;
+      _dpo.network_reward_split_fund = 0;
    } );
-   
 }
 
 template<class Type>

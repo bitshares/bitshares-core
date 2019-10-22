@@ -1852,30 +1852,30 @@ BOOST_AUTO_TEST_CASE( standby_witnesses )
    };
 
    // create a map with account id and witness id of the first 11 witnesses
-      const flat_map <account_id_type, witness_id_type> witness_map = {
-            {nathan_id,  nathan_witness_id},
-            {nathan1_id, nathan_witness1_id},
-            {nathan2_id, nathan_witness2_id},
-            {nathan3_id, nathan_witness3_id},
-            {nathan4_id, nathan_witness4_id},
-            {nathan5_id, nathan_witness5_id},
-            {nathan6_id, nathan_witness6_id},
-            {nathan7_id, nathan_witness7_id},
-            {nathan8_id, nathan_witness8_id},
-            {nathan9_id, nathan_witness9_id},
-            {nathan10_id, nathan_witness10_id},
-            {nathan11_id, nathan_witness11_id},
-            {nathan12_id, nathan_witness12_id},
-            {nathan13_id, nathan_witness13_id},
-            {nathan14_id, nathan_witness14_id},
-            {nathan15_id, nathan_witness15_id},
-            {nathan16_id, nathan_witness16_id},
-            {nathan17_id, nathan_witness17_id},
-            {nathan18_id, nathan_witness18_id},
-            {nathan19_id, nathan_witness19_id},
-            {nathan20_id, nathan_witness20_id},
-            {nathan21_id, nathan_witness21_id}
-      };
+   const flat_map <account_id_type, witness_id_type> witness_map = {
+         {nathan_id,  nathan_witness_id},
+         {nathan1_id, nathan_witness1_id},
+         {nathan2_id, nathan_witness2_id},
+         {nathan3_id, nathan_witness3_id},
+         {nathan4_id, nathan_witness4_id},
+         {nathan5_id, nathan_witness5_id},
+         {nathan6_id, nathan_witness6_id},
+         {nathan7_id, nathan_witness7_id},
+         {nathan8_id, nathan_witness8_id},
+         {nathan9_id, nathan_witness9_id},
+         {nathan10_id, nathan_witness10_id},
+         {nathan11_id, nathan_witness11_id},
+         {nathan12_id, nathan_witness12_id},
+         {nathan13_id, nathan_witness13_id},
+         {nathan14_id, nathan_witness14_id},
+         {nathan15_id, nathan_witness15_id},
+         {nathan16_id, nathan_witness16_id},
+         {nathan17_id, nathan_witness17_id},
+         {nathan18_id, nathan_witness18_id},
+         {nathan19_id, nathan_witness19_id},
+         {nathan20_id, nathan_witness20_id},
+         {nathan21_id, nathan_witness21_id}
+   };
 
 
    // Give nathan some voting stake
@@ -1976,6 +1976,71 @@ BOOST_AUTO_TEST_CASE( standby_witnesses )
    BOOST_CHECK_EQUAL(standby_witnesses.begin()[19].instance.value, 9u);
    BOOST_CHECK_EQUAL(standby_witnesses.begin()[20].instance.value, 10u);
 
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( block_reward_split )
+{ try {
+   INVOKE(standby_witnesses);
+
+   auto schedule_maint = [&]()
+   {
+      // Do maintenance at next generated block
+      db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& _dpo )
+      {
+         _dpo.next_maintenance_time = db.head_block_time() + 1;
+      } );
+   };
+
+   db.modify( db.get_global_properties(), [&]( global_property_object& _gpo )
+   {
+      // Will exhaust the reserve.
+      _gpo.parameters.witness_pay_per_block = 1000;
+      _gpo.parameters.maintenance_interval = 100 * _gpo.parameters.block_interval;
+      _gpo.parameters.core_inflation_amount = 1000000; // this is mostly to increase the reserve
+   } );
+
+   schedule_maint();
+   generate_block();
+
+   const asset_object* core = &asset_id_type()(db);
+
+   BOOST_TEST_MESSAGE( printf("current_max_supply = %lu. current_supply = %lu, reserved = %lu  ", 
+   core->dynamic_data(db).current_max_supply.value, 
+   core->dynamic_data(db).current_supply.value, 
+   core->reserved(db).value) );
+
+
+   const auto& standby_witnesses = db.get_global_properties().standby_witnesses;
+   BOOST_CHECK_EQUAL(standby_witnesses.size(), 21u);
+
+   const flat_map <account_id_type, witness_id_type> standby_witness_vbo_map;
+
+   for (auto standby_witness : standby_witnesses) {
+      BOOST_CHECK_EQUAL(standby_witness(db).pay_vb.valid(), false);
+   }
+
+   generate_block();
+   generate_block();
+   generate_block();
+   schedule_maint();
+
+   // For some reason, at this point, it runs into a segmentation fault while trying to payout the 
+   // Standby witnesses.
+   generate_block();
+   generate_block();
+   
+
+   for (auto standby_witness : standby_witnesses) {
+      BOOST_TEST_MESSAGE( printf("Standby witness = %s", "test" ) );
+      BOOST_CHECK_EQUAL(standby_witness(db).pay_vb.valid(), true);
+
+      
+      if( standby_witness(db).pay_vb.valid() )
+      {
+         auto vb = (*standby_witness(db).pay_vb)(db).balance.amount.value;
+         BOOST_CHECK_EQUAL(vb, 0u);
+      }
+   }
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

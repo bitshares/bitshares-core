@@ -79,9 +79,9 @@ namespace graphene { namespace chain {
          time_point_sec    next_maintenance_time;
          time_point_sec    last_budget_time;
          share_type        witness_budget;
-         share_type        standby_witness_fund;
-         share_type        marketing_partner_fund;
-         share_type        network_fund;
+         share_type        standby_witness_reward_split_fund;
+         share_type        marketing_partner_reward_split_fund;
+         share_type        network_reward_split_fund;
          uint32_t          accounts_registered_this_interval = 0;
          /**
           *  Every time a block is missed this increases by
