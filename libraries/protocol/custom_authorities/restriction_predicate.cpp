@@ -45,12 +45,15 @@ restriction_predicate_function get_restriction_predicate(vector<restriction> rs,
          return get_restriction_predicate_list_6(typelist::index_of<operation_list_6::list, Op>(), std::move(rs));
       if (typelist::contains<operation_list_7::list, Op>())
          return get_restriction_predicate_list_7(typelist::index_of<operation_list_7::list, Op>(), std::move(rs));
+      if (typelist::contains<operation_list_8::list, Op>())
+         return get_restriction_predicate_list_8(typelist::index_of<operation_list_8::list, Op>(), std::move(rs));
 
       // Compile time check that we'll never get to the exception below
       static_assert(typelist::contains<typelist::concat<operation_list_1::list, operation_list_2::list,
                                                         operation_list_3::list, operation_list_4::list,
                                                         operation_list_5::list, operation_list_6::list,
-                                                        operation_list_7::list>, Op>(), "");
+                                                        operation_list_7::list, operation_list_8::list>,
+                                       Op>(), "");
       FC_THROW_EXCEPTION(fc::assert_exception,
                          "LOGIC ERROR: Operation type not handled by custom authorities implementation. "
                          "Please report this error.");

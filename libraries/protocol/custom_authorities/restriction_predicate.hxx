@@ -594,9 +594,10 @@ using operation_list_1 = static_variant<typelist::slice<operation::list, 0, 5>>;
 using operation_list_2 = static_variant<typelist::slice<operation::list, 5, 10>>;
 using operation_list_3 = static_variant<typelist::slice<operation::list, 10, 20>>;
 using operation_list_4 = static_variant<typelist::slice<operation::list, 20, 30>>;
-using operation_list_5 = static_variant<typelist::slice<operation::list, 30, 40>>;
-using operation_list_6 = static_variant<typelist::slice<operation::list, 40, 50>>;
-using operation_list_7 = static_variant<typelist::slice<operation::list, 50>>;
+using operation_list_5 = static_variant<typelist::slice<operation::list, 30, 35>>;
+using operation_list_6 = static_variant<typelist::slice<operation::list, 35, 40>>;
+using operation_list_7 = static_variant<typelist::slice<operation::list, 40, 50>>;
+using operation_list_8 = static_variant<typelist::slice<operation::list, 50>>;
 
 object_restriction_predicate<operation> get_restriction_predicate_list_1(size_t idx, vector<restriction> rs);
 object_restriction_predicate<operation> get_restriction_predicate_list_2(size_t idx, vector<restriction> rs);
@@ -605,5 +606,6 @@ object_restriction_predicate<operation> get_restriction_predicate_list_4(size_t 
 object_restriction_predicate<operation> get_restriction_predicate_list_5(size_t idx, vector<restriction> rs);
 object_restriction_predicate<operation> get_restriction_predicate_list_6(size_t idx, vector<restriction> rs);
 object_restriction_predicate<operation> get_restriction_predicate_list_7(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_predicate_list_8(size_t idx, vector<restriction> rs);
 
 } } // namespace graphene::protocol
