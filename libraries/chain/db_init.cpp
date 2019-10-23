@@ -196,18 +196,12 @@ void database::initialize_indexes()
    add_index< primary_index<asset_index, 13> >(); // 8192 assets per chunk
    add_index< primary_index<force_settlement_index> >();
 
-   auto acnt_index = add_index< primary_index<account_index, 20> >(); // ~1 million accounts per chunk
-   acnt_index->add_secondary_index<account_member_index>();
-   acnt_index->add_secondary_index<account_referrer_index>();
-
+   add_index< primary_index<account_index, 20> >(); // ~1 million accounts per chunk
    add_index< primary_index<committee_member_index, 8> >(); // 256 members per chunk
    add_index< primary_index<witness_index, 10> >(); // 1024 witnesses per chunk
    add_index< primary_index<limit_order_index > >();
    add_index< primary_index<call_order_index > >();
-
-   auto prop_index = add_index< primary_index<proposal_index > >();
-   prop_index->add_secondary_index<required_approval_index>();
-
+   add_index< primary_index<proposal_index > >();
    add_index< primary_index<withdraw_permission_index > >();
    add_index< primary_index<vesting_balance_index> >();
    add_index< primary_index<worker_index> >();

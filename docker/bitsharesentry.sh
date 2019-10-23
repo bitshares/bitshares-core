@@ -82,11 +82,12 @@ fi
 ## Link the bitshares config file into home
 ## This link has been created in Dockerfile, already
 ln -f -s /etc/bitshares/config.ini /var/lib/bitshares
+ln -f -s /etc/bitshares/logging.ini /var/lib/bitshares
 
 # Plugins need to be provided in a space-separated list, which
 # makes it necessary to write it like this
 if [[ ! -z "$BITSHARESD_PLUGINS" ]]; then
-   exec $BITSHARESD --data-dir ${HOME} ${ARGS} ${BITSHARESD_ARGS} --plugins "${BITSHARESD_PLUGINS}"
+   exec "$BITSHARESD" --data-dir "${HOME}" ${ARGS} ${BITSHARESD_ARGS} --plugins "${BITSHARESD_PLUGINS}"
 else
-   exec $BITSHARESD --data-dir ${HOME} ${ARGS} ${BITSHARESD_ARGS}
+   exec "$BITSHARESD" --data-dir "${HOME}" ${ARGS} ${BITSHARESD_ARGS}
 fi

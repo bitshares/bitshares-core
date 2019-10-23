@@ -440,8 +440,7 @@ namespace graphene { namespace chain {
          void pay_order( const account_object& receiver, const asset& receives, const asset& pays );
 
          asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
-         asset pay_market_fees( const asset_object& recv_asset, const asset& receives );
-         asset pay_market_fees( const account_object& seller, const asset_object& recv_asset, const asset& receives );
+         asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives );
          ///@}
 
 
@@ -519,6 +518,8 @@ namespace graphene { namespace chain {
 
          const witness_object& validate_block_header( uint32_t skip, const signed_block& next_block )const;
          const witness_object& _validate_block_header( const signed_block& next_block )const;
+         void verify_signing_witness( const signed_block& new_block, const fork_item& fork_entry )const;
+         void update_witnesses( fork_item& fork_entry )const;
          void create_block_summary(const signed_block& next_block);
 
          //////////////////// db_witness_schedule.cpp ////////////////////
