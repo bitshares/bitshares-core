@@ -41,6 +41,9 @@
 
 #include "../common/database_fixture.hpp"
 
+// Dependencies required by the HTLC-related tests
+#include <random>
+
 using namespace graphene::chain;
 using namespace graphene::chain::test;
 
@@ -3263,5 +3266,252 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
       } FC_LOG_AND_RETHROW()
    }
+
+
+   /**
+    * Generate a random pre-image for HTLC-related tests
+    */
+   void generate_random_preimage(uint16_t key_size, std::vector<char>& vec)
+   {
+      std::independent_bits_engine<std::default_random_engine, sizeof(unsigned), unsigned int> rbe;
+      std::generate(begin(vec), end(vec), std::ref(rbe));
+      return;
+   }
+
+
+   /**
+    * Test of greater than or equal to (ge) restriction on a field
+    * Test of CAA for htlc_create_operation
+    *
+    * Scenario: Test of authorization of one account (alice) authorizing another account (bob)
+    * to create an HTLC operation as long as the pre-image size is greater than or equal to a specified size
+    *
+    * This test is similar to the HTLC test called "other_peoples_money"
+    */
+   BOOST_AUTO_TEST_CASE(authorized_htlc_creation) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         time_point_sec LATER_HF_TIME
+                 = (HARDFORK_BSIP_40_TIME > HARDFORK_CORE_1468_TIME) ? HARDFORK_BSIP_40_TIME : HARDFORK_CORE_1468_TIME;
+         generate_blocks(LATER_HF_TIME);
+         generate_blocks(5);
+         set_expiration(db, trx);
+
+         // Initialize HTLC blockchain parameters
+         trx.clear();
+         set_htlc_committee_parameters();
+         generate_blocks(5);
+
+         // Initialize CAA blockchain parameters
+         trx.clear();
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Accounts
+         //////
+         ACTORS((alice)(bob)(gateway));
+         int64_t init_balance(100 * GRAPHENE_BLOCKCHAIN_PRECISION );
+         transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
+
+
+         //////
+         // Initialize: Pre-image sizes and pre-images to reduce the test variability
+         //////
+         uint16_t pre_image_size_256 = 256;
+         std::vector<char> pre_image_256(pre_image_size_256);
+         generate_random_preimage(pre_image_size_256, pre_image_256);
+
+         // The minimum pre-image size that will be authorized by Alice
+         uint16_t authorized_minimum_pre_image_size_512 = 512;
+
+         int64_t pre_image_size_512 = int64_t(authorized_minimum_pre_image_size_512 + 0);
+         std::vector<char> pre_image_512(pre_image_size_512);
+         generate_random_preimage(pre_image_size_512, pre_image_512);
+
+         int64_t pre_image_size_600 = int64_t(authorized_minimum_pre_image_size_512 + 88);
+         std::vector<char> pre_image_600(pre_image_size_600);
+         generate_random_preimage(pre_image_size_600, pre_image_600);
+
+
+         //////
+         // Alice attempts to put a contract on the blockchain using Alice's funds
+         // This should succeed because Alice is authorized to create HTLC for her own account
+         //////
+         {
+            graphene::chain::htlc_create_operation create_operation;
+            create_operation.amount = graphene::chain::asset( 1 * GRAPHENE_BLOCKCHAIN_PRECISION );
+            create_operation.from = alice_id;
+            create_operation.to = gateway_id;
+            create_operation.claim_period_seconds = 3;
+            create_operation.preimage_hash = hash_it<fc::ripemd160>( pre_image_256 );
+            create_operation.preimage_size = pre_image_size_256;
+            create_operation.fee = db.current_fee_schedule().calculate_fee( create_operation );
+            trx.clear();
+            trx.operations.push_back(create_operation);
+            sign(trx, alice_private_key);
+            PUSH_TX( db, trx );
+         }
+
+
+         //////
+         // Advance the blockchain to generate distinctive hash IDs for the similar transactions
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Bob attempts to put a contract on the blockchain using Alice's funds
+         // This should fail because Bob is not authorized to create HTLC on behalf of Alice
+         //////
+         {
+            graphene::chain::htlc_create_operation create_operation;
+            create_operation.amount = graphene::chain::asset( 1 * GRAPHENE_BLOCKCHAIN_PRECISION );
+            create_operation.from = alice_id;
+            create_operation.to = gateway_id;
+            create_operation.claim_period_seconds = 3;
+            create_operation.preimage_hash = hash_it<fc::ripemd160>( pre_image_256 );
+            create_operation.preimage_size = pre_image_size_256;
+            create_operation.fee = db.current_fee_schedule().calculate_fee( create_operation );
+            trx.clear();
+            trx.operations.push_back(create_operation);
+            sign(trx, bob_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+            // "rejected_custom_auths":[]
+            EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+
+         }
+
+
+         //////
+         // Alice authorizes Bob to create HTLC only to an account (gateway)
+         // and if the pre-image size is greater than or equal to 512 bytes
+         //////
+         custom_authority_create_operation authorize_htlc_create;
+         authorize_htlc_create.account = alice.get_id();
+         authorize_htlc_create.auth.add_authority(bob.get_id(), 1);
+         authorize_htlc_create.auth.weight_threshold = 1;
+         authorize_htlc_create.enabled = true;
+         authorize_htlc_create.valid_to = db.head_block_time() + 1000;
+         authorize_htlc_create.operation_type = operation::tag<htlc_create_operation>::value;
+
+         auto to_index = member_index<htlc_create_operation>("to");
+         authorize_htlc_create.restrictions.emplace_back(to_index, FUNC(eq), gateway.get_id());
+
+         auto preimage_size_index = member_index<htlc_create_operation>("preimage_size");
+         authorize_htlc_create.restrictions.emplace_back(restriction(preimage_size_index, FUNC(ge), pre_image_size_512));
+         //[
+         //  {
+         //    "member_index": 2,
+         //    "restriction_type": 0,
+         //    "argument": [
+         //      7,
+         //      "1.2.18"
+         //    ],
+         //    "extensions": []
+         //  },
+         //  {
+         //    "member_index": 5,
+         //    "restriction_type": 5,
+         //    "argument": [
+         //      2,
+         //      512
+         //    ],
+         //    "extensions": []
+         //  }
+         //]
+         trx.clear();
+         trx.operations = {authorize_htlc_create};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to generate distinctive hash IDs for the similar transactions
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Bob attempts to put a contract on the blockchain using Alice's funds
+         // with a preimage size of 256.
+         // This should fail because Bob is not authorized to create HTLC on behalf of Alice
+         // if the preimage size is below the minimum value restriction.
+         //////
+         {
+            graphene::chain::htlc_create_operation create_operation;
+            create_operation.amount = graphene::chain::asset( 1 * GRAPHENE_BLOCKCHAIN_PRECISION );
+            create_operation.from = alice_id;
+            create_operation.to = gateway_id;
+            create_operation.claim_period_seconds = 3;
+            create_operation.preimage_hash = hash_it<fc::ripemd160>( pre_image_256 );
+            create_operation.preimage_size = pre_image_size_256;
+            create_operation.fee = db.current_fee_schedule().calculate_fee( create_operation );
+            trx.clear();
+            trx.operations.push_back(create_operation);
+            sign(trx, bob_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should indicate the rejection path
+            // "rejection_path":[[0,1],[2,"predicate_was_false"]
+            // [0,1]: 0 is the rejection_indicator for an index to a sub-restriction; 1 is the index value for Restriction 2
+            // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,1],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+
+         }
+
+         //////
+         // Bob attempts to put a contract on the blockchain using Alice's funds
+         // with a preimage size of 512.
+         // This should succeed because Bob is authorized to create HTLC on behalf of Alice
+         // and the preimage size equals the minimum value restriction.
+         //////
+         {
+            graphene::chain::htlc_create_operation create_operation;
+            create_operation.amount = graphene::chain::asset( 1 * GRAPHENE_BLOCKCHAIN_PRECISION );
+            create_operation.from = alice_id;
+            create_operation.to = gateway_id;
+            create_operation.claim_period_seconds = 3;
+            create_operation.preimage_hash = hash_it<fc::ripemd160>( pre_image_512 );
+            create_operation.preimage_size = pre_image_size_512;
+            create_operation.fee = db.current_fee_schedule().calculate_fee( create_operation );
+            trx.clear();
+            trx.operations.push_back(create_operation);
+            sign(trx, bob_private_key);
+            PUSH_TX( db, trx );
+
+         }
+
+
+         //////
+         // Bob attempts to put a contract on the blockchain using Alice's funds
+         // with a preimage size of 600.
+         // This should succeed because Bob is authorized to create HTLC on behalf of Alice
+         // and the preimage size is greater than the minimum value restriction.
+         //////
+         {
+            graphene::chain::htlc_create_operation create_operation;
+            create_operation.amount = graphene::chain::asset( 1 * GRAPHENE_BLOCKCHAIN_PRECISION );
+            create_operation.from = alice_id;
+            create_operation.to = gateway_id;
+            create_operation.claim_period_seconds = 3;
+            create_operation.preimage_hash = hash_it<fc::ripemd160>( pre_image_600 );
+            create_operation.preimage_size = pre_image_size_600;
+            create_operation.fee = db.current_fee_schedule().calculate_fee( create_operation );
+            trx.clear();
+            trx.operations.push_back(create_operation);
+            sign(trx, bob_private_key);
+            PUSH_TX( db, trx );
+
+         }
+
+      } FC_LOG_AND_RETHROW()
+   }
+
 
 BOOST_AUTO_TEST_SUITE_END()
