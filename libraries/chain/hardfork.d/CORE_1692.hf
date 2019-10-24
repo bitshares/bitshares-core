@@ -1,4 +1,4 @@
 // bitshares-core issue #1692 validation check of bid_collateral
 #ifndef HARDFORK_CORE_1692_TIME
-#define HARDFORK_CORE_1692_TIME (fc::time_point_sec( 1600000000 ) ) // Sep 2020
+#define HARDFORK_CORE_1692_TIME (fc::time_point_sec( 1572271080 )) // 2019-10-28T13:58Z - testnet
 #endif
