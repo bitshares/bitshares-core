@@ -1,0 +1,4 @@
+// bitshares-core issue #460 Prediction Market price feed should not cause black swan
+#ifndef HARDFORK_CORE_460_TIME
+#define HARDFORK_CORE_460_TIME (fc::time_point_sec( 1572271080 )) // 2019-10-28T13:58Z - testnet
+#endif

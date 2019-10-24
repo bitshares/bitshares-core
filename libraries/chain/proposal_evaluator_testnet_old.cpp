@@ -179,6 +179,7 @@ void _testnet_old_verify_authority( const vector<operation>& ops, const flat_set
                        const std::function<const authority*(account_id_type)>& get_owner,
                        uint32_t max_recursion_depth,
                        bool  allow_committe,
+                       bool  ignore_custom_op_auths,
                        const flat_set<account_id_type>& active_aprovals,
                        const flat_set<account_id_type>& owner_approvals )
 { try {
@@ -187,7 +188,7 @@ void _testnet_old_verify_authority( const vector<operation>& ops, const flat_set
    vector<authority> other;
 
    for( const auto& op : ops )
-      operation_get_required_authorities( op, required_active, required_owner, other );
+      operation_get_required_authorities( op, required_active, required_owner, other, ignore_custom_op_auths );
 
    if( !allow_committe )
       GRAPHENE_ASSERT( required_active.find(GRAPHENE_COMMITTEE_ACCOUNT) == required_active.end(),
@@ -238,6 +239,7 @@ bool _testnet_old_is_authorized(const proposal_object& proposal, database& db)
                         [&]( account_id_type id ){ return &id(db).owner;  },
                         db.get_global_properties().parameters.max_authority_depth,
                         true, /* allow committeee */
+                        MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( db.head_block_time() ),
                         proposal.available_active_approvals,
                         proposal.available_owner_approvals );
    }

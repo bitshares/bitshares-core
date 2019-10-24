@@ -31,6 +31,7 @@
 #include <graphene/elasticsearch/elasticsearch_plugin.hpp>
 #include <graphene/api_helper_indexes/api_helper_indexes.hpp>
 #include <graphene/es_objects/es_objects.hpp>
+#include <graphene/custom_operations/custom_operations_plugin.hpp>
 
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
@@ -41,6 +42,7 @@
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/hardfork_visitor.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 
@@ -59,6 +61,8 @@ namespace graphene { namespace chain {
 using std::cout;
 using std::cerr;
 
+namespace buf = boost::unit_test::framework;
+
 void clearable_block::clear()
 {
    _calculated_merkle_root = checksum_type();
@@ -70,16 +74,20 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    : app(), db( *app.chain_database() )
 {
    try {
-   int argc = boost::unit_test::framework::master_test_suite().argc;
-   char** argv = boost::unit_test::framework::master_test_suite().argv;
+   int argc = buf::master_test_suite().argc;
+   char** argv = buf::master_test_suite().argv;
    for( int i=1; i<argc; i++ )
    {
       const std::string arg = argv[i];
       if( arg == "--record-assert-trip" )
          fc::enable_record_assert_trip = true;
       if( arg == "--show-test-names" )
-         std::cout << "running test " << boost::unit_test::framework::current_test_case().p_name << std::endl;
+         std::cout << "running test " << buf::current_test_case().p_name << std::endl;
    }
+
+   const auto current_test_name = buf::current_test_case().p_name.value;
+   const auto current_test_suite_id = buf::current_test_case().p_parent_id;
+   const auto current_suite_name = buf::get<boost::unit_test::test_suite>(current_test_suite_id).p_name.value;
    auto mhplugin = app.register_plugin<graphene::market_history::market_history_plugin>();
    auto goplugin = app.register_plugin<graphene::grouped_orders::grouped_orders_plugin>();
    init_account_pub_key = init_account_priv_key.get_public_key();
@@ -88,7 +96,8 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
 
    genesis_state.initial_timestamp = initial_timestamp;
 
-   if(boost::unit_test::framework::current_test_case().p_name.value == "hf_935_test") {
+   if(current_test_name == "hf_1270_test")
+   {
       genesis_state.initial_active_witnesses = 20;
    }
    else {
@@ -125,8 +134,6 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    /**
     * Test specific settings
     */
-   auto current_test_name = boost::unit_test::framework::current_test_case().p_name.value;
-   auto current_test_suite_id = boost::unit_test::framework::current_test_case().p_parent_id;
    if (current_test_name == "get_account_history_operations")
    {
       options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)75, false)));
@@ -135,76 +142,125 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    {
     options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
     options.insert(std::make_pair("api-limit-get-account-history-operations", boost::program_options::variable_value((uint64_t)300, false)));
-    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_account_history")
    {
     options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
     options.insert(std::make_pair("api-limit-get-account-history", boost::program_options::variable_value((uint64_t)250, false)));
-    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_grouped_limit_orders")
    {
     options.insert(std::make_pair("api-limit-get-grouped-limit-orders", boost::program_options::variable_value((uint64_t)250, false)));
-    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("grouped_orders"), false)));
    }
    if(current_test_name =="api_limit_get_relative_account_history")
    {
     options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
     options.insert(std::make_pair("api-limit-get-relative-account-history", boost::program_options::variable_value((uint64_t)250, false)));
-    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_account_history_by_operations")
    {
     options.insert(std::make_pair("api-limit-get-account-history-by-operations", boost::program_options::variable_value((uint64_t)250, false)));
     options.insert(std::make_pair("api-limit-get-relative-account-history", boost::program_options::variable_value((uint64_t)250, false)));
-    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_asset_holders")
    {
     options.insert(std::make_pair("api-limit-get-asset-holders", boost::program_options::variable_value((uint64_t)250, false)));
-    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_key_references")
    {
     options.insert(std::make_pair("api-limit-get-key-references", boost::program_options::variable_value((uint64_t)200, false)));
-    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_limit_orders")
    {
     options.insert(std::make_pair("api-limit-get-limit-orders", boost::program_options::variable_value(
        (uint64_t)350, false)));
-    options.insert(std::make_pair("plugins", boost::program_options::variable_value(
-       string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_call_orders")
    {
     options.insert(std::make_pair("api-limit-get-call-orders", boost::program_options::variable_value(
        (uint64_t)350, false)));
-    options.insert(std::make_pair("plugins", boost::program_options::variable_value(
-       string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_settle_orders")
    {
     options.insert(std::make_pair("api-limit-get-settle-orders", boost::program_options::variable_value(
        (uint64_t)350, false)));
-    options.insert(std::make_pair("plugins", boost::program_options::variable_value(
-       string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_order_book")
    {
     options.insert(std::make_pair("api-limit-get-order-book", boost::program_options::variable_value(
        (uint64_t)80, false)));
-    options.insert(std::make_pair("plugins", boost::program_options::variable_value(
-       string("account_history"), false)));
    }
    if( current_test_name == "asset_in_collateral" )
    {
     options.insert( std::make_pair( "plugins",
                                     boost::program_options::variable_value( string("api_helper_indexes"), false ) ) );
    }
-
-   // add account tracking for ahplugin for special test case with track-account enabled
+   if(current_test_name =="api_limit_lookup_accounts")
+   {
+      options.insert(std::make_pair("api-limit-lookup-accounts", boost::program_options::variable_value
+         ((uint64_t)200, false)));
+   }
+   if(current_test_name =="api_limit_lookup_witness_accounts")
+   {
+      options.insert(std::make_pair("api-limit-lookup-witness-accounts", boost::program_options::variable_value
+         ((uint64_t)200, false)));
+   }
+   if(current_test_name =="api_limit_lookup_committee_member_accounts")
+   {
+      options.insert(std::make_pair("api-limit-lookup-committee-member-accounts", boost::program_options::variable_value
+         ((uint64_t)200, false)));
+   }
+   if(current_test_name =="api_limit_lookup_committee_member_accounts")
+   {
+      options.insert(std::make_pair("api-limit-lookup-committee-member-accounts", boost::program_options::variable_value
+         ((uint64_t)200, false)));
+   }
+   if(current_test_name =="api_limit_lookup_vote_ids")
+   {
+      options.insert(std::make_pair("api-limit-lookup-vote-ids", boost::program_options::variable_value
+         ((uint64_t)3, false)));
+   }
+   if(current_test_name =="api_limit_get_account_limit_orders")
+   {
+      options.insert(std::make_pair("api-limit-get-account-limit-orders", boost::program_options::variable_value
+         ((uint64_t)250, false)));
+   }
+   if(current_test_name =="api_limit_get_collateral_bids")
+   {
+      options.insert(std::make_pair("api-limit-get-collateral-bids", boost::program_options::variable_value
+         ((uint64_t)250, false)));
+   }
+   if(current_test_name =="api_limit_get_top_markets")
+   {
+      options.insert(std::make_pair("api-limit-get-top-markets", boost::program_options::variable_value
+         ((uint64_t)250, false)));
+   }
+   if(current_test_name =="api_limit_get_trade_history")
+   {
+      options.insert(std::make_pair("api-limit-get-trade-history", boost::program_options::variable_value
+         ((uint64_t)250, false)));
+   }
+   if(current_test_name =="api_limit_get_trade_history_by_sequence")
+   {
+      options.insert(std::make_pair("api-limit-get-trade-history-by-sequence", boost::program_options::variable_value
+         ((uint64_t)250, false)));
+   }
+   if(current_test_name =="api_limit_get_withdraw_permissions_by_giver")
+   {
+      options.insert(std::make_pair("api-limit-get-withdraw-permissions-by-giver", boost::program_options::variable_value
+         ((uint64_t)250, false)));
+   }
+   if(current_test_name =="api_limit_get_withdraw_permissions_by_recipient")
+   {
+      options.insert(std::make_pair("api-limit-get-withdraw-permissions-by-recipient", boost::program_options::variable_value
+         ((uint64_t)250, false)));
+   }
+   if(current_test_name =="api_limit_get_full_accounts2")
+   {
+      options.insert(std::make_pair("api-limit-get-full-accounts", boost::program_options::variable_value
+         ((uint64_t)200, false)));
+   }
+      // add account tracking for ahplugin for special test case with track-account enabled
    if( !options.count("track-account") && current_test_name == "track_account") {
       std::vector<std::string> track_account;
       std::string track = "\"1.2.17\"";
@@ -222,8 +278,8 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       options.insert(std::make_pair("track-account", boost::program_options::variable_value(track_account, false)));
    }
    // standby votes tracking
-   if( boost::unit_test::framework::current_test_case().p_name.value == "track_votes_witnesses_disabled" ||
-       boost::unit_test::framework::current_test_case().p_name.value == "track_votes_committee_disabled") {
+   if( current_test_name == "track_votes_witnesses_disabled"
+          || current_test_name == "track_votes_committee_disabled") {
       app.chain_database()->enable_standby_votes_tracking( false );
    }
    if(current_test_name == "elasticsearch_account_history" || current_test_name == "elasticsearch_suite" ||
@@ -243,18 +299,14 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       esplugin->plugin_initialize(options);
       esplugin->plugin_startup();
    }
-   else if( boost::unit_test::framework::get<boost::unit_test::test_suite>(current_test_suite_id).p_name.value != "performance_tests" )
+   else if( current_suite_name != "performance_tests" )
    {
       auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
       ahplugin->plugin_set_app(&app);
       ahplugin->plugin_initialize(options);
       ahplugin->plugin_startup();
-      if (current_test_name == "api_limit_get_account_history_operations" || current_test_name == "api_limit_get_account_history"
-      || current_test_name == "api_limit_get_grouped_limit_orders" || current_test_name == "api_limit_get_relative_account_history"
-      || current_test_name == "api_limit_get_account_history_by_operations" || current_test_name =="api_limit_get_asset_holders"
-      || current_test_name =="api_limit_get_key_references" || current_test_name =="api_limit_get_limit_orders"
-      || current_test_name =="api_limit_get_call_orders" || current_test_name =="api_limit_get_settle_orders"
-      || current_test_name =="api_limit_get_order_book")
+
+      if(validation_current_test_name_for_setting_api_limit(current_test_name))
       {
           app.initialize(graphene::utilities::temp_directory_path(), options);
           app.set_api_limit();
@@ -278,12 +330,22 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       esobjects_plugin->plugin_initialize(options);
       esobjects_plugin->plugin_startup();
    }
-   else if( current_test_name == "asset_in_collateral" )
+   else if( current_test_name == "asset_in_collateral"
+            || current_test_name == "htlc_database_api"
+            || current_suite_name == "database_api_tests" )
    {
       auto ahiplugin = app.register_plugin<graphene::api_helper_indexes::api_helper_indexes>();
       ahiplugin->plugin_set_app(&app);
       ahiplugin->plugin_initialize(options);
       ahiplugin->plugin_startup();
+   }
+
+   if(current_test_name == "custom_operations_account_storage_map_test" ||
+      current_test_name == "custom_operations_account_storage_list_test") {
+      auto custom_operations_plugin = app.register_plugin<graphene::custom_operations::custom_operations_plugin>();
+      custom_operations_plugin->plugin_set_app(&app);
+      custom_operations_plugin->plugin_initialize(options);
+      custom_operations_plugin->plugin_startup();
    }
 
    options.insert(std::make_pair("bucket-size", boost::program_options::variable_value(string("[15]"),false)));
@@ -386,7 +448,30 @@ string database_fixture::generate_anon_acct_name()
    //    to workaround issue #46
    return "anon-acct-x" + std::to_string( anon_acct_count++ );
 }
+bool database_fixture::validation_current_test_name_for_setting_api_limit( const string& current_test_name ) const
+{
+   vector <string> valid_testcase {"api_limit_get_account_history_operations","api_limit_get_account_history"
+      ,"api_limit_get_grouped_limit_orders","api_limit_get_relative_account_history"
+      ,"api_limit_get_account_history_by_operations","api_limit_get_asset_holders"
+      ,"api_limit_get_key_references","api_limit_get_limit_orders"
+      ,"api_limit_get_call_orders","api_limit_get_settle_orders"
+      ,"api_limit_get_order_book","api_limit_lookup_accounts"
+      ,"api_limit_lookup_witness_accounts","api_limit_lookup_committee_member_accounts"
+      ,"api_limit_lookup_vote_ids","api_limit_get_account_limit_orders"
+      ,"api_limit_get_collateral_bids","api_limit_get_top_markets"
+      ,"api_limit_get_trade_history", "api_limit_get_trade_history_by_sequence"
+      ,"api_limit_get_withdraw_permissions_by_giver","api_limit_get_withdraw_permissions_by_recipient"
+      ,"api_limit_get_full_accounts2"};
+   for(string i_valid_testcase: valid_testcase)
+   {
+      if(i_valid_testcase.compare(current_test_name)==0)
+      {
+         return true;
+      }
+   }
 
+   return false;
+}
 void database_fixture::verify_asset_supplies( const database& db )
 {
    //wlog("*** Begin asset supply verification ***");
@@ -730,7 +815,7 @@ void database_fixture::issue_uia( account_id_type recipient_id, asset amount )
 }
 
 void database_fixture::change_fees(
-   const flat_set< fee_parameters >& new_params,
+   const fee_parameters::flat_set_type& new_params,
    uint32_t new_scale /* = 0 */
    )
 {
@@ -1384,14 +1469,15 @@ void database_fixture::set_htlc_committee_parameters()
    std::shared_ptr<fee_schedule_type> new_fee_schedule = std::make_shared<fee_schedule_type>();
    new_fee_schedule->scale = GRAPHENE_100_PERCENT;
    // replace the old with the new
-   flat_map<uint64_t, graphene::chain::fee_parameters> params_map = get_htlc_fee_parameters();
+   flat_map<uint64_t, graphene::chain::fee_parameters> htlc_fees = get_htlc_fee_parameters();
    for(auto param : existing_fee_schedule.parameters)
    {
-      auto itr = params_map.find(param.which());
-      if (itr == params_map.end())
-         new_fee_schedule->parameters.insert(param);
-      else
-      {
+      auto itr = htlc_fees.find(param.which());
+      if (itr == htlc_fees.end()) {
+         // Only define fees for operations which are already forked in!
+         if (hardfork_visitor(db.head_block_time()).visit(param.which()))
+            new_fee_schedule->parameters.insert(param);
+      } else {
          new_fee_schedule->parameters.insert( (*itr).second);
       }
    }

@@ -353,7 +353,7 @@ struct database_fixture {
     * finish creating a block
     */
    void enable_fees();
-   void change_fees( const flat_set< fee_parameters >& new_params, uint32_t new_scale = 0 );
+   void change_fees( const fee_parameters::flat_set_type& new_params, uint32_t new_scale = 0 );
    void upgrade_to_lifetime_member( account_id_type account );
    void upgrade_to_lifetime_member( const account_object& account );
    void upgrade_to_annual_member( account_id_type account );
@@ -371,6 +371,7 @@ struct database_fixture {
 
    vector< operation_history_object > get_operation_history( account_id_type account_id )const;
    vector< graphene::market_history::order_history_object > get_market_order_history( asset_id_type a, asset_id_type b )const;
+   bool validation_current_test_name_for_setting_api_limit( const string& current_test_name )const;
 
    /****
     * @brief return htlc fee parameters

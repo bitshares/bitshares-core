@@ -763,7 +763,7 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
          // C++ -- The above commented out statement doesn't work, I don't know why
          // so we will use the following rather lengthy initialization instead
          {
-            flat_set< fee_parameters > new_fees;
+            fee_parameters::flat_set_type new_fees;
             {
                limit_order_create_operation::fee_parameters_type create_fee_params;
                create_fee_params.fee = order_create_fee;
@@ -880,7 +880,7 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
 
       generate_block( skip );
 
-      flat_set< fee_parameters > new_fees;
+      fee_parameters::flat_set_type new_fees;
       {
          limit_order_create_operation::fee_parameters_type create_fee_params;
          create_fee_params.fee = order_create_fee;
@@ -1266,7 +1266,7 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
 
       generate_block( skip );
 
-      flat_set< fee_parameters > new_fees;
+      fee_parameters::flat_set_type new_fees;
       {
          limit_order_create_operation::fee_parameters_type create_fee_params;
          create_fee_params.fee = order_create_fee;
@@ -1772,9 +1772,9 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
 
       generate_block( skip );
 
-      flat_set< fee_parameters > new_fees;
-      flat_set< fee_parameters > new_fees1;
-      flat_set< fee_parameters > new_fees2;
+      fee_parameters::flat_set_type new_fees;
+      fee_parameters::flat_set_type new_fees1;
+      fee_parameters::flat_set_type new_fees2;
       {
          limit_order_create_operation::fee_parameters_type create_fee_params;
          create_fee_params.fee = order_create_fee;
@@ -2329,7 +2329,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       generate_block( skip );
 
-      flat_set< fee_parameters > new_fees;
+      fee_parameters::flat_set_type new_fees;
       {
          limit_order_create_operation::fee_parameters_type create_fee_params;
          create_fee_params.fee = order_create_fee;
@@ -3425,7 +3425,6 @@ BOOST_AUTO_TEST_CASE( stealth_fba_test )
 
       generate_blocks( HARDFORK_555_TIME );
       generate_blocks( HARDFORK_563_TIME );
-      generate_blocks( HARDFORK_572_TIME );
 
       // Philbin (registrar who registers Rex)
 

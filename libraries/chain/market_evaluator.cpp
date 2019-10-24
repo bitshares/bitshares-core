@@ -192,18 +192,9 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    _dynamic_data_obj = &_debt_asset->dynamic_asset_data_id(d);
 
    /***
-    * We have softfork code already in production to prevent exceeding MAX_SUPPLY between 2018-12-21 until HF 1465.
-    * But we must allow this in replays until 2018-12-21. The HF 1465 code will correct the problem.
-    * After HF 1465, we MAY be able to remove the cleanup code IF it never executes. We MAY be able to clean
-    * up the softfork code IF it never executes. We MAY be able to turn the hardfork code into regular code IF
-    * noone ever attempted this before HF 1465.
+    * There are instances of assets exceeding max_supply before hf 1465, therefore this code must remain.
     */
-   if (next_maintenance_time <= SOFTFORK_CORE_1465_TIME)
-   {
-      if ( _dynamic_data_obj->current_supply + o.delta_debt.amount > _debt_asset->options.max_supply )
-         ilog("Issue 1465... Borrowing and exceeding MAX_SUPPLY. Will be corrected at hardfork time.");
-   }
-   else
+   if (next_maintenance_time > HARDFORK_CORE_1465_TIME)
    {
       FC_ASSERT( _dynamic_data_obj->current_supply + o.delta_debt.amount <= _debt_asset->options.max_supply,
             "Borrowing this quantity would exceed MAX_SUPPLY" );
@@ -348,6 +339,7 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
          call_obj = d.find(call_order_id);
          // we know no black swan event has occurred
          FC_ASSERT( call_obj, "no margin call was executed and yet the call object was deleted" );
+         // this HF must remain as-is, as the assert inside the "if" was triggered during push_proposal()
          if( d.head_block_time() <= HARDFORK_CORE_583_TIME )
          {
             // We didn't fill any call orders.  This may be because we
@@ -408,13 +400,6 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
 
    FC_ASSERT( !_bitasset_data->is_prediction_market, "Cannot bid on a prediction market!" );
 
-   if( o.additional_collateral.amount > 0 )
-   {
-      FC_ASSERT( d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)) >= o.additional_collateral,
-                 "Cannot bid ${c} collateral when payer only has ${b}", ("c", o.additional_collateral.amount)
-                 ("b", d.get_balance(*_paying_account, o.additional_collateral.asset_id(d)).amount) );
-   }
-
    const collateral_bid_index& bids = d.get_index_type<collateral_bid_index>();
    const auto& index = bids.indices().get<by_account>();
    const auto& bid = index.find( boost::make_tuple( o.debt_covered.asset_id, o.bidder ) );
@@ -422,6 +407,22 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
       _bid = &(*bid);
    else
        FC_ASSERT( o.debt_covered.amount > 0, "Can't find bid to cancel?!");
+
+   if( o.additional_collateral.amount > 0 )
+   {
+      if( _bid && d.head_block_time() >= HARDFORK_CORE_1692_TIME ) // TODO: see if HF check can be removed after HF
+      {
+         asset delta = o.additional_collateral - _bid->get_additional_collateral();
+         FC_ASSERT( d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)) >= delta,
+                    "Cannot increase bid from ${oc} to ${nc} collateral when payer only has ${b}",
+                    ("oc", _bid->get_additional_collateral().amount)("nc", o.additional_collateral.amount)
+                    ("b", d.get_balance(*_paying_account, o.additional_collateral.asset_id(d)).amount) );
+      } else
+         FC_ASSERT( d.get_balance( *_paying_account,
+                                   _bitasset_data->options.short_backing_asset(d) ) >= o.additional_collateral,
+                    "Cannot bid ${c} collateral when payer only has ${b}", ("c", o.additional_collateral.amount)
+                    ("b", d.get_balance(*_paying_account, o.additional_collateral.asset_id(d)).amount) );
+   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

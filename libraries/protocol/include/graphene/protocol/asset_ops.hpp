@@ -222,7 +222,6 @@ namespace graphene { namespace protocol {
    /**
     * Virtual op generated when force settlement is cancelled.
     */
-
    struct asset_settle_cancel_operation : public base_operation
    {
       struct fee_parameters_type { };
@@ -236,9 +235,11 @@ namespace graphene { namespace protocol {
       extensions_type extensions;
 
       account_id_type fee_payer()const { return account; }
-      void            validate()const {
-         FC_ASSERT( amount.amount > 0, "Must settle at least 1 unit" );
-      }
+      /***
+       * This is a virtual operation and should never be placed in a block
+       * (i.e. in a proposal)
+       */
+      void validate() const { FC_ASSERT( !"Virtual operation"); }
 
       share_type calculate_fee(const fee_parameters_type& params)const
       { return 0; }

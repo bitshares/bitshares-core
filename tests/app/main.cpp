@@ -40,6 +40,8 @@
 
 #include <boost/filesystem/path.hpp>
 
+#include "../../libraries/app/application_impl.hxx"
+
 #define BOOST_TEST_MODULE Test Application
 #include <boost/test/included/unit_test.hpp>
 
@@ -64,7 +66,7 @@ BOOST_AUTO_TEST_CASE(load_configuration_options_test_config_logging_files_create
    auto node = new app::application();
    bpo::options_description cli, cfg;
    node->set_program_options(cli, cfg);
-   bpo::options_description cfg_options("Graphene Witness Node");
+   bpo::options_description cfg_options("BitShares Witness Node");
    cfg_options.add(cfg);
 
    /// check preconditions
@@ -331,8 +333,6 @@ BOOST_AUTO_TEST_CASE( two_node_network )
 }
 
 // a contrived example to test the breaking out of application_impl to a header file
-
-#include "../../libraries/app/application_impl.hxx"
 
 BOOST_AUTO_TEST_CASE(application_impl_breakout) {
    class test_impl : public graphene::app::detail::application_impl {

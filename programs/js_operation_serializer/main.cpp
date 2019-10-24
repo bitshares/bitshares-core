@@ -37,10 +37,12 @@
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/custom_operations/custom_operations_plugin.hpp>
 
 #include <iostream>
 
 using namespace graphene::chain;
+using namespace graphene::custom_operations;
 
 namespace detail_ns {
 
@@ -392,6 +394,8 @@ int main( int argc, char** argv )
     detail_ns::serializer<operation>::init();
     detail_ns::serializer<transaction>::init();
     detail_ns::serializer<signed_transaction>::init();
+    detail_ns::serializer<account_storage_map>::init();
+
     for( const auto& gen : detail_ns::serializers )
        gen();
 
