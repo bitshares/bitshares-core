@@ -28,6 +28,7 @@
 #include <graphene/chain/get_config.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/protocol/pts_address.hpp>
+#include <graphene/protocol/restriction_predicate.hpp>
 
 #include <fc/crypto/hex.hpp>
 #include <fc/rpc/api_connection.hpp>
@@ -510,7 +511,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       // Add the account's balances
       const auto& balances = _db.get_index_type< primary_index< account_balance_index > >().
             get_secondary_index< balances_by_account_index >().get_account_balances( account->id );
-      for( const auto balance : balances )
+      for( const auto& balance : balances )
       {
          if(acnt.balances.size() >= api_limit_get_full_accounts_lists) {
             acnt.more_data_available.balances = true;
@@ -684,7 +685,7 @@ map<string,account_id_type> database_api_impl::lookup_accounts( const string& lo
                                                                 uint32_t limit,
                                                                 optional<bool> subscribe )const
 {
-   FC_ASSERT( limit <= 1000 );
+   FC_ASSERT( limit <= _app_options->api_limit_lookup_accounts );
    const auto& accounts_by_name = _db.get_index_type<account_index>().indices().get<by_name>();
    map<string,account_id_type> result;
 
@@ -738,7 +739,7 @@ vector<asset> database_api_impl::get_account_balances( const std::string& accoun
       const auto& balance_index = _db.get_index_type< primary_index< account_balance_index > >();
       const auto& balances = balance_index.get_secondary_index< balances_by_account_index >()
                                           .get_account_balances( acnt );
-      for( const auto balance : balances )
+      for( const auto& balance : balances )
          result.push_back( balance.second->get_balance() );
    }
    else
@@ -982,7 +983,7 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders(
                               const string& account_name_or_id, const string &base, const string &quote,
                               uint32_t limit, optional<limit_order_id_type> ostart_id, optional<price> ostart_price )
 {
-   FC_ASSERT( limit <= 101 );
+   FC_ASSERT( limit <= _app_options->api_limit_get_account_limit_orders );
 
    vector<limit_order_object>   results;
    uint32_t                     count = 0;
@@ -1197,7 +1198,7 @@ vector<collateral_bid_object> database_api::get_collateral_bids( const std::stri
 vector<collateral_bid_object> database_api_impl::get_collateral_bids( const std::string& asset,
                                                                       uint32_t limit, uint32_t skip )const
 { try {
-   FC_ASSERT( limit <= 100 );
+   FC_ASSERT( limit <= _app_options->api_limit_get_collateral_bids );
    const asset_id_type asset_id = get_asset_from_string(asset)->id;
    const asset_object& swan = asset_id(_db);
    FC_ASSERT( swan.is_market_issued() );
@@ -1313,9 +1314,8 @@ order_book database_api::get_order_book( const string& base, const string& quote
 
 order_book database_api_impl::get_order_book( const string& base, const string& quote, unsigned limit )const
 {
-   uint64_t api_limit_get_order_book=_app_options->api_limit_get_order_book;
-   FC_ASSERT( limit <= api_limit_get_order_book );
-
+   FC_ASSERT( limit <= _app_options->api_limit_get_order_book );
+  
    order_book result;
    result.base = base;
    result.quote = quote;
@@ -1364,7 +1364,7 @@ vector<market_ticker> database_api_impl::get_top_markets(uint32_t limit)const
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-   FC_ASSERT( limit <= 100 );
+   FC_ASSERT( limit <= _app_options->api_limit_get_top_markets );
 
    const auto& volume_idx = _db.get_index_type<market_ticker_index>().indices().get<by_volume>();
    auto itr = volume_idx.rbegin();
@@ -1402,7 +1402,7 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-   FC_ASSERT( limit <= 100 );
+   FC_ASSERT( limit <= _app_options->api_limit_get_trade_history );
 
    auto assets = lookup_asset_symbols( {base, quote} );
    FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
@@ -1494,7 +1494,7 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-   FC_ASSERT( limit <= 100 );
+   FC_ASSERT( limit <= _app_options->api_limit_get_trade_history_by_sequence );
    FC_ASSERT( start >= 0 );
    int64_t start_seq = -start;
 
@@ -1628,7 +1628,7 @@ map<string, witness_id_type> database_api::lookup_witness_accounts( const string
 map<string, witness_id_type> database_api_impl::lookup_witness_accounts( const string& lower_bound_name,
                                                                          uint32_t limit )const
 {
-   FC_ASSERT( limit <= 1000 );
+   FC_ASSERT( limit <= _app_options->api_limit_lookup_witness_accounts );
    const auto& witnesses_by_id = _db.get_index_type<witness_index>().indices().get<by_id>();
 
    // we want to order witnesses by account name, but that name is in the account object
@@ -1710,7 +1710,7 @@ map<string, committee_member_id_type> database_api::lookup_committee_member_acco
 map<string, committee_member_id_type> database_api_impl::lookup_committee_member_accounts(
                                          const string& lower_bound_name, uint32_t limit )const
 {
-   FC_ASSERT( limit <= 1000 );
+   FC_ASSERT( limit <= _app_options->api_limit_lookup_committee_member_accounts );
    const auto& committee_members_by_id = _db.get_index_type<committee_member_index>().indices().get<by_id>();
 
    // we want to order committee_members by account name, but that name is in the account object
@@ -1808,7 +1808,7 @@ vector<variant> database_api::lookup_vote_ids( const vector<vote_id_type>& votes
 
 vector<variant> database_api_impl::lookup_vote_ids( const vector<vote_id_type>& votes )const
 {
-   FC_ASSERT( votes.size() < 1000, "Only 1000 votes can be queried at a time" );
+   FC_ASSERT( votes.size() < _app_options->api_limit_lookup_vote_ids );
 
    const auto& witness_idx = _db.get_index_type<witness_index>().indices().get<by_vote_id>();
    const auto& committee_idx = _db.get_index_type<committee_member_index>().indices().get<by_vote_id>();
@@ -1926,34 +1926,36 @@ set<address> database_api::get_potential_address_signatures( const signed_transa
 
 set<public_key_type> database_api_impl::get_potential_signatures( const signed_transaction& trx )const
 {
-   bool allow_non_immediate_owner = ( _db.head_block_time() >= HARDFORK_CORE_584_TIME );
+   auto chain_time = _db.head_block_time();
+   bool allow_non_immediate_owner = ( chain_time >= HARDFORK_CORE_584_TIME );
+   bool ignore_custom_op_reqd_auths = MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( chain_time );
+
    set<public_key_type> result;
-   trx.get_required_signatures(
-      _db.get_chain_id(),
-      flat_set<public_key_type>(),
-      [&]( account_id_type id )
-      {
-         const auto& auth = id(_db).active;
-         for( const auto& k : auth.get_keys() )
-            result.insert(k);
-         return &auth;
-      },
-      [&]( account_id_type id )
-      {
-         const auto& auth = id(_db).owner;
-         for( const auto& k : auth.get_keys() )
-            result.insert(k);
-         return &auth;
-      },
-      allow_non_immediate_owner,
-      _db.get_global_properties().parameters.max_authority_depth
-   );
+   auto get_active = [this, &result]( account_id_type id ){
+      const auto& auth = id( _db ).active;
+      for( const auto& k : auth.get_keys() )
+         result.insert( k );
+      return &auth;
+   };
+   auto get_owner = [this, &result]( account_id_type id ){
+      const auto& auth = id( _db ).owner;
+      for( const auto& k : auth.get_keys() )
+         result.insert( k );
+      return &auth;
+   };
+
+   trx.get_required_signatures( _db.get_chain_id(),
+                                flat_set<public_key_type>(),
+                                get_active, get_owner,
+                                allow_non_immediate_owner,
+                                ignore_custom_op_reqd_auths,
+                                _db.get_global_properties().parameters.max_authority_depth );
 
    // Insert keys in required "other" authories
    flat_set<account_id_type> required_active;
    flat_set<account_id_type> required_owner;
    vector<authority> other;
-   trx.get_required_authorities( required_active, required_owner, other );
+   trx.get_required_authorities( required_active, required_owner, other, ignore_custom_op_reqd_auths );
    for( const auto& auth : other )
       for( const auto& key : auth.get_keys() )
          result.insert( key );
@@ -1963,26 +1965,30 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
 
 set<address> database_api_impl::get_potential_address_signatures( const signed_transaction& trx )const
 {
+   auto chain_time = _db.head_block_time();
+   bool allow_non_immediate_owner = ( chain_time >= HARDFORK_CORE_584_TIME );
+   bool ignore_custom_op_reqd_auths = MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( chain_time );
+
    set<address> result;
-   trx.get_required_signatures(
-      _db.get_chain_id(),
-      flat_set<public_key_type>(),
-      [&]( account_id_type id )
-      {
-         const auto& auth = id(_db).active;
-         for( const auto& k : auth.get_addresses() )
-            result.insert(k);
-         return &auth;
-      },
-      [&]( account_id_type id )
-      {
-         const auto& auth = id(_db).owner;
-         for( const auto& k : auth.get_addresses() )
-            result.insert(k);
-         return &auth;
-      },
-      _db.get_global_properties().parameters.max_authority_depth
-   );
+   auto get_active = [this, &result]( account_id_type id ){
+      const auto& auth = id( _db ).active;
+      for( const auto& k : auth.get_addresses() )
+         result.insert( k );
+      return &auth;
+   };
+   auto get_owner = [this, &result]( account_id_type id ) {
+      const auto& auth = id( _db ).owner;
+      for (const auto& k : auth.get_addresses())
+         result.insert( k );
+      return &auth;
+   };
+
+   trx.get_required_signatures( _db.get_chain_id(),
+                                flat_set<public_key_type>(),
+                                get_active, get_owner,
+                                allow_non_immediate_owner,
+                                ignore_custom_op_reqd_auths,
+                                _db.get_global_properties().parameters.max_authority_depth );
    return result;
 }
 
@@ -1997,6 +2003,8 @@ bool database_api_impl::verify_authority( const signed_transaction& trx )const
    trx.verify_authority( _db.get_chain_id(),
                          [this]( account_id_type id ){ return &id(_db).active; },
                          [this]( account_id_type id ){ return &id(_db).owner; },
+                         [this]( account_id_type id, const operation& op, rejected_predicate_map* rejects ) {
+                           return _db.get_viable_custom_authorities(id, op, rejects); },
                          allow_non_immediate_owner,
                          _db.get_global_properties().parameters.max_authority_depth );
    return true;
@@ -2022,8 +2030,10 @@ bool database_api_impl::verify_account_authority( const string& account_name_or_
       graphene::chain::verify_authority(ops, keys,
             [this]( account_id_type id ){ return &id(_db).active; },
             [this]( account_id_type id ){ return &id(_db).owner; },
-            true );
-   }
+            // Use a no-op lookup for custom authorities; we don't want it even if one does apply for our dummy op
+            [](auto, auto, auto*) { return vector<authority>(); },
+            true, MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(_db.head_block_time()) );
+   } 
    catch (fc::exception& ex)
    {
       return false;
@@ -2204,7 +2214,7 @@ vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_b
                                       withdraw_permission_id_type start,
                                       uint32_t limit)const
 {
-   FC_ASSERT( limit <= 101 );
+   FC_ASSERT( limit <= _app_options->api_limit_get_withdraw_permissions_by_giver );
    vector<withdraw_permission_object> result;
 
    const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_from>();
@@ -2233,7 +2243,7 @@ vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_b
                                       withdraw_permission_id_type start,
                                       uint32_t limit)const
 {
-   FC_ASSERT( limit <= 101 );
+   FC_ASSERT( limit <= _app_options->api_limit_get_withdraw_permissions_by_recipient );
    vector<withdraw_permission_object> result;
 
    const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_authorized>();

@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 #pragma once
+
 #include <graphene/protocol/block.hpp>
 
 #include <graphene/chain/types.hpp>
@@ -31,7 +32,6 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/mem_fun.hpp>
-
 
 namespace graphene { namespace chain {
    using boost::multi_index_container;
@@ -48,6 +48,11 @@ namespace graphene { namespace chain {
       uint32_t              num;    // initialized in ctor
       block_id_type         id;
       signed_block          data;
+
+      // contains witness block signing keys scheduled *after* the block has been applied
+      shared_ptr< vector< pair< witness_id_type, public_key_type > > > scheduled_witnesses;
+      uint64_t                                                         next_block_aslot = 0;
+      fc::time_point_sec                                               next_block_time;
    };
    typedef shared_ptr<fork_item> item_ptr;
 

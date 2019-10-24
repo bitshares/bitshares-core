@@ -370,7 +370,14 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
 
       auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
 
-      BOOST_TEST_MESSAGE( "Adding blocks 1 through 10" );
+      {
+         const auto first_slot = db1.get_slot_at_time( fc::time_point::now() );
+         auto b = db1.generate_block( db1.get_slot_time(first_slot), db1.get_scheduled_witness(first_slot),
+                                      init_account_priv_key, database::skip_nothing);
+         PUSH_BLOCK( db2, b );
+      }
+
+      BOOST_TEST_MESSAGE( "Adding blocks 2 through 11" );
       for( uint32_t i = 1; i <= 10; ++i )
       {
          auto b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
@@ -381,19 +388,19 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
 
       for( uint32_t j = 0; j <= 4; j += 4 )
       {
-         // add blocks 11 through 13 to db1 only
+         // add blocks 12 through 14 to db1 only
          BOOST_TEST_MESSAGE( "Adding 3 blocks to db1 only" );
-         for( uint32_t i = 11 + j; i <= 13 + j; ++i )
+         for( uint32_t i = 12 + j; i <= 14 + j; ++i )
          {
             BOOST_TEST_MESSAGE( i );
             auto b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
          }
          string db1_tip = db1.head_block_id().str();
 
-         // add different blocks 11 through 13 to db2 only
+         // add different blocks 12 through 14 to db2 only
          BOOST_TEST_MESSAGE( "Add 3 different blocks to db2 only" );
          uint32_t next_slot = 3;
-         for( uint32_t i = 11 + j; i <= 13 + j; ++i )
+         for( uint32_t i = 12 + j; i <= 14 + j; ++i )
          {
             BOOST_TEST_MESSAGE( i );
             auto b =  db2.generate_block(db2.get_slot_time(next_slot), db2.get_scheduled_witness(next_slot), init_account_priv_key, database::skip_nothing);
@@ -406,8 +413,8 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
          }
 
          //The two databases are on distinct forks now, but at the same height.
-         BOOST_CHECK_EQUAL(db1.head_block_num(), 13u + j);
-         BOOST_CHECK_EQUAL(db2.head_block_num(), 13u + j);
+         BOOST_CHECK_EQUAL(db1.head_block_num(), 14u + j);
+         BOOST_CHECK_EQUAL(db2.head_block_num(), 14u + j);
          BOOST_CHECK( db1.head_block_id() != db2.head_block_id() );
 
          //Make a block on db2, make it invalid, then
@@ -419,7 +426,7 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
             b.transactions.emplace_back(signed_transaction());
             b.transactions.back().operations.emplace_back(transfer_operation());
             b.sign( init_account_priv_key );
-            BOOST_CHECK_EQUAL(b.block_num(), 14u + j);
+            BOOST_CHECK_EQUAL(b.block_num(), 15u + j);
             GRAPHENE_CHECK_THROW(PUSH_BLOCK( db1, b ), fc::exception);
 
             // At this point, `fetch_block_by_number` will fetch block from fork_db,
@@ -436,13 +443,13 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
                previous_block = curr_block;
             }
          }
-         BOOST_CHECK_EQUAL(db1.head_block_num(), 13u + j);
+         BOOST_CHECK_EQUAL(db1.head_block_num(), 14u + j);
          BOOST_CHECK_EQUAL(db1.head_block_id().str(), db1_tip);
 
          if( j == 0 )
          {
             // assert that db1 switches to new fork with good block
-            BOOST_CHECK_EQUAL(db2.head_block_num(), 14u + j);
+            BOOST_CHECK_EQUAL(db2.head_block_num(), 15u + j);
             PUSH_BLOCK( db1, good_block );
             BOOST_CHECK_EQUAL(db1.head_block_id().str(), db2.head_block_id().str());
          }

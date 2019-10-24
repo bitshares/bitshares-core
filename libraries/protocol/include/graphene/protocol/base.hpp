@@ -117,7 +117,7 @@ namespace graphene { namespace protocol {
     *  @note static_variant compares only the type tag and not the 
     *  content.
     */
-   typedef flat_set<future_extensions> extensions_type;
+   using extensions_type = future_extensions::flat_set_type;
 
    ///@}
 

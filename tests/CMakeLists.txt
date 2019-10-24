@@ -10,7 +10,7 @@ file(GLOB UNIT_TESTS "tests/*.cpp")
 add_executable( chain_test ${COMMON_SOURCES} ${UNIT_TESTS} )
 target_link_libraries( chain_test
                        graphene_chain graphene_app graphene_witness graphene_account_history graphene_elasticsearch
-                       graphene_es_objects graphene_egenesis_none graphene_api_helper_indexes
+                       graphene_es_objects graphene_egenesis_none graphene_api_helper_indexes graphene_custom_operations
                        fc graphene_wallet ${PLATFORM_SPECIFIC_LIBS} )
 if(MSVC)
   set_source_files_properties( tests/serialization_tests.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
@@ -22,6 +22,7 @@ add_executable( performance_test ${COMMON_SOURCES} ${PERFORMANCE_TESTS} )
 target_link_libraries( performance_test
                        graphene_chain graphene_app graphene_account_history graphene_elasticsearch
                        graphene_es_objects graphene_egenesis_none graphene_api_helper_indexes
+                       graphene_custom_operations
                        fc ${PLATFORM_SPECIFIC_LIBS} )
 
 file(GLOB BENCH_MARKS "benchmarks/*.cpp")
@@ -29,6 +30,7 @@ add_executable( chain_bench ${COMMON_SOURCES} ${BENCH_MARKS} )
 target_link_libraries( chain_bench
                        graphene_chain graphene_app graphene_account_history graphene_elasticsearch
                        graphene_es_objects graphene_egenesis_none graphene_api_helper_indexes
+                       graphene_custom_operations
                        fc ${PLATFORM_SPECIFIC_LIBS} )
 
 file(GLOB APP_SOURCES "app/*.cpp")
@@ -50,6 +52,7 @@ add_executable( es_test ${COMMON_SOURCES} ${ES_SOURCES} )
 target_link_libraries( es_test
                        graphene_chain graphene_app graphene_account_history graphene_elasticsearch
                        graphene_es_objects graphene_egenesis_none graphene_api_helper_indexes
+                       graphene_custom_operations
                        fc ${PLATFORM_SPECIFIC_LIBS} )
-
+                       
 add_subdirectory( generate_empty_blocks )
