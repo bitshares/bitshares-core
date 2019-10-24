@@ -1,0 +1,4 @@
+// Changes required for upgrading test net to latest core release
+#ifndef HARDFORK_TEST_201706_TIME
+#define HARDFORK_TEST_201706_TIME (fc::time_point_sec( 1498240800 ))
+#endif
