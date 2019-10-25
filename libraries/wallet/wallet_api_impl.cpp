@@ -63,7 +63,7 @@ namespace graphene { namespace wallet { namespace detail {
       }
       catch(const fc::exception& e)
       {
-         wlog("Custom operations plugin is not loaded.");
+         wlog("Custom operations API is not active on server.");
       }
       chain_id_type remote_chain_id = _remote_db->get_chain_id();
       if( remote_chain_id != _chain_id )
