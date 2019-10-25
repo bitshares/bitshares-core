@@ -122,7 +122,8 @@ namespace graphene { namespace app {
        }
        else if( api_name == "custom_operations_api" )
        {
-          _custom_operations_api = std::make_shared< custom_operations_api >( std::ref( _app ) );
+          if( _app.get_plugin( "custom_operations" ) )
+             _custom_operations_api = std::make_shared< custom_operations_api >( std::ref( _app ) );
        }
        else if( api_name == "debug_api" )
        {
