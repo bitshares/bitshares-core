@@ -169,9 +169,6 @@ void database::handle_block_reward_payout()
    share_type standby_witness_reward = dpo.standby_witness_reward_split_fund;
 
    share_type standby_wit_count = standby_witnesses_ids.size();
-   if(standby_wit_count < 1){
-      return;
-   }
 
    //////////////////
    // START PAYOUT //
@@ -200,21 +197,33 @@ void database::handle_block_reward_payout()
       _core_dd.current_supply -= network_reward;
    } );
 
-   // payout all standby witnesses
-   share_type share = standby_witness_reward / standby_wit_count;
-   share_type first_wit_share = standby_witness_reward - ( share * ( standby_wit_count -1 ));
-   for (std::size_t i = 0; i != standby_wit_count; ++i)
-   {
-     share_type current_share = i == 0 ? first_wit_share : share;
-     deposit_witness_pay( standby_witnesses_ids[i](*this), current_share );
-   }
-
-   // clear all reward accumulators 
    modify( dpo, [&]( dynamic_global_property_object& _dpo )
    {
-      _dpo.standby_witness_reward_split_fund = 0;
       _dpo.network_reward_split_fund = 0;
    } );
+
+   if(standby_wit_count > 0){
+      // payout all standby witnesses
+      share_type share = standby_witness_reward / standby_wit_count;
+      share_type first_wit_share = standby_witness_reward - ( share * ( standby_wit_count -1 ));
+      share_type total_paid;
+      for (std::size_t i = 0; i != standby_wit_count; ++i)
+      {
+         share_type current_share = i == 0 ? first_wit_share : share;
+         deposit_witness_pay( standby_witnesses_ids[i](*this), current_share );
+         total_paid = total_paid + current_share;
+      }
+      
+      modify( dpo, [&]( dynamic_global_property_object& _dpo )
+      {
+         _dpo.standby_witness_reward_split_fund = 0;
+      } );
+
+      FC_ASSERT( total_paid == standby_witness_reward, 
+                  "Reward split calculation is off. Sum of funds paid to stanbys != total standby pay", 
+                 ("total_paid",total_paid)
+                 ("standby_witness_reward",standby_witness_reward));
+   }
 }
 
 template<class Type>

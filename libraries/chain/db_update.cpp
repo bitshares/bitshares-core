@@ -81,6 +81,19 @@ void database::update_global_dynamic_data( const signed_block& b, const uint32_t
    _fork_db.set_max_size( _dgp.head_block_number - _dgp.last_irreversible_block_num + 1 );
 }
 
+share_type cut_reward(share_type a, uint16_t p)
+{
+   if( a == 0 || p == 0 )
+      return 0;
+   if( p == GRAPHENE_100_PERCENT )
+      return a;
+
+   fc::uint128 r(a.value);
+   r *= p;
+   r /= GRAPHENE_100_PERCENT;
+   return r.to_uint64();
+}
+
 void database::update_signing_witness(const witness_object& signing_witness, const signed_block& new_block)
 {
    const global_property_object& gpo = get_global_properties();
@@ -91,10 +104,19 @@ void database::update_signing_witness(const witness_object& signing_witness, con
 
    share_type witness_pay = std::min( gpo.parameters.witness_pay_per_block, dpo.witness_budget );
 
-   share_type marketing_partner_pay = (witness_pay * (10*GRAPHENE_1_PERCENT)) / GRAPHENE_100_PERCENT;
-   share_type network_pay = (witness_pay * (10*GRAPHENE_1_PERCENT)) / GRAPHENE_100_PERCENT;
-   share_type standby_witnesses_pay = (witness_pay * (20*GRAPHENE_1_PERCENT)) / GRAPHENE_100_PERCENT;
-   share_type signing_witness_pay = (witness_pay * (60*GRAPHENE_1_PERCENT)) / GRAPHENE_100_PERCENT;
+   share_type marketing_partner_pay = cut_reward(witness_pay, (10*GRAPHENE_1_PERCENT));
+   share_type network_pay = cut_reward(witness_pay, (10*GRAPHENE_1_PERCENT));
+   share_type standby_witnesses_pay = cut_reward(witness_pay, (20*GRAPHENE_1_PERCENT));
+   // signing_witness_pay = 60%, or remainder from other pay splits
+   share_type signing_witness_pay = witness_pay - (marketing_partner_pay + network_pay + standby_witnesses_pay);
+
+   FC_ASSERT( marketing_partner_pay + network_pay + standby_witnesses_pay + signing_witness_pay == witness_pay, 
+   "Reward split calculation is off. Sum of split funds != total witness pay", 
+                 ("marketing_partner_pay",marketing_partner_pay)
+                 ("network_pay",network_pay)
+                 ("standby_witnesses_pay",standby_witnesses_pay)
+                 ("signing_witness_pay",signing_witness_pay)
+                 ("witness_pay",witness_pay) );
 
    modify( dpo, [&]( dynamic_global_property_object& _dpo )
    {
