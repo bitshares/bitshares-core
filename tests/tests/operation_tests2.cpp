@@ -1008,7 +1008,8 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
       trx.clear();
    }
 
-   BOOST_CHECK_EQUAL(get_balance(nathan_id, asset_id_type()), 101000);
+   // since nathan is the marketing partner in tests, it also got 400000 from marketing partner fees
+   BOOST_CHECK_EQUAL(get_balance(nathan_id, asset_id_type()), 501000);
    BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<vesting_balance_worker_type>().balance(db).balance.amount.value, 0);
 } FC_LOG_AND_RETHROW() }
 
@@ -1746,5 +1747,345 @@ BOOST_AUTO_TEST_CASE( top_n_special )
 
    // } FC_LOG_AND_RETHROW()
 }
+
+BOOST_AUTO_TEST_CASE( standby_witnesses )
+{ try {
+   // Create 21 new witnesses, vote them in, make sure they push the existing witnesses
+   // into standby. Make sure there's 10 of the new witnesses in standby as well.
+
+   // setup test account
+   ACTOR(nathan1);
+   ACTOR(nathan2);
+   ACTOR(nathan3);
+   ACTOR(nathan4);
+   ACTOR(nathan5);
+   ACTOR(nathan6);
+   ACTOR(nathan7);
+   ACTOR(nathan8);
+   ACTOR(nathan9);
+   ACTOR(nathan10);
+   ACTOR(nathan11);
+   ACTOR(nathan12);
+   ACTOR(nathan13);
+   ACTOR(nathan14);
+   ACTOR(nathan15);
+   ACTOR(nathan16);
+   ACTOR(nathan17);
+   ACTOR(nathan18);
+   ACTOR(nathan19);
+   ACTOR(nathan20);
+   ACTOR(nathan21);
+   ACTOR(nathan22);
+
+   auto schedule_maint = [&]()
+   {
+      // Do maintenance at next generated block
+      db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& _dpo )
+      {
+         _dpo.next_maintenance_time = db.head_block_time() + 1;
+      } );
+   };
+
+   upgrade_to_lifetime_member(nathan1_id);
+   upgrade_to_lifetime_member(nathan2_id);
+   upgrade_to_lifetime_member(nathan3_id);
+   upgrade_to_lifetime_member(nathan4_id);
+   upgrade_to_lifetime_member(nathan5_id);
+   upgrade_to_lifetime_member(nathan6_id);
+   upgrade_to_lifetime_member(nathan7_id);
+   upgrade_to_lifetime_member(nathan8_id);
+   upgrade_to_lifetime_member(nathan9_id);
+   upgrade_to_lifetime_member(nathan10_id);
+   upgrade_to_lifetime_member(nathan11_id);
+   upgrade_to_lifetime_member(nathan12_id);
+   upgrade_to_lifetime_member(nathan13_id);
+   upgrade_to_lifetime_member(nathan14_id);
+   upgrade_to_lifetime_member(nathan15_id);
+   upgrade_to_lifetime_member(nathan16_id);
+   upgrade_to_lifetime_member(nathan17_id);
+   upgrade_to_lifetime_member(nathan18_id);
+   upgrade_to_lifetime_member(nathan19_id);
+   upgrade_to_lifetime_member(nathan20_id);
+   upgrade_to_lifetime_member(nathan21_id);
+   upgrade_to_lifetime_member(nathan22_id);
+
+   trx.clear();
+
+   // create witness
+   witness_id_type nathan_witness1_id = create_witness(nathan1_id, nathan1_private_key).id;
+   witness_id_type nathan_witness2_id = create_witness(nathan2_id, nathan2_private_key).id;
+   witness_id_type nathan_witness3_id = create_witness(nathan3_id, nathan3_private_key).id;
+   witness_id_type nathan_witness4_id = create_witness(nathan4_id, nathan4_private_key).id;
+   witness_id_type nathan_witness5_id = create_witness(nathan5_id, nathan5_private_key).id;
+   witness_id_type nathan_witness6_id = create_witness(nathan6_id, nathan6_private_key).id;
+   witness_id_type nathan_witness7_id = create_witness(nathan7_id, nathan7_private_key).id;
+   witness_id_type nathan_witness8_id = create_witness(nathan8_id, nathan8_private_key).id;
+   witness_id_type nathan_witness9_id = create_witness(nathan9_id, nathan9_private_key).id;
+   witness_id_type nathan_witness10_id = create_witness(nathan10_id, nathan10_private_key).id;
+   witness_id_type nathan_witness11_id = create_witness(nathan11_id, nathan11_private_key).id;
+   witness_id_type nathan_witness12_id = create_witness(nathan12_id, nathan12_private_key).id;
+   witness_id_type nathan_witness13_id = create_witness(nathan13_id, nathan13_private_key).id;
+   witness_id_type nathan_witness14_id = create_witness(nathan14_id, nathan14_private_key).id;
+   witness_id_type nathan_witness15_id = create_witness(nathan15_id, nathan15_private_key).id;
+   witness_id_type nathan_witness16_id = create_witness(nathan16_id, nathan16_private_key).id;
+   witness_id_type nathan_witness17_id = create_witness(nathan17_id, nathan17_private_key).id;
+   witness_id_type nathan_witness18_id = create_witness(nathan18_id, nathan18_private_key).id;
+   witness_id_type nathan_witness19_id = create_witness(nathan19_id, nathan19_private_key).id;
+   witness_id_type nathan_witness20_id = create_witness(nathan20_id, nathan20_private_key).id;
+   witness_id_type nathan_witness21_id = create_witness(nathan21_id, nathan21_private_key).id;
+   witness_id_type nathan_witness22_id = create_witness(nathan22_id, nathan22_private_key).id;
+
+   // Create a vector with private key of all witnesses, will be used to activate 11 witnesses at a time
+   const vector <fc::ecc::private_key> private_keys = {
+         nathan1_private_key,
+         nathan2_private_key,
+         nathan3_private_key,
+         nathan4_private_key,
+         nathan5_private_key,
+         nathan6_private_key,
+         nathan7_private_key,
+         nathan8_private_key,
+         nathan9_private_key,
+         nathan10_private_key,
+         nathan11_private_key,
+         nathan12_private_key,
+         nathan13_private_key,
+         nathan14_private_key,
+         nathan15_private_key,
+         nathan16_private_key,
+         nathan17_private_key,
+         nathan18_private_key,
+         nathan19_private_key,
+         nathan20_private_key,
+         nathan21_private_key,
+         nathan22_private_key
+   };
+
+   // create a map with account id and witness id of the first 11 witnesses
+   const flat_map <account_id_type, witness_id_type> witness_map = {
+         {nathan1_id, nathan_witness1_id},
+         {nathan2_id, nathan_witness2_id},
+         {nathan3_id, nathan_witness3_id},
+         {nathan4_id, nathan_witness4_id},
+         {nathan5_id, nathan_witness5_id},
+         {nathan6_id, nathan_witness6_id},
+         {nathan7_id, nathan_witness7_id},
+         {nathan8_id, nathan_witness8_id},
+         {nathan9_id, nathan_witness9_id},
+         {nathan10_id, nathan_witness10_id},
+         {nathan11_id, nathan_witness11_id},
+         {nathan12_id, nathan_witness12_id},
+         {nathan13_id, nathan_witness13_id},
+         {nathan14_id, nathan_witness14_id},
+         {nathan15_id, nathan_witness15_id},
+         {nathan16_id, nathan_witness16_id},
+         {nathan17_id, nathan_witness17_id},
+         {nathan18_id, nathan_witness18_id},
+         {nathan19_id, nathan_witness19_id},
+         {nathan20_id, nathan_witness20_id},
+         {nathan21_id, nathan_witness21_id},
+         {nathan22_id,  nathan_witness22_id}
+   };
+
+   // Activate all witnesses
+   // Each witness is voted with incremental stake so last witness created will be the ones with more votes
+   int c = 0;
+   for (auto l : witness_map) {
+      int stake = 100 + c * 10;
+      transfer(committee_account, l.first, asset(stake));
+      {
+         set_expiration(db, trx);
+         account_update_operation op;
+         op.account = l.first;
+         op.new_options = l.first(db).options;
+         op.new_options->votes.insert(l.second(db).vote_id);
+
+         trx.operations.push_back(op);
+         sign(trx, private_keys.at(c));
+         PUSH_TX(db, trx);
+         trx.clear();
+      }
+      ++c;
+   }
+
+   schedule_maint();
+   generate_block();
+
+   // New accounts should be witnesses now
+   BOOST_REQUIRE( db.find( nathan_witness1_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness2_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness3_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness4_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness5_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness6_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness7_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness8_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness9_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness10_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness11_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness12_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness13_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness14_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness15_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness16_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness17_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness18_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness19_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness20_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness21_id ) );
+   BOOST_REQUIRE( db.find( nathan_witness22_id ) );
+   
+   schedule_maint();
+   generate_block();
+
+   const auto& witnesses = db.get_global_properties().active_witnesses;
+   const auto& standby_witnesses = db.get_global_properties().standby_witnesses;
+
+   // Because the new witnesses created were voted in, the last ones voted in
+   // become the active witnesses and all the initial witnesses get pusehd
+   // out and become standby witnesses
+   BOOST_CHECK_EQUAL(witnesses.size(), 11u);
+   BOOST_CHECK_EQUAL(witnesses.begin()[0].instance.value, nathan_witness12_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[1].instance.value, nathan_witness13_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[2].instance.value, nathan_witness14_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[3].instance.value, nathan_witness15_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[4].instance.value, nathan_witness16_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[5].instance.value, nathan_witness17_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[6].instance.value, nathan_witness18_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[7].instance.value, nathan_witness19_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[8].instance.value, nathan_witness20_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[9].instance.value, nathan_witness21_id.instance.value);
+   BOOST_CHECK_EQUAL(witnesses.begin()[10].instance.value, nathan_witness22_id.instance.value);
+
+   BOOST_CHECK_EQUAL(standby_witnesses.size(), 21u);
+
+   // Check that new witnesses are in standby
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[0].instance.value, nathan_witness11_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[1].instance.value, nathan_witness10_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[2].instance.value, nathan_witness9_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[3].instance.value, nathan_witness8_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[4].instance.value, nathan_witness7_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[5].instance.value, nathan_witness6_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[6].instance.value, nathan_witness5_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[7].instance.value, nathan_witness4_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[8].instance.value, nathan_witness3_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[9].instance.value, nathan_witness2_id.instance.value);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[10].instance.value, nathan_witness1_id.instance.value);
+
+   // Check that initial witnesses are in standby
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[11].instance.value, 1u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[12].instance.value, 2u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[13].instance.value, 3u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[14].instance.value, 4u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[15].instance.value, 5u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[16].instance.value, 6u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[17].instance.value, 7u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[18].instance.value, 8u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[19].instance.value, 9u);
+   BOOST_CHECK_EQUAL(standby_witnesses.begin()[20].instance.value, 10u);
+
+   // Make enough blocks to cause the witness schedule to rebuild so
+   // only the new witnesses will be signing blocks.
+   generate_block();
+   generate_block();
+   generate_block();
+   generate_block();
+   generate_block();
+   generate_block();
+   generate_block();
+   generate_block();
+   generate_block();
+   generate_block();
+   schedule_maint();
+   generate_block();
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( block_reward_split )
+{ try {
+   INVOKE(standby_witnesses);
+
+   auto schedule_maint = [&]()
+   {
+      // Do maintenance at next generated block
+      db.modify( db.get_dynamic_global_properties(), [&]( dynamic_global_property_object& _dpo )
+      {
+         _dpo.next_maintenance_time = db.head_block_time() + 1;
+      } );
+   };
+
+   db.modify( db.get_global_properties(), [&]( global_property_object& _gpo )
+   {
+      _gpo.parameters.witness_pay_per_block = 1000;
+      _gpo.parameters.maintenance_interval = 100 * _gpo.parameters.block_interval;
+      _gpo.parameters.core_inflation_amount = 1000000; // this is mostly to increase the reserve
+   } );
+
+   const auto& standby_witnesses = db.get_global_properties().standby_witnesses;
+   BOOST_CHECK_EQUAL(standby_witnesses.size(), 21u);
+   const auto& witnesses = db.get_global_properties().active_witnesses;
+   BOOST_CHECK_EQUAL(witnesses.size(), 11u);
+
+   // Maintenance hasn't occurred yet so standbys should not have any vested balance
+   for (auto standby_witness : standby_witnesses) {
+      BOOST_CHECK_EQUAL(standby_witness(db).pay_vb.valid(), false);
+   }
+
+   schedule_maint();
+   generate_block();
+
+   // First maintenance just turned on witness pay/inflation so standbys should not have any vested balance
+   for (auto standby_witness : standby_witnesses) {
+      BOOST_CHECK_EQUAL(standby_witness(db).pay_vb.valid(), false);
+   }
+
+   generate_block();
+   generate_block();
+   generate_block();
+   schedule_maint();
+   generate_block();
+
+   // 4 blocks got created prior to maintenance, with witness pay at 1000 per block. 
+   // That means the overall funds distributed to standby witnesses should be
+   // 4000 * .2 = 800, split among 21 standbys.
+   // First standby gets 40, all others get 38.
+   int i = 0;
+   for (auto standby_witness : standby_witnesses) {
+      BOOST_CHECK_EQUAL(standby_witness(db).pay_vb.valid(), true);
+      
+      if( standby_witness(db).pay_vb.valid() )
+      {
+         auto vb = (*standby_witness(db).pay_vb)(db).balance.amount.value;
+         if(i == 0){
+            BOOST_CHECK_EQUAL(vb, 40u);
+         }else{
+            BOOST_CHECK_EQUAL(vb, 38u);
+         }
+      }
+      i ++;
+   }
+
+   schedule_maint();
+   generate_block();
+
+   // 1 block got created prior to maintenance, with witness pay at 1000 per block. 
+   // That means the overall funds distributed to standby witnesses should be
+   // 1000 * .2 = 200, split among 21 standbys.
+   // First standby gets 20, all others get 9.
+   i = 0;
+   for (auto standby_witness : standby_witnesses) {
+      BOOST_CHECK_EQUAL(standby_witness(db).pay_vb.valid(), true);
+      
+      if( standby_witness(db).pay_vb.valid() )
+      {
+         auto vb = (*standby_witness(db).pay_vb)(db).balance.amount.value;
+         if(i == 0){
+            BOOST_CHECK_EQUAL(vb, 60u);
+         }else{
+            BOOST_CHECK_EQUAL(vb, 47u);
+         }
+      }
+      i ++;
+   }
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

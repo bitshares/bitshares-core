@@ -348,7 +348,13 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    generate_block();
 
    const auto witness_ppb = db.get_global_properties().parameters.witness_pay_per_block.value;
+   // Reward split
+   // Marketing pay = 10%
+   // Standby pay = 20%
+   // Network pay = 10%
+   // Signing witness = 60%
 
+   int64_t reward_split_pay = witness_ppb * (0.4);
    const asset_object* core = &asset_id_type()(db);
 
    const share_type prec = asset::scaled_precision( asset_id_type()(db).precision );
@@ -438,19 +444,19 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
    // second witness finally gets paid!
    generate_block();
-   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)witness_ppb );
+   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)witness_ppb - reward_split_pay );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, (int64_t)(ref_budget - witness_ppb) );
 
    generate_block();
-   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)witness_ppb );
+   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)witness_ppb - reward_split_pay );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, (int64_t)(ref_budget - 2 * witness_ppb) );
 
    generate_block();
-   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)witness_ppb );
+   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)witness_ppb - reward_split_pay );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, (int64_t)(ref_budget - 3 * witness_ppb) );
 
    generate_block();
-   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)witness_ppb );
+   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)witness_ppb - reward_split_pay );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, (int64_t)(ref_budget - 4 * witness_ppb) );
    BOOST_CHECK_EQUAL(core->reserved(db).value, 499900000 );
 

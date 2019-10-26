@@ -307,6 +307,9 @@ void database_fixture::verify_asset_supplies( const database& db )
       total_balances[ bo.balance.asset_id ] += bo.balance.amount;
 
    total_balances[asset_id_type()] += db.get_dynamic_global_properties().witness_budget;
+   total_balances[asset_id_type()] += db.get_dynamic_global_properties().standby_witness_reward_split_fund;
+   total_balances[asset_id_type()] += db.get_dynamic_global_properties().marketing_partner_reward_split_fund;
+   total_balances[asset_id_type()] += db.get_dynamic_global_properties().network_reward_split_fund;
 
    for( const auto& item : total_debts )
    {

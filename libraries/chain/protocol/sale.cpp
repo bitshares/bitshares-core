@@ -32,8 +32,7 @@ share_type sale_operation::calculate_fee( const fee_parameters_type& schedule )c
    r /= GRAPHENE_100_PERCENT;
    share_type core_fee_required = r.to_uint64();
 
-   if( memo )
-      core_fee_required += calculate_data_fee( fc::raw::pack_size(memo), schedule.price_per_kbyte );
+   // Since memo is capped to 1kb, don't charge a fee for memo
    return core_fee_required;
 }
 
@@ -43,6 +42,12 @@ void sale_operation::validate()const
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( from != to );
    FC_ASSERT( amount.amount > 0 );
+   if (memo) {
+      // Since the fee is paid by the recipient of the funds we don't want the
+      // Memo fee to ruin the sale and cause the recipient to lose money
+      auto temp = fc::raw::pack_size(memo);
+      FC_ASSERT( temp <= 1024 );
+   }
 }
 
 } } // graphene::chain

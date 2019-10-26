@@ -68,6 +68,43 @@ vector<std::reference_wrapper<const typename Index::object_type>> database::sort
    return refs;
 }
 
+template<class Index>
+vector<std::reference_wrapper<const typename Index::object_type>> database::sort_standby_objects(size_t count) const
+{
+   using ObjectType = typename Index::object_type;
+   const auto& all_objects = get_index_type<Index>().indices();
+   size_t active_wit_count = count;
+   size_t total_wit_count = 100;
+   size_t all_object_count = all_objects.size();
+   count = std::min(total_wit_count, all_object_count);
+   vector<std::reference_wrapper<const ObjectType>> refs;
+
+   if(all_objects.size() <= active_wit_count){
+      return refs;
+   }
+   
+   refs.reserve(all_objects.size());
+   std::transform(all_objects.begin(), all_objects.end(),
+                  std::back_inserter(refs),
+                  [](const ObjectType& o) { return std::cref(o); });
+   std::partial_sort(refs.begin(), refs.begin() + count, refs.end(),
+                   [this](const ObjectType& a, const ObjectType& b)->bool {
+      share_type oa_vote = _vote_tally_buffer[a.vote_id];
+      share_type ob_vote = _vote_tally_buffer[b.vote_id];
+      if( oa_vote != ob_vote )
+         return oa_vote > ob_vote;
+      return a.vote_id < b.vote_id;
+   });
+
+   auto first = refs.begin() + active_wit_count;
+   auto last = refs.begin() + count;
+   vector<std::reference_wrapper<const ObjectType>> standby_wits;
+   standby_wits.reserve(count - active_wit_count);
+   std::copy(first, last, std::inserter(standby_wits, standby_wits.end()));
+
+   return standby_wits;
+}
+
 void database::handle_core_inflation()
 {
    const global_property_object& gpo = get_global_properties();
@@ -118,6 +155,74 @@ void database::handle_charity_fees()
             addo.accumulated_fees_for_charity = 0;
          });
       }
+   }
+}
+
+void database::handle_block_reward_payout()
+{
+   const global_property_object& gpo = get_global_properties();
+   const dynamic_global_property_object& dpo = get_dynamic_global_properties();
+   vector<witness_id_type> standby_witnesses_ids = gpo.standby_witnesses;
+   const asset_dynamic_data_object& core_dd = get_core_dynamic_data();
+   share_type network_reward = dpo.network_reward_split_fund;
+   share_type marketing_partner_reward = dpo.marketing_partner_reward_split_fund;
+   share_type standby_witness_reward = dpo.standby_witness_reward_split_fund;
+
+   share_type standby_wit_count = standby_witnesses_ids.size();
+
+   //////////////////
+   // START PAYOUT //
+   //////////////////
+
+   if (gpo.marketing_partner_account_name != "" ) 
+   {
+      auto& acnt_indx = get_index_type<account_index>();
+      auto marketing_partner_itr = acnt_indx.indices().get<by_name>().find( gpo.marketing_partner_account_name );
+      if ( marketing_partner_itr != acnt_indx.indices().get<by_name>().end() )
+      {
+         // payout marketing partner
+         adjust_balance(marketing_partner_itr->id,  marketing_partner_reward);
+
+         modify( dpo, [&]( dynamic_global_property_object& _dpo )
+         {
+            _dpo.marketing_partner_reward_split_fund = 0;
+         } );
+      }
+   }
+   
+   // payout network
+   modify( core_dd, [&]( asset_dynamic_data_object& _core_dd )
+   {
+      _core_dd.current_max_supply += network_reward;
+      _core_dd.current_supply -= network_reward;
+   } );
+
+   modify( dpo, [&]( dynamic_global_property_object& _dpo )
+   {
+      _dpo.network_reward_split_fund = 0;
+   } );
+
+   if(standby_wit_count > 0){
+      // payout all standby witnesses
+      share_type share = standby_witness_reward / standby_wit_count;
+      share_type first_wit_share = standby_witness_reward - ( share * ( standby_wit_count -1 ));
+      share_type total_paid;
+      for (std::size_t i = 0; i != standby_wit_count; ++i)
+      {
+         share_type current_share = i == 0 ? first_wit_share : share;
+         deposit_witness_pay( standby_witnesses_ids[i](*this), current_share );
+         total_paid = total_paid + current_share;
+      }
+      
+      modify( dpo, [&]( dynamic_global_property_object& _dpo )
+      {
+         _dpo.standby_witness_reward_split_fund = 0;
+      } );
+
+      FC_ASSERT( total_paid == standby_witness_reward, 
+                  "Reward split calculation is off. Sum of funds paid to stanbys != total standby pay", 
+                 ("total_paid",total_paid)
+                 ("standby_witness_reward",standby_witness_reward));
    }
 }
 
@@ -271,6 +376,7 @@ void database::update_active_witnesses()
 
    witness_count = std::max( witness_count*2+1, (size_t)cpo.immutable_parameters.min_witness_count );
    auto wits = sort_votable_objects<witness_index>( witness_count );
+   auto standby_wits = sort_standby_objects<witness_index>( witness_count );
 
    const global_property_object& gpo = get_global_properties();
 
@@ -342,6 +448,17 @@ void database::update_active_witnesses()
       gp.active_witnesses.reserve(wits.size());
       std::transform(wits.begin(), wits.end(),
                      std::inserter(gp.active_witnesses, gp.active_witnesses.end()),
+                     [](const witness_object& w) {
+         return w.id;
+      });
+   });
+
+   modify( gpo, [&standby_wits]( global_property_object& gp )
+   {
+      gp.standby_witnesses.clear();
+      gp.standby_witnesses.reserve(standby_wits.size());
+      std::transform(standby_wits.begin(), standby_wits.end(),
+                     std::inserter(gp.standby_witnesses, gp.standby_witnesses.end()),
                      [](const witness_object& w) {
          return w.id;
       });
@@ -744,7 +861,8 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
 
    perform_account_maintenance( tally_helper );
    handle_marketing_fees();
-   
+   handle_charity_fees();
+   handle_block_reward_payout();
 
    struct clear_canary {
       clear_canary(vector<uint64_t>& target): target(target){}
