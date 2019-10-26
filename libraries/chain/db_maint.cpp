@@ -135,6 +135,19 @@ void database::handle_marketing_fees()
             addo.accumulated_fees_for_marketing_partner = 0;
          });
       }
+   } else {
+      auto& acnt_indx = get_index_type<account_index>();
+      auto marketing_partner_itr = acnt_indx.indices().get<by_name>().find( GRAPHENE_DEFAULT_MARKETING_PARTNER_ACCOUNT_NAME );
+      if ( marketing_partner_itr != acnt_indx.indices().get<by_name>().end() )
+      {
+         // Found current marketing partner account.
+         // Now give the marketing partner all the accumulated fees for them and zero it out on the db
+         const asset_dynamic_data_object& core_dd = get_core_dynamic_data();
+         adjust_balance(marketing_partner_itr->id,  asset(core_dd.accumulated_fees_for_marketing_partner, asset_id_type()));
+         modify( core_dd, [](asset_dynamic_data_object& addo) {
+            addo.accumulated_fees_for_marketing_partner = 0;
+         });
+      }
    }
 }
 
@@ -178,6 +191,19 @@ void database::handle_block_reward_payout()
    {
       auto& acnt_indx = get_index_type<account_index>();
       auto marketing_partner_itr = acnt_indx.indices().get<by_name>().find( gpo.marketing_partner_account_name );
+      if ( marketing_partner_itr != acnt_indx.indices().get<by_name>().end() )
+      {
+         // payout marketing partner
+         adjust_balance(marketing_partner_itr->id,  marketing_partner_reward);
+
+         modify( dpo, [&]( dynamic_global_property_object& _dpo )
+         {
+            _dpo.marketing_partner_reward_split_fund = 0;
+         } );
+      }
+   } else {
+      auto& acnt_indx = get_index_type<account_index>();
+      auto marketing_partner_itr = acnt_indx.indices().get<by_name>().find( GRAPHENE_DEFAULT_MARKETING_PARTNER_ACCOUNT_NAME );
       if ( marketing_partner_itr != acnt_indx.indices().get<by_name>().end() )
       {
          // payout marketing partner
@@ -862,7 +888,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    perform_account_maintenance( tally_helper );
    handle_marketing_fees();
    handle_charity_fees();
-   handle_block_reward_payout();
+   handle_block_reward_payout();      
 
    struct clear_canary {
       clear_canary(vector<uint64_t>& target): target(target){}
