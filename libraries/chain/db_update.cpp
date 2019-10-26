@@ -97,8 +97,6 @@ share_type cut_reward(share_type a, uint16_t p)
 void database::update_signing_witness(const witness_object& signing_witness, const signed_block& new_block)
 {
    const global_property_object& gpo = get_global_properties();
-   auto& acnt_indx = get_index_type<account_index>();
-   auto mp_itr = acnt_indx.indices().get<by_name>().find( gpo.marketing_partner_account_name );
    const dynamic_global_property_object& dpo = get_dynamic_global_properties();
    uint64_t new_block_aslot = dpo.current_aslot + get_slot_at_time( new_block.timestamp );
 
