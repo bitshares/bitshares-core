@@ -1905,9 +1905,9 @@ signed_transaction wallet_api::account_store_map(string account, string catalog,
 }
 
 vector<account_storage_object> wallet_api::get_account_storage(string account, string catalog)
-{
+{ try {
    return my->_custom_operations->get_storage_info(account, catalog);
-}
+} FC_CAPTURE_AND_RETHROW( (account)(catalog) ) }
 
 signed_block_with_info::signed_block_with_info( const signed_block& block )
    : signed_block( block )
