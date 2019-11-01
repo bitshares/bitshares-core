@@ -38,6 +38,7 @@
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/custom_authority_object.hpp>
 #include <graphene/chain/market_object.hpp>
+#include <graphene/chain/vesting_balance_object.hpp>
 
 #include "../common/database_fixture.hpp"
 
@@ -3944,6 +3945,183 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
             // [0,1]: 0 is the rejection_indicator for an index to a sub-restriction; 1 is the index value for Restriction 2
             // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
             EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,1],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+
+         }
+
+      } FC_LOG_AND_RETHROW()
+   }
+
+
+   /**
+    * Test of variant assert (variant_assert) restriction on a field
+    * Test of CAA for vesting_balance_create_operation
+    *
+    * Scenario: Test of authorization of one account (alice) authorizing another account (bob)
+    * to extend an HTLC operation as long as the extension is within a specified timespan
+    */
+   BOOST_AUTO_TEST_CASE(authorized_vesting_balance_create) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Accounts
+         //////
+         ACTORS((alice)(bob)(charlie));
+         fund(alice, asset(500000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+
+
+         //////
+         // Bob attempts to create a coins-day vesting balance for Alice
+         // This attempt should fail because Alice has not authorized Bob to create a vesting balance
+         //////
+         vesting_balance_create_operation original_vb_op;
+         time_point_sec policy_start_time = db.head_block_time() + 86400;
+         {
+            vesting_balance_create_operation vb_op;
+            vb_op.creator = alice_id;
+            vb_op.owner = charlie_id;
+            vb_op.amount = graphene::chain::asset(60000);
+            vb_op.policy = cdd_vesting_policy_initializer(800000, policy_start_time);
+            vb_op.fee = db.current_fee_schedule().calculate_fee(vb_op);
+            trx.clear();
+            trx.operations.push_back(vb_op);
+            sign(trx, bob_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+            // "rejected_custom_auths":[]
+            EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+
+            original_vb_op = vb_op;
+         }
+
+
+         //////
+         // Alice authorizes Bob to create a coins-day vesting balance from her funds
+         // only if the vesting policy if the vesting duration equals 800,000 seconds
+         //////
+         custom_authority_create_operation authorize_create_vesting;
+         authorize_create_vesting.account = alice.get_id();
+         authorize_create_vesting.auth.add_authority(bob.get_id(), 1);
+         authorize_create_vesting.auth.weight_threshold = 1;
+         authorize_create_vesting.enabled = true;
+         authorize_create_vesting.valid_to = db.head_block_time() + 1000;
+         authorize_create_vesting.operation_type = operation::tag<vesting_balance_create_operation>::value;
+
+         // Restrict authorization to a coin-days vesting policy with a vesting duration of 800000 seconds
+         auto policy_index = member_index<vesting_balance_create_operation>("policy");
+         int64_t policy_tag = vesting_policy_initializer::tag<cdd_vesting_policy_initializer>::value;
+         auto vesting_seconds_index = member_index<cdd_vesting_policy_initializer>("vesting_seconds");
+         vector<restriction> policy_restrictions = {restriction(vesting_seconds_index, FUNC(eq), int64_t(800000))};
+         pair<int64_t, vector<restriction>> policy_argument(policy_tag, policy_restrictions);
+         authorize_create_vesting.restrictions = {restriction(policy_index, FUNC(variant_assert), policy_argument)};
+         //[
+         //  {
+         //    "member_index": 4,
+         //    "restriction_type": 12,
+         //    "argument": [
+         //      41,
+         //      [
+         //        1,
+         //        [
+         //          {
+         //            "member_index": 1,
+         //            "restriction_type": 0,
+         //            "argument": [
+         //              2,
+         //              800000
+         //            ],
+         //            "extensions": []
+         //          }
+         //        ]
+         //      ]
+         //    ],
+         //    "extensions": []
+         //  }
+         //]
+         trx.clear();
+         trx.operations = {authorize_create_vesting};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to generate distinctive hash IDs for the similar transactions
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // Bob attempts to create a coins-day vesting balance for Alice with a vesting duration of 86400 seconds
+         // This attempt should fail because Alice has not authorized this duration
+         //////
+         {
+            vesting_balance_create_operation vb_op;
+            vb_op.creator = alice_id;
+            vb_op.owner = charlie_id;
+            vb_op.amount = graphene::chain::asset(60000);
+            vb_op.policy = cdd_vesting_policy_initializer(86400, policy_start_time);
+            vb_op.fee = db.current_fee_schedule().calculate_fee(vb_op);
+            trx.clear();
+            trx.operations.push_back(vb_op);
+            sign(trx, bob_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should indicate the rejection path
+            // "rejection_path":[[0,0],[0,0],[2,"predicate_was_false"]
+            // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for Restriction 1
+            // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for the only argument
+            // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[0,0],[2,\"predicate_was_false\"]", [&] {PUSH_TX(db, trx);});
+
+         }
+
+
+         //////
+         // Bob attempts to create a linear vesting balance for Alice
+         // This attempt should fail because Alice has not authorized this type of vesting balance creation
+         //////
+         {
+            vesting_balance_create_operation vb_op;
+            vb_op.creator = alice_id;
+            vb_op.owner = charlie_id;
+            vb_op.amount = graphene::chain::asset(60000);
+            linear_vesting_policy_initializer policy;
+            policy.begin_timestamp = policy_start_time;
+            policy.vesting_cliff_seconds = 800000;
+            policy.vesting_duration_seconds = 40000;
+            vb_op.policy = policy;
+            vb_op.fee = db.current_fee_schedule().calculate_fee(vb_op);
+            trx.clear();
+            trx.operations.push_back(vb_op);
+            sign(trx, bob_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should indicate the rejection path
+            // "rejection_path":[[0,0],[2,"incorrect_variant_type"]
+            // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for Restriction 1
+            // [2,"incorrect_variant_type"]: 0 is the rejection_indicator for rejection_reason; "incorrect_variant_type" is the reason
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"incorrect_variant_type\"]", [&] {PUSH_TX(db, trx);});
+
+         }
+
+
+         //////
+         // Bob attempts to create a coins-day vesting balance for Alice with a vesting duration of 800000 seconds
+         // This attempt should succeed because Alice has authorized authorized this type of vesting balance creation
+         // with this duration
+         //////
+         {
+            trx.clear();
+            trx.operations.push_back(original_vb_op);
+            sign(trx, bob_private_key);
+            PUSH_TX(db, trx);
 
          }
 
