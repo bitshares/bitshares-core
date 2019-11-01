@@ -38,6 +38,7 @@
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/custom_authority_object.hpp>
 #include <graphene/chain/market_object.hpp>
+#include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 
 #include "../common/database_fixture.hpp"
@@ -4501,6 +4502,277 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
             op.delta_debt = asset(0, usd_id);
             trx.clear();
             trx.operations.push_back(op);
+            sign(trx, bob_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+            // "rejected_custom_auths":[]
+            EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+         }
+
+      } FC_LOG_AND_RETHROW()
+   }
+
+
+   /**
+    * Test of time restrictions on CAA
+    * Test of CAA for asset_reserve_operation
+    * Test of CAA in a proposed operation
+    *
+    * Scenario: Test of authorization of one account (alice) authorizing another account (bob)
+    * to reserve (burn) an asset only during a specfied timespan
+    */
+   BOOST_AUTO_TEST_CASE(authorized_time_restrictions_3) {
+      try {
+         //////
+         // Initialize: Accounts
+         //////
+         ACTORS((assetissuer)(feedproducer)(alice)(bob)(charlie));
+         int64_t init_balance(100 * GRAPHENE_BLOCKCHAIN_PRECISION);
+         fund(alice, asset(init_balance));
+
+
+         // Lambda for issuing an asset to an account
+         auto issue_amount_to = [&](const account_id_type &issuer, const asset &amount, const account_id_type &to) {
+            asset_issue_operation op;
+            op.issuer = issuer;
+            op.asset_to_issue = amount;
+            op.issue_to_account = to;
+
+            return op;
+         };
+
+         // Lambda for reserving an asset from an account
+         auto reserve_asset = [&](const account_id_type &reserver, const asset &amount) {
+            asset_reserve_operation op;
+            op.payer = reserver;
+            op.amount_to_reserve = amount;
+
+            return op;
+         };
+
+
+         //////
+         // Initialize: Create user-issued assets
+         //////
+         upgrade_to_lifetime_member(assetissuer);
+         create_user_issued_asset("SPECIALCOIN", assetissuer,  UIA_ASSET_ISSUER_PERMISSION_MASK);
+         generate_blocks(1);
+         const asset_object &specialcoin
+                 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SPECIALCOIN");
+
+
+         //////
+         // Initialize: assetissuer issues SPECIALCOIN to different accounts
+         //////
+         asset_issue_operation issue_special_to_alice_op
+                 = issue_amount_to(assetissuer.get_id(), asset(1000, specialcoin.id), alice.get_id());
+         asset_issue_operation issue_special_to_charlie_op
+                 = issue_amount_to(assetissuer.get_id(), asset(2000, specialcoin.id), charlie.get_id());
+         trx.clear();
+         trx.operations = {issue_special_to_alice_op, issue_special_to_charlie_op};
+         sign(trx, assetissuer_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Alice reserves some SPECIALCOIN from her account
+         //////
+         asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.id));
+         trx.clear();
+         trx.operations = {reserve_op};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+         int64_t allowed1_balance_specialcoin_after_override1 = get_balance(alice.get_id(), specialcoin.id);
+         BOOST_CHECK_EQUAL(allowed1_balance_specialcoin_after_override1, 800);
+
+
+         //////
+         // Charlie reserves some SPECIALCOIN from his account
+         //////
+         reserve_op = reserve_asset(charlie.get_id(), asset(200, specialcoin.id));
+         trx.clear();
+         trx.operations = {reserve_op};
+         sign(trx, charlie_private_key);
+         PUSH_TX(db, trx);
+         int64_t charlie_balance_specialcoin_after_override1 = get_balance(charlie.get_id(), specialcoin.id);
+         BOOST_CHECK_EQUAL(charlie_balance_specialcoin_after_override1, 1800);
+
+
+         //////
+         // Alice authorizes Bob to reserve her SPECIALCOIN
+         // This attempt should fail because the blockchain has not yet been initialized for CAA
+         //////
+         custom_authority_create_operation authorize_reserve;
+         authorize_reserve.account = alice.get_id();
+         authorize_reserve.auth.add_authority(bob.get_id(), 1);
+         authorize_reserve.auth.weight_threshold = 1;
+         authorize_reserve.enabled = true;
+         // Authorization is valid only for 2/5 of the maximum duration of a custom authority
+         time_point_sec before_authorization_start_time =
+                 db.head_block_time() + (GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS * 1 / 5);
+         time_point_sec authorization_start_time =
+                 db.head_block_time() + (GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS * 2 / 5);
+         time_point_sec authorization_middle_time =
+                 db.head_block_time() + (GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS * 3 / 5);
+         time_point_sec authorization_end_time =
+                 db.head_block_time() + (GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS * 4 / 5);
+         time_point_sec after_authorization_end_time = authorization_end_time + 86400;
+         authorize_reserve.valid_from = authorization_start_time;
+         authorize_reserve.valid_to = authorization_end_time;
+         authorize_reserve.operation_type = operation::tag<asset_reserve_operation>::value;
+         trx.clear();
+         trx.operations = {authorize_reserve};
+         sign(trx, alice_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), fc::assert_exception);
+
+
+         //////
+         // Alice creates a PROPOSAL to authorize Bob to reserve her SPECIALCOIN
+         // This attempt should fail because the blockchain has not yet been initialized for CAA
+         //////
+         proposal_create_operation proposal;
+         proposal.fee_paying_account = alice.get_id();
+         proposal.proposed_ops = {op_wrapper(authorize_reserve)};
+         proposal.expiration_time = db.head_block_time() + 86400;
+         trx.clear();
+         trx.operations = {authorize_reserve};
+         sign(trx, alice_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), fc::assert_exception);
+
+
+         //////
+         // Initialize the blockchain for CAA
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Alice creates a PROPOSAL to authorize Bob to reserve her SPECIALCOIN
+         // Authorization is valid only for 2/5 of the maximum duration of a custom authority
+         // This attempt should succeed because the blockchain is initialized for CAA
+         //////
+         before_authorization_start_time =
+                 db.head_block_time() + (GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS * 1 / 5);
+         authorization_start_time =
+                 db.head_block_time() + (GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS * 2 / 5);
+         authorization_middle_time =
+                 db.head_block_time() + (GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS * 3 / 5);
+         authorization_end_time =
+                 db.head_block_time() + (GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS * 4 / 5);
+         after_authorization_end_time = authorization_end_time + 86400;
+         authorize_reserve.valid_from = authorization_start_time;
+         authorize_reserve.valid_to = authorization_end_time;
+
+         proposal.fee_paying_account = alice.get_id();
+         proposal.proposed_ops = {op_wrapper(authorize_reserve)};
+         proposal.expiration_time = db.head_block_time() + 86400;
+         trx.clear();
+         trx.operations = {proposal};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to get the finalized proposal ID
+         //////
+         generate_blocks(1);
+         const proposal_object& prop = *db.get_index_type<proposal_index>().indices().begin();
+         proposal_id_type proposal_id = prop.id;
+
+         // Alice approves the proposal
+         proposal_update_operation approve_proposal;
+         approve_proposal.proposal = proposal_id;
+         approve_proposal.fee_paying_account = alice.get_id();
+         approve_proposal.active_approvals_to_add = {alice.get_id()};
+         trx.clear();
+         trx.operations = {approve_proposal};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to before the authorization starts
+         //////
+         generate_blocks(before_authorization_start_time);
+         set_expiration(db, trx);
+
+
+         //////
+         // Bob attempts to reserve some of Alice's SPECIALCOIN
+         // This attempt should fail because Bob the Alice authorization is not yet active
+         //////
+         {
+            asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.id));
+            trx.clear();
+            trx.operations = {reserve_op};
+            sign(trx, bob_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should not indicate any rejected custom auths because the CAA is not yet active
+            // "rejected_custom_auths":[]
+            EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // Advance the blockchain to the start of the authorization period
+         //////
+         generate_blocks(authorization_start_time);
+         set_expiration(db, trx);
+
+
+         //////
+         // Bob attempts to update the collateral for Alice's debt position
+         // This should succeed because the authorization is active
+         //////
+         {
+            asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.id));
+            trx.clear();
+            trx.operations = {reserve_op};
+            sign(trx, bob_private_key);
+            PUSH_TX(db, trx);
+         }
+
+
+         //////
+         // Advance the blockchain to the end of the authorization period
+         //////
+         generate_blocks(authorization_middle_time);
+         set_expiration(db, trx);
+
+
+         //////
+         // Bob attempts to update the collateral for Alice's debt position
+         // This should fail because Bob the Alice authorization is not yet active
+         //////
+         {
+            asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.id));
+            trx.clear();
+            trx.operations = {reserve_op};
+            sign(trx, bob_private_key);
+            PUSH_TX(db, trx);
+         }
+
+
+         //////
+         // Advance the blockchain to after the authorization expires
+         //////
+         generate_blocks(after_authorization_end_time);
+         set_expiration(db, trx);
+
+
+         //////
+         // Bob attempts to update the collateral for Alice's debt position
+         // This should fail because Bob the authorization has expired
+         //////
+         {
+            asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.id));
+            trx.clear();
+            trx.operations = {reserve_op};
             sign(trx, bob_private_key);
             BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
             // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
