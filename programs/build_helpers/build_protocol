@@ -8,5 +8,6 @@ programs/build_helpers/buildstep cmake 5 "cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE
 programs/build_helpers/buildstep make.fc 200 "make -j 2 fc"
 programs/build_helpers/buildstep make.custom_auths 1300 "make -j 1 graphene_protocol_custom_auths"
 programs/build_helpers/buildstep make.protocol 400 "make -j 2 graphene_protocol"
+programs/build_helpers/buildstep make.chain 1000 "make -j 2 graphene_chain"
 programs/build_helpers/buildstep end 0
 ccache -s
