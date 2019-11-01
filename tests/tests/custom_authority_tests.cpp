@@ -2432,8 +2432,8 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          fund(coldwallet, asset(init_balance));
          // coldwallet will borrow 1000 bitUSD
          borrow(coldwallet, bitusd.amount(1000), asset(15000));
-         int64_t alice_balance_usd_before_offer = get_balance(coldwallet_id, usd_id);
-         BOOST_CHECK_EQUAL( 1000,  alice_balance_usd_before_offer);
+         int64_t coldwallet_balance_usd_before_offer = get_balance(coldwallet_id, usd_id);
+         BOOST_CHECK_EQUAL( 1000,  coldwallet_balance_usd_before_offer);
          int64_t coldwallet_balance_core_before_offer = get_balance(coldwallet_id, core_id);
          BOOST_CHECK_EQUAL( init_balance - 15000, coldwallet_balance_core_before_offer );
 
@@ -4279,6 +4279,233 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
             // "rejected_custom_auths":[]
             EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
 
+         }
+
+      } FC_LOG_AND_RETHROW()
+   }
+
+
+   /**
+    * Test of time restrictions on CAA
+    * Test of CAA for call_order_update_operation
+    *
+    * Scenario: Test of authorization of one account (alice) authorizing another account (bob)
+    * to update a call order only during a specfied time interval
+    */
+   BOOST_AUTO_TEST_CASE(authorized_time_restrictions_2) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Accounts
+         //////
+         ACTORS((feedproducer)(alice)(bob));
+         int64_t init_balance(100 * GRAPHENE_BLOCKCHAIN_PRECISION);
+
+
+         //////
+         // Initialize: Define a market-issued asset called USDBIT
+         //////
+         // Define core asset
+         const auto &core = asset_id_type()(db);
+         asset_id_type core_id = core.id;
+
+         // Create a smart asset
+         create_bitasset("USDBIT", feedproducer_id);
+         generate_blocks(1);
+         const asset_object &bitusd
+                 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("USDBIT");
+         asset_id_type usd_id = bitusd.id;
+
+         // Configure the smart asset
+         update_feed_producers(bitusd, {feedproducer.id});
+         price_feed current_feed;
+         current_feed.maintenance_collateral_ratio = 1750;
+         current_feed.maximum_short_squeeze_ratio = 1100;
+         current_feed.settlement_price = bitusd.amount(1) / core.amount(5);
+         publish_feed(bitusd, feedproducer, current_feed);
+
+
+         //////
+         // Fund alice with core asset
+         //////
+         fund(alice, asset(init_balance));
+         // alice will borrow 1000 bitUSD
+         borrow(alice, bitusd.amount(1000), asset(15000));
+         int64_t alice_balance_usd_before_offer = get_balance(alice_id, usd_id);
+         BOOST_CHECK_EQUAL( 1000,  alice_balance_usd_before_offer);
+         int64_t alice_balance_core_before_offer = get_balance(alice_id, core_id);
+         BOOST_CHECK_EQUAL( init_balance - 15000, alice_balance_core_before_offer );
+
+
+         //////
+         // Alice updates the collateral for the Alice debt position
+         //////
+         {
+            call_order_update_operation op;
+            op.funding_account = alice_id;
+            op.delta_collateral = asset(1000);
+            op.delta_debt = asset(0, usd_id);
+            trx.clear();
+            trx.operations.push_back(op);
+            sign(trx, alice_private_key);
+            PUSH_TX(db, trx);
+         }
+
+
+         //////
+         // Bob attempts to update the collateral for Alice's debt position
+         // This attempt should fail because Bob is not authorized by Alice
+         //////
+         {
+            call_order_update_operation op;
+            op.funding_account = alice_id;
+            op.delta_collateral = asset(2000);
+            op.delta_debt = asset(0, usd_id);
+            trx.clear();
+            trx.operations.push_back(op);
+            sign(trx, bob_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+            // "rejected_custom_auths":[]
+            EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // Alice authorizes Bob to update her call order
+         //////
+         custom_authority_create_operation authorize_call_order_update;
+         authorize_call_order_update.account = alice.get_id();
+         authorize_call_order_update.auth.add_authority(bob.get_id(), 1);
+         authorize_call_order_update.auth.weight_threshold = 1;
+         authorize_call_order_update.enabled = true;
+         // Authorization is valid only for 2/5 of the maximum duration of a custom authority
+         time_point_sec before_authorization_start_time =
+                 db.head_block_time() + (GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS * 1 / 5);
+         time_point_sec authorization_start_time =
+                 db.head_block_time() + (GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS * 2 / 5);
+         time_point_sec authorization_middle_time =
+                 db.head_block_time() + (GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS * 3 / 5);
+         time_point_sec authorization_end_time =
+                 db.head_block_time() + (GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS * 4 / 5);
+         time_point_sec after_authorization_end_time = authorization_end_time + 86400;
+         authorize_call_order_update.valid_from = authorization_start_time;
+         authorize_call_order_update.valid_to = authorization_end_time;
+         authorize_call_order_update.operation_type = operation::tag<call_order_update_operation>::value;
+         trx.clear();
+         trx.operations = {authorize_call_order_update};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to before the authorization starts
+         //////
+         generate_blocks(before_authorization_start_time);
+         set_expiration(db, trx);
+         publish_feed(bitusd, feedproducer, current_feed); // Update the price feed
+
+
+         //////
+         // Bob attempts to update the collateral for Alice's debt position
+         // This attempt should fail because authorization is not yet active
+         //////
+         {
+            call_order_update_operation op;
+            op.funding_account = alice_id;
+            op.delta_collateral = asset(3000);
+            op.delta_debt = asset(0, usd_id);
+            trx.clear();
+            trx.operations.push_back(op);
+            sign(trx, bob_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should not indicate any rejected custom auths because the CAA is not yet active
+            // "rejected_custom_auths":[]
+            EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // Advance the blockchain to the start of the authorization period
+         //////
+         generate_blocks(authorization_start_time);
+         set_expiration(db, trx);
+         publish_feed(bitusd, feedproducer, current_feed); // Update the price feed
+
+         //////
+         // Bob attempts to update the collateral for Alice's debt position
+         // This attempt should succeed because the Alice authorization is active
+         //////
+         {
+            call_order_update_operation op;
+            op.funding_account = alice_id;
+            op.delta_collateral = asset(4000);
+            op.delta_debt = asset(0, usd_id);
+            trx.clear();
+            trx.operations.push_back(op);
+            sign(trx, bob_private_key);
+            PUSH_TX(db, trx);
+         }
+
+
+         //////
+         // Advance the blockchain to the end of the authorization period
+         //////
+         generate_blocks(authorization_middle_time);
+         set_expiration(db, trx);
+         publish_feed(bitusd, feedproducer, current_feed); // Update the price feed
+
+
+         //////
+         // Bob attempts to update the collateral for Alice's debt position
+         // This attempt should succeed because the Alice authorization is active
+         //////
+         {
+            call_order_update_operation op;
+            op.funding_account = alice_id;
+            op.delta_collateral = asset(5000);
+            op.delta_debt = asset(0, usd_id);
+            trx.clear();
+            trx.operations.push_back(op);
+            sign(trx, bob_private_key);
+            PUSH_TX(db, trx);
+         }
+
+
+         //////
+         // Advance the blockchain to after the authorization expires
+         //////
+         generate_blocks(after_authorization_end_time);
+         set_expiration(db, trx);
+         publish_feed(bitusd, feedproducer, current_feed); // Update the price feed
+
+
+         //////
+         // Bob attempts to update the collateral for Alice's debt position
+         // This attempt should fail because the authorization has expired
+         //////
+         {
+            call_order_update_operation op;
+            op.funding_account = alice_id;
+            op.delta_collateral = asset(6000);
+            op.delta_debt = asset(0, usd_id);
+            trx.clear();
+            trx.operations.push_back(op);
+            sign(trx, bob_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+            // "rejected_custom_auths":[]
+            EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
          }
 
       } FC_LOG_AND_RETHROW()
