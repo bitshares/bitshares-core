@@ -4129,4 +4129,160 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    }
 
 
+   /**
+    * Test of time restrictions on CAA
+    * Test of CAA for vesting_balance_withdraw_operation
+    *
+    * Scenario: Test of authorization of one account (alice) authorizing another account (bob)
+    * to withdraw vesting for a limited duration
+    */
+   BOOST_AUTO_TEST_CASE(authorized_time_restrictions_1) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Accounts
+         //////
+         ACTORS((alice)(bob)(charlie));
+         fund(charlie, asset(500000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+
+
+         //////
+         // Charlie creates an instant vesting balance for Alice
+         //////
+         vesting_balance_create_operation original_vb_op;
+         time_point_sec policy_start_time = db.head_block_time() + 86400;
+         vesting_balance_create_operation vb_op;
+         vb_op.creator = charlie_id;
+         vb_op.owner = alice_id;
+         vb_op.amount = graphene::chain::asset(60000);
+         vb_op.policy = instant_vesting_policy_initializer();
+         vb_op.fee = db.current_fee_schedule().calculate_fee(vb_op);
+         trx.clear();
+         trx.operations.push_back(vb_op);
+         sign(trx, charlie_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to before withdrawal of vesting balance can start
+         //////
+         generate_blocks(1);
+         set_expiration(db, trx);
+         vesting_balance_id_type vesting_balance_id =
+                 db.get_index_type<vesting_balance_index>().indices().get<by_account>().find(alice.get_id())->id;
+
+
+         //////
+         // Bob attempts to withdraw some of the vesting balance on behalf of Alice
+         // This attempt should fail because Alice has not authorized Bob
+         //////
+         {
+            asset partial_amount = asset(10000);
+
+            vesting_balance_withdraw_operation vb_op;
+            vb_op.vesting_balance = vesting_balance_id;
+            vb_op.owner = alice_id;
+            vb_op.amount = partial_amount;
+            vb_op.fee = db.current_fee_schedule().calculate_fee(vb_op);
+            trx.clear();
+            trx.operations.push_back(vb_op);
+            sign(trx, bob_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+            // "rejected_custom_auths":[]
+            EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+
+         }
+
+
+         //////
+         // Alice authorizes Bob to withdraw her vesting balance
+         //////
+         custom_authority_create_operation authorize_create_vesting;
+         authorize_create_vesting.account = alice.get_id();
+         authorize_create_vesting.auth.add_authority(bob.get_id(), 1);
+         authorize_create_vesting.auth.weight_threshold = 1;
+         authorize_create_vesting.enabled = true;
+         // Authorization is valid only for 3/5 of the maximum duration of a custom authority
+         time_point_sec authorization_end_time = policy_start_time + (GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS * 3 / 5);
+         time_point_sec authorization_before_end_time = policy_start_time + (GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS * 1 / 5);
+         authorize_create_vesting.valid_to = authorization_end_time;
+         authorize_create_vesting.operation_type = operation::tag<vesting_balance_withdraw_operation>::value;
+         trx.clear();
+         trx.operations = {authorize_create_vesting};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to before the authorization expires
+         //////
+         generate_blocks(authorization_before_end_time);
+         set_expiration(db, trx);
+
+
+         //////
+         // Bob attempts to withdraw the available vesting balance for Alice
+         // This attempt should succeed because the authorization is active
+         //////
+         {
+            asset partial_amount = asset(10000);
+
+            vesting_balance_withdraw_operation vb_op;
+            vb_op.vesting_balance = vesting_balance_id;
+            vb_op.owner = alice_id;
+            vb_op.amount = partial_amount;
+            vb_op.fee = db.current_fee_schedule().calculate_fee(vb_op);
+            trx.clear();
+            trx.operations.push_back(vb_op);
+            sign(trx, bob_private_key);
+            PUSH_TX(db, trx);
+
+         }
+
+
+         //////
+         // Advance the blockchain to after the authorization expires
+         //////
+         time_point_sec after_authorization_end_time = authorization_end_time + 86400;
+         generate_blocks(after_authorization_end_time);
+         set_expiration(db, trx);
+
+
+         //////
+         // Bob attempts to withdraw the available vesting balance for Alice
+         // This attempt should fail because the authorization has expired
+         //////
+         {
+            asset partial_amount = asset(10000);
+
+            vesting_balance_withdraw_operation vb_op;
+            vb_op.vesting_balance = vesting_balance_id;
+            vb_op.owner = alice_id;
+            vb_op.amount = partial_amount;
+            vb_op.fee = db.current_fee_schedule().calculate_fee(vb_op);
+            trx.clear();
+            trx.operations.push_back(vb_op);
+            sign(trx, bob_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+            // "rejected_custom_auths":[]
+            EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+
+         }
+
+      } FC_LOG_AND_RETHROW()
+   }
+
+
 BOOST_AUTO_TEST_SUITE_END()
