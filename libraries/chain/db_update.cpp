@@ -120,7 +120,7 @@ void database::update_last_irreversible_block()
    // 3 3 3 3 3 3 3 3 3 3 -> 3
    // 3 3 3 4 4 4 4 4 4 4 -> 4
 
-   size_t offset = ((GRAPHENE_100_PERCENT - GRAPHENE_IRREVERSIBLE_THRESHOLD) * wit_objs.size() / GRAPHENE_100_PERCENT);
+   const size_t offset = ((GRAPHENE_100_PERCENT - GRAPHENE_IRREVERSIBLE_THRESHOLD) * wit_objs.size() / GRAPHENE_100_PERCENT);
 
    std::nth_element( wit_objs.begin(), wit_objs.begin() + offset, wit_objs.end(),
       []( const witness_object* a, const witness_object* b )
@@ -130,9 +130,16 @@ void database::update_last_irreversible_block()
 
    uint32_t new_last_irreversible_block_num = wit_objs[offset]->last_confirmed_block_num;
 
+   const auto& witness_idx = get_index_type<witness_index>().indices().get<by_last_block>();
+   auto itr = witness_idx.end();
+   for( uint32_t i = gpo.active_witnesses.size() - offset; i > 0; --i )
+      --itr;
+   if( new_last_irreversible_block_num != itr->last_confirmed_block_num )
+      elog( "Mismatch: nlib = ${n} != lcb ${l}", ("n",new_last_irreversible_block_num)("l",itr->last_confirmed_block_num) );
+
    if( new_last_irreversible_block_num > dpo.last_irreversible_block_num )
    {
-      modify( dpo, [&]( dynamic_global_property_object& _dpo )
+      modify( dpo, [new_last_irreversible_block_num]( dynamic_global_property_object& _dpo )
       {
          _dpo.last_irreversible_block_num = new_last_irreversible_block_num;
       } );

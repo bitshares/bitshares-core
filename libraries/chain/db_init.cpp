@@ -680,6 +680,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          p.active_witnesses.insert(witness_id_type(i));
       }
    });
+   for( const auto witness : get_global_properties().active_witnesses )
+      modify( get<witness_object>( witness ), [] ( witness_object& w ) { w.is_active = true; } );
 
    // Enable fees
    modify(get_global_properties(), [&genesis_state](global_property_object& p) {

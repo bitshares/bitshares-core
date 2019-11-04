@@ -286,6 +286,15 @@ void database::update_active_witnesses()
       }
    } );
 
+   const witness_object& last_witness = wits.back();
+   for( const auto witness_id : gpo.active_witnesses )
+   {
+      const auto& witness = get<witness_object>( witness_id );
+      if( _vote_tally_buffer[witness.vote_id] < _vote_tally_buffer[last_witness.vote_id]
+             || (_vote_tally_buffer[witness.vote_id] == _vote_tally_buffer[last_witness.vote_id]
+                 && witness.id > last_witness.id) )
+         modify( witness, [] ( witness_object& w ) { w.is_active = false; } );
+   }
    modify( gpo, [&wits]( global_property_object& gp )
    {
       gp.active_witnesses.clear();
@@ -296,6 +305,12 @@ void database::update_active_witnesses()
          return w.id;
       });
    });
+   for( const auto witness_id : gpo.active_witnesses )
+   {
+      const auto& witness = get<witness_object>( witness_id );
+      if( !witness.is_active )
+         modify( witness, [] ( witness_object& w ) { w.is_active = true; } );
+   }
 
 } FC_CAPTURE_AND_RETHROW() }
 
