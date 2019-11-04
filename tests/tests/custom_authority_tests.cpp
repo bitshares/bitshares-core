@@ -2575,7 +2575,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
     * - the memo is set where the "from" equal's Bob's public key and "to" equals Diana's public *active* key
     * (The active key is chosen for simplicity. Other keys such as the memo key or an alternate key could also be used.)
     */
-   BOOST_AUTO_TEST_CASE(authorized_transfer_with_memo) {
+   BOOST_AUTO_TEST_CASE(authorized_transfer_with_memo_1) {
       try {
          //////
          // Initialize the test
@@ -2794,7 +2794,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //[ // A vector of predicate results
          //  [
          //    0, // Index 0 (the outer-most) rejection path
-         //    1  // The second outer-most sub-restriction
+         //    1  // 1 is the index for Restriction 2
          //  ],
          //  [
          //    1, // A (sub-)vector of predicate results
@@ -2847,7 +2847,223 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          trx.operations = {top};
          sign(trx, bob_private_key);
          BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for Restriction 1
+         // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+
+      } FC_LOG_AND_RETHROW()
+   }
+
+
+   /**
+    * Test of a restriction on an optional operation field
+    * Variation of the the original transfer_with_memo test for CAA
+    * Bob is authorized to transfer Alice's account to Charlies's account only if
+    * - the memo is set where the "from" equal's Bob's public key and "to" equals Diana's public *active* key
+    * (The active key is chosen for simplicity. Other keys such as the memo key or an alternate key could also be used.)
+    *
+    * A memo field is implicitly required.  Attempts without a memo field should have a rejection reaso of null_optional
+    */
+   BOOST_AUTO_TEST_CASE(authorized_transfer_with_memo_2) {
+      try {
+         //////
+         // Initialize the test
+         //////
+         ACTORS((alice)(bob)(charlie)(diana))
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object& gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+         transfer(account_id_type(), alice_id, asset(1000));
+         BOOST_CHECK_EQUAL(get_balance(alice_id, asset_id_type()), 1000);
+         BOOST_CHECK_EQUAL(get_balance(bob_id, asset_id_type()), 0);
+         BOOST_CHECK_EQUAL(get_balance(charlie_id, asset_id_type()), 00);
+         BOOST_CHECK_EQUAL(get_balance(diana_id, asset_id_type()), 0);
+
+
+         //////
+         // Alice transfers to Charlie with her own authorization
+         //////
+         transfer_operation top;
+         top.from = alice.get_id();
+         top.to = charlie.get_id();
+         top.amount = asset(50);
+         top.memo = memo_data();
+         top.memo->set_message(alice_private_key, bob_public_key, "Dear Bob,\n\nMoney!\n\nLove, Alice");
+         trx.operations = {top};
+         trx.sign(alice_private_key, db.get_chain_id());
+         auto processed = PUSH_TX(db, trx);
+
+         BOOST_CHECK_EQUAL(get_balance(alice_id, asset_id_type()), 950);
+         BOOST_CHECK_EQUAL(get_balance(bob_id, asset_id_type()), 0);
+         BOOST_CHECK_EQUAL(get_balance(charlie_id, asset_id_type()), 50);
+         BOOST_CHECK_EQUAL(get_balance(diana_id, asset_id_type()), 0);
+
+         auto memo = db.get_recent_transaction(processed.id()).operations.front().get<transfer_operation>().memo;
+         BOOST_CHECK(memo);
+         BOOST_CHECK_EQUAL(memo->get_message(bob_private_key, alice_public_key), "Dear Bob,\n\nMoney!\n\nLove, Alice");
+
+
+         //////
+         // Bob attempts to transfers from Alice to Charlie
+         // This should fail because Bob is not authorized
+         //////
+         generate_blocks(1); // Advance the blockchain to generate a distinctive hash ID for the re-used transfer op
+         top = transfer_operation();
+         top.from = alice.get_id();
+         top.to = charlie.get_id();
+         top.amount = asset(50);
+         trx.clear();
+         trx.operations = {top};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+         // "rejected_custom_auths":[]
+         EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+
+
+         //////
+         // Alice authorizes Bob to transfer to Charlie if
+         // - the memo is set where the "from" equal's Bob's public key and "to" equals Diana's public key
+         //////
+         custom_authority_create_operation caop;
+         caop.account = alice.get_id();
+         caop.auth.add_authority(bob.get_id(), 1);
+         caop.auth.weight_threshold = 1;
+         caop.enabled = true;
+         caop.valid_to = db.head_block_time() + 1000;
+         caop.operation_type = operation::tag<transfer_operation>::value;
+
+         vector<restriction> restrictions;
+
+         // Restriction 1 is for "to" to equal Charlie
+         auto to_index = member_index<transfer_operation>("to");
+         auto memo_index = member_index<transfer_operation>("memo");
+         auto to_inside_memo_index = member_index<memo_data>("to");
+         restrictions.emplace_back(to_index, FUNC(eq), charlie.get_id());
+
+         // Restriction 2 is for memo "to" to reference Diana's public *active* key
+         restrictions.emplace_back(restriction(memo_index, restriction::func_attr,
+                                               vector<restriction>{
+                                                       restriction(to_inside_memo_index, FUNC(eq), diana_public_key)}));
+         caop.restrictions = restrictions;
+         //[
+         //  {
+         //    "member_index": 2,
+         //    "restriction_type": 0,
+         //    "argument": [
+         //      7,
+         //      "1.2.18"
+         //    ],
+         //    "extensions": []
+         //  },
+         //  {
+         //    "member_index": 4,
+         //    "restriction_type": 10,
+         //    "argument": [
+         //      39,
+         //      [
+         //        {
+         //          "member_index": 1,
+         //          "restriction_type": 0,
+         //          "argument": [
+         //            5,
+         //            "BTS6MWg7PpE6azCGwKuhB17DbtSqhzf8i25hspdhndsf7VfsLee7k"
+         //          ],
+         //          "extensions": []
+         //        }
+         //      ]
+         //    ],
+         //    "extensions": []
+         //  }
+         //]
+         trx.clear();
+         trx.operations = {caop};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Bob attempts to transfers from Alice to Charlie WITHOUT a memo
+         // This should fail because Restriction 2 expects a memo
+         //////
+         generate_blocks(1); // Advance the blockchain to generate a distinctive hash ID for the re-used transfer op
+         trx.clear();
+         trx.operations = {top};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // [0,1]: 0 is the rejection_indicator for an index to a sub-restriction; 1 is the index value for Restriction 2
+         // [2,"null_optional"]: 0 is the rejection_indicator for rejection_reason; "null_optional" is the reason
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,1],[2,\"null_optional\"]]", [&] {PUSH_TX(db, trx);});
+
+
+         //////
+         // Bob attempts to transfers from Alice to Charlie with a memo
+         // where "from" equals Bob's public key and "to" equals Diana's public key
+         // This should succeed
+         //////
+         generate_blocks(1); // Advance the blockchain to generate a distinctive hash ID for the similar transfer op
+         top = transfer_operation();
+         top.from = alice.get_id();
+         top.to = charlie.get_id();
+         top.amount = asset(50);
+         top.memo = memo_data();
+         top.memo->set_message(bob_private_key, diana_public_key,
+                               "Dear Diana,\n\nOnly you should be able to read this\n\nLove, Bob");
+         trx.clear();
+         trx.operations = {top};
+         sign(trx, bob_private_key);
+         processed = PUSH_TX(db, trx);
+
+         BOOST_CHECK_EQUAL(get_balance(alice_id, asset_id_type()), 900);
+         BOOST_CHECK_EQUAL(get_balance(bob_id, asset_id_type()), 0);
+         BOOST_CHECK_EQUAL(get_balance(charlie_id, asset_id_type()), 100);
+         BOOST_CHECK_EQUAL(get_balance(diana_id, asset_id_type()), 0);
+
+         memo = db.get_recent_transaction(processed.id()).operations.front().get<transfer_operation>().memo;
+         BOOST_CHECK(memo);
+         BOOST_CHECK_EQUAL(memo->get_message(diana_private_key, bob_public_key),
+                           "Dear Diana,\n\nOnly you should be able to read this\n\nLove, Bob");
+
+         //////
+         // Bob attempts to transfers from Alice to Charlie with a memo
+         // where "from" equals Bob's public key and "to" equals Charlie's public key
+         // This should fail because it violates the memo restriction
+         //////
+         generate_blocks(1); // Advance the blockchain to generate a distinctive hash ID for the similar transfer op
+         top = transfer_operation();
+         top.from = alice.get_id();
+         top.to = charlie.get_id();
+         top.amount = asset(50);
+         top.memo = memo_data();
+         top.memo->set_message(bob_private_key, charlie_public_key,
+                               "Dear Charlie,\n\nOnly you should be able to read this\n\nLove, Bob");
+         trx.clear();
+         trx.operations = {top};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // [0,1]: 0 is the rejection_indicator for an index to a sub-restriction; 1 is the index value for Restriction 2
          // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for the only argument
+         // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "null_optional" is the reason
+         EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,1],[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+
+         //////
+         // Bob attempts to transfers from Alice to Diana
+         // This should fail because Diana is violates the recipient restriction
+         //////
+         generate_blocks(1); // Advance the blockchain to generate a distinctive hash ID for the similar transfer op
+         top = transfer_operation();
+         top.from = alice.get_id();
+         top.to = diana.get_id();
+         top.amount = asset(50);
+         trx.clear();
+         trx.operations = {top};
+         sign(trx, bob_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index for Restriction 1
          // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
          EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
 
