@@ -5000,4 +5000,235 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    }
 
 
+   /**
+    * Test of string field restriction
+    * Test of CAA for asset_create_operation
+    *
+    * Scenario: Test of authorization of one account (alice) authorizing another account (bob)
+    * to create an asset with a description that starts with the literal string "ACOIN."
+    */
+   BOOST_AUTO_TEST_CASE(authorized_asset_creation) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Accounts
+         //////
+         ACTORS((alice)(bob));
+         fund(alice, asset(500000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+         upgrade_to_lifetime_member(alice);
+         fund(bob, asset(200000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+
+
+         // Lambda for issuing an asset to an account
+         auto create_uia = [&](const string& name,
+                                    const account_object& issuer,
+                                    uint16_t flags,
+                                    const additional_asset_options_t& options = additional_asset_options_t(),
+                                    const price& core_exchange_rate = price(asset(1, asset_id_type(1)), asset(1)),
+                                    uint8_t precision = 2 /* traditional precision for tests */,
+                                    uint16_t market_fee_percent = 0) {
+
+            asset_create_operation op;
+
+            op.issuer = issuer.id;
+            op.fee = asset();
+            op.symbol = name;
+            op.common_options.max_supply = 0;
+            op.precision = precision;
+            op.common_options.core_exchange_rate = core_exchange_rate;
+            op.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+            op.common_options.flags = flags;
+            op.common_options.issuer_permissions = flags;
+            op.common_options.market_fee_percent = market_fee_percent;
+            op.common_options.extensions = std::move(options);
+
+            return op;
+         };
+
+
+         //////
+         // Alice creates a UIA
+         //////
+         {
+            asset_create_operation create_uia_op = create_uia("ACOIN", alice, white_list);
+            trx.clear();
+            trx.operations = {create_uia_op};
+            sign(trx, alice_private_key);
+            PUSH_TX(db, trx);
+         }
+
+
+         //////
+         // Bob attempts to creates a UIA
+         // This should fail because Bob is not authorized by Alice to create any coin with Alice as the issuer
+         //////
+         {
+            asset_create_operation create_uia_op = create_uia("ACOIN.BOB", alice, white_list);
+            trx.clear();
+            trx.operations = {create_uia_op};
+            sign(trx, bob_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+            // "rejected_custom_auths":[]
+            EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // Alice authorizes Bob to create sub-token UIAs below ACOIN
+         //////
+         {
+            custom_authority_create_operation authorize_uia_creation;
+            authorize_uia_creation.account = alice.get_id();
+            authorize_uia_creation.auth.add_authority(bob.get_id(), 1);
+            authorize_uia_creation.auth.weight_threshold = 1;
+            authorize_uia_creation.enabled = true;
+            authorize_uia_creation.valid_to = db.head_block_time() + 86400;
+            authorize_uia_creation.operation_type = operation::tag<asset_create_operation>::value;
+
+            auto symbol_index = member_index<asset_create_operation>("symbol");
+            authorize_uia_creation.restrictions.emplace_back(symbol_index, FUNC(gt), string("ACOIN."));
+            authorize_uia_creation.restrictions.emplace_back(symbol_index, FUNC(le), string("ACOIN.ZZZZZZZZZZZZZZZZ"));
+            //[
+            //  {
+            //    "member_index": 2,
+            //    "restriction_type": 4,
+            //    "argument": [
+            //      3,
+            //      "ACOIN."
+            //    ],
+            //    "extensions": []
+            //  },
+            //  {
+            //    "member_index": 2,
+            //    "restriction_type": 3,
+            //    "argument": [
+            //      3,
+            //      "ACOIN.ZZZZZZZZZZZZZZZZ"
+            //    ],
+            //    "extensions": []
+            //  }
+            //]
+
+            trx.clear();
+            trx.operations = {authorize_uia_creation};
+            sign(trx, alice_private_key);
+            PUSH_TX(db, trx);
+         }
+
+
+         //////
+         // Bob attempts to creates a UIA with a symobl name below the authorized textual range
+         // This should fail because it violates Restriction 1
+         //////
+         {
+            asset_create_operation create_uia_op = create_uia("ABCOIN", alice, white_list);
+            trx.clear();
+            trx.operations = {create_uia_op};
+            sign(trx, bob_private_key);
+
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should indicate the rejection path
+            // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for Restriction 1
+            // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // Bob attempts to creates a UIA with a symobl name above the authorized textual range
+         // This should fail because it violates Restriction 2
+         //////
+         {
+            asset_create_operation create_uia_op = create_uia("BOB", alice, white_list);
+            trx.clear();
+            trx.operations = {create_uia_op};
+            sign(trx, bob_private_key);
+
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should indicate the rejection path
+            // [0,1]: 0 is the rejection_indicator for an index to a sub-restriction; 1 is the index value for Restriction 2
+            // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,1],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // Bob attempts to creates a sub-token of ACOIN
+         // This should succeed because this satisfies the sub-token restriction by Alice
+         //////
+         {
+            asset_create_operation create_uia_op = create_uia("ACOIN.BOB", alice, white_list);
+            trx.clear();
+            trx.operations = {create_uia_op};
+            sign(trx, bob_private_key);
+            PUSH_TX(db, trx);
+
+            create_uia_op = create_uia("ACOIN.CHARLIE", alice, white_list);
+            trx.clear();
+            trx.operations = {create_uia_op};
+            sign(trx, bob_private_key);
+            PUSH_TX(db, trx);
+
+            create_uia_op = create_uia("ACOIN.DIANA", alice, white_list);
+            trx.clear();
+            trx.operations = {create_uia_op};
+            sign(trx, bob_private_key);
+            PUSH_TX(db, trx);
+         }
+
+
+         //////
+         // Bob creates his own UIA that is similar to ACOIN
+         //////
+         {
+            upgrade_to_lifetime_member(bob);
+
+            asset_create_operation create_uia_op = create_uia("AACOIN", bob, white_list);
+            trx.clear();
+            trx.operations = {create_uia_op};
+            sign(trx, bob_private_key);
+
+            PUSH_TX(db, trx);
+
+
+            create_uia_op = create_uia("AACOIN.TEST", bob, white_list);
+            trx.clear();
+            trx.operations = {create_uia_op};
+            sign(trx, bob_private_key);
+
+            PUSH_TX(db, trx);
+         }
+
+
+         //////
+         // Bob attempts to creates a sub-token of AACOIN but with Alice as the issuer
+         // This should fail because it violates Restriction 2
+         //////
+         {
+            asset_create_operation create_uia_op = create_uia("AACOIN.BOB", alice, white_list);
+            trx.clear();
+            trx.operations = {create_uia_op};
+            sign(trx, bob_private_key);
+
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should indicate the rejection path
+            // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for Restriction 1
+            // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         }
+
+      } FC_LOG_AND_RETHROW()
+   }
+
 BOOST_AUTO_TEST_SUITE_END()
