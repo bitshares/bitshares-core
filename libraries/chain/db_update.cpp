@@ -107,35 +107,15 @@ void database::update_last_irreversible_block()
    const global_property_object& gpo = get_global_properties();
    const dynamic_global_property_object& dpo = get_dynamic_global_properties();
 
-   // TODO for better performance, move this to db_maint, because only need to do it once per maintenance interval
-   vector< const witness_object* > wit_objs;
-   wit_objs.reserve( gpo.active_witnesses.size() );
-   for( const witness_id_type& wid : gpo.active_witnesses )
-      wit_objs.push_back( &(wid(*this)) );
-
    static_assert( GRAPHENE_IRREVERSIBLE_THRESHOLD > 0, "irreversible threshold must be nonzero" );
 
-   // 1 1 1 2 2 2 2 2 2 2 -> 2     .3*10 = 3
-   // 1 1 1 1 1 1 1 2 2 2 -> 1
-   // 3 3 3 3 3 3 3 3 3 3 -> 3
-   // 3 3 3 4 4 4 4 4 4 4 -> 4
-
-   const size_t offset = ((GRAPHENE_100_PERCENT - GRAPHENE_IRREVERSIBLE_THRESHOLD) * wit_objs.size() / GRAPHENE_100_PERCENT);
-
-   std::nth_element( wit_objs.begin(), wit_objs.begin() + offset, wit_objs.end(),
-      []( const witness_object* a, const witness_object* b )
-      {
-         return a->last_confirmed_block_num < b->last_confirmed_block_num;
-      } );
-
-   uint32_t new_last_irreversible_block_num = wit_objs[offset]->last_confirmed_block_num;
-
+   const size_t offset = (GRAPHENE_100_PERCENT - GRAPHENE_IRREVERSIBLE_THRESHOLD)
+                         * gpo.active_witnesses.size() / GRAPHENE_100_PERCENT;
    const auto& witness_idx = get_index_type<witness_index>().indices().get<by_last_block>();
    auto itr = witness_idx.end();
    for( uint32_t i = gpo.active_witnesses.size() - offset; i > 0; --i )
       --itr;
-   if( new_last_irreversible_block_num != itr->last_confirmed_block_num )
-      elog( "Mismatch: nlib = ${n} != lcb ${l}", ("n",new_last_irreversible_block_num)("l",itr->last_confirmed_block_num) );
+   const auto new_last_irreversible_block_num = itr->last_confirmed_block_num;
 
    if( new_last_irreversible_block_num > dpo.last_irreversible_block_num )
    {
