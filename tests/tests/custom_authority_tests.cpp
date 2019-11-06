@@ -630,11 +630,11 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    op.operation_type = operation::tag<transfer_operation>::value;
    auto transfer_amount_index = member_index<transfer_operation>("amount");
    auto asset_amount_index = member_index<asset>("amount");
-   auto assed_id_index = member_index<asset>("asset_id");
+   auto asset_id_index = member_index<asset>("asset_id");
    op.restrictions = {restriction(transfer_amount_index, restriction::func_attr, vector<restriction>{
                           restriction(asset_amount_index, restriction::func_lt,
                                       int64_t(100*GRAPHENE_BLOCKCHAIN_PRECISION)),
-                          restriction(assed_id_index, restriction::func_eq, asset_id_type(0))})};
+                          restriction(asset_id_index, restriction::func_eq, asset_id_type(0))})};
    //[
    //  {
    //    "member_index": 3,
@@ -1737,7 +1737,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
          //////
          // Alice authorizes Bob to issue assets on its behalf
-         // except for accounts bad1, bad2, and bad3
+         // except for account banned1
          //////
          custom_authority_create_operation authorize_to_issue;
          authorize_to_issue.account = alice.get_id();
@@ -1918,7 +1918,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
          //////
          // Alice authorizes Bob to issue assets on its behalf
-         // except for accounts bad1, bad2, and bad3
+         // except for accounts banned1, banned2, and banned3
          //////
          custom_authority_create_operation authorize_to_issue;
          authorize_to_issue.account = alice.get_id();
@@ -2464,9 +2464,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          op.restrictions.emplace_back(to_index, FUNC(eq), hotwallet_id);
 
          auto transfer_amount_index = member_index<transfer_operation>("amount");
-         auto assed_id_index = member_index<asset>("asset_id");
+         auto asset_id_index = member_index<asset>("asset_id");
          op.restrictions.emplace_back(restriction(transfer_amount_index, restriction::func_attr, vector<restriction>{
-                 restriction(assed_id_index, restriction::func_eq, usd_id)}));
+                 restriction(asset_id_index, restriction::func_eq, usd_id)}));
          //[
          //  {
          //    "member_index": 2,
@@ -2619,7 +2619,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
          //////
-         // Bob attempts to transfers from Alice to Charlie
+         // Bob attempts to transfer from Alice to Charlie
          // This should fail because Bob is not authorized
          //////
          generate_blocks(1); // Advance the blockchain to generate a distinctive hash ID for the re-used transfer op
@@ -2651,19 +2651,22 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
          vector<restriction> restrictions;
 
-         // Restriction 1 is for "to" to equal Charlie
+         // Restriction 1 should have "to" to equal Charlie
          auto to_index = member_index<transfer_operation>("to");
          auto memo_index = member_index<transfer_operation>("memo");
          auto to_inside_memo_index = member_index<memo_data>("to");
          restrictions.emplace_back(to_index, FUNC(eq), charlie.get_id());
 
          // Restriction 2 is logical OR restriction
-         // Branch 1 is for memo "to" to not be set (to equal void)
+         // Branch 1 should have the memo "to" to not be set (to equal void)
          vector<restriction> branch1 = vector<restriction>{restriction(memo_index, FUNC(eq), void_t())};
-         // Branch 2 is for memo "to" to reference Diana's public *active* key
+         // Branch 2 should have the memo "to" reference Diana's public *active* key
+         // and "from" reference Bob's public *active* key
+         auto from_inside_memo_index = member_index<memo_data>("from");
          vector<restriction> branch2 = vector<restriction>{restriction(memo_index, restriction::func_attr,
                                                                        vector<restriction>{
-                 restriction(to_inside_memo_index, FUNC(eq), diana_public_key)})};
+                 restriction(to_inside_memo_index, FUNC(eq), diana_public_key),
+                 restriction(from_inside_memo_index, FUNC(eq), bob_public_key)})};
          unsigned_int dummy_index = 999;
          restriction or_restriction = restriction(dummy_index, FUNC(logical_or), vector<vector<restriction>>{branch1, branch2});
          restrictions.emplace_back(or_restriction);
@@ -2710,6 +2713,15 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //                    "BTS6MWg7PpE6azCGwKuhB17DbtSqhzf8i25hspdhndsf7VfsLee7k"
          //                  ],
          //                  "extensions": []
+         //                },
+         //                {
+         //                  "member_index": 0,
+         //                  "restriction_type": 0,
+         //                  "argument": [
+         //                    5,
+         //                    "BTS5VE6Dgy9FUmd1mFotXwF88HkQN1KysCWLPqpVnDMjRvGRi1YrM"
+         //                  ],
+         //                  "extensions": []
          //                }
          //              ]
          //            ],
@@ -2728,7 +2740,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          PUSH_TX(db, trx);
 
          //////
-         // Bob attempts to transfers from Alice to Charlie WITHOUT a memo
+         // Bob attempts to transfer from Alice to Charlie WITHOUT a memo
          // This should succeed
          //////
          generate_blocks(1); // Advance the blockchain to generate a distinctive hash ID for the re-used transfer op
@@ -2743,7 +2755,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          BOOST_CHECK_EQUAL(get_balance(diana_id, asset_id_type()), 0);
 
          //////
-         // Bob attempts to transfers from Alice to Charlie with a memo
+         // Bob attempts to transfer from Alice to Charlie with a memo
          // where "from" equals Bob's public key and "to" equals Diana's public key
          // This should succeed
          //////
@@ -2771,7 +2783,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
                            "Dear Diana,\n\nOnly you should be able to read this\n\nLove, Bob");
 
          //////
-         // Bob attempts to transfers from Alice to Charlie with a memo
+         // Bob attempts to transfer from Alice to Charlie with a memo
          // where "from" equals Bob's public key and "to" equals Charlie's public key
          // This should fail because it violates the memo restriction
          //////
@@ -2835,8 +2847,8 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          EXPECT_EXCEPTION_STRING("[[0,1],[1,[{\"success\":false,\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]},{\"success\":false,\"rejection_path\":[[0,0],[0,0],[2,\"predicate_was_false\"]]}]]]", [&] {PUSH_TX(db, trx);});
 
          //////
-         // Bob attempts to transfers from Alice to Diana
-         // This should fail because Diana is violates the recipient restriction
+         // Bob attempts to transfer from Alice to Diana
+         // This should fail because the transfer must be to Charlie
          //////
          generate_blocks(1); // Advance the blockchain to generate a distinctive hash ID for the similar transfer op
          top = transfer_operation();
@@ -2858,11 +2870,11 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    /**
     * Test of a restriction on an optional operation field
     * Variation of the the original transfer_with_memo test for CAA
-    * Bob is authorized to transfer Alice's account to Charlies's account only if
+    * Bob is authorized to transfer from Alice's account to Charlies's account only if
     * - the memo is set where the "from" equal's Bob's public key and "to" equals Diana's public *active* key
     * (The active key is chosen for simplicity. Other keys such as the memo key or an alternate key could also be used.)
     *
-    * A memo field is implicitly required.  Attempts without a memo field should have a rejection reaso of null_optional
+    * A memo field is implicitly required.  Attempts without a memo field should have a rejection reason of null_optional
     */
    BOOST_AUTO_TEST_CASE(authorized_transfer_with_memo_2) {
       try {
@@ -2908,7 +2920,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
          //////
-         // Bob attempts to transfers from Alice to Charlie
+         // Bob attempts to transfer from Alice to Charlie
          // This should fail because Bob is not authorized
          //////
          generate_blocks(1); // Advance the blockchain to generate a distinctive hash ID for the re-used transfer op
@@ -2939,16 +2951,19 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
          vector<restriction> restrictions;
 
-         // Restriction 1 is for "to" to equal Charlie
+         // Restriction 1 should have "to" to equal Charlie
          auto to_index = member_index<transfer_operation>("to");
          auto memo_index = member_index<transfer_operation>("memo");
          auto to_inside_memo_index = member_index<memo_data>("to");
          restrictions.emplace_back(to_index, FUNC(eq), charlie.get_id());
 
-         // Restriction 2 is for memo "to" to reference Diana's public *active* key
+         // Branch 2 should have the memo "to" reference Diana's public *active* key
+         // and "from" reference Bob's public *active* key
+         auto from_inside_memo_index = member_index<memo_data>("from");
          restrictions.emplace_back(restriction(memo_index, restriction::func_attr,
                                                vector<restriction>{
-                                                       restriction(to_inside_memo_index, FUNC(eq), diana_public_key)}));
+                                                       restriction(to_inside_memo_index, FUNC(eq), diana_public_key),
+                                                       restriction(from_inside_memo_index, FUNC(eq), bob_public_key)}));
          caop.restrictions = restrictions;
          //[
          //  {
@@ -2974,12 +2989,22 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //            "BTS6MWg7PpE6azCGwKuhB17DbtSqhzf8i25hspdhndsf7VfsLee7k"
          //          ],
          //          "extensions": []
+         //        },
+         //        {
+         //          "member_index": 0,
+         //          "restriction_type": 0,
+         //          "argument": [
+         //            5,
+         //            "BTS5VE6Dgy9FUmd1mFotXwF88HkQN1KysCWLPqpVnDMjRvGRi1YrM"
+         //          ],
+         //          "extensions": []
          //        }
          //      ]
          //    ],
          //    "extensions": []
          //  }
          //]
+
          trx.clear();
          trx.operations = {caop};
          sign(trx, alice_private_key);
@@ -2987,7 +3012,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
          //////
-         // Bob attempts to transfers from Alice to Charlie WITHOUT a memo
+         // Bob attempts to transfer from Alice to Charlie WITHOUT a memo
          // This should fail because Restriction 2 expects a memo
          //////
          generate_blocks(1); // Advance the blockchain to generate a distinctive hash ID for the re-used transfer op
@@ -3001,7 +3026,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
          //////
-         // Bob attempts to transfers from Alice to Charlie with a memo
+         // Bob attempts to transfer from Alice to Charlie with a memo
          // where "from" equals Bob's public key and "to" equals Diana's public key
          // This should succeed
          //////
@@ -3029,7 +3054,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
                            "Dear Diana,\n\nOnly you should be able to read this\n\nLove, Bob");
 
          //////
-         // Bob attempts to transfers from Alice to Charlie with a memo
+         // Bob attempts to transfer from Alice to Charlie with a memo
          // where "from" equals Bob's public key and "to" equals Charlie's public key
          // This should fail because it violates the memo restriction
          //////
@@ -3051,8 +3076,8 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,1],[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
 
          //////
-         // Bob attempts to transfers from Alice to Diana
-         // This should fail because Diana is violates the recipient restriction
+         // Bob attempts to transfer from Alice to Diana
+         // This should fail because transfer must be to Charlie
          //////
          generate_blocks(1); // Advance the blockchain to generate a distinctive hash ID for the similar transfer op
          top = transfer_operation();
@@ -4178,7 +4203,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
     * Test of CAA for vesting_balance_create_operation
     *
     * Scenario: Test of authorization of one account (alice) authorizing another account (bob)
-    * to extend an HTLC operation as long as the extension is within a specified timespan
+    * to create a coins-day vesting balance with a vesting duration of 800,000 seconds
     */
    BOOST_AUTO_TEST_CASE(authorized_vesting_balance_create) {
       try {
@@ -4227,7 +4252,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
          //////
          // Alice authorizes Bob to create a coins-day vesting balance from her funds
-         // only if the vesting policy if the vesting duration equals 800,000 seconds
+         // only if the vesting duration equals 800,000 seconds
          //////
          custom_authority_create_operation authorize_create_vesting;
          authorize_create_vesting.account = alice.get_id();
@@ -4967,7 +4992,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
          //////
          // Bob attempts to update the collateral for Alice's debt position
-         // This should fail because Bob the Alice authorization is not yet active
+         // This should succeed because the authorization is active
          //////
          {
             asset_reserve_operation reserve_op = reserve_asset(alice.get_id(), asset(200, specialcoin.id));
@@ -5073,7 +5098,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
          //////
-         // Bob attempts to creates a UIA
+         // Bob attempts to create a UIA
          // This should fail because Bob is not authorized by Alice to create any coin with Alice as the issuer
          //////
          {
@@ -5132,7 +5157,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
          //////
-         // Bob attempts to creates a UIA with a symobl name below the authorized textual range
+         // Bob attempts to create a UIA with a symbol name below the authorized textual range
          // This should fail because it violates Restriction 1
          //////
          {
@@ -5150,7 +5175,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
          //////
-         // Bob attempts to creates a UIA with a symobl name above the authorized textual range
+         // Bob attempts to create a UIA with a symobl name above the authorized textual range
          // This should fail because it violates Restriction 2
          //////
          {
@@ -5168,7 +5193,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
          //////
-         // Bob attempts to creates a sub-token of ACOIN
+         // Bob attempts to create a sub-token of ACOIN
          // This should succeed because this satisfies the sub-token restriction by Alice
          //////
          {
@@ -5216,8 +5241,8 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
          //////
-         // Bob attempts to creates a sub-token of AACOIN but with Alice as the issuer
-         // This should fail because it violates Restriction 2
+         // Bob attempts to create a sub-token of AACOIN but with Alice as the issuer
+         // This should fail because it violates Restriction 1
          //////
          {
             asset_create_operation create_uia_op = create_uia("AACOIN.BOB", alice, white_list);
