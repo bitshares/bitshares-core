@@ -3762,6 +3762,8 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
             gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
          });
+
+         // Update the expiration of the re-usable trx relative to the head block time
          set_expiration(db, trx);
 
 
@@ -3840,7 +3842,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
          //////
          // Gateway authorizes Bob to redeem an HTLC
-         // only if the preimage length equals 200
+         // only if the preimage length equals 200 bytes
          // This length is incompatible with the HTLC pre-image that is already on the blockchain
          //////
          custom_authority_create_operation authorize_htlc_redeem;
@@ -3902,7 +3904,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
          //////
-         // Alice updates the authorization to to
+         // Gateway updates the authorization for to redeem an HTLC
+         // only if the preimage length equals 256 bytes
+         // This length is compatible with the HTLC pre-image that is already on the blockchain
          //////
          custom_authority_update_operation update_authorization;
          update_authorization.account = gateway.get_id();
@@ -3919,7 +3923,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
          //////
          // Bob attempts to redeem the HTLC
-         // This should succeed because Bob is authorized to redeem on behalf of the gateway
+         // This should succeed because the redemption satisfies the authorization
          //////
          {
             trx.clear();
