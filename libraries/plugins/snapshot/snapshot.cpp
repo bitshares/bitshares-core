@@ -25,7 +25,8 @@
 
 #include <graphene/chain/database.hpp>
 
-#include <fc/io/fstream.hpp>
+#include <fstream>
+#include <ios>
 
 using namespace graphene::snapshot_plugin;
 using std::string;
@@ -87,10 +88,11 @@ void snapshot_plugin::plugin_shutdown() {}
 static void create_snapshot( const graphene::chain::database& db, const fc::path& dest )
 {
    ilog("snapshot plugin: creating snapshot");
-   fc::ofstream out;
+   std::ofstream out;
    try
    {
-      out.open( dest );
+      out.open( dest.string(), std::ios_base::binary | std::ios_base::trunc );
+      FC_ASSERT( !out.fail() && !out.bad(), "Failed to open file '${f}'", ("f",dest.string()) );
    }
    catch ( fc::exception& e )
    {

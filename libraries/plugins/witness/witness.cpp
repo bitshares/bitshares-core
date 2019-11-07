@@ -29,10 +29,10 @@
 #include <graphene/utilities/key_conversion.hpp>
 
 #include <fc/thread/thread.hpp>
-#include <fc/io/fstream.hpp>
 
 #include <boost/filesystem/path.hpp>
 
+#include <fstream>
 #include <iostream>
 
 using namespace graphene::witness_plugin;
@@ -138,9 +138,9 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
       {
          if (fc::exists(key_id_to_wif_pair_file))
          {
-            std::string file_content;
-            fc::read_file_contents(key_id_to_wif_pair_file, file_content);
-            std::istringstream file_content_as_stream(file_content);
+             std::ifstream file_content_as_stream( key_id_to_wif_pair_file.string() );
+             FC_ASSERT( !file_content_as_stream.fail() && !file_content_as_stream.bad(),
+                        "Failed to open file '${f}'", ("f",key_id_to_wif_pair_file.string()) );
 
             std::string line; // key_id_to_wif_pair_string
             while (std::getline(file_content_as_stream, line))

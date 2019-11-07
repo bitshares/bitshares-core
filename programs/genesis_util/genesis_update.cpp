@@ -27,13 +27,13 @@
 #include <iostream>
 #include <iterator>
 
-#include <fc/io/fstream.hpp>
 #include <fc/io/json.hpp>
 #include <fc/io/stdio.hpp>
 
 #include <graphene/app/api.hpp>
 #include <graphene/protocol/address.hpp>
 #include <graphene/egenesis/egenesis.hpp>
+#include <graphene/utilities/file_util.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 
 #include <boost/filesystem.hpp>
@@ -61,7 +61,7 @@ int main( int argc, char** argv )
       bpo::options_description cli_options("BitShares empty blocks");
       cli_options.add_options()
             ("help,h", "Print this help message and exit.")
-            ("genesis-json,g", bpo::value<boost::filesystem::path>(), "File to read genesis state from")
+            ("genesis-json,g", bpo::value<std::string>(), "File to read genesis state from")
             ("out,o", bpo::value<boost::filesystem::path>(), "File to output new genesis to")
             ("dev-account-prefix", bpo::value<std::string>()->default_value("devacct"), "Prefix for dev accounts")
             ("dev-key-prefix", bpo::value<std::string>()->default_value("devkey-"), "Prefix for dev key")
@@ -102,10 +102,9 @@ int main( int argc, char** argv )
       genesis_state_type genesis;
       if( options.count("genesis-json") )
       {
-         fc::path genesis_json_filename = options["genesis-json"].as<boost::filesystem::path>();
-         std::cerr << "update_genesis:  Reading genesis from file " << genesis_json_filename.preferred_string() << "\n";
-         std::string genesis_json;
-         read_file_contents( genesis_json_filename, genesis_json );
+         std::string genesis_json_filename = options["genesis-json"].as<std::string>();
+         std::cerr << "update_genesis:  Reading genesis from file " << genesis_json_filename << "\n";
+         std::string genesis_json = graphene::utilities::read_file_contents( genesis_json_filename );
          genesis = fc::json::from_string( genesis_json ).as< genesis_state_type >(20);
       }
       else

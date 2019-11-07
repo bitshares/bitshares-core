@@ -13,7 +13,7 @@ namespace graphene { namespace app { namespace detail {
 /// @param directory the directory to place the file "genesis.json"
 /// @returns the full path to the file
 ////////
-boost::filesystem::path create_genesis_file(fc::temp_directory& directory) {
+std::string create_genesis_file(fc::temp_directory& directory) {
    boost::filesystem::path genesis_path = boost::filesystem::path{directory.path().generic_string()} / "genesis.json";
    fc::path genesis_out = genesis_path;
    graphene::chain::genesis_state_type genesis_state = graphene::app::detail::create_example_genesis();
@@ -42,5 +42,5 @@ boost::filesystem::path create_genesis_file(fc::temp_directory& directory) {
    */
 
    fc::json::save_to_file(genesis_state, genesis_out);
-   return genesis_path;
+   return genesis_path.string();
 }
