@@ -1705,8 +1705,11 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Create a UIA
          //////
          upgrade_to_lifetime_member(alice);
-         const asset_object &alicecoin = create_user_issued_asset("ALICECOIN", alice, white_list);
-         const asset_object &specialcoin = create_user_issued_asset( "SPECIALCOIN", alice,  white_list );
+         create_user_issued_asset("ALICECOIN", alice, white_list);
+         create_user_issued_asset("SPECIALCOIN", alice,  white_list);
+         generate_blocks(1);
+         const asset_object &alicecoin = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("ALICECOIN");
+         const asset_object &specialcoin = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SPECIALCOIN");
          const asset_id_type alicecoin_id = alicecoin.id;
 
 
@@ -1886,8 +1889,11 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Create user-issued assets
          //////
          upgrade_to_lifetime_member(alice);
-         const asset_object &alicecoin = create_user_issued_asset("ALICECOIN", alice, white_list);
-         const asset_object &specialcoin = create_user_issued_asset( "SPECIALCOIN", alice,  white_list );
+         create_user_issued_asset("ALICECOIN", alice, white_list);
+         create_user_issued_asset("SPECIALCOIN", alice,  white_list);
+         generate_blocks(1);
+         const asset_object &alicecoin = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("ALICECOIN");
+         const asset_object &specialcoin = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SPECIALCOIN");
          const asset_id_type alicecoin_id = alicecoin.id;
 
 
@@ -3142,7 +3148,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Create user-issued assets
          //////
          upgrade_to_lifetime_member(alice);
-         const asset_object &alicecoin = create_bitasset("ALICECOIN", alice.get_id());
+         create_bitasset("ALICECOIN", alice.get_id());
+         generate_blocks(1);
+         const asset_object &alicecoin = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("ALICECOIN");
 
 
          //////
@@ -3337,7 +3345,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Create user-issued assets
          //////
          upgrade_to_lifetime_member(alice);
-         const asset_object &alicecoin = create_bitasset("ALICECOIN", alice.get_id());
+         create_bitasset("ALICECOIN", alice.get_id());
+         generate_blocks(1);
+         const asset_object &alicecoin = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("ALICECOIN");
 
 
          //////
@@ -3832,14 +3842,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
          //////
-         // Advance the blockchain to get the finalized CAA and HTLC IDs
+         // Advance the blockchain to get the finalized HTLC ID
          //////
          generate_blocks(1);
-
-         auto caa =
-                 db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(alice.get_id());
-         custom_authority_id_type caa_id = caa->id;
-
          graphene::chain::htlc_id_type alice_htlc_id =
                  db.get_index_type<htlc_index>().indices().get<by_from_id>().find(alice.get_id())->id;
 
@@ -3899,9 +3904,11 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
          //////
-         // Advance the blockchain to generate distinctive hash IDs for the similar transactions
+         // Advance the blockchain to get the finalized CAA ID
          //////
          generate_blocks(1);
+         auto caa = db.get_index_type<custom_authority_index>().indices().get<by_account_custom>().find(gateway.get_id());
+         custom_authority_id_type caa_id = caa->id;
 
 
          //////
