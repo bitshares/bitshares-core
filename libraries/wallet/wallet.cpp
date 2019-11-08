@@ -49,7 +49,6 @@
 #include <boost/multi_index/hashed_index.hpp>
 
 #include <fc/git_revision.hpp>
-#include <fc/io/fstream.hpp>
 #include <fc/io/json.hpp>
 #include <fc/io/stdio.hpp>
 #include <fc/network/http/websocket.hpp>
