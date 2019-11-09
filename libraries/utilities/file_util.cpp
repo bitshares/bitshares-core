@@ -27,7 +27,7 @@
 #include <fc/exception/exception.hpp>
 
 #include <ios>
-#include <istream>
+#include <fstream>
 
 namespace graphene { namespace utilities {
 

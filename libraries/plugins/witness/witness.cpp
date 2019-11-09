@@ -138,9 +138,9 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
       {
          if (fc::exists(key_id_to_wif_pair_file))
          {
-             std::ifstream file_content_as_stream( key_id_to_wif_pair_file.string() );
-             FC_ASSERT( !file_content_as_stream.fail() && !file_content_as_stream.bad(),
-                        "Failed to open file '${f}'", ("f",key_id_to_wif_pair_file.string()) );
+            std::ifstream file_content_as_stream( key_id_to_wif_pair_file.string() );
+            FC_ASSERT( !file_content_as_stream.fail() && !file_content_as_stream.bad(),
+                       "Failed to open file '${f}'", ("f",key_id_to_wif_pair_file.string()) );
 
             std::string line; // key_id_to_wif_pair_string
             while (std::getline(file_content_as_stream, line))

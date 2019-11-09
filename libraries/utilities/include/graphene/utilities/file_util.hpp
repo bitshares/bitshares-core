@@ -1,5 +1,3 @@
-#pragma once
-
 /*
  * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
  *
@@ -23,12 +21,18 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#pragma once
 
-#include <fstream>
 #include <string>
 
 namespace graphene { namespace utilities {
 
+   /**
+    * @brief Reads the file at the given path and returns the full contents in a string. Note that the result
+    *        will contain non-printable characters if the file does.
+    * @param path the pathname of the file to read
+    * @return the file contents as a string
+    */
    std::string read_file_contents( const std::string& path );
 
 } } // graphene::utilities
