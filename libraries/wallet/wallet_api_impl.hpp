@@ -325,6 +325,9 @@ public:
          bool broadcast );
 
    signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false);
+   signed_transaction sign_transaction2(signed_transaction tx,
+                                        const vector<public_key_type>& signing_keys = vector<public_key_type>(),
+                                        bool broadcast = false);
 
    flat_set<public_key_type> get_transaction_signers(const signed_transaction &tx) const;
 
