@@ -29,7 +29,7 @@ namespace graphene { namespace utilities {
 
    /**
     * @brief Reads the file at the given path and returns the full contents in a string. Note that the result
-    *        will contain non-printable characters if the file does.
+    *        will contain non-printable characters (including 0-bytes) if the file does.
     * @param path the pathname of the file to read
     * @return the file contents as a string
     */
