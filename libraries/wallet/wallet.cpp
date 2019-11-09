@@ -999,6 +999,12 @@ signed_transaction wallet_api::sign_transaction(signed_transaction tx, bool broa
    return my->sign_transaction( tx, broadcast);
 } FC_CAPTURE_AND_RETHROW( (tx) ) }
 
+signed_transaction wallet_api::sign_transaction2(signed_transaction tx, const vector<public_key_type>& signing_keys,
+                                                 bool broadcast /* = false */)
+{ try {
+   return my->sign_transaction2( tx, signing_keys, broadcast);
+} FC_CAPTURE_AND_RETHROW( (tx) ) }
+
 flat_set<public_key_type> wallet_api::get_transaction_signers(const signed_transaction &tx) const
 { try {
    return my->get_transaction_signers(tx);

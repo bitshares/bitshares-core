@@ -1588,6 +1588,21 @@ class wallet_api
        */
       signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false);
 
+      /** Signs a transaction.
+       *
+       * Given a fully-formed transaction that is only lacking signatures, this signs
+       * the transaction with the inferred necessary keys and the explicitly provided keys,
+       * and optionally broadcasts the transaction
+       * @param tx the unsigned transaction
+       * @param signing_keys Keys that must be used when signing the transaction
+       * @param broadcast true if you wish to broadcast the transaction
+       * @return the signed version of the transaction
+       */
+      signed_transaction sign_transaction2(signed_transaction tx,
+                                           const vector<public_key_type>& signing_keys = vector<public_key_type>(),
+                                           bool broadcast = true);
+
+
       /** Get transaction signers.
        *
        * Returns information about who signed the transaction, specifically,
@@ -1857,6 +1872,7 @@ FC_API( graphene::wallet::wallet_api,
         (save_wallet_file)
         (serialize_transaction)
         (sign_transaction)
+        (sign_transaction2)
         (add_transaction_signature)
         (get_transaction_signers)
         (get_key_references)
