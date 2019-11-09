@@ -219,6 +219,9 @@ public:
    asset set_fees_on_builder_transaction(transaction_handle_type handle, string fee_asset = GRAPHENE_SYMBOL);
    transaction preview_builder_transaction(transaction_handle_type handle);
    signed_transaction sign_builder_transaction(transaction_handle_type transaction_handle, bool broadcast = true);
+   signed_transaction sign_builder_transaction2(transaction_handle_type transaction_handle,
+                                               const vector<public_key_type>& signing_keys = vector<public_key_type>(),
+                                               bool broadcast = true);
 
    pair<transaction_id_type,signed_transaction> broadcast_transaction(signed_transaction tx);
 
