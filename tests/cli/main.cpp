@@ -495,6 +495,122 @@ BOOST_FIXTURE_TEST_CASE( cli_get_signed_transaction_signers, cli_fixture )
    }
 }
 
+
+///////////////////////
+// Wallet RPC
+// Test adding an unnecessary signature to a transaction
+///////////////////////
+BOOST_FIXTURE_TEST_CASE(cli_sign_tx_with_unnecessary_signature, cli_fixture) {
+   try {
+      auto db = app1->chain_database();
+
+      account_object nathan_acct = con.wallet_api_ptr->get_account("nathan");
+      INVOKE(upgrade_nathan_account);
+
+      // Register Bob account
+      const auto bob_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+              "bob", bob_bki.pub_key, bob_bki.pub_key, "nathan", "nathan", 0, true
+      );
+
+      // Register Charlie account
+      const graphene::wallet::brain_key_info charlie_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+              "charlie", charlie_bki.pub_key, charlie_bki.pub_key, "nathan", "nathan", 0, true
+      );
+      const account_object &charlie_acc = con.wallet_api_ptr->get_account("charlie");
+
+      // Import Bob's key
+      BOOST_CHECK(con.wallet_api_ptr->import_key("bob", bob_bki.wif_priv_key));
+
+      // Create transaction with a transfer operation from Nathan to Charlie
+      transfer_operation top;
+      top.from = nathan_acct.id;
+      top.to = charlie_acc.id;
+      top.amount = asset(5000);
+      top.fee = db->current_fee_schedule().calculate_fee(top);
+
+      signed_transaction test_tx;
+      test_tx.operations.push_back(top);
+
+      // Sign the transaction with the implied nathan's key and the explicitly yet unnecessary Bob's key
+      auto signed_trx = con.wallet_api_ptr->sign_transaction2(test_tx, {bob_bki.pub_key}, false);
+
+      // Check for two signatures on the transaction
+      BOOST_CHECK_EQUAL(signed_trx.signatures.size(), 2);
+      flat_set<public_key_type> signers = con.wallet_api_ptr->get_transaction_signers(signed_trx);
+
+      // Check that the signed transaction contains both Nathan's required signature and Bob's unnecessary signature
+      BOOST_CHECK_EQUAL(nathan_acct.active.get_keys().size(), 1);
+      flat_set<public_key_type> expected_signers = {bob_bki.pub_key, nathan_acct.active.get_keys().front()};
+      flat_set<public_key_type> actual_signers = con.wallet_api_ptr->get_transaction_signers(signed_trx);
+      BOOST_CHECK(signers == expected_signers);
+
+   } catch (fc::exception &e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+
+///////////////////////
+// Wallet RPC
+// Test adding an unnecessary signature to a transaction builder
+///////////////////////
+BOOST_FIXTURE_TEST_CASE(cli_sign_tx_builder_with_unnecessary_signature, cli_fixture) {
+   try {
+      auto db = app1->chain_database();
+
+      account_object nathan_acct = con.wallet_api_ptr->get_account("nathan");
+      INVOKE(upgrade_nathan_account);
+
+      // Register Bob account
+      const auto bob_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+              "bob", bob_bki.pub_key, bob_bki.pub_key, "nathan", "nathan", 0, true
+      );
+
+      // Register Charlie account
+      const graphene::wallet::brain_key_info charlie_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+              "charlie", charlie_bki.pub_key, charlie_bki.pub_key, "nathan", "nathan", 0, true
+      );
+      const account_object &charlie_acc = con.wallet_api_ptr->get_account("charlie");
+
+      // Import Bob's key
+      BOOST_CHECK(con.wallet_api_ptr->import_key("bob", bob_bki.wif_priv_key));
+
+      // Use transaction builder to build a transaction with a transfer operation from Nathan to Charlie
+      graphene::wallet::transaction_handle_type tx_handle = con.wallet_api_ptr->begin_builder_transaction();
+
+      transfer_operation top;
+      top.from = nathan_acct.id;
+      top.to = charlie_acc.id;
+      top.amount = asset(5000);
+
+      con.wallet_api_ptr->add_operation_to_builder_transaction(tx_handle, top);
+      con.wallet_api_ptr->set_fees_on_builder_transaction(tx_handle, GRAPHENE_SYMBOL);
+
+      // Sign the transaction with the implied nathan's key and the explicitly yet unnecessary Bob's key
+      auto signed_trx = con.wallet_api_ptr->sign_builder_transaction2(tx_handle, {bob_bki.pub_key}, false);
+
+      // Check for two signatures on the transaction
+      BOOST_CHECK_EQUAL(signed_trx.signatures.size(), 2);
+      flat_set<public_key_type> signers = con.wallet_api_ptr->get_transaction_signers(signed_trx);
+
+      // Check that the signed transaction contains both Nathan's required signature and Bob's unnecessary signature
+      BOOST_CHECK_EQUAL(nathan_acct.active.get_keys().size(), 1);
+      flat_set<public_key_type> expected_signers = {bob_bki.pub_key, nathan_acct.active.get_keys().front()};
+      flat_set<public_key_type> actual_signers = con.wallet_api_ptr->get_transaction_signers(signed_trx);
+      BOOST_CHECK(signers == expected_signers);
+
+   } catch (fc::exception &e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+
 BOOST_FIXTURE_TEST_CASE( cli_get_available_transaction_signers, cli_fixture )
 {
    try
