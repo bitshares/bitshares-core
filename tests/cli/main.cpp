@@ -239,17 +239,10 @@ public:
       wallet_cli = std::make_shared<fc::rpc::cli>(GRAPHENE_MAX_NESTED_OBJECTS);
       for( auto& name_formatter : wallet_api_ptr->get_result_formatters() )
          wallet_cli->format_result( name_formatter.first, name_formatter.second );
-
-      boost::signals2::scoped_connection closed_connection(websocket_connection->closed.connect([=]{
-         cerr << "Server has disconnected us.\n";
-         wallet_cli->stop();
-      }));
-      (void)(closed_connection);
    }
    ~client_connection()
    {
-      // wait for everything to finish up
-      fc::usleep(fc::milliseconds(500));
+      wallet_cli->stop();
    }
 public:
    fc::http::websocket_client websocket_client;
@@ -261,6 +254,7 @@ public:
    fc::api<graphene::wallet::wallet_api> wallet_api;
    std::shared_ptr<fc::rpc::cli> wallet_cli;
    std::string wallet_filename;
+   fc::future<void> was_closed;
 };
 
 ///////////////////////////////
@@ -316,10 +310,6 @@ struct cli_fixture
    ~cli_fixture()
    {
       BOOST_TEST_MESSAGE("Cleanup cli_wallet::boost_fixture_test_case");
-
-      // wait for everything to finish up
-      fc::usleep(fc::seconds(1));
-
       app1->shutdown();
 #ifdef _WIN32
       sockQuit();
