@@ -602,6 +602,10 @@ namespace graphene { namespace app {
 
          /// @brief Called to enable an API, not reflected.
          void enable_api( const string& api_name );
+
+         /// @brief Can be used to externally acquire the api_access_info for a user
+         boost::signals2::signal<void(const string&, fc::optional<api_access_info>&)> api_access_info_external;
+
       private:
 
          application& _app;

@@ -69,6 +69,7 @@ namespace graphene { namespace app {
          uint64_t api_limit_get_withdraw_permissions_by_recipient = 101;
    };
 
+   class login_api;
    class application
    {
       public:
@@ -140,6 +141,9 @@ namespace graphene { namespace app {
          bool is_plugin_enabled(const string& name) const;
 
          std::shared_ptr<fc::thread> elasticsearch_thread;
+
+         /// Signal to reroute login requests
+         boost::signals2::signal< void(bool&, const string&, const string&, login_api&) > login_attempt;
 
    private:
          void add_available_plugin( std::shared_ptr<abstract_plugin> p );

@@ -66,9 +66,17 @@ namespace graphene { namespace app {
 
     bool login_api::login(const string& user, const string& password)
     {
-       optional< api_access_info > acc = _app.get_api_access_info( user );
+       optional< api_access_info > acc;
+       // signal to connect to for the external acquisition of an api_access_info
+       api_access_info_external( user, acc );
+
        if( !acc.valid() )
-          return false;
+       {
+          acc = _app.get_api_access_info( user );
+          if( !acc.valid() )
+            return false;
+       }
+
        if( acc->password_hash_b64 != "*" )
        {
           std::string password_salt = fc::base64_decode( acc->password_salt_b64 );
