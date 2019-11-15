@@ -174,11 +174,50 @@ bool generate_block(std::shared_ptr<graphene::app::application> app, graphene::c
    }
 }
 
-bool generate_block(std::shared_ptr<graphene::app::application> app) 
+bool generate_block(std::shared_ptr<graphene::app::application> app)
 {
    graphene::chain::signed_block returned_block;
    return generate_block(app, returned_block);
 }
+
+
+signed_block generate_block(std::shared_ptr<graphene::app::application> app, uint32_t skip, const fc::ecc::private_key& key, int miss_blocks)
+{
+   // skip == ~0 will skip checks specified in database::validation_steps
+   skip |= database::skip_undo_history_check;
+
+   auto db = app->chain_database();
+   auto block = db->generate_block(db->get_slot_time(miss_blocks + 1),
+                                   db->get_scheduled_witness(miss_blocks + 1),
+                                   key, skip);
+   db->clear_pending();
+   return block;
+}
+
+
+//////
+// Generate blocks until the timestamp
+//////
+uint32_t generate_blocks(std::shared_ptr<graphene::app::application> app, fc::time_point_sec timestamp)
+//uint32_t generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks, uint32_t skip)
+{
+   bool miss_intermediate_blocks = true;
+   fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
+   uint32_t skip = ~0;
+   auto db = app->chain_database();
+
+   if( miss_intermediate_blocks )
+   {
+      generate_block(app);
+      auto slots_to_miss = db->get_slot_at_time(timestamp);
+      if( slots_to_miss <= 1 )
+         return 1;
+      --slots_to_miss;
+      generate_block(app, skip, committee_key, slots_to_miss);
+      return 2;
+   }
+}
+
 
 ///////////
 /// @brief Skip intermediate blocks, and generate a maintenance block
@@ -215,7 +254,8 @@ public:
    client_connection(
       std::shared_ptr<graphene::app::application> app,
       const fc::temp_directory& data_dir,
-      const int server_port_number
+      const int server_port_number,
+      const std::string custom_wallet_filename = "wallet.json"
    )
    {
       wallet_data.chain_id = app->chain_database()->get_chain_id();
@@ -231,7 +271,7 @@ public:
       BOOST_CHECK(remote_login_api->login( wallet_data.ws_user, wallet_data.ws_password ) );
 
       wallet_api_ptr = std::make_shared<graphene::wallet::wallet_api>(wallet_data, remote_login_api);
-      wallet_filename = data_dir.path().generic_string() + "/wallet.json";
+      wallet_filename = data_dir.path().generic_string() + "/" + custom_wallet_filename;
       wallet_api_ptr->set_wallet_filename(wallet_filename);
 
       wallet_api = fc::api<graphene::wallet::wallet_api>(wallet_api_ptr);
@@ -254,7 +294,6 @@ public:
    fc::api<graphene::wallet::wallet_api> wallet_api;
    std::shared_ptr<fc::rpc::cli> wallet_cli;
    std::string wallet_filename;
-   fc::future<void> was_closed;
 };
 
 ///////////////////////////////
