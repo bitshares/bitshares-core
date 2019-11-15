@@ -33,6 +33,7 @@
 #include <graphene/custom_operations/custom_operations_plugin.hpp>
 #include <graphene/egenesis/egenesis.hpp>
 #include <graphene/wallet/wallet.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <fc/thread/thread.hpp>
 #include <fc/network/http/websocket.hpp>
@@ -1405,6 +1406,187 @@ BOOST_FIXTURE_TEST_CASE( general_storage, cli_fixture )
       BOOST_CHECK_EQUAL(nathan_list[2].key, "milk");
 
    } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+//////
+// Template copied
+//////
+template<typename Object>
+unsigned_int member_index(string name) {
+   unsigned_int index;
+   fc::typelist::runtime::for_each(typename fc::reflector<Object>::native_members(), [&name, &index](auto t) mutable {
+      if (name == decltype(t)::type::get_name())
+      index = decltype(t)::type::index;
+   });
+   return index;
+}
+
+///////////////////////
+// Wallet RPC
+// Test sign_builder_transaction2 with an account (bob) that has received a custom authorization
+// to transfer funds from another account (alice)
+///////////////////////
+BOOST_FIXTURE_TEST_CASE(cli_use_authorized_transfer, cli_fixture) {
+   try {
+      //////
+      // Initialize the blockchain
+      //////
+      auto db = app1->chain_database();
+
+      account_object nathan_acct = con.wallet_api_ptr->get_account("nathan");
+      INVOKE(upgrade_nathan_account);
+
+      // Register Alice account
+      const auto alice_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+              "alice", alice_bki.pub_key, alice_bki.pub_key, "nathan", "nathan", 0, true
+      );
+      const account_object &alice_acc = con.wallet_api_ptr->get_account("alice");
+
+      // Register Bob account
+      const auto bob_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+              "bob", bob_bki.pub_key, bob_bki.pub_key, "nathan", "nathan", 0, true
+      );
+      const account_object &bob_acc = con.wallet_api_ptr->get_account("bob");
+
+      // Register Charlie account
+      const graphene::wallet::brain_key_info charlie_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+              "charlie", charlie_bki.pub_key, charlie_bki.pub_key, "nathan", "nathan", 0, true
+      );
+      const account_object &charlie_acc = con.wallet_api_ptr->get_account("charlie");
+
+      // Fund Alice's account
+      con.wallet_api_ptr->transfer("nathan", "alice", "450000", "1.3.0", "", true);
+
+      // Initialize common variables
+      signed_transaction signed_trx;
+
+
+      //////
+      // Initialize Alice's CLI wallet
+      //////
+      client_connection con_alice(app1, app_dir, server_port_number, "wallet_alice.json");
+      con_alice.wallet_api_ptr->set_password("supersecret");
+      con_alice.wallet_api_ptr->unlock("supersecret");
+
+      // Import Alice's key
+      BOOST_CHECK(con_alice.wallet_api_ptr->import_key("alice", alice_bki.wif_priv_key));
+
+
+      //////
+      // Initialize the blockchain for BSIP 40
+      //////
+      generate_blocks(app1, HARDFORK_BSIP_40_TIME);
+      // Set committee parameters
+      app1->chain_database()->modify(app1->chain_database()->get_global_properties(), [](global_property_object& p) {
+         p.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+      });
+
+
+      //////
+      // Alice authorizes Bob to transfer funds from her account to Charlie's account
+      //////
+      graphene::wallet::transaction_handle_type tx_alice_handle = con_alice.wallet_api_ptr->begin_builder_transaction();
+
+      custom_authority_create_operation caop;
+      caop.account = alice_acc.get_id();
+      caop.auth.add_authority(bob_acc.get_id(), 1);
+      caop.auth.weight_threshold = 1;
+      caop.enabled = true;
+      caop.valid_to = db->head_block_time() + 1000;
+      caop.operation_type = operation::tag<transfer_operation>::value;
+
+      // Restriction should have "to"  equal Charlie
+      vector<restriction> restrictions;
+      auto to_index = member_index<transfer_operation>("to");
+      restrictions.emplace_back(to_index, restriction::func_eq, charlie_acc.get_id());
+
+      con_alice.wallet_api_ptr->add_operation_to_builder_transaction(tx_alice_handle, caop);
+      asset ca_fee = con_alice.wallet_api_ptr->set_fees_on_builder_transaction(tx_alice_handle, GRAPHENE_SYMBOL);
+
+      // Sign the transaction with the implied nathan's key and the explicitly yet unnecessary Bob's key
+      signed_trx = con_alice.wallet_api_ptr->sign_builder_transaction2(tx_alice_handle, {}, true);
+
+      // Check for one signatures on the transaction
+      BOOST_CHECK_EQUAL(signed_trx.signatures.size(), 1);
+
+      // Check that the signed transaction contains Bob's signature
+      BOOST_CHECK_EQUAL(nathan_acct.active.get_keys().size(), 1);
+      flat_set<public_key_type> expected_signers = {alice_bki.pub_key};
+      flat_set<public_key_type> actual_signers = con_alice.wallet_api_ptr->get_transaction_signers(signed_trx);
+      BOOST_CHECK(actual_signers == expected_signers);
+
+
+      //////
+      // Initialize Bob's CLI wallet
+      //////
+      client_connection con_bob(app1, app_dir, server_port_number, "wallet_bob.json");
+      con_bob.wallet_api_ptr->set_password("supersecret");
+      con_bob.wallet_api_ptr->unlock("supersecret");
+
+      // Import Bob's key
+      BOOST_CHECK(con_bob.wallet_api_ptr->import_key("bob", bob_bki.wif_priv_key));
+
+
+      //////
+      // Bob attempt to transfer funds from Alice to Charlie while using Bob's wallet
+      // This should succeed because Bob is authorized to transfer by Alice
+      //////
+      graphene::wallet::transaction_handle_type tx_bob_handle = con_bob.wallet_api_ptr->begin_builder_transaction();
+
+      const asset transfer_amount = asset(123 * GRAPHENE_BLOCKCHAIN_PRECISION);
+      transfer_operation top;
+      top.from = alice_acc.id;
+      top.to = charlie_acc.id;
+      top.amount = transfer_amount;
+
+      con_bob.wallet_api_ptr->add_operation_to_builder_transaction(tx_bob_handle, top);
+      asset transfer_fee = con_bob.wallet_api_ptr->set_fees_on_builder_transaction(tx_bob_handle, GRAPHENE_SYMBOL);
+
+      // Sign the transaction with the implied nathan's key and the explicitly yet unnecessary Bob's key
+      signed_trx = con_bob.wallet_api_ptr->sign_builder_transaction2(tx_bob_handle, {bob_bki.pub_key}, true);
+
+      // Check for two signatures on the transaction
+      BOOST_CHECK_EQUAL(signed_trx.signatures.size(), 1);
+
+      // Check that the signed transaction contains Bob's signature
+      BOOST_CHECK_EQUAL(nathan_acct.active.get_keys().size(), 1);
+      expected_signers = {bob_bki.pub_key};
+      actual_signers = con_bob.wallet_api_ptr->get_transaction_signers(signed_trx);
+      BOOST_CHECK(actual_signers == expected_signers);
+
+
+      //////
+      // Check account balances
+      //////
+      // Check Charlie's balances
+      vector<asset> charlie_balances = con.wallet_api_ptr->list_account_balances("charlie");
+      BOOST_CHECK_EQUAL(charlie_balances.size(), 1);
+      asset charlie_core_balance = charlie_balances.front();
+      asset expected_charlie_core_balance = transfer_amount;
+      BOOST_ASSERT(charlie_core_balance == expected_charlie_core_balance);
+
+      // Check Bob's balances
+      vector<asset> bob_balances = con.wallet_api_ptr->list_account_balances("bob");
+      BOOST_CHECK_EQUAL(bob_balances.size(), 0);
+
+      // Check Alice's balance
+      vector<asset> alice_balances = con.wallet_api_ptr->list_account_balances("alice");
+      BOOST_CHECK_EQUAL(alice_balances.size(), 1);
+      asset alice_core_balance = alice_balances.front();
+      asset expected_alice_balance =  asset(450000 * GRAPHENE_BLOCKCHAIN_PRECISION)
+                                      - expected_charlie_core_balance
+                                      - ca_fee - transfer_fee;
+      wdump((alice_core_balance)(expected_alice_balance)(expected_charlie_core_balance)(ca_fee)(transfer_fee));
+      BOOST_CHECK(alice_core_balance.asset_id == expected_alice_balance.asset_id);
+      BOOST_CHECK_EQUAL(alice_core_balance.amount.value, expected_alice_balance.amount.value);
+
+   } catch (fc::exception &e) {
       edump((e.to_detail_string()));
       throw;
    }
