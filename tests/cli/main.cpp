@@ -200,23 +200,18 @@ signed_block generate_block(std::shared_ptr<graphene::app::application> app, uin
 // Generate blocks until the timestamp
 //////
 uint32_t generate_blocks(std::shared_ptr<graphene::app::application> app, fc::time_point_sec timestamp)
-//uint32_t generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks, uint32_t skip)
 {
-   bool miss_intermediate_blocks = true;
    fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
    uint32_t skip = ~0;
    auto db = app->chain_database();
 
-   if( miss_intermediate_blocks )
-   {
-      generate_block(app);
-      auto slots_to_miss = db->get_slot_at_time(timestamp);
-      if( slots_to_miss <= 1 )
-         return 1;
-      --slots_to_miss;
-      generate_block(app, skip, committee_key, slots_to_miss);
-      return 2;
-   }
+   generate_block(app);
+   auto slots_to_miss = db->get_slot_at_time(timestamp);
+   if( slots_to_miss <= 1 )
+      return 1;
+   --slots_to_miss;
+   generate_block(app, skip, committee_key, slots_to_miss);
+   return 2;
 }
 
 
@@ -1501,7 +1496,7 @@ BOOST_FIXTURE_TEST_CASE(cli_use_authorized_transfer, cli_fixture) {
       caop.valid_to = db->head_block_time() + 1000;
       caop.operation_type = operation::tag<transfer_operation>::value;
 
-      // Restriction should have "to"  equal Charlie
+      // Restriction should have "to" equal Charlie
       vector<restriction> restrictions;
       auto to_index = member_index<transfer_operation>("to");
       restrictions.emplace_back(to_index, restriction::func_eq, charlie_acc.get_id());
@@ -1509,14 +1504,13 @@ BOOST_FIXTURE_TEST_CASE(cli_use_authorized_transfer, cli_fixture) {
       con_alice.wallet_api_ptr->add_operation_to_builder_transaction(tx_alice_handle, caop);
       asset ca_fee = con_alice.wallet_api_ptr->set_fees_on_builder_transaction(tx_alice_handle, GRAPHENE_SYMBOL);
 
-      // Sign the transaction with the implied nathan's key and the explicitly yet unnecessary Bob's key
+      // Sign the transaction with the inferred Alice key
       signed_trx = con_alice.wallet_api_ptr->sign_builder_transaction2(tx_alice_handle, {}, true);
 
       // Check for one signatures on the transaction
       BOOST_CHECK_EQUAL(signed_trx.signatures.size(), 1);
 
-      // Check that the signed transaction contains Bob's signature
-      BOOST_CHECK_EQUAL(nathan_acct.active.get_keys().size(), 1);
+      // Check that the signed transaction contains Alice's signature
       flat_set<public_key_type> expected_signers = {alice_bki.pub_key};
       flat_set<public_key_type> actual_signers = con_alice.wallet_api_ptr->get_transaction_signers(signed_trx);
       BOOST_CHECK(actual_signers == expected_signers);
@@ -1548,10 +1542,10 @@ BOOST_FIXTURE_TEST_CASE(cli_use_authorized_transfer, cli_fixture) {
       con_bob.wallet_api_ptr->add_operation_to_builder_transaction(tx_bob_handle, top);
       asset transfer_fee = con_bob.wallet_api_ptr->set_fees_on_builder_transaction(tx_bob_handle, GRAPHENE_SYMBOL);
 
-      // Sign the transaction with the implied nathan's key and the explicitly yet unnecessary Bob's key
+      // Sign the transaction with the explicit Bob key
       signed_trx = con_bob.wallet_api_ptr->sign_builder_transaction2(tx_bob_handle, {bob_bki.pub_key}, true);
 
-      // Check for two signatures on the transaction
+      // Check for one signatures on the transaction
       BOOST_CHECK_EQUAL(signed_trx.signatures.size(), 1);
 
       // Check that the signed transaction contains Bob's signature
@@ -1582,7 +1576,6 @@ BOOST_FIXTURE_TEST_CASE(cli_use_authorized_transfer, cli_fixture) {
       asset expected_alice_balance =  asset(450000 * GRAPHENE_BLOCKCHAIN_PRECISION)
                                       - expected_charlie_core_balance
                                       - ca_fee - transfer_fee;
-      wdump((alice_core_balance)(expected_alice_balance)(expected_charlie_core_balance)(ca_fee)(transfer_fee));
       BOOST_CHECK(alice_core_balance.asset_id == expected_alice_balance.asset_id);
       BOOST_CHECK_EQUAL(alice_core_balance.amount.value, expected_alice_balance.amount.value);
 
