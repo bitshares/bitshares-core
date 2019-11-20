@@ -16,7 +16,7 @@ BitShares Core
 * [License](#license)
 
 BitShares Core is the BitShares blockchain implementation and command-line interface.
-The web wallet is [BitShares UI](https://github.com/bitshares/bitshares-ui).
+The browser web based wallet is [BitShares UI](https://github.com/bitshares/bitshares-ui).
 
 Visit [BitShares.org](https://bitshares.org/) to learn about BitShares and join the community at [BitSharesTalk.org](https://bitsharestalk.org/).
 
@@ -31,7 +31,7 @@ Build instructions and additional documentation are available in the
 
 We recommend building on Ubuntu 16.04 LTS (64-bit) 
 
-**Build Dependencies**:
+**Build Dependencies:**
 
     sudo apt-get update
     sudo apt-get install autoconf cmake make automake libtool git libboost-all-dev libssl-dev g++ libcurl4-openssl-dev
@@ -90,10 +90,17 @@ After starting the witness node again, in a separate terminal you can run:
 
     ./programs/cli_wallet/cli_wallet
 
+
 Set your inital password:
 
     >>> set_password <PASSWORD>
     >>> unlock <PASSWORD>
+
+**IMPORTANT:** The cli_wallet or API interfaces to the witness node wouldn't be fully functional unless the witness node is fully synchronized with the blockchain, the cli_wallet command "info" will show how far are you from the live current block of the blockchain, you can compare the result "head_block_num" with [CURRENT BLOCK](https://wallet.bitshares.org/#/explorer/blocks).
+
+To check your current block:
+
+    >>> info
 
 To import your initial balance:
 
