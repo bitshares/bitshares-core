@@ -884,6 +884,9 @@ BOOST_FIXTURE_TEST_CASE( account_history_pagination, cli_fixture )
 ///////////////////////
 BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
 {
+   std::cout << std::endl;
+   std::cout << "cli_multsig_transaction: " << std::endl;
+
    using namespace graphene::chain;
    using namespace graphene::app;
    std::shared_ptr<graphene::app::application> app1;
@@ -1000,6 +1003,9 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
          }
       }
 
+      std::cout << "Z con: " << &con << std::endl;
+      std::cout << "Z con.wallet_api_ptr: " << &con.wallet_api_ptr << std::endl;
+
       // wait for everything to finish up
       fc::usleep(fc::seconds(1));
    } catch( fc::exception& e ) {
@@ -1017,7 +1023,14 @@ graphene::wallet::plain_keys decrypt_keys( const std::string& password, const ve
 }
 
 BOOST_AUTO_TEST_CASE( saving_keys_wallet_test ) {
+   std::cout << std::endl;
+   std::cout << "saving_keys_wallet_test: " << std::endl;
+
    cli_fixture cli;
+   
+   std::cout << "A cli: " << &cli << std::endl;
+   std::cout << "A cli.con: " << &cli.con << std::endl;
+   std::cout << "A cli.con.wallet_api_ptr: " << &cli.con.wallet_api_ptr << std::endl;
 
    cli.con.wallet_api_ptr->import_balance( "nathan", cli.nathan_keys, true );
    cli.con.wallet_api_ptr->upgrade_account( "nathan", true );
@@ -1026,11 +1039,19 @@ BOOST_AUTO_TEST_CASE( saving_keys_wallet_test ) {
 
    BOOST_CHECK_NO_THROW( cli.con.wallet_api_ptr->transfer( "nathan", "account1", "9000", "1.3.0", "", true ) );
 
+   std::cout << "B cli: " << &cli << std::endl;
+   std::cout << "B cli.con: " << &cli.con << std::endl;
+   std::cout << "B cli.con.wallet_api_ptr: " << &cli.con.wallet_api_ptr << std::endl;
+
    std::string path( cli.app_dir.path().generic_string() + "/wallet.json" );
    graphene::wallet::wallet_data wallet = fc::json::from_file( path ).as<graphene::wallet::wallet_data>( 2 * GRAPHENE_MAX_NESTED_OBJECTS );
    BOOST_CHECK( wallet.extra_keys.size() == 1 ); // nathan
    BOOST_CHECK( wallet.pending_account_registrations.size() == 1 ); // account1
    BOOST_CHECK( wallet.pending_account_registrations["account1"].size() == 2 ); // account1 active key + account1 memo key
+
+   std::cout << "C cli: " << &cli << std::endl;
+   std::cout << "C cli.con: " << &cli.con << std::endl;
+   std::cout << "C cli.con.wallet_api_ptr: " << &cli.con.wallet_api_ptr << std::endl;
 
    graphene::wallet::plain_keys pk = decrypt_keys( "supersecret", wallet.cipher_keys );
    BOOST_CHECK( pk.keys.size() == 1 ); // nathan key
@@ -1038,13 +1059,25 @@ BOOST_AUTO_TEST_CASE( saving_keys_wallet_test ) {
    BOOST_CHECK( generate_block( cli.app1 ) );
    fc::usleep( fc::seconds(1) );
 
+   std::cout << "D cli: " << &cli << std::endl;
+   std::cout << "D cli.con: " << &cli.con << std::endl;
+   std::cout << "D cli.con.wallet_api_ptr: " << &cli.con.wallet_api_ptr << std::endl;
+
    wallet = fc::json::from_file( path ).as<graphene::wallet::wallet_data>( 2 * GRAPHENE_MAX_NESTED_OBJECTS );
    BOOST_CHECK( wallet.extra_keys.size() == 2 ); // nathan + account1
    BOOST_CHECK( wallet.pending_account_registrations.empty() );
    BOOST_CHECK_NO_THROW( cli.con.wallet_api_ptr->transfer( "account1", "nathan", "1000", "1.3.0", "", true ) );
 
+   std::cout << "E cli: " << &cli << std::endl;
+   std::cout << "E cli.con: " << &cli.con << std::endl;
+   std::cout << "E cli.con.wallet_api_ptr: " << &cli.con.wallet_api_ptr << std::endl;
+
    pk = decrypt_keys( "supersecret", wallet.cipher_keys );
    BOOST_CHECK( pk.keys.size() == 3 ); // nathan key + account1 active key + account1 memo key
+
+   std::cout << "Z cli: " << &cli << std::endl;
+   std::cout << "Z cli.con: " << &cli.con << std::endl;
+   std::cout << "Z cli.con.wallet_api_ptr: " << &cli.con.wallet_api_ptr << std::endl;
 }
 
 
