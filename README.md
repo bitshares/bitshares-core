@@ -16,7 +16,7 @@ BitShares Core
 * [License](#license)
 
 BitShares Core is the BitShares blockchain implementation and command-line interface.
-The browser web based wallet is [BitShares UI](https://github.com/bitshares/bitshares-ui).
+The web browser based wallet is [BitShares UI](https://github.com/bitshares/bitshares-ui).
 
 Visit [BitShares.org](https://bitshares.org/) to learn about BitShares and join the community at [BitSharesTalk.org](https://bitsharestalk.org/).
 
