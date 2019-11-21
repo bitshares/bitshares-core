@@ -333,8 +333,10 @@ struct cli_fixture
    public:
       ~dummy()
       {
+         std::cout << "CLI_Fixture Dummy Dx A: " << std::endl;
          // wait for everything to finish up
          fc::usleep(fc::milliseconds(500));
+         std::cout << "CLI_Fixture Dummy Dx Z: " << std::endl;
       }
    };
    dummy dmy;
