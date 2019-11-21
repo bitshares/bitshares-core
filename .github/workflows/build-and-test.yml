@@ -111,8 +111,7 @@ jobs:
     - name: Start ES
       uses: docker://elasticsearch:7.4.2
       with:
-        env:
-          discovery.type: single-node
+        args: /usr/share/elasticsearch/bin/elasticsearch -Ediscovery.type=single-node
     - name: Test
       run: |
         _build/tests/app_test
