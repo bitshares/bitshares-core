@@ -1643,5 +1643,3 @@ BOOST_FIXTURE_TEST_CASE(cli_use_authorized_transfer, cli_fixture) {
       throw;
    }
 }
-
-// Nudge Travis-CI
