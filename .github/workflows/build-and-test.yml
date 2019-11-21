@@ -1,0 +1,113 @@
+on: [ push, pull_request ]
+env:
+  CCACHE_COMPRESS: exists means true
+  CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
+jobs:
+  test-release:
+    name: Build and run tests in Release mode
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get install -y \
+                     ccache \
+                     parallel \
+                     libboost-thread-dev \
+                     libboost-iostreams-dev \
+                     libboost-date-time-dev \
+                     libboost-system-dev \
+                     libboost-filesystem-dev \
+                     libboost-program-options-dev \
+                     libboost-chrono-dev \
+                     libboost-test-dev \
+                     libboost-context-dev \
+                     libboost-regex-dev \
+                     libboost-coroutine-dev
+    - uses: actions/checkout@v1
+      with:
+        submodules: recursive
+    - name: Configure
+      run: |
+        mkdir -p _build
+        pushd _build
+        cmake -D CMAKE_BUILD_TYPE=Release \
+              -D CMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON \
+              -D CMAKE_C_COMPILER=gcc \
+              -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+              -D CMAKE_CXX_COMPILER=g++ \
+              -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              ..
+        popd
+    - name: Load Cache
+      uses: actions/cache@v1
+      with:
+        path: ccache
+        key: ccache-release-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          ccache-release-${{ github.ref }}-
+          ccache-release-
+          ccache-
+    - name: Build
+      run: |
+        export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
+        mkdir -p "$CCACHE_DIR"
+        make -j 2 -C _build
+    - name: Test
+      run: |
+        _build/tests/app_test
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
+  test-debug:
+    name: Build and run tests in Debug mode
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get install -y \
+                     ccache \
+                     parallel \
+                     libboost-thread-dev \
+                     libboost-iostreams-dev \
+                     libboost-date-time-dev \
+                     libboost-system-dev \
+                     libboost-filesystem-dev \
+                     libboost-program-options-dev \
+                     libboost-chrono-dev \
+                     libboost-test-dev \
+                     libboost-context-dev \
+                     libboost-regex-dev \
+                     libboost-coroutine-dev
+    - uses: actions/checkout@v1
+      with:
+        submodules: recursive
+    - name: Configure
+      run: |
+        mkdir -p _build
+        pushd _build
+        cmake -D CMAKE_BUILD_TYPE=Debug \
+              -D CMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON \
+              -D CMAKE_C_COMPILER=gcc \
+              -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+              -D CMAKE_CXX_COMPILER=g++ \
+              -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              ..
+        popd
+    - name: Load Cache
+      uses: actions/cache@v1
+      with:
+        path: ccache
+        key: ccache-debug-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          ccache-debug-${{ github.ref }}-
+          ccache-debug-
+          ccache-
+    - name: Build
+      run: |
+        export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
+        mkdir -p "$CCACHE_DIR"
+        make -j 2 -C _build
+    - name: Test
+      run: |
+        _build/tests/app_test
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
