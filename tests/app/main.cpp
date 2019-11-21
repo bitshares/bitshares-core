@@ -253,9 +253,14 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       cfg2.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
       app2.initialize(app2_dir.path(), cfg2);
 
-      BOOST_TEST_MESSAGE( "Starting app2 and waiting 500 ms" );
+      BOOST_TEST_MESSAGE( "Starting app2 and waiting for connection" );
       app2.startup();
-      fc::usleep(fc::milliseconds(500));
+
+      const auto start = fc::time_point::now();
+      do
+      {
+         fc::usleep(fc::milliseconds(200));
+      } while( app1.p2p_node()->get_connection_count() < 1 && fc::time_point::now() < start + fc::seconds(5) );
 
       BOOST_REQUIRE_EQUAL(app1.p2p_node()->get_connection_count(), 1u);
       BOOST_CHECK_EQUAL(std::string(app1.p2p_node()->get_connected_peers().front().host.get_address()), "127.0.0.1");
