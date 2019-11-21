@@ -61,6 +61,10 @@ jobs:
   test-debug:
     name: Build and run tests in Debug mode
     runs-on: ubuntu-latest
+    services:
+      elasticsearch:
+        image: docker://elasticsearch:7.4.2
+        options: --env discovery.type=single-node
     steps:
     - name: Install dependencies
       run: |
@@ -108,10 +112,6 @@ jobs:
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
         make -j 2 -C _build
-    - name: Start ES
-      uses: docker://elasticsearch:7.4.2
-      with:
-        args: /usr/share/elasticsearch/bin/elasticsearch -Ediscovery.type=single-node
     - name: Test
       run: |
         _build/tests/app_test
