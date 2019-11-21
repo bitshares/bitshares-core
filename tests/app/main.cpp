@@ -53,6 +53,17 @@ namespace bpo = boost::program_options;
 namespace fc {
    extern std::unordered_map<std::string, logger> &get_logger_map();
    extern std::unordered_map<std::string, appender::ptr> &get_appender_map();
+
+   /** Waits for F() to return true before max_duration has passed.
+    */
+   template<typename Functor>
+   static void wait_for( const fc::microseconds max_duration, const Functor&& f )
+   {
+      const auto start = fc::time_point::now();
+      while( !f() && fc::time_point::now() < start + max_duration )
+         fc::usleep(fc::milliseconds(100));
+      BOOST_REQUIRE( f() );
+   }
 }
 
 BOOST_AUTO_TEST_CASE(load_configuration_options_test_config_logging_files_created)
@@ -234,7 +245,10 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app1.initialize(app_dir.path(), cfg);
       BOOST_TEST_MESSAGE( "Starting app1 and waiting 500 ms" );
       app1.startup();
-      fc::usleep(fc::milliseconds(500));
+      fc::wait_for( fc::seconds(10), [&app1] () {
+         const auto status = app1.p2p_node()->network_get_info();
+         return status["listening_on"].as<fc::ip::endpoint>( 5 ).port() == 3939;
+      });
 
       BOOST_TEST_MESSAGE( "Creating and initializing app2" );
 
@@ -254,11 +268,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Starting app2 and waiting for connection" );
       app2.startup();
 
-      const auto start = fc::time_point::now();
-      do
-      {
-         fc::usleep(fc::milliseconds(200));
-      } while( app1.p2p_node()->get_connection_count() < 1 && fc::time_point::now() < start + fc::seconds(5) );
+      fc::wait_for( fc::seconds(10), [&app1] () { return app1.p2p_node()->get_connection_count() > 0; } );
 
       BOOST_REQUIRE_EQUAL(app1.p2p_node()->get_connection_count(), 1u);
       BOOST_CHECK_EQUAL(std::string(app1.p2p_node()->get_connected_peers().front().host.get_address()), "127.0.0.1");
