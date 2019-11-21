@@ -123,7 +123,11 @@ int get_available_port()
 /// @returns the application object
 //////////
 std::shared_ptr<graphene::app::application> start_application(fc::temp_directory& app_dir, int& server_port_number) {
+   std::cout << "App A: " << std::endl;
+
    std::shared_ptr<graphene::app::application> app1(new graphene::app::application{});
+
+   std::cout << "App B: " << std::endl;
 
    app1->register_plugin<graphene::account_history::account_history_plugin>(true);
    app1->register_plugin< graphene::market_history::market_history_plugin >(true);
@@ -131,12 +135,16 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    app1->register_plugin< graphene::api_helper_indexes::api_helper_indexes>(true);
    app1->register_plugin<graphene::custom_operations::custom_operations_plugin>(true);
 
+   std::cout << "App C: " << std::endl;
+
    app1->startup_plugins();
    boost::program_options::variables_map cfg;
 #ifdef _WIN32
    sockInit();
 #endif
    server_port_number = get_available_port();
+   std::cout << "App D: " << server_port_number << std::endl;
+
    cfg.emplace(
       "rpc-endpoint",
       boost::program_options::variable_value(string("127.0.0.1:" + std::to_string(server_port_number)), false)
@@ -145,11 +153,17 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
    app1->initialize(app_dir.path(), cfg);
 
+   std::cout << "App E: " << &app1 << std::endl;
+
    app1->initialize_plugins(cfg);
    app1->startup_plugins();
+   
+   std::cout << "App F: " << std::endl;
 
    app1->startup();
    fc::usleep(fc::milliseconds(500));
+   
+   std::cout << "App Z: " << std::endl;
 
    return app1;
 }
@@ -254,31 +268,47 @@ public:
       const std::string custom_wallet_filename = "wallet.json"
    )
    {
+      std::cout << "Con A: " << std::endl;
+      
       wallet_data.chain_id = app->chain_database()->get_chain_id();
       wallet_data.ws_server = "ws://127.0.0.1:" + std::to_string(server_port_number);
       wallet_data.ws_user = "";
       wallet_data.ws_password = "";
       websocket_connection  = websocket_client.connect( wallet_data.ws_server );
+      
+      std::cout << "Con B: " << std::endl;
 
       api_connection = std::make_shared<fc::rpc::websocket_api_connection>( websocket_connection,
                                                                             GRAPHENE_MAX_NESTED_OBJECTS );
 
+      std::cout << "Con C: " << std::endl;
+      
       remote_login_api = api_connection->get_remote_api< graphene::app::login_api >(1);
       BOOST_CHECK(remote_login_api->login( wallet_data.ws_user, wallet_data.ws_password ) );
+      
+      std::cout << "Con D: " << std::endl;
 
       wallet_api_ptr = std::make_shared<graphene::wallet::wallet_api>(wallet_data, remote_login_api);
       wallet_filename = data_dir.path().generic_string() + "/" + custom_wallet_filename;
       wallet_api_ptr->set_wallet_filename(wallet_filename);
+      
+      std::cout << "Con E: " << std::endl;
 
       wallet_api = fc::api<graphene::wallet::wallet_api>(wallet_api_ptr);
+      
+      std::cout << "Con F: " << std::endl;
 
       wallet_cli = std::make_shared<fc::rpc::cli>(GRAPHENE_MAX_NESTED_OBJECTS);
       for( auto& name_formatter : wallet_api_ptr->get_result_formatters() )
          wallet_cli->format_result( name_formatter.first, name_formatter.second );
+      
+      std::cout << "Con Z: " << std::endl;
    }
    ~client_connection()
    {
+      std::cout << "Con Dx A: " << std::endl;
       wallet_cli->stop();
+      std::cout << "Con Dx Z: " << std::endl;
    }
 public:
    fc::http::websocket_client websocket_client;
@@ -321,6 +351,8 @@ struct cli_fixture
       con( app1, app_dir, server_port_number ),
       nathan_keys( {"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"} )
    {
+      std::cout << "CLI_Fixture A: " << std::endl;
+         
       BOOST_TEST_MESSAGE("Setup cli_wallet::boost_fixture_test_case");
 
       using namespace graphene::chain;
@@ -331,24 +363,34 @@ struct cli_fixture
          BOOST_TEST_MESSAGE("Setting wallet password");
          con.wallet_api_ptr->set_password("supersecret");
          con.wallet_api_ptr->unlock("supersecret");
+         
+         std::cout << "CLI_Fixture B: " << std::endl;
 
          // import Nathan account
          BOOST_TEST_MESSAGE("Importing nathan key");
          BOOST_CHECK_EQUAL(nathan_keys[0], "5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3");
          BOOST_CHECK(con.wallet_api_ptr->import_key("nathan", nathan_keys[0]));
+         
+         std::cout << "CLI_Fixture C: " << std::endl;
+         
       } catch( fc::exception& e ) {
          edump((e.to_detail_string()));
          throw;
       }
+         
+      std::cout << "CLI_Fixture Z: " << std::endl;
    }
 
    ~cli_fixture()
    {
+      std::cout << "CLI_Fixture Dx A: " << std::endl;
       BOOST_TEST_MESSAGE("Cleanup cli_wallet::boost_fixture_test_case");
       app1->shutdown();
+      std::cout << "CLI_Fixture Dx Y: " << std::endl;
 #ifdef _WIN32
       sockQuit();
 #endif
+      std::cout << "CLI_Fixture Dx Z: " << std::endl;
    }
 };
 
@@ -1003,8 +1045,8 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
          }
       }
 
-      std::cout << "Z con: " << &con << std::endl;
-      std::cout << "Z con.wallet_api_ptr: " << &con.wallet_api_ptr << std::endl;
+      std::cout << "Y con: " << &con << std::endl;
+      std::cout << "Y con.wallet_api_ptr: " << &con.wallet_api_ptr << std::endl;
 
       // wait for everything to finish up
       fc::usleep(fc::seconds(1));
@@ -1013,6 +1055,9 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
       throw;
    }
    app1->shutdown();
+
+   std::cout << "Z con: " << &con << std::endl;
+   std::cout << "Z con.wallet_api_ptr: " << &con.wallet_api_ptr << std::endl;
 }
 
 graphene::wallet::plain_keys decrypt_keys( const std::string& password, const vector<char>& cipher_keys )
