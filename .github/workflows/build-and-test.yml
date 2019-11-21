@@ -6,6 +6,10 @@ jobs:
   test-release:
     name: Build and run tests in Release mode
     runs-on: ubuntu-latest
+    services:
+      elasticsearch:
+        image: docker://elasticsearch:7.4.2
+        options: --env discovery.type=single-node --publish 9200:9200 --publish 9300:9300
     steps:
     - name: Install dependencies
       run: |
@@ -58,6 +62,7 @@ jobs:
         _build/tests/app_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/es_test
   test-debug:
     name: Build and run tests in Debug mode
     runs-on: ubuntu-latest
