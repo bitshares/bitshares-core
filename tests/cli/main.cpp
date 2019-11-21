@@ -1056,8 +1056,7 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
    }
    app1->shutdown();
 
-   std::cout << "Z con: " << &con << std::endl;
-   std::cout << "Z con.wallet_api_ptr: " << &con.wallet_api_ptr << std::endl;
+   std::cout << "Z: " << std::endl;
 }
 
 graphene::wallet::plain_keys decrypt_keys( const std::string& password, const vector<char>& cipher_keys )
