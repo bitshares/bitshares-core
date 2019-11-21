@@ -45,7 +45,7 @@ We recommend building on Ubuntu 16.04 LTS (64-bit)
     cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo .
     make
 
-**Upgrade Script** (prepend to the Build Script above if you built a prior release):
+**Upgrade Script:** (prepend to the Build Script above if you built a prior release):
 
     git remote set-url origin https://github.com/bitshares/bitshares-core.git
     git checkout master
@@ -95,7 +95,7 @@ Set your inital password:
     >>> set_password <PASSWORD>
     >>> unlock <PASSWORD>
 
-**IMPORTANT:** The cli_wallet or API interfaces to the witness node wouldn't be fully functional unless the witness node is fully synchronized with the blockchain, the cli_wallet command "info" will show how far are you from the live current block of the blockchain, you can compare the result "head_block_num" with the current block number appearing [here](https://wallet.bitshares.org/#/explorer/blocks).
+**IMPORTANT:** The cli_wallet or API interfaces to the witness node wouldn't be fully functional unless the witness node is fully synchronized with the blockchain. The cli_wallet command `info` will show result `head_block_age` which will tell you how far you are from the live current block of the blockchain.
 
 
 To check your current block:
