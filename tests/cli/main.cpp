@@ -1286,12 +1286,22 @@ static string encapsulate( const graphene::wallet::signed_message& msg )
  * Check signing/verifying a message with a memo key
  */
 BOOST_FIXTURE_TEST_CASE( cli_sign_message, cli_fixture )
-{ try {
+{
+   std::cout << std::endl;
+   std::cout << "cli_sign_message" << std::endl;
+
+   try {
+   std::cout << "A con: " << &con << std::endl;
+   std::cout << "A con.wallet_api_ptr: " << &con.wallet_api_ptr << std::endl;
+
    const auto nathan_priv = *wif_to_key( nathan_keys[0] );
    const public_key_type nathan_pub( nathan_priv.get_public_key() );
 
    // account does not exist
    BOOST_REQUIRE_THROW( con.wallet_api_ptr->sign_message( "dan", "123" ), fc::assert_exception );
+
+   std::cout << "B con: " << &con << std::endl;
+   std::cout << "B con.wallet_api_ptr: " << &con.wallet_api_ptr << std::endl;
 
    // success
    graphene::wallet::signed_message msg = con.wallet_api_ptr->sign_message( "nathan", "123" );
@@ -1308,6 +1318,10 @@ BOOST_FIXTURE_TEST_CASE( cli_sign_message, cli_fixture )
    BOOST_CHECK( !con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
    msg.message = "123";
 
+
+   std::cout << "C con: " << &con << std::endl;
+   std::cout << "C con.wallet_api_ptr: " << &con.wallet_api_ptr << std::endl;
+
    // change account, verify failure
    // nonexistent account:
    msg.meta.account = "dan";
@@ -1322,6 +1336,9 @@ BOOST_FIXTURE_TEST_CASE( cli_sign_message, cli_fixture )
    BOOST_CHECK( !con.wallet_api_ptr->verify_signed_message( msg ) );
    BOOST_CHECK( !con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
    msg.meta.account = "nathan";
+
+   std::cout << "D con: " << &con << std::endl;
+   std::cout << "D con.wallet_api_ptr: " << &con.wallet_api_ptr << std::endl;
 
    // change key, verify failure
    ++msg.meta.memo_key.key_data.data()[1];
@@ -1338,6 +1355,9 @@ BOOST_FIXTURE_TEST_CASE( cli_sign_message, cli_fixture )
    BOOST_CHECK( !con.wallet_api_ptr->verify_signed_message( msg ) );
    BOOST_CHECK( !con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
    --msg.meta.block;
+
+   std::cout << "E con: " << &con << std::endl;
+   std::cout << "E con.wallet_api_ptr: " << &con.wallet_api_ptr << std::endl;
 
    // change time, verify failure
    ++msg.meta.time[0];
@@ -1361,11 +1381,17 @@ BOOST_FIXTURE_TEST_CASE( cli_sign_message, cli_fixture )
    } catch( const fc::assert_exception& ) {} // failure to reconstruct key from signature is ok as well
    --msg.signature->data()[1];
 
+   std::cout << "F con: " << &con << std::endl;
+   std::cout << "F con.wallet_api_ptr: " << &con.wallet_api_ptr << std::endl;
+
    // verify success
    BOOST_CHECK( con.wallet_api_ptr->verify_message( msg.message, msg.meta.account, msg.meta.block, msg.meta.time,
                                                     *msg.signature ) );
    BOOST_CHECK( con.wallet_api_ptr->verify_signed_message( msg ) );
    BOOST_CHECK( con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
+
+   std::cout << "Z con: " << &con << std::endl;
+   std::cout << "Z con.wallet_api_ptr: " << &con.wallet_api_ptr << std::endl;
 
 } FC_LOG_AND_RETHROW() }
 
