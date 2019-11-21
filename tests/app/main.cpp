@@ -245,12 +245,10 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app2.register_plugin< graphene::witness_plugin::witness_plugin >();
       app2.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
       app2.startup_plugins();
-      auto cfg2 = cfg;
-      cfg2.erase("p2p-endpoint");
+      boost::program_options::variables_map cfg2;
       cfg2.emplace("p2p-endpoint", boost::program_options::variable_value(string("127.0.0.1:4040"), false));
       cfg2.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
-      cfg2.emplace("seed-node", boost::program_options::variable_value(vector<string>{"127.0.0.1:3939"}, false));
-      cfg2.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
+      cfg2.emplace("seed-nodes", boost::program_options::variable_value(string("[\"127.0.0.1:3939\"]"), false));
       app2.initialize(app2_dir.path(), cfg2);
 
       BOOST_TEST_MESSAGE( "Starting app2 and waiting for connection" );
