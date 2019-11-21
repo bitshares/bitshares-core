@@ -108,8 +108,14 @@ jobs:
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
         make -j 2 -C _build
+    - name: Start ES
+      uses: docker://elasticsearch:7.4.2
+      with:
+        env:
+          discovery.type: single-node
     - name: Test
       run: |
         _build/tests/app_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/es_test
