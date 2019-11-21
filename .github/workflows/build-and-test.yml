@@ -22,7 +22,8 @@ jobs:
                      libboost-test-dev \
                      libboost-context-dev \
                      libboost-regex-dev \
-                     libboost-coroutine-dev
+                     libboost-coroutine-dev \
+                     libcurl4-openssl-dev
     - uses: actions/checkout@v1
       with:
         submodules: recursive
@@ -76,7 +77,8 @@ jobs:
                      libboost-test-dev \
                      libboost-context-dev \
                      libboost-regex-dev \
-                     libboost-coroutine-dev
+                     libboost-coroutine-dev \
+                     libcurl4-openssl-dev
     - uses: actions/checkout@v1
       with:
         submodules: recursive
