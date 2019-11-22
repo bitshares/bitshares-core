@@ -81,7 +81,7 @@ void undo_database::on_modify( const object& obj )
       return;
    auto itr =  state.old_values.find(obj.id);
    if( itr != state.old_values.end() ) return;
-   state.old_values[obj.id] = obj.clone();
+   state.old_values[obj.id] = obj.backup();
 }
 void undo_database::on_remove( const object& obj )
 {
@@ -102,7 +102,7 @@ void undo_database::on_remove( const object& obj )
       return;
    }
    if( state.removed.count(obj.id) ) return;
-   state.removed[obj.id] = obj.clone();
+   state.removed[obj.id] = obj.backup();
 }
 
 void undo_database::undo()
@@ -113,19 +113,17 @@ void undo_database::undo()
 
    auto& state = _stack.back();
    for( auto& item : state.old_values )
-   {
-      _db.modify( _db.get_object( item.second->id ), [&]( object& obj ){ obj.move_from( *item.second ); } );
-   }
+      _db.modify( _db.get_object( item.second->id ), [&item]( object& obj ){ obj.restore( *item.second ); } );
 
    for( auto ritr = state.new_ids.begin(); ritr != state.new_ids.end(); ++ritr  )
    {
-      _db.remove( _db.get_object(*ritr) );
+      const auto& obj = _db.get_object(*ritr);
+      _db.modify( obj, [] ( object& o ) { o.clear(); } );
+      _db.remove( obj );
    }
 
    for( auto& item : state.old_index_next_ids )
-   {
       _db.get_mutable_index( item.first.space(), item.first.type() ).set_next_id( item.second );
-   }
 
    for( auto& item : state.removed )
       _db.insert( std::move(*item.second) );
@@ -196,11 +194,13 @@ void undo_database::merge()
       if( prev_state.new_ids.find(obj.second->id) != prev_state.new_ids.end() )
       {
          // new+upd -> new, type A
+         obj.second->clear();
          continue;
       }
       if( prev_state.old_values.find(obj.second->id) != prev_state.old_values.end() )
       {
          // upd(was=X) + upd(was=Y) -> upd(was=X), type A
+         obj.second->clear();
          continue;
       }
       // del+upd -> N/A
@@ -236,6 +236,7 @@ void undo_database::merge()
       if( prev_state.new_ids.find(obj.second->id) != prev_state.new_ids.end() )
       {
          // new + del -> nop (type C)
+         obj.second->clear();
          prev_state.new_ids.erase(obj.second->id);
          continue;
       }
@@ -272,12 +273,14 @@ void undo_database::pop_commit()
 
       for( auto& item : state.old_values )
       {
-         _db.modify( _db.get_object( item.second->id ), [&]( object& obj ){ obj.move_from( *item.second ); } );
+         _db.modify( _db.get_object( item.second->id ), [&item]( object& obj ){ obj.restore( *item.second ); } );
       }
 
       for( auto ritr = state.new_ids.begin(); ritr != state.new_ids.end(); ++ritr  )
       {
-         _db.remove( _db.get_object(*ritr) );
+         const auto& obj = _db.get_object(*ritr);
+         _db.modify( obj, [] ( object& o ) { o.clear(); } );
+         _db.remove( obj );
       }
 
       for( auto& item : state.old_index_next_ids )

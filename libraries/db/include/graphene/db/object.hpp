@@ -30,6 +30,7 @@
 #define MAX_NESTING (200)
 
 namespace graphene { namespace db {
+   class undo_database;
 
    /**
     *  @brief base for all database objects
@@ -65,14 +66,21 @@ namespace graphene { namespace db {
          object(){}
          virtual ~object(){}
 
+         static const uint8_t space_id = 0;
+         static const uint8_t type_id  = 0;
+
          // serialized
          object_id_type          id;
 
          /// these methods are implemented for derived classes by inheriting abstract_object<DerivedClass>
-         virtual unique_ptr<object> clone()const = 0;
-         virtual void               move_from( object& obj ) = 0;
          virtual variant            to_variant()const  = 0;
          virtual vector<char>       pack()const = 0;
+
+      protected:
+         virtual unique_ptr<object> backup()const = 0;
+         virtual void               clear() {}
+         virtual void               restore( object& obj ) = 0;
+         friend class undo_database;
    };
 
    /**
@@ -85,16 +93,17 @@ namespace graphene { namespace db {
    template<typename DerivedClass>
    class abstract_object : public object
    {
-      public:
-         virtual unique_ptr<object> clone()const
+      protected:
+         virtual unique_ptr<object> backup()const
          {
-            return unique_ptr<object>(new DerivedClass( *static_cast<const DerivedClass*>(this) ));
+            return std::make_unique<DerivedClass>( *static_cast<const DerivedClass*>(this) );
          }
 
-         virtual void    move_from( object& obj )
+         virtual void restore( object& obj )
          {
             static_cast<DerivedClass&>(*this) = std::move( static_cast<DerivedClass&>(obj) );
          }
+      public:
          virtual variant to_variant()const { return variant( static_cast<const DerivedClass&>(*this), MAX_NESTING ); }
          virtual vector<char> pack()const  { return fc::raw::pack( static_cast<const DerivedClass&>(*this) ); }
    };
