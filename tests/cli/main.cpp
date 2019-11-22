@@ -1007,6 +1007,8 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
       throw;
    }
    app1->shutdown();
+   // Wait for app1 to shut down before initiating the next unit test
+   fc::usleep(fc::seconds(1)); // Heuristic delay
 }
 
 graphene::wallet::plain_keys decrypt_keys( const std::string& password, const vector<char>& cipher_keys )
@@ -1231,6 +1233,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       throw;
    }
    app1->shutdown();
+   // Wait for app1 to shut down before initiating the next unit test
+   fc::usleep(fc::seconds(1)); // Heuristic delay
 }
 
 static string encapsulate( const graphene::wallet::signed_message& msg )
