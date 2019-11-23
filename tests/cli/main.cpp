@@ -310,20 +310,10 @@ struct cli_fixture
          fc::usleep(fc::milliseconds(500));
       }
    };
-   class delayer
-   {
-   public:
-      delayer()
-      {
-         // Delay before proceeding
-         fc::usleep(fc::milliseconds(1000));
-      }
-   };
    dummy dmy;
    int server_port_number;
    fc::temp_directory app_dir;
    std::shared_ptr<graphene::app::application> app1;
-   delayer dly;
    client_connection con;
    std::vector<std::string> nathan_keys;
 
@@ -331,7 +321,6 @@ struct cli_fixture
       server_port_number(0),
       app_dir( graphene::utilities::temp_directory_path() ),
       app1( start_application(app_dir, server_port_number) ),
-      dly(),
       con( app1, app_dir, server_port_number ),
       nathan_keys( {"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"} )
    {
