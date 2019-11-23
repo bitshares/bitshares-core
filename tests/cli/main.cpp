@@ -1007,6 +1007,10 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
       throw;
    }
    app1->shutdown();
+   app1.reset();
+   // Intentional delay after app1->shutdown
+   std::cout << "cli_multisig_transaction conclusion: Intentional delay" << std::endl;
+   fc::usleep(fc::seconds(1));
 }
 
 graphene::wallet::plain_keys decrypt_keys( const std::string& password, const vector<char>& cipher_keys )
@@ -1231,6 +1235,10 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       throw;
    }
    app1->shutdown();
+   app1.reset();
+   // Intentional delay after app1->shutdown
+   std::cout << "cli_create_htlc conclusion: Intentional delay" << std::endl;
+   fc::usleep(fc::seconds(1));
 }
 
 static string encapsulate( const graphene::wallet::signed_message& msg )
