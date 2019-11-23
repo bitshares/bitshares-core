@@ -32,6 +32,9 @@ list(APPEND SOURCES account.cpp
 
 
 list(APPEND CUSTOM_AUTHS_FILES
+     custom_authorities/create_predicate_fwd_1.cpp
+     custom_authorities/create_predicate_fwd_2.cpp
+     custom_authorities/create_predicate_fwd_3.cpp
      custom_authorities/restriction_predicate.cpp
      custom_authorities/list_1.cpp
      custom_authorities/list_2.cpp

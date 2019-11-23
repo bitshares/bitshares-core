@@ -510,6 +510,8 @@ object_restriction_predicate<Field> create_predicate_function(restriction_functi
    } FC_CAPTURE_AND_RETHROW( (fc::get_typename<Field>::name())(func)(arg) )
 }
 
+#include "create_predicate_fwd.hxx"
+
 /**
  * @brief Create a predicate asserting on the field of the object a restriction is referencing
  *
