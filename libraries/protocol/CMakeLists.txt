@@ -7,6 +7,7 @@ list(APPEND SOURCES account.cpp
                     confidential.cpp
                     chain_parameters.cpp
                     fee_schedule.cpp
+                    fee_schedule_calc.cpp
                     memo.cpp
                     proposal.cpp
                     transfer.cpp
