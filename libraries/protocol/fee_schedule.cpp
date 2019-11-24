@@ -46,23 +46,6 @@ namespace graphene { namespace protocol {
       return result;
    }
 
-   struct fee_schedule_validate_visitor
-   {
-      typedef void result_type;
-
-      template<typename T>
-      void operator()( const T& p )const
-      {
-         //p.validate();
-      }
-   };
-
-   void fee_schedule::validate()const
-   {
-      for( const auto& f : parameters )
-         f.visit( fee_schedule_validate_visitor() );
-   }
-
    struct calc_fee_visitor
    {
       typedef uint64_t result_type;

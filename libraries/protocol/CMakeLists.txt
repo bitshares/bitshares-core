@@ -53,10 +53,10 @@ target_link_libraries( graphene_protocol_custom_auths fc )
 target_include_directories( graphene_protocol_custom_auths PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 
 if( MSVC )
-   set_source_files_properties( ${CUSTOM_AUTHS_FILES} PROPERTIES COMPILE_FLAGS /bigobj )
+   set_source_files_properties( ${CUSTOM_AUTHS_FILES} ${SOURCES} PROPERTIES COMPILE_FLAGS /bigobj )
 else( MSVC )
    if( MINGW )
-      set_source_files_properties( ${CUSTOM_AUTHS_FILES} PROPERTIES COMPILE_FLAGS -Wa,-mbig-obj )
+      set_source_files_properties( ${CUSTOM_AUTHS_FILES} ${SOURCES} PROPERTIES COMPILE_FLAGS -Wa,-mbig-obj )
    endif( MINGW )
 endif( MSVC )
 
