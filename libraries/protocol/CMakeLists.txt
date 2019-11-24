@@ -43,7 +43,8 @@ list(APPEND CUSTOM_AUTHS_FILES
      custom_authorities/list_5.cpp
      custom_authorities/list_6.cpp
      custom_authorities/list_7.cpp
-     custom_authorities/list_8.cpp)
+     custom_authorities/list_8.cpp
+     custom_authorities/list_9.cpp)
 
 add_library( graphene_protocol_custom_auths ${CUSTOM_AUTHS_FILES} )
 target_link_libraries( graphene_protocol_custom_auths fc )
