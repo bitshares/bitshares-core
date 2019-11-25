@@ -57,12 +57,16 @@ jobs:
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
         make -j 2 -C _build
-    - name: Test
+    - name: Unit-Tests
       run: |
         _build/tests/app_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/es_test
+    - name: Node-Test
+      run: |
+        pushd _build
+        ../programs/build_helpers/run-node-test
   test-debug:
     name: Build and run tests in Debug mode
     runs-on: ubuntu-latest
@@ -117,9 +121,13 @@ jobs:
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
         make -j 2 -C _build
-    - name: Test
+    - name: Unit-Tests
       run: |
         _build/tests/app_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/es_test
+    - name: Node-Test
+      run: |
+        pushd _build
+        ../programs/build_helpers/run-node-test
