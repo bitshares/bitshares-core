@@ -1,3 +1,4 @@
+name: Github Autobuild
 on: [ push, pull_request ]
 env:
   CCACHE_COMPRESS: exists means true
