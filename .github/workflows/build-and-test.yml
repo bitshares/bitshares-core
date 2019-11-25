@@ -141,23 +141,25 @@ jobs:
     name: Build 3rd-party libraries required for windows cross-build
     runs-on: ubuntu-latest
     steps:
+    - name: Load Cache
+      id: cache-libs
+      uses: actions/cache@v1
+      with:
+        path: libs
+        key: mingw64-libs-${{ env.BOOST_VERSION }}_${{ env.CURL_VERSION }}_${{ env.OPENSSL_VERSION }}_${{ env.ZLIB_VERSION }}
     - name: Install dependencies
+      if: steps.cache-libs.outputs.cache-hit != 'true'
       run: |
         sudo apt-get install -y \
                      g++-mingw-w64-x86-64 \
                      mingw-w64-tools
     - name: Download library sources
+      if: steps.cache-libs.outputs.cache-hit != 'true'
       run: |
         curl -LO https://dl.bintray.com/boostorg/release/${{ env.BOOST_DOTTED_VERSION }}/source/boost_${{ env.BOOST_VERSION }}.tar.bz2
         curl -LO https://curl.haxx.se/download/curl-${{ env.CURL_VERSION }}.tar.bz2
         curl -LO https://www.openssl.org/source/openssl-${{ env.OPENSSL_VERSION }}.tar.gz
         curl -LO https://zlib.net/zlib-${{ env.ZLIB_VERSION }}.tar.gz
-    - name: Load Cache
-      uses: actions/cache@v1
-      with:
-        path: libs
-        id: cache-libs
-        key: mingw64-libs-${{ env.BOOST_VERSION }}_${{ env.CURL_VERSION }}_${{ env.OPENSSL_VERSION }}_${{ env.ZLIB_VERSION }}
     - name: Build zlib
       if: steps.cache-libs.outputs.cache-hit != 'true'
       run: |
