@@ -510,6 +510,8 @@ object_restriction_predicate<Field> create_predicate_function(restriction_functi
    } FC_CAPTURE_AND_RETHROW( (fc::get_typename<Field>::name())(func)(arg) )
 }
 
+#include "create_predicate_fwd.hxx"
+
 /**
  * @brief Create a predicate asserting on the field of the object a restriction is referencing
  *
@@ -588,24 +590,5 @@ object_restriction_predicate<Object> restrictions_to_predicate(vector<restrictio
       return predicate_result::Success();
    };
 }
-
-// To make the build gentler on RAM, break the operation list into several pieces to build over several files
-using operation_list_1 = static_variant<typelist::slice<operation::list, 0, 5>>;
-using operation_list_2 = static_variant<typelist::slice<operation::list, 5, 10>>;
-using operation_list_3 = static_variant<typelist::slice<operation::list, 10, 20>>;
-using operation_list_4 = static_variant<typelist::slice<operation::list, 20, 30>>;
-using operation_list_5 = static_variant<typelist::slice<operation::list, 30, 35>>;
-using operation_list_6 = static_variant<typelist::slice<operation::list, 35, 40>>;
-using operation_list_7 = static_variant<typelist::slice<operation::list, 40, 50>>;
-using operation_list_8 = static_variant<typelist::slice<operation::list, 50>>;
-
-object_restriction_predicate<operation> get_restriction_predicate_list_1(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_2(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_3(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_4(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_5(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_6(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_7(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_8(size_t idx, vector<restriction> rs);
 
 } } // namespace graphene::protocol
