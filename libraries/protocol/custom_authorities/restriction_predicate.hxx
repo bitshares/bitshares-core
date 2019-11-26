@@ -523,15 +523,16 @@ template<typename Object,
          typename = std::enable_if_t<typelist::length<typename fc::reflector<Object>::native_members>() != 0>>
 object_restriction_predicate<Object> create_field_predicate(restriction&& r, short) {
    using member_list = typename fc::reflector<Object>::native_members;
-   FC_ASSERT(r.member_index < typelist::length<member_list>(), "Invalid member index ${I} for object ${O}",
-             ("I", r.member_index)("O", fc::get_typename<Object>::name()));
+   FC_ASSERT( r.member_index < static_cast<uint64_t>(typelist::length<member_list>()),
+              "Invalid member index ${I} for object ${O}",
+              ("I", r.member_index)("O", fc::get_typename<Object>::name()) );
    auto predicator = [f=r.restriction_type, a=std::move(r.argument)](auto t) -> object_restriction_predicate<Object> {
       using FieldReflection = typename decltype(t)::type;
       using Field = typename FieldReflection::type;
       auto p = create_predicate_function<Field>(static_cast<restriction_function>(f), std::move(a));
       return [p=std::move(p)](const Object& o) { return p(FieldReflection::get(o)); };
    };
-   return typelist::runtime::dispatch(member_list(), r.member_index.value, predicator);
+   return typelist::runtime::dispatch(member_list(), static_cast<size_t>(r.member_index.value), predicator);
 }
 template<typename Object>
 object_restriction_predicate<Object> create_field_predicate(restriction&&, long) {
