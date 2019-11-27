@@ -193,7 +193,6 @@ class node_impl : public peer_connection_delegate
       std::list<potential_peer_record> _add_once_node_list; /// list of peers we want to connect to as soon as possible
 
       peer_database             _potential_peer_db;
-      fc::promise<void>::ptr    _retrigger_connect_loop_promise;
       bool                      _potential_peer_database_updated;
       fc::future<void>          _p2p_network_connect_loop_done;
       // @}
