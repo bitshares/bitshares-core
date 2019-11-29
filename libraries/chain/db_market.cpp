@@ -156,45 +156,54 @@ void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const 
 
 void database::cancel_bid(const collateral_bid_object& bid, bool create_virtual_op)
 {
-   adjust_balance(bid.bidder, bid.inv_swan_price.base);
-
+   stored_value collateral;
+   modify( bid, [&collateral] ( collateral_bid_object& _bid ) {
+      collateral = std::move(_bid.collateral_offered);
+   });
    if( create_virtual_op )
    {
       bid_collateral_operation vop;
       vop.bidder = bid.bidder;
-      vop.additional_collateral = bid.inv_swan_price.base;
-      vop.debt_covered = asset( 0, bid.inv_swan_price.quote.asset_id );
+      vop.additional_collateral = collateral.get_value();
+      vop.debt_covered = asset( 0, bid.debt_covered.asset_id() );
       push_applied_operation( vop );
    }
+   add_balance( bid.bidder, std::move(collateral) );
    remove(bid);
 }
 
-void database::execute_bid( const collateral_bid_object& bid, share_type debt_covered, share_type collateral_from_fund,
-                            const price_feed& current_feed )
+void database::execute_bid( const collateral_bid_object& bid, share_type debt_covered,
+                            stored_value&& collateral_from_fund, const price_feed& current_feed )
 {
-   const call_order_object& call_obj = create<call_order_object>( [&](call_order_object& call ){
+   stored_value collateral;
+   modify( bid, [&collateral] ( collateral_bid_object& _bid ) {
+      collateral = std::move(_bid.collateral_offered);
+   });
+   const auto& call_obj = create<call_order_object>(
+      [&bid,&collateral,debt_covered,&current_feed] ( call_order_object& call ) {
          call.borrower = bid.bidder;
-         call.collateral = bid.inv_swan_price.base.amount + collateral_from_fund;
+         call.collateral = std::move(collateral);
+         call.collateral += std::move(collateral_from_fund);
          call.debt = debt_covered;
          // don't calculate call_price after core-1270 hard fork
          if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_1270_TIME )
             // bid.inv_swan_price is in collateral / debt
-            call.call_price = price( asset( 1, bid.inv_swan_price.base.asset_id ),
-                                     asset( 1, bid.inv_swan_price.quote.asset_id ) );
+            call.call_price = price( asset( 1, bid.collateral_offered.get_asset() ),
+                                     asset( 1, bid.debt_covered.asset_id ) );
          else
-            call.call_price = price::call_price( asset(debt_covered, bid.inv_swan_price.quote.asset_id),
-                                                 asset(call.collateral, bid.inv_swan_price.base.asset_id),
+            call.call_price = price::call_price( asset( debt_covered, bid.debt_covered.asset_id),
+                                                 call.collateral.get_value(),
                                                  current_feed.maintenance_collateral_ratio );
       });
 
    // Note: CORE asset in collateral_bid_object is not counted in account_stats.total_core_in_orders
-   if( bid.inv_swan_price.base.asset_id == asset_id_type() )
-      modify( get_account_stats_by_owner(bid.bidder), [&](account_statistics_object& stats) {
-         stats.total_core_in_orders += call_obj.collateral;
+   if( collateral.get_asset() == asset_id_type() )
+      modify( get_account_stats_by_owner(bid.bidder), [&call_obj] ( account_statistics_object& stats ) {
+         stats.total_core_in_orders += call_obj.collateral.get_amount();
       });
 
-   push_applied_operation( execute_bid_operation( bid.bidder, asset( call_obj.collateral, bid.inv_swan_price.base.asset_id ),
-                                                  asset( debt_covered, bid.inv_swan_price.quote.asset_id ) ) );
+   push_applied_operation( execute_bid_operation( bid.bidder, call_obj.collateral.get_value(),
+                                                  asset( debt_covered, bid.debt_covered.asset_id ) ) );
 
    remove(bid);
 }

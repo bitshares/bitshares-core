@@ -68,7 +68,7 @@ void database::debug_dump()
       reported_core_in_orders += s.total_core_in_orders;
    }
    for( const collateral_bid_object& b : bids )
-      total_balances[b.inv_swan_price.base.asset_id] += b.inv_swan_price.base.amount;
+      total_balances[b.collateral_offered.get_asset()] += b.collateral_offered.get_amount();
    for( const limit_order_object& o : db.get_index_type<limit_order_index>().indices() )
    {
       auto for_sale = o.amount_for_sale();

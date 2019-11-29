@@ -29,7 +29,7 @@
 
 #include <fc/io/raw.hpp>
 
-using namespace graphene::chain;
+namespace graphene { namespace chain {
 
 /*
 target_CR = max( target_CR, MCR )
@@ -303,23 +303,79 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
 
 } FC_CAPTURE_AND_RETHROW( (*this)(feed_price)(match_price)(maintenance_collateral_ratio) ) }
 
+class call_order_backup : public call_order_master
+{
+   private:
+      call_order_backup( const call_order_object& original )
+         : call_order_master( original )
+      {
+         collateral = original.collateral.get_amount();
+      }
+      asset collateral;
+      friend class call_order_object;
+};
+
+unique_ptr<object> call_order_object::backup()const
+{
+   return std::make_unique<call_order_backup>( *this );
+}
+
+void call_order_object::restore( object& obj )
+{
+   const auto& backup = static_cast<call_order_backup&>(obj);
+   collateral.restore( backup.collateral ) );
+   static_cast<call_order_master&>(*this) = std::move( backup );
+}
+
+class collateral_bid_backup : public collateral_bid_master
+{
+   private:
+      collateral_bid_backup( const collateral_bid_object& original )
+         : collateral_bid_master( original )
+      {
+         collateral_covered = original.collateral_covered.get_amount();
+      }
+      asset collateral_covered;
+      friend class collateral_bid_object;
+};
+
+unique_ptr<object> collateral_bid_object::backup()const
+{
+   return std::make_unique<collateral_bid_backup>( *this );
+}
+
+void collateral_bid_object::restore( object& obj )
+{
+   const auto& backup = static_cast<collateral_bid_backup&>(obj);
+   collateral_offered.restore( backup.collateral_offered ) );
+   static_cast<collateral_bid_master&>(*this) = std::move( backup );
+}
+
+} } // graphene::chain
+
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::limit_order_object,
                     (graphene::db::object),
                     (expiration)(seller)(for_sale)(sell_price)(deferred_fee)(deferred_paid_fee)
                   )
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::call_order_object, (graphene::db::object),
-                    (borrower)(collateral)(debt)(call_price)(target_collateral_ratio) )
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::call_order_master, (graphene::db::object),
+                    (borrower)(debt)(call_price)(target_collateral_ratio) )
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::call_order_object, (graphene::chain::call_order_object),
+                    (collateral) )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::force_settlement_object,
                     (graphene::db::object),
                     (owner)(balance)(settlement_date)
                   )
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::collateral_bid_object, (graphene::db::object),
-                    (bidder)(inv_swan_price) )
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::collateral_bid_master, (graphene::db::object),
+                    (bidder)(debt_covered) )
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::collateral_bid_object,
+                    (graphene::chain::collateral_bid_master),
+                    (collateral_offered) )
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::limit_order_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::call_order_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::force_settlement_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::collateral_bid_master )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::collateral_bid_object )

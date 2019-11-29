@@ -83,7 +83,7 @@ void database::perform_account_maintenance(Type tally_helper)
          const account_balance_object& bal_obj = *bal_itr;
 
          modify( get_account_stats_by_owner( bal_obj.owner ), [&bal_obj](account_statistics_object& aso) {
-            aso.core_in_balance = bal_obj.balance;
+            aso.core_in_balance = bal_obj.get_amount();
          });
 
          modify( bal_obj, []( account_balance_object& abo ) {
@@ -704,8 +704,8 @@ void create_buyback_orders( database& db )
       for( const auto& entry : bal_idx.get_account_balances( buyback_account.id ) )
       {
          const auto* it = entry.second;
-         asset_id_type asset_to_sell = it->asset_type;
-         share_type amount_to_sell = it->balance;
+         asset_id_type asset_to_sell = it->get_asset();
+         share_type amount_to_sell = it->get_amount();
          if( asset_to_sell == asset_to_buy.id )
             continue;
          if( amount_to_sell == 0 )
@@ -801,12 +801,13 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    while( covered < bdd.current_supply && itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == to_revive_id )
    {
       const collateral_bid_object& bid = *itr;
-      asset debt_in_bid = bid.inv_swan_price.quote;
+      asset debt_in_bid = bid.debt_covered;
       if( debt_in_bid.amount > bdd.current_supply )
          debt_in_bid.amount = bdd.current_supply;
       asset total_collateral = debt_in_bid * bad.settlement_price;
-      total_collateral += bid.inv_swan_price.base;
-      price call_price = price::call_price( debt_in_bid, total_collateral, bad.current_feed.maintenance_collateral_ratio );
+      total_collateral += bid.collateral_offered.get_value();
+      price call_price = price::call_price( debt_in_bid, total_collateral,
+                                            bad.current_feed.maintenance_collateral_ratio );
       if( ~call_price >= bad.current_feed.settlement_price ) break;
       covered += debt_in_bid.amount;
       ++itr;
@@ -820,7 +821,7 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    {
       const collateral_bid_object& bid = *itr;
       ++itr;
-      asset debt_in_bid = bid.inv_swan_price.quote;
+      asset debt_in_bid = bid.debt_covered;
       if( debt_in_bid.amount > bdd.current_supply )
          debt_in_bid.amount = bdd.current_supply;
       share_type debt = debt_in_bid.amount;
