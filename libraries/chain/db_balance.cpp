@@ -51,36 +51,53 @@ string database::to_pretty_string( const asset& a )const
    return a.asset_id(*this).amount_to_pretty_string(a.amount);
 }
 
-void database::adjust_balance(account_id_type account, asset delta )
+void database::add_balance(account_id_type account, stored_value&& what )
 { try {
-   if( delta.amount == 0 )
+   if( what.get_amount() == 0 )
       return;
+   FC_ASSERT( what.get_amount() > 0, "Cannot add a negative amount!" );
 
    auto& index = get_index_type< primary_index< account_balance_index > >().get_secondary_index<balances_by_account_index>();
-   auto abo = index.get_account_balance( account, delta.asset_id );
+   auto abo = index.get_account_balance( account, what.get_asset() );
    if( !abo )
-   {
-      FC_ASSERT( delta.amount > 0, "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}", 
-                 ("a",account(*this).name)
-                 ("b",to_pretty_string(asset(0,delta.asset_id)))
-                 ("r",to_pretty_string(-delta)));
-      create<account_balance_object>([account,&delta](account_balance_object& b) {
+      create<account_balance_object>([account,delta = std::move(what)](account_balance_object& b) mutable {
          b.owner = account;
-         b.asset_type = delta.asset_id;
-         b.balance = delta.amount.value;
-         if( b.asset_type == asset_id_type() ) // CORE asset
+         b.balance = std::move(delta);
+         if( b.balance.get_asset() == asset_id_type() ) // CORE asset
             b.maintenance_flag = true;
       });
-   } else {
-      if( delta.amount < 0 )
-         FC_ASSERT( abo->get_balance() >= -delta, "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}",
-                    ("a",account(*this).name)("b",to_pretty_string(abo->get_balance()))("r",to_pretty_string(-delta)));
-      modify(*abo, [delta](account_balance_object& b) {
-         b.adjust_balance(delta);
+   else
+      modify(*abo, [delta = std::move(what)] (account_balance_object& b) mutable {
+         if( b.balance.get_asset() == asset_id_type() ) // CORE asset
+            b.maintenance_flag = true;
+         b.balance += std::move(delta);
       });
-   }
+} FC_CAPTURE_AND_RETHROW( (account)(what) ) }
 
-} FC_CAPTURE_AND_RETHROW( (account)(delta) ) }
+stored_value database::reduce_balance( account_id_type account, const asset& how_much )
+{ try {
+   if( how_much.amount == 0 )
+      return stored_value( how_much.asset_id );
+   FC_ASSERT( how_much.amount > 0, "Cannot reduce by a negative amount!" );
+
+   auto& index = get_index_type< primary_index< account_balance_index > >().get_secondary_index<balances_by_account_index>();
+   auto abo = index.get_account_balance( account, how_much.asset_id );
+   FC_ASSERT( abo, "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}",
+              ("a",account(*this).name)
+              ("b",to_pretty_string(asset(0,how_much.asset_id)))
+              ("r",to_pretty_string(how_much.amount)));
+   FC_ASSERT( abo->get_amount() >= how_much.amount,
+              "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}",
+              ("a",account(*this).name)("b",to_pretty_string(abo->get_balance()))
+              ("r",to_pretty_string(how_much.amount)));
+   stored_value result;
+   modify(*abo, [&how_much,&result] (account_balance_object& b) {
+      if( b.balance.get_asset() == asset_id_type() ) // CORE asset
+         b.maintenance_flag = true;
+      result = b.balance.split( how_much.amount );
+   });
+   return result;
+} FC_CAPTURE_AND_RETHROW( (account)(how_much) ) }
 
 namespace detail {
 

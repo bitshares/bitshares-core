@@ -45,7 +45,6 @@
 
 namespace graphene { namespace chain {
    using graphene::db::abstract_object;
-   using graphene::db::object;
    class op_evaluator;
    class transaction_evaluation_state;
    class proposal_object;
@@ -57,6 +56,7 @@ namespace graphene { namespace chain {
    class limit_order_object;
    class collateral_bid_object;
    class call_order_object;
+   class stored_value;
 
    struct budget_record;
    enum class vesting_balance_type;
@@ -312,7 +312,8 @@ namespace graphene { namespace chain {
           * @param account ID of account whose balance should be adjusted
           * @param delta Asset ID and amount to adjust balance by
           */
-         void adjust_balance(account_id_type account, asset delta);
+         void add_balance( account_id_type account, stored_value&& what );
+         stored_value reduce_balance( account_id_type account, const asset& delta );
 
          void deposit_market_fee_vesting_balance(const account_id_type &account_id, const asset &delta);
         /**

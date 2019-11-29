@@ -191,7 +191,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    // Create blockchain accounts
    fc::ecc::private_key null_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
    create<account_balance_object>([](account_balance_object& b) {
-      b.balance = GRAPHENE_MAX_SHARE_SUPPLY;
+      b.balance = stored_value::issue( asset_id_type(), GRAPHENE_MAX_SHARE_SUPPLY );
    });
    const account_object& committee_account =
       create<account_object>( [&](account_object& n) {
@@ -530,7 +530,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    if( total_supplies[ asset_id_type(0) ] > 0 )
    {
-       adjust_balance(GRAPHENE_COMMITTEE_ACCOUNT, -get_balance(GRAPHENE_COMMITTEE_ACCOUNT,{}));
+       reduce_balance( GRAPHENE_COMMITTEE_ACCOUNT, -get_balance(GRAPHENE_COMMITTEE_ACCOUNT,{}) ).burn();
    }
    else
    {
@@ -636,28 +636,25 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    });
 
    // Create FBA counters
-   create<fba_accumulator_object>([&]( fba_accumulator_object& acc )
+   create<fba_accumulator_object>([]( fba_accumulator_object& acc )
    {
       FC_ASSERT( acc.id == fba_accumulator_id_type( fba_accumulator_id_transfer_to_blind ) );
-      acc.accumulated_fba_fees = 0;
 #ifdef GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET
       acc.designated_asset = GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET;
 #endif
    });
 
-   create<fba_accumulator_object>([&]( fba_accumulator_object& acc )
+   create<fba_accumulator_object>([]( fba_accumulator_object& acc )
    {
       FC_ASSERT( acc.id == fba_accumulator_id_type( fba_accumulator_id_blind_transfer ) );
-      acc.accumulated_fba_fees = 0;
 #ifdef GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET
       acc.designated_asset = GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET;
 #endif
    });
 
-   create<fba_accumulator_object>([&]( fba_accumulator_object& acc )
+   create<fba_accumulator_object>([]( fba_accumulator_object& acc )
    {
       FC_ASSERT( acc.id == fba_accumulator_id_type( fba_accumulator_id_transfer_from_blind ) );
-      acc.accumulated_fba_fees = 0;
 #ifdef GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET
       acc.designated_asset = GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET;
 #endif

@@ -28,7 +28,7 @@
 
 namespace graphene { namespace chain {
 
-bool fba_accumulator_object::is_configured( const database& db )const
+bool fba_accumulator_master::is_configured( const database& db )const
 {
    if( !designated_asset.valid() )
    {
@@ -100,4 +100,35 @@ bool fba_accumulator_object::is_configured( const database& db )const
    return true;
 }
 
+class fba_accumulator_backup : public fba_accumulator_master
+{
+   private:
+      fba_accumulator_backup( const fba_accumulator_object& original )
+         : fba_accumulator_master( original )
+      {
+         accumulated_fba_fees = original.accumulated_fba_fees.get_amount();
+      }
+      share_type accumulated_fba_fees;
+      friend class fba_accumulator_object;
+};
+
+unique_ptr<object> fba_accumulator_object::backup()const
+{
+   return std::make_unique<fba_accumulator_backup>( *this );
+}
+
+void fba_accumulator_object::restore( object& obj )
+{
+   const auto& backup = static_cast<fba_accumulator_backup&>(obj);
+   accumulated_fba_fees.restore( asset( asset_id_type(), backup.accumulated_fba_fees ) );
+   static_cast<fba_accumulator_master&>(*this) = std::move( backup );
+}
+
 } }
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::fba_accumulator_master, (graphene::db::object),
+                                (designated_asset) )
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::fba_accumulator_object, (graphene::chain::fba_accumulator_master),
+                                (accumulated_fba_fees) )
+
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::fba_accumulator_object )

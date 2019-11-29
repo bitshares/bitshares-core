@@ -587,7 +587,7 @@ void update_top_n_authorities( database& db )
              assert( bal.asset_type == tha.asset );
              if( bal.owner == acct.id )
                 continue;
-             vc.add( bal.owner, bal.balance.value );
+             vc.add( bal.owner, bal.get_amount().value );
              --num_needed;
              if( num_needed == 0 )
                 break;
@@ -613,73 +613,67 @@ void split_fba_balance(
 {
    FC_ASSERT( uint32_t(network_pct) + uint32_t(designated_asset_buyback_pct) + uint32_t(designated_asset_issuer_pct) == GRAPHENE_100_PERCENT );
    const fba_accumulator_object& fba = fba_accumulator_id_type( fba_id )(db);
-   if( fba.accumulated_fba_fees == 0 )
+   if( fba.accumulated_fba_fees.get_amount() == 0 )
       return;
 
    const asset_dynamic_data_object& core_dd = db.get_core_dynamic_data();
 
+   stored_value fees_to_distribute;
+   db.modify( fba, [&fees_to_distribute]( fba_accumulator_object& _fba )
+   {
+      fees_to_distribute = std::move(_fba.accumulated_fba_fees);
+   } );
+
    if( !fba.is_configured(db) )
    {
-      ilog( "${n} core given to network at block ${b} due to non-configured FBA", ("n", fba.accumulated_fba_fees)("b", db.head_block_time()) );
-      db.modify( core_dd, [&]( asset_dynamic_data_object& _core_dd )
+      ilog( "${n} core given to network at block ${b} due to non-configured FBA",
+            ("n", fees_to_distribute.get_amount())("b", db.head_block_time()) );
+   }
+   else
+   {
+      fc::uint128_t buyback_amount_128 = fees_to_distribute.get_amount().value;
+      buyback_amount_128 *= designated_asset_buyback_pct;
+      buyback_amount_128 /= GRAPHENE_100_PERCENT;
+      share_type buyback_amount = static_cast<uint64_t>(buyback_amount_128);
+
+      fc::uint128_t issuer_amount_128 = fees_to_distribute.get_amount().value;
+      issuer_amount_128 *= designated_asset_issuer_pct;
+      issuer_amount_128 /= GRAPHENE_100_PERCENT;
+      share_type issuer_amount = static_cast<uint64_t>(issuer_amount_128);
+
+      // this assert should never fail
+      FC_ASSERT( buyback_amount + issuer_amount <= fees_to_distribute.get_amount() );
+
+      const asset_object& designated_asset = (*fba.designated_asset)(db);
+
+      fba_distribute_operation vop;
+      vop.account_id = *designated_asset.buyback_account;
+      vop.fba_id = fba.id;
+      vop.amount = buyback_amount;
+      if( vop.amount != 0 )
       {
-         _core_dd.current_supply -= fba.accumulated_fba_fees;
-      } );
-      db.modify( fba, [&]( fba_accumulator_object& _fba )
+         db.add_balance( *designated_asset.buyback_account, fees_to_distribute.split(buyback_amount) );
+         db.push_applied_operation(vop);
+      }
+
+      vop.account_id = designated_asset.issuer;
+      vop.fba_id = fba.id;
+      vop.amount = issuer_amount;
+      if( vop.amount != 0 )
       {
-         _fba.accumulated_fba_fees = 0;
-      } );
-      return;
+         db.add_balance( designated_asset.issuer, fees_to_distribute.split(issuer_amount) );
+         db.push_applied_operation(vop);
+      }
    }
 
-   fc::uint128_t buyback_amount_128 = fba.accumulated_fba_fees.value;
-   buyback_amount_128 *= designated_asset_buyback_pct;
-   buyback_amount_128 /= GRAPHENE_100_PERCENT;
-   share_type buyback_amount = static_cast<uint64_t>(buyback_amount_128);
-
-   fc::uint128_t issuer_amount_128 = fba.accumulated_fba_fees.value;
-   issuer_amount_128 *= designated_asset_issuer_pct;
-   issuer_amount_128 /= GRAPHENE_100_PERCENT;
-   share_type issuer_amount = static_cast<uint64_t>(issuer_amount_128);
-
-   // this assert should never fail
-   FC_ASSERT( buyback_amount + issuer_amount <= fba.accumulated_fba_fees );
-
-   share_type network_amount = fba.accumulated_fba_fees - (buyback_amount + issuer_amount);
-
-   const asset_object& designated_asset = (*fba.designated_asset)(db);
-
-   if( network_amount != 0 )
+   if( fees_to_distribute.get_amount() != 0 )
    {
-      db.modify( core_dd, [&]( asset_dynamic_data_object& _core_dd )
+      db.modify( core_dd, [&fees_to_distribute]( asset_dynamic_data_object& _core_dd )
       {
-         _core_dd.current_supply -= network_amount;
+         _core_dd.current_supply -= fees_to_distribute.get_amount();
       } );
+      fees_to_distribute.burn();
    }
-
-   fba_distribute_operation vop;
-   vop.account_id = *designated_asset.buyback_account;
-   vop.fba_id = fba.id;
-   vop.amount = buyback_amount;
-   if( vop.amount != 0 )
-   {
-      db.adjust_balance( *designated_asset.buyback_account, asset(buyback_amount) );
-      db.push_applied_operation(vop);
-   }
-
-   vop.account_id = designated_asset.issuer;
-   vop.fba_id = fba.id;
-   vop.amount = issuer_amount;
-   if( vop.amount != 0 )
-   {
-      db.adjust_balance( designated_asset.issuer, asset(issuer_amount) );
-      db.push_applied_operation(vop);
-   }
-
-   db.modify( fba, [&]( fba_accumulator_object& _fba )
-   {
-      _fba.accumulated_fba_fees = 0;
-   } );
 }
 
 void distribute_fba_balances( database& db )

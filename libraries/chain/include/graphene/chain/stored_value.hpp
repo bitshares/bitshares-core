@@ -48,6 +48,59 @@ namespace graphene { namespace chain {
                                  const graphene::protocol::share_type amount );
       void burn();
       graphene::protocol::asset get_value()const;
+      graphene::protocol::asset_id_type get_asset()const { return _asset; }
+      graphene::protocol::share_type get_amount()const { return _amount; }
+   protected:
+      void restore( const graphene::protocol::asset& backup );
+      friend class object;
    };
 } } // graphene::chain
 
+namespace fc {
+/* should be unused
+template<>
+void from_variant( const fc::variant& var, graphene::chain::stored_value& value, uint32_t max_depth )
+{
+}
+*/
+
+template<>
+void to_variant( const graphene::chain::stored_value& value, fc::variant& var, uint32_t max_depth )
+{
+   to_variant( value.get_value(), var, max_depth );
+}
+
+namespace raw {
+
+template< typename Stream >
+void pack( Stream& stream, const graphene::chain::stored_value& value, uint32_t _max_depth=FC_PACK_MAX_DEPTH )
+{
+   FC_ASSERT( _max_depth > 0 );
+   --_max_depth;
+   pack( stream, value.get_value(), _max_depth );
+}
+
+
+template< typename Stream >
+void unpack( Stream& s, graphene::chain::stored_value& value, uint32_t _max_depth=FC_PACK_MAX_DEPTH )
+{
+   FC_ASSERT( _max_depth > 0 );
+   --_max_depth;
+   graphene::protocol::asset amount;
+   unpack( s, amount, _max_depth );
+   value = graphene::chain::stored_value::issue( amount.asset_id, amount.amount );
+}
+
+} // fc::raw
+
+template<>
+struct get_typename< graphene::chain::stored_value >
+{
+   static const char* name()
+   {
+      return "graphene::chain::stored_value";
+   }
+};
+
+
+} // fc
