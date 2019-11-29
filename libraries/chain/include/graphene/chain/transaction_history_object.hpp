@@ -44,8 +44,8 @@ namespace graphene { namespace chain {
    class transaction_history_object : public abstract_object<transaction_history_object>
    {
       public:
-         static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_transaction_history_object_type;
+         static constexpr uint8_t space_id = implementation_ids;
+         static constexpr uint8_t type_id  = impl_transaction_history_object_type;
 
          signed_transaction  trx;
          transaction_id_type trx_id;
