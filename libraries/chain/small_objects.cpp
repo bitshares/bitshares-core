@@ -44,6 +44,34 @@
 
 #include <fc/io/raw.hpp>
 
+namespace graphene { namespace chain {
+
+class dynamic_global_property_backup : public dynamic_global_property_master
+{
+   private:
+      dynamic_global_property_backup( const dynamic_global_property_object& original )
+         : dynamic_global_property_master( original )
+      {
+         witness_budget = original.witness_budget.get_value();
+      }
+      asset witness_budget;
+      friend class dynamic_global_property_object;
+};
+
+unique_ptr<object> dynamic_global_property_object::backup()const
+{
+   return std::make_unique<dynamic_global_property_backup>( *this );
+}
+
+void dynamic_global_property_object::restore( object& obj )
+{
+   const auto& backup = static_cast<dynamic_global_property_backup&>(obj);
+   balance.restore( backup.witness_budget ) );
+   static_cast<dynamic_global_property_master&>(*this) = std::move( backup );
+}
+
+} } // graphene::chain
+
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::balance_object, (graphene::db::object),
                     (owner)(balance)(vesting_policy)(last_claim_date) )
 
@@ -91,20 +119,22 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::committee_member_object, (graph
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::blinded_balance_object, (graphene::db::object),
                                 (commitment)(asset_id)(owner) )
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::dynamic_global_property_object, (graphene::db::object),
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::dynamic_global_property_master, (graphene::db::object),
                     (head_block_number)
                     (head_block_id)
                     (time)
                     (current_witness)
                     (next_maintenance_time)
                     (last_budget_time)
-                    (witness_budget)
                     (accounts_registered_this_interval)
                     (recently_missed_count)
                     (current_aslot)
                     (recent_slots_filled)
                     (dynamic_flags)
                     (last_irreversible_block_num)
+                  )
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::dynamic_global_property_object, (graphene::chain::dynamic_global_property_master),
+                    (witness_budget)
                   )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::global_property_object, (graphene::db::object),
@@ -195,6 +225,7 @@ GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::immutable_chain_para
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::chain_property_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::committee_member_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::blinded_balance_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::dynamic_global_property_master )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::dynamic_global_property_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::global_property_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::htlc_object )

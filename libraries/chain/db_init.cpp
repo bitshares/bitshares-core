@@ -190,9 +190,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    // Create blockchain accounts
    fc::ecc::private_key null_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
-   create<account_balance_object>([](account_balance_object& b) {
-      b.balance = stored_value::issue( asset_id_type(), GRAPHENE_MAX_SHARE_SUPPLY );
-   });
    const account_object& committee_account =
       create<account_object>( [&](account_object& n) {
          n.membership_expiration_date = time_point_sec::maximum();
@@ -204,7 +201,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          n.statistics = create<account_statistics_object>( [&n](account_statistics_object& s){
                            s.owner = n.id;
                            s.name = n.name;
-                           s.core_in_balance = GRAPHENE_MAX_SHARE_SUPPLY;
+                           s.core_in_balance = 0;
                         }).id;
       });
    FC_ASSERT(committee_account.get_id() == GRAPHENE_COMMITTEE_ACCOUNT);
@@ -300,7 +297,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    // Create core asset
    const asset_dynamic_data_object& dyn_asset =
       create<asset_dynamic_data_object>([](asset_dynamic_data_object& a) {
-         a.current_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+         a.current_supply = stored_debt( asset_id_type() );
       });
    const asset_object& core_asset =
      create<asset_object>( [&genesis_state,&dyn_asset]( asset_object& a ) {
@@ -318,7 +315,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       });
    FC_ASSERT( dyn_asset.id == asset_dynamic_data_id_type() );
    FC_ASSERT( asset_id_type(core_asset.id) == asset().asset_id );
-   FC_ASSERT( get_balance(account_id_type(), asset_id_type()) == asset(dyn_asset.current_supply) );
+   FC_ASSERT( get_balance(account_id_type(), asset_id_type()) == dyn_asset.current_supply.get_value() );
    _p_core_asset_obj = &core_asset;
    _p_core_dynamic_data_obj = &dyn_asset;
    // Create more special assets
@@ -328,8 +325,9 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       if( id >= genesis_state.immutable_parameters.num_special_assets )
          break;
       const asset_dynamic_data_object& dyn_asset =
-         create<asset_dynamic_data_object>([](asset_dynamic_data_object& a) {
-            a.current_supply = 0;
+         create<asset_dynamic_data_object>([id](asset_dynamic_data_object& a) {
+            a.current_supply = stored_debt( asset_id_type(id) );
+            a.accumulated_fees = stored_value( asset_id_type(id) );
          });
       const asset_object& asset_obj = create<asset_object>( [id,&dyn_asset]( asset_object& a ) {
          a.symbol = "SPECIAL" + std::to_string( id );
@@ -361,7 +359,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    _p_dyn_global_prop_obj = & create<dynamic_global_property_object>([&genesis_state](dynamic_global_property_object& p) {
       p.time = genesis_state.initial_timestamp;
       p.dynamic_flags = 0;
-      p.witness_budget = 0;
       p.recent_slots_filled = std::numeric_limits<fc::uint128_t>::max();
    });
 
@@ -453,12 +450,17 @@ void database::init_genesis(const genesis_state_type& genesis_state)
                o.total_core_in_orders = collateral_rec.collateral;
             });
 
-            create<call_order_object>([&](call_order_object& c) {
+            stored_value collateral;
+            modify( dyn_asset, [&collateral,&collateral_rec] ( asset_dynamic_data_object& core ) {
+               collateral = core.current_supply.issue( collateral_rec.collateral );
+            });
+
+            create<call_order_object>([owner_account_id,&collateral_rec,&core_asset,new_asset_id,&collateral](call_order_object& c) {
                c.borrower = owner_account_id;
-               c.collateral = collateral_rec.collateral;
+               c.collateral = std::move( collateral );
                c.debt = collateral_rec.debt;
                c.call_price = price::call_price(chain::asset(c.debt, new_asset_id),
-                                                chain::asset(c.collateral, core_asset.id),
+                                                c.collateral.get_value(),
                                                 GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
             });
 
@@ -474,8 +476,9 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          }).id;
       }
 
-      dynamic_data_id = create<asset_dynamic_data_object>([&asset](asset_dynamic_data_object& d) {
-         d.accumulated_fees = asset.accumulated_fees;
+      dynamic_data_id = create<asset_dynamic_data_object>([&asset,new_asset_id](asset_dynamic_data_object& d) {
+         d.current_supply = stored_debt( new_asset_id );
+         d.accumulated_fees = d.current_supply.issue( asset.accumulated_fees );
       }).id;
 
       total_supplies[ new_asset_id ] += asset.accumulated_fees;
@@ -528,14 +531,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       total_supplies[ asset_id ] += vest.amount;
    }
 
-   if( total_supplies[ asset_id_type(0) ] > 0 )
-   {
-       reduce_balance( GRAPHENE_COMMITTEE_ACCOUNT, -get_balance(GRAPHENE_COMMITTEE_ACCOUNT,{}) ).burn();
-   }
-   else
-   {
-       total_supplies[ asset_id_type(0) ] = GRAPHENE_MAX_SHARE_SUPPLY;
-   }
+   FC_ASSERT( get_balance(GRAPHENE_COMMITTEE_ACCOUNT,{}).amount == 0 );
 
    const auto& idx = get_index_type<asset_index>().indices().get<by_symbol>();
    auto it = idx.begin();
@@ -565,17 +561,13 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    }
    FC_ASSERT( !has_imbalanced_assets );
 
-   // Save tallied supplies
+   // Verify tallied supplies
    for( const auto& item : total_supplies )
    {
        const auto asset_id = item.first;
        const auto total_supply = item.second;
-
-       modify( get( asset_id ), [ & ]( asset_object& asset ) {
-           modify( get( asset.dynamic_asset_data_id ), [ & ]( asset_dynamic_data_object& asset_data ) {
-               asset_data.current_supply = total_supply;
-           } );
-       } );
+       const auto actual_supply = asset_id(*this).dynamic_asset_data_id(*this).current_supply.get_value();
+       FC_ASSERT( actual_supply == asset( total_supply, asset_id ) );
    }
 
    // Create special witness account

@@ -119,8 +119,8 @@ void database::revive_bitasset( const asset_object& bitasset )
       // Create + execute a "bid" with 0 additional collateral
       const collateral_bid_object& pseudo_bid = create<collateral_bid_object>([&](collateral_bid_object& bid) {
          bid.bidder = bitasset.issuer;
-         bid.inv_swan_price = asset(0, bad.options.short_backing_asset)
-                              / asset(bdd.current_supply, bitasset.id);
+         bid.collateral_offered = stored_value( bad.options.short_backing_asset );
+         bid.debt_covered = asset( bdd.current_supply, bitasset.id );
       });
       execute_bid( pseudo_bid, bdd.current_supply, bad.settlement_fund, bad.current_feed );
    } else
@@ -140,7 +140,7 @@ void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const 
    auto itr = bid_idx.lower_bound( boost::make_tuple( bitasset.id,
                                                       price::max( bad.options.short_backing_asset, bitasset.id ),
                                                       collateral_bid_id_type() ) );
-   while( itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == bitasset.id )
+   while( itr != bid_idx.end() && itr->debt_type() == bitasset.id )
    {
       const collateral_bid_object& bid = *itr;
       ++itr;
@@ -148,7 +148,7 @@ void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const 
    }
 
    // revive
-   modify( bad, [&]( asset_bitasset_data_object& obj ){
+   modify( bad, []( asset_bitasset_data_object& obj ){
               obj.settlement_price = price();
               obj.settlement_fund = 0;
            });
@@ -165,7 +165,7 @@ void database::cancel_bid(const collateral_bid_object& bid, bool create_virtual_
       bid_collateral_operation vop;
       vop.bidder = bid.bidder;
       vop.additional_collateral = collateral.get_value();
-      vop.debt_covered = asset( 0, bid.debt_covered.asset_id() );
+      vop.debt_covered = asset( 0, bid.debt_type() );
       push_applied_operation( vop );
    }
    add_balance( bid.bidder, std::move(collateral) );

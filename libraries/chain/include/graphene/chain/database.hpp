@@ -315,7 +315,7 @@ namespace graphene { namespace chain {
          void add_balance( account_id_type account, stored_value&& what );
          stored_value reduce_balance( account_id_type account, const asset& delta );
 
-         void deposit_market_fee_vesting_balance(const account_id_type &account_id, const asset &delta);
+         void deposit_market_fee_vesting_balance(const account_id_type &account_id, stored_value&& delta);
         /**
           * @brief Retrieve a particular account's market fee vesting balance in a given asset
           * @param owner Account whose balance should be retrieved
@@ -339,16 +339,16 @@ namespace graphene { namespace chain {
           */
          optional< vesting_balance_id_type > deposit_lazy_vesting(
             const optional< vesting_balance_id_type >& ovbid,
-            share_type amount,
+            stored_value&& amount,
             uint32_t req_vesting_seconds,
             vesting_balance_type balance_type,
             account_id_type req_owner,
             bool require_vesting );
 
          // helper to handle cashback rewards
-         void deposit_cashback(const account_object& acct, share_type amount, bool require_vesting = true);
+         void deposit_cashback(const account_object& acct, stored_value&& amount, bool require_vesting = true);
          // helper to handle witness pay
-         void deposit_witness_pay(const witness_object& wit, share_type amount);
+         void deposit_witness_pay(const witness_object& wit, stored_value&& amount);
 
          //////////////////// db_debug.cpp ////////////////////
 
@@ -364,7 +364,8 @@ namespace graphene { namespace chain {
          void cancel_limit_order(const limit_order_object& order, bool create_virtual_op = true, bool skip_cancel_fee = false);
          void revive_bitasset( const asset_object& bitasset );
          void cancel_bid(const collateral_bid_object& bid, bool create_virtual_op = true);
-         void execute_bid( const collateral_bid_object& bid, share_type debt_covered, share_type collateral_from_fund, const price_feed& current_feed );
+         void execute_bid( const collateral_bid_object& bid, share_type debt_covered,
+                           stored_value&& collateral_from_fund, const price_feed& current_feed );
 
          /**
           * @brief Process a new limit order through the markets
@@ -529,7 +530,7 @@ namespace graphene { namespace chain {
 
          void initialize_budget_record( fc::time_point_sec now, budget_record& rec )const;
          void process_budget();
-         void pay_workers( share_type& budget );
+         void pay_workers( stored_value&& budget );
          void perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props);
          void update_active_witnesses();
          void update_active_committee_members();

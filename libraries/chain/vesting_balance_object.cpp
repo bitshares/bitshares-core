@@ -237,14 +237,14 @@ bool vesting_balance_object::is_withdraw_allowed(const time_point_sec& now, cons
    return result;
 }
 
-void vesting_balance_object::deposit(const time_point_sec& now, const asset& amount)
+void vesting_balance_object::deposit(const time_point_sec& now, stored_value&& amount)
 {
    on_deposit_visitor vtor(balance, now, amount);
    policy.visit(vtor);
    balance += amount;
 }
 
-void vesting_balance_object::deposit_vested(const time_point_sec& now, const asset& amount)
+void vesting_balance_object::deposit_vested(const time_point_sec& now, stored_value&& amount)
 {
    on_deposit_vested_visitor vtor(balance, now, amount);
    policy.visit(vtor);
@@ -256,7 +256,7 @@ bool vesting_balance_object::is_deposit_vested_allowed(const time_point_sec& now
    return policy.visit(is_deposit_vested_allowed_visitor(balance, now, amount));
 }
 
-void vesting_balance_object::withdraw(const time_point_sec& now, const asset& amount)
+stored_value vesting_balance_object::withdraw(const time_point_sec& now, const asset& amount)
 {
    assert(amount <= balance);
    on_withdraw_visitor vtor(balance, now, amount);
@@ -268,6 +268,30 @@ asset vesting_balance_object::get_allowed_withdraw(const time_point_sec& now)con
 {
    asset amount = asset();
    return policy.visit(get_allowed_withdraw_visitor(balance, now, amount));
+}
+
+class vesting_balance_backup : public vesting_balance_master
+{
+   private:
+      vesting_balance_backup( const vesting_balance_object& original )
+         : vesting_balance_master( original )
+      {
+         balance = original.balance.get_value();
+      }
+      asset balance;
+      friend class vesting_balance_object;
+};
+
+unique_ptr<object> vesting_balance_object::backup()const
+{
+   return std::make_unique<vesting_balance_backup>( *this );
+}
+
+void vesting_balance_object::restore( object& obj )
+{
+   const auto& backup = static_cast<vesting_balance_backup&>(obj);
+   balance.restore( backup.balance ) );
+   static_cast<vesting_balance_master&>(*this) = std::move( backup );
 }
 
 } } // graphene::chain

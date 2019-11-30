@@ -104,26 +104,26 @@ object_id_type worker_create_evaluator::do_apply(const worker_create_evaluator::
    }).id;
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-void refund_worker_type::pay_worker(share_type pay, database& db)
+void refund_worker_type::pay_worker(stored_value&& pay, database& db)
 {
-   total_burned += pay;
-   db.modify( db.get_core_dynamic_data(), [pay](asset_dynamic_data_object& d) {
-      d.current_supply -= pay;
+   total_burned += pay.get_amount();
+   db.modify( db.get_core_dynamic_data(), [&pay](asset_dynamic_data_object& d) {
+      d.current_supply.burn( std::move(pay) );
    });
 }
 
-void vesting_balance_worker_type::pay_worker(share_type pay, database& db)
+void vesting_balance_worker_type::pay_worker(stored_value&& pay, database& db)
 {
-   db.modify(balance(db), [&](vesting_balance_object& b) {
-      b.deposit(db.head_block_time(), asset(pay));
+   db.modify(balance(db), [&pay,&db](vesting_balance_object& b) {
+      b.deposit(db.head_block_time(), std::move(pay));
    });
 }
 
 
-void burn_worker_type::pay_worker(share_type pay, database& db)
+void burn_worker_type::pay_worker(stored_value&& pay, database& db)
 {
    total_burned += pay;
-   db.adjust_balance( GRAPHENE_NULL_ACCOUNT, pay );
+   db.add_balance( GRAPHENE_NULL_ACCOUNT, std::move(pay) );
 }
 
 } } // graphene::chain

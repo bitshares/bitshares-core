@@ -28,9 +28,39 @@
 #include <fc/io/raw.hpp>
 #include <fc/uint128.hpp>
 
-using namespace graphene::chain;
+namespace graphene { namespace chain {
 
-share_type asset_bitasset_data_object::max_force_settlement_volume(share_type current_supply) const
+class asset_dynamic_data_backup : public asset_dynamic_data_master
+{
+   private:
+      asset_dynamic_data_backup( const asset_dynamic_data_object& original )
+         : asset_dynamic_data_master( original )
+      {
+         current_supply = original.current_supply.get_value();
+         accumulated_fees = original.accumulated_fees.get_amount();
+         fee_pool = original.fee_pool.get_amount();
+      }
+      asset current_supply;
+      share_type accumulated_fees;
+      share_type fee_pool;
+      friend class asset_dynamic_data_object;
+};
+
+unique_ptr<object> asset_dynamic_data_object::backup()const
+{
+   return std::make_unique<asset_dynamic_data_backup>( *this );
+}
+
+void asset_dynamic_data_object::restore( object& obj )
+{
+   const auto& backup = static_cast<asset_dynamic_data_backup&>(obj);
+   current_supply.restore( backup.current_supply ) );
+   accumulated_fees.restore( asset( backup.accumulated_fees, backup.current_supply.asset_id ) );
+   fee_pool.restore( asset( backup.fee_pool ) );
+   static_cast<asset_dynamic_data_master&>(*this) = std::move( backup );
+}
+
+share_type asset_bitasset_data_master::max_force_settlement_volume(share_type current_supply) const
 {
    if( options.maximum_force_settlement_volume == 0 )
       return 0;
@@ -44,7 +74,7 @@ share_type asset_bitasset_data_object::max_force_settlement_volume(share_type cu
    return static_cast<uint64_t>(volume);
 }
 
-void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_point_sec current_time,
+void graphene::chain::asset_bitasset_data_master::update_median_feeds( time_point_sec current_time,
                                                                        time_point_sec next_maintenance_time )
 {
    bool after_core_hardfork_1270 = ( next_maintenance_time > HARDFORK_CORE_1270_TIME ); // call price caching issue
@@ -105,6 +135,32 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
       current_maintenance_collateralization = current_feed.maintenance_collateralization();
 }
 
+class asset_bitasset_data_backup : public asset_bitasset_data_master
+{
+   private:
+      asset_bitasset_data_backup( const asset_bitasset_data_object& original )
+         : asset_bitasset_data_master( original )
+      {
+         settlement_fund = original.settlement_fund.get_amount();
+         total_debt = original.total_debt.get_amount();
+      }
+      share_type settlement_fund;
+      share_type total_debt;
+      friend class asset_bitasset_data_object;
+};
+
+unique_ptr<object> asset_bitasset_data_object::backup()const
+{
+   return std::make_unique<asset_bitasset_data_backup>( *this );
+}
+
+void asset_bitasset_data_object::restore( object& obj )
+{
+   const auto& backup = static_cast<asset_bitasset_data_backup&>(obj);
+   settlement_fund.restore( asset( backup.settlement_fund, backup.options.short_backing_asset ) );
+   total_debt.restore( asset( backup.total_debt, backup.asset_id ) );
+   static_cast<asset_bitasset_data_master&>(*this) = std::move( backup );
+}
 
 
 asset asset_object::amount_from_string(string amount_string) const
@@ -177,8 +233,13 @@ string asset_object::amount_to_string(share_type amount) const
    return result;
 }
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_dynamic_data_object, (graphene::db::object),
-                    (current_supply)(confidential_supply)(accumulated_fees)(fee_pool) )
+} } // graphene::chain
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_dynamic_data_master, (graphene::db::object),
+                    (confidential_supply)(accumulated_fees)(fee_pool) )
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_dynamic_data_object,
+                    (graphene::chain::asset_dynamic_data_master),
+                    (current_supply) )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_bitasset_data_object, (graphene::db::object),
                     (asset_id)

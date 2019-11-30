@@ -116,18 +116,18 @@ void database::perform_account_maintenance(Type tally_helper)
 struct worker_pay_visitor
 {
    private:
-      share_type pay;
+      stored_value pay;
       database& db;
 
    public:
-      worker_pay_visitor(share_type pay, database& db)
-         : pay(pay), db(db) {}
+      worker_pay_visitor(stored_value&& pay, database& db)
+         : pay(std::move(pay)), db(db) {}
 
       typedef void result_type;
       template<typename W>
-      void operator()(W& worker)const
+      void operator()(W& worker)
       {
-         worker.pay_worker(pay, db);
+         worker.pay_worker(std::move(pay), db);
       }
 };
 
@@ -148,7 +148,7 @@ void database::update_worker_votes()
    }
 }
 
-void database::pay_workers( share_type& budget )
+void database::pay_workers( stored_value&& budget )
 {
    const auto head_time = head_block_time();
 //   ilog("Processing payroll! Available budget is ${b}", ("b", budget));
@@ -174,7 +174,7 @@ void database::pay_workers( share_type& budget )
    const auto passed_time_ms = head_time - last_budget_time;
    const auto passed_time_count = passed_time_ms.count();
    const auto day_count = fc::days(1).count();
-   for( uint32_t i = 0; i < active_workers.size() && budget > 0; ++i )
+   for( uint32_t i = 0; i < active_workers.size() && budget.get_amount() > 0; ++i )
    {
       const worker_object& active_worker = active_workers[i];
       share_type requested_pay = active_worker.daily_pay;
@@ -187,13 +187,10 @@ void database::pay_workers( share_type& budget )
       pay /= day_count;
       requested_pay = static_cast<uint64_t>(pay);
 
-      share_type actual_pay = std::min(budget, requested_pay);
-      //ilog(" ==> Paying ${a} to worker ${w}", ("w", active_worker.id)("a", actual_pay));
-      modify(active_worker, [&](worker_object& w) {
-         w.worker.visit(worker_pay_visitor(actual_pay, *this));
+      worker_pay_visitor vtor( budget.split( std::min(budget.get_amount(), requested_pay) ), *this );
+      modify(active_worker, [&vtor](worker_object& w) {
+         w.worker.visit( vtor );
       });
-
-      budget -= actual_pay;
    }
 }
 
@@ -407,8 +404,8 @@ void database::initialize_budget_record( fc::time_point_sec now, budget_record& 
    const asset_dynamic_data_object& core_dd = get_core_dynamic_data();
 
    rec.from_initial_reserve = core.reserved(*this);
-   rec.from_accumulated_fees = core_dd.accumulated_fees;
-   rec.from_unused_witness_budget = dpo.witness_budget;
+   rec.from_accumulated_fees = core_dd.accumulated_fees.get_amount();
+   rec.from_unused_witness_budget = dpo.witness_budget.get_amount();
 
    if(    (dpo.last_budget_time == fc::time_point_sec())
        || (now <= dpo.last_budget_time) )
@@ -426,10 +423,10 @@ void database::initialize_budget_record( fc::time_point_sec now, budget_record& 
    // end of the maintenance interval.  Thus the accumulated_fees
    // are available for the budget at this point, but not included
    // in core.reserved().
-   share_type reserve = rec.from_initial_reserve + core_dd.accumulated_fees;
+   share_type reserve = rec.from_initial_reserve + rec.from_accumulated_fees;
    // Similarly, we consider leftover witness_budget to be burned
    // at the BEGINNING of the maintenance interval.
-   reserve += dpo.witness_budget;
+   reserve += dpo.witness_budget.get_amount();
 
    fc::uint128_t budget_u128 = reserve.value;
    budget_u128 *= uint64_t(dt);
@@ -479,30 +476,44 @@ void database::process_budget()
 
       budget_record rec;
       initialize_budget_record( now, rec );
-      share_type available_funds = rec.total_budget;
 
-      share_type witness_budget = gpo.parameters.witness_pay_per_block.value * blocks_to_maint;
-      rec.requested_witness_budget = witness_budget;
-      witness_budget = std::min(witness_budget, available_funds);
-      rec.witness_budget = witness_budget;
-      available_funds -= witness_budget;
+      rec.requested_witness_budget = gpo.parameters.witness_pay_per_block.value * blocks_to_maint;
+      rec.witness_budget = std::min(rec.requested_witness_budget, rec.total_budget);
+
+      stored_value available_funds;
+      modify( core, [&available_funds,&rec,&dpo]( asset_dynamic_data_object& _core )
+      {
+         available_funds = std::move(_core.accumulated_fees);
+         share_type required = rec.total_budget
+                               - available_funds.get_amount()
+                               - rec.witness_budget
+                               + dpo.witness_budget.get_amount();
+         if( required > 0 )
+            available_funds += _core.current_supply.issue( required );
+      });
+
+      modify(dpo, [now,&available_funds,&rec]( dynamic_global_property_object& _dpo )
+      {
+         _dpo.last_budget_time = now;
+         if( _dpo.witness_budget.get_amount() > rec.witness_budget )
+            available_funds += _dpo.witness_budget.split( _dpo.witness_budget.get_amount() - rec.witness_budget );
+         else
+            _dpo.witness_budget += available_funds.split( rec.witness_budget - _dpo.witness_budget.get_amount() );
+      });
 
       fc::uint128_t worker_budget_u128 = gpo.parameters.worker_budget_per_day.value;
       worker_budget_u128 *= uint64_t(time_to_maint);
       worker_budget_u128 /= 60*60*24;
 
-      share_type worker_budget;
-      if( worker_budget_u128 >= static_cast<fc::uint128_t>(available_funds.value) )
-         worker_budget = available_funds;
+      if( worker_budget_u128 >= static_cast<fc::uint128_t>(available_funds.get_amount().value) )
+         rec.worker_budget = available_funds.get_amount();
       else
-         worker_budget = static_cast<uint64_t>(worker_budget_u128);
-      rec.worker_budget = worker_budget;
-      available_funds -= worker_budget;
+         rec.worker_budget = static_cast<uint64_t>(worker_budget_u128);
 
-      share_type leftover_worker_funds = worker_budget;
-      pay_workers(leftover_worker_funds);
-      rec.leftover_worker_funds = leftover_worker_funds;
-      available_funds += leftover_worker_funds;
+      stored_value worker_budget = available_funds.split( rec.worker_budget );
+      pay_workers( std::move(worker_budget) );
+      rec.leftover_worker_funds = worker_budget.get_amount();
+      available_funds += std::move( worker_budget );
 
       rec.supply_delta = rec.witness_budget
          + rec.worker_budget
@@ -510,37 +521,19 @@ void database::process_budget()
          - rec.from_accumulated_fees
          - rec.from_unused_witness_budget;
 
-      modify(core, [&]( asset_dynamic_data_object& _core )
-      {
-         _core.current_supply = (_core.current_supply + rec.supply_delta );
+      if( available_funds.get_amount() > 0 )
+         // available_funds is money we could spend, but don't want to.
+         // we simply let it evaporate back into the reserve.
+         modify(core, [&available_funds]( asset_dynamic_data_object& _core )
+         {
+            _core.current_supply.burn( std::move(available_funds) );
+         });
 
-         assert( rec.supply_delta ==
-                                   witness_budget
-                                 + worker_budget
-                                 - leftover_worker_funds
-                                 - _core.accumulated_fees
-                                 - dpo.witness_budget
-                                );
-         _core.accumulated_fees = 0;
-      });
-
-      modify(dpo, [&]( dynamic_global_property_object& _dpo )
+      create< budget_record_object >( [now,&rec]( budget_record_object& _rec )
       {
-         // Since initial witness_budget was rolled into
-         // available_funds, we replace it with witness_budget
-         // instead of adding it.
-         _dpo.witness_budget = witness_budget;
-         _dpo.last_budget_time = now;
-      });
-
-      create< budget_record_object >( [&]( budget_record_object& _rec )
-      {
-         _rec.time = head_block_time();
+         _rec.time = now;
          _rec.record = rec;
       });
-
-      // available_funds is money we could spend, but don't want to.
-      // we simply let it evaporate back into the reserve.
    }
    FC_CAPTURE_AND_RETHROW()
 }
@@ -670,9 +663,8 @@ void split_fba_balance(
    {
       db.modify( core_dd, [&fees_to_distribute]( asset_dynamic_data_object& _core_dd )
       {
-         _core_dd.current_supply -= fees_to_distribute.get_amount();
+         _core_dd.current_supply.burn( std::move(fees_to_distribute) );
       } );
-      fees_to_distribute.burn();
    }
 }
 
@@ -798,12 +790,12 @@ void database::process_bids( const asset_bitasset_data_object& bad )
 
    share_type covered = 0;
    auto itr = start;
-   while( covered < bdd.current_supply && itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == to_revive_id )
+   while( covered < bdd.current_supply.get_amount() && itr != bid_idx.end() && itr->debt_type() == to_revive_id )
    {
       const collateral_bid_object& bid = *itr;
       asset debt_in_bid = bid.debt_covered;
-      if( debt_in_bid.amount > bdd.current_supply )
-         debt_in_bid.amount = bdd.current_supply;
+      if( debt_in_bid.amount > bdd.current_supply.get_amount() )
+         debt_in_bid.amount = bdd.current_supply.get_amount();
       asset total_collateral = debt_in_bid * bad.settlement_price;
       total_collateral += bid.collateral_offered.get_value();
       price call_price = price::call_price( debt_in_bid, total_collateral,
@@ -812,30 +804,31 @@ void database::process_bids( const asset_bitasset_data_object& bad )
       covered += debt_in_bid.amount;
       ++itr;
    }
-   if( covered < bdd.current_supply ) return;
+   if( covered < bdd.current_supply.get_amount() ) return;
 
    const auto end = itr;
-   share_type to_cover = bdd.current_supply;
-   share_type remaining_fund = bad.settlement_fund;
+   share_type to_cover = bdd.current_supply.get_amount();
+   stored_value remaining_fund;
+   modify( bad, [&remaining_fund] ( asset_bitasset_data_object& _bad ) {
+      remaining_fund = std::move(_bad.settlement_fund);
+   });
    for( itr = start; itr != end; )
    {
       const collateral_bid_object& bid = *itr;
       ++itr;
       asset debt_in_bid = bid.debt_covered;
-      if( debt_in_bid.amount > bdd.current_supply )
-         debt_in_bid.amount = bdd.current_supply;
+      if( debt_in_bid.amount > bdd.current_supply.get_amount() )
+         debt_in_bid.amount = bdd.current_supply.get_amount();
       share_type debt = debt_in_bid.amount;
       share_type collateral = (debt_in_bid * bad.settlement_price).amount;
       if( debt >= to_cover )
       {
          debt = to_cover;
-         collateral = remaining_fund;
+         collateral = remaining_fund.get_amount();
       }
       to_cover -= debt;
-      remaining_fund -= collateral;
-      execute_bid( bid, debt, collateral, bad.current_feed );
+      execute_bid( bid, debt, remaining_fund.split(collateral), bad.current_feed );
    }
-   FC_ASSERT( remaining_fund == 0 );
    FC_ASSERT( to_cover == 0 );
 
    _cancel_bids_and_revive_mpa( to_revive, bad );
@@ -949,7 +942,7 @@ void process_hf_1465( database& db )
    for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
    {
       const auto& current_asset = *asset_itr;
-      graphene::chain::share_type current_supply = current_asset.dynamic_data(db).current_supply;
+      graphene::chain::share_type current_supply = current_asset.dynamic_data(db).current_supply.get_amount();
       graphene::chain::share_type max_supply = current_asset.options.max_supply;
       if (current_supply > max_supply && max_supply != GRAPHENE_MAX_SHARE_SUPPLY)
       {
@@ -1089,7 +1082,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
                                      : d.get(stake_account.options.voting_account);
 
             uint64_t voting_stake = stats.total_core_in_orders.value
-                  + (stake_account.cashback_vb.valid() ? (*stake_account.cashback_vb)(d).balance.amount.value: 0)
+                  + (stake_account.cashback_vb.valid() ? (*stake_account.cashback_vb)(d).balance.get_amount().value: 0)
                   + stats.core_in_balance.value;
 
             for( vote_id_type id : opinion_account.options.votes )

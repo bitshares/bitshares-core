@@ -60,7 +60,7 @@ void database::debug_dump()
       total_balances[s.balance.asset_id] += s.balance.amount;
    }
    for( const vesting_balance_object& vbo : db.get_index_type< vesting_balance_index >().indices() )
-      total_balances[ vbo.balance.asset_id ] += vbo.balance.amount;
+      total_balances[ vbo.balance.get_asset() ] += vbo.balance.get_amount();
    for( const fba_accumulator_object& fba : db.get_index_type< simple_index< fba_accumulator_object > >() )
       total_balances[ asset_id_type() ] += fba.accumulated_fba_fees.get_amount();
    for( const account_statistics_object& s : statistics_index )
@@ -84,15 +84,15 @@ void database::debug_dump()
    }
    for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )
    {
-      total_balances[asset_obj.id] += asset_obj.dynamic_asset_data_id(db).accumulated_fees;
-      total_balances[asset_id_type()] += asset_obj.dynamic_asset_data_id(db).fee_pool;
+      total_balances[asset_obj.id] += asset_obj.dynamic_asset_data_id(db).accumulated_fees.get_amount();
+      total_balances[asset_id_type()] += asset_obj.dynamic_asset_data_id(db).fee_pool.get_amount();
    }
 
-   if( total_balances[asset_id_type()].value != core_asset_data.current_supply.value )
+   if( total_balances[asset_id_type()].value != core_asset_data.current_supply.get_amount() )
    {
       FC_THROW( "computed balance of CORE mismatch",
                 ("computed value",total_balances[asset_id_type()].value)
-                ("current supply",core_asset_data.current_supply.value) );
+                ("current supply",core_asset_data.current_supply.get_amount()) );
    }
 }
 

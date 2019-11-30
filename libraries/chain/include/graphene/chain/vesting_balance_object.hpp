@@ -148,7 +148,7 @@ namespace graphene { namespace chain {
    /**
     * Vesting balance object is a balance that is locked by the blockchain for a period of time.
     */
-   class vesting_balance_object : public abstract_object<vesting_balance_object>
+   class vesting_balance_master : public abstract_object<vesting_balance_master>
    {
       public:
          static constexpr uint8_t space_id = protocol_ids;
@@ -156,22 +156,25 @@ namespace graphene { namespace chain {
 
          /// Account which owns and may withdraw from this vesting balance
          account_id_type owner;
-         /// Total amount remaining in this vesting balance
-         /// Includes the unvested funds, and the vested funds which have not yet been withdrawn
-         asset balance;
          /// The vesting policy stores details on when funds vest, and controls when they may be withdrawn
          vesting_policy policy;
          /// type of the vesting balance
          vesting_balance_type balance_type = vesting_balance_type::unspecified;
+   };
 
-         vesting_balance_object() {}
+   class vesting_balance_object : public vesting_balance_master
+   {
+      public:
+         /// Total amount remaining in this vesting balance
+         /// Includes the unvested funds, and the vested funds which have not yet been withdrawn
+         stored_value balance;
 
          ///@brief Deposit amount into vesting balance, requiring it to vest before withdrawal
-         void deposit(const fc::time_point_sec& now, const asset& amount);
+         void deposit(const fc::time_point_sec& now, stored_value&& amount);
          bool is_deposit_allowed(const fc::time_point_sec& now, const asset& amount)const;
 
          /// @brief Deposit amount into vesting balance, making the new funds vest immediately
-         void deposit_vested(const fc::time_point_sec& now, const asset& amount);
+         void deposit_vested(const fc::time_point_sec& now, stored_value&& amount);
          bool is_deposit_vested_allowed(const fc::time_point_sec& now, const asset& amount)const;
 
          /**
@@ -182,14 +185,19 @@ namespace graphene { namespace chain {
           * The money doesn't "go" anywhere; the caller is responsible for
           * crediting it to the proper account.
           */
-         void withdraw(const fc::time_point_sec& now, const asset& amount);
+         stored_value withdraw(const fc::time_point_sec& now, const asset& amount);
          bool is_withdraw_allowed(const fc::time_point_sec& now, const asset& amount)const;
 
          /**
           * Get amount of allowed withdrawal.
           */
          asset get_allowed_withdraw(const time_point_sec& now)const;
+
+   protected:
+      virtual unique_ptr<graphene::db::object> backup()const;
+      virtual void restore( graphene::db::object& obj );
    };
+
    /**
     * @ingroup object_index
     */
@@ -221,7 +229,7 @@ namespace detail {
       {
          if ( vbo.balance_type == vesting_balance_type::market_fee_sharing )
          {
-            return vbo_mfs_hash(vbo.owner, vbo.balance.asset_id);
+            return vbo_mfs_hash(vbo.owner, vbo.balance.get_asset());
          }
          return hash_value(vbo.id);
       }
@@ -241,7 +249,7 @@ namespace detail {
          if ( ( lhs.balance_type == vesting_balance_type::market_fee_sharing ) &&
               ( lhs.balance_type == rhs.balance_type ) &&
               ( lhs.owner == rhs.owner ) &&
-              ( lhs.balance.asset_id == rhs.balance.asset_id)
+              ( lhs.balance.get_asset() == rhs.balance.get_asset())
             )
          {
                return true;
@@ -257,7 +265,7 @@ namespace detail {
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id >
          >,
          ordered_non_unique< tag<by_account>,
-            member<vesting_balance_object, account_id_type, &vesting_balance_object::owner>
+            member<vesting_balance_master, account_id_type, &vesting_balance_master::owner>
          >,
          hashed_unique< tag<by_vesting_type>,
             identity<vesting_balance_object>,
@@ -293,11 +301,13 @@ FC_REFLECT_EMPTY( graphene::chain::instant_vesting_policy )
 
 FC_REFLECT_TYPENAME( graphene::chain::vesting_policy )
 
-FC_REFLECT_DERIVED(graphene::chain::vesting_balance_object, (graphene::db::object),
+FC_REFLECT_DERIVED(graphene::chain::vesting_balance_master, (graphene::db::object),
                    (owner)
-                   (balance)
                    (policy)
                    (balance_type)
+                  )
+FC_REFLECT_DERIVED(graphene::chain::vesting_balance_object, (graphene::chain::vesting_balance_master),
+                   (balance)
                   )
 
 FC_REFLECT_ENUM( graphene::chain::vesting_balance_type, (unspecified)(cashback)(worker)(witness)(market_fee_sharing) )
