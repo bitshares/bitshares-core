@@ -46,8 +46,8 @@ namespace graphene { namespace chain {
    class account_statistics_object : public graphene::db::abstract_object<account_statistics_object>
    {
       public:
-         static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_account_statistics_object_type;
+         static constexpr uint8_t space_id = implementation_ids;
+         static constexpr uint8_t type_id  = impl_account_statistics_object_type;
 
          account_id_type  owner;
 
@@ -128,8 +128,8 @@ namespace graphene { namespace chain {
    class account_balance_object : public abstract_object<account_balance_object>
    {
       public:
-         static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_account_balance_object_type;
+         static constexpr uint8_t space_id = implementation_ids;
+         static constexpr uint8_t type_id  = impl_account_balance_object_type;
 
          account_id_type   owner;
          asset_id_type     asset_type;
@@ -152,8 +152,8 @@ namespace graphene { namespace chain {
    class account_object : public graphene::db::abstract_object<account_object>
    {
       public:
-         static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id  = account_object_type;
+         static constexpr uint8_t space_id = protocol_ids;
+         static constexpr uint8_t type_id  = account_object_type;
 
          /**
           * The time at which this account's membership expires.

@@ -42,8 +42,8 @@ enum types {
 
 struct account_storage_object : public abstract_object<account_storage_object>
 {
-   static const uint8_t space_id = CUSTOM_OPERATIONS_SPACE_ID;
-   static const uint8_t type_id  = account_map;
+   static constexpr uint8_t space_id = CUSTOM_OPERATIONS_SPACE_ID;
+   static constexpr uint8_t type_id  = account_map;
 
    account_id_type account;
    string catalog;

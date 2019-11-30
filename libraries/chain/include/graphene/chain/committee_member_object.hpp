@@ -43,8 +43,8 @@ namespace graphene { namespace chain {
    class committee_member_object : public abstract_object<committee_member_object>
    {
       public:
-         static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id  = committee_member_object_type;
+         static constexpr uint8_t space_id = protocol_ids;
+         static constexpr uint8_t type_id  = committee_member_object_type;
 
          account_id_type  committee_member_account;
          vote_id_type     vote_id;
