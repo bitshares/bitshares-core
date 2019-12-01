@@ -31,6 +31,36 @@
 
 namespace graphene { namespace chain {
 
+class limit_order_backup : public limit_order_master
+{
+   private:
+      limit_order_backup( const limit_order_object& original )
+         : limit_order_master( original )
+      {
+         for_sale = original.for_sale.get_amount();
+         deferred_fee = original.deferred_fee.get_amount();
+         deferred_paid_fee = original.deferred_paid_fee.get_value();
+      }
+      share_type for_sale;
+      share_type deferred_fee;
+      asset      deferred_paid_fee;
+      friend class limit_order_object;
+};
+
+unique_ptr<object> limit_order_object::backup()const
+{
+   return std::make_unique<limit_order_backup>( *this );
+}
+
+void limit_order_object::restore( object& obj )
+{
+   const auto& backup = static_cast<limit_order_backup&>(obj);
+   for_sale.restore( asset( backup.for_sale, backup.sell_price.base.asset_id ) );
+   deferred_fee.restore( asset( backup.deferred_fee ) );
+   deferred_paid_fee.restore( backup.deferred_paid_fee );
+   static_cast<limit_order_master&>(*this) = std::move( backup );
+}
+
 /*
 target_CR = max( target_CR, MCR )
 
@@ -309,8 +339,10 @@ class call_order_backup : public call_order_master
       call_order_backup( const call_order_object& original )
          : call_order_master( original )
       {
+         debt = original.debt.get_amount();
          collateral = original.collateral.get_amount();
       }
+      asset debt;
       asset collateral;
       friend class call_order_object;
 };
@@ -323,8 +355,33 @@ unique_ptr<object> call_order_object::backup()const
 void call_order_object::restore( object& obj )
 {
    const auto& backup = static_cast<call_order_backup&>(obj);
+   debt.restore( backup.debt ) );
    collateral.restore( backup.collateral ) );
    static_cast<call_order_master&>(*this) = std::move( backup );
+}
+
+class force_settlement_backup : public force_settlement_master
+{
+   private:
+      force_settlement_backup( const force_settlement_object& original )
+         : force_settlement_master( original )
+      {
+         balance = original.balance.get_amount();
+      }
+      asset balance;
+      friend class force_settlement_object;
+};
+
+unique_ptr<object> force_settlement_object::backup()const
+{
+   return std::make_unique<force_settlement_backup>( *this );
+}
+
+void force_settlement_object::restore( object& obj )
+{
+   const auto& backup = static_cast<force_settlement_backup&>(obj);
+   balance.restore( backup.balance ) );
+   static_cast<force_settlement_master&>(*this) = std::move( backup );
 }
 
 class collateral_bid_backup : public collateral_bid_master
@@ -353,19 +410,27 @@ void collateral_bid_object::restore( object& obj )
 
 } } // graphene::chain
 
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::limit_order_master,
+                    (graphene::db::object),
+                    (expiration)(seller)(sell_price)
+                  )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::limit_order_object,
                     (graphene::db::object),
-                    (expiration)(seller)(for_sale)(sell_price)(deferred_fee)(deferred_paid_fee)
+                    (for_sale)(deferred_fee)(deferred_paid_fee)
                   )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::call_order_master, (graphene::db::object),
-                    (borrower)(debt)(call_price)(target_collateral_ratio) )
+                    (borrower)(call_price)(target_collateral_ratio) )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::call_order_object, (graphene::chain::call_order_object),
-                    (collateral) )
+                    (debt)(collateral) )
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::force_settlement_object,
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::force_settlement_master,
                     (graphene::db::object),
-                    (owner)(balance)(settlement_date)
+                    (owner)(settlement_date)
+                  )
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::force_settlement_object,
+                    (graphene::chain::force_settlement_master),
+                    (balance)
                   )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::collateral_bid_master, (graphene::db::object),
@@ -374,8 +439,11 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::collateral_bid_object,
                     (graphene::chain::collateral_bid_master),
                     (collateral_offered) )
 
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::limit_order_master )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::limit_order_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::call_order_master )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::call_order_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::force_settlement_master )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::force_settlement_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::collateral_bid_master )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::collateral_bid_object )

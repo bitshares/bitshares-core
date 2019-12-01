@@ -436,6 +436,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       {
          int collateral_holder_number = 0;
          total_debts[ new_asset_id ] = 0;
+         stored_value total_borrowed( new_asset_id );
          for( const auto& collateral_rec : asset.collateral_records )
          {
             account_create_operation cop;
@@ -455,13 +456,14 @@ void database::init_genesis(const genesis_state_type& genesis_state)
                collateral = core.current_supply.issue( collateral_rec.collateral );
             });
 
-            create<call_order_object>([owner_account_id,&collateral_rec,&core_asset,new_asset_id,&collateral](call_order_object& c) {
+            stored_value borrowed;
+            create<call_order_object>([owner_account_id,&collateral_rec,&core_asset,&collateral,&total_borrowed](call_order_object& c) {
                c.borrower = owner_account_id;
                c.collateral = std::move( collateral );
-               c.debt = collateral_rec.debt;
-               c.call_price = price::call_price(chain::asset(c.debt, new_asset_id),
-                                                c.collateral.get_value(),
-                                                GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
+               c.debt = stored_debt(total_borrowed.get_asset());
+               total_borrowed += c.debt.issue( collateral_rec.debt );
+               c.call_price = price::call_price( c.debt.get_value(), c.collateral.get_value(),
+                                                 GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO );
             });
 
             total_supplies[ asset_id_type(0) ] += collateral_rec.collateral;
@@ -469,10 +471,11 @@ void database::init_genesis(const genesis_state_type& genesis_state)
             ++collateral_holder_number;
          }
 
-         bitasset_data_id = create<asset_bitasset_data_object>([&core_asset,new_asset_id](asset_bitasset_data_object& b) {
+         bitasset_data_id = create<asset_bitasset_data_object>([&core_asset,&total_borrowed](asset_bitasset_data_object& b) {
             b.options.short_backing_asset = core_asset.id;
             b.options.minimum_feeds = GRAPHENE_DEFAULT_MINIMUM_FEEDS;
-            b.asset_id = new_asset_id;
+            b.asset_id = total_borrowed.get_asset();
+            b.total_debt = std::move(total_borrowed);
          }).id;
       }
 

@@ -59,11 +59,11 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
    FC_ASSERT( !bitasset.has_settlement(), "black swan already occurred, it should not happen again" );
 
-   const asset_object& backing_asset = bitasset.options.short_backing_asset(*this);
-   asset collateral_gathered = backing_asset.amount(0);
-
-   const asset_dynamic_data_object& mia_dyn = mia.dynamic_asset_data_id(*this);
-   auto original_mia_supply = mia_dyn.current_supply;
+   stored_value collateral_gathered( bitasset.options.short_backing_asset );
+   stored_value debt_pool;
+   modify( bitasset, [&debt_pool]( asset_bitasset_data_object& obj ){
+       debt_pool = std::move(obj.total_debt);
+   });
 
    const auto& call_price_index = get_index_type<call_order_index>().indices().get<by_price>();
 
@@ -83,26 +83,37 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
 
       if( pays > call_itr->get_collateral() )
          pays = call_itr->get_collateral();
+      asset receives = call_itr->get_debt();
 
-      collateral_gathered += pays;
       const auto&  order = *call_itr;
       ++call_itr;
-      FC_ASSERT( fill_call_order( order, pays, order.get_debt(), settlement_price, true ) ); // call order is maker
-   }
+      stored_value remaining_collateral;
+      modify( order, [&collateral_gathered,&debt_pool,&pays,&remaining_collateral] ( call_order_object& call ) {
+         collateral_gathered += call.collateral.split(pays.amount);
+         call.debt.burn( debt_pool.split(call.debt.get_amount()) );
+         remaining_collateral = std::move(call.collateral);
+      });
 
-   modify( bitasset, [&mia,original_mia_supply,&collateral_gathered]( asset_bitasset_data_object& obj ){
-           obj.settlement_price = mia.amount(original_mia_supply) / collateral_gathered;
-           obj.settlement_fund  = collateral_gathered.amount;
-           });
-
-   /// After all margin positions are closed, the current supply will be reported as 0, but
-   /// that is a lie, the supply didn't change.   We need to capture the current supply before
-   /// filling all call orders and then restore it afterward.   Then in the force settlement
-   /// evaluator reduce the supply
-   modify( mia_dyn, [original_mia_supply]( asset_dynamic_data_object& obj ){
-           obj.current_supply = original_mia_supply;
+      // Update account statistics. We know that order.collateral_type() == pays.asset_id
+      if( pays.asset_id == asset_id_type() )
+         modify( get_account_stats_by_owner(order.borrower), [&remaining_collateral,&pays]( account_statistics_object& b ){
+            b.total_core_in_orders -= pays.amount;
+            b.total_core_in_orders -= remaining_collateral.get_amount();
          });
 
+      if( remaining_collateral.get_amount() > 0 )
+         add_balance( order.borrower, std::move(remaining_collateral) );
+
+      push_applied_operation( fill_order_operation( order.id, order.borrower, pays, receives,
+                                                    asset(0, pays.asset_id), settlement_price, true ) );
+      remove( order );
+   }
+
+   const auto& add = mia.dynamic_asset_data_id(*this);
+   modify( bitasset, [&add,&collateral_gathered]( asset_bitasset_data_object& obj ){
+      obj.settlement_price = add.current_supply.get_value() / collateral_gathered.get_value();
+      obj.settlement_fund  = std::move( collateral_gathered );
+   });
 } FC_CAPTURE_AND_RETHROW( (mia)(settlement_price) ) }
 
 void database::revive_bitasset( const asset_object& bitasset )
@@ -114,17 +125,18 @@ void database::revive_bitasset( const asset_object& bitasset )
    FC_ASSERT( !bad.is_prediction_market );
    FC_ASSERT( !bad.current_feed.settlement_price.is_null() );
 
-   if( bdd.current_supply > 0 )
+   if( bdd.current_supply.get_amount() > 0 )
    {
       // Create + execute a "bid" with 0 additional collateral
-      const collateral_bid_object& pseudo_bid = create<collateral_bid_object>([&](collateral_bid_object& bid) {
+      const collateral_bid_object& pseudo_bid = create<collateral_bid_object>([&bitasset,&bad,&bdd](collateral_bid_object& bid) {
          bid.bidder = bitasset.issuer;
          bid.collateral_offered = stored_value( bad.options.short_backing_asset );
-         bid.debt_covered = asset( bdd.current_supply, bitasset.id );
+         bid.debt_covered = asset( bdd.current_supply.get_amount(), bitasset.id );
       });
-      execute_bid( pseudo_bid, bdd.current_supply, bad.settlement_fund, bad.current_feed );
-   } else
-      FC_ASSERT( bad.settlement_fund == 0 );
+      stored_value fund;
+      modify( bad, [&fund] ( asset_bitasset_data_object& _bad ) { fund = std::move(_bad.settlement_fund); });
+      execute_bid( pseudo_bid, bdd.current_supply.get_amount(), std::move(fund), bad.current_feed );
+   }
 
    _cancel_bids_and_revive_mpa( bitasset, bad );
 } FC_CAPTURE_AND_RETHROW( (bitasset) ) }
@@ -134,6 +146,7 @@ void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const 
    FC_ASSERT( bitasset.is_market_issued() );
    FC_ASSERT( bad.has_settlement() );
    FC_ASSERT( !bad.is_prediction_market );
+   FC_ASSERT( bad.settlement_fund.get_amount() == 0 );
 
    // cancel remaining bids
    const auto& bid_idx = get_index_type< collateral_bid_index >().indices().get<by_price>();
@@ -148,10 +161,7 @@ void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const 
    }
 
    // revive
-   modify( bad, []( asset_bitasset_data_object& obj ){
-              obj.settlement_price = price();
-              obj.settlement_fund = 0;
-           });
+   modify( bad, []( asset_bitasset_data_object& obj ){ obj.settlement_price = price(); });
 } FC_CAPTURE_AND_RETHROW( (bitasset) ) }
 
 void database::cancel_bid(const collateral_bid_object& bid, bool create_virtual_op)
@@ -179,20 +189,23 @@ void database::execute_bid( const collateral_bid_object& bid, share_type debt_co
    modify( bid, [&collateral] ( collateral_bid_object& _bid ) {
       collateral = std::move(_bid.collateral_offered);
    });
+   collateral += std::move(collateral_from_fund);
+   stored_debt debt( bid.debt_covered.asset_id );
+   modify( debt.get_asset()(*this).bitasset_data(*this), [&debt,debt_covered] ( asset_bitasset_data_object& bad ) {
+      bad.total_debt += debt.issue( debt_covered );
+   });
    const auto& call_obj = create<call_order_object>(
-      [&bid,&collateral,debt_covered,&current_feed] ( call_order_object& call ) {
+      [&bid,&collateral,&debt,&current_feed,this] ( call_order_object& call ) {
          call.borrower = bid.bidder;
          call.collateral = std::move(collateral);
-         call.collateral += std::move(collateral_from_fund);
-         call.debt = debt_covered;
+         call.debt = std::move(debt);
          // don't calculate call_price after core-1270 hard fork
          if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_1270_TIME )
             // bid.inv_swan_price is in collateral / debt
             call.call_price = price( asset( 1, bid.collateral_offered.get_asset() ),
                                      asset( 1, bid.debt_covered.asset_id ) );
          else
-            call.call_price = price::call_price( asset( debt_covered, bid.debt_covered.asset_id),
-                                                 call.collateral.get_value(),
+            call.call_price = price::call_price( call.debt.get_value(), call.collateral.get_value(),
                                                  current_feed.maintenance_collateral_ratio );
       });
 
@@ -210,16 +223,20 @@ void database::execute_bid( const collateral_bid_object& bid, share_type debt_co
 
 void database::cancel_settle_order(const force_settlement_object& order, bool create_virtual_op)
 {
-   adjust_balance(order.owner, order.balance);
+   stored_value balance;
+   modify( order, [&balance] ( force_settlement_object& fso ) { balance = std::move(fso.balance); });
 
    if( create_virtual_op )
    {
       asset_settle_cancel_operation vop;
       vop.settlement = order.id;
       vop.account = order.owner;
-      vop.amount = order.balance;
+      vop.amount = balance.get_value();
       push_applied_operation( vop );
    }
+
+   add_balance( order.owner, std::move(balance) );
+
    remove(order);
 }
 
@@ -232,84 +249,89 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
    const account_statistics_object* seller_acc_stats = nullptr;
    const asset_dynamic_data_object* fee_asset_dyn_data = nullptr;
    limit_order_cancel_operation vop;
-   share_type deferred_fee = order.deferred_fee;
-   asset deferred_paid_fee = order.deferred_paid_fee;
+   stored_value refunded;
+   stored_value deferred_fee;
+   stored_value deferred_paid_fee;
+   modify( order, [&refunded,&deferred_fee,&deferred_paid_fee] ( limit_order_object& loo ) {
+      refunded = std::move( loo.for_sale );
+      deferred_fee = std::move( loo.deferred_fee );
+      deferred_paid_fee = std::move( loo.deferred_paid_fee );
+   });
    if( create_virtual_op )
    {
       vop.order = order.id;
       vop.fee_paying_account = order.seller;
       // only deduct fee if not skipping fee, and there is any fee deferred
-      if( !skip_cancel_fee && deferred_fee > 0 )
+      if( !skip_cancel_fee && deferred_fee.get_amount() > 0 )
       {
-         asset core_cancel_fee = current_fee_schedule().calculate_fee( vop );
+         share_type core_cancel_fee_amount = current_fee_schedule().calculate_fee( vop ).amount;
          // cap the fee
-         if( core_cancel_fee.amount > deferred_fee )
-            core_cancel_fee.amount = deferred_fee;
+         if( core_cancel_fee_amount > deferred_fee.get_amount() )
+            core_cancel_fee_amount = deferred_fee.get_amount();
          // if there is any CORE fee to deduct, redirect it to referral program
-         if( core_cancel_fee.amount > 0 )
+         if( core_cancel_fee_amount > 0 )
          {
-            seller_acc_stats = &order.seller( *this ).statistics( *this );
-            modify( *seller_acc_stats, [&]( account_statistics_object& obj ) {
-               obj.pay_fee( core_cancel_fee.amount, get_global_properties().parameters.cashback_vesting_threshold );
-            } );
-            deferred_fee -= core_cancel_fee.amount;
             // handle originally paid fee if any:
             //    to_deduct = round_up( paid_fee * core_cancel_fee / deferred_core_fee_before_deduct )
-            if( deferred_paid_fee.amount == 0 )
+            if( deferred_paid_fee.get_amount() == 0 )
             {
-               vop.fee = core_cancel_fee;
+               vop.fee = asset( core_cancel_fee_amount );
             }
             else
             {
-               fc::uint128_t fee128( deferred_paid_fee.amount.value );
-               fee128 *= core_cancel_fee.amount.value;
+               fc::uint128_t fee128( deferred_paid_fee.get_amount().value );
+               fee128 *= core_cancel_fee_amount.value;
                // to round up
-               fee128 += order.deferred_fee.value;
+               fee128 += deferred_fee.get_amount().value;
                fee128 -= 1;
-               fee128 /= order.deferred_fee.value;
-               share_type cancel_fee_amount = static_cast<int64_t>(fee128);
-               // cancel_fee should be positive, pay it to asset's accumulated_fees
-               fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
-               modify( *fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {
-                  addo.accumulated_fees += cancel_fee_amount;
-               });
+               fee128 /= deferred_fee.get_amount().value;
                // cancel_fee should be no more than deferred_paid_fee
-               deferred_paid_fee.amount -= cancel_fee_amount;
-               vop.fee = asset( cancel_fee_amount, deferred_paid_fee.asset_id );
+               stored_value cancel_fee = deferred_paid_fee.split( static_cast<int64_t>(fee128) );
+               vop.fee = cancel_fee.get_value();
+               // cancel_fee should be positive, pay it to asset's accumulated_fees
+               fee_asset_dyn_data = &deferred_paid_fee.get_asset()(*this).dynamic_asset_data_id(*this);
+               modify( *fee_asset_dyn_data, [&cancel_fee](asset_dynamic_data_object& addo) {
+                  addo.accumulated_fees += std::move( cancel_fee );
+               });
             }
+
+            stored_value core_cancel_fee = deferred_fee.split( core_cancel_fee_amount );
+            seller_acc_stats = &order.seller( *this ).statistics( *this );
+            modify( *seller_acc_stats, [&core_cancel_fee,this]( account_statistics_object& obj ) {
+               obj.pay_fee( std::move(core_cancel_fee), get_global_properties().parameters.cashback_vesting_threshold );
+            } );
          }
       }
    }
 
    // refund funds in order
-   auto refunded = order.amount_for_sale();
-   if( refunded.asset_id == asset_id_type() )
+   if( refunded.get_asset() == asset_id_type() )
    {
       if( seller_acc_stats == nullptr )
          seller_acc_stats = &order.seller( *this ).statistics( *this );
-      modify( *seller_acc_stats, [&]( account_statistics_object& obj ) {
-         obj.total_core_in_orders -= refunded.amount;
+      modify( *seller_acc_stats, [&refunded]( account_statistics_object& obj ) {
+         obj.total_core_in_orders -= refunded.get_amount();
       });
    }
-   adjust_balance(order.seller, refunded);
+   add_balance( order.seller, std::move(refunded) );
 
    // refund fee
    // could be virtual op or real op here
-   if( order.deferred_paid_fee.amount == 0 )
+   if( deferred_paid_fee.get_amount() == 0 )
    {
       // be here, order.create_time <= HARDFORK_CORE_604_TIME, or fee paid in CORE, or no fee to refund.
       // if order was created before hard fork 604 then cancelled no matter before or after hard fork 604,
       //    see it as fee paid in CORE, deferred_fee should be refunded to order owner but not fee pool
-      adjust_balance( order.seller, deferred_fee );
+      add_balance( order.seller, std::move(deferred_fee) );
    }
    else // need to refund fee in originally paid asset
    {
-      adjust_balance(order.seller, deferred_paid_fee);
+      add_balance( order.seller, std::move(deferred_paid_fee) );
       // be here, must have: fee_asset != CORE
       if( fee_asset_dyn_data == nullptr )
-         fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
-      modify( *fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {
-         addo.fee_pool += deferred_fee;
+         fee_asset_dyn_data = &deferred_paid_fee.get_asset()(*this).dynamic_asset_data_id(*this);
+      modify( *fee_asset_dyn_data, [&deferred_fee](asset_dynamic_data_object& addo) {
+         addo.fee_pool += std::move(deferred_fee);
       });
    }
 
@@ -333,7 +355,7 @@ bool maybe_cull_small_order( database& db, const limit_order_object& order )
     */
    if( order.amount_to_receive().amount == 0 )
    {
-      if( order.deferred_fee > 0 && db.head_block_time() <= HARDFORK_CORE_604_TIME )
+      if( order.deferred_fee.get_amount() > 0 && db.head_block_time() <= HARDFORK_CORE_604_TIME )
       {
          db.cancel_limit_order( order, true, true );
       }
@@ -569,7 +591,7 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
 {
    FC_ASSERT( usd.sell_price.quote.asset_id == core.sell_price.base.asset_id );
    FC_ASSERT( usd.sell_price.base.asset_id  == core.sell_price.quote.asset_id );
-   FC_ASSERT( usd.for_sale > 0 && core.for_sale > 0 );
+   FC_ASSERT( usd.for_sale.get_amount() > 0 && core.for_sale.get_amount() > 0 );
 
    auto usd_for_sale = usd.amount_for_sale();
    auto core_for_sale = core.amount_for_sale();
@@ -626,8 +648,12 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
                  core_pays == core.amount_for_sale() );
 
    int result = 0;
-   result |= fill_limit_order( usd, usd_pays, usd_receives, cull_taker, match_price, false ); // the first param is taker
-   result |= fill_limit_order( core, core_pays, core_receives, true, match_price, true ) << 1; // the second param is maker
+   stored_value transport;
+   modify( core, [&transport,&core_pays] ( limit_order_object& loo ) {
+      transport = loo.for_sale.split( core_pays.amount );
+   });
+   result |= fill_limit_order( usd, usd_pays, std::move(transport), cull_taker, match_price, false, false ); // the first param is taker
+   result |= fill_limit_order( core, core_pays, std::move(transport), true, match_price, true, true ) << 1; // the second param is maker
    FC_ASSERT( result != 0 );
    return result;
 }
@@ -638,7 +664,7 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
 {
    FC_ASSERT( bid.sell_asset_id() == ask.debt_type() );
    FC_ASSERT( bid.receive_asset_id() == ask.collateral_type() );
-   FC_ASSERT( bid.for_sale > 0 && ask.debt > 0 && ask.collateral > 0 );
+   FC_ASSERT( bid.for_sale.get_amount() > 0 && ask.debt.get_amount() > 0 && ask.collateral.get_amount() > 0 );
 
    bool cull_taker = false;
 
@@ -673,8 +699,12 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    order_pays = call_receives;
 
    int result = 0;
-   result |= fill_limit_order( bid, order_pays, order_receives, cull_taker, match_price, false ); // the limit order is taker
-   result |= fill_call_order( ask, call_pays, call_receives, match_price, true ) << 1;      // the call order is maker
+   stored_value transport;
+   modify( ask, [&transport,&call_pays] ( call_order_object& coo ) {
+      transport = coo.collateral.split( call_pays.amount );
+   });
+   result |= fill_limit_order( bid, order_pays, std::move(transport), cull_taker, match_price, false, false ); // the limit order is taker
+   result |= fill_call_order( ask, call_pays, std::move(transport), match_price, true, true ) << 1;      // the call order is maker
    // result can be 0 when call order has target_collateral_ratio option set.
 
    return result;
@@ -687,13 +717,13 @@ asset database::match( const call_order_object& call,
                        asset max_settlement,
                        const price& fill_price )
 { try {
-   FC_ASSERT(call.get_debt().asset_id == settle.balance.asset_id );
-   FC_ASSERT(call.debt > 0 && call.collateral > 0 && settle.balance.amount > 0);
+   FC_ASSERT(call.get_debt().asset_id == settle.balance.get_asset() );
+   FC_ASSERT(call.debt.get_amount() > 0 && call.collateral.get_amount() > 0 && settle.balance.get_amount() > 0);
 
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
 
-   auto settle_for_sale = std::min(settle.balance, max_settlement);
+   auto settle_for_sale = std::min(settle.balance.get_value(), max_settlement);
    auto call_debt = call.get_debt();
 
    asset call_receives   = std::min(settle_for_sale, call_debt);
@@ -712,13 +742,13 @@ asset database::match( const call_order_object& call,
          }
          else
          {
-            if( call_receives == settle.balance ) // the settle order is smaller
+            if( call_receives.amount == settle.balance.get_amount() ) // the settle order is smaller
             {
                cancel_settle_order( settle );
             }
             // else do nothing: neither order will be completely filled, perhaps due to max_settlement too small
 
-            return asset( 0, settle.balance.asset_id );
+            return asset( 0, settle.balance.get_asset() );
          }
       }
 
@@ -738,7 +768,7 @@ asset database::match( const call_order_object& call,
 
             // be here, we should have: call_pays <= call_collateral
 
-            if( call_receives == settle.balance ) // the settle order will be completely filled, assuming we need to cull it
+            if( call_receives.amount == settle.balance.get_amount() ) // the settle order will be completely filled, assuming we need to cull it
                cull_settle_order = true;
             // else do nothing, since we can't cull the settle order
 
@@ -747,7 +777,7 @@ asset database::match( const call_order_object& call,
                                                                             // rounded up call_receives won't be greater than the
                                                                             // old call_receives.
 
-            if( call_receives == settle.balance ) // the settle order will be completely filled, no need to cull
+            if( call_receives.amount == settle.balance.get_amount() ) // the settle order will be completely filled, no need to cull
                cull_settle_order = false;
             // else do nothing, since we still need to cull the settle order or still can't cull the settle order
          }
@@ -755,7 +785,6 @@ asset database::match( const call_order_object& call,
    }
 
    asset settle_pays     = call_receives;
-   asset settle_receives = call_pays;
 
    /**
     *  If the least collateralized call position lacks sufficient
@@ -773,8 +802,12 @@ asset database::match( const call_order_object& call,
    }
    // else do nothing, since black swan event won't happen, and the assertion is no longer true
 
-   fill_call_order( call, call_pays, call_receives, fill_price, true ); // call order is maker
-   fill_settle_order( settle, settle_pays, settle_receives, fill_price, false ); // force settlement order is taker
+   stored_value transport;
+   modify( settle, [&transport,&settle_pays] ( force_settlement_object& fso ) {
+      transport = fso.balance.split( settle_pays.amount );
+   });
+   fill_call_order( call, call_pays, std::move(transport), fill_price, false, true ); // call order is maker
+   fill_settle_order( settle, settle_pays, std::move(transport), fill_price ); // force settlement order is always taker
 
    if( cull_settle_order )
       cancel_settle_order( settle );
@@ -782,9 +815,11 @@ asset database::match( const call_order_object& call,
    return call_receives;
 } FC_CAPTURE_AND_RETHROW( (call)(settle)(match_price)(max_settlement) ) }
 
-bool database::fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small,
-                           const price& fill_price, const bool is_maker )
+bool database::fill_limit_order( const limit_order_object& order, const asset& pays, stored_value&& transport,
+                                 bool cull_if_small, const price& fill_price, bool already_paid, const bool is_maker )
 { try {
+   const auto receives = transport.get_value();
+
    cull_if_small |= (head_block_time() < HARDFORK_555_TIME);
 
    FC_ASSERT( order.amount_for_sale().asset_id == pays.asset_id );
@@ -793,69 +828,83 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
    const account_object& seller = order.seller(*this);
    const asset_object& recv_asset = receives.asset_id(*this);
 
-   auto issuer_fees = pay_market_fees(&seller, recv_asset, receives);
+   auto issuer_fees = pay_market_fees( &seller, recv_asset, std::move(transport) );
 
-   pay_order( seller, receives - issuer_fees, pays );
-
-   assert( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation( order.id, order.seller, pays, receives, issuer_fees, fill_price, is_maker ) );
 
+   pay_order( seller, std::move(transport), pays );
+
+   stored_value deferred_fee;
+   stored_value deferred_paid_fee;
+   modify( order, [&pays,&transport,&deferred_fee,&deferred_paid_fee,already_paid] ( limit_order_object& loo ) {
+      deferred_fee = std::move(loo.deferred_fee);
+      deferred_paid_fee = std::move(loo.deferred_paid_fee);
+      if( !already_paid )
+         transport = loo.for_sale.split( pays.amount );
+   });
    // conditional because cheap integer comparison may allow us to avoid two expensive modify() and object lookups
-   if( order.deferred_fee > 0 )
+   if( deferred_fee.get_amount() > 0 )
    {
-      modify( seller.statistics(*this), [&]( account_statistics_object& statistics )
+      modify( seller.statistics(*this), [&deferred_fee,this]( account_statistics_object& statistics )
       {
-         statistics.pay_fee( order.deferred_fee, get_global_properties().parameters.cashback_vesting_threshold );
+         statistics.pay_fee( std::move(deferred_fee), get_global_properties().parameters.cashback_vesting_threshold );
       } );
    }
 
-   if( order.deferred_paid_fee.amount > 0 ) // implies head_block_time() > HARDFORK_CORE_604_TIME
+   if( deferred_paid_fee.get_amount() > 0 ) // implies head_block_time() > HARDFORK_CORE_604_TIME
    {
-      const auto& fee_asset_dyn_data = order.deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
-      modify( fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {
-         addo.accumulated_fees += order.deferred_paid_fee.amount;
+      const auto& fee_asset_dyn_data = order.deferred_paid_fee.get_asset()(*this).dynamic_asset_data_id(*this);
+      modify( fee_asset_dyn_data, [&deferred_paid_fee](asset_dynamic_data_object& addo) {
+         addo.accumulated_fees += std::move(deferred_paid_fee);
       });
    }
 
-   if( pays == order.amount_for_sale() )
+   if( order.for_sale.get_amount() == 0 )
    {
       remove( order );
       return true;
    }
-   else
-   {
-      modify( order, [&]( limit_order_object& b ) {
-                             b.for_sale -= pays.amount;
-                             b.deferred_fee = 0;
-                             b.deferred_paid_fee.amount = 0;
-                          });
-      if( cull_if_small )
-         return maybe_cull_small_order( *this, order );
-      return false;
-   }
-} FC_CAPTURE_AND_RETHROW( (order)(pays)(receives) ) }
+
+   if( cull_if_small )
+      return maybe_cull_small_order( *this, order );
+
+   return false;
+} FC_CAPTURE_AND_RETHROW( (order)(pays)(transport) ) }
 
 
-bool database::fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
-                                const price& fill_price, const bool is_maker )
+bool database::fill_call_order( const call_order_object& order, const asset& pays, stored_value&& transport,
+                                const price& fill_price, bool already_paid, const bool is_maker )
 { try {
+   const auto receives = transport.get_value();
+
    FC_ASSERT( order.debt_type() == receives.asset_id );
    FC_ASSERT( order.collateral_type() == pays.asset_id );
-   FC_ASSERT( order.collateral >= pays.amount );
+   FC_ASSERT( order.collateral.get_amount() >= pays.amount );
 
    // TODO pass in mia and bitasset_data for better performance
    const asset_object& mia = receives.asset_id(*this);
    FC_ASSERT( mia.is_market_issued() );
 
-   optional<asset> collateral_freed;
-   modify( order, [&]( call_order_object& o ){
-            o.debt       -= receives.amount;
-            o.collateral -= pays.amount;
-            if( o.debt == 0 )
-            {
-              collateral_freed = o.get_collateral();
-              o.collateral = 0;
-            }
+   stored_value supply_to_burn = std::move(transport);
+   // update current supply
+   const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
+   modify( mia_ddo, [&supply_to_burn]( asset_dynamic_data_object& ao ){
+      ao.current_supply.burn( std::move(supply_to_burn) );
+   });
+
+   stored_value debt_to_burn;
+   const auto& bdo = (*mia.bitasset_data_id)(*this);
+   modify( bdo, [&receives,&debt_to_burn] ( asset_bitasset_data_object& _bdo ) {
+       debt_to_burn = _bdo.total_debt.split( receives.amount );
+   });
+
+   stored_value collateral_freed( order.collateral_type() );
+   modify( order, [&bdo,&pays,&debt_to_burn,&transport,&collateral_freed,already_paid,this]( call_order_object& o ){
+            o.debt.burn( std::move(debt_to_burn) );
+            if( !already_paid )
+               transport = o.collateral.split( pays.amount );
+            if( o.debt.get_amount() == 0 )
+              collateral_freed = std::move( o.collateral );
             else
             {
                auto maint_time = get_dynamic_global_properties().next_maintenance_time;
@@ -864,67 +913,48 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
                if( maint_time <= HARDFORK_CORE_1270_TIME && maint_time > HARDFORK_CORE_343_TIME )
                {
                   o.call_price = price::call_price( o.get_debt(), o.get_collateral(),
-                                                    mia.bitasset_data(*this).current_feed.maintenance_collateral_ratio );
+                                                    bdo.current_feed.maintenance_collateral_ratio );
                }
             }
       });
-
-   // update current supply
-   const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
-
-   modify( mia_ddo, [&receives]( asset_dynamic_data_object& ao ){
-         ao.current_supply -= receives.amount;
-      });
-
-   // Adjust balance
-   if( collateral_freed.valid() )
-      adjust_balance( order.borrower, *collateral_freed );
 
    // Update account statistics. We know that order.collateral_type() == pays.asset_id
    if( pays.asset_id == asset_id_type() )
    {
       modify( get_account_stats_by_owner(order.borrower), [&collateral_freed,&pays]( account_statistics_object& b ){
          b.total_core_in_orders -= pays.amount;
-         if( collateral_freed.valid() )
-            b.total_core_in_orders -= collateral_freed->amount;
+         b.total_core_in_orders -= collateral_freed.get_amount();
       });
    }
+
+   // Adjust balance
+   add_balance( order.borrower, std::move(collateral_freed) );
 
    push_applied_operation( fill_order_operation( order.id, order.borrower, pays, receives,
                                                  asset(0, pays.asset_id), fill_price, is_maker ) );
 
-   if( collateral_freed.valid() )
+   bool filled = order.collateral.get_amount() == 0;
+   if( filled )
       remove( order );
 
-   return collateral_freed.valid();
-} FC_CAPTURE_AND_RETHROW( (order)(pays)(receives) ) }
-
-bool database::fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
-                                  const price& fill_price, const bool is_maker )
-{ try {
-   bool filled = false;
-
-   auto issuer_fees = pay_market_fees( nullptr, get(receives.asset_id), receives);
-
-   if( pays < settle.balance )
-   {
-      modify(settle, [&pays](force_settlement_object& s) {
-         s.balance -= pays;
-      });
-      filled = false;
-   } else {
-      filled = true;
-   }
-   adjust_balance(settle.owner, receives - issuer_fees);
-
-   assert( pays.asset_id != receives.asset_id );
-   push_applied_operation( fill_order_operation( settle.id, settle.owner, pays, receives, issuer_fees, fill_price, is_maker ) );
-
-   if (filled)
-      remove(settle);
-
    return filled;
-} FC_CAPTURE_AND_RETHROW( (settle)(pays)(receives) ) }
+} FC_CAPTURE_AND_RETHROW( (order)(pays)(transport) ) }
+
+void database::fill_settle_order( const force_settlement_object& settle, const asset& paid,
+                                  stored_value&& receives, const price& fill_price )
+{ try {
+   const auto received = receives.get_value();
+
+   auto issuer_fees = pay_market_fees( nullptr, get(receives.get_asset()), std::move(receives) );
+
+   add_balance( settle.owner, std::move(receives) );
+
+   assert( paid.asset_id != receives.asset_id );
+   push_applied_operation( fill_order_operation( settle.id, settle.owner, paid, received, issuer_fees, fill_price, false ) );
+
+   if( settle.balance.get_amount() == 0 )
+      remove(settle);
+} FC_CAPTURE_AND_RETHROW( (settle)(paid)(receives) ) }
 
 /**
  *  Starting with the least collateralized orders, fill them if their
@@ -1116,8 +1146,12 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
        if( filled_call && before_core_hardfork_343 )
           ++call_price_itr;
+       stored_value transport;
+       modify( limit_order, [&transport,&order_pays] ( limit_order_object& loo ) {
+          transport = loo.for_sale.split(order_pays.amount);
+       });
        // when for_new_limit_order is true, the call order is maker, otherwise the call order is taker
-       fill_call_order( call_order, call_pays, call_receives, match_price, for_new_limit_order );
+       fill_call_order( call_order, call_pays, std::move(transport), match_price, false, for_new_limit_order );
        if( !before_core_hardfork_1270 )
           call_collateral_itr = call_collateral_index.lower_bound( call_min );
        else if( !before_core_hardfork_343 )
@@ -1125,7 +1159,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
        auto next_limit_itr = std::next( limit_itr );
        // when for_new_limit_order is true, the limit order is taker, otherwise the limit order is maker
-       bool really_filled = fill_limit_order( limit_order, order_pays, order_receives, true, match_price, !for_new_limit_order );
+       bool really_filled = fill_limit_order( limit_order, order_pays, std::move(transport), true, match_price, true, !for_new_limit_order );
        if( really_filled || ( filled_limit && before_core_hardfork_453 ) )
           limit_itr = next_limit_itr;
 
@@ -1134,45 +1168,38 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     return margin_called;
 } FC_CAPTURE_AND_RETHROW() }
 
-void database::pay_order( const account_object& receiver, const asset& receives, const asset& pays )
+void database::pay_order( const account_object& receiver, stored_value&& receives, const asset& pays )
 {
-   const auto& balances = receiver.statistics(*this);
-   modify( balances, [&]( account_statistics_object& b ){
-         if( pays.asset_id == asset_id_type() )
-         {
-            b.total_core_in_orders -= pays.amount;
-         }
-   });
-   adjust_balance(receiver.get_id(), receives);
+   if( receives.get_asset() == asset_id_type() )
+      modify( receiver.statistics(*this), [&pays]( account_statistics_object& b ){
+         b.total_core_in_orders -= pays.amount;
+      });
+   add_balance( receiver.get_id(), std::move(receives) );
 }
 
-asset database::calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount )
+share_type database::calculate_market_fee( const asset_object& trade_asset, const share_type trade_amount )
 {
-   assert( trade_asset.id == trade_amount.asset_id );
-
    if( !trade_asset.charges_market_fees() )
-      return trade_asset.amount(0);
+      return 0;
    if( trade_asset.options.market_fee_percent == 0 )
-      return trade_asset.amount(0);
+      return 0;
 
-   auto value = detail::calculate_percent(trade_amount.amount, trade_asset.options.market_fee_percent);
-   asset percent_fee = trade_asset.amount(value);
+   auto percent_fee = detail::calculate_percent(trade_amount, trade_asset.options.market_fee_percent);
 
-   if( percent_fee.amount > trade_asset.options.max_market_fee )
-      percent_fee.amount = trade_asset.options.max_market_fee;
+   if( percent_fee > trade_asset.options.max_market_fee )
+      percent_fee = trade_asset.options.max_market_fee;
 
    return percent_fee;
 }
 
-asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives )
+asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, stored_value&& receives )
 {
-   const auto issuer_fees = calculate_market_fee( recv_asset, receives );
-   FC_ASSERT( issuer_fees <= receives, "Market fee shouldn't be greater than receives");
+   stored_value issuer_fees = receives.split( calculate_market_fee( recv_asset, receives.get_amount() ) );
+   const asset result = issuer_fees.get_value();
    //Don't dirty undo state if not actually collecting any fees
-   if ( issuer_fees.amount > 0 )
+   if ( issuer_fees.get_amount() > 0 )
    {
       // calculate and pay rewards
-      asset reward = recv_asset.amount(0);
 
       auto is_rewards_allowed = [&recv_asset, seller]() {
          if (seller == nullptr)
@@ -1187,39 +1214,34 @@ asset database::pay_market_fees(const account_object* seller, const asset_object
          const auto reward_percent = recv_asset.options.extensions.value.reward_percent;
          if ( reward_percent && *reward_percent )
          {
-            const auto reward_value = detail::calculate_percent(issuer_fees.amount, *reward_percent);
+            const auto reward_value = detail::calculate_percent( issuer_fees.get_amount(), *reward_percent );
             if ( reward_value > 0 && is_authorized_asset(*this, seller->registrar(*this), recv_asset) )
             {
-               reward = recv_asset.amount(reward_value);
-               FC_ASSERT( reward < issuer_fees, "Market reward should be less than issuer fees");
                // cut referrer percent from reward
-               auto registrar_reward = reward;
+               auto registrar_reward = issuer_fees.split(reward_value);
                if( seller->referrer != seller->registrar )
                {
-                  const auto referrer_rewards_value = detail::calculate_percent( reward.amount,
+                  const auto referrer_rewards_value = detail::calculate_percent( registrar_reward.get_amount(),
                                                                                  seller->referrer_rewards_percentage );
 
                   if ( referrer_rewards_value > 0 && is_authorized_asset(*this, seller->referrer(*this), recv_asset) )
                   {
-                     FC_ASSERT ( referrer_rewards_value <= reward.amount.value,
-                                 "Referrer reward shouldn't be greater than total reward" );
-                     const asset referrer_reward = recv_asset.amount(referrer_rewards_value);
-                     registrar_reward -= referrer_reward;
-                     deposit_market_fee_vesting_balance(seller->referrer, referrer_reward);
+                     auto referrer_reward = registrar_reward.split( referrer_rewards_value );
+                     deposit_market_fee_vesting_balance(seller->referrer, std::move(referrer_reward) );
                   }
                }
-               deposit_market_fee_vesting_balance(seller->registrar, registrar_reward);
+               deposit_market_fee_vesting_balance( seller->registrar, std::move(registrar_reward) );
             }
          }
       }
 
       const auto& recv_dyn_data = recv_asset.dynamic_asset_data_id(*this);
-      modify( recv_dyn_data, [&issuer_fees, &reward]( asset_dynamic_data_object& obj ){
-         obj.accumulated_fees += issuer_fees.amount - reward.amount;
+      modify( recv_dyn_data, [&issuer_fees]( asset_dynamic_data_object& obj ){
+         obj.accumulated_fees += std::move(issuer_fees);
       });
    }
 
-   return issuer_fees;
+   return result;
 }
 
 } }

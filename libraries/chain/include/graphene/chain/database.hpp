@@ -408,21 +408,21 @@ namespace graphene { namespace chain {
          /**
           * @return true if the order was completely filled and thus freed.
           */
-         bool fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small,
-                                const price& fill_price, const bool is_maker );
-         bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
-                               const price& fill_price, const bool is_maker );
-         bool fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
-                                 const price& fill_price, const bool is_maker );
+         bool fill_limit_order( const limit_order_object& order, const asset& pays, stored_value&& transport,
+                                bool cull_if_small, const price& fill_price, bool already_paid, const bool is_maker );
+         bool fill_call_order( const call_order_object& order, const asset& pays, stored_value&& transport,
+                               const price& fill_price, bool already_paid, const bool is_maker );
+         void fill_settle_order( const force_settlement_object& settle, const asset& pays,
+                                 stored_value&& receives, const price& fill_price );
 
          bool check_call_orders( const asset_object& mia, bool enable_black_swan = true, bool for_new_limit_order = false,
                                  const asset_bitasset_data_object* bitasset_ptr = nullptr );
 
          // helpers to fill_order
-         void pay_order( const account_object& receiver, const asset& receives, const asset& pays );
+         void pay_order( const account_object& receiver, stored_value&& receives, const asset& pays );
 
-         asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
-         asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives );
+         share_type calculate_market_fee(const asset_object& recv_asset, const share_type trade_amount);
+         asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, stored_value&& receives );
          ///@}
 
 

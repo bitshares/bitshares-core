@@ -57,7 +57,7 @@ void database::debug_dump()
    }
    for( const force_settlement_object& s : settle_index )
    {
-      total_balances[s.balance.asset_id] += s.balance.amount;
+      total_balances[s.balance.get_asset()] += s.balance.get_amount();
    }
    for( const vesting_balance_object& vbo : db.get_index_type< vesting_balance_index >().indices() )
       total_balances[ vbo.balance.get_asset() ] += vbo.balance.get_amount();
