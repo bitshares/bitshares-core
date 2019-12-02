@@ -51,13 +51,13 @@ database& generic_evaluator::db()const { return trx_state->db(); }
    void generic_evaluator::prepare_fee(account_id_type account_id, asset fee)
    {
       const database& d = db();
-      fee_from_account = fee;
       FC_ASSERT( fee.amount >= 0 );
       fee_paying_account = &account_id(d);
       fee_paying_account_statistics = &fee_paying_account->statistics(d);
 
       fee_asset = &fee.asset_id(d);
-      fee_asset_dyn_data = &fee_asset->dynamic_asset_data_id(d);
+      if( fee_asset->get_id() != asset_id_type() )
+         fee_asset_dyn_data = &fee_asset->dynamic_asset_data_id(d);
 
       FC_ASSERT( is_authorized_asset( d, *fee_paying_account, *fee_asset ), 
             "Account ${acct} '${name}' attempted to pay fee by using asset ${a} '${sym}', "
@@ -65,41 +65,38 @@ database& generic_evaluator::db()const { return trx_state->db(); }
             ( "acct", fee_paying_account->id)("name", fee_paying_account->name)("a", fee_asset->id)
             ("sym", fee_asset->symbol) );
 
-      if( fee_from_account.asset_id == asset_id_type() )
-         core_fee_paid = fee_from_account.amount;
+      fee_from_account = db().reduce_balance( account_id, fee );
+      if( fee.asset_id == asset_id_type() )
+         fee_from_pool = 0;
       else
       {
-         asset fee_from_pool = fee_from_account * fee_asset->options.core_exchange_rate;
-         FC_ASSERT( fee_from_pool.asset_id == asset_id_type() );
-         core_fee_paid = fee_from_pool.amount;
-         FC_ASSERT( core_fee_paid <= fee_asset_dyn_data->fee_pool, "Fee pool balance of '${b}' is less than the ${r} required to convert ${c}",
-                    ("r", db().to_pretty_string( fee_from_pool))("b",db().to_pretty_string(fee_asset_dyn_data->fee_pool))("c",db().to_pretty_string(fee)) );
+         asset pool_fee = fee_from_account.get_value() * fee_asset->options.core_exchange_rate;
+         FC_ASSERT( pool_fee.asset_id == asset_id_type() );
+         fee_from_pool = pool_fee.amount;
+         FC_ASSERT( fee_from_pool <= fee_asset_dyn_data->fee_pool.get_amount(),
+                    "Fee pool balance of '${b}' is less than the ${r} required to convert ${c}",
+                    ("r",db().to_pretty_string(pool_fee))
+                    ("b",db().to_pretty_string(fee_asset_dyn_data->fee_pool.get_value()))
+                    ("c",db().to_pretty_string(fee)) );
       }
    }
 
    void generic_evaluator::convert_fee()
    {
-      if( !trx_state->skip_fee ) {
-         if( fee_asset->get_id() != asset_id_type() )
-         {
-            db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
-               d.accumulated_fees += fee_from_account.amount;
-               d.fee_pool -= core_fee_paid;
-            });
-         }
-      }
+      if( !trx_state->skip_fee && fee_asset->get_id() != asset_id_type() )
+         db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
+            d.accumulated_fees += std::move(fee_from_account);
+            core_fee_paid = d.fee_pool.split( fee_from_pool );
+         });
    }
 
    void generic_evaluator::pay_fee()
    { try {
-      if( !trx_state->skip_fee ) {
-         database& d = db();
-         /// TODO: db().pay_fee( account_id, core_fee );
-         d.modify(*fee_paying_account_statistics, [&](account_statistics_object& s)
+      if( !trx_state->skip_fee )
+         db().modify(*fee_paying_account_statistics, [this](account_statistics_object& s)
          {
-            s.pay_fee( core_fee_paid, d.get_global_properties().parameters.cashback_vesting_threshold );
+            s.pay_fee( std::move(core_fee_paid), db().get_global_properties().parameters.cashback_vesting_threshold );
          });
-      }
    } FC_CAPTURE_AND_RETHROW() }
 
    void generic_evaluator::pay_fba_fee( uint64_t fba_id )
@@ -111,9 +108,9 @@ database& generic_evaluator::db()const { return trx_state->db(); }
          generic_evaluator::pay_fee();
          return;
       }
-      d.modify( fba, [&]( fba_accumulator_object& _fba )
+      d.modify( fba, [this]( fba_accumulator_object& _fba )
       {
-         _fba.accumulated_fba_fees += core_fee_paid;
+         _fba.accumulated_fba_fees += std::move(core_fee_paid);
       } );
    }
 
@@ -121,9 +118,4 @@ database& generic_evaluator::db()const { return trx_state->db(); }
    {
      return db().current_fee_schedule().calculate_fee( op ).amount;
    }
-   void generic_evaluator::db_adjust_balance(const account_id_type& fee_payer, asset fee_from_account)
-   {
-     db().adjust_balance(fee_payer, fee_from_account);
-   }
-
 } }

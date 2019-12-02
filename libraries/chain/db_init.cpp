@@ -506,8 +506,12 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    for( const auto& handout : genesis_state.initial_balances )
    {
       const auto asset_id = get_asset_id(handout.asset_symbol);
-      create<balance_object>([&handout,total_allocation,asset_id](balance_object& b) {
-         b.balance = asset(handout.amount, asset_id);
+      stored_value balance;
+      modify( asset_id(*this).dynamic_asset_data_id(*this), [&balance,&handout] ( asset_dynamic_data_object& add ) {
+          balance = add.current_supply.issue(handout.amount);
+      });
+      create<balance_object>([&handout,&balance](balance_object& b) {
+         b.balance = std::move(balance);
          b.owner = handout.owner;
       });
 
@@ -518,9 +522,13 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    for( const genesis_state_type::initial_vesting_balance_type& vest : genesis_state.initial_vesting_balances )
    {
       const auto asset_id = get_asset_id(vest.asset_symbol);
-      create<balance_object>([&](balance_object& b) {
+      stored_value balance;
+      modify( asset_id(*this).dynamic_asset_data_id(*this), [&balance,&vest] ( asset_dynamic_data_object& add ) {
+          balance = add.current_supply.issue(vest.amount);
+      });
+      create<balance_object>([&vest,&balance](balance_object& b) {
          b.owner = vest.owner;
-         b.balance = asset(vest.amount, asset_id);
+         b.balance = std::move(balance);
 
          linear_vesting_policy policy;
          policy.begin_timestamp = vest.begin_timestamp;

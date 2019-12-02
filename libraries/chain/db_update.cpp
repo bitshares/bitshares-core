@@ -84,18 +84,17 @@ void database::update_signing_witness(const witness_object& signing_witness, con
 {
    const global_property_object& gpo = get_global_properties();
    const dynamic_global_property_object& dpo = get_dynamic_global_properties();
-   uint64_t new_block_aslot = dpo.current_aslot + get_slot_at_time( new_block.timestamp );
+   const uint64_t new_block_aslot = dpo.current_aslot + get_slot_at_time( new_block.timestamp );
 
-   share_type witness_pay = std::min( gpo.parameters.witness_pay_per_block, dpo.witness_budget );
-
-   modify( dpo, [&]( dynamic_global_property_object& _dpo )
+   stored_value witness_pay;
+   modify( dpo, [&witness_pay,&gpo]( dynamic_global_property_object& _dpo )
    {
-      _dpo.witness_budget -= witness_pay;
+      witness_pay = _dpo.witness_budget.split( std::min( gpo.parameters.witness_pay_per_block, _dpo.witness_budget.get_amount() ) );
    } );
 
-   deposit_witness_pay( signing_witness, witness_pay );
+   deposit_witness_pay( signing_witness, std::move(witness_pay) );
 
-   modify( signing_witness, [&]( witness_object& _wit )
+   modify( signing_witness, [&new_block,new_block_aslot]( witness_object& _wit )
    {
       _wit.last_aslot = new_block_aslot;
       _wit.last_confirmed_block_num = new_block.block_num();
@@ -387,7 +386,7 @@ void database::clear_expired_orders()
             continue;
          }
          if( max_settlement_volume.asset_id != current_asset )
-            max_settlement_volume = mia_object.amount(mia.max_force_settlement_volume(mia_object.dynamic_data(*this).current_supply));
+            max_settlement_volume = mia_object.amount(mia.max_force_settlement_volume(mia_object.dynamic_data(*this).current_supply.get_amount()));
          // When current_asset_finished is true, this would be the 2nd time processing the same order.
          // In this case, we move to the next asset.
          if( mia.force_settled_volume >= max_settlement_volume.amount || current_asset_finished )
@@ -415,12 +414,12 @@ void database::clear_expired_orders()
 
          if( before_core_hardfork_342 )
          {
-            auto& pays = order.balance;
-            auto receives = (order.balance * mia.current_feed.settlement_price);
+            auto pays = order.balance.get_value();
+            auto receives = (pays * mia.current_feed.settlement_price);
             receives.amount = static_cast<uint64_t>( fc::uint128_t(receives.amount.value) *
                                 (GRAPHENE_100_PERCENT - mia.options.force_settlement_offset_percent) /
                                 GRAPHENE_100_PERCENT );
-            assert(receives <= order.balance * mia.current_feed.settlement_price);
+            assert(receives <= pays * mia.current_feed.settlement_price);
             settlement_price = pays / receives;
          }
          else if( settlement_price.base.asset_id != current_asset ) // only calculate once per asset
@@ -437,7 +436,7 @@ void database::clear_expired_orders()
             assert(itr != call_index.end() && itr->debt_type() == mia_object.get_id());
             asset max_settlement = max_settlement_volume - settled;
 
-            if( order.balance.amount == 0 )
+            if( order.balance.get_amount() == 0 )
             {
                wlog( "0 settlement detected" );
                cancel_settle_order( order );
@@ -590,12 +589,15 @@ void database::clear_expired_htlcs()
          && htlc_idx.begin()->conditions.time_lock.expiration <= head_block_time() )
    {
       const htlc_object& obj = *htlc_idx.begin();
-      const auto amount = asset(obj.transfer.amount, obj.transfer.asset_id);
-      adjust_balance( obj.transfer.from, amount );
+      stored_value refund;
+      modify( obj, [&refund] ( htlc_object& htlc ) {
+         refund = std::move(htlc.transfer.amount);
+      });
       // notify related parties
-      htlc_refund_operation vop( obj.id, obj.transfer.from, obj.transfer.to, amount,
+      htlc_refund_operation vop( obj.id, obj.transfer.from, obj.transfer.to, refund.get_value(),
          obj.conditions.hash_lock.preimage_hash, obj.conditions.hash_lock.preimage_size );
       push_applied_operation( vop );
+      add_balance( obj.transfer.from, std::move(refund) );
       remove( obj );
    }
 }

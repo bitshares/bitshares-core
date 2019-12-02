@@ -37,18 +37,16 @@ namespace graphene { namespace chain {
     * This object is stored in the database while an HTLC is active. The HTLC will
     * become inactive at expiration or when unlocked via the preimage.
     */
-   class htlc_object : public graphene::db::abstract_object<htlc_object> {
+   class htlc_master : public graphene::db::abstract_object<htlc_master> {
       public:
          // uniquely identify this object in the database
          static constexpr uint8_t space_id = protocol_ids;
          static constexpr uint8_t type_id  = htlc_object_type;
 
-         struct transfer_info {
+         struct transfer_info_master {
             account_id_type from;
             account_id_type to;
-            share_type amount;
-            asset_id_type asset_id;
-         } transfer;
+         };
          struct condition_info {
             struct hash_lock_info {  
                htlc_hash preimage_hash;
@@ -64,8 +62,16 @@ namespace graphene { namespace chain {
        */
       struct timelock_extractor {
          typedef fc::time_point_sec result_type;
-         const result_type& operator()(const htlc_object& o)const { return o.conditions.time_lock.expiration; }
+         const result_type& operator()(const htlc_master& o)const { return o.conditions.time_lock.expiration; }
       };
+   };
+
+   class htlc_object : public htlc_master
+   {
+      public:
+         struct transfer_info : transfer_info_master {
+            stored_value amount;
+         } transfer;
 
       /*****
        * Index helper for from
@@ -82,6 +88,10 @@ namespace graphene { namespace chain {
          typedef account_id_type result_type;
          const result_type& operator()(const htlc_object& o)const { return o.transfer.to; }
       };
+
+   protected:
+      virtual unique_ptr<graphene::db::object> backup()const;
+      virtual void restore( graphene::db::object& obj );
    };
 
    struct by_from_id;
@@ -94,7 +104,7 @@ namespace graphene { namespace chain {
 
             ordered_unique< tag< by_expiration >, 
                   composite_key< htlc_object,
-                  htlc_object::timelock_extractor,
+                  htlc_master::timelock_extractor,
                   member< object, object_id_type, &object::id > > >,
 
             ordered_unique< tag< by_from_id >,
@@ -121,4 +131,5 @@ FC_REFLECT_TYPENAME( graphene::chain::htlc_object::condition_info::time_lock_inf
 FC_REFLECT_TYPENAME( graphene::chain::htlc_object::condition_info )
 FC_REFLECT_TYPENAME( graphene::chain::htlc_object )
 
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::htlc_master )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::htlc_object )

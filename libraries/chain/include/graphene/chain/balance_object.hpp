@@ -27,7 +27,7 @@
 
 namespace graphene { namespace chain {
 
-   class balance_object : public abstract_object<balance_object>
+   class balance_master : public abstract_object<balance_master>
    {
       public:
          static constexpr uint8_t space_id = protocol_ids;
@@ -35,17 +35,24 @@ namespace graphene { namespace chain {
 
          bool is_vesting_balance()const
          { return vesting_policy.valid(); }
-         asset available(fc::time_point_sec now)const
-         {
-            return is_vesting_balance()? vesting_policy->get_allowed_withdraw({balance, now, {}})
-                                       : balance;
-         }
 
          address owner;
-         asset   balance;
          optional<linear_vesting_policy> vesting_policy;
          time_point_sec last_claim_date;
-         asset_id_type asset_type()const { return balance.asset_id; }
+   };
+
+   class balance_object : public balance_master
+   {
+      public:
+         asset available(fc::time_point_sec now)const
+         {
+            return is_vesting_balance()? vesting_policy->get_allowed_withdraw({balance.get_value(), now, {}})
+                                       : balance.get_value();
+         }
+
+         stored_value balance;
+
+         asset_id_type asset_type()const { return balance.get_asset(); }
    };
 
    struct by_owner;
@@ -59,7 +66,7 @@ namespace graphene { namespace chain {
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_non_unique< tag<by_owner>, composite_key<
             balance_object,
-            member<balance_object, address, &balance_object::owner>,
+            member<balance_master, address, &balance_master::owner>,
             const_mem_fun<balance_object, asset_id_type, &balance_object::asset_type>
          > >
       >
@@ -75,4 +82,5 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::balance_object)
 
 FC_REFLECT_TYPENAME( graphene::chain::balance_object )
 
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::balance_master )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::balance_object )
