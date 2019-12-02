@@ -32,7 +32,13 @@ namespace graphene { namespace chain {
 
 class asset_dynamic_data_backup : public asset_dynamic_data_master
 {
-   private:
+      asset current_supply;
+      share_type accumulated_fees;
+      share_type fee_pool;
+      share_type confidential_supply;
+      friend class asset_dynamic_data_object;
+
+   public:
       asset_dynamic_data_backup( const asset_dynamic_data_object& original )
          : asset_dynamic_data_master( original )
       {
@@ -41,11 +47,6 @@ class asset_dynamic_data_backup : public asset_dynamic_data_master
          fee_pool = original.fee_pool.get_amount();
          confidential_supply = original.confidential_supply.get_amount();
       }
-      asset current_supply;
-      share_type accumulated_fees;
-      share_type fee_pool;
-      share_type confidential_supply;
-      friend class asset_dynamic_data_object;
 };
 
 unique_ptr<object> asset_dynamic_data_object::backup()const
@@ -56,7 +57,7 @@ unique_ptr<object> asset_dynamic_data_object::backup()const
 void asset_dynamic_data_object::restore( object& obj )
 {
    const auto& backup = static_cast<asset_dynamic_data_backup&>(obj);
-   current_supply.restore( backup.current_supply ) );
+   current_supply.restore( backup.current_supply );
    accumulated_fees.restore( asset( backup.accumulated_fees, backup.current_supply.asset_id ) );
    fee_pool.restore( asset( backup.fee_pool ) );
    confidential_supply.restore( asset( backup.confidential_supply, backup.current_supply.asset_id ) );
@@ -140,16 +141,17 @@ void graphene::chain::asset_bitasset_data_master::update_median_feeds( time_poin
 
 class asset_bitasset_data_backup : public asset_bitasset_data_master
 {
-   private:
+      share_type settlement_fund;
+      share_type total_debt;
+      friend class asset_bitasset_data_object;
+
+   public:
       asset_bitasset_data_backup( const asset_bitasset_data_object& original )
          : asset_bitasset_data_master( original )
       {
          settlement_fund = original.settlement_fund.get_amount();
          total_debt = original.total_debt.get_amount();
       }
-      share_type settlement_fund;
-      share_type total_debt;
-      friend class asset_bitasset_data_object;
 };
 
 unique_ptr<object> asset_bitasset_data_object::backup()const
@@ -238,12 +240,12 @@ string asset_object::amount_to_string(share_type amount) const
 
 } } // graphene::chain
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_dynamic_data_master, (graphene::db::object), )
+FC_REFLECT_DERIVED( graphene::chain::asset_dynamic_data_master, (graphene::db::object), )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_dynamic_data_object,
                     (graphene::chain::asset_dynamic_data_master),
                     (current_supply)(accumulated_fees)(fee_pool)(confidential_supply) )
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_bitasset_data_object, (graphene::db::object),
+FC_REFLECT_DERIVED( graphene::chain::asset_bitasset_data_master, (graphene::db::object),
                     (asset_id)
                     (feeds)
                     (current_feed)
@@ -253,11 +255,17 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_bitasset_data_object, (gr
                     (force_settled_volume)
                     (is_prediction_market)
                     (settlement_price)
-                    (settlement_fund)
                     (asset_cer_updated)
                     (feed_cer_updated)
                   )
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_bitasset_data_object,
+                    (graphene::chain::asset_bitasset_data_master),
+                    (settlement_fund)
+                    (total_debt)
+                  )
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_bitasset_data_master )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_bitasset_data_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_dynamic_data_master )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_dynamic_data_object )

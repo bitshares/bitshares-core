@@ -53,6 +53,10 @@ namespace graphene { namespace chain {
          stored_value balance;
 
          asset_id_type asset_type()const { return balance.get_asset(); }
+
+   protected:
+      virtual unique_ptr<graphene::db::object> backup()const;
+      virtual void restore( graphene::db::object& obj );
    };
 
    struct by_owner;

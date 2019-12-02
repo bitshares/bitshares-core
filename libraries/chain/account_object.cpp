@@ -27,8 +27,6 @@
 #include <fc/io/raw.hpp>
 #include <fc/uint128.hpp>
 
-#include "include/graphene/chain/stored_value.hpp"
-
 namespace graphene { namespace chain {
 
 static share_type cut_fee(share_type a, uint16_t p)
@@ -58,16 +56,17 @@ stored_value account_balance_object::reduce_balance( share_type delta )
    return balance.split( delta );
 }
 
-class account_balance_backup : public account_balance_object_master
+class account_balance_backup : public account_balance_master
 {
-   private:
+      asset balance;
+      friend class account_balance_object;
+
+   public:
       account_balance_backup( const account_balance_object& original )
-         : account_balance_object_master( original )
+         : account_balance_master( original )
       {
          balance = original.balance.get_value();
       }
-      asset balance;
-      friend class account_statistics_object;
 };
 
 unique_ptr<object> account_balance_object::backup()const
@@ -79,12 +78,12 @@ void account_balance_object::restore( object& obj )
 {
    const auto& backup = static_cast<account_balance_backup&>(obj);
    balance.restore( backup.balance );
-   static_cast<account_balance_object_master&>(*this) = std::move( backup );
+   static_cast<account_balance_master&>(*this) = std::move( backup );
 }
 
 void account_statistics_object::process_fees(const account_object& a, database& d) const
 {
-   if( pending_fees > 0 || pending_vested_fees > 0 )
+   if( pending_fees.get_amount() > 0 || pending_vested_fees.get_amount() > 0 )
    {
       auto pay_out_fees = [&d]( const account_object& account, stored_value&& core_fee, bool require_vesting )
       {
@@ -95,8 +94,8 @@ void account_statistics_object::process_fees(const account_object& a, database& 
                acc.referrer = acc.lifetime_referrer;
             });
 
-         share_type network_cut = cut_fee(core_fee_total, account.network_fee_percentage);
-         assert( network_cut <= core_fee_total );
+         share_type network_cut = cut_fee(core_fee.get_amount(), account.network_fee_percentage);
+         assert( network_cut <= core_fee.get_amount() );
 
 #ifndef NDEBUG
          const auto& props = d.get_global_properties();
@@ -105,8 +104,8 @@ void account_statistics_object::process_fees(const account_object& a, database& 
          share_type accumulated = network_cut - reserveed;
          assert( accumulated + reserveed == network_cut );
 #endif
-         share_type lifetime_cut = cut_fee(core_fee_total, account.lifetime_referrer_fee_percentage);
-         share_type referral = core_fee_total - network_cut - lifetime_cut;
+         share_type lifetime_cut = cut_fee(core_fee.get_amount(), account.lifetime_referrer_fee_percentage);
+         share_type referral = core_fee.get_amount() - network_cut - lifetime_cut;
 
          d.modify( d.get_core_dynamic_data(), [network_cut,&core_fee](asset_dynamic_data_object& addo) {
             addo.accumulated_fees += core_fee.split( network_cut );
@@ -122,11 +121,15 @@ void account_statistics_object::process_fees(const account_object& a, database& 
          d.deposit_cashback(d.get(account.registrar), std::move( core_fee ), require_vesting);
       };
 
-      d.modify(*this, [](account_statistics_object& s) {
+      stored_value transport;
+      stored_value transport_vested;
+      d.modify(*this, [&transport,&transport_vested](account_statistics_object& s) {
          s.lifetime_fees_paid += s.pending_fees.get_amount() + s.pending_vested_fees.get_amount();
+         transport = std::move(s.pending_fees);
+         transport_vested = std::move(s.pending_vested_fees);
       });
-      pay_out_fees(a, std::move( pending_fees ), true);
-      pay_out_fees(a, std::move( pending_vested_fees ), false);
+      pay_out_fees(a, std::move(transport), true);
+      pay_out_fees(a, std::move(transport_vested), false);
    }
 }
 
@@ -138,18 +141,19 @@ void account_statistics_object::pay_fee( stored_value&& core_fee, share_type cas
       pending_vested_fees += std::move( core_fee );
 }
 
-class account_statistics_backup : public account_statistics_object_master
+class account_statistics_backup : public account_statistics_master
 {
-   private:
+      share_type pending_fees;
+      share_type pending_vested_fees;
+      friend class account_statistics_object;
+
+   public:
       account_statistics_backup( const account_statistics_object& original )
-         : account_statistics_object_master( original )
+         : account_statistics_master( original )
       {
          pending_fees = original.pending_fees.get_amount();
          pending_vested_fees = original.pending_vested_fees.get_amount();
       }
-      share_type pending_fees;
-      share_type pending_vested_fees;
-      friend class account_statistics_object;
 };
 
 unique_ptr<object> account_statistics_object::backup()const
@@ -160,9 +164,9 @@ unique_ptr<object> account_statistics_object::backup()const
 void account_statistics_object::restore( object& obj )
 {
    const auto& backup = static_cast<account_statistics_backup&>(obj);
-   pending_fees.restore( asset( asset_id_type(), backup.pending_fees ) );
-   pending_vested_fees.restore( asset( asset_id_type(), backup.pending_fees ) );
-   static_cast<account_statistics_object_master&>(*this) = std::move( backup );
+   pending_fees.restore( asset( backup.pending_fees ) );
+   pending_vested_fees.restore( asset( backup.pending_vested_fees ) );
+   static_cast<account_statistics_master&>(*this) = std::move( backup );
 }
 
 set<account_id_type> account_member_index::get_account_members(const account_object& a)const
@@ -373,15 +377,15 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_object,
                     (allowed_assets)
                     )
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_balance_master,
+FC_REFLECT_DERIVED( graphene::chain::account_balance_master,
                     (graphene::db::object),
-                    (owner)(asset_type)(maintenance_flag) )
+                    (owner)(maintenance_flag) )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_balance_object,
                     (graphene::chain::account_balance_master),
                     (balance) )
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_statistics_master,
+FC_REFLECT_DERIVED( graphene::chain::account_statistics_master,
                     (graphene::db::object),
                     (owner)(name)
                     (most_recent_op)
@@ -395,12 +399,12 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_statistics_master,
                   )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_statistics_object,
-                    (graphene::chain::account_statistics_object),
+                    (graphene::chain::account_statistics_master),
                     (pending_fees)(pending_vested_fees)
                   )
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_object )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_balance_object_master )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_balance_master )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_balance_object )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_statistics_object_master )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_statistics_master )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_statistics_object )

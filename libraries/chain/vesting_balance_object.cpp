@@ -199,7 +199,7 @@ struct NAME ## _visitor                                       \
      ) result_type;                                           \
                                                               \
    NAME ## _visitor(                                          \
-      const asset& balance,                                   \
+      const asset balance,                                    \
       const time_point_sec& now,                              \
       const asset& amount                                     \
      )                                                        \
@@ -225,61 +225,61 @@ VESTING_VISITOR(get_allowed_withdraw, const);
 
 bool vesting_balance_object::is_deposit_allowed(const time_point_sec& now, const asset& amount)const
 {
-   return policy.visit(is_deposit_allowed_visitor(balance, now, amount));
+   return policy.visit(is_deposit_allowed_visitor(balance.get_value(), now, amount));
 }
 
 bool vesting_balance_object::is_withdraw_allowed(const time_point_sec& now, const asset& amount)const
 {
-   bool result = policy.visit(is_withdraw_allowed_visitor(balance, now, amount));
+   bool result = policy.visit(is_withdraw_allowed_visitor(balance.get_value(), now, amount));
    // if some policy allows you to withdraw more than your balance,
    //    there's a programming bug in the policy algorithm
-   assert((amount <= balance) || (!result));
+   assert((amount <= balance.get_value()) || (!result));
    return result;
 }
 
 void vesting_balance_object::deposit(const time_point_sec& now, stored_value&& amount)
 {
-   on_deposit_visitor vtor(balance, now, amount);
+   on_deposit_visitor vtor(balance.get_value(), now, amount.get_value());
    policy.visit(vtor);
-   balance += amount;
+   balance += std::move(amount);
 }
 
 void vesting_balance_object::deposit_vested(const time_point_sec& now, stored_value&& amount)
 {
-   on_deposit_vested_visitor vtor(balance, now, amount);
+   on_deposit_vested_visitor vtor(balance.get_value(), now, amount.get_value());
    policy.visit(vtor);
-   balance += amount;
+   balance += std::move(amount);
 }
 
 bool vesting_balance_object::is_deposit_vested_allowed(const time_point_sec& now, const asset& amount) const
 {
-   return policy.visit(is_deposit_vested_allowed_visitor(balance, now, amount));
+   return policy.visit(is_deposit_vested_allowed_visitor(balance.get_value(), now, amount));
 }
 
 stored_value vesting_balance_object::withdraw(const time_point_sec& now, const asset& amount)
 {
-   assert(amount <= balance);
-   on_withdraw_visitor vtor(balance, now, amount);
+   assert(amount <= balance.get_value());
+   on_withdraw_visitor vtor(balance.get_value(), now, amount);
    policy.visit(vtor);
-   balance -= amount;
+   return balance.split( amount.amount );
 }
 
 asset vesting_balance_object::get_allowed_withdraw(const time_point_sec& now)const
 {
-   asset amount = asset();
-   return policy.visit(get_allowed_withdraw_visitor(balance, now, amount));
+   return policy.visit(get_allowed_withdraw_visitor(balance.get_value(), now, asset()));
 }
 
 class vesting_balance_backup : public vesting_balance_master
 {
-   private:
+      asset balance;
+      friend class vesting_balance_object;
+
+   public:
       vesting_balance_backup( const vesting_balance_object& original )
          : vesting_balance_master( original )
       {
          balance = original.balance.get_value();
       }
-      asset balance;
-      friend class vesting_balance_object;
 };
 
 unique_ptr<object> vesting_balance_object::backup()const
@@ -290,7 +290,7 @@ unique_ptr<object> vesting_balance_object::backup()const
 void vesting_balance_object::restore( object& obj )
 {
    const auto& backup = static_cast<vesting_balance_backup&>(obj);
-   balance.restore( backup.balance ) );
+   balance.restore( backup.balance );
    static_cast<vesting_balance_master&>(*this) = std::move( backup );
 }
 
@@ -298,4 +298,5 @@ void vesting_balance_object::restore( object& obj )
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::linear_vesting_policy )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::cdd_vesting_policy )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::vesting_balance_master )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::vesting_balance_object )

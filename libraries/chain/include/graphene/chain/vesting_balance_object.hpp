@@ -23,6 +23,7 @@
  */
 #pragma once
 
+#include <graphene/chain/stored_value.hpp>
 #include <graphene/db/generic_index.hpp>
 #include <graphene/protocol/asset.hpp>
 
@@ -314,4 +315,5 @@ FC_REFLECT_ENUM( graphene::chain::vesting_balance_type, (unspecified)(cashback)(
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::linear_vesting_policy )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::cdd_vesting_policy )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::vesting_balance_master )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::vesting_balance_object )

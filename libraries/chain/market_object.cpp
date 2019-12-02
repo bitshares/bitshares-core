@@ -33,7 +33,12 @@ namespace graphene { namespace chain {
 
 class limit_order_backup : public limit_order_master
 {
-   private:
+      share_type for_sale;
+      share_type deferred_fee;
+      asset      deferred_paid_fee;
+      friend class limit_order_object;
+
+   public:
       limit_order_backup( const limit_order_object& original )
          : limit_order_master( original )
       {
@@ -41,10 +46,6 @@ class limit_order_backup : public limit_order_master
          deferred_fee = original.deferred_fee.get_amount();
          deferred_paid_fee = original.deferred_paid_fee.get_value();
       }
-      share_type for_sale;
-      share_type deferred_fee;
-      asset      deferred_paid_fee;
-      friend class limit_order_object;
 };
 
 unique_ptr<object> limit_order_object::backup()const
@@ -120,7 +121,7 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
       return 0;
 
    if( !target_collateral_ratio.valid() ) // target cr is not set
-      return debt;
+      return debt.get_amount();
 
    uint16_t tcr = std::max( *target_collateral_ratio, maintenance_collateral_ratio ); // use mcr if target cr is too small
 
@@ -142,20 +143,20 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
    i256 fp_coll_amt = feed_price.base.amount.value;
 
    // firstly we calculate without the fraction (x), the result could be a bit too small
-   i256 numerator = fp_coll_amt * mp_debt_amt * debt.value * tcr
-                  - fp_debt_amt * mp_debt_amt * collateral.value * GRAPHENE_COLLATERAL_RATIO_DENOM;
+   i256 numerator = fp_coll_amt * mp_debt_amt * debt.get_amount().value * tcr
+                  - fp_debt_amt * mp_debt_amt * collateral.get_amount().value * GRAPHENE_COLLATERAL_RATIO_DENOM;
    if( numerator < 0 ) // feed protected, actually should not be true here, just check to be safe
       return 0;
 
    i256 denominator = fp_coll_amt * mp_debt_amt * tcr - fp_debt_amt * mp_coll_amt * GRAPHENE_COLLATERAL_RATIO_DENOM;
    if( denominator <= 0 ) // black swan
-      return debt;
+      return debt.get_amount();
 
    // note: if add 1 here, will result in 1.5x imperfection rate;
    //       however, due to rounding, the result could still be a bit too big, thus imperfect.
    i256 to_cover_i256 = ( numerator / denominator );
-   if( to_cover_i256 >= debt.value ) // avoid possible overflow
-      return debt;
+   if( to_cover_i256 >= debt.get_amount().value ) // avoid possible overflow
+      return debt.get_amount();
    share_type to_cover_amt = static_cast< int64_t >( to_cover_i256 );
 
    // stabilize
@@ -164,9 +165,9 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
    asset to_cover = to_pay * match_price;
    to_pay = to_cover.multiply_and_round_up( match_price );
 
-   if( to_cover.amount >= debt || to_pay.amount >= collateral ) // to be safe
-      return debt;
-   FC_ASSERT( to_pay.amount < collateral && to_cover.amount < debt );
+   if( to_cover.amount >= debt.get_amount() || to_pay.amount >= collateral.get_amount() ) // to be safe
+      return debt.get_amount();
+   FC_ASSERT( to_pay.amount < collateral.get_amount() && to_cover.amount < debt.get_amount() );
 
    // Check whether the collateral ratio after filled is high enough
    // Before core-1270 hard fork, we check with call_price; afterwards, we check with collateralization().
@@ -189,24 +190,24 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
    // be here, to_cover is too small due to rounding. deal with the fraction
    numerator += fp_coll_amt * mp_debt_amt * tcr; // plus the fraction
    to_cover_i256 = ( numerator / denominator ) + 1;
-   if( to_cover_i256 >= debt.value ) // avoid possible overflow
-      to_cover_i256 = debt.value;
+   if( to_cover_i256 >= debt.get_amount().value ) // avoid possible overflow
+      to_cover_i256 = debt.get_amount().value;
    to_cover_amt = static_cast< int64_t >( to_cover_i256 );
 
-   asset max_to_pay = ( ( to_cover_amt == debt.value ) ? get_collateral()
+   asset max_to_pay = ( ( to_cover_amt == debt.get_amount().value ) ? get_collateral()
                         : asset( to_cover_amt, debt_type() ).multiply_and_round_up( match_price ) );
-   if( max_to_pay.amount > collateral )
-      max_to_pay.amount = collateral;
+   if( max_to_pay.amount > collateral.get_amount() )
+      max_to_pay.amount = collateral.get_amount();
 
-   asset max_to_cover = ( ( max_to_pay.amount == collateral ) ? get_debt() : ( max_to_pay * match_price ) );
-   if( max_to_cover.amount >= debt ) // to be safe
+   asset max_to_cover = ( ( max_to_pay.amount == collateral.get_amount() ) ? get_debt() : ( max_to_pay * match_price ) );
+   if( max_to_cover.amount >= debt.get_amount() ) // to be safe
    {
-      max_to_pay.amount = collateral;
-      max_to_cover.amount = debt;
+      max_to_pay.amount = collateral.get_amount();
+      max_to_cover.amount = debt.get_amount();
    }
 
    if( max_to_pay <= to_pay || max_to_cover <= to_cover ) // strange data. should skip binary search and go on, but doesn't help much
-      return debt;
+      return debt.get_amount();
    FC_ASSERT( max_to_pay > to_pay && max_to_cover > to_cover );
 
    asset min_to_pay = to_pay;
@@ -273,9 +274,9 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
       }
 
       // check the mean
-      if( to_pay.amount == max_to_pay.amount && ( max_is_ok || to_pay.amount == collateral ) )
+      if( to_pay.amount == max_to_pay.amount && ( max_is_ok || to_pay.amount == collateral.get_amount() ) )
          return to_cover.amount;
-      FC_ASSERT( to_pay.amount < collateral && to_cover.amount < debt );
+      FC_ASSERT( to_pay.amount < collateral.get_amount() && to_cover.amount < debt.get_amount() );
 
       // Check whether the result is good
       if( result_is_good() ) // good
@@ -301,30 +302,30 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
       if( match_price.base.amount > match_price.quote.amount ) // step of debt is smaller
       {
          to_pay.amount += d2;
-         if( to_pay.amount >= collateral )
-            return debt;
+         if( to_pay.amount >= collateral.get_amount() )
+            return debt.get_amount();
          to_cover = to_pay * match_price;
-         if( to_cover.amount >= debt )
-            return debt;
+         if( to_cover.amount >= debt.get_amount() )
+            return debt.get_amount();
          to_pay = to_cover.multiply_and_round_up( match_price ); // stabilization
-         if( to_pay.amount >= collateral )
-            return debt;
+         if( to_pay.amount >= collateral.get_amount() )
+            return debt.get_amount();
       }
       else // step of collateral is smaller or equal
       {
          to_cover.amount += d2;
-         if( to_cover.amount >= debt )
-            return debt;
+         if( to_cover.amount >= debt.get_amount() )
+            return debt.get_amount();
          to_pay = to_cover.multiply_and_round_up( match_price );
-         if( to_pay.amount >= collateral )
-            return debt;
+         if( to_pay.amount >= collateral.get_amount() )
+            return debt.get_amount();
          to_cover = to_pay * match_price; // stabilization
-         if( to_cover.amount >= debt )
-            return debt;
+         if( to_cover.amount >= debt.get_amount() )
+            return debt.get_amount();
       }
 
       // defensive check
-      FC_ASSERT( to_pay.amount < collateral && to_cover.amount < debt );
+      FC_ASSERT( to_pay.amount < collateral.get_amount() && to_cover.amount < debt.get_amount() );
 
       // Check whether the result is good
       if( result_is_good() ) // good
@@ -335,16 +336,17 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
 
 class call_order_backup : public call_order_master
 {
-   private:
+      asset debt;
+      asset collateral;
+      friend class call_order_object;
+
+   public:
       call_order_backup( const call_order_object& original )
          : call_order_master( original )
       {
          debt = original.debt.get_amount();
          collateral = original.collateral.get_amount();
       }
-      asset debt;
-      asset collateral;
-      friend class call_order_object;
 };
 
 unique_ptr<object> call_order_object::backup()const
@@ -355,21 +357,22 @@ unique_ptr<object> call_order_object::backup()const
 void call_order_object::restore( object& obj )
 {
    const auto& backup = static_cast<call_order_backup&>(obj);
-   debt.restore( backup.debt ) );
-   collateral.restore( backup.collateral ) );
+   debt.restore( backup.debt );
+   collateral.restore( backup.collateral );
    static_cast<call_order_master&>(*this) = std::move( backup );
 }
 
 class force_settlement_backup : public force_settlement_master
 {
-   private:
+      asset balance;
+      friend class force_settlement_object;
+
+   public:
       force_settlement_backup( const force_settlement_object& original )
          : force_settlement_master( original )
       {
          balance = original.balance.get_amount();
       }
-      asset balance;
-      friend class force_settlement_object;
 };
 
 unique_ptr<object> force_settlement_object::backup()const
@@ -380,20 +383,21 @@ unique_ptr<object> force_settlement_object::backup()const
 void force_settlement_object::restore( object& obj )
 {
    const auto& backup = static_cast<force_settlement_backup&>(obj);
-   balance.restore( backup.balance ) );
+   balance.restore( backup.balance );
    static_cast<force_settlement_master&>(*this) = std::move( backup );
 }
 
 class collateral_bid_backup : public collateral_bid_master
 {
-   private:
+      asset collateral_offered;
+      friend class collateral_bid_object;
+
+   public:
       collateral_bid_backup( const collateral_bid_object& original )
          : collateral_bid_master( original )
       {
-         collateral_covered = original.collateral_covered.get_amount();
+         collateral_offered = original.collateral_offered.get_value();
       }
-      asset collateral_covered;
-      friend class collateral_bid_object;
 };
 
 unique_ptr<object> collateral_bid_object::backup()const
@@ -404,27 +408,27 @@ unique_ptr<object> collateral_bid_object::backup()const
 void collateral_bid_object::restore( object& obj )
 {
    const auto& backup = static_cast<collateral_bid_backup&>(obj);
-   collateral_offered.restore( backup.collateral_offered ) );
+   collateral_offered.restore( backup.collateral_offered );
    static_cast<collateral_bid_master&>(*this) = std::move( backup );
 }
 
 } } // graphene::chain
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::limit_order_master,
+FC_REFLECT_DERIVED( graphene::chain::limit_order_master,
                     (graphene::db::object),
                     (expiration)(seller)(sell_price)
                   )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::limit_order_object,
-                    (graphene::db::object),
+                    (graphene::chain::limit_order_master),
                     (for_sale)(deferred_fee)(deferred_paid_fee)
                   )
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::call_order_master, (graphene::db::object),
+FC_REFLECT_DERIVED( graphene::chain::call_order_master, (graphene::db::object),
                     (borrower)(call_price)(target_collateral_ratio) )
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::call_order_object, (graphene::chain::call_order_object),
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::call_order_object, (graphene::chain::call_order_master),
                     (debt)(collateral) )
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::force_settlement_master,
+FC_REFLECT_DERIVED( graphene::chain::force_settlement_master,
                     (graphene::db::object),
                     (owner)(settlement_date)
                   )
@@ -433,7 +437,7 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::force_settlement_object,
                     (balance)
                   )
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::collateral_bid_master, (graphene::db::object),
+FC_REFLECT_DERIVED( graphene::chain::collateral_bid_master, (graphene::db::object),
                     (bidder)(debt_covered) )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::collateral_bid_object,
                     (graphene::chain::collateral_bid_master),

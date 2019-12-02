@@ -53,7 +53,7 @@ namespace graphene { namespace chain {
       void unpack( Stream s, uint32_t _max_depth )
       {
          graphene::protocol::asset amount;
-         unpack( s, amount, _max_depth );
+         fc::raw::unpack( s, amount, _max_depth );
          _asset = amount.asset_id;
          _amount = amount.amount;
       }
@@ -63,7 +63,20 @@ namespace graphene { namespace chain {
       graphene::protocol::share_type _amount;
 
       void restore( const graphene::protocol::asset& backup );
-      friend class object;
+      friend class account_balance_object;
+      friend class account_statistics_object;
+      friend class asset_dynamic_data_object;
+      friend class asset_bitasset_data_object;
+      friend class balance_object;
+      friend class fba_accumulator_object;
+      friend class dynamic_global_property_object;
+      friend class htlc_object;
+      friend class limit_order_object;
+      friend class call_order_object;
+      friend class force_settlement_object;
+      friend class collateral_bid_object;
+      friend class vesting_balance_object;
+      friend class worker_object;
    };
 
    class stored_value : public stored_debt
@@ -90,12 +103,18 @@ namespace graphene { namespace chain {
 } } // graphene::chain
 
 namespace fc {
-/* should be unused
+
 template<>
 void from_variant( const fc::variant& var, graphene::chain::stored_debt& value, uint32_t max_depth )
 {
+   FC_THROW_EXCEPTION( fc::assert_exception, "Unsupported!" );
 }
-*/
+
+template<>
+void from_variant( const fc::variant& var, graphene::chain::stored_value& value, uint32_t max_depth )
+{
+   FC_THROW_EXCEPTION( fc::assert_exception, "Unsupported!" );
+}
 
 template<>
 void to_variant( const graphene::chain::stored_debt& value, fc::variant& var, uint32_t max_depth )
@@ -120,7 +139,23 @@ void pack( Stream& stream, const graphene::chain::stored_debt& value, uint32_t _
 }
 
 template< typename Stream >
+void pack( Stream& stream, const graphene::chain::stored_value& value, uint32_t _max_depth=FC_PACK_MAX_DEPTH )
+{
+   FC_ASSERT( _max_depth > 0 );
+   --_max_depth;
+   pack( stream, value.get_value(), _max_depth );
+}
+
+template< typename Stream >
 void unpack( Stream& s, graphene::chain::stored_debt& value, uint32_t _max_depth=FC_PACK_MAX_DEPTH )
+{
+   FC_ASSERT( _max_depth > 0 );
+   --_max_depth;
+   value.unpack( s, _max_depth );
+}
+
+template< typename Stream >
+void unpack( Stream& s, graphene::chain::stored_value& value, uint32_t _max_depth=FC_PACK_MAX_DEPTH )
 {
    FC_ASSERT( _max_depth > 0 );
    --_max_depth;

@@ -23,10 +23,9 @@
  */
 #pragma once
 #include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/stored_value.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 #include <graphene/protocol/operations.hpp>
-
-#include "stored_value.hpp"
 
 namespace graphene { namespace chain {
 

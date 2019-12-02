@@ -24,12 +24,11 @@
 #pragma once
 
 #include <graphene/chain/types.hpp>
+#include <graphene/chain/stored_value.hpp>
 #include <graphene/db/generic_index.hpp>
 #include <graphene/protocol/asset.hpp>
 
 #include <boost/multi_index/composite_key.hpp>
-
-#include "stored_value.hpp"
 
 namespace graphene { namespace chain {
 

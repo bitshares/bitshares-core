@@ -116,7 +116,6 @@ void_result transfer_from_blind_evaluator::do_apply( const transfer_from_blind_o
 
 void transfer_from_blind_evaluator::prepare_fee(account_id_type account_id, asset fee)
 {
-   const database& d = db();
    FC_ASSERT( fee.amount >= 0 );
 
    tmp_fee = stored_debt(fee.asset_id);                       // account_id borrows the fee temporarily,
@@ -136,8 +135,8 @@ void transfer_from_blind_evaluator::pay_fee()
 void_result blind_transfer_evaluator::do_evaluate( const blind_transfer_operation& o )
 { try {
    const auto& d = db();
-   o.fee.asset_id(db());  // verify fee is a legit asset 
-   const auto& bbi = db().get_index_type<blinded_balance_index>();
+   o.fee.asset_id(d);  // verify fee is a legit asset 
+   const auto& bbi = d.get_index_type<blinded_balance_index>();
    const auto& cidx = bbi.indices().get<by_commitment>();
    for( const auto& out : o.outputs )
    {
@@ -182,7 +181,6 @@ void_result blind_transfer_evaluator::do_apply( const blind_transfer_operation& 
 
 void blind_transfer_evaluator::prepare_fee(account_id_type account_id, asset fee)
 {
-   const database& d = db();
    FC_ASSERT( fee.amount >= 0 );
 
    tmp_fee = stored_debt(fee.asset_id);                       // account_id borrows the fee temporarily,

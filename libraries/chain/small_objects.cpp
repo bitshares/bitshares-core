@@ -48,14 +48,15 @@ namespace graphene { namespace chain {
 
 class balance_backup : public balance_master
 {
-   private:
+      asset balance;
+      friend class balance_object;
+
+   public:
       balance_backup( const balance_object& original )
          : balance_master( original )
       {
          balance = original.balance.get_value();
       }
-      asset balance;
-      friend class balance_object;
 };
 
 unique_ptr<object> balance_object::backup()const
@@ -72,14 +73,15 @@ void balance_object::restore( object& obj )
 
 class dynamic_global_property_backup : public dynamic_global_property_master
 {
-   private:
+      asset witness_budget;
+      friend class dynamic_global_property_object;
+
+   public:
       dynamic_global_property_backup( const dynamic_global_property_object& original )
          : dynamic_global_property_master( original )
       {
          witness_budget = original.witness_budget.get_value();
       }
-      asset witness_budget;
-      friend class dynamic_global_property_object;
 };
 
 unique_ptr<object> dynamic_global_property_object::backup()const
@@ -90,22 +92,23 @@ unique_ptr<object> dynamic_global_property_object::backup()const
 void dynamic_global_property_object::restore( object& obj )
 {
    const auto& backup = static_cast<dynamic_global_property_backup&>(obj);
-   balance.restore( backup.witness_budget ) );
+   witness_budget.restore( backup.witness_budget );
    static_cast<dynamic_global_property_master&>(*this) = std::move( backup );
 }
 
 class htlc_backup : public htlc_master
 {
-   private:
+      asset amount;
+      transfer_info_master transfer;
+      friend class htlc_object;
+
+   public:
       htlc_backup( const htlc_object& original )
          : htlc_master( original )
       {
          transfer = original.transfer;
          amount = original.transfer.amount.get_value();
       }
-      asset amount;
-      transfer_info_master transfer;
-      friend class htlc_object;
 };
 
 unique_ptr<object> htlc_object::backup()const
@@ -123,7 +126,7 @@ void htlc_object::restore( object& obj )
 
 } } // graphene::chain
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::balance_master, (graphene::db::object),
+FC_REFLECT_DERIVED( graphene::chain::balance_master, (graphene::db::object),
                     (owner)(vesting_policy)(last_claim_date) )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::balance_object, (graphene::chain::balance_master),
                     (balance) )
@@ -172,7 +175,7 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::committee_member_object, (graph
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::blinded_balance_object, (graphene::db::object),
                                 (commitment)(asset_id)(owner) )
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::dynamic_global_property_master, (graphene::db::object),
+FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_master, (graphene::db::object),
                     (head_block_number)
                     (head_block_id)
                     (time)
@@ -198,18 +201,18 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::global_property_object, (graphe
                     (active_witnesses)
                   )
 
-FC_REFLECT( graphene::chain::htlc_master::transfer_info_master, (from) (to) )
+FC_REFLECT( graphene::chain::htlc_master::transfer_info_master, (from)(to) )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::condition_info::hash_lock_info, BOOST_PP_SEQ_NIL,
    (preimage_hash) (preimage_size) )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::condition_info::time_lock_info, BOOST_PP_SEQ_NIL,
    (expiration) )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::condition_info, BOOST_PP_SEQ_NIL,
    (hash_lock)(time_lock) )
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_master, (graphene::db::object),
+FC_REFLECT_DERIVED( graphene::chain::htlc_master, (graphene::db::object),
                (conditions) )
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::transfer_info,
-                                (graphene::chain::htlc_master::transfer_info_master),
-                                (from) (to) )
+FC_REFLECT_DERIVED( graphene::chain::htlc_object::transfer_info,
+                    (graphene::chain::htlc_master::transfer_info_master),
+                    (amount) )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object, (graphene::chain::htlc_master),
                (transfer) )
 
