@@ -44,7 +44,7 @@ namespace graphene { namespace chain {
           */
          virtual void pay_fee() override;
       private:
-         bool fee_is_odd;
+         stored_value for_pool;
    };
 
    class asset_issue_evaluator : public evaluator<asset_issue_evaluator>
