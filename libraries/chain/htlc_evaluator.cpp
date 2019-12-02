@@ -64,13 +64,13 @@ namespace graphene {
       {
          try {
             graphene::chain::database& dbase = db();
-            dbase.adjust_balance( o.from, -o.amount );
 
-            const htlc_object& esc = db().create<htlc_object>([&dbase,&o]( htlc_object& esc ) {
+            stored_value transport = dbase.reduce_balance( o.from, o.amount );
+
+            const htlc_object& esc = db().create<htlc_object>([&dbase,&o,&transport]( htlc_object& esc ) {
                esc.transfer.from                  = o.from;
                esc.transfer.to                    = o.to;
-               esc.transfer.amount                = o.amount.amount;
-               esc.transfer.asset_id              = o.amount.asset_id;
+               esc.transfer.amount                = std::move(transport);
                esc.conditions.hash_lock.preimage_hash = o.preimage_hash;
                esc.conditions.hash_lock.preimage_size = o.preimage_size;
                esc.conditions.time_lock.expiration    = dbase.head_block_time() + o.claim_period_seconds;
@@ -111,12 +111,18 @@ namespace graphene {
 
       void_result htlc_redeem_evaluator::do_apply(const htlc_redeem_operation& o)
       {
-         const auto amount = asset(htlc_obj->transfer.amount, htlc_obj->transfer.asset_id);
-         db().adjust_balance(htlc_obj->transfer.to, amount);
          // notify related parties
-         htlc_redeemed_operation virt_op( htlc_obj->id, htlc_obj->transfer.from, htlc_obj->transfer.to, o.redeemer,
-               amount, htlc_obj->conditions.hash_lock.preimage_hash, htlc_obj->conditions.hash_lock.preimage_size );
+         htlc_redeemed_operation virt_op( htlc_obj->id, htlc_obj->transfer.from, htlc_obj->transfer.to,
+               o.redeemer, htlc_obj->transfer.amount.get_value(),
+               htlc_obj->conditions.hash_lock.preimage_hash, htlc_obj->conditions.hash_lock.preimage_size );
          db().push_applied_operation( virt_op );
+
+         stored_value transport;
+         db().modify( *htlc_obj, [&transport] ( htlc_object& htlc ) {
+            transport = std::move(htlc.transfer.amount);
+         });
+         db().add_balance(htlc_obj->transfer.to, std::move(transport));
+
          db().remove(*htlc_obj);
          return void_result();
       }

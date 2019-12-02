@@ -57,7 +57,6 @@ struct worker_init_visitor
       vesting_balance_worker_type w;
        w.balance = db.create<vesting_balance_object>([&](vesting_balance_object& b) {
          b.owner = worker.worker_account;
-         b.balance = asset(0);
          b.balance_type = vesting_balance_type::worker;
 
          cdd_vesting_policy policy;
@@ -122,7 +121,7 @@ void vesting_balance_worker_type::pay_worker(stored_value&& pay, database& db)
 
 void burn_worker_type::pay_worker(stored_value&& pay, database& db)
 {
-   total_burned += pay;
+   total_burned += pay.get_amount();
    db.add_balance( GRAPHENE_NULL_ACCOUNT, std::move(pay) );
 }
 

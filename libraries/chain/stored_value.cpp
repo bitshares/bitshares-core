@@ -40,10 +40,10 @@ namespace graphene { namespace chain {
       move._amount = 0;
    }
 
-   stored_debt& stored_debt::operator=( stored_value&& other )
+   stored_debt& stored_debt::operator=( stored_debt&& other )
    {
       if( &other == this ) return *this;
-      FC_ASSERT( _amount.value == 0 && (_asset == asset_id_type() || _asset == other._asset),
+      FC_ASSERT( _amount.value == 0 && (_asset == graphene::protocol::asset_id_type() || _asset == other._asset),
                  "Can't overwrite (${n},${a}) with (${on},${oa})!",
                  ("on",other._amount.value)("oa",other._asset)("n",_amount.value)("a",_asset) );
       _asset = other._asset;
@@ -78,13 +78,6 @@ namespace graphene { namespace chain {
    graphene::protocol::asset stored_debt::get_value()const
    {
       return graphene::protocol::asset( _amount, _asset );
-   }
-
-   void stored_debt::restore( const graphene::protocol::asset& backup )
-   {
-      FC_ASSERT( _asset == backup.asset_id, "Corrupted backup: ${a} != ${b}",
-                 ("a",_asset)("b",backup.asset_id) );
-      _amount = backup.amount;
    }
 
 

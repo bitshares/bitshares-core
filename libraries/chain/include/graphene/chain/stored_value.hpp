@@ -30,8 +30,6 @@ namespace graphene { namespace chain {
 
    class stored_debt
    {
-      graphene::protocol::asset_id_type _asset;
-      graphene::protocol::share_type _amount;
    public:
       explicit stored_debt( const graphene::protocol::asset_id_type asset = graphene::protocol::asset_id_type() );
       ~stored_debt();
@@ -61,6 +59,9 @@ namespace graphene { namespace chain {
       }
 
    protected:
+      graphene::protocol::asset_id_type _asset;
+      graphene::protocol::share_type _amount;
+
       void restore( const graphene::protocol::asset& backup );
       friend class object;
    };

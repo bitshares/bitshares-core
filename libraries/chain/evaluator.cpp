@@ -83,7 +83,9 @@ database& generic_evaluator::db()const { return trx_state->db(); }
 
    void generic_evaluator::convert_fee()
    {
-      if( !trx_state->skip_fee && fee_asset->get_id() != asset_id_type() )
+      if( fee_asset->get_id() == asset_id_type() )
+         core_fee_paid = std::move(fee_from_account);
+      else if( !trx_state->skip_fee )
          db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
             d.accumulated_fees += std::move(fee_from_account);
             core_fee_paid = d.fee_pool.split( fee_from_pool );

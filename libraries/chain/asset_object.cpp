@@ -39,10 +39,12 @@ class asset_dynamic_data_backup : public asset_dynamic_data_master
          current_supply = original.current_supply.get_value();
          accumulated_fees = original.accumulated_fees.get_amount();
          fee_pool = original.fee_pool.get_amount();
+         confidential_supply = original.confidential_supply.get_amount();
       }
       asset current_supply;
       share_type accumulated_fees;
       share_type fee_pool;
+      share_type confidential_supply;
       friend class asset_dynamic_data_object;
 };
 
@@ -57,6 +59,7 @@ void asset_dynamic_data_object::restore( object& obj )
    current_supply.restore( backup.current_supply ) );
    accumulated_fees.restore( asset( backup.accumulated_fees, backup.current_supply.asset_id ) );
    fee_pool.restore( asset( backup.fee_pool ) );
+   confidential_supply.restore( asset( backup.confidential_supply, backup.current_supply.asset_id ) );
    static_cast<asset_dynamic_data_master&>(*this) = std::move( backup );
 }
 
@@ -235,11 +238,10 @@ string asset_object::amount_to_string(share_type amount) const
 
 } } // graphene::chain
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_dynamic_data_master, (graphene::db::object),
-                    (confidential_supply)(accumulated_fees)(fee_pool) )
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_dynamic_data_master, (graphene::db::object), )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_dynamic_data_object,
                     (graphene::chain::asset_dynamic_data_master),
-                    (current_supply) )
+                    (current_supply)(accumulated_fees)(fee_pool)(confidential_supply) )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_bitasset_data_object, (graphene::db::object),
                     (asset_id)

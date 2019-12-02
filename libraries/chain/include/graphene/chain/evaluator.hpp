@@ -83,7 +83,7 @@ namespace graphene { namespace chain {
        *
        * In particular, fee_from_account and fee_from_pool fields are set by prepare_fee().
        */
-      void prepare_fee(account_id_type account_id, asset fee);
+      virtual void prepare_fee(account_id_type account_id, asset fee);
 
       /**
        * Convert the fee into BTS through the exchange pool.

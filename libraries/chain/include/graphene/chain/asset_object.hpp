@@ -61,8 +61,6 @@ namespace graphene { namespace chain {
       public:
          static constexpr uint8_t space_id = implementation_ids;
          static constexpr uint8_t type_id  = impl_asset_dynamic_data_object_type;
-
-         share_type confidential_supply; ///< total asset held in confidential balances
    };
 
    class asset_dynamic_data_object : public asset_dynamic_data_master
@@ -72,6 +70,7 @@ namespace graphene { namespace chain {
          stored_debt current_supply;
          stored_value accumulated_fees; ///< fees accumulate to be paid out over time
          stored_value fee_pool;         ///< in core asset
+         stored_value confidential_supply; ///< total asset held in confidential balances
 
    protected:
       virtual unique_ptr<graphene::db::object> backup()const;

@@ -105,8 +105,7 @@ void_result withdraw_permission_claim_evaluator::do_apply(const withdraw_permiss
          p.claimed_this_period = op.amount_to_withdraw.amount;
    });
 
-   d.adjust_balance(op.withdraw_from_account, -op.amount_to_withdraw);
-   d.adjust_balance(op.withdraw_to_account, op.amount_to_withdraw);
+   d.add_balance( op.withdraw_to_account, d.reduce_balance(op.withdraw_from_account, op.amount_to_withdraw) );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }

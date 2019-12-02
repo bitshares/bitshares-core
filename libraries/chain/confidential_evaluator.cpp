@@ -51,12 +51,12 @@ void_result transfer_to_blind_evaluator::do_evaluate( const transfer_to_blind_op
 
 void_result transfer_to_blind_evaluator::do_apply( const transfer_to_blind_operation& o ) 
 { try {
-   db().adjust_balance( o.from, -o.amount ); 
+   stored_value transport = db().reduce_balance( o.from, o.amount );
 
    const auto& add = o.amount.asset_id(db()).dynamic_asset_data_id(db());  // verify fee is a legit asset 
-   db().modify( add, [&]( asset_dynamic_data_object& obj ){
-      obj.confidential_supply += o.amount.amount;
-      FC_ASSERT( obj.confidential_supply >= 0 );
+   db().modify( add, [&transport]( asset_dynamic_data_object& obj ){
+      obj.confidential_supply += std::move(transport);
+      FC_ASSERT( obj.confidential_supply.get_amount() >= 0 );
    });
    for( const auto& out : o.outputs )
    {
@@ -95,8 +95,6 @@ void_result transfer_from_blind_evaluator::do_evaluate( const transfer_from_blin
 
 void_result transfer_from_blind_evaluator::do_apply( const transfer_from_blind_operation& o ) 
 { try {
-   db().adjust_balance( o.fee_payer(), o.fee ); 
-   db().adjust_balance( o.to, o.amount ); 
    const auto& bbi = db().get_index_type<blinded_balance_index>();
    const auto& cidx = bbi.indices().get<by_commitment>();
    for( const auto& in : o.inputs )
@@ -105,13 +103,27 @@ void_result transfer_from_blind_evaluator::do_apply( const transfer_from_blind_o
       FC_ASSERT( itr != cidx.end() );
       db().remove( *itr );
    }
-   const auto& add = o.amount.asset_id(db()).dynamic_asset_data_id(db());  // verify fee is a legit asset 
-   db().modify( add, [&]( asset_dynamic_data_object& obj ){
-      obj.confidential_supply -= o.amount.amount + o.fee.amount;
-      FC_ASSERT( obj.confidential_supply >= 0 );
+   const auto& add = o.amount.asset_id(db()).dynamic_asset_data_id(db());
+   stored_value transport;
+   db().modify( add, [&o,&transport]( asset_dynamic_data_object& obj ){
+      transport = obj.confidential_supply.split( o.amount.amount + o.fee.amount );
    });
+   tmp_fee.burn( transport.split(o.fee.amount) );
+   db().add_balance( o.to, std::move(transport) );
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
+
+void transfer_from_blind_evaluator::prepare_fee(account_id_type account_id, asset fee)
+{
+   const database& d = db();
+   FC_ASSERT( fee.amount >= 0 );
+
+   tmp_fee = stored_debt(fee.asset_id);                       // account_id borrows the fee temporarily,
+   db().add_balance( account_id, tmp_fee.issue(fee.amount) ); // which is paid back from the blinded balance
+
+   generic_evaluator::prepare_fee( account_id, fee );
+}
 
 void transfer_from_blind_evaluator::pay_fee()
 {
@@ -144,7 +156,6 @@ void_result blind_transfer_evaluator::do_evaluate( const blind_transfer_operatio
 
 void_result blind_transfer_evaluator::do_apply( const blind_transfer_operation& o ) 
 { try {
-   db().adjust_balance( o.fee_payer(), o.fee ); // deposit the fee to the temp account
    const auto& bbi = db().get_index_type<blinded_balance_index>();
    const auto& cidx = bbi.indices().get<by_commitment>();
    for( const auto& in : o.inputs )
@@ -162,13 +173,23 @@ void_result blind_transfer_evaluator::do_apply( const blind_transfer_operation& 
       });
    }
    const auto& add = o.fee.asset_id(db()).dynamic_asset_data_id(db());  
-   db().modify( add, [&]( asset_dynamic_data_object& obj ){
-      obj.confidential_supply -= o.fee.amount;
-      FC_ASSERT( obj.confidential_supply >= 0 );
+   db().modify( add, [this,&o]( asset_dynamic_data_object& obj ){
+      tmp_fee.burn( obj.confidential_supply.split(o.fee.amount) );
    });
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
+
+void blind_transfer_evaluator::prepare_fee(account_id_type account_id, asset fee)
+{
+   const database& d = db();
+   FC_ASSERT( fee.amount >= 0 );
+
+   tmp_fee = stored_debt(fee.asset_id);                       // account_id borrows the fee temporarily,
+   db().add_balance( account_id, tmp_fee.issue(fee.amount) ); // which is paid back from the blinded balance
+
+   generic_evaluator::prepare_fee( account_id, fee );
+}
 
 void blind_transfer_evaluator::pay_fee()
 {
