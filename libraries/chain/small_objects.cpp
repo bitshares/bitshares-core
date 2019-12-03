@@ -126,8 +126,6 @@ void htlc_object::restore( object& obj )
 
 } } // graphene::chain
 
-FC_REFLECT_DERIVED( graphene::chain::balance_master, (graphene::db::object),
-                    (owner)(vesting_policy)(last_claim_date) )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::balance_object, (graphene::chain::balance_master),
                     (balance) )
 
@@ -175,20 +173,6 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::committee_member_object, (graph
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::blinded_balance_object, (graphene::db::object),
                                 (commitment)(asset_id)(owner) )
 
-FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_master, (graphene::db::object),
-                    (head_block_number)
-                    (head_block_id)
-                    (time)
-                    (current_witness)
-                    (next_maintenance_time)
-                    (last_budget_time)
-                    (accounts_registered_this_interval)
-                    (recently_missed_count)
-                    (current_aslot)
-                    (recent_slots_filled)
-                    (dynamic_flags)
-                    (last_irreversible_block_num)
-                  )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::dynamic_global_property_object, (graphene::chain::dynamic_global_property_master),
                     (witness_budget)
                   )
@@ -201,15 +185,6 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::global_property_object, (graphe
                     (active_witnesses)
                   )
 
-FC_REFLECT( graphene::chain::htlc_master::transfer_info_master, (from)(to) )
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::condition_info::hash_lock_info, BOOST_PP_SEQ_NIL,
-   (preimage_hash) (preimage_size) )
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::condition_info::time_lock_info, BOOST_PP_SEQ_NIL,
-   (expiration) )
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::condition_info, BOOST_PP_SEQ_NIL,
-   (hash_lock)(time_lock) )
-FC_REFLECT_DERIVED( graphene::chain::htlc_master, (graphene::db::object),
-               (conditions) )
 FC_REFLECT_DERIVED( graphene::chain::htlc_object::transfer_info,
                     (graphene::chain::htlc_master::transfer_info_master),
                     (amount) )

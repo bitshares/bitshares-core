@@ -115,7 +115,7 @@ namespace graphene { namespace wallet { namespace detail {
       try
       {
          FC_ASSERT( !self.is_locked() );
-         fc::optional<htlc_object> htlc_obj = get_htlc(htlc_id);
+         fc::optional<htlc_api_object> htlc_obj = get_htlc(htlc_id);
          FC_ASSERT(htlc_obj, "Could not find HTLC matching ${htlc}", ("htlc", htlc_id));
 
          account_object issuer_obj = get_account(issuer);
@@ -140,7 +140,7 @@ namespace graphene { namespace wallet { namespace detail {
       try
       {
          FC_ASSERT( !self.is_locked() );
-         fc::optional<htlc_object> htlc_obj = get_htlc(htlc_id);
+         fc::optional<htlc_api_object> htlc_obj = get_htlc(htlc_id);
          FC_ASSERT(htlc_obj, "Could not find HTLC matching ${htlc}", ("htlc", htlc_id));
 
          account_object issuer_obj = get_account(issuer);
@@ -159,7 +159,7 @@ namespace graphene { namespace wallet { namespace detail {
       } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(seconds_to_add)(broadcast) )
    }
 
-   fc::optional<htlc_object> wallet_api_impl::get_htlc(string htlc_id) const
+   fc::optional<graphene::app::htlc_api_object> wallet_api_impl::get_htlc(string htlc_id) const
    {
       htlc_id_type id;
       fc::from_variant(htlc_id, id);

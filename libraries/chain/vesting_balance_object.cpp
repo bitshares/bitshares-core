@@ -264,9 +264,14 @@ stored_value vesting_balance_object::withdraw(const time_point_sec& now, const a
    return balance.split( amount.amount );
 }
 
+asset vesting_balance_master::get_allowed_withdraw( const asset& balance, const time_point_sec& now )const
+{
+   return policy.visit(get_allowed_withdraw_visitor(balance, now, asset()));
+}
+
 asset vesting_balance_object::get_allowed_withdraw(const time_point_sec& now)const
 {
-   return policy.visit(get_allowed_withdraw_visitor(balance.get_value(), now, asset()));
+   return vesting_balance_master::get_allowed_withdraw( balance.get_value(), now );
 }
 
 class vesting_balance_backup : public vesting_balance_master

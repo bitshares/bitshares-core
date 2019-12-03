@@ -414,31 +414,19 @@ void collateral_bid_object::restore( object& obj )
 
 } } // graphene::chain
 
-FC_REFLECT_DERIVED( graphene::chain::limit_order_master,
-                    (graphene::db::object),
-                    (expiration)(seller)(sell_price)
-                  )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::limit_order_object,
                     (graphene::chain::limit_order_master),
                     (for_sale)(deferred_fee)(deferred_paid_fee)
                   )
 
-FC_REFLECT_DERIVED( graphene::chain::call_order_master, (graphene::db::object),
-                    (borrower)(call_price)(target_collateral_ratio) )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::call_order_object, (graphene::chain::call_order_master),
                     (debt)(collateral) )
 
-FC_REFLECT_DERIVED( graphene::chain::force_settlement_master,
-                    (graphene::db::object),
-                    (owner)(settlement_date)
-                  )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::force_settlement_object,
                     (graphene::chain::force_settlement_master),
                     (balance)
                   )
 
-FC_REFLECT_DERIVED( graphene::chain::collateral_bid_master, (graphene::db::object),
-                    (bidder)(debt_covered) )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::collateral_bid_object,
                     (graphene::chain::collateral_bid_master),
                     (collateral_offered) )

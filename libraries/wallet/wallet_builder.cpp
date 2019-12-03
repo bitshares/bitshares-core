@@ -62,7 +62,7 @@ namespace graphene { namespace wallet { namespace detail {
             total_fee += gprops.get_current_fees().set_fee( op, fee_asset_obj.options.core_exchange_rate );
 
          FC_ASSERT((total_fee * fee_asset_obj.options.core_exchange_rate).amount <=
-                   get_object(fee_asset_obj.dynamic_asset_data_id).fee_pool,
+                   get_object(fee_asset_obj.dynamic_asset_data_id).fee_pool.get_amount(), // FIXME
                    "Cannot pay fees in ${asset}, as this asset's fee pool is insufficiently funded.",
                    ("asset", fee_asset_obj.symbol));
       } else {

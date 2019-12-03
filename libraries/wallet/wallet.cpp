@@ -210,10 +210,10 @@ signed_transaction wallet_api::htlc_create( string source, string destination, s
 
 fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
 {
-   fc::optional<htlc_object> optional_obj = my->get_htlc(htlc_id);
+   fc::optional<graphene::app::htlc_api_object> optional_obj = my->get_htlc(htlc_id);
    if ( optional_obj.valid() )
    {
-      const htlc_object& obj = *optional_obj;
+      const auto& obj = *optional_obj;
       // convert to formatted variant
       fc::mutable_variant_object transfer;
       const auto& from = my->get_account( obj.transfer.from );
@@ -426,7 +426,7 @@ vector<bucket_object> wallet_api::get_market_history(
    return my->_remote_hist->get_market_history( symbol1, symbol2, bucket, start, end );
 }
 
-vector<limit_order_object> wallet_api::get_account_limit_orders(
+vector<graphene::app::limit_order_api_object> wallet_api::get_account_limit_orders(
       const string& name_or_id,
       const string &base,
       const string &quote,
@@ -437,22 +437,22 @@ vector<limit_order_object> wallet_api::get_account_limit_orders(
    return my->_remote_db->get_account_limit_orders(name_or_id, base, quote, limit, ostart_id, ostart_price);
 }
 
-vector<limit_order_object> wallet_api::get_limit_orders(std::string a, std::string b, uint32_t limit)const
+vector<graphene::app::limit_order_api_object> wallet_api::get_limit_orders(std::string a, std::string b, uint32_t limit)const
 {
    return my->_remote_db->get_limit_orders(a, b, limit);
 }
 
-vector<call_order_object> wallet_api::get_call_orders(std::string a, uint32_t limit)const
+vector<graphene::app::call_order_api_object> wallet_api::get_call_orders(std::string a, uint32_t limit)const
 {
    return my->_remote_db->get_call_orders(a, limit);
 }
 
-vector<force_settlement_object> wallet_api::get_settle_orders(std::string a, uint32_t limit)const
+vector<graphene::app::force_settlement_api_object> wallet_api::get_settle_orders(std::string a, uint32_t limit)const
 {
    return my->_remote_db->get_settle_orders(a, limit);
 }
 
-vector<collateral_bid_object> wallet_api::get_collateral_bids(std::string asset, uint32_t limit, uint32_t start)const
+vector<graphene::app::collateral_bid_api_object> wallet_api::get_collateral_bids(std::string asset, uint32_t limit, uint32_t start)const
 {
    return my->_remote_db->get_collateral_bids(asset, limit, start);
 }
@@ -567,11 +567,11 @@ extended_asset_object wallet_api::get_asset(string asset_name_or_id) const
    return *a;
 }
 
-asset_bitasset_data_object wallet_api::get_bitasset_data(string asset_name_or_id) const
+variant wallet_api::get_bitasset_data(string asset_name_or_id) const
 {
    auto asset = get_asset(asset_name_or_id);
    FC_ASSERT(asset.is_market_issued() && asset.bitasset_data_id);
-   return my->get_object(*asset.bitasset_data_id);
+   return my->_remote_db->get_objects({*asset.bitasset_data_id}, {}).front();;
 }
 
 account_id_type wallet_api::get_account_id(string account_name_or_id) const
@@ -1097,7 +1097,7 @@ global_property_object wallet_api::get_global_properties() const
    return my->get_global_properties();
 }
 
-dynamic_global_property_object wallet_api::get_dynamic_global_properties() const
+dynamic_global_property_api_object wallet_api::get_dynamic_global_properties() const
 {
    return my->get_dynamic_global_properties();
 }
@@ -1920,11 +1920,11 @@ signed_block_with_info::signed_block_with_info( const signed_block& block )
 }
 
 vesting_balance_object_with_info::vesting_balance_object_with_info(
-      const vesting_balance_object& vbo,
+      const vesting_balance_api_object& vbo,
       fc::time_point_sec now )
-   : vesting_balance_object( vbo )
+   : vesting_balance_api_object( vbo )
 {
-   allowed_withdraw = get_allowed_withdraw( now );
+   allowed_withdraw = get_allowed_withdraw( balance, now );
    allowed_withdraw_time = now;
 }
 

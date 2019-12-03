@@ -452,6 +452,23 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::account_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::account_balance_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::account_statistics_object)
 
+FC_REFLECT_DERIVED( graphene::chain::account_balance_master,
+                    (graphene::db::object),
+                    (owner)(maintenance_flag) )
+
+FC_REFLECT_DERIVED( graphene::chain::account_statistics_master,
+                    (graphene::db::object),
+                    (owner)(name)
+                    (most_recent_op)
+                    (total_ops)(removed_ops)
+                    (total_core_in_orders)
+                    (core_in_balance)
+                    (has_cashback_vb)
+                    (is_voting)
+                    (last_vote_time)
+                    (lifetime_fees_paid)
+                  )
+
 FC_REFLECT_TYPENAME( graphene::chain::account_object )
 FC_REFLECT_TYPENAME( graphene::chain::account_balance_object )
 FC_REFLECT_TYPENAME( graphene::chain::account_statistics_object )

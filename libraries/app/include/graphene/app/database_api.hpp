@@ -215,7 +215,7 @@ class database_api
       /**
        * @brief Retrieve the current @ref graphene::chain::dynamic_global_property_object
        */
-      dynamic_global_property_object get_dynamic_global_properties()const;
+      dynamic_global_property_api_object get_dynamic_global_properties()const;
 
       //////////
       // Keys //
@@ -339,7 +339,7 @@ class database_api
        * @param addrs a list of addresses
        * @return all unclaimed balance objects for the addresses
        */
-      vector<balance_object> get_balance_objects( const vector<address>& addrs )const;
+      vector<balance_api_object> get_balance_objects( const vector<address>& addrs )const;
 
       /**
        * @brief Calculate how much assets in the given balance objects are able to be claimed at current head
@@ -354,7 +354,7 @@ class database_api
        * @param account_name_or_id name or ID of an account
        * @return all vesting balance objects owned by the account
        */
-      vector<vesting_balance_object> get_vesting_balances( const std::string account_name_or_id )const;
+      vector<vesting_balance_api_object> get_vesting_balances( const std::string account_name_or_id )const;
 
       /**
        * @brief Get the total number of accounts registered with the blockchain
@@ -429,7 +429,7 @@ class database_api
        * @param limit Maximum number of orders to retrieve
        * @return The limit orders, ordered from least price to greatest
        */
-      vector<limit_order_object> get_limit_orders(std::string a, std::string b, uint32_t limit)const;
+      vector<limit_order_api_object> get_limit_orders(std::string a, std::string b, uint32_t limit)const;
 
       /**
        * @brief Fetch all orders relevant to the specified account and specified market, result orders
@@ -454,7 +454,7 @@ class database_api
        *    was just canceled accidentally, in such case, the result orders' price may lower or equal to
        *    @p ostart_price, but orders' id greater than @p ostart_id
        */
-      vector<limit_order_object> get_account_limit_orders( const string& account_name_or_id,
+      vector<limit_order_api_object> get_account_limit_orders( const string& account_name_or_id,
                                     const string &base,
                                     const string &quote,
                                     uint32_t limit = 101,
@@ -467,7 +467,7 @@ class database_api
        * @param limit Maximum number of orders to retrieve
        * @return The call orders, ordered from earliest to be called to latest
        */
-      vector<call_order_object> get_call_orders(const std::string& a, uint32_t limit)const;
+      vector<call_order_api_object> get_call_orders(const std::string& a, uint32_t limit)const;
 
       /**
        * @brief Get call orders (aka margin positions) of a given account
@@ -476,7 +476,7 @@ class database_api
        * @param limit Maximum number of objects to retrieve
        * @return The call orders of the account
        */
-      vector<call_order_object> get_call_orders_by_account(const std::string& account_name_or_id,
+      vector<call_order_api_object> get_call_orders_by_account(const std::string& account_name_or_id,
                                                            asset_id_type start, uint32_t limit)const;
 
       /**
@@ -485,7 +485,7 @@ class database_api
        * @param limit Maximum number of orders to retrieve
        * @return The settle orders, ordered from earliest settlement date to latest
        */
-      vector<force_settlement_object> get_settle_orders(const std::string& a, uint32_t limit)const;
+      vector<force_settlement_api_object> get_settle_orders(const std::string& a, uint32_t limit)const;
 
       /**
        * @brief Get forced settlement orders of a given account
@@ -494,7 +494,7 @@ class database_api
        * @param limit Maximum number of orders to retrieve
        * @return The settle orders of the account
        */
-      vector<force_settlement_object> get_settle_orders_by_account( const std::string& account_name_or_id,
+      vector<force_settlement_api_object> get_settle_orders_by_account( const std::string& account_name_or_id,
                                                                     force_settlement_id_type start,
                                                                     uint32_t limit )const;
 
@@ -505,7 +505,7 @@ class database_api
        * @param start skip that many results
        * @return The settle orders, ordered from earliest settlement date to latest
        */
-      vector<collateral_bid_object> get_collateral_bids(const std::string& a, uint32_t limit, uint32_t start)const;
+      vector<collateral_bid_api_object> get_collateral_bids(const std::string& a, uint32_t limit, uint32_t start)const;
 
       /**
        * @brief Get all open margin positions of a given account
@@ -514,7 +514,7 @@ class database_api
        *
        * Similar to @ref get_call_orders_by_account, but without pagination.
        */
-      vector<call_order_object> get_margin_positions( const std::string account_name_or_id )const;
+      vector<call_order_api_object> get_margin_positions( const std::string account_name_or_id )const;
 
       /**
        * @brief Request notification when the active orders in the market between two assets changes
@@ -854,7 +854,7 @@ class database_api
        *                   (see @ref set_auto_subscription)
        *  @return HTLC object for the id
        */
-      optional<htlc_object> get_htlc( htlc_id_type id, optional<bool> subscribe = optional<bool>() ) const;
+      optional<htlc_api_object> get_htlc( htlc_id_type id, optional<bool> subscribe = optional<bool>() ) const;
 
       /**
        *  @brief Get non expired HTLC objects using the sender account
@@ -863,7 +863,7 @@ class database_api
        *  @param limit Maximum number of objects to retrieve
        *  @return HTLC objects for the account
        */
-      vector<htlc_object> get_htlc_by_from( const std::string account_name_or_id,
+      vector<htlc_api_object> get_htlc_by_from( const std::string account_name_or_id,
                                             htlc_id_type start,
                                             uint32_t limit ) const;
 
@@ -874,7 +874,7 @@ class database_api
        *  @param limit Maximum number of objects to retrieve
        *  @return HTLC objects for the account
       */
-      vector<htlc_object> get_htlc_by_to( const std::string account_name_or_id,
+      vector<htlc_api_object> get_htlc_by_to( const std::string account_name_or_id,
                                           htlc_id_type start,
                                           uint32_t limit ) const;
 
@@ -884,7 +884,7 @@ class database_api
        * @param limit Maximum number of htlc objects to fetch
        * @return The htlc object list
       */
-      vector<htlc_object> list_htlcs(const htlc_id_type start, uint32_t limit) const;
+      vector<htlc_api_object> list_htlcs(const htlc_id_type start, uint32_t limit) const;
 
 
 private:

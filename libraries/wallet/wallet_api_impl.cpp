@@ -172,7 +172,7 @@ namespace graphene { namespace wallet { namespace detail {
    {
       return _remote_db->get_global_properties();
    }
-   dynamic_global_property_object wallet_api_impl::get_dynamic_global_properties() const
+   graphene::app::dynamic_global_property_api_object wallet_api_impl::get_dynamic_global_properties() const
    {
       return _remote_db->get_dynamic_global_properties();
    }

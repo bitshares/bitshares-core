@@ -36,6 +36,12 @@ namespace graphene { namespace chain {
          bool is_vesting_balance()const
          { return vesting_policy.valid(); }
 
+         asset available( const asset& balance, const fc::time_point_sec now )const
+         {
+            return is_vesting_balance()? vesting_policy->get_allowed_withdraw({balance, now, {}})
+                                       : balance;
+         }
+
          address owner;
          optional<linear_vesting_policy> vesting_policy;
          time_point_sec last_claim_date;
@@ -44,10 +50,9 @@ namespace graphene { namespace chain {
    class balance_object : public balance_master
    {
       public:
-         asset available(fc::time_point_sec now)const
+         asset available(const fc::time_point_sec now)const
          {
-            return is_vesting_balance()? vesting_policy->get_allowed_withdraw({balance.get_value(), now, {}})
-                                       : balance.get_value();
+            return balance_master::available( balance.get_value(), now );
          }
 
          stored_value balance;
@@ -83,6 +88,9 @@ namespace graphene { namespace chain {
 } }
 
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::balance_object)
+
+FC_REFLECT_DERIVED( graphene::chain::balance_master, (graphene::db::object),
+                    (owner)(vesting_policy)(last_claim_date) )
 
 FC_REFLECT_TYPENAME( graphene::chain::balance_object )
 

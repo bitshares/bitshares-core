@@ -161,6 +161,11 @@ namespace graphene { namespace chain {
          vesting_policy policy;
          /// type of the vesting balance
          vesting_balance_type balance_type = vesting_balance_type::unspecified;
+
+         /**
+          * Get amount of allowed withdrawal.
+          */
+         asset get_allowed_withdraw(const asset& balance, const time_point_sec& now )const;
    };
 
    class vesting_balance_object : public vesting_balance_master

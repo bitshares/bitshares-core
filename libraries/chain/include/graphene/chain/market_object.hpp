@@ -313,6 +313,19 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::call_order_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::force_settlement_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::collateral_bid_object)
 
+FC_REFLECT_DERIVED( graphene::chain::limit_order_master,
+                    (graphene::db::object),
+                    (expiration)(seller)(sell_price)
+                  )
+FC_REFLECT_DERIVED( graphene::chain::call_order_master, (graphene::db::object),
+                    (borrower)(call_price)(target_collateral_ratio) )
+FC_REFLECT_DERIVED( graphene::chain::force_settlement_master,
+                    (graphene::db::object),
+                    (owner)(settlement_date)
+                  )
+FC_REFLECT_DERIVED( graphene::chain::collateral_bid_master, (graphene::db::object),
+                    (bidder)(debt_covered) )
+
 FC_REFLECT_TYPENAME( graphene::chain::limit_order_object )
 FC_REFLECT_TYPENAME( graphene::chain::call_order_object )
 FC_REFLECT_TYPENAME( graphene::chain::force_settlement_object )

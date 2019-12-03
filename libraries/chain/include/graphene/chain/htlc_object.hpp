@@ -126,9 +126,15 @@ namespace graphene { namespace chain {
 
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::htlc_object)
 
-FC_REFLECT_TYPENAME( graphene::chain::htlc_object::condition_info::hash_lock_info )
-FC_REFLECT_TYPENAME( graphene::chain::htlc_object::condition_info::time_lock_info )
-FC_REFLECT_TYPENAME( graphene::chain::htlc_object::condition_info )
+FC_REFLECT( graphene::chain::htlc_master::transfer_info_master, (from)(to) )
+FC_REFLECT( graphene::chain::htlc_master::condition_info::hash_lock_info,
+   (preimage_hash) (preimage_size) )
+FC_REFLECT( graphene::chain::htlc_master::condition_info::time_lock_info,
+   (expiration) )
+FC_REFLECT( graphene::chain::htlc_master::condition_info,
+   (hash_lock)(time_lock) )
+FC_REFLECT_DERIVED( graphene::chain::htlc_master, (graphene::db::object), (conditions) )
+
 FC_REFLECT_TYPENAME( graphene::chain::htlc_object )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::htlc_master )
