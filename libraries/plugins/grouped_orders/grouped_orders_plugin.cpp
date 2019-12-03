@@ -85,7 +85,7 @@ void limit_order_group_index::object_inserted( const object& objct )
    for( uint16_t group : get_tracked_groups() )
    {
       auto create_ogo = [&]() {
-         idx[ limit_order_group_key( group, o.sell_price ) ] = limit_order_group_data( o.sell_price, o.for_sale );
+         idx[ limit_order_group_key( group, o.sell_price ) ] = limit_order_group_data( o.sell_price, o.for_sale.get_amount() );
       };
       // if idx is empty, insert this order
       // Note: not capped
@@ -135,7 +135,7 @@ void limit_order_group_index::object_inserted( const object& objct )
             if( capped_min && o.sell_price < itr->first.min_price )
             {  // need to update itr->min_price here, if itr is below min, and new order is even lower
                // TODO improve performance
-               limit_order_group_data data( itr->second.max_price, o.for_sale + itr->second.total_for_sale );
+               limit_order_group_data data( itr->second.max_price, o.for_sale.get_amount() + itr->second.total_for_sale );
                idx.erase( itr );
                idx[ limit_order_group_key( group, o.sell_price ) ] = data;
             }
@@ -143,7 +143,7 @@ void limit_order_group_index::object_inserted( const object& objct )
             {
                if( update_max || ( capped_max && o.sell_price > itr->second.max_price ) )
                   itr->second.max_price = o.sell_price; // store real price here, not capped
-               itr->second.total_for_sale += o.for_sale;
+               itr->second.total_for_sale += o.for_sale.get_amount();
             }
          }
       }
@@ -172,12 +172,12 @@ void limit_order_group_index::object_inserted( const object& objct )
                {  // itr is above max, and price of new order is even higher
                   if( o.sell_price > itr->second.max_price )
                      itr->second.max_price = o.sell_price;
-                  itr->second.total_for_sale += o.for_sale;
+                  itr->second.total_for_sale += o.for_sale.get_amount();
                }
                else
                {  // new order is within the range
                   // TODO improve performance
-                  limit_order_group_data data( itr->second.max_price, o.for_sale + itr->second.total_for_sale );
+                  limit_order_group_data data( itr->second.max_price, o.for_sale.get_amount() + itr->second.total_for_sale );
                   idx.erase( itr );
                   idx[ limit_order_group_key( group, o.sell_price ) ] = data;
                }
@@ -223,11 +223,11 @@ void limit_order_group_index::remove_order( const limit_order_object& o, bool re
       }
       else // found
       {
-         if( itr->second.total_for_sale < o.for_sale )
+         if( itr->second.total_for_sale < o.for_sale.get_amount() )
             // should not happen
             wlog( "can not find the order group containing order for removing (amount dismatch): ${o}", ("o",o) );
-         else if( !remove_empty || itr->second.total_for_sale > o.for_sale )
-            itr->second.total_for_sale -= o.for_sale;
+         else if( !remove_empty || itr->second.total_for_sale > o.for_sale.get_amount() )
+            itr->second.total_for_sale -= o.for_sale.get_amount();
          else
             // it's the only order in the group and need to be removed
             idx.erase( itr );
