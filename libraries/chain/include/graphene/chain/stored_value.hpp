@@ -104,29 +104,10 @@ namespace graphene { namespace chain {
 
 namespace fc {
 
-template<>
-void from_variant( const fc::variant& var, graphene::chain::stored_debt& value, uint32_t max_depth )
-{
-   FC_THROW_EXCEPTION( fc::assert_exception, "Unsupported!" );
-}
-
-template<>
-void from_variant( const fc::variant& var, graphene::chain::stored_value& value, uint32_t max_depth )
-{
-   FC_THROW_EXCEPTION( fc::assert_exception, "Unsupported!" );
-}
-
-template<>
-void to_variant( const graphene::chain::stored_debt& value, fc::variant& var, uint32_t max_depth )
-{
-   to_variant( value.get_value(), var, max_depth );
-}
-
-template<>
-void to_variant( const graphene::chain::stored_value& value, fc::variant& var, uint32_t max_depth )
-{
-   to_variant( value.get_value(), var, max_depth );
-}
+void from_variant( const fc::variant& var, graphene::chain::stored_debt& value, uint32_t max_depth );
+void from_variant( const fc::variant& var, graphene::chain::stored_value& value, uint32_t max_depth );
+void to_variant( const graphene::chain::stored_debt& value, fc::variant& var, uint32_t max_depth );
+void to_variant( const graphene::chain::stored_value& value, fc::variant& var, uint32_t max_depth );
 
 namespace raw {
 
