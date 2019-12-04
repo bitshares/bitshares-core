@@ -30,6 +30,7 @@
 #include <graphene/protocol/types.hpp>
 
 #include <list>
+#include <thread>
 
 namespace graphene { namespace net {
 
@@ -293,35 +294,10 @@ namespace graphene { namespace net {
         void disable_peer_advertising();
         fc::variant_object get_call_statistics() const;
       private:
-        std::unique_ptr<detail::node_impl, detail::node_impl_deleter> my;
+        std::unique_ptr<detail::node_impl> my;
    };
 
-    class simulated_network : public node
-    {
-    public:
-      ~simulated_network();
-      simulated_network(const std::string& user_agent) : node(user_agent) {}
-      void      listen_to_p2p_network() override {}
-      void      connect_to_p2p_network() override {}
-      void      connect_to_endpoint(const fc::ip::endpoint& ep) override {}
-
-      fc::ip::endpoint get_actual_listening_endpoint() const override { return fc::ip::endpoint(); }
-
-      void      sync_from(const item_id& current_head_block, const std::vector<uint32_t>& hard_fork_block_numbers) override {}
-      void      broadcast(const message& item_to_broadcast) override;
-      void      add_node_delegate(node_delegate* node_delegate_to_add);
-
-      virtual uint32_t get_connection_count() const override { return 8; }
-    private:
-      struct node_info;
-      void message_sender(node_info* destination_node);
-      std::list<node_info*> network_nodes;
-    };
-
-
    typedef std::shared_ptr<node> node_ptr;
-   typedef std::shared_ptr<simulated_network> simulated_network_ptr;
-
 } } // graphene::net
 
 FC_REFLECT(graphene::net::message_propagation_data, (received_time)(validated_time)(originating_peer));

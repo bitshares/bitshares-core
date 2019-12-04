@@ -72,7 +72,7 @@ void object_database::flush()
 {
 //   ilog("Save object_database in ${d}", ("d", _data_dir));
    fc::create_directories( _data_dir / "object_database.tmp" / "lock" );
-   std::vector<fc::future<void>> tasks;
+   std::vector<boost::fibers::future<void>> tasks;
    tasks.reserve(200);
    for( uint32_t space = 0; space < _index.size(); ++space )
    {
@@ -109,7 +109,7 @@ void object_database::open(const fc::path& data_dir)
        wlog("Ignoring locked object_database");
        return;
    }
-   std::vector<fc::future<void>> tasks;
+   std::vector<boost::fibers::future<void>> tasks;
    tasks.reserve(200);
    ilog("Opening object database from ${d} ...", ("d", data_dir));
    for( uint32_t space = 0; space < _index.size(); ++space )

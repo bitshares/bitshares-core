@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
-#include <fc/thread/thread.hpp>
+#include <thread>
+
 #include <fc/log/logger.hpp>
 #include <fc/network/tcp_socket.hpp>
 #include <graphene/chain/config.hpp>
@@ -8,6 +9,7 @@
 #include <graphene/net/node.hpp>
 #include <graphene/net/core_messages.hpp>
 #include <graphene/net/peer_connection.hpp>
+#include <graphene/utilities/recurring_task.hpp>
 
 namespace graphene { namespace net { namespace detail {
 
@@ -38,7 +40,7 @@ class statistics_gathering_node_delegate_wrapper : public node_delegate
 {
 private:
   node_delegate *_node_delegate;
-  fc::thread *_thread;
+  std::thread::id _thread;
 
   typedef boost::accumulators::accumulator_set<int64_t, boost::accumulators::stats<boost::accumulators::tag::min,
                                                                                    boost::accumulators::tag::rolling_mean,
@@ -138,7 +140,7 @@ private:
         }
       };
     public:
-      statistics_gathering_node_delegate_wrapper(node_delegate* delegate, fc::thread* thread_for_delegate_calls);
+      statistics_gathering_node_delegate_wrapper(node_delegate* delegate, std::thread::id thread_for_delegate_calls);
 
       fc::variant_object get_call_statistics();
 
@@ -163,11 +165,135 @@ private:
       uint8_t get_current_block_interval_in_seconds() const override;
     };
 
+class node_impl;
+
+class node_task : public graphene::utilities::recurring_task
+{
+public:
+   node_task() : _node(nullptr) {}
+   explicit node_task( node_impl& node, const std::string& name = "" );
+
+protected:
+   node_impl* _node;
+};
+
+class p2p_network_connect_task : public node_task
+{
+public:
+   p2p_network_connect_task() = default;
+   explicit p2p_network_connect_task( node_impl& node ) : node_task( node, "P2P network connect loop" ) {}
+
+protected:
+   virtual void run();
+};
+
+class fetch_sync_items_task : public node_task
+{
+public:
+   fetch_sync_items_task() = default;
+   explicit fetch_sync_items_task( node_impl& node ) : node_task( node, "Fetch sync items loop" ) {}
+
+protected:
+   virtual void run();
+};
+
+class process_backlog_of_sync_blocks_task : public node_task
+{
+public:
+   process_backlog_of_sync_blocks_task() = default;
+   explicit process_backlog_of_sync_blocks_task( node_impl& node )
+         : node_task( node, "Process backlog of sync blocks" ) {}
+
+protected:
+   virtual void run();
+};
+
+class fetch_items_task : public node_task
+{
+public:
+   fetch_items_task() = default;
+   explicit fetch_items_task( node_impl& node ) : node_task( node, "Fetch items loop" ) {}
+
+protected:
+   virtual void run();
+};
+
+class advertise_inventory_task : public node_task
+{
+public:
+   advertise_inventory_task() = default;
+   explicit advertise_inventory_task( node_impl& node ) : node_task( node, "Advertise inventory loop" ) {}
+
+protected:
+   virtual void run();
+};
+
+class terminate_inactive_connections_task : public node_task
+{
+public:
+   terminate_inactive_connections_task() = default;
+   explicit terminate_inactive_connections_task( node_impl& node )
+         : node_task( node, "Terminate inactive connections loop" ) {}
+
+protected:
+   virtual void run();
+};
+
+class accept_task : public node_task
+{
+public:
+   accept_task() = default;
+   explicit accept_task( node_impl& node ) : node_task( node, "Accept loop" ) {}
+
+protected:
+   virtual void run();
+};
+
+class fetch_updated_peer_lists_task : public node_task
+{
+public:
+   fetch_updated_peer_lists_task() = default;
+   explicit fetch_updated_peer_lists_task( node_impl& node ) : node_task( node, "Fetch updated peer lists" ) {}
+
+protected:
+   virtual void run();
+};
+
+class bandwidth_monitor_task : public node_task
+{
+public:
+   bandwidth_monitor_task() = default;
+   explicit bandwidth_monitor_task( node_impl& node ) : node_task( node, "Bandwidth monitor" ) {}
+
+protected:
+   virtual void run();
+};
+
+class dump_node_status_task : public node_task
+{
+public:
+   dump_node_status_task() = default;
+   explicit dump_node_status_task( node_impl& node ) : node_task( node, "Dump node status" ) {}
+
+protected:
+   virtual void run();
+};
+
+class delayed_peer_deletion_task : public node_task
+{
+public:
+   delayed_peer_deletion_task() = default;
+   explicit delayed_peer_deletion_task( node_impl& node ) : node_task( node, "Delayed peer deletion" ) {}
+
+protected:
+   virtual void run();
+};
+
 class node_impl : public peer_connection_delegate
 {
     public:
 #ifdef P2P_IN_DEDICATED_THREAD
-      std::shared_ptr<fc::thread> _thread;
+      std::thread _thread;
 #endif // P2P_IN_DEDICATED_THREAD
       std::unique_ptr<statistics_gathering_node_delegate_wrapper> _delegate;
       fc::sha256           _chain_id;
@@ -193,16 +319,14 @@ class node_impl : public peer_connection_delegate
       std::list<potential_peer_record> _add_once_node_list; /// list of peers we want to connect to as soon as possible
 
       peer_database             _potential_peer_db;
-      fc::promise<void>::ptr    _retrigger_connect_loop_promise;
       bool                      _potential_peer_database_updated;
-      fc::future<void>          _p2p_network_connect_loop_done;
+      p2p_network_connect_task  _p2p_network_connect_loop;
       // @}
 
       /// used by the task that fetches sync items during synchronization
       // @{
-      fc::promise<void>::ptr    _retrigger_fetch_sync_items_loop_promise;
       bool                      _sync_items_to_fetch_updated;
-      fc::future<void>          _fetch_sync_items_loop_done;
+      fetch_sync_items_task     _fetch_sync_items_loop;
 
       typedef std::unordered_map<graphene::net::block_id_type, fc::time_point> active_sync_requests_map;
 
@@ -211,14 +335,13 @@ class node_impl : public peer_connection_delegate
       std::list<graphene::net::block_message> _received_sync_items; /// list of sync blocks we've received, but can't yet process because we are still missing blocks that come earlier in the chain
       // @}
 
-      fc::future<void> _process_backlog_of_sync_blocks_done;
+      process_backlog_of_sync_blocks_task _process_backlog_of_sync_blocks;
       bool _suspend_fetching_sync_blocks;
 
       /// used by the task that fetches items during normal operation
       // @{
-      fc::promise<void>::ptr _retrigger_fetch_item_loop_promise;
       bool                   _items_to_fetch_updated;
-      fc::future<void>       _fetch_item_loop_done;
+      fetch_items_task       _fetch_item_loop;
 
       struct item_id_index{};
       typedef boost::multi_index_container<prioritized_item_id,
@@ -234,12 +357,11 @@ class node_impl : public peer_connection_delegate
 
       /// used by the task that advertises inventory during normal operation
       // @{
-      fc::promise<void>::ptr        _retrigger_advertise_inventory_loop_promise;
-      fc::future<void>              _advertise_inventory_loop_done;
+      advertise_inventory_task      _advertise_inventory_loop;
       std::unordered_set<item_id>   _new_inventory; /// list of items we have received but not yet advertised to our peers
       // @}
 
-      fc::future<void>     _terminate_inactive_connections_loop_done;
+      terminate_inactive_connections_task _terminate_inactive_connections_loop;
       uint8_t _recent_block_interval_in_seconds; // a cached copy of the block interval, to avoid a thread hop to the blockchain to get the current value
 
       std::string          _user_agent_string;
@@ -268,7 +390,7 @@ class node_impl : public peer_connection_delegate
       uint32_t              _peer_inactivity_timeout;
 
       fc::tcp_server       _tcp_server;
-      fc::future<void>     _accept_loop_complete;
+      accept_task          _accept_loop;
 
       /** Stores all connections which have not yet finished key exchange or are still sending initial handshaking messages
        * back and forth (not yet ready to initiate syncing) */
@@ -294,7 +416,7 @@ class node_impl : public peer_connection_delegate
 
       bool _peer_advertising_disabled;
 
-      fc::future<void> _fetch_updated_peer_lists_loop_done;
+      fetch_updated_peer_lists_task _fetch_updated_peer_lists_loop;
 
       boost::circular_buffer<uint32_t> _average_network_read_speed_seconds;
       boost::circular_buffer<uint32_t> _average_network_write_speed_seconds;
@@ -306,9 +428,9 @@ class node_impl : public peer_connection_delegate
       unsigned _average_network_usage_minute_counter;
 
       fc::time_point_sec _bandwidth_monitor_last_update_time;
-      fc::future<void> _bandwidth_monitor_loop_done;
+      bandwidth_monitor_task _bandwidth_monitor_loop;
 
-      fc::future<void> _dump_node_status_task_done;
+      dump_node_status_task _dump_node_status_task;
 
       /* We have two alternate paths through the schedule_peer_for_deletion code -- one that
        * uses a mutex to prevent one fiber from adding items to the queue while another is deleting
@@ -320,10 +442,10 @@ class node_impl : public peer_connection_delegate
        */
 //#define USE_PEERS_TO_DELETE_MUTEX 1
 #ifdef USE_PEERS_TO_DELETE_MUTEX
-      fc::mutex _peers_to_delete_mutex;
+      boost::fibers::mutex _peers_to_delete_mutex;
 #endif
       std::list<peer_connection_ptr> _peers_to_delete;
-      fc::future<void> _delayed_peer_deletion_task_done;
+      delayed_peer_deletion_task _delayed_peer_deletion_task;
 
 #ifdef ENABLE_P2P_DEBUGGING_API
       std::set<node_id_t> _allowed_peers;
@@ -335,35 +457,28 @@ class node_impl : public peer_connection_delegate
       unsigned _maximum_number_of_sync_blocks_to_prefetch;
       unsigned _maximum_blocks_per_peer_during_syncing;
 
-      std::list<fc::future<void> > _handle_message_calls_in_progress;
+      std::list<boost::fibers::future<void> > _handle_message_calls_in_progress;
 
       node_impl(const std::string& user_agent);
       virtual ~node_impl();
+      void _shutdown();
 
       void save_node_configuration();
 
-      void p2p_network_connect_loop();
       void trigger_p2p_network_connect_loop();
 
       bool have_already_received_sync_item( const item_hash_t& item_hash );
       void request_sync_item_from_peer( const peer_connection_ptr& peer, const item_hash_t& item_to_request );
       void request_sync_items_from_peer( const peer_connection_ptr& peer, const std::vector<item_hash_t>& items_to_request );
-      void fetch_sync_items_loop();
       void trigger_fetch_sync_items_loop();
 
       bool is_item_in_any_peers_inventory(const item_id& item) const;
-      void fetch_items_loop();
+
       void trigger_fetch_items_loop();
 
-      void advertise_inventory_loop();
       void trigger_advertise_inventory_loop();
 
-      void terminate_inactive_connections_loop();
-
-      void fetch_updated_peer_lists_loop();
       void update_bandwidth_data(uint32_t bytes_read_this_second, uint32_t bytes_written_this_second);
-      void bandwidth_monitor_loop();
-      void dump_node_status_task();
 
       bool is_accepting_new_connections();
       bool is_wanting_new_connections();
@@ -468,7 +583,6 @@ class node_impl : public peer_connection_delegate
 
       void dump_node_status();
 
-      void delayed_peer_deletion_task();
       void schedule_peer_for_deletion(const peer_connection_ptr& peer_to_delete);
 
       void disconnect_from_peer( peer_connection* originating_peer,
@@ -477,7 +591,7 @@ class node_impl : public peer_connection_delegate
                                const fc::oexception& additional_data = fc::oexception() );
 
       // methods implementing node's public interface
-      void set_node_delegate(node_delegate* del, fc::thread* thread_for_delegate_calls);
+      void set_node_delegate(node_delegate* del, std::thread::id thread_for_delegate_calls);
       void load_configuration( const fc::path& configuration_directory );
       void listen_to_p2p_network();
       void connect_to_p2p_network();

@@ -39,6 +39,7 @@
 
 #include <graphene/protocol/fee_schedule.hpp>
 
+#include <fc/asio.hpp>
 #include <fc/io/raw.hpp>
 #include <fc/thread/parallel.hpp>
 
@@ -822,9 +823,9 @@ void database::_precompute_parallel( const Trx* trx, const size_t count, const u
    }
 }
 
-fc::future<void> database::precompute_parallel( const signed_block& block, const uint32_t skip )const
+boost::fibers::future<void> database::precompute_parallel( const signed_block& block, const uint32_t skip )const
 { try {
-   std::vector<fc::future<void>> workers;
+   std::vector<boost::fibers::future<void>> workers;
    if( !block.transactions.empty() )
    {
       if( (skip & skip_expensive) == skip_expensive )
@@ -850,16 +851,20 @@ fc::future<void> database::precompute_parallel( const signed_block& block, const
    block.id();
 
    if( workers.empty() )
-      return fc::future< void >( fc::promise< void >::create( true ) );
+   {
+      boost::fibers::promise< void > done;
+      done.set_value();
+      return done.get_future();
+   }
 
    auto first = workers.begin();
    auto worker = first;
    while( ++worker != workers.end() )
       worker->wait();
-   return *first;
+   return std::move( *first );
 } FC_LOG_AND_RETHROW() }
 
-fc::future<void> database::precompute_parallel( const precomputable_transaction& trx )const
+boost::fibers::future<void> database::precompute_parallel( const precomputable_transaction& trx )const
 {
    return fc::do_parallel([this,&trx] () {
       _precompute_parallel( &trx, 1, skip_nothing );
