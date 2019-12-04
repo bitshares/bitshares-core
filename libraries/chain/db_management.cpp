@@ -80,7 +80,7 @@ void database::reindex( fc::path data_dir )
 
    size_t total_block_size = _block_id_to_block.total_block_size();
    const auto& gpo = get_global_properties();
-   std::queue< std::tuple< size_t, signed_block, fc::future< void > > > blocks;
+   std::queue< std::tuple< size_t, signed_block, boost::fibers::future< void > > > blocks;
    uint32_t next_block_num = head_block_num() + 1;
    uint32_t i = next_block_num;
    while( next_block_num <= last_block_num || !blocks.empty() )
@@ -93,7 +93,7 @@ void database::reindex( fc::path data_dir )
          {
             if( block->timestamp >= last_block->timestamp - gpo.parameters.maximum_time_until_expiration )
                skip &= ~skip_transaction_dupe_check;
-            blocks.emplace( processed_block_size, std::move(*block), fc::future<void>() );
+            blocks.emplace( processed_block_size, std::move(*block), boost::fibers::future<void>() );
             std::get<2>(blocks.back()) = precompute_parallel( std::get<1>(blocks.back()), skip );
          }
          else

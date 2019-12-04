@@ -27,9 +27,10 @@
 #include <graphene/chain/config.hpp>
 
 #include <fc/io/raw.hpp>
-#include <fc/thread/thread.hpp>
 
 #include <boost/scope_exit.hpp>
+
+#include <thread>
 
 #ifdef DEFAULT_LOGGER
 # undef DEFAULT_LOGGER
@@ -37,7 +38,7 @@
 #define DEFAULT_LOGGER "p2p"
 
 #ifndef NDEBUG
-# define VERIFY_CORRECT_THREAD() assert(_thread->is_current())
+# define VERIFY_CORRECT_THREAD() assert( _thread == std::this_thread::get_id() )
 #else
 # define VERIFY_CORRECT_THREAD() do {} while (0)
 #endif
@@ -90,7 +91,7 @@ namespace graphene { namespace net
       last_known_fork_block_number(0),
       firewall_check_state(nullptr),
 #ifndef NDEBUG
-      _thread(&fc::thread::current()),
+      _thread(std::this_thread::get_id()),
       _send_message_queue_tasks_running(0),
 #endif
       _currently_handling_message(false)
@@ -114,16 +115,6 @@ namespace graphene { namespace net
     void peer_connection::destroy()
     {
       VERIFY_CORRECT_THREAD();
-
-#if 0 // this gets too verbose
-#ifndef NDEBUG
-      struct scope_logger {
-        fc::optional<fc::ip::endpoint> endpoint;
-        scope_logger(const fc::optional<fc::ip::endpoint>& endpoint) : endpoint(endpoint) { dlog("entering peer_connection::destroy() for peer ${endpoint}", ("endpoint", endpoint)); }
-        ~scope_logger() { dlog("leaving peer_connection::destroy() for peer ${endpoint}", ("endpoint", endpoint)); }
-      } send_message_scope_logger(get_remote_endpoint());
-#endif
-#endif
 
       try
       {

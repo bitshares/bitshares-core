@@ -39,7 +39,6 @@
 
 #include <queue>
 #include <boost/container/deque.hpp>
-#include <fc/thread/future.hpp>
 
 namespace graphene { namespace net
   {
@@ -166,7 +165,7 @@ namespace graphene { namespace net
 
       size_t _total_queued_messages_size = 0;
       std::queue<std::unique_ptr<queued_message>, std::list<std::unique_ptr<queued_message> > > _queued_messages;
-      fc::future<void> _send_queued_messages_done;
+      boost::fibers::future<void> _send_queued_messages_done;
     public:
       fc::time_point connection_initiation_time;
       fc::time_point connection_closed_time;
@@ -260,7 +259,7 @@ namespace graphene { namespace net
 
       uint32_t last_known_fork_block_number = 0;
 
-      fc::future<void> accept_or_connect_task_done;
+      boost::fibers::future<void> accept_or_connect_task_done;
 
       firewall_check_state_data *firewall_check_state = nullptr;
     private:

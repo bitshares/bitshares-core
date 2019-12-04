@@ -30,6 +30,7 @@
 #include <graphene/protocol/types.hpp>
 
 #include <list>
+#include <thread>
 
 namespace graphene { namespace net {
 
@@ -293,7 +294,7 @@ namespace graphene { namespace net {
         void disable_peer_advertising();
         fc::variant_object get_call_statistics() const;
       private:
-        std::unique_ptr<detail::node_impl, detail::node_impl_deleter> my;
+        std::unique_ptr<detail::node_impl> my;
    };
 
    typedef std::shared_ptr<node> node_ptr;

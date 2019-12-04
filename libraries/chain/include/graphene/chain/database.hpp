@@ -37,9 +37,11 @@
 #include <graphene/db/object_database.hpp>
 #include <graphene/db/object.hpp>
 #include <graphene/db/simple_index.hpp>
-#include <fc/signals.hpp>
 
+#include <fc/signals.hpp>
 #include <fc/log/logger.hpp>
+
+#include <boost/fiber/future.hpp>
 
 #include <map>
 
@@ -453,7 +455,8 @@ namespace graphene { namespace chain {
           * @return a future that will resolve to the input block with
           *         precomputations applied
           */
-         fc::future<void> precompute_parallel( const signed_block& block, const uint32_t skip = skip_nothing )const;
+         boost::fibers::future<void> precompute_parallel( const signed_block& block,
+                                                          const uint32_t skip = skip_nothing )const;
 
          /** Precomputes digests, signatures and operation validations.
           *  "Expensive" computations may be done in a parallel thread.
@@ -462,7 +465,7 @@ namespace graphene { namespace chain {
           * @return a future that will resolve to the input transaction with
           *         precomputations applied
           */
-         fc::future<void> precompute_parallel( const precomputable_transaction& trx )const;
+         boost::fibers::future<void> precompute_parallel( const precomputable_transaction& trx )const;
    private:
          template<typename Trx>
          void _precompute_parallel( const Trx* trx, const size_t count, const uint32_t skip )const;
