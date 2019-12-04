@@ -650,8 +650,8 @@ BOOST_AUTO_TEST_CASE(accumulated_fees_before_hf_test)
 
       // 100 Izzys and 300 Jills are matched, so the fees should be
       // 10 Izzy (10%) and 60 Jill (20%).
-      BOOST_CHECK( izzycoin.dynamic_asset_data_id(db).accumulated_fees == izzycoin.amount(10).amount );
-      BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees == jillcoin.amount(60).amount );
+      BOOST_CHECK( izzycoin.dynamic_asset_data_id(db).accumulated_fees.get_amount() == izzycoin.amount(10).amount );
+      BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees.get_amount() == jillcoin.amount(60).amount );
    }
    FC_LOG_AND_RETHROW()
 }
@@ -674,8 +674,8 @@ BOOST_AUTO_TEST_CASE(accumulated_fees_after_hf_test)
 
       // 100 Izzys and 300 Jills are matched, so the fees should be
       // 10 Izzy (10%) and 60 Jill (20%).
-      BOOST_CHECK( izzycoin.dynamic_asset_data_id(db).accumulated_fees == izzycoin.amount(10).amount );
-      BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees == jillcoin.amount(60).amount );
+      BOOST_CHECK( izzycoin.dynamic_asset_data_id(db).accumulated_fees.get_amount() == izzycoin.amount(10).amount );
+      BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees.get_amount() == jillcoin.amount(60).amount );
    }
    FC_LOG_AND_RETHROW()
 }
@@ -705,8 +705,8 @@ BOOST_AUTO_TEST_CASE(accumulated_fees_with_additional_options_after_hf_test)
 
       // 100 Izzys and 300 Jills are matched, so the fees should be
       // 10 Izzy (10%) and 60 Jill (20%).
-      BOOST_CHECK( izzycoin.dynamic_asset_data_id(db).accumulated_fees == izzycoin.amount(10).amount );
-      BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees == jillcoin.amount(60).amount );
+      BOOST_CHECK( izzycoin.dynamic_asset_data_id(db).accumulated_fees.get_amount() == izzycoin.amount(10).amount );
+      BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees.get_amount() == jillcoin.amount(60).amount );
    }
    FC_LOG_AND_RETHROW()
 }

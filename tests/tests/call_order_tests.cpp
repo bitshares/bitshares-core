@@ -40,14 +40,21 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
    // assume GRAPHENE_COLLATERAL_RATIO_DENOM is 1000 in this test case
    BOOST_REQUIRE_EQUAL( 1000, GRAPHENE_COLLATERAL_RATIO_DENOM );
 
+   stored_debt core_debt;
+   stored_value total_mia( asset_id_type(1) );
    // function to create a new call_order_object
-   auto new_call_obj = []( const share_type c, const share_type d, int16_t mcr, optional<uint16_t> tcr = {} ) {
+   auto new_call_obj = [&core_debt,&total_mia]( const share_type c, const share_type d, int16_t mcr, optional<uint16_t> tcr = {} ) {
       call_order_object o;
-      o.collateral = c;
-      o.debt = d;
-      o.call_price = price::call_price( asset( d, asset_id_type(1)), asset(c) , mcr );
+      o.collateral = core_debt.issue(c);
+      o.debt = stored_debt( asset_id_type(1) );
+      total_mia += o.debt.issue(d);
+      o.call_price = price::call_price( o.debt.get_value(), o.collateral.get_value(), mcr );
       o.target_collateral_ratio = tcr;
       return o;
+   };
+   auto clear_call_obj = [&core_debt,&total_mia]( call_order_object& obj ) {
+      core_debt.burn( std::move(obj.collateral) );
+      obj.debt.burn( std::move(total_mia) );
    };
 
    // function to validate result of call_order_object::get_max_debt_to_cover(...)
@@ -57,7 +64,7 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
          return 1;
 
       BOOST_REQUIRE_GT( result.value, 0 );
-      BOOST_REQUIRE_LE( result.value, o.debt.value );
+      BOOST_REQUIRE_LE( result.value, o.debt.get_amount().value );
 
       BOOST_REQUIRE( match_price.base.asset_id == o.collateral_type() );
       BOOST_REQUIRE( match_price.quote.asset_id == o.debt_type() );
@@ -70,7 +77,7 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
 
       if( !o.target_collateral_ratio.valid() )
       {
-         BOOST_CHECK_EQUAL( result.value, o.debt.value );
+         BOOST_CHECK_EQUAL( result.value, o.debt.get_amount().value );
          return 2;
       }
 
@@ -80,10 +87,10 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
 
       asset to_cover( result, o.debt_type() );
       asset to_pay = o.get_collateral();
-      if( result < o.debt )
+      if( result < o.debt.get_amount() )
       {
          to_pay = to_cover.multiply_and_round_up( match_price );
-         BOOST_CHECK_LT( to_pay.amount.value, o.collateral.value ); // should cover more on black swan event
+         BOOST_CHECK_LT( to_pay.amount.value, o.collateral.get_amount().value ); // should cover more on black swan event
          BOOST_CHECK_EQUAL( result.value, (to_pay * match_price).amount.value ); // should not change after rounded down debt to cover
 
          // should have target_cr set
@@ -120,13 +127,13 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
                sell_less = cover_less.multiply_and_round_up( match_price ); // round up to get collateral to sell
                if( sell_less.amount <= 0 || cover_less.amount <= 0 ) // unable to sell or cover less, we return
                {
-                  if( to_pay.amount == o.collateral )
+                  if( to_pay.amount == o.collateral.get_amount() )
                      return j;
                   return (j + 10);
                }
             }
-            BOOST_REQUIRE_LT( cover_less.amount.value, o.debt.value );
-            BOOST_REQUIRE_LT( sell_less.amount.value, o.collateral.value );
+            BOOST_REQUIRE_LT( cover_less.amount.value, o.debt.get_amount().value );
+            BOOST_REQUIRE_LT( sell_less.amount.value, o.collateral.get_amount().value );
             price tmp_tcr_call_price = price::call_price( o.get_debt() - cover_less, o.get_collateral() - sell_less, tcr );
             price tmp_mcr_call_price = price::call_price( o.get_debt() - cover_less, o.get_collateral() - sell_less, mcr );
             bool cover_less_is_enough = ( tmp_tcr_call_price > feed_price && tmp_mcr_call_price > feed_price );
@@ -134,7 +141,7 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
             {
                if( !last_check )
                   continue;
-               if( to_pay.amount == o.collateral )
+               if( to_pay.amount == o.collateral.get_amount() )
                   return j;
                return (j + 10);
             }
@@ -147,7 +154,7 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
             break;
          }
       }
-      if( to_pay.amount == o.collateral )
+      if( to_pay.amount == o.collateral.get_amount() )
          return j;
       return (j + 10);
    };
@@ -168,48 +175,56 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
    result = obj.get_max_debt_to_cover( mp, fp, mcr );
    BOOST_CHECK_EQUAL( result.value, expected );
    validate_result( obj, mp, fp, mcr, result );
+   clear_call_obj(obj);
 
    obj = new_call_obj( 1751, 1000, mcr, 10000 ); // order is not in margin call territory
    expected = 0;
    result = obj.get_max_debt_to_cover( mp, fp, mcr );
    BOOST_CHECK_EQUAL( result.value, expected );
    validate_result( obj, mp, fp, mcr, result );
+   clear_call_obj(obj);
 
    obj = new_call_obj( 160, 100, mcr ); // target_cr is not set
    expected = 100;
    result = obj.get_max_debt_to_cover( mp, fp, mcr );
    BOOST_CHECK_EQUAL( result.value, expected );
    validate_result( obj, mp, fp, mcr, result );
+   clear_call_obj(obj);
 
    obj = new_call_obj( 1009, 1000, mcr, 200 ); // target_cr set, but order is in black swan territory
    expected = 1000;
    result = obj.get_max_debt_to_cover( mp, fp, mcr );
    BOOST_CHECK_EQUAL( result.value, expected );
    validate_result( obj, mp, fp, mcr, result );
+   clear_call_obj(obj);
 
    obj = new_call_obj( 1499,  999, mcr, 1600 ); // target_cr is 160%, less than 175%, so use 175%
    expected = 385;
    result = obj.get_max_debt_to_cover( mp, fp, mcr );
    BOOST_CHECK_EQUAL( result.value, expected );
    validate_result( obj, mp, fp, mcr, result );
+   clear_call_obj(obj);
 
    obj = new_call_obj( 1500, 1000, mcr, 1800 ); // target_cr is 180%
    expected = 429;
    result = obj.get_max_debt_to_cover( mp, fp, mcr );
    BOOST_CHECK_EQUAL( result.value, expected );
    validate_result( obj, mp, fp, mcr, result );
+   clear_call_obj(obj);
 
    obj = new_call_obj( 1501, 1001, mcr, 2000 ); // target_cr is 200%
    expected = 558;
    result = obj.get_max_debt_to_cover( mp, fp, mcr );
    BOOST_CHECK_EQUAL( result.value, expected );
    validate_result( obj, mp, fp, mcr, result );
+   clear_call_obj(obj);
 
    obj = new_call_obj( 1502, 1002, mcr, 3000 ); // target_cr is 300%
    expected = 793;
    result = obj.get_max_debt_to_cover( mp, fp, mcr );
    BOOST_CHECK_EQUAL( result.value, expected );
    validate_result( obj, mp, fp, mcr, result );
+   clear_call_obj(obj);
 
    mcr = 1750;
    mp = price( asset(40009), asset(79070, asset_id_type(1)) ); // match_price
@@ -218,6 +233,7 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
    obj = new_call_obj( 557197, 701502, mcr, 1700 ); // target_cr is less than mcr
    result = obj.get_max_debt_to_cover( mp, fp, mcr );
    validate_result( obj, mp, fp, mcr, result );
+   clear_call_obj(obj);
 
    mcr = 1455;
    mp = price( asset(1150171), asset(985450, asset_id_type(1)) ); // match_price
@@ -226,6 +242,7 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
    obj = new_call_obj( 423536, 302688, mcr, 200 ); // target_cr is less than mcr
    result = obj.get_max_debt_to_cover( mp, fp, mcr );
    validate_result( obj, mp, fp, mcr, result );
+   clear_call_obj(obj);
 
    // random tests
    std::mt19937_64 gen( time(NULL) );
@@ -337,6 +354,7 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
          BOOST_CHECK( e.to_detail_string().find( "result <= GRAPHENE_MAX_SHARE_SUPPLY" ) != string::npos );
          ++count[0];
       }
+      clear_call_obj(obj);
    }
    ilog( "count: [bad_input,sell zero,not set,"
          " sell full (perfect), sell full (<0.01%), sell full (<0.1%),sell full (<1%), sell full (other), ...,"

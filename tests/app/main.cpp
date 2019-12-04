@@ -278,7 +278,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
          claim_op.deposit_to_account = nathan_id;
          claim_op.balance_to_claim = bid;
          claim_op.balance_owner_key = nathan_key.get_public_key();
-         claim_op.total_claimed = bid(*db1).balance;
+         claim_op.total_claimed = bid(*db1).balance.get_value();
          trx.operations.push_back( claim_op );
          db1->current_fee_schedule().set_fee( trx.operations.back() );
 

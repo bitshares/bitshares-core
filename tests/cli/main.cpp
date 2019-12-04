@@ -689,7 +689,7 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
 
       // ** Check head block:
       BOOST_TEST_MESSAGE("Check that all expected blocks have processed");
-      dynamic_global_property_object dgp = W.get_dynamic_global_properties();
+      graphene::app::dynamic_global_property_api_object dgp = W.get_dynamic_global_properties();
       BOOST_CHECK(dgp.head_block_number == head_block);
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
@@ -809,7 +809,6 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
 
       // transfer bts from cifer.test to nathan
       BOOST_TEST_MESSAGE("Transferring bitshares from cifer.test to nathan");
-      auto dyn_props = app1->chain_database()->get_dynamic_global_properties();
       account_object cifer_test = con.wallet_api_ptr->get_account("cifer.test");
 
       // construct a transfer transaction

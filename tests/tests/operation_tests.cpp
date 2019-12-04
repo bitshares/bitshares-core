@@ -787,7 +787,7 @@ BOOST_AUTO_TEST_CASE( prediction_market )
 
       // force settle the rest
       force_settle( dan, pmark.amount(400) );
-      BOOST_CHECK_EQUAL( 0, pmark_dd_id(db).current_supply.value );
+      BOOST_CHECK_EQUAL( 0, pmark_dd_id(db).current_supply.get_amount().value );
 
       generate_block(~database::skip_transaction_dupe_check);
       generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
@@ -825,7 +825,7 @@ BOOST_AUTO_TEST_CASE( prediction_market_resolves_to_0 )
 
       // force settle the rest
       force_settle( dan, pmark.amount(900) );
-      BOOST_CHECK_EQUAL( 0, pmark_dd_id(db).current_supply.value );
+      BOOST_CHECK_EQUAL( 0, pmark_dd_id(db).current_supply.get_amount().value );
 
       generate_block(~database::skip_transaction_dupe_check);
       generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
@@ -1035,7 +1035,7 @@ BOOST_AUTO_TEST_CASE( create_mia )
       const asset_object& bitusd = create_bitasset( "USDBIT" );
       BOOST_CHECK(bitusd.symbol == "USDBIT");
       BOOST_CHECK(bitusd.bitasset_data(db).options.short_backing_asset == asset_id_type());
-      BOOST_CHECK(bitusd.dynamic_asset_data_id(db).current_supply == 0);
+      BOOST_CHECK(bitusd.dynamic_asset_data_id(db).current_supply.get_amount() == 0);
       GRAPHENE_REQUIRE_THROW( create_bitasset("USDBIT"), fc::exception);
    } catch ( const fc::exception& e ) {
       elog( "${e}", ("e", e.to_detail_string() ) );
@@ -1126,9 +1126,9 @@ BOOST_AUTO_TEST_CASE( create_uia )
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
 
       const asset_dynamic_data_object& test_asset_dynamic_data = test_asset.dynamic_asset_data_id(db);
-      BOOST_CHECK(test_asset_dynamic_data.current_supply == 0);
-      BOOST_CHECK(test_asset_dynamic_data.accumulated_fees == 0);
-      BOOST_CHECK(test_asset_dynamic_data.fee_pool == 0);
+      BOOST_CHECK(test_asset_dynamic_data.current_supply.get_amount()== 0);
+      BOOST_CHECK(test_asset_dynamic_data.accumulated_fees.get_amount() == 0);
+      BOOST_CHECK(test_asset_dynamic_data.fee_pool.get_amount() == 0);
 
       auto op = trx.operations.back().get<asset_create_operation>();
       op.symbol = "TESTFAIL";
@@ -1386,16 +1386,16 @@ BOOST_AUTO_TEST_CASE( issue_uia )
 
       const asset_dynamic_data_object& test_dynamic_data = test_asset.dynamic_asset_data_id(db);
       BOOST_CHECK_EQUAL(get_balance(nathan_account, test_asset), 5000000);
-      BOOST_CHECK(test_dynamic_data.current_supply == 5000000);
-      BOOST_CHECK(test_dynamic_data.accumulated_fees == 0);
-      BOOST_CHECK(test_dynamic_data.fee_pool == 0);
+      BOOST_CHECK(test_dynamic_data.current_supply.get_amount() == 5000000);
+      BOOST_CHECK(test_dynamic_data.accumulated_fees.get_amount() == 0);
+      BOOST_CHECK(test_dynamic_data.fee_pool.get_amount() == 0);
 
       PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK_EQUAL(get_balance(nathan_account, test_asset), 10000000);
-      BOOST_CHECK(test_dynamic_data.current_supply == 10000000);
-      BOOST_CHECK(test_dynamic_data.accumulated_fees == 0);
-      BOOST_CHECK(test_dynamic_data.fee_pool == 0);
+      BOOST_CHECK(test_dynamic_data.current_supply.get_amount() == 10000000);
+      BOOST_CHECK(test_dynamic_data.accumulated_fees.get_amount() == 0);
+      BOOST_CHECK(test_dynamic_data.fee_pool.get_amount() == 0);
    } catch(fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -1463,7 +1463,7 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new )
 
    BOOST_CHECK_EQUAL( get_balance( seller_account, test_asset ), 200 );
    BOOST_CHECK_EQUAL( get_balance( buyer_account, core_asset ), 297 );
-   BOOST_CHECK_EQUAL( core_asset.dynamic_asset_data_id(db).accumulated_fees.value , 3 );
+   BOOST_CHECK_EQUAL( core_asset.dynamic_asset_data_id(db).accumulated_fees.get_amount().value , 3 );
  }
  catch ( const fc::exception& e )
  {
@@ -1503,7 +1503,7 @@ BOOST_AUTO_TEST_CASE( create_buy_exact_match_uia )
 
    BOOST_CHECK_EQUAL( get_balance( seller_account, test_asset ), 99 );
    BOOST_CHECK_EQUAL( get_balance( buyer_account, core_asset ), 100 );
-   BOOST_CHECK_EQUAL( test_asset.dynamic_asset_data_id(db).accumulated_fees.value , 1 );
+   BOOST_CHECK_EQUAL( test_asset.dynamic_asset_data_id(db).accumulated_fees.get_amount().value , 1 );
  }
  catch ( const fc::exception& e )
  {
@@ -1544,7 +1544,7 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new_reverse )
 
    BOOST_CHECK_EQUAL( get_balance( seller_account, test_asset ), 198 );
    BOOST_CHECK_EQUAL( get_balance( buyer_account, core_asset ), 300 );
-   BOOST_CHECK_EQUAL( test_asset.dynamic_asset_data_id(db).accumulated_fees.value , 2 );
+   BOOST_CHECK_EQUAL( test_asset.dynamic_asset_data_id(db).accumulated_fees.get_amount().value , 2 );
  }
  catch ( const fc::exception& e )
  {
@@ -1587,7 +1587,7 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new_reverse_fract )
    BOOST_CHECK_EQUAL( get_balance( seller_account, test_asset ), 198 );
    BOOST_CHECK_EQUAL( get_balance( buyer_account, core_asset ), 30 );
    BOOST_CHECK_EQUAL( get_balance( seller_account, core_asset ), 0 );
-   BOOST_CHECK_EQUAL( test_asset.dynamic_asset_data_id(db).accumulated_fees.value , 2 );
+   BOOST_CHECK_EQUAL( test_asset.dynamic_asset_data_id(db).accumulated_fees.get_amount().value , 2 );
  }
  catch ( const fc::exception& e )
  {
@@ -1611,7 +1611,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
       const share_type prec = asset::scaled_precision( asset_id_type()(db).precision );
 
       fund_fee_pool(committee_account, test_asset, 1000*prec);
-      BOOST_CHECK(asset_dynamic.fee_pool == 1000*prec);
+      BOOST_CHECK(asset_dynamic.fee_pool.get_amount() == 1000*prec);
 
       transfer_operation op;
       op.fee = test_asset.amount(0);
@@ -1630,16 +1630,16 @@ BOOST_AUTO_TEST_CASE( uia_fees )
       BOOST_CHECK_EQUAL(get_balance(nathan_account, test_asset),
                         (old_balance - fee - test_asset.amount(100)).amount.value);
       BOOST_CHECK_EQUAL(get_balance(committee_account, test_asset), 100);
-      BOOST_CHECK(asset_dynamic.accumulated_fees == fee.amount);
-      BOOST_CHECK(asset_dynamic.fee_pool == 1000*prec - core_fee.amount);
+      BOOST_CHECK(asset_dynamic.accumulated_fees.get_amount() == fee.amount);
+      BOOST_CHECK(asset_dynamic.fee_pool.get_amount() == 1000*prec - core_fee.amount);
 
       //Do it again, for good measure.
       PUSH_TX( db, trx, ~0 );
       BOOST_CHECK_EQUAL(get_balance(nathan_account, test_asset),
                         (old_balance - fee - fee - test_asset.amount(200)).amount.value);
       BOOST_CHECK_EQUAL(get_balance(committee_account, test_asset), 200);
-      BOOST_CHECK(asset_dynamic.accumulated_fees == fee.amount + fee.amount);
-      BOOST_CHECK(asset_dynamic.fee_pool == 1000*prec - core_fee.amount - core_fee.amount);
+      BOOST_CHECK(asset_dynamic.accumulated_fees.get_amount() == fee.amount + fee.amount);
+      BOOST_CHECK(asset_dynamic.fee_pool.get_amount() == 1000*prec - core_fee.amount - core_fee.amount);
 
       op = std::move(trx.operations.back().get<transfer_operation>());
       trx.operations.clear();
@@ -1656,8 +1656,8 @@ BOOST_AUTO_TEST_CASE( uia_fees )
       BOOST_CHECK_EQUAL(get_balance(nathan_account, test_asset),
                         (old_balance - fee - fee - fee - test_asset.amount(200)).amount.value);
       BOOST_CHECK_EQUAL(get_balance(committee_account, test_asset), 200);
-      BOOST_CHECK(asset_dynamic.accumulated_fees == fee.amount.value * 3);
-      BOOST_CHECK(asset_dynamic.fee_pool == 1000*prec - core_fee.amount.value * 3);
+      BOOST_CHECK(asset_dynamic.accumulated_fees.get_amount() == fee.amount.value * 3);
+      BOOST_CHECK(asset_dynamic.fee_pool.get_amount() == 1000*prec - core_fee.amount.value * 3);
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -1798,7 +1798,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
       const witness_object& wit = db.fetch_block_by_number(db.head_block_num())->witness(db);
       if( !wit.pay_vb.valid() )
          return 0;
-      return (*wit.pay_vb)(db).balance.amount;
+      return (*wit.pay_vb)(db).balance.get_amount();
    };
 
    const auto block_interval = db.get_global_properties().parameters.block_interval;
@@ -1828,7 +1828,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
       _gpo.parameters.witness_pay_per_block = witness_ppb;
    } );
 
-   BOOST_CHECK_EQUAL(core->dynamic_asset_data_id(db).accumulated_fees.value, 0);
+   BOOST_CHECK_EQUAL(core->dynamic_asset_data_id(db).accumulated_fees.get_amount().value, 0);
    BOOST_TEST_MESSAGE( "Upgrading account" );
    account_upgrade_operation uop;
    uop.account_to_upgrade = nathan->get_id();
@@ -1871,26 +1871,26 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    BOOST_CHECK( core->reserved(db).value == 8000*prec );
    generate_block();
    BOOST_CHECK_EQUAL( core->reserved(db).value, 999999406 );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, (int64_t)ref_budget );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.get_amount().value, (int64_t)ref_budget );
    // first witness paid from old budget (so no pay)
    BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
    // second witness finally gets paid!
    generate_block();
    BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)witness_ppb );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, (int64_t)(ref_budget - witness_ppb) );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.get_amount().value, (int64_t)(ref_budget - witness_ppb) );
 
    generate_block();
    BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)witness_ppb );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, (int64_t)(ref_budget - 2 * witness_ppb) );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.get_amount().value, (int64_t)(ref_budget - 2 * witness_ppb) );
 
    generate_block();
    BOOST_CHECK_LT( last_witness_vbo_balance().value, (int64_t)witness_ppb );
    BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, (int64_t)(ref_budget - 2 * witness_ppb) );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.get_amount().value, 0 );
 
    generate_block();
    BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.get_amount().value, 0 );
    BOOST_CHECK_EQUAL(core->reserved(db).value, 999999406 );
 
 } FC_LOG_AND_RETHROW() }
@@ -2144,7 +2144,7 @@ BOOST_AUTO_TEST_CASE( cover_with_collateral_test )
       const limit_order_object* order = create_sell_order( bob_id, bitusd.amount(99), asset(4950) );
       BOOST_REQUIRE( order != nullptr );
       limit_order_id_type order1_id = order->id;
-      BOOST_CHECK_EQUAL( order->for_sale.value, 99 );
+      BOOST_CHECK_EQUAL( order->for_sale.get_amount().value, 99 );
       // wdump( (*call_order) );
 
       BOOST_TEST_MESSAGE( "Alice still cannot decrease her collateral to maint level" );
@@ -2155,7 +2155,7 @@ BOOST_AUTO_TEST_CASE( cover_with_collateral_test )
       order = create_sell_order( bob_id, bitusd.amount(1), asset(50) );
       BOOST_REQUIRE( order != nullptr );
       limit_order_id_type order2_id = order->id;
-      BOOST_CHECK_EQUAL( order->for_sale.value, 1 );
+      BOOST_CHECK_EQUAL( order->for_sale.get_amount().value, 1 );
       // wdump( (*call_order) );
 
       BOOST_TEST_MESSAGE( "Alice decreases her collateral to maint level and Bob's orders fill" );

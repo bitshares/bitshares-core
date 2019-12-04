@@ -24,6 +24,7 @@
 #pragma once
 
 #include <graphene/chain/types.hpp>
+#include <graphene/chain/stored_value.hpp>
 #include <graphene/db/generic_index.hpp>
 
 namespace graphene { namespace chain {

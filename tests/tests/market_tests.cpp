@@ -77,8 +77,8 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
    call_order_id_type call3_id = call3.id;
    transfer(borrower, seller, bitusd.amount(1000));
 
-   BOOST_CHECK_EQUAL( 1000, call.debt.value );
-   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.get_amount().value );
    BOOST_CHECK_EQUAL( 1000, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
@@ -103,32 +103,32 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(7), core.amount(60)) );
    BOOST_CHECK_EQUAL( 993, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 60, get_balance(seller, core) );
-   BOOST_CHECK_EQUAL( 993, call.debt.value );
-   BOOST_CHECK_EQUAL( 14940, call.collateral.value );
+   BOOST_CHECK_EQUAL( 993, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 14940, call.collateral.get_amount().value );
 
    limit_order_id_type buy_low = create_sell_order(buyer, asset(90), bitusd.amount(10))->id;
    // margin call takes precedence
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(7), core.amount(60)) );
    BOOST_CHECK_EQUAL( 986, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 120, get_balance(seller, core) );
-   BOOST_CHECK_EQUAL( 986, call.debt.value );
-   BOOST_CHECK_EQUAL( 14880, call.collateral.value );
+   BOOST_CHECK_EQUAL( 986, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 14880, call.collateral.get_amount().value );
 
    limit_order_id_type buy_med = create_sell_order(buyer, asset(105), bitusd.amount(10))->id;
    // margin call takes precedence
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(7), core.amount(70)) );
    BOOST_CHECK_EQUAL( 979, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 190, get_balance(seller, core) );
-   BOOST_CHECK_EQUAL( 979, call.debt.value );
-   BOOST_CHECK_EQUAL( 14810, call.collateral.value );
+   BOOST_CHECK_EQUAL( 979, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 14810, call.collateral.get_amount().value );
 
    limit_order_id_type buy_high = create_sell_order(buyer, asset(115), bitusd.amount(10))->id;
    // margin call still has precedence (!) #625
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(7), core.amount(77)) );
    BOOST_CHECK_EQUAL( 972, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 267, get_balance(seller, core) );
-   BOOST_CHECK_EQUAL( 972, call.debt.value );
-   BOOST_CHECK_EQUAL( 14733, call.collateral.value );
+   BOOST_CHECK_EQUAL( 972, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 14733, call.collateral.get_amount().value );
 
    cancel_limit_order( buy_high(db) );
    cancel_limit_order( buy_med(db) );
@@ -138,8 +138,8 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(700), core.amount(7700)) );
    BOOST_CHECK_EQUAL( 272, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 7967, get_balance(seller, core) );
-   BOOST_CHECK_EQUAL( 272, call.debt.value );
-   BOOST_CHECK_EQUAL( 7033, call.collateral.value );
+   BOOST_CHECK_EQUAL( 272, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 7033, call.collateral.get_amount().value );
 
    // at this moment, collateralization of call is 7033 / 272 = 25.8
    // collateralization of call2 is 15500 / 1000 = 15.5
@@ -149,8 +149,8 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(10), core.amount(110)) );
    BOOST_CHECK_EQUAL( 262, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 8077, get_balance(seller, core) );
-   BOOST_CHECK_EQUAL( 262, call.debt.value );
-   BOOST_CHECK_EQUAL( 6923, call.collateral.value );
+   BOOST_CHECK_EQUAL( 262, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 6923, call.collateral.get_amount().value );
 
    // at this moment, collateralization of call is 6923 / 262 = 26.4
    // collateralization of call2 is 15500 / 1000 = 15.5
@@ -160,18 +160,18 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
    force_settle( seller, bitusd.amount(10) );
    BOOST_CHECK_EQUAL( 252, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 8077, get_balance(seller, core) );
-   BOOST_CHECK_EQUAL( 262, call.debt.value );
-   BOOST_CHECK_EQUAL( 6923, call.collateral.value );
+   BOOST_CHECK_EQUAL( 262, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 6923, call.collateral.get_amount().value );
 
    // generate blocks to let the settle order execute (price feed will expire after it)
    generate_blocks( HARDFORK_615_TIME + fc::hours(25) );
    // call2 get settled #343
    BOOST_CHECK_EQUAL( 252, get_balance(seller_id, usd_id) );
    BOOST_CHECK_EQUAL( 8177, get_balance(seller_id, core_id) );
-   BOOST_CHECK_EQUAL( 262, call_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 6923, call_id(db).collateral.value );
-   BOOST_CHECK_EQUAL( 990, call2_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 15400, call2_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 262, call_id(db).debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 6923, call_id(db).collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 990, call2_id(db).debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15400, call2_id(db).collateral.get_amount().value );
 
    set_expiration( db, trx );
    update_feed_producers( usd_id(db), {feedproducer_id} );
@@ -277,12 +277,12 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
    transfer(borrower2, seller, bitusd.amount(1000));
    transfer(borrower3, seller, bitusd.amount(1000));
 
-   BOOST_CHECK_EQUAL( 1000, call.debt.value );
-   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
-   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 16000, call3.collateral.get_amount().value );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
@@ -312,8 +312,8 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 
    // firstly it will match with buy_high, at buy_high's price: #625 fixed
    BOOST_CHECK( !db.find<limit_order_object>( buy_high ) );
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_med )->for_sale.value, 110 );
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 90 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_med )->for_sale.get_amount().value, 110 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.get_amount().value, 90 );
 
    // buy_high pays 111 CORE, receives 10 USD goes to buyer's balance
    BOOST_CHECK_EQUAL( 10, get_balance(buyer, bitusd) );
@@ -323,12 +323,12 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
    // then it will match with call, at mssp: 1/11 = 690/7590 : #338 fixed
    BOOST_CHECK_EQUAL( 2293, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 7701, get_balance(seller, core) );
-   BOOST_CHECK_EQUAL( 310, call.debt.value );
-   BOOST_CHECK_EQUAL( 7410, call.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
-   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 310, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 7410, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 16000, call3.collateral.get_amount().value );
 
    // call's call_price will be updated after the match, to 741/31/1.75 CORE/USD = 2964/217
    // it's above settlement price (10/1) so won't be margin called again
@@ -337,18 +337,18 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 
    // This would match with call before, but would match with call2 after #343 fixed
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(700), core.amount(6000) ) );
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_med )->for_sale.value, 110 );
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 90 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_med )->for_sale.get_amount().value, 110 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.get_amount().value, 90 );
 
    // fill price would be mssp: 1/11 = 700/7700 : #338 fixed
    BOOST_CHECK_EQUAL( 1593, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 15401, get_balance(seller, core) );
-   BOOST_CHECK_EQUAL( 310, call.debt.value );
-   BOOST_CHECK_EQUAL( 7410, call.collateral.value );
-   BOOST_CHECK_EQUAL( 300, call2.debt.value );
-   BOOST_CHECK_EQUAL( 7800, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 310, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 7410, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 300, call2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 7800, call2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 16000, call3.collateral.get_amount().value );
    // call2's call_price will be updated after the match, to 78/3/1.75 CORE/USD = 312/21
    if(!hf1270) // can use call price only if we are before hf1270
       BOOST_CHECK( price(asset(312),asset(21,usd_id)) == call2.call_price );
@@ -363,12 +363,12 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 
    BOOST_CHECK_EQUAL( 1583, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 15401, get_balance(seller, core) );
-   BOOST_CHECK_EQUAL( 310, call.debt.value );
-   BOOST_CHECK_EQUAL( 7410, call.collateral.value );
-   BOOST_CHECK_EQUAL( 300, call2.debt.value );
-   BOOST_CHECK_EQUAL( 7800, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 310, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 7410, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 300, call2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 7800, call2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 16000, call3.collateral.get_amount().value );
 
    // generate blocks to let the settle order execute (price feed will expire after it)
    generate_block();
@@ -377,12 +377,12 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
    // call3 get settled, at settlement price 1/10: #343 fixed
    BOOST_CHECK_EQUAL( 1583, get_balance(seller_id, usd_id) );
    BOOST_CHECK_EQUAL( 15501, get_balance(seller_id, core_id) );
-   BOOST_CHECK_EQUAL( 310, call_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 7410, call_id(db).collateral.value );
-   BOOST_CHECK_EQUAL( 300, call2_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 7800, call2_id(db).collateral.value );
-   BOOST_CHECK_EQUAL( 990, call3_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 15900, call3_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 310, call_id(db).debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 7410, call_id(db).collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 300, call2_id(db).debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 7800, call2_id(db).collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 990, call3_id(db).debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15900, call3_id(db).collateral.get_amount().value );
 
    set_expiration( db, trx );
    update_feed_producers( usd_id(db), {feedproducer_id} );
@@ -459,12 +459,12 @@ BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
    transfer(borrower2, seller, bitusd.amount(1000));
    transfer(borrower3, seller, bitusd.amount(1000));
 
-   BOOST_CHECK_EQUAL( 1000, call.debt.value );
-   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
-   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 16000, call3.collateral.get_amount().value );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
@@ -544,12 +544,12 @@ BOOST_AUTO_TEST_CASE(hardfork_core_625_big_limit_order_test)
    transfer(borrower2, seller, bitusd.amount(1000));
    transfer(borrower3, seller, bitusd.amount(1000));
 
-   BOOST_CHECK_EQUAL( 1000, call.debt.value );
-   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
-   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 25000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 25000, call3.collateral.get_amount().value );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
@@ -567,7 +567,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_625_big_limit_order_test)
 
    // This sell order above MSSP will not be matched with a call
    limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(7), core.amount(78))->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 7 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.get_amount().value, 7 );
 
    BOOST_CHECK_EQUAL( 2993, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -612,14 +612,14 @@ BOOST_AUTO_TEST_CASE(hardfork_core_625_big_limit_order_test)
    BOOST_CHECK_EQUAL( 783, get_balance(buyer2, bitusd) ); // 700*4-10-1000-1000=790, minus 1% market fee 790*100/10000=7
    BOOST_CHECK_EQUAL( init_balance - 11000, get_balance(buyer2, core) );
    // buy_med pays at 1/11 = 790/8690
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_med )->for_sale.value, 11000-8690 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_med )->for_sale.get_amount().value, 11000-8690 );
 
    // call3 is not in margin call territory so won't be matched
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 25000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 25000, call3.collateral.get_amount().value );
 
    // buy_low's price is too low that won't be matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.get_amount().value, 80 );
 
    // check seller balance
    BOOST_CHECK_EQUAL( 193, get_balance(seller, bitusd) ); // 3000 - 7 - 700*4
@@ -633,17 +633,17 @@ BOOST_AUTO_TEST_CASE(hardfork_core_625_big_limit_order_test)
 
    // Create another sell order slightly below the call price, won't fill
    limit_order_id_type sell_med = create_sell_order( seller, bitusd.amount(7), core.amount(59) )->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_med )->for_sale.value, 7 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_med )->for_sale.get_amount().value, 7 );
    // check seller balance
    BOOST_CHECK_EQUAL( 193-7, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 30801, get_balance(seller, core) );
 
    // call3 is not in margin call territory so won't be matched
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 25000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 25000, call3.collateral.get_amount().value );
 
    // buy_low's price is too low that won't be matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.get_amount().value, 80 );
 
    // generate a block
    generate_block();
@@ -722,26 +722,26 @@ BOOST_AUTO_TEST_CASE(hard_fork_453_cross_test)
    transfer(borrower2, seller, bitcny.amount(1000));
    transfer(borrower3, seller, bitcny.amount(1000));
 
-   BOOST_CHECK_EQUAL( 1000, call_usd.debt.value );
-   BOOST_CHECK_EQUAL( 15000, call_usd.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call_usd2.debt.value );
-   BOOST_CHECK_EQUAL( 15500, call_usd2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call_usd3.debt.value );
-   BOOST_CHECK_EQUAL( 16000, call_usd3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call_usd.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15000, call_usd.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call_usd2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500, call_usd2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call_usd3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 16000, call_usd3.collateral.get_amount().value );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
-   BOOST_CHECK_EQUAL( 1000, call_eur.debt.value );
-   BOOST_CHECK_EQUAL( 15000, call_eur.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call_eur2.debt.value );
-   BOOST_CHECK_EQUAL( 15500, call_eur2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call_eur3.debt.value );
-   BOOST_CHECK_EQUAL( 16000, call_eur3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call_eur.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15000, call_eur.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call_eur2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500, call_eur2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call_eur3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 16000, call_eur3.collateral.get_amount().value );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, biteur) );
-   BOOST_CHECK_EQUAL( 1000, call_cny.debt.value );
-   BOOST_CHECK_EQUAL( 15000, call_cny.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call_cny2.debt.value );
-   BOOST_CHECK_EQUAL( 15500, call_cny2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call_cny3.debt.value );
-   BOOST_CHECK_EQUAL( 16000, call_cny3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call_cny.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15000, call_cny.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call_cny2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500, call_cny2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call_cny3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 16000, call_cny3.collateral.get_amount().value );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitcny) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
@@ -807,9 +807,9 @@ BOOST_AUTO_TEST_CASE(hard_fork_453_cross_test)
    // sell_med and call3 should get matched
    BOOST_CHECK( !db.find<limit_order_object>( sell_usd_med ) );
    // call3 now is not at margin call state, so sell_med2 won't get matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_usd_med2 )->for_sale.value, 7 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_usd_med2 )->for_sale.get_amount().value, 7 );
    // sell_high should still be there, didn't match anything
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_usd_high )->for_sale.value, 7 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_usd_high )->for_sale.get_amount().value, 7 );
 
    // sell_low and call should get matched first
    BOOST_CHECK( !db.find<limit_order_object>( sell_eur_low ) );
@@ -821,9 +821,9 @@ BOOST_AUTO_TEST_CASE(hard_fork_453_cross_test)
    // sell_med and call3 should get matched
    BOOST_CHECK( !db.find<limit_order_object>( sell_eur_med ) );
    // call3 now is not at margin call state, so sell_med2 won't get matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_eur_med2 )->for_sale.value, 7 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_eur_med2 )->for_sale.get_amount().value, 7 );
    // sell_high should still be there, didn't match anything
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_eur_high )->for_sale.value, 7 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_eur_high )->for_sale.get_amount().value, 7 );
 
    // sell_low and call should get matched first
    BOOST_CHECK( !db.find<limit_order_object>( sell_cny_low ) );
@@ -835,21 +835,21 @@ BOOST_AUTO_TEST_CASE(hard_fork_453_cross_test)
    // sell_med and call3 should get matched
    BOOST_CHECK( !db.find<limit_order_object>( sell_cny_med ) );
    // call3 now is not at margin call state, so sell_med2 won't get matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_cny_med2 )->for_sale.value, 7 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_cny_med2 )->for_sale.get_amount().value, 7 );
    // sell_high should still be there, didn't match anything
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_cny_high )->for_sale.value, 7 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_cny_high )->for_sale.get_amount().value, 7 );
 
    // all match price would be limit order price
    BOOST_CHECK_EQUAL( 3000-1000-1007-7-700-7, get_balance(seller_id, usd_id) );
    BOOST_CHECK_EQUAL( 3000-1000-1007-7-700-7, get_balance(seller_id, eur_id) );
    BOOST_CHECK_EQUAL( 3000-1000-1007-7-700-7, get_balance(seller_id, cny_id) );
    BOOST_CHECK_EQUAL( (7000+8056+6400)*3, get_balance(seller_id, core_id) );
-   BOOST_CHECK_EQUAL( 1000-7-700, call_usd3_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 16000-56-6400, call_usd3_id(db).collateral.value );
-   BOOST_CHECK_EQUAL( 1000-7-700, call_eur3_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 16000-56-6400, call_eur3_id(db).collateral.value );
-   BOOST_CHECK_EQUAL( 1000-7-700, call_cny3_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 16000-56-6400, call_cny3_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000-7-700, call_usd3_id(db).debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 16000-56-6400, call_usd3_id(db).collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000-7-700, call_eur3_id(db).debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 16000-56-6400, call_eur3_id(db).collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000-7-700, call_cny3_id(db).debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 16000-56-6400, call_cny3_id(db).collateral.get_amount().value );
    // call3's call_price should be updated: 9544/293/1.75 = 9544*4 / 293*7 = 38176/2051 CORE/USD
    BOOST_CHECK( price(asset(38176),asset(2051,usd_id)) == call_usd3_id(db).call_price );
    BOOST_CHECK( price(asset(38176),asset(2051,eur_id)) == call_eur3_id(db).call_price );
@@ -907,12 +907,12 @@ BOOST_AUTO_TEST_CASE(hard_fork_338_cross_test)
    transfer(borrower2, seller, bitusd.amount(1000));
    transfer(borrower3, seller, bitusd.amount(1000));
 
-   BOOST_CHECK_EQUAL( 1000, call.debt.value );
-   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
-   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 16000, call3.collateral.get_amount().value );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
@@ -964,7 +964,7 @@ BOOST_AUTO_TEST_CASE(hard_fork_338_cross_test)
 
    // since 16.1 > 16, global settlement should at feed price 16/1
    // so settlement fund should be 986*16 + 1000*16
-   BOOST_CHECK_EQUAL( 1986*16, usd_id(db).bitasset_data(db).settlement_fund.value );
+   BOOST_CHECK_EQUAL( 1986*16, usd_id(db).bitasset_data(db).settlement_fund.get_amount().value );
    // global settlement price should be 16/1, since no rounding here
    BOOST_CHECK( price(asset(1,usd_id),asset(16) ) == usd_id(db).bitasset_data(db).settlement_price );
 
@@ -1024,12 +1024,12 @@ BOOST_AUTO_TEST_CASE(hard_fork_649_cross_test)
    transfer(borrower2, seller, bitusd.amount(1000));
    transfer(borrower3, seller, bitusd.amount(1000));
 
-   BOOST_CHECK_EQUAL( 1000, call.debt.value );
-   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
-   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 16000, call3.collateral.get_amount().value );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
@@ -1042,8 +1042,8 @@ BOOST_AUTO_TEST_CASE(hard_fork_649_cross_test)
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(707), core.amount(6464)) );
    BOOST_CHECK_EQUAL( 3000-707, get_balance(seller_id, usd_id) );
    BOOST_CHECK_EQUAL( 6464, get_balance(seller_id, core_id) );
-   BOOST_CHECK_EQUAL( 293, call.debt.value );
-   BOOST_CHECK_EQUAL( 8536, call.collateral.value );
+   BOOST_CHECK_EQUAL( 293, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 8536, call.collateral.get_amount().value );
 
    // at this moment,
    // collateralization of call is 8536 / 293 = 29.1
@@ -1076,7 +1076,7 @@ BOOST_AUTO_TEST_CASE(hard_fork_649_cross_test)
 
    // since least collateral ratio 15.5 < 20, global settlement should execute at price = least collateral ratio 15.5/1
    // so settlement fund should be 15500 + 15500 + round_up(15.5 * 293)
-   BOOST_CHECK_EQUAL( 15500*2 + (293 * 155 + 9) / 10, usd_id(db).bitasset_data(db).settlement_fund.value );
+   BOOST_CHECK_EQUAL( 15500*2 + (293 * 155 + 9) / 10, usd_id(db).bitasset_data(db).settlement_fund.get_amount().value );
    // global settlement price should be settlement_fund/(2000+293), but not 15.5/1 due to rounding
    BOOST_CHECK( price(asset(2293,usd_id),asset(15500*2+(293*155+9)/10) ) == usd_id(db).bitasset_data(db).settlement_price );
 
@@ -1138,12 +1138,12 @@ BOOST_AUTO_TEST_CASE(hard_fork_343_cross_test)
    transfer(borrower2, seller, bitusd.amount(1000));
    transfer(borrower3, seller, bitusd.amount(1000));
 
-   BOOST_CHECK_EQUAL( 1000, call.debt.value );
-   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
-   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.get_amount().value );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
@@ -1156,8 +1156,8 @@ BOOST_AUTO_TEST_CASE(hard_fork_343_cross_test)
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(700), core.amount(6400)) );
    BOOST_CHECK_EQUAL( 3000-700, get_balance(seller_id, usd_id) );
    BOOST_CHECK_EQUAL( 6400, get_balance(seller_id, core_id) );
-   BOOST_CHECK_EQUAL( 300, call.debt.value );
-   BOOST_CHECK_EQUAL( 8600, call.collateral.value );
+   BOOST_CHECK_EQUAL( 300, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 8600, call.collateral.get_amount().value );
 
    // at this moment,
    // collateralization of call is 8600 / 300 = 28.67
@@ -1175,12 +1175,12 @@ BOOST_AUTO_TEST_CASE(hard_fork_343_cross_test)
    BOOST_CHECK( !create_sell_order(seller_id(db), asset(7*50,usd_id), asset(65*50)) );
    BOOST_CHECK_EQUAL( 3000-700-7*50, get_balance(seller_id, usd_id) );
    BOOST_CHECK_EQUAL( 6400+77*50, get_balance(seller_id, core_id) );
-   BOOST_CHECK_EQUAL( 300, call_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 8600, call_id(db).collateral.value );
-   BOOST_CHECK_EQUAL( 1000-7*50, call2_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 15500-77*50, call2_id(db).collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 300, call_id(db).debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 8600, call_id(db).collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000-7*50, call2_id(db).debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500-77*50, call2_id(db).collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call3_id(db).debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3_id(db).collateral.get_amount().value );
 
    // at this moment,
    // collateralization of call is 8600 / 300 = 28.67
@@ -1191,12 +1191,12 @@ BOOST_AUTO_TEST_CASE(hard_fork_343_cross_test)
    BOOST_CHECK( !create_sell_order(seller_id(db), asset(7,usd_id), asset(65)) );
    BOOST_CHECK_EQUAL( 3000-700-7*50-7, get_balance(seller_id, usd_id) );
    BOOST_CHECK_EQUAL( 6400+77*50+77, get_balance(seller_id, core_id) );
-   BOOST_CHECK_EQUAL( 300, call_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 8600, call_id(db).collateral.value );
-   BOOST_CHECK_EQUAL( 1000-7*50, call2_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 15500-77*50, call2_id(db).collateral.value );
-   BOOST_CHECK_EQUAL( 1000-7, call3_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 17500-77, call3_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 300, call_id(db).debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 8600, call_id(db).collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000-7*50, call2_id(db).debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500-77*50, call2_id(db).collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000-7, call3_id(db).debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500-77, call3_id(db).collateral.get_amount().value );
 
    // at this moment,
    // collateralization of call is 8600 / 300 = 28.67
@@ -1259,12 +1259,12 @@ BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
    transfer(borrower2, seller, bitusd.amount(1000));
    transfer(borrower3, seller, bitusd.amount(1000));
 
-   BOOST_CHECK_EQUAL( 1000, call.debt.value );
-   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
-   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 25000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 25000, call3.collateral.get_amount().value );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
@@ -1282,7 +1282,7 @@ BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
 
    // This sell order above MSSP will not be matched with a call
    limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(7), core.amount(78))->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 7 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.get_amount().value, 7 );
 
    BOOST_CHECK_EQUAL( 2993, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -1305,8 +1305,8 @@ BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
    price match_price( bitusd.amount(1) / core.amount(11) );
    share_type call_to_cover = call_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750);
    share_type call2_to_cover = call2_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750);
-   BOOST_CHECK_LT( call_to_cover.value, call_id(db).debt.value );
-   BOOST_CHECK_LT( call2_to_cover.value, call2_id(db).debt.value );
+   BOOST_CHECK_LT( call_to_cover.value, call_id(db).debt.get_amount().value );
+   BOOST_CHECK_LT( call2_to_cover.value, call2_id(db).debt.get_amount().value );
    // even though call2 has a higher CR, since call's TCR is less than call2's TCR, so we expect call will cover less when called
    BOOST_CHECK_LT( call_to_cover.value, call2_to_cover.value );
 
@@ -1325,10 +1325,10 @@ BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
 
    // call will receive call_to_cover, pay 11*call_to_cover
    share_type call_to_pay = call_to_cover * 11;
-   BOOST_CHECK_EQUAL( 1000 - call_to_cover.value, call.debt.value );
-   BOOST_CHECK_EQUAL( 15000 - call_to_pay.value, call.collateral.value );
+   BOOST_CHECK_EQUAL( 1000 - call_to_cover.value, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15000 - call_to_pay.value, call.collateral.get_amount().value );
    // new collateral ratio should be higher than mcr as well as tcr
-   BOOST_CHECK( call.debt.value * 10 * 1750 < call.collateral.value * 1000 );
+   BOOST_CHECK( call.debt.get_amount().value * 10 * 1750 < call.collateral.get_amount().value * 1000 );
    idump( (call) );
    // borrower's balance doesn't change
    BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower, core) );
@@ -1340,10 +1340,10 @@ BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
 
    // call2 will receive call2_to_cover, pay 11*call2_to_cover
    share_type call2_to_pay = call2_to_cover * 11;
-   BOOST_CHECK_EQUAL( 1000 - call2_to_cover.value, call2.debt.value );
-   BOOST_CHECK_EQUAL( 15500 - call2_to_pay.value, call2.collateral.value );
+   BOOST_CHECK_EQUAL( 1000 - call2_to_cover.value, call2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500 - call2_to_pay.value, call2.collateral.get_amount().value );
    // new collateral ratio should be higher than mcr as well as tcr
-   BOOST_CHECK( call2.debt.value * 10 * 2000 < call2.collateral.value * 1000 );
+   BOOST_CHECK( call2.debt.get_amount().value * 10 * 2000 < call2.collateral.get_amount().value * 1000 );
    idump( (call2) );
    // borrower2's balance doesn't change
    BOOST_CHECK_EQUAL( init_balance - 15500, get_balance(borrower2, core) );
@@ -1356,14 +1356,14 @@ BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
    buy_med_get -= (buy_med_get/100); // minus 1% market fee
    BOOST_CHECK_EQUAL( buy_med_get.value, get_balance(buyer2, bitusd) );
    BOOST_CHECK_EQUAL( init_balance - 33000, get_balance(buyer2, core) );
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_med )->for_sale.value, 33000-buy_med_pay.value );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_med )->for_sale.get_amount().value, 33000-buy_med_pay.value );
 
    // call3 is not in margin call territory so won't be matched
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 25000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 25000, call3.collateral.get_amount().value );
 
    // buy_low's price is too low that won't be matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.get_amount().value, 80 );
 
    // check seller balance
    BOOST_CHECK_EQUAL( 193, get_balance(seller, bitusd) ); // 3000 - 7 - 700*4
@@ -1377,17 +1377,17 @@ BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
 
    // Create another sell order slightly below the call price, won't fill
    limit_order_id_type sell_med = create_sell_order( seller, bitusd.amount(7), core.amount(59) )->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_med )->for_sale.value, 7 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_med )->for_sale.get_amount().value, 7 );
    // check seller balance
    BOOST_CHECK_EQUAL( 193-7, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 30801, get_balance(seller, core) );
 
    // call3 is not in margin call territory so won't be matched
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 25000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 25000, call3.collateral.get_amount().value );
 
    // buy_low's price is too low that won't be matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.get_amount().value, 80 );
 
    // generate a block
    generate_block();
@@ -1441,12 +1441,12 @@ BOOST_AUTO_TEST_CASE(target_cr_test_call_limit)
    transfer(borrower2, seller, bitusd.amount(1000));
    transfer(borrower3, seller, bitusd.amount(1000));
 
-   BOOST_CHECK_EQUAL( 1000, call.debt.value );
-   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
-   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 25000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 25000, call3.collateral.get_amount().value );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
@@ -1459,7 +1459,7 @@ BOOST_AUTO_TEST_CASE(target_cr_test_call_limit)
 
    // This sell order above MSSP will not be matched with a call
    limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(7), core.amount(78))->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 7 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.get_amount().value, 7 );
 
    BOOST_CHECK_EQUAL( 2993, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -1472,7 +1472,7 @@ BOOST_AUTO_TEST_CASE(target_cr_test_call_limit)
 
    // Create a sell order which will be matched with several call orders later, price 1/9
    limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(500), core.amount(4500) )->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_id )->for_sale.value, 500 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_id )->for_sale.get_amount().value, 500 );
 
    // prepare price feed to get call and call2 (but not call3) into margin call territory
    current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(10);
@@ -1481,8 +1481,8 @@ BOOST_AUTO_TEST_CASE(target_cr_test_call_limit)
    price match_price = sell_id(db).sell_price;
    share_type call_to_cover = call_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750);
    share_type call2_to_cover = call2_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750);
-   BOOST_CHECK_LT( call_to_cover.value, call_id(db).debt.value );
-   BOOST_CHECK_LT( call2_to_cover.value, call2_id(db).debt.value );
+   BOOST_CHECK_LT( call_to_cover.value, call_id(db).debt.get_amount().value );
+   BOOST_CHECK_LT( call2_to_cover.value, call2_id(db).debt.get_amount().value );
    // even though call2 has a higher CR, since call's TCR is less than call2's TCR, so we expect call will cover less when called
    BOOST_CHECK_LT( call_to_cover.value, call2_to_cover.value );
 
@@ -1496,10 +1496,10 @@ BOOST_AUTO_TEST_CASE(target_cr_test_call_limit)
 
    // call will receive call_to_cover, pay 9*call_to_cover
    share_type call_to_pay = call_to_cover * 9;
-   BOOST_CHECK_EQUAL( 1000 - call_to_cover.value, call.debt.value );
-   BOOST_CHECK_EQUAL( 15000 - call_to_pay.value, call.collateral.value );
+   BOOST_CHECK_EQUAL( 1000 - call_to_cover.value, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15000 - call_to_pay.value, call.collateral.get_amount().value );
    // new collateral ratio should be higher than mcr as well as tcr
-   BOOST_CHECK( call.debt.value * 10 * 1750 < call.collateral.value * 1000 );
+   BOOST_CHECK( call.debt.get_amount().value * 10 * 1750 < call.collateral.get_amount().value * 1000 );
    idump( (call) );
    // borrower's balance doesn't change
    BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower, core) );
@@ -1513,16 +1513,16 @@ BOOST_AUTO_TEST_CASE(target_cr_test_call_limit)
    // however it's not the case, so call2 will receive less
    call2_to_cover = 500 - call_to_cover;
    share_type call2_to_pay = call2_to_cover * 9;
-   BOOST_CHECK_EQUAL( 1000 - call2_to_cover.value, call2.debt.value );
-   BOOST_CHECK_EQUAL( 15500 - call2_to_pay.value, call2.collateral.value );
+   BOOST_CHECK_EQUAL( 1000 - call2_to_cover.value, call2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500 - call2_to_pay.value, call2.collateral.get_amount().value );
    idump( (call2) );
    // borrower2's balance doesn't change
    BOOST_CHECK_EQUAL( init_balance - 15500, get_balance(borrower2, core) );
    BOOST_CHECK_EQUAL( 0, get_balance(borrower2, bitusd) );
 
    // call3 is not in margin call territory so won't be matched
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 25000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 25000, call3.collateral.get_amount().value );
 
    // sell_id is completely filled
    BOOST_CHECK( !db.find<limit_order_object>( sell_id ) );
@@ -1532,7 +1532,7 @@ BOOST_AUTO_TEST_CASE(target_cr_test_call_limit)
    BOOST_CHECK_EQUAL( 4500, get_balance(seller, core) ); // 500*9
 
    // buy_low's price is too low that won't be matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.get_amount().value, 80 );
 
    // generate a block
    generate_block();

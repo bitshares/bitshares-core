@@ -168,8 +168,8 @@ BOOST_AUTO_TEST_CASE(asset_claim_fees_test)
          //wdump( (jillcoin)(jillcoin.dynamic_asset_data_id(db))((*jillcoin.bitasset_data_id)(db)) );
 
          // check the correct amount of fees has been awarded
-         BOOST_CHECK( izzycoin.dynamic_asset_data_id(db).accumulated_fees == _izzy(1).amount );
-         BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees == _jill(6).amount );
+         BOOST_CHECK( izzycoin.dynamic_asset_data_id(db).accumulated_fees.get_amount() == _izzy(1).amount );
+         BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees.get_amount() == _jill(6).amount );
 
       }
 
@@ -188,14 +188,14 @@ BOOST_AUTO_TEST_CASE(asset_claim_fees_test)
          // can claim asset in one go
          claim_fees( izzy_id, _izzy(1) );
          GRAPHENE_REQUIRE_THROW( claim_fees( izzy_id, izzy_satoshi ), fc::exception );
-         BOOST_CHECK( izzycoin.dynamic_asset_data_id(db).accumulated_fees == _izzy(0).amount );
+         BOOST_CHECK( izzycoin.dynamic_asset_data_id(db).accumulated_fees.get_amount() == _izzy(0).amount );
 
          // can claim in multiple goes
          claim_fees( jill_id, _jill(4) );
-         BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees == _jill(2).amount );
+         BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees.get_amount() == _jill(2).amount );
          GRAPHENE_REQUIRE_THROW( claim_fees( jill_id, _jill(2) + jill_satoshi ), fc::exception );
          claim_fees( jill_id, _jill(2) );
-         BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees == _jill(0).amount );
+         BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees.get_amount() == _jill(0).amount );
       }
    }
    FC_LOG_AND_RETHROW()
@@ -287,8 +287,8 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
         fund_fee_pool( alice_id(db), alicecoin_id(db), _core(300).amount );
 
         // Test amount of CORE in fee pools
-        BOOST_CHECK( alicecoin_id(db).dynamic_asset_data_id(db).fee_pool == _core(300).amount );
-        BOOST_CHECK( aliceusd_id(db).dynamic_asset_data_id(db).fee_pool == _core(100).amount );
+        BOOST_CHECK( alicecoin_id(db).dynamic_asset_data_id(db).fee_pool.get_amount() == _core(300).amount );
+        BOOST_CHECK( aliceusd_id(db).dynamic_asset_data_id(db).fee_pool.get_amount() == _core(100).amount );
 
         // can't claim pool of an asset that doesn't belong to you
         GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, bobcoin_id, _core(200), core_asset_hf), fc::exception );
@@ -301,12 +301,12 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
 
         // can claim BTS back from the fee pool
         claim_pool( alice_id, alicecoin_id, _core(200), core_asset_hf );
-        BOOST_CHECK( alicecoin_id(db).dynamic_asset_data_id(db).fee_pool == _core(100).amount );
+        BOOST_CHECK( alicecoin_id(db).dynamic_asset_data_id(db).fee_pool.get_amount() == _core(100).amount );
 
         // can pay fee in the asset other than the one whose pool is being drained
         share_type balance_before_claim = get_balance( alice_id, asset_id_type() );
         claim_pool( alice_id, alicecoin_id, _core(100), aliceusd_id(db) );
-        BOOST_CHECK( alicecoin_id(db).dynamic_asset_data_id(db).fee_pool == _core(0).amount );
+        BOOST_CHECK( alicecoin_id(db).dynamic_asset_data_id(db).fee_pool.get_amount() == _core(0).amount );
 
         //check balance after claiming pool
         share_type current_balance = get_balance( alice_id, asset_id_type() );
@@ -326,14 +326,14 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
    BOOST_CHECK_EQUAL( get_balance( actor_name ## _id, asset_id_type() ), amount )
 
 #define CHECK_VESTED_CASHBACK( actor_name, amount ) \
-   BOOST_CHECK_EQUAL( actor_name ## _id(db).statistics(db).pending_vested_fees.value, amount )
+   BOOST_CHECK_EQUAL( actor_name ## _id(db).statistics(db).pending_vested_fees.get_amount().value, amount )
 
 #define CHECK_UNVESTED_CASHBACK( actor_name, amount ) \
-   BOOST_CHECK_EQUAL( actor_name ## _id(db).statistics(db).pending_fees.value, amount )
+   BOOST_CHECK_EQUAL( actor_name ## _id(db).statistics(db).pending_fees.get_amount().value, amount )
 
 #define GET_CASHBACK_BALANCE( account ) \
    ( (account.cashback_vb.valid()) \
-   ? account.cashback_balance(db).balance.amount.value \
+   ? account.cashback_balance(db).balance.get_amount().value \
    : 0 )
 
 #define CHECK_CASHBACK_VBO( actor_name, _amount ) \
@@ -965,8 +965,8 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // Bob cancels order
          if( !expire_order )
@@ -1004,8 +1004,8 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
 
          // Alice cancels order
@@ -1020,8 +1020,8 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // Check partial fill
          const limit_order_object* ao2 = create_sell_order( alice_id, asset(1000), asset(200, usd_id), exp, cer );
@@ -1047,8 +1047,8 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // cancel Alice order, show that entire deferred_fee was consumed by partial match
          if( !expire_order )
@@ -1087,8 +1087,8 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // Check multiple fill
          // Alice creating multiple orders
@@ -1113,8 +1113,8 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // Bob creating an order matching multiple Alice's orders
          const limit_order_object* bo31 = create_sell_order(   bob_id, asset(500, usd_id), asset(2500), exp );
@@ -1138,8 +1138,8 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // Bob creating an order matching multiple Alice's orders
          const limit_order_object* bo32 = create_sell_order(   bob_id, asset(500, usd_id), asset(2500), exp );
@@ -1163,8 +1163,8 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // cancel Bob order, show that entire deferred_fee was consumed by partial match
          if( !expire_order )
@@ -1202,8 +1202,8 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // cancel Alice order, will refund after hard fork 445
          cancel_limit_order( ao32id( db ) );
@@ -1217,8 +1217,8 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // undo above tx's and reset
          generate_block( skip );
@@ -1337,8 +1337,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // ao3: won't expire, partially match before hard fork 445, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao3 .." );
@@ -1358,8 +1358,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // ao4: will expire, will partially match before hard fork 445, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao4 .." );
@@ -1379,8 +1379,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // bo3: won't expire, will partially match before hard fork 445, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo3 .." );
@@ -1402,8 +1402,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // bo4: will expire, will partially match before hard fork 445, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo4 .." );
@@ -1425,8 +1425,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // ao5: won't expire, partially match after hard fork 445, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao5 .." );
@@ -1441,8 +1441,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // ao6: will expire, partially match after hard fork 445, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao6 .." );
@@ -1457,8 +1457,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // bo5: won't expire, partially match after hard fork 445, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo5 .." );
@@ -1475,8 +1475,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // bo6: will expire, partially match after hard fork 445, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo6 .." );
@@ -1493,8 +1493,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // generate block so the orders will be in db before hard fork
       BOOST_TEST_MESSAGE( "Generating blocks ..." );
@@ -1509,8 +1509,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // generate more blocks, so some orders will expire
       generate_blocks( exp, true, skip );
@@ -1526,8 +1526,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // prepare for new transactions
       enable_fees();
@@ -1546,8 +1546,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // cancel ao3
       BOOST_TEST_MESSAGE( "Cancel order ao3 .." );
@@ -1560,8 +1560,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // cancel bo1
       BOOST_TEST_MESSAGE( "Cancel order bo1 .." );
@@ -1574,8 +1574,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // cancel bo3
       BOOST_TEST_MESSAGE( "Cancel order bo3 .." );
@@ -1588,8 +1588,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // partially fill ao6
       BOOST_TEST_MESSAGE( "Partially fill ao6 .." );
@@ -1605,8 +1605,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // partially fill bo6
       BOOST_TEST_MESSAGE( "Partially fill bo6 .." );
@@ -1622,8 +1622,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // generate block to save the changes
       BOOST_TEST_MESSAGE( "Generating blocks ..." );
@@ -1633,8 +1633,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // generate blocks util exp2, so some orders will expire
       generate_blocks( exp2, true, skip );
@@ -1648,8 +1648,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // prepare for new transactions
       enable_fees();
@@ -1671,8 +1671,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // partially fill bo5
       BOOST_TEST_MESSAGE( "Partially fill bo5 .." );
@@ -1688,8 +1688,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // cancel ao5
       BOOST_TEST_MESSAGE( "Cancel order ao5 .." );
@@ -1702,8 +1702,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // cancel bo5
       BOOST_TEST_MESSAGE( "Cancel order bo5 .." );
@@ -1716,8 +1716,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // generate block to save the changes
       BOOST_TEST_MESSAGE( "Generating blocks ..." );
@@ -1727,8 +1727,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
    }
    FC_LOG_AND_RETHROW()
@@ -1913,8 +1913,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // Alice cancels order
          if( !expire_order )
@@ -1969,8 +1969,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          BOOST_TEST_MESSAGE( "Creating bo1" );
          limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(500, usd_id), asset(1000), exp, cer )->id;
@@ -1984,8 +1984,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // Bob cancels order
          if( !expire_order )
@@ -2054,8 +2054,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
 
          // Check partial fill
@@ -2084,8 +2084,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // cancel Alice order, show that entire deferred_fee was consumed by partial match
          if( !expire_order )
@@ -2128,8 +2128,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // Check multiple fill
          // Alice creating multiple orders
@@ -2155,8 +2155,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // Bob creating an order matching multiple Alice's orders
          BOOST_TEST_MESSAGE( "Creating bo31, completely fill ao31 and ao33, partially fill ao34" );
@@ -2182,8 +2182,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // Bob creating an order matching multiple Alice's orders
          BOOST_TEST_MESSAGE( "Creating bo32, completely fill partially filled ao34 and new ao35, leave on market" );
@@ -2209,8 +2209,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // cancel Bob order, show that entire deferred_fee was consumed by partial match
          if( !expire_order )
@@ -2252,8 +2252,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // cancel Alice order, will refund after hard fork 445
          BOOST_TEST_MESSAGE( "Cancel order ao32" );
@@ -2269,8 +2269,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
          BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
          BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
          // undo above tx's and reset
          BOOST_TEST_MESSAGE( "Clean up" );
@@ -2401,8 +2401,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // ao3: won't expire, partially match before hard fork 445, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao3 .." ); // 1:30
@@ -2422,8 +2422,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // ao4: will expire, will partially match before hard fork 445, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao4 .." ); // 1:20
@@ -2443,8 +2443,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // bo3: won't expire, will partially match before hard fork 445, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo3 .." ); // 1:30
@@ -2466,8 +2466,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // bo4: will expire, will partially match before hard fork 445, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo4 .." ); // 1:20
@@ -2489,8 +2489,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
 
       // ao11: won't expire, partially match after hard fork core-604, fee in core
@@ -2506,8 +2506,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // ao12: will expire, partially match after hard fork core-604, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao12 .." ); // 1:16
@@ -2522,8 +2522,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // bo11: won't expire, partially match after hard fork core-604, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo11 .." ); // 1:18
@@ -2540,8 +2540,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // bo12: will expire, partially match after hard fork core-604, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo12 .." ); // 1:17
@@ -2558,8 +2558,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // ao5: won't expire, partially match after hard fork 445, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao5 .." ); // 1:15
@@ -2574,8 +2574,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // ao6: will expire, partially match after hard fork 445, fee in core
       if( false ) { // only can have either ao5 or ao6, can't have both
@@ -2591,8 +2591,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
       }
 
       // bo5: won't expire, partially match after hard fork 445, fee in usd
@@ -2611,8 +2611,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
       }
 
       // bo6: will expire, partially match after hard fork 445, fee in usd
@@ -2631,8 +2631,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // generate block so the orders will be in db before hard fork 445
       BOOST_TEST_MESSAGE( "Generating blocks, passing hard fork 445 ..." );
@@ -2647,8 +2647,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // prepare for new transactions
       enable_fees();
@@ -2671,8 +2671,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
       }
 
       // partially fill bo6
@@ -2689,8 +2689,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // partially fill ao5
       BOOST_TEST_MESSAGE( "Partially fill ao5 .." ); // 1:15
@@ -2706,8 +2706,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // partially fill bo5
       if( false ) { // only can have either bo5 or bo6, can't have both
@@ -2724,8 +2724,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
       }
 
       // prepare more orders
@@ -2760,8 +2760,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // ao9: won't expire, partially match before hard fork core-604, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao9 .." ); // 1:3
@@ -2781,8 +2781,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // ao10: will expire, will partially match before hard fork core-604, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao10 .." ); // 1:2
@@ -2802,8 +2802,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // bo9: won't expire, will partially match before hard fork core-604, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo9 .." ); // 1:3
@@ -2825,8 +2825,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // bo10: will expire, will partially match before hard fork core-604, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo10 .." ); // 1:2
@@ -2848,8 +2848,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // ao13: won't expire, partially match after hard fork core-604, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao13 .." ); // 1:1.5
@@ -2864,8 +2864,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // ao14: will expire, partially match after hard fork core-604, fee in core
       BOOST_TEST_MESSAGE( "Creating order ao14 .." ); // 1:1.2
@@ -2880,8 +2880,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // bo13: won't expire, partially match after hard fork core-604, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo13 .." ); // 1:1.5
@@ -2898,8 +2898,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // bo14: will expire, partially match after hard fork core-604, fee in usd
       BOOST_TEST_MESSAGE( "Creating order bo14 .." ); // 1:1.2
@@ -2916,8 +2916,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // generate block so the orders will be in db before hard fork core-604
       BOOST_TEST_MESSAGE( "Generating blocks, passing hard fork core-604 ..." );
@@ -2932,8 +2932,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // prepare for new transactions
       enable_fees();
@@ -2955,8 +2955,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // partially fill bo14
       BOOST_TEST_MESSAGE( "Partially fill bo14 .." ); // 1:1.2
@@ -2972,8 +2972,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // generate block to save the changes
       BOOST_TEST_MESSAGE( "Generating blocks ..." );
@@ -2983,8 +2983,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // generate more blocks, so some orders will expire
       generate_blocks( exp, true, skip );
@@ -3008,8 +3008,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // prepare for new transactions
       enable_fees();
@@ -3031,8 +3031,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // partially fill bo13
       BOOST_TEST_MESSAGE( "Partially fill bo13 .." ); // 1:1.5
@@ -3048,8 +3048,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // don't refund fee, only refund remaining funds, for manually cancellations with an explicit fee:
       // * orders created before hard fork 445 : ao1, ao3, ao5, bo1, bo3, bo5
@@ -3066,8 +3066,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // cancel bo1
       BOOST_TEST_MESSAGE( "Cancel order bo1 .." );
@@ -3080,8 +3080,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // cancel ao3
       BOOST_TEST_MESSAGE( "Cancel order ao3 .." );
@@ -3094,8 +3094,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // cancel bo3
       BOOST_TEST_MESSAGE( "Cancel order bo3 .." );
@@ -3108,8 +3108,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // cancel ao5
       BOOST_TEST_MESSAGE( "Cancel order ao5 .." );
@@ -3122,8 +3122,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // cancel bo5
       if( false ) { // can only have bo5 or bo6 but not both
@@ -3137,8 +3137,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
       }
 
       // cancel ao9
@@ -3152,8 +3152,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // cancel bo9
       BOOST_TEST_MESSAGE( "Cancel order bo9 .." );
@@ -3166,8 +3166,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // cancel ao13
       BOOST_TEST_MESSAGE( "Cancel order ao13 .." );
@@ -3180,8 +3180,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // cancel bo13
       BOOST_TEST_MESSAGE( "Cancel order bo13 .." );
@@ -3194,8 +3194,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
 
       // generate block to save the changes
@@ -3206,8 +3206,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // generate blocks util exp1, so some orders will expire
       BOOST_TEST_MESSAGE( "Generating blocks ..." );
@@ -3226,8 +3226,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // prepare for new transactions
       enable_fees();
@@ -3251,8 +3251,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // cancel bo7
       BOOST_TEST_MESSAGE( "Cancel order bo7 .." );
@@ -3266,8 +3266,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // partially fill ao12
       BOOST_TEST_MESSAGE( "Partially fill ao12 .." ); // 1:16
@@ -3283,8 +3283,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // partially fill bo12
       BOOST_TEST_MESSAGE( "Partially fill bo12 .." ); // 1:17
@@ -3300,8 +3300,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // generate block to save the changes
       BOOST_TEST_MESSAGE( "Generating blocks ..." );
@@ -3311,8 +3311,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // generate blocks util exp2, so some orders will expire
       generate_blocks( exp2, true, skip );
@@ -3327,8 +3327,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // prepare for new transactions
       enable_fees();
@@ -3350,8 +3350,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // partially fill bo11
       BOOST_TEST_MESSAGE( "Partially fill bo11 .." ); // 1:18
@@ -3367,8 +3367,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // no fee refund for orders created before hard fork 445, if manually cancelled with an explicit fee.
       // remaining funds will be refunded
@@ -3384,8 +3384,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // cancel bo11
       BOOST_TEST_MESSAGE( "Cancel order bo11 .." );
@@ -3398,8 +3398,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
       // generate block to save the changes
       BOOST_TEST_MESSAGE( "Generating blocks ..." );
@@ -3409,8 +3409,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
       BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
       BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.get_amount().value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.get_amount().value,  accum_b );
 
    }
    FC_LOG_AND_RETHROW()

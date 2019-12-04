@@ -928,7 +928,7 @@ BOOST_FIXTURE_TEST_CASE( limit_order_expiration, database_fixture )
    BOOST_CHECK_EQUAL( get_balance(*nathan, *core), 49500 );
 
    auto ptrx_id = ptrx.operation_results.back().get<object_id_type>();
-   auto limit_index = db.get_index_type<limit_order_index>().indices();
+   auto& limit_index = db.get_index_type<limit_order_index>().indices();
    auto limit_itr = limit_index.begin();
    BOOST_REQUIRE( limit_itr != limit_index.end() );
    BOOST_REQUIRE( limit_itr->id == ptrx_id );

@@ -1147,7 +1147,7 @@ BOOST_AUTO_TEST_CASE( worker_create_test )
 
    const vesting_balance_object& balance = worker.worker.get<vesting_balance_worker_type>().balance(db);
    BOOST_CHECK(balance.owner == nathan_id);
-   BOOST_CHECK(balance.balance == asset(0));
+   BOOST_CHECK(balance.balance.get_value() == asset(0));
    BOOST_CHECK(balance.policy.get<cdd_vesting_policy>().vesting_seconds == fc::days(1).to_seconds());
 } FC_LOG_AND_RETHROW() }
 
@@ -1176,9 +1176,9 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
       trx.clear();
    }
 
-   BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<vesting_balance_worker_type>().balance(db).balance.amount.value, 0);
+   BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<vesting_balance_worker_type>().balance(db).balance.get_amount().value, 0);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-   BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<vesting_balance_worker_type>().balance(db).balance.amount.value, 1000);
+   BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<vesting_balance_worker_type>().balance(db).balance.get_amount().value, 1000);
    generate_blocks(db.head_block_time() + fc::hours(12));
 
    {
@@ -1196,7 +1196,7 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
    }
 
    BOOST_CHECK_EQUAL(get_balance(nathan_id, asset_id_type()), 100500);
-   BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<vesting_balance_worker_type>().balance(db).balance.amount.value, 500);
+   BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<vesting_balance_worker_type>().balance(db).balance.get_amount().value, 500);
 
    {
       account_update_operation op;
@@ -1209,7 +1209,7 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
    }
 
    generate_blocks(db.head_block_time() + fc::hours(12));
-   BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<vesting_balance_worker_type>().balance(db).balance.amount.value, 500);
+   BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<vesting_balance_worker_type>().balance(db).balance.get_amount().value, 500);
 
    {
       vesting_balance_withdraw_operation op;
@@ -1230,7 +1230,7 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
    }
 
    BOOST_CHECK_EQUAL(get_balance(nathan_id, asset_id_type()), 101000);
-   BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<vesting_balance_worker_type>().balance(db).balance.amount.value, 0);
+   BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<vesting_balance_worker_type>().balance(db).balance.get_amount().value, 0);
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( refund_worker_test )
@@ -1507,7 +1507,7 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
 
       // settle3 should be least collateralized order according to index
       BOOST_CHECK( db.get_index_type<call_order_index>().indices().get<by_collateral>().begin()->id == call3_id );
-      BOOST_CHECK_EQUAL( call3_id(db).debt.value, 3000 );
+      BOOST_CHECK_EQUAL( call3_id(db).debt.get_amount().value, 3000 );
 
       BOOST_TEST_MESSAGE( "Verify partial settlement of call" );
       // Partially settle a call
@@ -1515,9 +1515,9 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
 
       // Call does not take effect immediately
       BOOST_CHECK_EQUAL( get_balance(nathan_id, bitusd_id), 14950);
-      BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 50);
-      BOOST_CHECK_EQUAL( call3_id(db).debt.value, 3000 );
-      BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 5780 );
+      BOOST_CHECK_EQUAL( settle_id(db).balance.get_amount().value, 50);
+      BOOST_CHECK_EQUAL( call3_id(db).debt.get_amount().value, 3000 );
+      BOOST_CHECK_EQUAL( call3_id(db).collateral.get_amount().value, 5780 );
       BOOST_CHECK( settle_id(db).owner == nathan_id );
 
       // Wait for settlement to take effect
@@ -1528,8 +1528,8 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
       BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 50 );
       BOOST_CHECK_EQUAL( get_balance(nathan_id, bitusd_id), 14950);
       BOOST_CHECK_EQUAL( get_balance(nathan_id, core_id), 49 );   // 1% force_settlement_offset_percent (rounded unfavorably)
-      BOOST_CHECK_EQUAL( call3_id(db).debt.value, 2950 );
-      BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 5731 );  // 5731 == 5780-49
+      BOOST_CHECK_EQUAL( call3_id(db).debt.get_amount().value, 2950 );
+      BOOST_CHECK_EQUAL( call3_id(db).collateral.get_amount().value, 5731 );  // 5731 == 5780-49
 
       BOOST_CHECK( db.get_index_type<call_order_index>().indices().get<by_collateral>().begin()->id == call3_id );
 
@@ -1585,11 +1585,11 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
       BOOST_REQUIRE( db.find(call1_id) != nullptr );
       BOOST_REQUIRE( db.find(call2_id) != nullptr );
 
-      BOOST_CHECK_EQUAL( call1_id(db).debt.value, 1000 );
-      BOOST_CHECK_EQUAL( call1_id(db).collateral.value, 2000 );
+      BOOST_CHECK_EQUAL( call1_id(db).debt.get_amount().value, 1000 );
+      BOOST_CHECK_EQUAL( call1_id(db).collateral.get_amount().value, 2000 );
 
-      BOOST_CHECK_EQUAL( call2_id(db).debt.value, 2000-550 );
-      BOOST_CHECK_EQUAL( call2_id(db).collateral.value, 3998-call2_payout );
+      BOOST_CHECK_EQUAL( call2_id(db).debt.get_amount().value, 2000-550 );
+      BOOST_CHECK_EQUAL( call2_id(db).collateral.get_amount().value, 3998-call2_payout );
    }
    catch(fc::exception& e)
    {
@@ -1669,8 +1669,8 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
 
    db.open(td.path(), [this]{return genesis_state;}, "TEST");
    const balance_object& balance = balance_id_type()(db);
-   BOOST_CHECK_EQUAL(balance.balance.amount.value, 1);
-   BOOST_CHECK_EQUAL(balance_id_type(1)(db).balance.amount.value, 1);
+   BOOST_CHECK_EQUAL(balance.balance.get_amount().value, 1);
+   BOOST_CHECK_EQUAL(balance_id_type(1)(db).balance.get_amount().value, 1);
 
    balance_claim_operation op;
    op.deposit_to_account = db.get_index_type<account_index>().indices().get<by_name>().find("n")->get_id();
@@ -1700,10 +1700,10 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    const balance_object& vesting_balance_1 = balance_id_type(2)(db);
    const balance_object& vesting_balance_2 = balance_id_type(3)(db);
    BOOST_CHECK(vesting_balance_1.is_vesting_balance());
-   BOOST_CHECK_EQUAL(vesting_balance_1.balance.amount.value, 500);
+   BOOST_CHECK_EQUAL(vesting_balance_1.balance.get_amount().value, 500);
    BOOST_CHECK_EQUAL(vesting_balance_1.available(db.head_block_time()).amount.value, 0);
    BOOST_CHECK(vesting_balance_2.is_vesting_balance());
-   BOOST_CHECK_EQUAL(vesting_balance_2.balance.amount.value, 400);
+   BOOST_CHECK_EQUAL(vesting_balance_2.balance.get_amount().value, 400);
    BOOST_CHECK_EQUAL(vesting_balance_2.available(db.head_block_time()).amount.value, 150);
 
    op.balance_to_claim = vesting_balance_1.id;
@@ -1735,7 +1735,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    _sign( trx, v2_key );
    PUSH_TX(db, trx);
    BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, 101);
-   BOOST_CHECK_EQUAL(vesting_balance_2.balance.amount.value, 300);
+   BOOST_CHECK_EQUAL(vesting_balance_2.balance.get_amount().value, 300);
 
    op.total_claimed.amount = 10;
    trx.operations = {op};
@@ -1776,7 +1776,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot), init_account_priv_key, skip_flags);
    set_expiration( db, trx );
 
-   op.total_claimed = vesting_balance_2.balance;
+   op.total_claimed = vesting_balance_2.balance.get_value();
    trx.operations = {op};
    trx.clear_signatures();
    _sign( trx, n_key );
@@ -2232,17 +2232,17 @@ BOOST_AUTO_TEST_CASE( buyback )
          generate_block();
 
          // no success because buyback has none for sale
-         BOOST_CHECK( order_id_mid(db).for_sale == 100 );
+         BOOST_CHECK( order_id_mid(db).for_sale.get_amount() == 100 );
 
          // but we can send some to buyback
          fund( rex_id(db), asset( 100, asset_id_type() ) );
          // no action until next maint
-         BOOST_CHECK( order_id_mid(db).for_sale == 100 );
+         BOOST_CHECK( order_id_mid(db).for_sale.get_amount() == 100 );
          generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
          generate_block();
 
          // partial fill, Alice now sells 90 BUYME for 900 BTS.
-         BOOST_CHECK( order_id_mid(db).for_sale == 90 );
+         BOOST_CHECK( order_id_mid(db).for_sale.get_amount() == 90 );
 
          // TODO check burn amount
 
@@ -2268,8 +2268,8 @@ BOOST_AUTO_TEST_CASE( buyback )
          //                                 70 BUYME in mid order     0 BUYME in low order
 
          idump( (order_id_mid(db)) );
-         BOOST_CHECK( order_id_mid(db).for_sale == 70 );
-         BOOST_CHECK( order_id_high(db).for_sale == 10 );
+         BOOST_CHECK( order_id_mid(db).for_sale.get_amount() == 70 );
+         BOOST_CHECK( order_id_high(db).for_sale.get_amount() == 10 );
 
          BOOST_CHECK( get_balance( rex_id, asset_id_type() ) == 0 );
 

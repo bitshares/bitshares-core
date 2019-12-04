@@ -475,7 +475,7 @@ void database_fixture::verify_asset_supplies( const database& db )
 {
    //wlog("*** Begin asset supply verification ***");
    const asset_dynamic_data_object& core_asset_data = db.get_core_asset().dynamic_asset_data_id(db);
-   BOOST_CHECK(core_asset_data.fee_pool == 0);
+   BOOST_CHECK(core_asset_data.fee_pool.get_amount() == 0);
 
    const auto& statistics_index = db.get_index_type<account_stats_index>().indices();
    const auto& acct_balance_index = db.get_index_type<account_balance_index>().indices();
@@ -487,23 +487,23 @@ void database_fixture::verify_asset_supplies( const database& db )
    share_type reported_core_in_orders;
 
    for( const account_balance_object& b : acct_balance_index )
-      total_balances[b.asset_type] += b.balance;
+      total_balances[b.get_asset()] += b.balance.get_amount();
    for( const force_settlement_object& s : settle_index )
-      total_balances[s.balance.asset_id] += s.balance.amount;
+      total_balances[s.balance.get_asset()] += s.balance.get_amount();
    for( const collateral_bid_object& b : bids )
-      total_balances[b.inv_swan_price.base.asset_id] += b.inv_swan_price.base.amount;
+      total_balances[b.collateral_offered.get_asset()] += b.collateral_offered.get_amount();
    for( const account_statistics_object& a : statistics_index )
    {
       reported_core_in_orders += a.total_core_in_orders;
-      total_balances[asset_id_type()] += a.pending_fees + a.pending_vested_fees;
+      total_balances[asset_id_type()] += a.pending_fees.get_amount() + a.pending_vested_fees.get_amount();
    }
    for( const limit_order_object& o : db.get_index_type<limit_order_index>().indices() )
    {
       asset for_sale = o.amount_for_sale();
       if( for_sale.asset_id == asset_id_type() ) core_in_orders += for_sale.amount;
       total_balances[for_sale.asset_id] += for_sale.amount;
-      total_balances[asset_id_type()] += o.deferred_fee;
-      total_balances[o.deferred_paid_fee.asset_id] += o.deferred_paid_fee.amount;
+      total_balances[asset_id_type()] += o.deferred_fee.get_amount();
+      total_balances[o.deferred_paid_fee.get_asset()] += o.deferred_paid_fee.get_amount();
    }
    for( const call_order_object& o : db.get_index_type<call_order_index>().indices() )
    {
@@ -515,39 +515,39 @@ void database_fixture::verify_asset_supplies( const database& db )
    for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )
    {
       const auto& dasset_obj = asset_obj.dynamic_asset_data_id(db);
-      total_balances[asset_obj.id] += dasset_obj.accumulated_fees;
-      total_balances[asset_id_type()] += dasset_obj.fee_pool;
+      total_balances[asset_obj.id] += dasset_obj.accumulated_fees.get_amount();
+      total_balances[asset_id_type()] += dasset_obj.fee_pool.get_amount();
       if( asset_obj.is_market_issued() )
       {
          const auto& bad = asset_obj.bitasset_data(db);
-         total_balances[bad.options.short_backing_asset] += bad.settlement_fund;
+         total_balances[bad.options.short_backing_asset] += bad.settlement_fund.get_amount();
       }
-      total_balances[asset_obj.id] += dasset_obj.confidential_supply.value;
+      total_balances[asset_obj.id] += dasset_obj.confidential_supply.get_amount();
    }
    for( const vesting_balance_object& vbo : db.get_index_type< vesting_balance_index >().indices() )
-      total_balances[ vbo.balance.asset_id ] += vbo.balance.amount;
+      total_balances[ vbo.balance.get_asset() ] += vbo.balance.get_amount();
    for( const fba_accumulator_object& fba : db.get_index_type< simple_index< fba_accumulator_object > >() )
-      total_balances[ asset_id_type() ] += fba.accumulated_fba_fees;
+      total_balances[ asset_id_type() ] += fba.accumulated_fba_fees.get_amount();
    for( const balance_object& bo : db.get_index_type< balance_index >().indices() )
-      total_balances[ bo.balance.asset_id ] += bo.balance.amount;
+      total_balances[ bo.balance.get_asset() ] += bo.balance.get_amount();
 
-   total_balances[asset_id_type()] += db.get_dynamic_global_properties().witness_budget;
+   total_balances[asset_id_type()] += db.get_dynamic_global_properties().witness_budget.get_amount();
 
    for( const auto& item : total_debts )
    {
-      BOOST_CHECK_EQUAL(item.first(db).dynamic_asset_data_id(db).current_supply.value, item.second.value);
+      BOOST_CHECK_EQUAL(item.first(db).dynamic_asset_data_id(db).current_supply.get_amount().value, item.second.value);
    }
 
    // htlc
    const auto& htlc_idx = db.get_index_type< htlc_index >().indices().get< by_id >();
    for( auto itr = htlc_idx.begin(); itr != htlc_idx.end(); ++itr )
    {
-      total_balances[itr->transfer.asset_id] += itr->transfer.amount;
+      total_balances[itr->transfer.amount.get_asset()] += itr->transfer.amount.get_amount();
    }
 
    for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )
    {
-      BOOST_CHECK_EQUAL(total_balances[asset_obj.id].value, asset_obj.dynamic_asset_data_id(db).current_supply.value);
+      BOOST_CHECK_EQUAL(total_balances[asset_obj.id].value, asset_obj.dynamic_asset_data_id(db).current_supply.get_amount().value);
    }
 
    BOOST_CHECK_EQUAL( core_in_orders.value , reported_core_in_orders.value );
@@ -1300,7 +1300,7 @@ void database_fixture::print_market( const string& syma, const string& symb )con
    while( cur != price_idx.end() )
    {
       cerr << std::setw( 10 ) << std::left   << cur->seller(db).name << " ";
-      cerr << std::setw( 10 ) << std::right  << cur->for_sale.value << " ";
+      cerr << std::setw( 10 ) << std::right  << cur->amount_for_sale().amount.value << " ";
       cerr << std::setw( 5 )  << std::left   << cur->amount_for_sale().asset_id(db).symbol << " ";
       cerr << std::setw( 10 ) << std::right  << cur->amount_to_receive().amount.value << " ";
       cerr << std::setw( 5 )  << std::left   << cur->amount_to_receive().asset_id(db).symbol << " ";

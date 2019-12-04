@@ -102,10 +102,13 @@ BOOST_AUTO_TEST_CASE( flat_index_test )
    BOOST_CHECK( !(*bitusd.bitasset_data_id)(db).current_feed.settlement_price.is_null() );
    try {
       auto ses = db._undo_db.start_undo_session();
-      const auto& obj1 = db.create<asset_bitasset_data_object>( [&]( asset_bitasset_data_object& obj ){
-          obj.settlement_fund = 17;
+      stored_value dummy_value;
+      stored_debt dummy_debt(bitusd_id + 1);
+      dummy_value = dummy_debt.issue(17);
+      const auto& obj1 = db.create<asset_bitasset_data_object>( [&dummy_value]( asset_bitasset_data_object& obj ){
+          obj.settlement_fund = std::move(dummy_value);
       });
-      BOOST_REQUIRE_EQUAL( obj1.settlement_fund.value, 17 );
+      BOOST_REQUIRE_EQUAL( obj1.settlement_fund.get_amount().value, 17 );
       throw std::string("Expected");
       // With flat_index, obj1 will not really be removed from the index
    } catch ( const std::string& e )
@@ -124,8 +127,12 @@ BOOST_AUTO_TEST_CASE( merge_test )
    try {
       database db;
       auto ses = db._undo_db.start_undo_session();
-      db.create<account_balance_object>( [&]( account_balance_object& obj ){
-          obj.balance = 42;
+      stored_value transport;
+      db.create<asset_dynamic_data_object>( [&transport]( asset_dynamic_data_object& obj ){
+          transport = obj.current_supply.issue(42);
+      });
+      db.create<account_balance_object>( [&transport]( account_balance_object& obj ){
+          obj.balance = std::move(transport);
       });
       ses.merge();
 
