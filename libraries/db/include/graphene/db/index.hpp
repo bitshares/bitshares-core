@@ -125,7 +125,7 @@ namespace graphene { namespace db {
           *   @note Lambda should have the signature:  void(Object&)
           */
          template<typename Object, typename Lambda>
-         void modify( const Object& obj, Lambda&& l ) {
+         void modify( const Object& obj, const Lambda& l ) {
             modify( static_cast<const object&>(obj),
                     std::function<void(object&)>( [&l]( object& o ){ l( static_cast<Object&>(o) ); } ) );
          }
