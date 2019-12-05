@@ -62,6 +62,13 @@ void limit_order_object::restore( object& obj )
    static_cast<limit_order_master&>(*this) = std::move( backup );
 }
 
+void limit_order_object::clear()
+{
+   for_sale.clear();
+   deferred_fee.clear();
+   deferred_paid_fee.clear();
+}
+
 /*
 target_CR = max( target_CR, MCR )
 
@@ -362,6 +369,12 @@ void call_order_object::restore( object& obj )
    static_cast<call_order_master&>(*this) = std::move( backup );
 }
 
+void call_order_object::clear()
+{
+   debt.clear();
+   collateral.clear();
+}
+
 class force_settlement_backup : public force_settlement_master
 {
       asset balance;
@@ -387,6 +400,11 @@ void force_settlement_object::restore( object& obj )
    static_cast<force_settlement_master&>(*this) = std::move( backup );
 }
 
+void force_settlement_object::clear()
+{
+   balance.clear();
+}
+
 class collateral_bid_backup : public collateral_bid_master
 {
       asset collateral_offered;
@@ -410,6 +428,11 @@ void collateral_bid_object::restore( object& obj )
    const auto& backup = static_cast<collateral_bid_backup&>(obj);
    collateral_offered.restore( backup.collateral_offered );
    static_cast<collateral_bid_master&>(*this) = std::move( backup );
+}
+
+void collateral_bid_object::clear()
+{
+   collateral_offered.clear();
 }
 
 } } // graphene::chain

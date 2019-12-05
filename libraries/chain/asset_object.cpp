@@ -64,6 +64,14 @@ void asset_dynamic_data_object::restore( object& obj )
    static_cast<asset_dynamic_data_master&>(*this) = std::move( backup );
 }
 
+void asset_dynamic_data_object::clear()
+{
+   current_supply.clear();
+   accumulated_fees.clear();
+   fee_pool.clear();
+   confidential_supply.clear();
+}
+
 share_type asset_bitasset_data_master::max_force_settlement_volume(share_type current_supply) const
 {
    if( options.maximum_force_settlement_volume == 0 )
@@ -165,6 +173,12 @@ void asset_bitasset_data_object::restore( object& obj )
    settlement_fund.restore( asset( backup.settlement_fund, backup.options.short_backing_asset ) );
    total_debt.restore( asset( backup.total_debt, backup.asset_id ) );
    static_cast<asset_bitasset_data_master&>(*this) = std::move( backup );
+}
+
+void asset_bitasset_data_object::clear()
+{
+   settlement_fund.clear();
+   total_debt.clear();
 }
 
 

@@ -75,6 +75,7 @@ namespace graphene { namespace chain {
    protected:
       virtual unique_ptr<graphene::db::object> backup()const;
       virtual void restore( graphene::db::object& obj );
+      virtual void clear();
    };
 
    /**
@@ -281,6 +282,7 @@ namespace graphene { namespace chain {
    protected:
       virtual unique_ptr<graphene::db::object> backup()const;
       virtual void restore( graphene::db::object& obj );
+      virtual void clear();
    };
 
    // key extractor for short backing asset

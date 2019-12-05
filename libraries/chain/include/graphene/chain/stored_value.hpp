@@ -62,7 +62,8 @@ namespace graphene { namespace chain {
       graphene::protocol::asset_id_type _asset;
       graphene::protocol::share_type _amount;
 
-      void restore( const graphene::protocol::asset& backup );
+      virtual void restore( const graphene::protocol::asset& backup );
+      virtual void clear() { _amount = 0; }
       friend class account_balance_object;
       friend class account_statistics_object;
       friend class asset_dynamic_data_object;
@@ -76,7 +77,6 @@ namespace graphene { namespace chain {
       friend class force_settlement_object;
       friend class collateral_bid_object;
       friend class vesting_balance_object;
-      friend class worker_object;
    };
 
    class stored_value : public stored_debt

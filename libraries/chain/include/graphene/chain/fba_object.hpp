@@ -57,6 +57,7 @@ class fba_accumulator_object : public fba_accumulator_master
       protected:
          virtual unique_ptr<graphene::db::object> backup()const;
          virtual void restore( graphene::db::object& obj );
+         virtual void clear();
 };
 
 } } // graphene::chain

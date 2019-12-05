@@ -81,6 +81,11 @@ void account_balance_object::restore( object& obj )
    static_cast<account_balance_master&>(*this) = std::move( backup );
 }
 
+void account_balance_object::clear()
+{
+   balance.clear();
+}
+
 void account_statistics_object::process_fees(const account_object& a, database& d) const
 {
    if( pending_fees.get_amount() > 0 || pending_vested_fees.get_amount() > 0 )
@@ -167,6 +172,12 @@ void account_statistics_object::restore( object& obj )
    pending_fees.restore( asset( backup.pending_fees ) );
    pending_vested_fees.restore( asset( backup.pending_vested_fees ) );
    static_cast<account_statistics_master&>(*this) = std::move( backup );
+}
+
+void account_statistics_object::clear()
+{
+   pending_fees.clear();
+   pending_vested_fees.clear();
 }
 
 set<account_id_type> account_member_index::get_account_members(const account_object& a)const

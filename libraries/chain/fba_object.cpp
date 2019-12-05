@@ -125,6 +125,11 @@ void fba_accumulator_object::restore( object& obj )
    static_cast<fba_accumulator_master&>(*this) = std::move( backup );
 }
 
+void fba_accumulator_object::clear()
+{
+   accumulated_fba_fees.clear();
+}
+
 } }
 
 FC_REFLECT_DERIVED( graphene::chain::fba_accumulator_master, (graphene::db::object),

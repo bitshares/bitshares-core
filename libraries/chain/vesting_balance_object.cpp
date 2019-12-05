@@ -299,6 +299,11 @@ void vesting_balance_object::restore( object& obj )
    static_cast<vesting_balance_master&>(*this) = std::move( backup );
 }
 
+void vesting_balance_object::clear()
+{
+   balance.clear();
+}
+
 } } // graphene::chain
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::linear_vesting_policy )

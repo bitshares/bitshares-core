@@ -32,6 +32,7 @@
 #include <graphene/protocol/fee_schedule.hpp>
 
 #include <fc/io/fstream.hpp>
+#include <fc/thread/parallel.hpp>
 
 #include <fstream>
 #include <functional>

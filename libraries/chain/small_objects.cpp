@@ -71,6 +71,11 @@ void balance_object::restore( object& obj )
    static_cast<balance_master&>(*this) = std::move( backup );
 }
 
+void balance_object::clear()
+{
+   balance.clear();
+}
+
 class dynamic_global_property_backup : public dynamic_global_property_master
 {
       asset witness_budget;
@@ -94,6 +99,11 @@ void dynamic_global_property_object::restore( object& obj )
    const auto& backup = static_cast<dynamic_global_property_backup&>(obj);
    witness_budget.restore( backup.witness_budget );
    static_cast<dynamic_global_property_master&>(*this) = std::move( backup );
+}
+
+void dynamic_global_property_object::clear()
+{
+   witness_budget.clear();
 }
 
 class htlc_backup : public htlc_master
@@ -122,6 +132,11 @@ void htlc_object::restore( object& obj )
    static_cast<transfer_info_master&>(transfer) = backup.transfer;
    transfer.amount.restore( backup.amount );
    static_cast<htlc_master&>(*this) = std::move( backup );
+}
+
+void htlc_object::clear()
+{
+   transfer.amount.clear();
 }
 
 } } // graphene::chain

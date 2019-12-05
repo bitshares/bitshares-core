@@ -80,6 +80,7 @@ namespace graphene { namespace db {
          virtual unique_ptr<object> backup()const = 0;
          virtual void               clear() {}
          virtual void               restore( object& obj ) = 0;
+         friend class object_database;
          friend class undo_database;
    };
 

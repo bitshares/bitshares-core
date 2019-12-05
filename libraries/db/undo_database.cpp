@@ -126,7 +126,7 @@ void undo_database::undo()
       _db.get_mutable_index( item.first.space(), item.first.type() ).set_next_id( item.second );
 
    for( auto& item : state.removed )
-      _db.insert( std::move(*item.second) );
+      _db.insert( std::move(*item.second) ); // FIXME
 
    _stack.pop_back();
    enable();
@@ -194,13 +194,11 @@ void undo_database::merge()
       if( prev_state.new_ids.find(obj.second->id) != prev_state.new_ids.end() )
       {
          // new+upd -> new, type A
-         obj.second->clear();
          continue;
       }
       if( prev_state.old_values.find(obj.second->id) != prev_state.old_values.end() )
       {
          // upd(was=X) + upd(was=Y) -> upd(was=X), type A
-         obj.second->clear();
          continue;
       }
       // del+upd -> N/A
@@ -236,7 +234,6 @@ void undo_database::merge()
       if( prev_state.new_ids.find(obj.second->id) != prev_state.new_ids.end() )
       {
          // new + del -> nop (type C)
-         obj.second->clear();
          prev_state.new_ids.erase(obj.second->id);
          continue;
       }
@@ -289,7 +286,7 @@ void undo_database::pop_commit()
       }
 
       for( auto& item : state.removed )
-         _db.insert( std::move(*item.second) );
+         _db.insert( std::move(*item.second) ); // FIXME
 
       _stack.pop_back();
    }

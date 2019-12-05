@@ -43,6 +43,7 @@ namespace graphene { namespace db {
          ~object_database();
 
          void reset_indexes() { _index.clear(); _index.resize(255); }
+         void clear_objects();
 
          void open(const fc::path& data_dir );
 

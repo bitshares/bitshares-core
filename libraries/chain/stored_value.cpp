@@ -70,8 +70,7 @@ namespace graphene { namespace chain {
 
    void stored_debt::restore( const graphene::protocol::asset& backup )
    {
-      FC_ASSERT( _asset == backup.asset_id, "Corrupted backup: ${a} != ${b}",
-                 ("a",_asset)("b",backup.asset_id) );
+      _asset = backup.asset_id;
       _amount = backup.amount;
    }
 

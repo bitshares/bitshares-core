@@ -76,6 +76,7 @@ class limit_order_object : public limit_order_master
    protected:
       virtual unique_ptr<graphene::db::object> backup()const;
       virtual void restore( graphene::db::object& obj );
+      virtual void clear();
 };
 
 struct by_price;
@@ -168,6 +169,7 @@ class call_order_object : public call_order_master
    protected:
       virtual unique_ptr<graphene::db::object> backup()const;
       virtual void restore( graphene::db::object& obj );
+      virtual void clear();
 };
 
 /**
@@ -196,6 +198,7 @@ class force_settlement_object : public force_settlement_master
    protected:
       virtual unique_ptr<graphene::db::object> backup()const;
       virtual void restore( graphene::db::object& obj );
+      virtual void clear();
 };
 
 /**
@@ -227,6 +230,7 @@ class collateral_bid_object : public collateral_bid_master
    protected:
       virtual unique_ptr<graphene::db::object> backup()const;
       virtual void restore( graphene::db::object& obj );
+      virtual void clear();
 };
 
 struct by_collateral;
