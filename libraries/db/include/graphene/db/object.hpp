@@ -111,33 +111,6 @@ namespace graphene { namespace db {
 
    typedef flat_map<uint8_t, object_id_type> annotation_map;
 
-   /**
-    *  @class annotated_object
-    *  @brief An object that is easily extended by providing pointers to other objects, one for each space.
-    */
-   template<typename DerivedClass>
-   class annotated_object : public abstract_object<DerivedClass>
-   {
-      public:
-         /** return object_id_type() if no anotation is found for id_space */
-         object_id_type          get_annotation( uint8_t annotation_id_space )const
-         {
-            auto itr = annotations.find(annotation_id_space);
-            if( itr != annotations.end() ) return itr->second;
-            return object_id_type();
-         }
-         void                    set_annotation( object_id_type id )
-         {
-            annotations[id.space()] = id;
-         }
-
-         /**
-          *  Annotations should be accessed via get_annotation and set_annotation so
-          *  that they can be maintained in sorted order.
-          */
-         annotation_map annotations;
-   };
-
 } } // graphene::db
 
 // Without this, pack(object_id) tries to match the template for
@@ -149,4 +122,3 @@ struct is_restricted_conversion<graphene::db::object,To> : public mpl::true_ {};
 
 FC_REFLECT_TYPENAME( graphene::db::annotation_map )
 FC_REFLECT( graphene::db::object, (id) )
-FC_REFLECT_DERIVED_TEMPLATE( (typename Derived), graphene::db::annotated_object<Derived>, (graphene::db::object), (annotations) )
