@@ -80,6 +80,7 @@ namespace graphene { namespace db {
          virtual unique_ptr<object> backup()const = 0;
          virtual void               clear() {}
          virtual void               restore( object& obj ) = 0;
+         virtual object*            recreate() = 0;
          friend class object_database;
          friend class undo_database;
    };
@@ -104,6 +105,8 @@ namespace graphene { namespace db {
          {
             static_cast<DerivedClass&>(*this) = std::move( static_cast<DerivedClass&>(obj) );
          }
+
+         virtual object* recreate() { return this; }
       public:
          virtual variant to_variant()const { return variant( static_cast<const DerivedClass&>(*this), MAX_NESTING ); }
          virtual vector<char> pack()const  { return fc::raw::pack( static_cast<const DerivedClass&>(*this) ); }

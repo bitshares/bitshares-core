@@ -56,10 +56,14 @@ stored_value account_balance_object::reduce_balance( share_type delta )
    return balance.split( delta );
 }
 
-class account_balance_backup : public account_balance_master
+class account_balance_backup
+   : public account_balance_master, public backup_object<account_balance_object>
 {
       asset balance;
       friend class account_balance_object;
+
+   protected:
+      using backup_object<account_balance_object>::recreate;
 
    public:
       account_balance_backup( const account_balance_object& original )
@@ -146,7 +150,8 @@ void account_statistics_object::pay_fee( stored_value&& core_fee, share_type cas
       pending_vested_fees += std::move( core_fee );
 }
 
-class account_statistics_backup : public account_statistics_master
+class account_statistics_backup
+   : public account_statistics_master, public backup_object<account_statistics_object>
 {
       share_type pending_fees;
       share_type pending_vested_fees;

@@ -23,6 +23,7 @@
  */
 
 #include <graphene/chain/vesting_balance_object.hpp>
+#include <graphene/db/undo_database.hpp>
 
 #include <fc/io/raw.hpp>
 
@@ -274,7 +275,8 @@ asset vesting_balance_object::get_allowed_withdraw(const time_point_sec& now)con
    return vesting_balance_master::get_allowed_withdraw( balance.get_value(), now );
 }
 
-class vesting_balance_backup : public vesting_balance_master
+class vesting_balance_backup
+   : public vesting_balance_master, public graphene::db::backup_object<vesting_balance_object>
 {
       asset balance;
       friend class vesting_balance_object;

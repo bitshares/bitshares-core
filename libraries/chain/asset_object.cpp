@@ -30,7 +30,8 @@
 
 namespace graphene { namespace chain {
 
-class asset_dynamic_data_backup : public asset_dynamic_data_master
+class asset_dynamic_data_backup
+   : public asset_dynamic_data_master, public backup_object<asset_dynamic_data_object>
 {
       asset current_supply;
       share_type accumulated_fees;
@@ -147,7 +148,8 @@ void graphene::chain::asset_bitasset_data_master::update_median_feeds( time_poin
       current_maintenance_collateralization = current_feed.maintenance_collateralization();
 }
 
-class asset_bitasset_data_backup : public asset_bitasset_data_master
+class asset_bitasset_data_backup
+   : public asset_bitasset_data_master, public graphene::db::backup_object<asset_bitasset_data_object>
 {
       share_type settlement_fund;
       share_type total_debt;

@@ -132,7 +132,11 @@ void undo_database::_undo_last()
       _db.get_mutable_index( item.first.space(), item.first.type() ).set_next_id( item.second );
 
    for( auto& item : state.removed )
-      _db.insert( std::move(*item.second) ); // FIXME
+   {
+      object* tmp = item.second->recreate();
+      tmp->restore( *item.second );
+      _db.insert( std::move(*tmp) );
+   }
 
    _stack.pop_back();
 }

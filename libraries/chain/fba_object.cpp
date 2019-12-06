@@ -100,7 +100,7 @@ bool fba_accumulator_master::is_configured( const database& db )const
    return true;
 }
 
-class fba_accumulator_backup : public fba_accumulator_master
+class fba_accumulator_backup : public fba_accumulator_master, public backup_object<fba_accumulator_object>
 {
       share_type accumulated_fba_fees;
       friend class fba_accumulator_object;

@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 #include <graphene/chain/market_object.hpp>
+#include <graphene/db/undo_database.hpp>
 
 #include <boost/multiprecision/cpp_int.hpp>
 
@@ -31,7 +32,7 @@
 
 namespace graphene { namespace chain {
 
-class limit_order_backup : public limit_order_master
+class limit_order_backup : public limit_order_master, public graphene::db::backup_object<limit_order_object>
 {
       share_type for_sale;
       share_type deferred_fee;
@@ -341,7 +342,7 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
 
 } FC_CAPTURE_AND_RETHROW( (*this)(feed_price)(match_price)(maintenance_collateral_ratio) ) }
 
-class call_order_backup : public call_order_master
+class call_order_backup : public call_order_master, public graphene::db::backup_object<call_order_object>
 {
       asset debt;
       asset collateral;
@@ -375,7 +376,8 @@ void call_order_object::clear()
    collateral.clear();
 }
 
-class force_settlement_backup : public force_settlement_master
+class force_settlement_backup
+   : public force_settlement_master, public graphene::db::backup_object<force_settlement_object>
 {
       asset balance;
       friend class force_settlement_object;
@@ -405,7 +407,8 @@ void force_settlement_object::clear()
    balance.clear();
 }
 
-class collateral_bid_backup : public collateral_bid_master
+class collateral_bid_backup
+   : public collateral_bid_master, public graphene::db::backup_object<collateral_bid_object>
 {
       asset collateral_offered;
       friend class collateral_bid_object;

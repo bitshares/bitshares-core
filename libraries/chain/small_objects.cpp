@@ -41,12 +41,13 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/witness_schedule_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/db/undo_database.hpp>
 
 #include <fc/io/raw.hpp>
 
 namespace graphene { namespace chain {
 
-class balance_backup : public balance_master
+class balance_backup : public balance_master, public graphene::db::backup_object<balance_object>
 {
       asset balance;
       friend class balance_object;
@@ -76,7 +77,8 @@ void balance_object::clear()
    balance.clear();
 }
 
-class dynamic_global_property_backup : public dynamic_global_property_master
+class dynamic_global_property_backup
+   : public dynamic_global_property_master, public graphene::db::backup_object<dynamic_global_property_object>
 {
       asset witness_budget;
       friend class dynamic_global_property_object;
@@ -106,7 +108,7 @@ void dynamic_global_property_object::clear()
    witness_budget.clear();
 }
 
-class htlc_backup : public htlc_master
+class htlc_backup : public htlc_master, public graphene::db::backup_object<htlc_object>
 {
       asset amount;
       transfer_info_master transfer;
