@@ -6182,4 +6182,165 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
    }
 
 
+   /**
+    * Test of CAA for witness_update_operation
+    *
+    * Scenario: Test of authorization of one account (alice) authorizing a key
+    * to ONLY change the signing key of a witness account
+    */
+   BOOST_AUTO_TEST_CASE(authorized_change_witness_signing_key) {
+      try {
+
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Accounts
+         //////
+         // Create a new witness account (witness0)
+         ACTORS((witness0));
+         // Upgrade witness account to LTM
+         upgrade_to_lifetime_member(witness0.id);
+         generate_block();
+
+         // Create the witnesses
+         // Get the witness0 identifier after a block has been generated
+         // to be sure of using the most up-to-date identifier for the account
+         const account_id_type witness0_identifier = get_account("witness0").id;
+         create_witness(witness0_identifier, witness0_private_key);
+
+         generate_block();
+
+         // Find the witness ID for witness0
+         const auto& idx = db.get_index_type<witness_index>().indices().get<by_account>();
+         witness_object witness0_obj = *idx.find(witness0_identifier);
+         BOOST_CHECK(witness0_obj.witness_account == witness0_identifier);
+
+
+         //////
+         // Define a key that can be authorized
+         // This can be a new key or an existing key. The existing key may even be the active key of an account.
+         //////
+         fc::ecc::private_key some_private_key = generate_private_key("some key");
+         public_key_type some_public_key = public_key_type(some_private_key.get_public_key());
+
+
+         //////
+         // Define an alternate witness signing key
+         //////
+         fc::ecc::private_key alternate_signing_private_key = generate_private_key("some signing key");
+         public_key_type alternate_signing_public_key = public_key_type(alternate_signing_private_key.get_public_key());
+         // The current signing key should be different than the alternate signing public key
+         BOOST_CHECK(witness0_obj.signing_key != alternate_signing_public_key);
+
+
+         //////
+         // The key attempts to update the signing key of witness0
+         // This should fail because the key is NOT authorized by witness0 to update the signing key
+         //////
+         {
+            witness_update_operation wop;
+            wop.witness = witness0_obj.id;
+            wop.witness_account = witness0_obj.witness_account;
+
+            wop.new_signing_key = alternate_signing_public_key;
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(wop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should not indicate any rejected custom auths because no CAA applies for the key's attempt
+            // "rejected_custom_auths":[]
+            EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] { PUSH_TX(db, trx); });
+         }
+
+
+         //////
+         // Alice authorizes the key to only update the witness signing key
+         //////
+         {
+            custom_authority_create_operation authorize_update_signing_key;
+            authorize_update_signing_key.account = witness0.get_id();
+            authorize_update_signing_key.auth.add_authority(some_public_key, 1);
+            authorize_update_signing_key.auth.weight_threshold = 1;
+            authorize_update_signing_key.enabled = true;
+            authorize_update_signing_key.valid_to = db.head_block_time() + 86400;
+            authorize_update_signing_key.operation_type = operation::tag<witness_update_operation>::value;
+            auto url_index = member_index<witness_update_operation>("new_url");
+            restriction no_url = restriction(url_index, FUNC(eq), void_t());
+            authorize_update_signing_key.restrictions = {no_url};
+            //[
+            //  {
+            //    "member_index": 3,
+            //    "restriction_type": 0,
+            //    "argument": [
+            //      0,
+            //      {}
+            //    ]
+            //  }
+            //]
+
+            // Broadcast the transaction
+            trx.clear();
+            trx.operations = {authorize_update_signing_key};
+            sign(trx, witness0_private_key);
+            PUSH_TX(db, trx);
+         }
+
+
+         //////
+         // The key attempts to update the URL of witness0
+         // This should fail because the key is NOT authorized by witness0 to update the URL
+         //////
+         {
+            witness_update_operation wop;
+            wop.witness = witness0_obj.id;
+            wop.witness_account = witness0_obj.witness_account;
+
+            wop.new_url = "NEW_URL";
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(wop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should indicate the rejection path
+            // {"success":false,"rejection_path":[[0,0],[2,"predicate_was_false"]]}
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // The key attempts to update the signing key of witness0
+         // This should succeed because the key is authorized by witness0 to update the signing key
+         //////
+         {
+            witness_update_operation wop;
+            wop.witness = witness0_obj.id;
+            wop.witness_account = witness0_obj.witness_account;
+
+            wop.new_signing_key = alternate_signing_public_key;
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(wop));
+            sign(trx, some_private_key);
+            PUSH_TX(db, trx);
+
+            // Check the current signing key for witness0
+            witness_object updated_witness0_obj = *idx.find(witness0_obj.witness_account);
+            BOOST_CHECK(updated_witness0_obj.witness_account == witness0_obj.witness_account);
+            BOOST_CHECK(updated_witness0_obj.signing_key == alternate_signing_public_key);
+         }
+
+      }
+      FC_LOG_AND_RETHROW()
+   }
+
 BOOST_AUTO_TEST_SUITE_END()
