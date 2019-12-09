@@ -47,6 +47,8 @@
 #include <random>
 #include <graphene/chain/htlc_object.hpp>
 
+// Dependencies for the voting and witness tests
+#include <graphene/chain/witness_object.hpp>
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
@@ -5831,5 +5833,353 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
       } FC_LOG_AND_RETHROW()
    }
+
+   /**
+    * Test of CAA for account_update_operation
+    *
+    * Scenario: Test of authorization of one account (alice) authorizing a key
+    * to ONLY update the voting slate of an account
+    */
+   BOOST_AUTO_TEST_CASE(authorized_voting_key) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Accounts
+         //////
+         ACTORS((alice));
+         fund(alice, asset(500000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+         upgrade_to_lifetime_member(alice);
+
+         // Arbitrarily identify one of the active witnesses
+         flat_set<witness_id_type> witnesses = db.get_global_properties().active_witnesses;
+         auto itr_witnesses = witnesses.begin();
+         witness_id_type witness0_id = itr_witnesses[0];
+         const auto& idx = db.get_index_type<witness_index>().indices().get<by_id>();
+         witness_object witness0_obj = *idx.find(witness0_id);
+
+
+         //////
+         // Define a key that can be authorized
+         // This can be a new key or an existing key. The existing key may even be the active key of an account.
+         //////
+         fc::ecc::private_key some_private_key = generate_private_key("some key");
+         public_key_type some_public_key = public_key_type(some_private_key.get_public_key());
+
+
+         //////
+         // The key attempts to update the voting slate of Alice
+         // This should fail because the key is not authorized by Alice to update any part of her account
+         //////
+         {
+            account_update_operation uop;
+            uop.account = alice.get_id();
+            account_options alice_options = alice.options;
+            auto insert_result = alice_options.votes.insert(witness0_obj.vote_id);
+            if (!insert_result.second)
+               FC_THROW("Account ${account} was already voting for witness ${witness}",
+                        ("account", alice)("witness", "init0"));
+            uop.new_options = alice_options;
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(uop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+            // "rejected_custom_auths":[]
+            EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] { PUSH_TX(db, trx); });
+         }
+
+
+         //////
+         // Alice authorizes the key to update her voting slate
+         // by authorizing account updates EXCEPT for
+         // updating the owner key
+         // updating the active key
+         // updating the memo key
+         // updating the special owner authority
+         // updating the special active authority
+         //////
+         {
+            custom_authority_create_operation authorize_account_update;
+            authorize_account_update.account = alice.get_id();
+            authorize_account_update.auth.add_authority(some_public_key, 1);
+            authorize_account_update.auth.weight_threshold = 1;
+            authorize_account_update.enabled = true;
+            authorize_account_update.valid_to = db.head_block_time() + 86400;
+            authorize_account_update.operation_type = operation::tag<account_update_operation>::value;
+
+            // Shall not update the owner key member
+            auto owner_index = member_index<account_update_operation>("owner");
+            restriction no_owner = restriction(owner_index, FUNC(eq), void_t());
+
+            // Shall not update the active key member
+            auto active_index = member_index<account_update_operation>("active");
+            restriction no_active = restriction(active_index, FUNC(eq), void_t());
+
+            // Shall not update the memo key member of the new_options member
+            auto new_options_index = member_index<account_update_operation>("new_options");
+            auto memo_index = member_index<account_options>("memo_key");
+            restriction same_memo = restriction(new_options_index, FUNC(attr),
+                                                vector<restriction>{
+                                                        restriction(memo_index, FUNC(eq), alice.options.memo_key)});
+
+            // Shall not update the extensions member
+            auto ext_index = member_index<account_update_operation>("extensions");
+            restriction no_ext = restriction(ext_index, FUNC(eq), void_t());
+
+            auto owner_special_index = member_index<account_update_operation::ext>("owner_special_authority");
+            restriction no_special_owner = restriction(ext_index, FUNC(attr),
+                                                       vector<restriction>{
+                                                               restriction(owner_special_index, FUNC(eq), void_t())});
+
+            auto active_special_index = member_index<account_update_operation::ext>("active_special_authority");
+            restriction no_special_active = restriction(ext_index, FUNC(attr),
+                                                        vector<restriction>{
+                                                                restriction(active_special_index, FUNC(eq), void_t())});
+
+            // Shall not update the extensions member of the new_options member
+            auto new_options_ext_index = member_index<account_options>("extensions");
+            restriction no_new_options_ext = restriction(new_options_index, FUNC(attr), vector<restriction>{
+                    restriction(new_options_ext_index, FUNC(eq), void_t())});
+
+            // Combine all of the shall not restrictions
+            vector<restriction> shall_not_restrictions = {no_owner, no_active, no_special_owner, no_special_active,
+                                                          same_memo};
+            authorize_account_update.restrictions = shall_not_restrictions;
+            //[
+            //  {
+            //    "member_index": 2,
+            //    "restriction_type": 0,
+            //    "argument": [
+            //      0,
+            //      {}
+            //    ],
+            //    "extensions": []
+            //  },
+            //  {
+            //    "member_index": 3,
+            //    "restriction_type": 0,
+            //    "argument": [
+            //      0,
+            //      {}
+            //    ],
+            //    "extensions": []
+            //  },
+            //  {
+            //    "member_index": 5,
+            //    "restriction_type": 10,
+            //    "argument": [
+            //      39,
+            //      [
+            //        {
+            //          "member_index": 1,
+            //          "restriction_type": 0,
+            //          "argument": [
+            //            0,
+            //            {}
+            //          ],
+            //          "extensions": []
+            //        }
+            //      ]
+            //    ],
+            //    "extensions": []
+            //  },
+            //  {
+            //    "member_index": 5,
+            //    "restriction_type": 10,
+            //    "argument": [
+            //      39,
+            //      [
+            //        {
+            //          "member_index": 2,
+            //          "restriction_type": 0,
+            //          "argument": [
+            //            0,
+            //            {}
+            //          ],
+            //          "extensions": []
+            //        }
+            //      ]
+            //    ],
+            //    "extensions": []
+            //  },
+            //  {
+            //    "member_index": 4,
+            //    "restriction_type": 10,
+            //    "argument": [
+            //      39,
+            //      [
+            //        {
+            //          "member_index": 0,
+            //          "restriction_type": 0,
+            //          "argument": [
+            //            5,
+            //            "BTS7zsqi7QUAjTAdyynd6DVe8uv4K8gCTRHnAoMN9w9CA1xLCTDVv"
+            //          ],
+            //          "extensions": []
+            //        }
+            //      ]
+            //    ],
+            //    "extensions": []
+            //  }
+            //]
+
+            // Broadcast the transaction
+            trx.clear();
+            trx.operations = {authorize_account_update};
+            sign(trx, alice_private_key);
+            PUSH_TX(db, trx);
+         }
+
+
+         //////
+         // The key attempts to update the owner key for alice
+         // This should fail because it is NOT authorized by alice
+         // It violates Restriction 1 (index-0)
+         //////
+         {
+            account_update_operation uop;
+            uop.account = alice.get_id();
+
+            uop.owner = authority(1, some_public_key, 1);
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(uop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_owner_auth);
+            // The failure should indicate the rejection path
+            // {"success":false,"rejection_path":[[0,0],[2,"predicate_was_false"]]}
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // The key attempts to update the active key for alice
+         // This should fail because it is NOT authorized by alice
+         // It violates Restriction 2 (index-1)
+         //////
+         {
+            account_update_operation uop;
+            uop.account = alice.get_id();
+
+            uop.active = authority(1, some_public_key, 1);
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(uop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should indicate the rejection path
+            // {"success":false,"rejection_path":[[0,1],[2,"predicate_was_false"]]}
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,1],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // The key attempts to update the special owner key for alice
+         // This should fail because it is NOT authorized by alice
+         // It violates Restriction 3 (index-2)
+         //////
+         {
+            account_update_operation uop;
+            uop.account = alice.get_id();
+
+            uop.extensions.value.owner_special_authority = no_special_authority();
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(uop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_owner_auth);
+            // The failure should indicate the rejection path
+            // "rejection_path":[[0,2],[0,0],[2,"predicate_was_false"]
+            // [0,2]: 0 is the rejection_indicator for an index to a sub-restriction; 2 is the index value for Restriction 3
+            // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for the only argument
+            // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,2],[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // The key attempts to update the special active key for alice
+         // This should fail because it is NOT authorized by alice
+         // It violates Restriction 4 (index-3)
+         //////
+         {
+            account_update_operation uop;
+            uop.account = alice.get_id();
+
+            uop.extensions.value.active_special_authority = no_special_authority();
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(uop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should indicate the rejection path
+            // "rejection_path":[[0,3],[0,0],[2,"predicate_was_false"]
+            // [0,3]: 0 is the rejection_indicator for an index to a sub-restriction; 3 is the index value for Restriction 4
+            // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for the only argument
+            // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,3],[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // The key attempts to update the memo key for alice
+         // This should fail because it is NOT authorized by alice
+         // It violates Restriction 5 (index-4)
+         //////
+         {
+            account_update_operation uop;
+            uop.account = alice.get_id();
+
+            account_options alice_options = alice.options;
+            alice_options.memo_key = some_public_key;
+            uop.new_options = alice_options;
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(uop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should indicate the rejection path
+            // "rejection_path":[[0,4],[0,0],[2,"predicate_was_false"]
+            // [0,4]: 0 is the rejection_indicator for an index to a sub-restriction; 4 is the index value for Restriction 5
+            // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for the only argument
+            // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,4],[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // The key attempts to update the voting slate for alice
+         // This should succeed because the key is authorized by alice
+         //////
+         {
+            account_update_operation uop;
+            uop.account = alice.get_id();
+            account_options alice_options = alice.options;
+            auto insert_result = alice_options.votes.insert(witness0_obj.vote_id);
+            if (!insert_result.second)
+               FC_THROW("Account ${account} was already voting for witness ${witness}",
+                        ("account", alice)("witness", "init0"));
+            uop.new_options = alice_options;
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(uop));
+            sign(trx, some_private_key);
+            PUSH_TX(db, trx);
+         }
+
+      } FC_LOG_AND_RETHROW()
+   }
+
 
 BOOST_AUTO_TEST_SUITE_END()
