@@ -1258,6 +1258,571 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
    /**
+    * Test of authorization of one account (Alice) authorizing another key
+    * for restricted trading between between ACOIN1 and any BCOIN (BCOIN1, BCOIN2, and BCOIN3).
+    *
+    * The restricted trading authortization will be constructed with two custom authorities
+    * each of which uses one OR restriction for the BCOINs.
+    */
+   BOOST_AUTO_TEST_CASE(authorized_restricted_trading_key) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Fund some accounts
+         //////
+         ACTORS((assetissuer)(alice))
+         fund(alice, asset(5000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+
+
+         //////
+         // Define a key that can be authorized
+         // This can be a new key or an existing key. The existing key may even be the active key of an account.
+         //////
+         fc::ecc::private_key some_private_key = generate_private_key("some key");
+         public_key_type some_public_key = public_key_type(some_private_key.get_public_key());
+
+
+         //////
+         // Initialize: Create user-issued assets
+         //////
+         upgrade_to_lifetime_member(assetissuer);
+         create_user_issued_asset("ACOIN1", assetissuer,  UIA_ASSET_ISSUER_PERMISSION_MASK);
+         create_user_issued_asset("BCOIN1", assetissuer,  UIA_ASSET_ISSUER_PERMISSION_MASK);
+         create_user_issued_asset("BCOIN2", assetissuer,  UIA_ASSET_ISSUER_PERMISSION_MASK);
+         create_user_issued_asset("BCOIN3", assetissuer,  UIA_ASSET_ISSUER_PERMISSION_MASK);
+         create_user_issued_asset("CCOIN1", assetissuer,  UIA_ASSET_ISSUER_PERMISSION_MASK);
+         generate_blocks(1);
+         const asset_object &acoin1 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("ACOIN1");
+         const asset_object &bcoin1 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("BCOIN1");
+         const asset_object &bcoin2 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("BCOIN2");
+         const asset_object &bcoin3 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("BCOIN3");
+         const asset_object &ccoin1 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("CCOIN1");
+
+         //////
+         // Initialize: Issue UIAs
+         //////
+
+         // Lambda for issuing an asset to an account
+         auto issue_amount_to = [&](const account_id_type &issuer, const asset &amount, const account_id_type &to) {
+            asset_issue_operation op;
+            op.issuer = issuer;
+            op.asset_to_issue = amount;
+            op.issue_to_account = to;
+
+            return op;
+         };
+
+         // assetissuer issues A1, B1, and C1 to alice
+         asset_issue_operation issue_a1_to_alice_op
+                 = issue_amount_to(assetissuer.get_id(), asset(1000, acoin1.id), alice.get_id());
+         asset_issue_operation issue_b1_to_alice_op
+                 = issue_amount_to(assetissuer.get_id(), asset(2000, bcoin1.id), alice.get_id());
+         asset_issue_operation issue_c1_to_alice_op
+                 = issue_amount_to(assetissuer.get_id(), asset(2000, ccoin1.id), alice.get_id());
+         trx.clear();
+         trx.operations = {issue_a1_to_alice_op, issue_b1_to_alice_op, issue_c1_to_alice_op};
+         sign(trx, assetissuer_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Some key attempts to create a limit order on behalf of Alice
+         // This should fail because the key is not authorized to trade with her account
+         //////
+         set_expiration( db, trx );
+         trx.operations.clear();
+
+         limit_order_create_operation buy_order;
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = acoin1.amount(60);
+         buy_order.min_to_receive = bcoin1.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should not indicate any rejected custom auths because no CAA applies for the key's attempt
+         // "rejected_custom_auths":[]
+         EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+
+
+         //////
+         // Alice authorizes a particular key to place limit orders that offer the any asset for sale
+         //////
+         custom_authority_create_operation authorize_limit_orders;
+         authorize_limit_orders.account = alice.get_id();
+         authorize_limit_orders.auth.add_authority(some_public_key, 1);
+         authorize_limit_orders.auth.weight_threshold = 1;
+         authorize_limit_orders.enabled = true;
+         authorize_limit_orders.valid_to = db.head_block_time() + 1000;
+         authorize_limit_orders.operation_type = operation::tag<limit_order_create_operation>::value;
+
+         auto amount_to_sell_index = member_index<limit_order_create_operation>("amount_to_sell");
+         auto min_to_receive_index = member_index<limit_order_create_operation>("min_to_receive");
+         auto asset_id_index = member_index<asset>("asset_id");
+
+         // Custom Authority 1: Sell ACOIN to buy BCOINs
+         unsigned_int dummy_index = 999;
+         vector<restriction> sell_a1_rx = {restriction(amount_to_sell_index, FUNC(attr),
+                                                       vector<restriction>{restriction(asset_id_index, FUNC(eq),
+                                                                                       asset_id_type(
+                                                                                               acoin1.id.instance()))})};
+         restriction sell_acoin_rx = sell_a1_rx[0];
+
+         vector<restriction> buy_b1_rx = {restriction(min_to_receive_index, FUNC(attr),
+                                                      vector<restriction>{restriction(asset_id_index, FUNC(eq),
+                                                                                      asset_id_type(
+                                                                                              bcoin1.id.instance()))})};
+         vector<restriction> buy_b2_rx = {restriction(min_to_receive_index, FUNC(attr),
+                                                      vector<restriction>{restriction(asset_id_index, FUNC(eq),
+                                                                                      asset_id_type(
+                                                                                              bcoin2.id.instance()))})};
+         vector<restriction> buy_b3_rx = {restriction(min_to_receive_index, FUNC(attr),
+                                                      vector<restriction>{restriction(asset_id_index, FUNC(eq),
+                                                                                      asset_id_type(
+                                                                                              bcoin3.id.instance()))})};
+         restriction buy_bcoin_rx = restriction(dummy_index, FUNC(logical_or),
+                                                vector<vector<restriction>>{buy_b1_rx, buy_b2_rx, buy_b3_rx});
+
+         vector<restriction> branch_sell_acoin_buy_bcoin = {sell_acoin_rx, buy_bcoin_rx};
+         authorize_limit_orders.restrictions = {branch_sell_acoin_buy_bcoin};
+         //[
+         //  {
+         //    "member_index": 2,
+         //    "restriction_type": 10,
+         //    "argument": [
+         //      39,
+         //      [
+         //        {
+         //          "member_index": 1,
+         //          "restriction_type": 0,
+         //          "argument": [
+         //            8,
+         //            "1.3.2"
+         //          ],
+         //          "extensions": []
+         //        }
+         //      ]
+         //    ],
+         //    "extensions": []
+         //  },
+         //  {
+         //    "member_index": 999,
+         //    "restriction_type": 11,
+         //    "argument": [
+         //      40,
+         //      [
+         //        [
+         //          {
+         //            "member_index": 3,
+         //            "restriction_type": 10,
+         //            "argument": [
+         //              39,
+         //              [
+         //                {
+         //                  "member_index": 1,
+         //                  "restriction_type": 0,
+         //                  "argument": [
+         //                    8,
+         //                    "1.3.4"
+         //                  ],
+         //                  "extensions": []
+         //                }
+         //              ]
+         //            ],
+         //            "extensions": []
+         //          }
+         //        ],
+         //        [
+         //          {
+         //            "member_index": 3,
+         //            "restriction_type": 10,
+         //            "argument": [
+         //              39,
+         //              [
+         //                {
+         //                  "member_index": 1,
+         //                  "restriction_type": 0,
+         //                  "argument": [
+         //                    8,
+         //                    "1.3.5"
+         //                  ],
+         //                  "extensions": []
+         //                }
+         //              ]
+         //            ],
+         //            "extensions": []
+         //          }
+         //        ],
+         //        [
+         //          {
+         //            "member_index": 3,
+         //            "restriction_type": 10,
+         //            "argument": [
+         //              39,
+         //              [
+         //                {
+         //                  "member_index": 1,
+         //                  "restriction_type": 0,
+         //                  "argument": [
+         //                    8,
+         //                    "1.3.6"
+         //                  ],
+         //                  "extensions": []
+         //                }
+         //              ]
+         //            ],
+         //            "extensions": []
+         //          }
+         //        ]
+         //      ]
+         //    ],
+         //    "extensions": []
+         //  }
+         //]
+
+         // Broadcast the authorization
+         trx.clear();
+         trx.operations = {authorize_limit_orders};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         // Custom Authority 2: Sell BCOINs to buy ACOIN
+         vector<restriction> sell_b1_rx = {restriction(amount_to_sell_index, FUNC(attr),
+                                                       vector<restriction>{restriction(asset_id_index, FUNC(eq),
+                                                                                       asset_id_type(
+                                                                                               bcoin1.id.instance()))})};
+         vector<restriction> sell_b2_rx = {restriction(amount_to_sell_index, FUNC(attr),
+                                                       vector<restriction>{restriction(asset_id_index, FUNC(eq),
+                                                                                       asset_id_type(
+                                                                                               bcoin2.id.instance()))})};
+         vector<restriction> sell_b3_rx = {restriction(amount_to_sell_index, FUNC(attr),
+                                                       vector<restriction>{restriction(asset_id_index, FUNC(eq),
+                                                                                       asset_id_type(
+                                                                                               bcoin2.id.instance()))})};
+         restriction sell_bcoin_rx = restriction(dummy_index, FUNC(logical_or),
+                                                 vector<vector<restriction>>{sell_b1_rx, sell_b2_rx, sell_b3_rx});
+
+         vector<restriction> buy_a1_rx = {restriction(min_to_receive_index, FUNC(attr),
+                                                      vector<restriction>{restriction(asset_id_index, FUNC(eq),
+                                                                                      asset_id_type(
+                                                                                              acoin1.id.instance()))})};
+         restriction buy_acoin_rx = buy_a1_rx[0];
+         vector<restriction> branch_sell_bcoin_buy_acoin = {sell_bcoin_rx, buy_acoin_rx};
+         authorize_limit_orders.restrictions = {branch_sell_bcoin_buy_acoin};
+         //[
+         //  {
+         //    "member_index": 999,
+         //    "restriction_type": 11,
+         //    "argument": [
+         //      40,
+         //      [
+         //        [
+         //          {
+         //            "member_index": 2,
+         //            "restriction_type": 10,
+         //            "argument": [
+         //              39,
+         //              [
+         //                {
+         //                  "member_index": 1,
+         //                  "restriction_type": 0,
+         //                  "argument": [
+         //                    8,
+         //                    "1.3.4"
+         //                  ],
+         //                  "extensions": []
+         //                }
+         //              ]
+         //            ],
+         //            "extensions": []
+         //          }
+         //        ],
+         //        [
+         //          {
+         //            "member_index": 2,
+         //            "restriction_type": 10,
+         //            "argument": [
+         //              39,
+         //              [
+         //                {
+         //                  "member_index": 1,
+         //                  "restriction_type": 0,
+         //                  "argument": [
+         //                    8,
+         //                    "1.3.5"
+         //                  ],
+         //                  "extensions": []
+         //                }
+         //              ]
+         //            ],
+         //            "extensions": []
+         //          }
+         //        ],
+         //        [
+         //          {
+         //            "member_index": 2,
+         //            "restriction_type": 10,
+         //            "argument": [*
+         //              39,
+         //              [
+         //                {
+         //                  "member_index": 1,
+         //                  "restriction_type": 0,
+         //                  "argument": [
+         //                    8,
+         //                    "1.3.5"
+         //                  ],
+         //                  "extensions": []
+         //                }
+         //              ]
+         //            ],
+         //            "extensions": []
+         //          }
+         //        ]
+         //      ]
+         //    ],
+         //    "extensions": []
+         //  },
+         //  {
+         //    "member_index": 3,
+         //    "restriction_type": 10,
+         //    "argument": [
+         //      39,
+         //      [
+         //        {
+         //          "member_index": 1,
+         //          "restriction_type": 0,
+         //          "argument": [
+         //            8,
+         //            "1.3.2"
+         //          ],
+         //          "extensions": []
+         //        }
+         //      ]
+         //    ],
+         //    "extensions": []
+         //  }
+         //]
+
+         // Broadcast the authorization
+         trx.clear();
+         trx.operations = {authorize_limit_orders};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         // Authorize the cancellation of orders
+         custom_authority_create_operation authorize_limit_order_cancellations;
+         authorize_limit_order_cancellations.account = alice.get_id();
+         authorize_limit_order_cancellations.auth.add_authority(some_public_key, 1);
+         authorize_limit_order_cancellations.auth.weight_threshold = 1;
+         authorize_limit_order_cancellations.enabled = true;
+         authorize_limit_order_cancellations.valid_to = db.head_block_time() + 1000;
+         authorize_limit_order_cancellations.operation_type = operation::tag<limit_order_cancel_operation>::value;
+         trx.clear();
+         trx.operations = {authorize_limit_order_cancellations};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the buy order transaction
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice
+         // This should succeed because Bob is authorized to create limit orders
+         //////
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         auto processed_buy = PUSH_TX(db, trx);
+         const limit_order_object *buy_order_object =
+            db.find<limit_order_object>( processed_buy.operation_results[0].get<object_id_type>() );
+
+
+         //////
+         // The key attempts to cancel the limit order on behalf of Alice
+         // This should succeed because the key is authorized to cancel limit orders
+         //////
+         limit_order_cancel_operation cancel_order;
+         cancel_order.fee_paying_account = alice_id;
+         cancel_order.order = buy_order_object->id;
+         trx.clear();
+         trx.operations = {cancel_order};
+         sign(trx, some_private_key);
+         auto processed_cancelled = PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the buy order transaction
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell ACOIN1 for CCOIN1
+         // This should fail because the key is not authorized to sell ACOIN1 for CCOIN1
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = acoin1.amount(60);
+         buy_order.min_to_receive = ccoin1.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell CCOIN1 for ACOIN1
+         // This should fail because the key is not authorized to create this exchange offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = ccoin1.amount(60);
+         buy_order.min_to_receive = acoin1.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell BCOIN1 for CCOIN1
+         // This should fail because the key is not authorized to create this exchange offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = bcoin1.amount(60);
+         buy_order.min_to_receive = ccoin1.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell CCOIN1 for BCOIN1
+         // This should fail because the key is not authorized to create this exchange offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = ccoin1.amount(60);
+         buy_order.min_to_receive = bcoin1.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell BCOIN1 for BCOIN2
+         // This should fail because the key is NOT authorized to create this exchange offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = bcoin1.amount(60);
+         buy_order.min_to_receive = bcoin2.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell ACOIN1 for BCOIN1
+         // This should succeed because the key is authorized to create this offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = acoin1.amount(60);
+         buy_order.min_to_receive = bcoin1.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell ACOIN1 for BCOIN2
+         // This should succeed because the key is authorized to create this offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = acoin1.amount(60);
+         buy_order.min_to_receive = bcoin2.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell ACOIN1 for BCOIN3
+         // This should succeed because the key is authorized to create this offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = acoin1.amount(60);
+         buy_order.min_to_receive = bcoin3.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell BCOIN1 for ACOIN1
+         // This should succeed because the key is authorized to create this offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = bcoin1.amount(60);
+         buy_order.min_to_receive = acoin1.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         PUSH_TX(db, trx);
+
+      } FC_LOG_AND_RETHROW()
+   }
+
+
+   /**
     * Test of authorization of one account (feedproducer) authorizing another account (Bob)
     * to publish feeds. The authorization remains associated with account even when the account changes its keys.
     */
