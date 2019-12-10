@@ -78,7 +78,8 @@ void_result balance_claim_evaluator::do_apply(const balance_claim_operation& op)
 
    stored_value claim;
    d.modify(*balance, [&claim,&d,&op](balance_object& b) {
-      b.vesting_policy->on_withdraw({b.balance.get_value(), d.head_block_time(), op.total_claimed});
+      if( b.is_vesting_balance() )
+         b.vesting_policy->on_withdraw({b.balance.get_value(), d.head_block_time(), op.total_claimed});
       claim = b.balance.split( op.total_claimed.amount );
       b.last_claim_date = d.head_block_time();
    });
