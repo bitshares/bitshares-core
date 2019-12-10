@@ -113,9 +113,13 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
                                                   init_account_priv_key.get_public_key(),
                                                   true);
       genesis_state.initial_committee_candidates.push_back({name});
-      genesis_state.initial_witness_candidates.push_back({name, init_account_priv_key.get_public_key()});
+      genesis_state.initial_witness_candidates.push_back({name, init_account_pub_key});
    }
    genesis_state.initial_parameters.get_mutable_fees().zero_all_fees();
+
+   genesis_state_type::initial_balance_type initial_core{ address(init_account_pub_key), GRAPHENE_SYMBOL,
+                                                          GRAPHENE_MAX_SHARE_SUPPLY };
+   genesis_state.initial_balances.push_back(initial_core);
 
    genesis_state_type::initial_asset_type init_mpa1;
    init_mpa1.symbol = "INITMPA";
@@ -359,11 +363,22 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
 
    generate_block();
 
+   set_expiration( db, trx );
+
+   {
+      balance_claim_operation bop;
+      bop.balance_owner_key = init_account_pub_key;
+      bop.total_claimed = asset( GRAPHENE_MAX_SHARE_SUPPLY );
+      trx.clear();
+      trx.operations.emplace_back(bop);
+      PUSH_TX(db, trx, ~0);
+      trx.operations.clear();
+   }
+
    asset_id_type mpa1_id(1);
    BOOST_REQUIRE( mpa1_id(db).is_market_issued() );
    BOOST_CHECK( mpa1_id(db).bitasset_data(db).asset_id == mpa1_id );
 
-   set_expiration( db, trx );
    } catch ( const fc::exception& e )
    {
       edump( (e.to_detail_string()) );
@@ -383,7 +398,6 @@ database_fixture::~database_fixture()
          verify_asset_supplies(db);
          BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
       }
-      return;
    } catch (fc::exception& ex) {
       BOOST_FAIL( std::string("fc::exception in ~database_fixture: ") + ex.to_detail_string() );
    } catch (std::exception& e) {
