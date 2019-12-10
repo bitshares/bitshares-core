@@ -577,7 +577,7 @@ void update_top_n_authorities( database& db )
          const auto range = bal_idx.equal_range( boost::make_tuple( tha.asset ) );
          for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
          {
-             assert( bal.asset_type == tha.asset );
+             assert( bal.get_asset() == tha.asset );
              if( bal.owner == acct.id )
                 continue;
              vc.add( bal.owner, bal.get_amount().value );

@@ -949,7 +949,7 @@ void database::fill_settle_order( const force_settlement_object& settle, const a
 
    add_balance( settle.owner, std::move(receives) );
 
-   assert( paid.asset_id != receives.asset_id );
+   assert( paid.asset_id != receives.get_asset() );
    push_applied_operation( fill_order_operation( settle.id, settle.owner, paid, received, issuer_fees, fill_price, false ) );
 
    if( settle.balance.get_amount() == 0 )

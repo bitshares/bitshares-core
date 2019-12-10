@@ -50,7 +50,7 @@ namespace graphene { namespace chain {
       void burn( stored_value&& amount );
 
       template< typename Stream >
-      void unpack( Stream s, uint32_t _max_depth )
+      void unpack( Stream& s, uint32_t _max_depth )
       {
          graphene::protocol::asset amount;
          fc::raw::unpack( s, amount, _max_depth );
