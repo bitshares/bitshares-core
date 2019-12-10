@@ -47,6 +47,8 @@ class limit_order_backup : public limit_order_master, public graphene::db::backu
          deferred_fee = original.deferred_fee.get_amount();
          deferred_paid_fee = original.deferred_paid_fee.get_value();
       }
+
+      virtual object* recreate() { return graphene::db::backup_object<limit_order_object>::recreate(); }
 };
 
 unique_ptr<object> limit_order_object::backup()const
@@ -355,6 +357,8 @@ class call_order_backup : public call_order_master, public graphene::db::backup_
          debt = original.debt.get_amount();
          collateral = original.collateral.get_amount();
       }
+
+      virtual object* recreate() { return graphene::db::backup_object<call_order_object>::recreate(); }
 };
 
 unique_ptr<object> call_order_object::backup()const
@@ -388,6 +392,8 @@ class force_settlement_backup
       {
          balance = original.balance.get_amount();
       }
+
+      virtual object* recreate() { return graphene::db::backup_object<force_settlement_object>::recreate(); }
 };
 
 unique_ptr<object> force_settlement_object::backup()const
@@ -419,6 +425,8 @@ class collateral_bid_backup
       {
          collateral_offered = original.collateral_offered.get_value();
       }
+
+      virtual object* recreate() { return graphene::db::backup_object<collateral_bid_object>::recreate(); }
 };
 
 unique_ptr<object> collateral_bid_object::backup()const

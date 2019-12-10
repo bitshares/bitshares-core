@@ -287,6 +287,8 @@ class vesting_balance_backup
       {
          balance = original.balance.get_value();
       }
+
+      virtual object* recreate() { return graphene::db::backup_object<vesting_balance_object>::recreate(); }
 };
 
 unique_ptr<object> vesting_balance_object::backup()const

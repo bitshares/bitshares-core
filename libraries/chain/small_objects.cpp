@@ -58,6 +58,8 @@ class balance_backup : public balance_master, public graphene::db::backup_object
       {
          balance = original.balance.get_value();
       }
+
+      virtual object* recreate() { return graphene::db::backup_object<balance_object>::recreate(); }
 };
 
 unique_ptr<object> balance_object::backup()const
@@ -88,6 +90,10 @@ class dynamic_global_property_backup
          : dynamic_global_property_master( original )
       {
          witness_budget = original.witness_budget.get_value();
+      }
+
+      virtual object* recreate() {
+         return graphene::db::backup_object<dynamic_global_property_object>::recreate();
       }
 };
 
@@ -121,6 +127,8 @@ class htlc_backup : public htlc_master, public graphene::db::backup_object<htlc_
          transfer = original.transfer;
          amount = original.transfer.amount.get_value();
       }
+
+      virtual object* recreate() { return graphene::db::backup_object<htlc_object>::recreate(); }
 };
 
 unique_ptr<object> htlc_object::backup()const

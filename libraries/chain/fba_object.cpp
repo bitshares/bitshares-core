@@ -111,6 +111,8 @@ class fba_accumulator_backup : public fba_accumulator_master, public backup_obje
       {
          accumulated_fba_fees = original.accumulated_fba_fees.get_amount();
       }
+
+      virtual object* recreate() { return graphene::db::backup_object<fba_accumulator_object>::recreate(); }
 };
 
 unique_ptr<object> fba_accumulator_object::backup()const

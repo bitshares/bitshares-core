@@ -71,6 +71,8 @@ class account_balance_backup
       {
          balance = original.balance.get_value();
       }
+
+      virtual object* recreate() { return graphene::db::backup_object<account_balance_object>::recreate(); }
 };
 
 unique_ptr<object> account_balance_object::backup()const
@@ -164,6 +166,8 @@ class account_statistics_backup
          pending_fees = original.pending_fees.get_amount();
          pending_vested_fees = original.pending_vested_fees.get_amount();
       }
+
+      virtual object* recreate() { return graphene::db::backup_object<account_statistics_object>::recreate(); }
 };
 
 unique_ptr<object> account_statistics_object::backup()const

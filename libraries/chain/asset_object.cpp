@@ -48,6 +48,8 @@ class asset_dynamic_data_backup
          fee_pool = original.fee_pool.get_amount();
          confidential_supply = original.confidential_supply.get_amount();
       }
+
+      virtual object* recreate() { return graphene::db::backup_object<asset_dynamic_data_object>::recreate(); }
 };
 
 unique_ptr<object> asset_dynamic_data_object::backup()const
@@ -162,6 +164,8 @@ class asset_bitasset_data_backup
          settlement_fund = original.settlement_fund.get_amount();
          total_debt = original.total_debt.get_amount();
       }
+
+      virtual object* recreate() { return graphene::db::backup_object<asset_bitasset_data_object>::recreate(); }
 };
 
 unique_ptr<object> asset_bitasset_data_object::backup()const
