@@ -103,7 +103,8 @@ namespace graphene { namespace db {
 
          virtual void restore( object& obj )
          {
-            static_cast<DerivedClass&>(*this) = std::move( static_cast<DerivedClass&>(obj) );
+            if( this != &obj )
+               static_cast<DerivedClass&>(*this) = std::move( static_cast<DerivedClass&>(obj) );
          }
 
          virtual object* recreate() { return this; }
