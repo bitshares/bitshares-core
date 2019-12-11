@@ -28,7 +28,6 @@
 #include <graphene/market_history/market_history_plugin.hpp>
 
 #include <fc/exception/exception.hpp>
-#include <fc/thread/thread.hpp>
 #include <fc/interprocess/signals.hpp>
 #include <fc/log/console_appender.hpp>
 #include <fc/log/file_appender.hpp>
@@ -43,6 +42,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/fiber/future.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -184,15 +184,15 @@ int main(int argc, char** argv) {
 
       node.startup_plugins();
 
-      fc::promise<int>::ptr exit_promise = fc::promise<int>::create("UNIX Signal Handler");
+      boost::fibers::promise<int> exit_promise;
       fc::set_signal_handler([&exit_promise](int signal) {
-          exit_promise->set_value(signal);
+          exit_promise.set_value(signal);
       }, SIGINT);
 
       ilog("Started delayed node on a chain with ${h} blocks.", ("h", node.chain_database()->head_block_num()));
       ilog("Chain ID is ${id}", ("id", node.chain_database()->get_chain_id()) );
 
-      int signal = exit_promise->wait();
+      int signal = exit_promise.get_future().get();
       ilog("Exiting from signal ${n}", ("n", signal));
       node.shutdown_plugins();
       node.shutdown();

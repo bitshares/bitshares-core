@@ -23,6 +23,7 @@
  */
 
 #include <boost/test/unit_test.hpp>
+#include <boost/fiber/fiber.hpp>
 
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/app/api.hpp>
@@ -48,7 +49,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_grouped_limit_orders) {
    create_account("bob");
    asset_id_type bit_jmj_id = create_bitasset("JMJBIT").id;
    generate_block();
-   fc::usleep(fc::milliseconds(100));
+   boost::this_fiber::sleep_for(std::chrono::milliseconds(100));
    GRAPHENE_CHECK_THROW(orders_api.get_grouped_limit_orders(std::string( static_cast<object_id_type>(asset_id_type())), std::string( static_cast<object_id_type>(asset_id_type())),10, start,260), fc::exception);
    vector< limit_order_group > orders =orders_api.get_grouped_limit_orders(std::string( static_cast<object_id_type>(asset_id_type())), std::string( static_cast<object_id_type>(bit_jmj_id)), 10,start,240);
    BOOST_REQUIRE_EQUAL( orders.size(), 0u);

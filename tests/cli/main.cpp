@@ -34,12 +34,12 @@
 #include <graphene/egenesis/egenesis.hpp>
 #include <graphene/wallet/wallet.hpp>
 
-#include <fc/thread/thread.hpp>
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/rpc/cli.hpp>
 #include <fc/crypto/base58.hpp>
 #include <fc/crypto/hex.hpp>
+#include <fc/io/sstream.hpp>
 
 #include <fc/crypto/aes.hpp>
 
@@ -148,7 +148,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    app1->startup_plugins();
 
    app1->startup();
-   fc::usleep(fc::milliseconds(500));
+   boost::this_fiber::sleep_for(std::chrono::milliseconds(500));
 
    return app1;
 }
@@ -249,7 +249,7 @@ public:
    ~client_connection()
    {
       // wait for everything to finish up
-      fc::usleep(fc::milliseconds(500));
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(500));
    }
 public:
    fc::http::websocket_client websocket_client;
@@ -275,7 +275,7 @@ struct cli_fixture
       ~dummy()
       {
          // wait for everything to finish up
-         fc::usleep(fc::milliseconds(500));
+         boost::this_fiber::sleep_for(std::chrono::milliseconds(500));
       }
    };
    dummy dmy;
@@ -318,7 +318,7 @@ struct cli_fixture
       BOOST_TEST_MESSAGE("Cleanup cli_wallet::boost_fixture_test_case");
 
       // wait for everything to finish up
-      fc::usleep(fc::seconds(1));
+      boost::this_fiber::sleep_for(std::chrono::seconds(1));
 
       app1->shutdown();
 #ifdef _WIN32
@@ -860,7 +860,7 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
       }
 
       // wait for everything to finish up
-      fc::usleep(fc::seconds(1));
+      boost::this_fiber::sleep_for(std::chrono::seconds(1));
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
@@ -895,7 +895,7 @@ BOOST_AUTO_TEST_CASE( saving_keys_wallet_test ) {
    BOOST_CHECK( pk.keys.size() == 1 ); // nathan key
 
    BOOST_CHECK( generate_block( cli.app1 ) );
-   fc::usleep( fc::seconds(1) );
+   boost::this_fiber::sleep_for(std::chrono::seconds(1) );
 
    wallet = fc::json::from_file( path ).as<graphene::wallet::wallet_data>( 2 * GRAPHENE_MAX_NESTED_OBJECTS );
    BOOST_CHECK( wallet.extra_keys.size() == 2 ); // nathan + account1
@@ -1084,7 +1084,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       }
 
       // wait for everything to finish up
-      fc::usleep(fc::seconds(1));
+      boost::this_fiber::sleep_for(std::chrono::seconds(1));
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;

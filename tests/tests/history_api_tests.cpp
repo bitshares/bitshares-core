@@ -23,6 +23,7 @@
  */
 
 #include <boost/test/unit_test.hpp>
+#include <boost/fiber/fiber.hpp>
 
 #include <graphene/app/api.hpp>
 
@@ -47,7 +48,7 @@ BOOST_AUTO_TEST_CASE(get_account_history) {
       create_account("bob");
 
       generate_block();
-      fc::usleep(fc::milliseconds(2000));
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(2000));
 
       int asset_create_op_id = operation::tag<asset_create_operation>::value;
       int account_create_op_id = operation::tag<account_create_operation>::value;
@@ -542,7 +543,7 @@ BOOST_AUTO_TEST_CASE(get_account_history_operations) {
       create_account("alice");
 
       generate_block();
-      fc::usleep(fc::milliseconds(2000));
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(2000));
 
       int asset_create_op_id = operation::tag<asset_create_operation>::value;
       int account_create_op_id = operation::tag<account_create_operation>::value;
@@ -610,7 +611,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_account_history_operations) {
    create_account("alice");
 
    generate_block();
-   fc::usleep(fc::milliseconds(100));
+   boost::this_fiber::sleep_for(std::chrono::milliseconds(100));
 
    int asset_create_op_id = operation::tag<asset_create_operation>::value;
    int account_create_op_id = operation::tag<account_create_operation>::value;
@@ -676,7 +677,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_account_history) {
    create_account("bob");
 
    generate_block();
-   fc::usleep(fc::milliseconds(100));
+   boost::this_fiber::sleep_for(std::chrono::milliseconds(100));
 
    int asset_create_op_id = operation::tag<asset_create_operation>::value;
    int account_create_op_id = operation::tag<account_create_operation>::value;
@@ -729,7 +730,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_relative_account_history) {
    create_account("bob");
 
    generate_block();
-   fc::usleep(fc::milliseconds(100));
+   boost::this_fiber::sleep_for(std::chrono::milliseconds(100));
 
    GRAPHENE_CHECK_THROW(hist_api.get_relative_account_history("1.2.0", 126, 260, 0), fc::exception);
    vector<operation_history_object> histories = hist_api.get_relative_account_history("1.2.0", 126, 210, 0);
@@ -750,7 +751,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_account_history_by_operations) {
    create_account("dan");
    create_account("bob");
    generate_block();
-   fc::usleep(fc::milliseconds(100));
+   boost::this_fiber::sleep_for(std::chrono::milliseconds(100));
    GRAPHENE_CHECK_THROW(hist_api.get_account_history_by_operations("1.2.0", operation_types, 0, 260), fc::exception);
    history_operation_detail histories = hist_api.get_account_history_by_operations("1.2.0", operation_types, 0, 210);
    BOOST_REQUIRE_EQUAL( histories.total_count, 3u );

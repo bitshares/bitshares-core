@@ -23,6 +23,7 @@
  */
 
 #include <boost/test/unit_test.hpp>
+#include <boost/fiber/fiber.hpp>
 
 #include <graphene/app/api.hpp>
 #include <graphene/chain/hardfork.hpp>
@@ -65,7 +66,7 @@ BOOST_AUTO_TEST_CASE( broadcast_transaction_with_callback_test ) {
 
       generate_block();
 
-      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
 
       BOOST_CHECK_EQUAL( called, 1u );
 

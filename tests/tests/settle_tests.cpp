@@ -23,6 +23,7 @@
  */
 
 #include <boost/test/unit_test.hpp>
+#include <boost/fiber/fiber.hpp>
 
 #include <graphene/chain/hardfork.hpp>
 
@@ -1534,7 +1535,7 @@ BOOST_AUTO_TEST_CASE( global_settle_ticker_test )
       force_global_settle( pmark, pmark.amount(1) / core.amount(1) );
 
       generate_block();
-      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
 
       {
          BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
@@ -1553,7 +1554,7 @@ BOOST_AUTO_TEST_CASE( global_settle_ticker_test )
       }
 
       generate_blocks( db.head_block_time() + 86000 ); // less than a day
-      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
 
       // nothing changes
       {
@@ -1573,7 +1574,7 @@ BOOST_AUTO_TEST_CASE( global_settle_ticker_test )
       }
 
       generate_blocks( db.head_block_time() + 4000 ); // now more than 24 hours
-      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
 
       // the history is rolled out, new 24h volume should be 0
       {
@@ -1593,7 +1594,7 @@ BOOST_AUTO_TEST_CASE( global_settle_ticker_test )
       }
 
       generate_block();
-      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
 
       // nothing changes
       {

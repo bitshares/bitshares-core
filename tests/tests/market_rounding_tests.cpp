@@ -23,6 +23,7 @@
  */
 
 #include <boost/test/unit_test.hpp>
+#include <boost/fiber/fiber.hpp>
 
 #include <graphene/chain/hardfork.hpp>
 
@@ -74,7 +75,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
       BOOST_CHECK_EQUAL(get_balance(core_seller, test), 3);
 
       generate_block();
-      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
 
       auto result = get_market_order_history(core_id, test_id);
       BOOST_CHECK_EQUAL(result.size(), 4u);
@@ -130,7 +131,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_after_hf_184 )
       BOOST_CHECK_EQUAL(get_balance(core_seller, test), 2);
 
       generate_block();
-      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
 
       auto result = get_market_order_history(core_id, test_id);
       BOOST_CHECK_EQUAL(result.size(), 2u);

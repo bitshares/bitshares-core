@@ -30,8 +30,11 @@
 #include <fc/crypto/digest.hpp>
 #include <fc/crypto/hex.hpp>
 
+#include <boost/fiber/fiber.hpp>
+
 #include "../common/database_fixture.hpp"
 
+#include <chrono>
 #include <random>
 
 using namespace graphene::chain;
@@ -772,7 +775,7 @@ BOOST_AUTO_TEST_CASE( subscription_key_collision_test )
    db_api.get_accounts( collision_ids );
 
    generate_block();
-   fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+   boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
 
    BOOST_CHECK_EQUAL( objects_changed, 0 ); // did not subscribe to UIATEST, so no notification
 
@@ -781,7 +784,7 @@ BOOST_AUTO_TEST_CASE( subscription_key_collision_test )
    db_api.get_assets( asset_names );
 
    generate_block();
-   fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+   boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
 
    BOOST_CHECK_EQUAL( objects_changed, 0 ); // UIATEST did not change in this block, so no notification
 }
@@ -964,7 +967,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       ++expected_objects_changed18; // db_api18 subscribed to HTLC object, notify object creation
       ++expected_objects_changed48; // db_api48 subscribed to HTLC object, notify object creation
 
-      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
       check_results();
 
       transfer( account_id_type(), alice_id, asset(1) );
@@ -978,7 +981,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       // db_api6 didn't subscribe to anything, nothing would be notified
       // db_api7: no change on UIA, nothing would be notified
 
-      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
       check_results();
 
       vector<object_id_type> obj_ids;
@@ -1007,7 +1010,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       // db_api6 didn't subscribe to anything, nothing would be notified
       // db_api7: no change on UIA, nothing would be notified
 
-      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
       check_results();
 
       db_api6.set_auto_subscription( false );
@@ -1022,7 +1025,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       // db_api6 didn't subscribe to anything, nothing would be notified
       // db_api7: no change on UIA, nothing would be notified
 
-      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
       check_results();
 
       account_names.clear();
@@ -1043,7 +1046,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       // db_api6 didn't subscribe to anything, nothing would be notified
       // db_api7: no change on UIA, nothing would be notified
 
-      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
       check_results();
 
       db_api6.set_auto_subscription( true );
@@ -1058,7 +1061,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       ++expected_objects_changed6; // db_api6 subscribed to dynamic global properties, would be notified
       // db_api7: no change on UIA, nothing would be notified
 
-      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
       check_results();
 
       db_api5.set_subscribe_callback( callback5, false ); // reset subscription
@@ -1079,7 +1082,7 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
       // db_api6 subscribed to anything, nothing notified
       // db_api7: no change on UIA, nothing would be notified
 
-      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(200)); // sleep a while to execute callback in another thread
       check_results();
 
    } FC_LOG_AND_RETHROW()
@@ -1565,7 +1568,7 @@ BOOST_AUTO_TEST_CASE( api_limit_get_limit_orders ){
    create_account("bob");
    asset_id_type bit_jmj_id = create_bitasset("JMJBIT").id;
    generate_block();
-   fc::usleep(fc::milliseconds(100));
+   boost::this_fiber::sleep_for(std::chrono::milliseconds(100));
    GRAPHENE_CHECK_THROW(db_api.get_limit_orders(std::string(static_cast<object_id_type>(asset_id_type())),
       std::string(static_cast<object_id_type>(bit_jmj_id)), 370), fc::exception);
    vector<limit_order_object>  limit_orders =db_api.get_limit_orders(std::string(
@@ -1588,7 +1591,7 @@ BOOST_AUTO_TEST_CASE( api_limit_get_call_orders ){
    asset_id_type bitusd_id = create_bitasset(
 	   "USDBIT", nathan_id, 100, disable_force_settle).id;
    generate_block();
-   fc::usleep(fc::milliseconds(100));
+   boost::this_fiber::sleep_for(std::chrono::milliseconds(100));
    BOOST_CHECK( bitusd_id(db).is_market_issued() );
    GRAPHENE_CHECK_THROW(db_api.get_call_orders(std::string(static_cast<object_id_type>(bitusd_id)),
 	   370), fc::exception);
@@ -1610,7 +1613,7 @@ BOOST_AUTO_TEST_CASE( api_limit_get_settle_orders ){
    asset_id_type bitusd_id = create_bitasset(
 	   "USDBIT", nathan_id, 100, disable_force_settle).id;
    generate_block();
-   fc::usleep(fc::milliseconds(100));
+   boost::this_fiber::sleep_for(std::chrono::milliseconds(100));
    GRAPHENE_CHECK_THROW(db_api.get_settle_orders(
    	std::string(static_cast<object_id_type>(bitusd_id)), 370), fc::exception);
    vector<force_settlement_object> result =db_api.get_settle_orders(
@@ -1635,7 +1638,7 @@ BOOST_AUTO_TEST_CASE( api_limit_get_order_book ){
    asset_id_type bitdan_id = create_bitasset(
 	   "DANBIT", dan_id, 100, disable_force_settle).id;
    generate_block();
-   fc::usleep(fc::milliseconds(100));
+   boost::this_fiber::sleep_for(std::chrono::milliseconds(100));
    GRAPHENE_CHECK_THROW(db_api.get_order_book(std::string(static_cast<object_id_type>(bitusd_id)),
    	std::string(static_cast<object_id_type>(bitdan_id)),89), fc::exception);
    graphene::app::order_book result =db_api.get_order_book(std::string(
@@ -1692,7 +1695,7 @@ BOOST_AUTO_TEST_CASE( asset_in_collateral )
    BOOST_CHECK_EQUAL( 0, oassets[3]->total_backing_collateral->value );
 
    generate_block();
-   fc::usleep(fc::milliseconds(100));
+   boost::this_fiber::sleep_for(std::chrono::milliseconds(100));
 
    const auto& bitusd = bitusd_id( db );
    const auto& bitdan = bitdan_id( db );
@@ -1763,7 +1766,7 @@ BOOST_AUTO_TEST_CASE( asset_in_collateral )
 
    force_settle( dan_id(db), bitusd.amount(100) ); // settles against nathan, receives 500 CORE collateral
    generate_blocks( db.head_block_time() + fc::days(2) );
-   fc::usleep(fc::milliseconds(100));
+   boost::this_fiber::sleep_for(std::chrono::milliseconds(100));
 
    auto assets = db_api.list_assets( GRAPHENE_SYMBOL, 1 );
    BOOST_REQUIRE( !assets.empty() );

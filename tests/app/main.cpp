@@ -34,11 +34,11 @@
 #include <graphene/witness/witness.hpp>
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 
-#include <fc/thread/thread.hpp>
 #include <fc/log/appender.hpp>
 #include <fc/log/logger.hpp>
 
 #include <boost/filesystem/path.hpp>
+#include <boost/fiber/fiber.hpp>
 
 #include "../../libraries/app/application_impl.hxx"
 
@@ -234,7 +234,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app1.initialize(app_dir.path(), cfg);
       BOOST_TEST_MESSAGE( "Starting app1 and waiting 500 ms" );
       app1.startup();
-      fc::usleep(fc::milliseconds(500));
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(500));
 
       BOOST_TEST_MESSAGE( "Creating and initializing app2" );
 
@@ -255,7 +255,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
 
       BOOST_TEST_MESSAGE( "Starting app2 and waiting 500 ms" );
       app2.startup();
-      fc::usleep(fc::milliseconds(500));
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(500));
 
       BOOST_REQUIRE_EQUAL(app1.p2p_node()->get_connection_count(), 1u);
       BOOST_CHECK_EQUAL(std::string(app1.p2p_node()->get_connected_peers().front().host.get_address()), "127.0.0.1");
@@ -303,7 +303,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Broadcasting tx" );
       app1.p2p_node()->broadcast(graphene::net::trx_message(trx));
 
-      fc::usleep(fc::milliseconds(500));
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(500));
 
       BOOST_CHECK_EQUAL( db1->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
       BOOST_CHECK_EQUAL( db2->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
@@ -320,7 +320,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Broadcasting block" );
       app2.p2p_node()->broadcast(graphene::net::block_message( block_1 ));
 
-      fc::usleep(fc::milliseconds(500));
+      boost::this_fiber::sleep_for(std::chrono::milliseconds(500));
       BOOST_TEST_MESSAGE( "Verifying nodes are still connected" );
       BOOST_CHECK_EQUAL(app1.p2p_node()->get_connection_count(), 1u);
       BOOST_CHECK_EQUAL(app1.chain_database()->head_block_num(), 1u);

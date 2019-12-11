@@ -4,7 +4,9 @@
 #include <fc/io/raw_variant.hpp>
 #include <fc/network/ip.hpp>
 #include <fc/network/resolve.hpp>
-#include <fc/thread/future.hpp>
+#include <fc/thread/async.hpp>
+
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <queue>
@@ -12,6 +14,8 @@
 
 #include <graphene/chain/database.hpp>
 #include <graphene/net/peer_connection.hpp>
+
+#include <boost/fiber/fiber.hpp>
 
 class peer_probe : public graphene::net::peer_connection_delegate
 {
@@ -24,7 +28,8 @@ public:
   fc::ip::endpoint _remote;
   bool _connection_was_rejected;
   bool _done;
-  fc::promise<void>::ptr _probe_complete_promise;
+  boost::fibers::promise<void> _probe_complete_promise;
+  boost::fibers::future<void> _probe_complete_future = _probe_complete_promise.get_future();
 
 public:
   peer_probe() :
@@ -32,24 +37,24 @@ public:
     _we_closed_connection(false),
     _connection(graphene::net::peer_connection::make_shared(this)),
     _connection_was_rejected(false),
-    _done(false),
-    _probe_complete_promise(fc::promise<void>::create("probe_complete"))
+    _done(false)
   {}
 
   void start(const fc::ip::endpoint& endpoint_to_probe,
              const fc::ecc::private_key& my_node_id,
              const graphene::chain::chain_id_type& chain_id)
   {
-    _remote = endpoint_to_probe;
-    fc::future<void> connect_task = fc::async([this](){ _connection->connect_to(_remote); }, "connect_task");
+    boost::fibers::future<void> connect_task = fc::async( [_connection=_connection,endpoint_to_probe](){
+       _connection->connect_to(endpoint_to_probe);
+    }, std::this_thread::get_id(), "connect_task");
     try
     {
-      connect_task.wait(fc::seconds(10));
+      connect_task.wait_for(std::chrono::seconds(10));
     }
     catch (const fc::timeout_exception&)
     {
       ilog("timeout connecting to node ${endpoint}", ("endpoint", endpoint_to_probe));
-      connect_task.cancel(__FUNCTION__);
+      _connection->close_connection(); // this should cancel the async connect_to operation
       throw;
     }
 
@@ -151,17 +156,12 @@ public:
   void on_connection_closed(graphene::net::peer_connection* originating_peer) override
   {
     _done = true;
-    _probe_complete_promise->set_value();
+    _probe_complete_promise.set_value();
   }
 
   graphene::net::message get_message_for_item(const graphene::net::item_id& item) override
   {
     return graphene::net::item_not_available_message(item);
-  }
-
-  void wait( const fc::microseconds& timeout_us )
-  {
-    _probe_complete_promise->wait( timeout_us );
   }
 };
 
@@ -223,17 +223,17 @@ int main(int argc, char** argv)
 
     if (!probes.empty())
     {
-       fc::yield();
+       boost::this_fiber::yield();
        std::vector<std::shared_ptr<peer_probe>> running;
        for ( auto& probe : probes ) {
-          if (probe->_probe_complete_promise->error())
-          {
-             std::cerr << fc::string(probe->_remote) << " ran into an error!\n";
-             continue;
-          }
-          if (!probe->_probe_complete_promise->ready())
+          if ( probe->_probe_complete_future.wait_for(std::chrono::seconds(0)) != boost::fibers::future_status::ready )
           {
              running.push_back( probe );
+             continue;
+          }
+          if ( probe->_probe_complete_future.get_exception_ptr() != std::exception_ptr() )
+          {
+             std::cerr << fc::string(probe->_remote) << " ran into an error!\n";
              continue;
           }
 
