@@ -1315,7 +1315,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //////
 
          // Lambda for issuing an asset to an account
-         auto issue_amount_to = [&](const account_id_type &issuer, const asset &amount, const account_id_type &to) {
+         auto issue_amount_to = [](const account_id_type &issuer, const asset &amount, const account_id_type &to) {
             asset_issue_operation op;
             op.issuer = issuer;
             op.asset_to_issue = amount;
