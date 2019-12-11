@@ -21,16 +21,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <fc/thread/thread.hpp>
-#include <fc/thread/mutex.hpp>
-#include <fc/thread/scoped_lock.hpp>
-#include <fc/thread/future.hpp>
 #include <fc/log/logger.hpp>
 #include <fc/io/enum_type.hpp>
 
 #include <graphene/net/message_oriented_connection.hpp>
 #include <graphene/net/stcp_socket.hpp>
 #include <graphene/net/config.hpp>
+#include <graphene/utilities/recurring_task.hpp>
 
 #include <atomic>
 
@@ -48,14 +45,33 @@
 namespace graphene { namespace net {
   namespace detail
   {
+    class message_oriented_connection_impl;
+
+    class connection_task : public graphene::utilities::recurring_task
+    {
+    public:
+       connection_task() : _conn(nullptr) {}
+       explicit connection_task( message_oriented_connection_impl& conn ) : _conn(&conn) {}
+
+    protected:
+       virtual void run();
+
+       message_oriented_connection_impl* _conn;
+    };
+
     class message_oriented_connection_impl
     {
     private:
       message_oriented_connection* _self;
       message_oriented_connection_delegate *_delegate;
       stcp_socket _sock;
-      fc::promise<void>::ptr _ready_for_sending;
-      fc::future<void> _read_loop_done;
+
+      bool _ready_for_sending = false;
+      bool _destroyed = false;
+      boost::fibers::condition_variable _cv;
+      boost::fibers::mutex _mtx;
+
+      connection_task _read_loop;
       uint64_t _bytes_received;
       uint64_t _bytes_sent;
 
@@ -64,13 +80,10 @@ namespace graphene { namespace net {
       fc::time_point _last_message_sent_time;
 
       std::atomic_bool _send_message_in_progress;
-      std::atomic_bool _read_loop_in_progress;
 #ifndef NDEBUG
       fc::thread* _thread;
 #endif
 
-      void read_loop();
-      void start_read_loop();
     public:
       fc::tcp_socket& get_socket();
       void accept();
@@ -92,17 +105,18 @@ namespace graphene { namespace net {
       fc::time_point get_last_message_received_time() const;
       fc::time_point get_connection_time() const { return _connected_time; }
       fc::sha512 get_shared_secret() const;
+
+      friend class connection_task;
     };
 
     message_oriented_connection_impl::message_oriented_connection_impl(message_oriented_connection* self,
                                                                        message_oriented_connection_delegate* delegate)
     : _self(self),
       _delegate(delegate),
-      _ready_for_sending(fc::promise<void>::create()),
+      _read_loop(*this),
       _bytes_received(0),
       _bytes_sent(0),
-      _send_message_in_progress(false),
-      _read_loop_in_progress(false)
+      _send_message_in_progress(false)
 #ifndef NDEBUG
       ,_thread(&fc::thread::current())
 #endif
@@ -124,18 +138,18 @@ namespace graphene { namespace net {
     {
       VERIFY_CORRECT_THREAD();
       _sock.accept();
-      assert(!_read_loop_done.valid()); // check to be sure we never launch two read loops
-      _read_loop_done = fc::async([=](){ read_loop(); }, "message read_loop");
-      _ready_for_sending->set_value();
+      _read_loop.trigger();
+      _ready_for_sending = true;
+      _cv.notify_all();
     }
 
     void message_oriented_connection_impl::connect_to(const fc::ip::endpoint& remote_endpoint)
     {
       VERIFY_CORRECT_THREAD();
       _sock.connect_to(remote_endpoint);
-      assert(!_read_loop_done.valid()); // check to be sure we never launch two read loops
-      _read_loop_done = fc::async([=](){ read_loop(); }, "message read_loop");
-      _ready_for_sending->set_value();
+      _read_loop.trigger();
+      _ready_for_sending = true;
+      _cv.notify_all();
     }
 
     void message_oriented_connection_impl::bind(const fc::ip::endpoint& local_endpoint)
@@ -159,16 +173,14 @@ namespace graphene { namespace net {
       }
     };
 
-    void message_oriented_connection_impl::read_loop()
+    void connection_task::run()
     {
       VERIFY_CORRECT_THREAD();
       const int BUFFER_SIZE = 16;
       const int LEFTOVER = BUFFER_SIZE - sizeof(message_header);
       static_assert(BUFFER_SIZE >= sizeof(message_header), "insufficient buffer");
 
-      no_parallel_execution_guard guard( &_read_loop_in_progress );
-
-      _connected_time = fc::time_point::now();
+      _conn->_connected_time = fc::time_point::now();
 
       fc::oexception exception_to_rethrow;
       bool call_on_connection_closed = false;
@@ -179,27 +191,28 @@ namespace graphene { namespace net {
         char buffer[BUFFER_SIZE];
         while( true )
         {
-          _sock.read(buffer, BUFFER_SIZE);
-          _bytes_received += BUFFER_SIZE;
+          _conn->_sock.read(buffer, BUFFER_SIZE);
+          _conn->_bytes_received += BUFFER_SIZE;
           memcpy((char*)&m, buffer, sizeof(message_header));
-          FC_ASSERT( m.size.value() <= MAX_MESSAGE_SIZE, "", ("m.size",m.size.value())("MAX_MESSAGE_SIZE",MAX_MESSAGE_SIZE) );
+          FC_ASSERT( m.size.value() <= MAX_MESSAGE_SIZE, "",
+                     ("m.size",m.size.value())("MAX_MESSAGE_SIZE",MAX_MESSAGE_SIZE) );
 
           size_t remaining_bytes_with_padding = 16 * ((m.size.value() - LEFTOVER + 15) / 16);
           m.data.resize(LEFTOVER + remaining_bytes_with_padding); //give extra 16 bytes to allow for padding added in send call
           std::copy(buffer + sizeof(message_header), buffer + sizeof(buffer), m.data.begin());
           if (remaining_bytes_with_padding)
           {
-            _sock.read(&m.data[LEFTOVER], remaining_bytes_with_padding);
-            _bytes_received += remaining_bytes_with_padding;
+            _conn->_sock.read(&m.data[LEFTOVER], remaining_bytes_with_padding);
+            _conn->_bytes_received += remaining_bytes_with_padding;
           }
           m.data.resize(m.size.value()); // truncate off the padding bytes
 
-          _last_message_received_time = fc::time_point::now();
+          _conn->_last_message_received_time = fc::time_point::now();
 
           try
           {
             // message handling errors are warnings...
-            _delegate->on_message(_self, m);
+            _conn->_delegate->on_message(_conn->_self, m);
           }
           /// Dedicated catches needed to distinguish from general fc::exception
           catch ( const fc::canceled_exception& e ) { throw; }
@@ -214,7 +227,8 @@ namespace graphene { namespace net {
       }
       catch ( const fc::canceled_exception& e )
       {
-        wlog( "caught a canceled_exception in read_loop.  this should mean we're in the process of deleting this object already, so there's no need to notify the delegate: ${e}", ("e", e.to_detail_string() ) );
+        wlog( "caught a canceled_exception in read_loop.  this should mean we're in the process of deleting this object already, so there's no need to notify the delegate: ${e}",
+              ("e", e.to_detail_string() ) );
         throw;
       }
       catch ( const fc::eof_exception& e )
@@ -226,23 +240,26 @@ namespace graphene { namespace net {
       {
         elog( "disconnected ${er}", ("er", e.to_detail_string() ) );
         call_on_connection_closed = true;
-        exception_to_rethrow = fc::unhandled_exception(FC_LOG_MESSAGE(warn, "disconnected: ${e}", ("e", e.to_detail_string())));
+        exception_to_rethrow = fc::unhandled_exception(FC_LOG_MESSAGE( warn, "disconnected: ${e}",
+                                                                       ("e", e.to_detail_string())));
       }
       catch ( const std::exception& e )
       {
         elog( "disconnected ${er}", ("er", e.what() ) );
         call_on_connection_closed = true;
-        exception_to_rethrow = fc::unhandled_exception(FC_LOG_MESSAGE(warn, "disconnected: ${e}", ("e", e.what())));
+        exception_to_rethrow = fc::unhandled_exception(FC_LOG_MESSAGE( warn, "disconnected: ${e}",
+                                                                       ("e", e.what())));
       }
       catch ( ... )
       {
         elog( "unexpected exception" );
         call_on_connection_closed = true;
-        exception_to_rethrow = fc::unhandled_exception(FC_LOG_MESSAGE(warn, "disconnected: ${e}", ("e", fc::except_str())));
+        exception_to_rethrow = fc::unhandled_exception(FC_LOG_MESSAGE( warn, "disconnected: ${e}",
+                                                                       ("e", fc::except_str())));
       }
 
       if (call_on_connection_closed)
-        _delegate->on_connection_closed(_self);
+        _conn->_delegate->on_connection_closed(_conn->_self);
 
       if (exception_to_rethrow)
         throw *exception_to_rethrow;
@@ -264,7 +281,12 @@ namespace graphene { namespace net {
 #endif
 #endif
       no_parallel_execution_guard guard( &_send_message_in_progress );
-      _ready_for_sending->wait();
+
+      {
+         std::unique_lock<boost::fibers::mutex> lock(_mtx);
+         _cv.wait( lock, [this] () { return _ready_for_sending || _destroyed; } );
+      }
+      FC_ASSERT( !_destroyed, "Connection was closed!" );
 
       try
       {
@@ -308,7 +330,8 @@ namespace graphene { namespace net {
 
       try
       {
-        _read_loop_done.cancel_and_wait(__FUNCTION__);
+        _read_loop.cancel();
+        _read_loop.wait();
       }
       catch ( const fc::exception& e )
       {
@@ -318,7 +341,8 @@ namespace graphene { namespace net {
       {
         wlog( "Exception thrown while canceling message_oriented_connection's read_loop, ignoring" );
       }
-      _ready_for_sending->set_exception( std::make_shared<fc::canceled_exception>() );
+      _destroyed = true;
+      _cv.notify_all();
     }
 
     uint64_t message_oriented_connection_impl::get_total_bytes_sent() const

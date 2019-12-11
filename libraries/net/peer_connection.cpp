@@ -76,6 +76,7 @@ namespace graphene { namespace net
       _node(delegate),
       _message_connection(this),
       _total_queued_messages_size(0),
+      _send_queued_messages(*this),
       direction(peer_connection_direction::unknown),
       is_firewalled(firewalled_state::unknown),
       our_state(our_connection_state::disconnected),
@@ -134,7 +135,8 @@ namespace graphene { namespace net
       try
       {
         dlog("canceling _send_queued_messages task");
-        _send_queued_messages_done.cancel_and_wait(__FUNCTION__);
+        _send_queued_messages.cancel();
+        _send_queued_messages.wait();
         dlog("cancel_and_wait completed normally");
       }
       catch( const fc::exception& e )
@@ -144,21 +146,6 @@ namespace graphene { namespace net
       catch( ... )
       {
         wlog("Unexpected exception from peer_connection's send_queued_messages_task");
-      }
-
-      try
-      {
-        dlog("canceling accept_or_connect_task");
-        accept_or_connect_task_done.cancel_and_wait(__FUNCTION__);
-        dlog("accept_or_connect_task completed normally");
-      }
-      catch( const fc::exception& e )
-      {
-        wlog("Unexpected exception from peer_connection's accept_or_connect_task : ${e}", ("e", e));
-      }
-      catch( ... )
-      {
-        wlog("Unexpected exception from peer_connection's accept_or_connect_task");
       }
 
       _message_connection.destroy_connection(); // shut down the read loop
@@ -273,7 +260,7 @@ namespace graphene { namespace net
       _node->on_connection_closed( this );
     }
 
-    void peer_connection::send_queued_messages_task()
+    void detail::send_queued_messages_task::run()
     {
       VERIFY_CORRECT_THREAD();
 #ifndef NDEBUG
@@ -283,16 +270,16 @@ namespace graphene { namespace net
         ~counter() { assert(_send_message_queue_tasks_counter == 1); --_send_message_queue_tasks_counter; /* dlog("leaving peer_connection::send_queued_messages_task()"); */ }
       } concurrent_invocation_counter(_send_message_queue_tasks_running);
 #endif
-      while (!_queued_messages.empty())
+      while (!_conn->_queued_messages.empty())
       {
-        _queued_messages.front()->transmission_start_time = fc::time_point::now();
-        message message_to_send = _queued_messages.front()->get_message(_node);
+        _conn->_queued_messages.front()->transmission_start_time = fc::time_point::now();
+        message message_to_send = _conn->_queued_messages.front()->get_message(_conn->_node);
         try
         {
           //dlog("peer_connection::send_queued_messages_task() calling message_oriented_connection::send_message() "
           //     "to send message of type ${type} for peer ${endpoint}",
           //     ("type", message_to_send.msg_type)("endpoint", get_remote_endpoint()));
-          _message_connection.send_message(message_to_send);
+          _conn->_message_connection.send_message(message_to_send);
           //dlog("peer_connection::send_queued_messages_task()'s call to message_oriented_connection::send_message() completed normally for peer ${endpoint}",
           //     ("endpoint", get_remote_endpoint()));
         }
@@ -306,7 +293,7 @@ namespace graphene { namespace net
           wlog("Error sending message: ${exception}.  Closing connection.", ("exception", send_error));
           try
           {
-            close_connection();
+            _conn->close_connection();
           }
           catch (const fc::exception& close_error)
           {
@@ -322,11 +309,10 @@ namespace graphene { namespace net
         {
           wlog("message_oriented_exception::send_message() threw an unhandled exception");
         }
-        _queued_messages.front()->transmission_finish_time = fc::time_point::now();
-        _total_queued_messages_size -= _queued_messages.front()->get_size_in_queue();
-        _queued_messages.pop();
+        _conn->_queued_messages.front()->transmission_finish_time = fc::time_point::now();
+        _conn->_total_queued_messages_size -= _conn->_queued_messages.front()->get_size_in_queue();
+        _conn->_queued_messages.pop();
       }
-      //dlog("leaving peer_connection::send_queued_messages_task() due to queue exhaustion");
     }
 
     void peer_connection::send_queueable_message(std::unique_ptr<queued_message>&& message_to_send)
@@ -349,16 +335,7 @@ namespace graphene { namespace net
         return;
       }
 
-      if( _send_queued_messages_done.valid() && _send_queued_messages_done.canceled() )
-        FC_THROW_EXCEPTION(fc::exception, "Attempting to send a message on a connection that is being shut down");
-
-      if (!_send_queued_messages_done.valid() || _send_queued_messages_done.ready())
-      {
-        //dlog("peer_connection::send_message() is firing up send_queued_message_task");
-        _send_queued_messages_done = fc::async([this](){ send_queued_messages_task(); }, "send_queued_messages_task");
-      }
-      //else
-      //  dlog("peer_connection::send_message() doesn't need to fire up send_queued_message_task, it's already running");
+      _send_queued_messages.trigger();
     }
 
     void peer_connection::send_message(const message& message_to_send, size_t message_send_time_field_offset)

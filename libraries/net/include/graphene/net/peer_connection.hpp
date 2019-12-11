@@ -27,6 +27,7 @@
 #include <graphene/net/peer_database.hpp>
 #include <graphene/net/message_oriented_connection.hpp>
 #include <graphene/net/config.hpp>
+#include <graphene/utilities/recurring_task.hpp>
 
 #include <boost/tuple/tuple.hpp>
 
@@ -40,8 +41,24 @@
 #include <queue>
 #include <boost/container/deque.hpp>
 
-namespace graphene { namespace net
-  {
+namespace graphene { namespace net {
+   class peer_connection;
+
+   namespace detail {
+
+   class send_queued_messages_task : public graphene::utilities::recurring_task {
+   public:
+      send_queued_messages_task() : _conn(nullptr) {}
+      explicit send_queued_messages_task( peer_connection& conn ) : _conn(&conn) {}
+
+   protected:
+      virtual void run();
+
+      peer_connection* _conn;
+   };
+
+   } // detail
+
     struct firewall_check_state_data
     {
       node_id_t        expected_node_id;
@@ -57,7 +74,6 @@ namespace graphene { namespace net
       node_id_t        requesting_peer;
     };
 
-    class peer_connection;
     class peer_connection_delegate
     {
     public:
@@ -68,7 +84,6 @@ namespace graphene { namespace net
       virtual message get_message_for_item(const item_id& item) = 0;
     };
 
-    class peer_connection;
     typedef std::shared_ptr<peer_connection> peer_connection_ptr;
     class peer_connection : public message_oriented_connection_delegate,
                             public std::enable_shared_from_this<peer_connection>
@@ -165,7 +180,7 @@ namespace graphene { namespace net
 
       size_t _total_queued_messages_size = 0;
       std::queue<std::unique_ptr<queued_message>, std::list<std::unique_ptr<queued_message> > > _queued_messages;
-      boost::fibers::future<void> _send_queued_messages_done;
+      detail::send_queued_messages_task _send_queued_messages;
     public:
       fc::time_point connection_initiation_time;
       fc::time_point connection_closed_time;
@@ -259,8 +274,6 @@ namespace graphene { namespace net
 
       uint32_t last_known_fork_block_number = 0;
 
-      boost::fibers::future<void> accept_or_connect_task_done;
-
       firewall_check_state_data *firewall_check_state = nullptr;
     private:
 #ifndef NDEBUG
@@ -312,6 +325,7 @@ namespace graphene { namespace net
       void send_queued_messages_task();
       void accept_connection_task();
       void connect_to_task(const fc::ip::endpoint& remote_endpoint);
+      friend class detail::send_queued_messages_task;
     };
     typedef std::shared_ptr<peer_connection> peer_connection_ptr;
 

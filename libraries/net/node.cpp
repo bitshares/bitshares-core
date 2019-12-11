@@ -85,6 +85,7 @@
 
 #include <mutex>
 #include <thread>
+#include <boost/fiber/future/future_status.hpp>
 
 //#define ENABLE_DEBUG_ULOGS
 
@@ -2558,7 +2559,7 @@ namespace graphene { namespace net { namespace detail {
         bool is_fork_block = is_hard_fork_block(block_message_to_send.block.block_num());
         for (const peer_connection_ptr& peer : _active_connections)
         {
-          ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
+          //ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
           bool disconnecting_this_peer = false;
           if (is_fork_block)
           {
@@ -2631,7 +2632,7 @@ namespace graphene { namespace net { namespace detail {
         // invalid message received
         for (const peer_connection_ptr& peer : _active_connections)
         {
-          ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
+          //ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
 
           if (peer->ids_of_items_being_processed.find(block_message_to_send.block_id)
                  != peer->ids_of_items_being_processed.end())
@@ -2668,40 +2669,38 @@ namespace graphene { namespace net { namespace detail {
 
       dlog("Leaving send_sync_block_to_node_delegate");
 
-      if (// _suspend_fetching_sync_blocks && <-- you can use this if "maximum_number_of_blocks_to_handle_at_one_time" == "maximum_number_of_sync_blocks_to_prefetch"
-          !_node_is_shutting_down &&
-          (!_process_backlog_of_sync_blocks_done.valid() || _process_backlog_of_sync_blocks_done.ready()))
-        _process_backlog_of_sync_blocks_done = fc::async([=](){ process_backlog_of_sync_blocks(); },
-                                                         "process_backlog_of_sync_blocks");
+      if ( !_node_is_shutting_down )
+        _process_backlog_of_sync_blocks.trigger();
     }
 
     void process_backlog_of_sync_blocks_task::run()
     {
       VERIFY_CORRECT_THREAD();
       // garbage-collect the list of async tasks here for lack of a better place
-      for (auto calls_iter = _handle_message_calls_in_progress.begin();
-            calls_iter != _handle_message_calls_in_progress.end();)
+      for (auto calls_iter = _node->_handle_message_calls_in_progress.begin();
+            calls_iter != _node->_handle_message_calls_in_progress.end();)
       {
-        if (calls_iter->ready())
-          calls_iter = _handle_message_calls_in_progress.erase(calls_iter);
+        if (calls_iter->wait_for(std::chrono::seconds(0)) == boost::fibers::future_status::ready)
+          calls_iter = _node->_handle_message_calls_in_progress.erase(calls_iter);
         else
           ++calls_iter;
       }
 
       dlog("in process_backlog_of_sync_blocks");
-      if (_handle_message_calls_in_progress.size() >= _maximum_number_of_blocks_to_handle_at_one_time)
+      if (_node->_handle_message_calls_in_progress.size() >= _node->_maximum_number_of_blocks_to_handle_at_one_time)
       {
         dlog("leaving process_backlog_of_sync_blocks because we're already processing too many blocks");
         return; // we will be rescheduled when the next block finishes its processing
       }
-      dlog("currently ${count} blocks in the process of being handled", ("count", _handle_message_calls_in_progress.size()));
+      dlog("currently ${count} blocks in the process of being handled",
+           ("count", _node->_handle_message_calls_in_progress.size()));
 
 
-      if (_suspend_fetching_sync_blocks)
+      if (_node->_suspend_fetching_sync_blocks)
       {
         dlog("resuming processing sync block backlog because we only ${count} blocks in progress",
-             ("count", _handle_message_calls_in_progress.size()));
-        _suspend_fetching_sync_blocks = false;
+             ("count", _node->_handle_message_calls_in_progress.size()));
+        _node->_suspend_fetching_sync_blocks = false;
       }
 
 
@@ -2720,23 +2719,23 @@ namespace graphene { namespace net { namespace detail {
 
       do
       {
-        std::copy(std::make_move_iterator(_new_received_sync_items.begin()),
-                  std::make_move_iterator(_new_received_sync_items.end()),
-                  std::front_inserter(_received_sync_items));
-        _new_received_sync_items.clear();
-        dlog("currently ${count} sync items to consider", ("count", _received_sync_items.size()));
+        std::copy(std::make_move_iterator(_node->_new_received_sync_items.begin()),
+                  std::make_move_iterator(_node->_new_received_sync_items.end()),
+                  std::front_inserter(_node->_received_sync_items));
+        _node->_new_received_sync_items.clear();
+        dlog("currently ${count} sync items to consider", ("count", _node->_received_sync_items.size()));
 
         block_processed_this_iteration = false;
-        for (auto received_block_iter = _received_sync_items.begin();
-             received_block_iter != _received_sync_items.end();
+        for (auto received_block_iter = _node->_received_sync_items.begin();
+             received_block_iter != _node->_received_sync_items.end();
              ++received_block_iter)
         {
 
           // find out if this block is the next block on the active chain or one of the forks
           bool potential_first_block = false;
-          for (const peer_connection_ptr& peer : _active_connections)
+          for (const peer_connection_ptr& peer : _node->_active_connections)
           {
-            ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
+            //ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
             if (!peer->ids_of_items_to_get.empty() &&
                 peer->ids_of_items_to_get.front() == received_block_iter->block_id)
             {
@@ -2755,14 +2754,14 @@ namespace graphene { namespace net { namespace detail {
             // block through the sync mechanism.  Further, we must request both blocks because
             // we don't know they're the same (for the peer in normal operation, it has only told us the
             // message id, for the peer in the sync case we only known the block_id).
-            if (std::find(_most_recent_blocks_accepted.begin(), _most_recent_blocks_accepted.end(),
-                          received_block_iter->block_id) == _most_recent_blocks_accepted.end())
+            if (std::find(_node->_most_recent_blocks_accepted.begin(), _node->_most_recent_blocks_accepted.end(),
+                          received_block_iter->block_id) == _node->_most_recent_blocks_accepted.end())
             {
               graphene::net::block_message block_message_to_process = *received_block_iter;
-              _received_sync_items.erase(received_block_iter);
-              _handle_message_calls_in_progress.emplace_back(fc::async([this, block_message_to_process](){
-                send_sync_block_to_node_delegate(block_message_to_process);
-              }, "send_sync_block_to_node_delegate"));
+              _node->_received_sync_items.erase(received_block_iter);
+              _node->_handle_message_calls_in_progress.emplace_back(fc::async([this, block_message_to_process](){
+                _node->send_sync_block_to_node_delegate(block_message_to_process);
+              }, std::this_thread::get_id(), "send_sync_block_to_node_delegate"));
               ++blocks_processed;
               block_processed_this_iteration = true;
             }
@@ -2770,7 +2769,7 @@ namespace graphene { namespace net { namespace detail {
             {
               dlog("Already received and accepted this block (presumably through normal inventory mechanism), treating it as accepted");
               std::vector< peer_connection_ptr > peers_needing_next_batch;
-              for (const peer_connection_ptr& peer : _active_connections)
+              for (const peer_connection_ptr& peer : _node->_active_connections)
               {
                 auto items_being_processed_iter = peer->ids_of_items_being_processed.find(received_block_iter->block_id);
                 if (items_being_processed_iter != peer->ids_of_items_being_processed.end())
@@ -2786,42 +2785,42 @@ namespace graphene { namespace net { namespace detail {
                       peer->number_of_unfetched_item_ids == 0 &&
                       peer->ids_of_items_being_processed.empty())
                   {
-                    dlog("We received last item in our list for peer ${endpoint}, setup to do a sync check", ("endpoint", peer->get_remote_endpoint()));
+                    dlog("We received last item in our list for peer ${endpoint}, setup to do a sync check",
+                         ("endpoint", peer->get_remote_endpoint()));
                     peers_needing_next_batch.push_back( peer );
                   }
                 }
               }
               for( const peer_connection_ptr& peer : peers_needing_next_batch )
-                fetch_next_batch_of_item_ids_from_peer(peer.get());
+                _node->fetch_next_batch_of_item_ids_from_peer(peer.get());
             }
 
             break; // start iterating _received_sync_items from the beginning
           } // end if potential_first_block
         } // end for each block in _received_sync_items
 
-        if (_handle_message_calls_in_progress.size() >= _maximum_number_of_blocks_to_handle_at_one_time)
+        if (_node->_handle_message_calls_in_progress.size() >= _node->_maximum_number_of_blocks_to_handle_at_one_time)
         {
           dlog("stopping processing sync block backlog because we have ${count} blocks in progress",
-               ("count", _handle_message_calls_in_progress.size()));
+               ("count", _node->_handle_message_calls_in_progress.size()));
           //ulog("stopping processing sync block backlog because we have ${count} blocks in progress, total on hand: ${received}",
           //     ("count", _handle_message_calls_in_progress.size())("received", _received_sync_items.size()));
-          if (_received_sync_items.size() >= _maximum_number_of_sync_blocks_to_prefetch)
-            _suspend_fetching_sync_blocks = true;
+          if (_node->_received_sync_items.size() >= _node->_maximum_number_of_sync_blocks_to_prefetch)
+            _node->_suspend_fetching_sync_blocks = true;
           break;
         }
       } while (block_processed_this_iteration);
 
       dlog("leaving process_backlog_of_sync_blocks, ${count} processed", ("count", blocks_processed));
 
-      if (!_suspend_fetching_sync_blocks)
-        trigger_fetch_sync_items_loop();
+      if (!_node->_suspend_fetching_sync_blocks)
+        _node->trigger_fetch_sync_items_loop();
     }
 
     void node_impl::trigger_process_backlog_of_sync_blocks()
     {
-      if (!_node_is_shutting_down &&
-          (!_process_backlog_of_sync_blocks_done.valid() || _process_backlog_of_sync_blocks_done.ready()))
-        _process_backlog_of_sync_blocks_done = fc::async([=](){ process_backlog_of_sync_blocks(); }, "process_backlog_of_sync_blocks");
+      if (!_node_is_shutting_down)
+        _process_backlog_of_sync_blocks.trigger();
     }
 
     void node_impl::process_block_during_sync( peer_connection* originating_peer,
@@ -2896,7 +2895,7 @@ namespace graphene { namespace net { namespace detail {
 
         for (const peer_connection_ptr& peer : _active_connections)
         {
-          ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
+          //ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
 
           auto iter = peer->inventory_peer_advertised_to_us.find(block_message_item_id);
           if (iter != peer->inventory_peer_advertised_to_us.end())
@@ -3288,7 +3287,7 @@ namespace graphene { namespace net { namespace detail {
       fc::time_point now = fc::time_point::now();
       for (const peer_connection_ptr& peer : _active_connections)
       {
-        ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
+        //ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
 
         current_connection_data data_for_this_peer;
         data_for_this_peer.connection_duration = now.sec_since_epoch() - peer->connection_initiation_time.sec_since_epoch();
@@ -3482,7 +3481,8 @@ namespace graphene { namespace net { namespace detail {
 
       try
       {
-        _accept_loop_complete.cancel_and_wait("node_impl::close()");
+        _accept_loop.cancel();
+        _accept_loop.wait();
         dlog("P2P accept loop terminated");
       }
       catch ( const fc::exception& e )
@@ -3497,10 +3497,8 @@ namespace graphene { namespace net { namespace detail {
       // terminate all of our long-running loops (these run continuously instead of rescheduling themselves)
       try
       {
-        _p2p_network_connect_loop_done.cancel("node_impl::close()");
-        // cancel() is currently broken, so we need to wake up the task to allow it to finish
-        trigger_p2p_network_connect_loop();
-        _p2p_network_connect_loop_done.wait();
+        _p2p_network_connect_loop.cancel();
+        _p2p_network_connect_loop.wait();
         dlog("P2P connect loop terminated");
       }
       catch ( const fc::canceled_exception& )
@@ -3518,7 +3516,8 @@ namespace graphene { namespace net { namespace detail {
 
       try
       {
-        _process_backlog_of_sync_blocks_done.cancel_and_wait("node_impl::close()");
+        _process_backlog_of_sync_blocks.cancel();
+        _process_backlog_of_sync_blocks.wait();
         dlog("Process backlog of sync items task terminated");
       }
       catch ( const fc::canceled_exception& )
@@ -3540,12 +3539,15 @@ namespace graphene { namespace net { namespace detail {
         auto it = _handle_message_calls_in_progress.begin();
         if( it == _handle_message_calls_in_progress.end() )
            break;
-        if( it->ready() || it->error() || it->canceled() )
+        if( it->wait_for(std::chrono::seconds(0)) == boost::fibers::future_status::ready )
         {
            _handle_message_calls_in_progress.erase( it );
            continue;
         }
         ++handle_message_call_count;
+        // FIXME: can't cancel message handlers
+        boost::this_fiber::yield();
+        /*
         try
         {
           it->cancel_and_wait("node_impl::close()");
@@ -3563,14 +3565,13 @@ namespace graphene { namespace net { namespace detail {
         {
           wlog("Exception thrown while terminating handle_message call #${count} task, ignoring",("count", handle_message_call_count));
         }
+         */
       }
 
       try
       {
-        _fetch_sync_items_loop_done.cancel("node_impl::close()");
-        // cancel() is currently broken, so we need to wake up the task to allow it to finish
-        trigger_fetch_sync_items_loop();
-        _fetch_sync_items_loop_done.wait();
+        _fetch_sync_items_loop.cancel();
+        _fetch_sync_items_loop.wait();
         dlog("Fetch sync items loop terminated");
       }
       catch ( const fc::canceled_exception& )
@@ -3588,10 +3589,8 @@ namespace graphene { namespace net { namespace detail {
 
       try
       {
-        _fetch_item_loop_done.cancel("node_impl::close()");
-        // cancel() is currently broken, so we need to wake up the task to allow it to finish
-        trigger_fetch_items_loop();
-        _fetch_item_loop_done.wait();
+        _fetch_item_loop.cancel();
+        _fetch_item_loop.wait();
         dlog("Fetch items loop terminated");
       }
       catch ( const fc::canceled_exception& )
@@ -3609,10 +3608,8 @@ namespace graphene { namespace net { namespace detail {
 
       try
       {
-        _advertise_inventory_loop_done.cancel("node_impl::close()");
-        // cancel() is currently broken, so we need to wake up the task to allow it to finish
-        trigger_advertise_inventory_loop();
-        _advertise_inventory_loop_done.wait();
+        _advertise_inventory_loop.cancel();
+        _advertise_inventory_loop.wait();
         dlog("Advertise inventory loop terminated");
       }
       catch ( const fc::canceled_exception& )
@@ -3667,7 +3664,8 @@ namespace graphene { namespace net { namespace detail {
 #endif
         try
         {
-          _delayed_peer_deletion_task_done.cancel_and_wait("node_impl::close()");
+          _delayed_peer_deletion_task.cancel();
+          _delayed_peer_deletion_task.wait();
           dlog("Delayed peer deletion task terminated");
         }
         catch ( const fc::exception& e )
@@ -3686,7 +3684,8 @@ namespace graphene { namespace net { namespace detail {
       // our loops now
       try
       {
-        _terminate_inactive_connections_loop_done.cancel_and_wait("node_impl::close()");
+        _terminate_inactive_connections_loop.cancel();
+        _terminate_inactive_connections_loop.wait();
         dlog("Terminate inactive connections loop terminated");
       }
       catch ( const fc::exception& e )
@@ -3700,7 +3699,8 @@ namespace graphene { namespace net { namespace detail {
 
       try
       {
-        _fetch_updated_peer_lists_loop_done.cancel_and_wait("node_impl::close()");
+        _fetch_updated_peer_lists_loop.cancel();
+        _fetch_updated_peer_lists_loop.wait();
         dlog("Fetch updated peer lists loop terminated");
       }
       catch ( const fc::exception& e )
@@ -3714,7 +3714,8 @@ namespace graphene { namespace net { namespace detail {
 
       try
       {
-        _bandwidth_monitor_loop_done.cancel_and_wait("node_impl::close()");
+        _bandwidth_monitor_loop.cancel();
+        _bandwidth_monitor_loop.wait();
         dlog("Bandwidth monitor loop terminated");
       }
       catch ( const fc::exception& e )
@@ -3728,7 +3729,8 @@ namespace graphene { namespace net { namespace detail {
 
       try
       {
-        _dump_node_status_task_done.cancel_and_wait("node_impl::close()");
+        _dump_node_status_task.cancel();
+        _dump_node_status_task.wait();
         dlog("Dump node status task terminated");
       }
       catch ( const fc::exception& e )
@@ -3754,25 +3756,26 @@ namespace graphene { namespace net { namespace detail {
       while ( true )
       {
         check_cancelled();
-        peer_connection_ptr new_peer(peer_connection::make_shared(this));
+        peer_connection_ptr new_peer(peer_connection::make_shared(_node));
 
         try
         {
-          _tcp_server.accept( new_peer->get_socket() );
-          ilog( "accepted inbound connection from ${remote_endpoint}", ("remote_endpoint", new_peer->get_socket().remote_endpoint() ) );
-          if (_node_is_shutting_down)
+          _node->_tcp_server.accept( new_peer->get_socket() );
+          ilog( "accepted inbound connection from ${remote_endpoint}",
+                ("remote_endpoint", new_peer->get_socket().remote_endpoint() ) );
+          if (_node->_node_is_shutting_down)
             return;
           new_peer->connection_initiation_time = fc::time_point::now();
-          _handshaking_connections.insert( new_peer );
-          _rate_limiter.add_tcp_socket( &new_peer->get_socket() );
+          _node->_handshaking_connections.insert( new_peer );
+          _node->_rate_limiter.add_tcp_socket( &new_peer->get_socket() );
           std::weak_ptr<peer_connection> new_weak_peer(new_peer);
           new_peer->accept_or_connect_task_done = fc::async( [this, new_weak_peer]() {
             peer_connection_ptr new_peer(new_weak_peer.lock());
             assert(new_peer);
             if (!new_peer)
               return;
-            accept_connection_task(new_peer);
-          }, "accept_connection_task" );
+            _node->accept_connection_task(new_peer);
+          }, std::this_thread::get_id(), "accept_connection_task" );
 
           // limit the rate at which we accept connections to mitigate DOS attacks
           sleep( std::chrono::milliseconds(10) );
@@ -3932,7 +3935,7 @@ namespace graphene { namespace net { namespace detail {
     }
 
     // methods implementing node's public interface
-    void node_impl::set_node_delegate(node_delegate* del, fc::thread* thread_for_delegate_calls)
+    void node_impl::set_node_delegate(node_delegate* del, std::thread::id thread_for_delegate_calls)
     {
       VERIFY_CORRECT_THREAD();
       _delegate.reset();
@@ -4076,7 +4079,7 @@ namespace graphene { namespace net { namespace detail {
               wlog(error_message);
               std::cout << "\033[31m" << error_message;  
               _delegate->error_encountered( error_message, fc::oexception() );
-              fc::usleep( fc::seconds(5 ) );
+              boost::this_fiber::sleep_for( std::chrono::seconds(5 ) );
             }
             else // don't wait, just find a random port
             {
@@ -4115,25 +4118,16 @@ namespace graphene { namespace net { namespace detail {
       VERIFY_CORRECT_THREAD();
       assert(_node_public_key != fc::ecc::public_key_data());
 
-      assert(!_accept_loop_complete.valid() &&
-             !_p2p_network_connect_loop_done.valid() &&
-             !_fetch_sync_items_loop_done.valid() &&
-             !_fetch_item_loop_done.valid() &&
-             !_advertise_inventory_loop_done.valid() &&
-             !_terminate_inactive_connections_loop_done.valid() &&
-             !_fetch_updated_peer_lists_loop_done.valid() &&
-             !_bandwidth_monitor_loop_done.valid() &&
-             !_dump_node_status_task_done.valid());
       if (_node_configuration.accept_incoming_connections)
-        _accept_loop_complete = fc::async( [=](){ accept_loop(); }, "accept_loop");
-      _p2p_network_connect_loop_done = fc::async( [=]() { p2p_network_connect_loop(); }, "p2p_network_connect_loop" );
-      _fetch_sync_items_loop_done = fc::async( [=]() { fetch_sync_items_loop(); }, "fetch_sync_items_loop" );
-      _fetch_item_loop_done = fc::async( [=]() { fetch_items_loop(); }, "fetch_items_loop" );
-      _advertise_inventory_loop_done = fc::async( [=]() { advertise_inventory_loop(); }, "advertise_inventory_loop" );
-      _terminate_inactive_connections_loop_done = fc::async( [=]() { terminate_inactive_connections_loop(); }, "terminate_inactive_connections_loop" );
-      _fetch_updated_peer_lists_loop_done = fc::async([=](){ fetch_updated_peer_lists_loop(); }, "fetch_updated_peer_lists_loop");
-      _bandwidth_monitor_loop_done = fc::async([=](){ bandwidth_monitor_loop(); }, "bandwidth_monitor_loop");
-      _dump_node_status_task_done = fc::async([=](){ dump_node_status_task(); }, "dump_node_status_task");
+        _accept_loop.trigger();
+      _p2p_network_connect_loop.trigger();
+      _fetch_sync_items_loop.trigger();
+      _fetch_item_loop.trigger();
+      _advertise_inventory_loop.trigger();
+      _terminate_inactive_connections_loop.trigger();
+      _fetch_updated_peer_lists_loop.trigger();
+      _bandwidth_monitor_loop.trigger();
+      _dump_node_status_task.trigger();
     }
 
     void node_impl::add_node(const fc::ip::endpoint& ep)
@@ -4169,7 +4163,7 @@ namespace graphene { namespace net { namespace detail {
         if (!new_peer)
           return;
         connect_to_task(new_peer, *new_peer->get_remote_endpoint());
-      }, "connect_to_task");
+      }, std::this_thread::get_id(), "connect_to_task");
     }
 
     void node_impl::connect_to_endpoint(const fc::ip::endpoint& remote_endpoint)
@@ -4366,7 +4360,7 @@ namespace graphene { namespace net { namespace detail {
       std::vector<peer_status> statuses;
       for (const peer_connection_ptr& peer : _active_connections)
       {
-        ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
+        //ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
 
         peer_status this_peer_status;
         this_peer_status.version = 0;
@@ -4648,8 +4642,8 @@ namespace graphene { namespace net { namespace detail {
 
 #ifdef P2P_IN_DEDICATED_THREAD
 # define INVOKE_IN_IMPL(method_name, ...) \
-    return fc::async([&](){ return my->method_name(__VA_ARGS__); },
-                     my->_thread.get_id(), "thread invoke for method " BOOST_PP_STRINGIZE(method_name)).wait()
+    return fc::async([&](){ return my->method_name(__VA_ARGS__); }, \
+                     my->_thread.get_id(), "thread invoke for method " BOOST_PP_STRINGIZE(method_name)).get()
 #else
 # define INVOKE_IN_IMPL(method_name, ...) \
     return my->method_name(__VA_ARGS__)
@@ -4968,7 +4962,7 @@ namespace graphene { namespace net { namespace detail {
     uint32_t statistics_gathering_node_delegate_wrapper::get_block_number(const item_hash_t& block_id)
     {
       // this function doesn't need to block,
-      ASSERT_TASK_NOT_PREEMPTED();
+      //ASSERT_TASK_NOT_PREEMPTED();
       return _node_delegate->get_block_number(block_id);
     }
 
