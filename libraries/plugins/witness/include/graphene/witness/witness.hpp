@@ -25,8 +25,7 @@
 
 #include <graphene/app/plugin.hpp>
 #include <graphene/chain/database.hpp>
-
-#include <fc/thread/future.hpp>
+#include <graphene/utilities/recurring_task.hpp>
 
 namespace graphene { namespace witness_plugin {
 
@@ -46,8 +45,22 @@ namespace block_production_condition
    };
 }
 
+class witness_plugin;
+
+class block_production_task : public graphene::utilities::recurring_task
+{
+public:
+   block_production_task() : _witness(nullptr) {}
+   explicit block_production_task( witness_plugin& witness ) : _witness(&witness) {}
+protected:
+   virtual void run();
+
+   witness_plugin* _witness;
+};
+
 class witness_plugin : public graphene::app::plugin {
 public:
+   witness_plugin() : _block_production_task(*this) {}
    ~witness_plugin() { stop_block_production(); }
 
    std::string plugin_name()const override;
@@ -68,7 +81,6 @@ public:
    { return _witness_key_cache; }
 
 private:
-   void schedule_production_loop();
    block_production_condition::block_production_condition_enum block_production_loop();
    block_production_condition::block_production_condition_enum maybe_produce_block( fc::limited_mutable_variant_object& capture );
    void add_private_key(const std::string& key_id_to_wif_pair_string);
@@ -84,11 +96,12 @@ private:
 
    std::map<chain::public_key_type, fc::ecc::private_key, chain::pubkey_comparator> _private_keys;
    std::set<chain::witness_id_type> _witnesses;
-   fc::future<void> _block_production_task;
+   block_production_task _block_production_task;
 
    /// For tracking signing keys of specified witnesses, only update when applied a block
    fc::flat_map< chain::witness_id_type, fc::optional<chain::public_key_type> > _witness_key_cache;
 
+   friend class block_production_task;
 };
 
 } } //graphene::witness_plugin

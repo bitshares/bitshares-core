@@ -30,6 +30,11 @@
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/api.hpp>
+#include <fc/thread/async.hpp>
+
+#include <boost/fiber/fiber.hpp>
+
+#include <chrono>
 
 namespace graphene { namespace delayed_node {
 namespace bpo = boost::program_options;
@@ -119,7 +124,7 @@ void delayed_node_plugin::mainloop()
    {
       try
       {
-         fc::usleep( fc::microseconds( 296645 ) );  // wake up a little over 3Hz
+         boost::this_fiber::sleep_for( std::chrono::microseconds( 296645 ) );  // wake up a little over 3Hz
 
          if( my->last_received_remote_head == my->last_processed_remote_head )
             continue;
@@ -160,7 +165,7 @@ void delayed_node_plugin::plugin_startup()
 void delayed_node_plugin::connection_failed()
 {
    elog("Connection to trusted node failed; retrying in 5 seconds...");
-   fc::schedule([this]{connect();}, fc::time_point::now() + fc::seconds(5));
+   fc::schedule([this]{connect();}, std::chrono::system_clock::now() + std::chrono::seconds(5));
 }
 
 } }

@@ -53,6 +53,8 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <websocketpp/version.hpp>
 
+#include <boost/fiber/future.hpp>
+
 #ifdef WIN32
 # include <signal.h>
 #else
@@ -350,30 +352,30 @@ int main( int argc, char** argv )
       }
       else
       {
-         fc::promise<int>::ptr exit_promise = fc::promise<int>::create("UNIX Signal Handler");
+         boost::fibers::promise<int> exit_promise;
 
          fc::set_signal_handler( [&exit_promise](int signal) {
             ilog( "Captured SIGINT in daemon mode, exiting" );
-            exit_promise->set_value(signal);
+            exit_promise.set_value(signal);
          }, SIGINT );
 
          fc::set_signal_handler( [&exit_promise](int signal) {
             ilog( "Captured SIGTERM in daemon mode, exiting" );
-            exit_promise->set_value(signal);
+            exit_promise.set_value(signal);
          }, SIGTERM );
 #ifdef SIGQUIT
          fc::set_signal_handler( [&exit_promise](int signal) {
             ilog( "Captured SIGQUIT in daemon mode, exiting" );
-            exit_promise->set_value(signal);
+            exit_promise.set_value(signal);
          }, SIGQUIT );
 #endif
          boost::signals2::scoped_connection closed_connection( con->closed.connect( [&exit_promise] {
             elog( "Server has disconnected us." );
-            exit_promise->set_value(0);
+            exit_promise.set_value(0);
          }));
 
          ilog( "Entering Daemon Mode, ^C to exit" );
-         exit_promise->wait();
+         exit_promise.get_future().wait();
 
          closed_connection.disconnect();
       }

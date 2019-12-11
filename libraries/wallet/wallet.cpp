@@ -33,7 +33,7 @@
 #include <boost/version.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/replace.hpp>
-
+#include <boost/fiber/mutex.hpp>
 #include <boost/range/adaptor/map.hpp>
 #include <boost/range/algorithm_ext/erase.hpp>
 #include <boost/range/algorithm/unique.hpp>
@@ -51,16 +51,16 @@
 #include <fc/git_revision.hpp>
 #include <fc/io/fstream.hpp>
 #include <fc/io/json.hpp>
+#include <fc/io/sstream.hpp>
 #include <fc/io/stdio.hpp>
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/cli.hpp>
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/crypto/hex.hpp>
-#include <fc/thread/mutex.hpp>
-#include <fc/thread/scoped_lock.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/crypto/base58.hpp>
 #include <fc/popcount.hpp>
+#include <fc/thread/async.hpp>
 
 #include <graphene/app/api.hpp>
 #include <graphene/app/util.hpp>
@@ -82,6 +82,9 @@
 # include <sys/types.h>
 # include <sys/stat.h>
 #endif
+
+#include <mutex>
+#include <thread>
 
 // explicit instantiation for later use
 namespace fc {
@@ -374,10 +377,10 @@ private:
       _wallet.pending_witness_registrations.erase(iter);
    }
 
-   fc::mutex _resync_mutex;
+   boost::fibers::mutex _resync_mutex;
    void resync()
    {
-      fc::scoped_lock<fc::mutex> lock(_resync_mutex);
+      std::unique_lock<boost::fibers::mutex> lock(_resync_mutex);
       // this method is used to update wallet_data annotations
       //   e.g. wallet has been restarted and was not notified
       //   of events while it was down
@@ -546,7 +549,7 @@ public:
 
    void on_block_applied( const variant& block_id )
    {
-      fc::async([this]{resync();}, "Resync after block");
+      fc::async([this]{resync();}, std::this_thread::get_id(), "Resync after block");
    }
 
    bool copy_wallet_file( string destination_filename )

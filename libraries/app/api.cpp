@@ -39,7 +39,9 @@
 #include <fc/crypto/base64.hpp>
 #include <fc/crypto/hex.hpp>
 #include <fc/rpc/api_connection.hpp>
-#include <fc/thread/future.hpp>
+#include <fc/thread/async.hpp>
+
+#include <boost/fiber/future.hpp>
 
 template class fc::api<graphene::app::block_api>;
 template class fc::api<graphene::app::network_broadcast_api>;
@@ -187,12 +189,13 @@ namespace graphene { namespace app {
 
     fc::variant network_broadcast_api::broadcast_transaction_synchronous(const precomputable_transaction& trx)
     {
-       fc::promise<fc::variant>::ptr prom = fc::promise<fc::variant>::create();
-       broadcast_transaction_with_callback( [prom]( const fc::variant& v ){
-        prom->set_value(v);
+       boost::fibers::promise<fc::variant> prom;
+       boost::fibers::future<fc::variant> result = prom.get_future();
+       broadcast_transaction_with_callback( [&prom]( const fc::variant& v ) {
+        prom.set_value(v);
        }, trx );
 
-       return fc::future<fc::variant>(prom).wait();
+       return result.get();
     }
 
     void network_broadcast_api::broadcast_block( const signed_block& b )
@@ -356,12 +359,7 @@ namespace graphene { namespace app {
        if(_app.is_plugin_enabled("elasticsearch")) {
           auto es = _app.get_plugin<elasticsearch::elasticsearch_plugin>("elasticsearch");
           if(es.get()->get_running_mode() != elasticsearch::mode::only_save) {
-             if(!_app.elasticsearch_thread)
-                _app.elasticsearch_thread= std::make_shared<fc::thread>("elasticsearch");
-
-             return _app.elasticsearch_thread->async([&es, &account, &stop, &limit, &start]() {
-                return es->get_account_history(account, stop, limit, start);
-             }, "thread invoke for method " BOOST_PP_STRINGIZE(method_name)).wait();
+             return es->get_account_history(account, stop, limit, start);
           }
        }
 

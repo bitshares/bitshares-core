@@ -26,7 +26,6 @@
 #include <graphene/app/plugin.hpp>
 #include <graphene/chain/database.hpp>
 
-#include <fc/thread/future.hpp>
 #include <fc/uint128.hpp>
 
 #include <boost/multi_index/composite_key.hpp>

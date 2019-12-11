@@ -27,7 +27,6 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/protocol/types.hpp>
 
-#include <fc/thread/future.hpp>
 #include <fc/container/flat.hpp>
 
 namespace graphene { namespace debug_witness_plugin {

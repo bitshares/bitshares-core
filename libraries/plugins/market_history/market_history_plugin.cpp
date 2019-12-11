@@ -33,8 +33,6 @@
 #include <graphene/chain/transaction_evaluation_state.hpp>
 #include <graphene/protocol/fee_schedule.hpp>
 
-#include <fc/thread/thread.hpp>
-
 namespace graphene { namespace market_history {
 
 namespace detail

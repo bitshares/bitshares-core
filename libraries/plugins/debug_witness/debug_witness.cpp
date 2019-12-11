@@ -28,8 +28,6 @@
 
 #include <graphene/utilities/key_conversion.hpp>
 
-#include <fc/thread/thread.hpp>
-
 #include <iostream>
 
 using namespace graphene::debug_witness_plugin;

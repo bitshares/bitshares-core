@@ -28,8 +28,6 @@
 
 #include <graphene/chain/operation_history_object.hpp>
 
-#include <fc/thread/future.hpp>
-
 namespace graphene { namespace account_history {
    using namespace chain;
    //using namespace graphene::db;

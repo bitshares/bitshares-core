@@ -36,14 +36,15 @@
 #include <graphene/api_helper_indexes/api_helper_indexes.hpp>
 #include <graphene/custom_operations/custom_operations_plugin.hpp>
 
-#include <fc/thread/thread.hpp>
 #include <fc/interprocess/signals.hpp>
 #include <fc/stacktrace.hpp>
+#include <fc/thread/fibers.hpp>
 
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/container/flat_set.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/fiber/future.hpp>
 
 #include <graphene/utilities/git_revision.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -62,6 +63,7 @@ namespace bpo = boost::program_options;
 
 int main(int argc, char** argv) {
    fc::print_stacktrace_on_segfault();
+   fc::initialize_fibers();
    app::application* node = new app::application();
    fc::oexception unhandled_exception;
    try {
@@ -172,22 +174,22 @@ int main(int argc, char** argv) {
       node->startup();
       node->startup_plugins();
 
-      fc::promise<int>::ptr exit_promise = fc::promise<int>::create("UNIX Signal Handler");
+      boost::fibers::promise<int> exit_promise;
 
       fc::set_signal_handler([&exit_promise](int signal) {
          elog( "Caught SIGINT attempting to exit cleanly" );
-         exit_promise->set_value(signal);
+         exit_promise.set_value(signal);
       }, SIGINT);
 
       fc::set_signal_handler([&exit_promise](int signal) {
          elog( "Caught SIGTERM attempting to exit cleanly" );
-         exit_promise->set_value(signal);
+         exit_promise.set_value(signal);
       }, SIGTERM);
 
       ilog("Started BitShares node on a chain with ${h} blocks.", ("h", node->chain_database()->head_block_num()));
       ilog("Chain ID is ${id}", ("id", node->chain_database()->get_chain_id()) );
 
-      int signal = exit_promise->wait();
+      int signal = exit_promise.get_future().get();
       ilog("Exiting from signal ${n}", ("n", signal));
       node->shutdown_plugins();
       node->shutdown();

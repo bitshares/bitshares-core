@@ -31,6 +31,7 @@
 
 #include <fc/crypto/hex.hpp>
 #include <fc/rpc/api_connection.hpp>
+#include <fc/thread/async.hpp>
 
 #include <boost/range/iterator_range.hpp>
 

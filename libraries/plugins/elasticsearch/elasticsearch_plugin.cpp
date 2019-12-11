@@ -25,6 +25,9 @@
 #include <graphene/elasticsearch/elasticsearch_plugin.hpp>
 #include <graphene/chain/impacted.hpp>
 #include <graphene/chain/account_evaluator.hpp>
+
+#include <fc/thread/async.hpp>
+
 #include <curl/curl.h>
 
 namespace graphene { namespace elasticsearch {
@@ -407,10 +410,21 @@ void elasticsearch_plugin_impl::populateESstruct()
 elasticsearch_plugin::elasticsearch_plugin() :
    my( new detail::elasticsearch_plugin_impl(*this) )
 {
+   _elasticsearch_thread = std::thread( [this] () {
+      fc::initialize_fibers();
+      std::unique_lock<boost::fibers::mutex> lock(_mtx);
+      _cv.wait( lock, [this] () { return _shutting_down; });
+   });
 }
 
 elasticsearch_plugin::~elasticsearch_plugin()
 {
+   {
+      std::unique_lock<boost::fibers::mutex> lock(_mtx);
+      _shutting_down = true;
+      _cv.notify_all();
+   }
+   _elasticsearch_thread.join();
 }
 
 std::string elasticsearch_plugin::plugin_name()const
@@ -544,6 +558,8 @@ vector<operation_history_object> elasticsearch_plugin::get_account_history(
       unsigned limit = 100,
       operation_history_id_type start = operation_history_id_type())
 {
+   return fc::async([this, account_id, stop, limit, start]() {
+                
    const string account_id_string = std::string(object_id_type(account_id));
 
    const auto stop_number = stop.instance.value;
@@ -592,6 +608,7 @@ vector<operation_history_object> elasticsearch_plugin::get_account_history(
       result.push_back(fromEStoOperation(source));
    }
    return result;
+   }, _elasticsearch_thread.get_id(), "thread invoke for method " BOOST_PP_STRINGIZE(method_name)).get();
 }
 
 operation_history_object elasticsearch_plugin::fromEStoOperation(variant source)

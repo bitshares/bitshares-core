@@ -28,6 +28,10 @@
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/utilities/elasticsearch.hpp>
 
+#include <fc/thread/fibers.hpp>
+
+#include <thread>
+
 namespace graphene { namespace elasticsearch {
    using namespace chain;
 
@@ -77,6 +81,11 @@ class elasticsearch_plugin : public graphene::app::plugin
    private:
       operation_history_object fromEStoOperation(variant source);
       graphene::utilities::ES prepareHistoryQuery(string query);
+
+      std::thread _elasticsearch_thread;
+      boost::fibers::mutex _mtx;
+      boost::fibers::condition_variable _cv;
+      bool _shutting_down;
 };
 
 

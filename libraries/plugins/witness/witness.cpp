@@ -28,11 +28,11 @@
 
 #include <graphene/utilities/key_conversion.hpp>
 
-#include <fc/thread/thread.hpp>
 #include <fc/io/fstream.hpp>
 
 #include <boost/filesystem/path.hpp>
 
+#include <chrono>
 #include <iostream>
 
 using namespace graphene::witness_plugin;
@@ -186,7 +186,7 @@ void witness_plugin::plugin_startup()
       {
          refresh_witness_key_cache();
       });
-      schedule_production_loop();
+      _block_production_task.trigger();
    }
    else
    {
@@ -205,8 +205,8 @@ void witness_plugin::stop_block_production()
    _shutting_down = true;
    
    try {
-      if( _block_production_task.valid() )
-         _block_production_task.cancel_and_wait(__FUNCTION__);
+      _block_production_task.cancel();
+      _block_production_task.wait();
    } catch(fc::canceled_exception&) {
       //Expected exception. Move along.
    } catch(fc::exception& e) {
@@ -227,21 +227,24 @@ void witness_plugin::refresh_witness_key_cache()
    }
 }
 
-void witness_plugin::schedule_production_loop()
+void block_production_task::run()
 {
-   if (_shutting_down) return;
+   while( true )
+   {
+      check_cancelled();
+      if (_witness->_shutting_down) return;
 
-   //Schedule for the next second's tick regardless of chain state
-   // If we would wait less than 50ms, wait for the whole second.
-   fc::time_point now = fc::time_point::now();
-   int64_t time_to_next_second = 1000000 - (now.time_since_epoch().count() % 1000000);
-   if( time_to_next_second < 50000 )      // we must sleep for at least 50ms
-       time_to_next_second += 1000000;
+      _witness->block_production_loop();
 
-   fc::time_point next_wakeup( now + fc::microseconds( time_to_next_second ) );
+      //Schedule for the next second's tick regardless of chain state
+      // If we would wait less than 50ms, wait for the whole second.
+      fc::time_point now = fc::time_point::now();
+      int64_t time_to_next_second = 1000000 - (now.time_since_epoch().count() % 1000000);
+      if( time_to_next_second < 50000 )      // we must sleep for at least 50ms
+         time_to_next_second += 1000000;
 
-   _block_production_task = fc::schedule([this]{block_production_loop();},
-                                         next_wakeup, "Witness Block Production");
+      sleep( std::chrono::microseconds(time_to_next_second) );
+   }
 }
 
 block_production_condition::block_production_condition_enum witness_plugin::block_production_loop()
@@ -305,7 +308,6 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
          break;
    }
 
-   schedule_production_loop();
    return result;
 }
 
