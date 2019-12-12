@@ -106,25 +106,30 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
 { try {
    database& d = db();
 
+   const auto next_asset_id = d.get_index_type<asset_index>().get_next_id();
+
    if( (core_fee_paid.get_amount().value & 1) && d.head_block_time() <= HARDFORK_CORE_429_TIME )
       d.modify( d.get_core_dynamic_data(), [this]( asset_dynamic_data_object& dd ) {
          for_pool += dd.current_supply.issue(1);
       });
 
    const asset_dynamic_data_object& dyn_asset =
-      d.create<asset_dynamic_data_object>( [this]( asset_dynamic_data_object& a ) {
+      d.create<asset_dynamic_data_object>( [this,next_asset_id]( asset_dynamic_data_object& a ) {
+         a.current_supply = stored_debt(next_asset_id);
+         a.accumulated_fees = stored_value(next_asset_id);
          a.fee_pool = std::move(for_pool);
+         a.confidential_supply = stored_value(next_asset_id);
       });
 
    asset_bitasset_data_id_type bit_asset_id;
-
-   auto next_asset_id = d.get_index_type<asset_index>().get_next_id();
 
    if( op.bitasset_opts.valid() )
       bit_asset_id = d.create<asset_bitasset_data_object>( [&op,next_asset_id]( asset_bitasset_data_object& a ) {
             a.options = *op.bitasset_opts;
             a.is_prediction_market = op.is_prediction_market;
             a.asset_id = next_asset_id;
+            a.total_debt = stored_value(next_asset_id);
+            a.settlement_fund = stored_value(a.options.short_backing_asset);
          }).id;
 
    const asset_object& new_asset =
