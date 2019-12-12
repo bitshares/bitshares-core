@@ -224,27 +224,28 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
 { try {
    database& d = db();
 
-   stored_value transport;
+   stored_value transport_debt;
    if( o.delta_debt.amount > 0 )
    {
       // Deduct the debt paid from the total supply of the debt asset.
-      d.modify(*_dynamic_data_obj, [&o,&transport](asset_dynamic_data_object& dynamic_asset) {
-         transport = dynamic_asset.current_supply.issue( o.delta_debt.amount );
+      d.modify(*_dynamic_data_obj, [&o,&transport_debt](asset_dynamic_data_object& dynamic_asset) {
+         transport_debt = dynamic_asset.current_supply.issue( o.delta_debt.amount );
       });
-      d.add_balance( o.funding_account, std::move(transport) );
+      d.add_balance( o.funding_account, std::move(transport_debt) );
    }
    else if( o.delta_debt.amount < 0 )
    {
-      transport = d.reduce_balance( o.funding_account, -o.delta_debt );
+      transport_debt = d.reduce_balance( o.funding_account, -o.delta_debt );
       // Deduct the debt paid from the total supply of the debt asset.
-      d.modify(*_dynamic_data_obj, [&o,&transport](asset_dynamic_data_object& dynamic_asset) {
-         dynamic_asset.current_supply.burn( std::move(transport) );
+      d.modify(*_dynamic_data_obj, [&o,&transport_debt](asset_dynamic_data_object& dynamic_asset) {
+         dynamic_asset.current_supply.burn( std::move(transport_debt) );
       });
    }
 
+   stored_value transport_collateral;
    if( o.delta_collateral.amount > 0 )
    {
-      transport = d.reduce_balance( o.funding_account, o.delta_collateral  );
+      transport_collateral = d.reduce_balance( o.funding_account, o.delta_collateral  );
 
       // Adjust the total core in orders accodingly
       if( o.delta_collateral.asset_id == asset_id_type() )
@@ -269,11 +270,12 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
       FC_ASSERT( o.delta_collateral.amount > 0, "Delta collateral amount of new debt position should be positive" );
       FC_ASSERT( o.delta_debt.amount > 0, "Delta debt amount of new debt position should be positive" );
 
-      call_obj = &d.create<call_order_object>( [&o,this,before_core_hardfork_1270,&transport]( call_order_object& call ){
+      call_obj = &d.create<call_order_object>(
+       [&o,this,before_core_hardfork_1270,&transport_debt,&transport_collateral]( call_order_object& call ){
          call.borrower = o.funding_account;
-         call.collateral = std::move(transport);
+         call.collateral = std::move(transport_collateral);
          call.debt = stored_debt(o.delta_debt.asset_id);
-         transport = call.debt.issue( o.delta_debt.amount );
+         transport_debt = call.debt.issue( o.delta_debt.amount );
          if( before_core_hardfork_1270 ) // before core-1270 hard fork, calculate call_price here and cache it
             call.call_price = price::call_price( o.delta_debt, o.delta_collateral,
                                                  _bitasset_data->current_feed.maintenance_collateral_ratio );
@@ -283,8 +285,8 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
       });
       call_order_id = call_obj->id;
 
-      d.modify( *_bitasset_data, [&transport] ( asset_bitasset_data_object& bdo ) {
-         bdo.total_debt += std::move(transport);
+      d.modify( *_bitasset_data, [&transport_debt] ( asset_bitasset_data_object& bdo ) {
+         bdo.total_debt += std::move(transport_debt);
       });
    }
    else // updating existing debt position
@@ -294,20 +296,20 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
       old_collateralization = call_obj->collateralization();
       old_debt = call_obj->debt.get_amount();
 
-      stored_value tmp_debt;
       if( o.delta_debt.amount < 0 )
-         d.modify( *_bitasset_data, [&o,&tmp_debt] ( asset_bitasset_data_object& bdo ) {
-            tmp_debt = bdo.total_debt.split( -o.delta_debt.amount );
+         d.modify( *_bitasset_data, [&o,&transport_debt] ( asset_bitasset_data_object& bdo ) {
+            transport_debt = bdo.total_debt.split( -o.delta_debt.amount );
          });
-      d.modify( *call_obj, [&o,&transport,this,before_core_hardfork_1270,&tmp_debt]( call_order_object& call ){
+      d.modify( *call_obj,
+       [&o,&transport_debt,&transport_collateral,this,before_core_hardfork_1270]( call_order_object& call ){
          if( o.delta_collateral.amount > 0 )
-            call.collateral += std::move(transport);
+            call.collateral += std::move(transport_collateral);
          else if( o.delta_collateral.amount < 0 )
-            transport = call.collateral.split( -o.delta_collateral.amount );
+            transport_collateral = call.collateral.split( -o.delta_collateral.amount );
          if( o.delta_debt.amount > 0 )
-            tmp_debt = call.debt.issue( o.delta_debt.amount );
+            transport_debt = call.debt.issue( o.delta_debt.amount );
          else if( o.delta_debt.amount < 0 )
-             call.debt.burn( std::move(tmp_debt) );
+             call.debt.burn( std::move(transport_debt) );
          if( before_core_hardfork_1270 ) // don't update call_price after core-1270 hard fork
          {
             call.call_price  =  price::call_price( call.get_debt(), call.get_collateral(),
@@ -315,10 +317,12 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
          }
          call.target_collateral_ratio = o.extensions.value.target_collateral_ratio;
       });
-      if( tmp_debt.get_amount() > 0 )
-         d.modify( *_bitasset_data, [&tmp_debt] ( asset_bitasset_data_object& bdo ) {
-            bdo.total_debt += std::move(tmp_debt);
+      if( transport_debt.get_amount() > 0 )
+         d.modify( *_bitasset_data, [&transport_debt] ( asset_bitasset_data_object& bdo ) {
+            bdo.total_debt += std::move(transport_debt);
          });
+      if( transport_collateral.get_amount() > 0 ) // negative delta_collateral
+         d.add_balance( o.funding_account, std::move(transport_collateral) );
 
       if( call_obj->debt.get_amount() == 0 )
       {
