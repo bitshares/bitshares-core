@@ -43,6 +43,7 @@ class recurring_task
    boost::fibers::mutex _mtx;
    boost::fibers::condition_variable _cv;
    boost::fibers::future<void> _worker;
+   std::string _name;
 
    /** Waits for the given duration. Waiting can be interrupted by trigger() or cancel().
     *  Throws when cancelled.

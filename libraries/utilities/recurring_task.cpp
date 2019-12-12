@@ -28,15 +28,10 @@
 
 namespace graphene { namespace utilities {
 
-recurring_task::recurring_task( const std::string& name )
-{
-   fc::set_fiber_name( name );
-}
+recurring_task::recurring_task( const std::string& name ) : _name(name) {}
 
-recurring_task::recurring_task( std::thread::id runner, const std::string& name ) : _runner( runner )
-{
-   fc::set_fiber_name( name );
-}
+recurring_task::recurring_task( std::thread::id runner, const std::string& name )
+   : _runner( runner ), _name(name) {}
 
 recurring_task::~recurring_task()
 {
@@ -90,8 +85,13 @@ void recurring_task::trigger()
    check_cancelled();
    if( !_worker.valid() || _worker.wait_for( std::chrono::seconds(0) ) == boost::fibers::future_status::ready )
    {
-      _worker = _runner != std::thread::id() ? fc::async( std::bind( &recurring_task::run, this ), _runner )
-                                             : fc::async( std::bind( &recurring_task::run, this ) );
+      std::function<void()> lambda;
+      if( _name.empty() )
+         lambda = std::bind( &recurring_task::run, this );
+      else
+         lambda = [this] () { fc::set_fiber_name(_name); run(); };
+      _worker = _runner != std::thread::id() ? fc::async( std::move(lambda), _runner )
+                                             : fc::async( std::move(lambda) );
    }
    else
    {
