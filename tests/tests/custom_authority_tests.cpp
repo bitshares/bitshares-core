@@ -1263,8 +1263,9 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
     * Test of authorization of one account (Alice) authorizing another key
     * for restricted trading between between ACOIN1 and any BCOIN (BCOIN1, BCOIN2, and BCOIN3).
     *
-    * The restricted trading authortization will be constructed with two custom authorities
-    * each of which uses one OR restriction for the BCOINs.
+    * The restricted trading authortization will be constructed with one custom authority
+    * containing two "logical_or" branches.  One branch authorizes selling ACOINs for BCOINs.
+    * Another branch authorizes selling BCOINs for ACOINs.
     */
    BOOST_AUTO_TEST_CASE(authorized_restricted_trading_key) {
       try {
@@ -1374,156 +1375,32 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          auto min_to_receive_index = member_index<limit_order_create_operation>("min_to_receive");
          auto asset_id_index = member_index<asset>("asset_id");
 
-         // Custom Authority 1: Sell ACOIN to buy BCOINs
-         unsigned_int dummy_index = 999;
-         vector<restriction> sell_a1_rx = {restriction(amount_to_sell_index, FUNC(attr),
-                                                       vector<restriction>{restriction(asset_id_index, FUNC(eq),
-                                                                                       asset_id_type(
-                                                                                               acoin1.id.instance()))})};
-         restriction sell_acoin_rx = sell_a1_rx[0];
+         // Define the two set of assets: ACOINs and BCOINs
+         restriction is_acoin_rx = restriction(asset_id_index, FUNC(in),
+                                               flat_set<asset_id_type>{acoin1.id});
+         restriction is_bcoin_rx = restriction(asset_id_index, FUNC(in),
+                                               flat_set<asset_id_type>{bcoin1.id, bcoin2.id, bcoin3.id});
 
-         vector<restriction> buy_b1_rx = {restriction(min_to_receive_index, FUNC(attr),
-                                                      vector<restriction>{restriction(asset_id_index, FUNC(eq),
-                                                                                      asset_id_type(
-                                                                                              bcoin1.id.instance()))})};
-         vector<restriction> buy_b2_rx = {restriction(min_to_receive_index, FUNC(attr),
-                                                      vector<restriction>{restriction(asset_id_index, FUNC(eq),
-                                                                                      asset_id_type(
-                                                                                              bcoin2.id.instance()))})};
-         vector<restriction> buy_b3_rx = {restriction(min_to_receive_index, FUNC(attr),
-                                                      vector<restriction>{restriction(asset_id_index, FUNC(eq),
-                                                                                      asset_id_type(
-                                                                                              bcoin3.id.instance()))})};
-         restriction buy_bcoin_rx = restriction(dummy_index, FUNC(logical_or),
-                                                vector<vector<restriction>>{buy_b1_rx, buy_b2_rx, buy_b3_rx});
+         // Custom Authority 1: Sell ACOINs to buy BCOINs
+         restriction sell_acoin_rx = restriction(amount_to_sell_index, FUNC(attr), vector<restriction>{is_acoin_rx});
+
+         restriction buy_bcoin_rx = restriction(min_to_receive_index, FUNC(attr), vector<restriction>{is_bcoin_rx});
 
          vector<restriction> branch_sell_acoin_buy_bcoin = {sell_acoin_rx, buy_bcoin_rx};
-         authorize_limit_orders.restrictions = {branch_sell_acoin_buy_bcoin};
-         //[
-         //  {
-         //    "member_index": 2,
-         //    "restriction_type": 10,
-         //    "argument": [
-         //      39,
-         //      [
-         //        {
-         //          "member_index": 1,
-         //          "restriction_type": 0,
-         //          "argument": [
-         //            8,
-         //            "1.3.2"
-         //          ],
-         //          "extensions": []
-         //        }
-         //      ]
-         //    ],
-         //    "extensions": []
-         //  },
-         //  {
-         //    "member_index": 999,
-         //    "restriction_type": 11,
-         //    "argument": [
-         //      40,
-         //      [
-         //        [
-         //          {
-         //            "member_index": 3,
-         //            "restriction_type": 10,
-         //            "argument": [
-         //              39,
-         //              [
-         //                {
-         //                  "member_index": 1,
-         //                  "restriction_type": 0,
-         //                  "argument": [
-         //                    8,
-         //                    "1.3.4"
-         //                  ],
-         //                  "extensions": []
-         //                }
-         //              ]
-         //            ],
-         //            "extensions": []
-         //          }
-         //        ],
-         //        [
-         //          {
-         //            "member_index": 3,
-         //            "restriction_type": 10,
-         //            "argument": [
-         //              39,
-         //              [
-         //                {
-         //                  "member_index": 1,
-         //                  "restriction_type": 0,
-         //                  "argument": [
-         //                    8,
-         //                    "1.3.5"
-         //                  ],
-         //                  "extensions": []
-         //                }
-         //              ]
-         //            ],
-         //            "extensions": []
-         //          }
-         //        ],
-         //        [
-         //          {
-         //            "member_index": 3,
-         //            "restriction_type": 10,
-         //            "argument": [
-         //              39,
-         //              [
-         //                {
-         //                  "member_index": 1,
-         //                  "restriction_type": 0,
-         //                  "argument": [
-         //                    8,
-         //                    "1.3.6"
-         //                  ],
-         //                  "extensions": []
-         //                }
-         //              ]
-         //            ],
-         //            "extensions": []
-         //          }
-         //        ]
-         //      ]
-         //    ],
-         //    "extensions": []
-         //  }
-         //]
-
-         // Broadcast the authorization
-         trx.clear();
-         trx.operations = {authorize_limit_orders};
-         sign(trx, alice_private_key);
-         PUSH_TX(db, trx);
 
 
-         // Custom Authority 2: Sell BCOINs to buy ACOIN
-         vector<restriction> sell_b1_rx = {restriction(amount_to_sell_index, FUNC(attr),
-                                                       vector<restriction>{restriction(asset_id_index, FUNC(eq),
-                                                                                       asset_id_type(
-                                                                                               bcoin1.id.instance()))})};
-         vector<restriction> sell_b2_rx = {restriction(amount_to_sell_index, FUNC(attr),
-                                                       vector<restriction>{restriction(asset_id_index, FUNC(eq),
-                                                                                       asset_id_type(
-                                                                                               bcoin2.id.instance()))})};
-         vector<restriction> sell_b3_rx = {restriction(amount_to_sell_index, FUNC(attr),
-                                                       vector<restriction>{restriction(asset_id_index, FUNC(eq),
-                                                                                       asset_id_type(
-                                                                                               bcoin2.id.instance()))})};
-         restriction sell_bcoin_rx = restriction(dummy_index, FUNC(logical_or),
-                                                 vector<vector<restriction>>{sell_b1_rx, sell_b2_rx, sell_b3_rx});
+         // Custom Authority 2: Sell BCOINs to buy ACOINs
+         restriction sell_bcoin_rx = restriction(amount_to_sell_index, FUNC(attr), vector<restriction>{is_bcoin_rx});
+         restriction buy_acoin_rx = restriction(min_to_receive_index, FUNC(attr), vector<restriction>{is_acoin_rx});
 
-         vector<restriction> buy_a1_rx = {restriction(min_to_receive_index, FUNC(attr),
-                                                      vector<restriction>{restriction(asset_id_index, FUNC(eq),
-                                                                                      asset_id_type(
-                                                                                              acoin1.id.instance()))})};
-         restriction buy_acoin_rx = buy_a1_rx[0];
          vector<restriction> branch_sell_bcoin_buy_acoin = {sell_bcoin_rx, buy_acoin_rx};
-         authorize_limit_orders.restrictions = {branch_sell_bcoin_buy_acoin};
+
+
+         unsigned_int dummy_index = 999;
+         restriction trade_acoin_for_bcoin_rx = restriction(dummy_index, FUNC(logical_or),
+                                                            vector<vector<restriction>>{branch_sell_acoin_buy_bcoin,
+                                                                                        branch_sell_bcoin_buy_acoin});
+         authorize_limit_orders.restrictions = {trade_acoin_for_bcoin_rx};
          //[
          //  {
          //    "member_index": 999,
@@ -1540,10 +1417,35 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //              [
          //                {
          //                  "member_index": 1,
-         //                  "restriction_type": 0,
+         //                  "restriction_type": 6,
          //                  "argument": [
-         //                    8,
-         //                    "1.3.4"
+         //                    27,
+         //                    [
+         //                      "1.3.2"
+         //                    ]
+         //                  ],
+         //                  "extensions": []
+         //                }
+         //              ]
+         //            ],
+         //            "extensions": []
+         //          },
+         //          {
+         //            "member_index": 3,
+         //            "restriction_type": 10,
+         //            "argument": [
+         //              39,
+         //              [
+         //                {
+         //                  "member_index": 1,
+         //                  "restriction_type": 6,
+         //                  "argument": [
+         //                    27,
+         //                    [
+         //                      "1.3.3",
+         //                      "1.3.4",
+         //                      "1.3.5"
+         //                    ]
          //                  ],
          //                  "extensions": []
          //                }
@@ -1561,31 +1463,35 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //              [
          //                {
          //                  "member_index": 1,
-         //                  "restriction_type": 0,
+         //                  "restriction_type": 6,
          //                  "argument": [
-         //                    8,
-         //                    "1.3.5"
+         //                    27,
+         //                    [
+         //                      "1.3.3",
+         //                      "1.3.4",
+         //                      "1.3.5"
+         //                    ]
          //                  ],
          //                  "extensions": []
          //                }
          //              ]
          //            ],
          //            "extensions": []
-         //          }
-         //        ],
-         //        [
+         //          },
          //          {
-         //            "member_index": 2,
+         //            "member_index": 3,
          //            "restriction_type": 10,
-         //            "argument": [*
+         //            "argument": [
          //              39,
          //              [
          //                {
          //                  "member_index": 1,
-         //                  "restriction_type": 0,
+         //                  "restriction_type": 6,
          //                  "argument": [
-         //                    8,
-         //                    "1.3.5"
+         //                    27,
+         //                    [
+         //                      "1.3.2"
+         //                    ]
          //                  ],
          //                  "extensions": []
          //                }
@@ -1594,25 +1500,6 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          //            "extensions": []
          //          }
          //        ]
-         //      ]
-         //    ],
-         //    "extensions": []
-         //  },
-         //  {
-         //    "member_index": 3,
-         //    "restriction_type": 10,
-         //    "argument": [
-         //      39,
-         //      [
-         //        {
-         //          "member_index": 1,
-         //          "restriction_type": 0,
-         //          "argument": [
-         //            8,
-         //            "1.3.2"
-         //          ],
-         //          "extensions": []
-         //        }
          //      ]
          //    ],
          //    "extensions": []
