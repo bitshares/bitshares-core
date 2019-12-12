@@ -1770,8 +1770,7 @@ class wallet_api
       /**
        * Get \c account_storage_object of an account by using the custom operations plugin.
        *
-       * Storage data added to the map with @ref account_store_map and list data added by
-       * @ref account_list_accounts will be returned.
+       * Storage data added to the map with @ref account_store_map will be returned.
        *
        * @param account Account ID or name to get contact data from.
        * @param catalog The catalog to retrieve.
