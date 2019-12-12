@@ -648,12 +648,14 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
                  core_pays == core.amount_for_sale() );
 
    int result = 0;
-   stored_value transport;
-   modify( core, [&transport,&core_pays] ( limit_order_object& loo ) {
-      transport = loo.for_sale.split( core_pays.amount );
+   stored_value transport_core;
+   modify( core, [&transport_core,&core_pays] ( limit_order_object& loo ) {
+      transport_core = loo.for_sale.split( core_pays.amount );
    });
-   result |= fill_limit_order( usd, usd_pays, std::move(transport), cull_taker, match_price, false, false ); // the first param is taker
-   result |= fill_limit_order( core, core_pays, std::move(transport), true, match_price, true, true ) << 1; // the second param is maker
+   fc::optional<stored_value> transport_usd = stored_value(usd_pays.asset_id);
+   result |= fill_limit_order( usd, usd_pays, std::move(transport_core), cull_taker, match_price, transport_usd, false ); // the first param is taker
+   fc::optional<stored_value> ignore;
+   result |= fill_limit_order( core, core_pays, std::move(*transport_usd), true, match_price, ignore, true ) << 1; // the second param is maker
    FC_ASSERT( result != 0 );
    return result;
 }
@@ -699,12 +701,14 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    order_pays = call_receives;
 
    int result = 0;
-   stored_value transport;
-   modify( ask, [&transport,&call_pays] ( call_order_object& coo ) {
-      transport = coo.collateral.split( call_pays.amount );
+   stored_value transport_debt;
+   modify( ask, [&transport_debt,&call_pays] ( call_order_object& coo ) {
+      transport_debt = coo.collateral.split( call_pays.amount );
    });
-   result |= fill_limit_order( bid, order_pays, std::move(transport), cull_taker, match_price, false, false ); // the limit order is taker
-   result |= fill_call_order( ask, call_pays, std::move(transport), match_price, true, true ) << 1;      // the call order is maker
+   fc::optional<stored_value> transport_collateral = stored_value(order_pays.asset_id);
+   result |= fill_limit_order( bid, order_pays, std::move(transport_debt), cull_taker, match_price, transport_collateral, false ); // the limit order is taker
+   fc::optional<stored_value> ignore;
+   result |= fill_call_order( ask, call_pays, std::move(*transport_collateral), match_price, ignore, true ) << 1;      // the call order is maker
    // result can be 0 when call order has target_collateral_ratio option set.
 
    return result;
@@ -806,8 +810,9 @@ asset database::match( const call_order_object& call,
    modify( settle, [&transport,&settle_pays] ( force_settlement_object& fso ) {
       transport = fso.balance.split( settle_pays.amount );
    });
-   fill_call_order( call, call_pays, std::move(transport), fill_price, false, true ); // call order is maker
-   fill_settle_order( settle, settle_pays, std::move(transport), fill_price ); // force settlement order is always taker
+   fc::optional<stored_value> transport_debt = stored_value();
+   fill_call_order( call, call_pays, std::move(transport), fill_price, transport_debt, true ); // call order is maker
+   fill_settle_order( settle, settle_pays, std::move(*transport_debt), fill_price ); // force settlement order is always taker
 
    if( cull_settle_order )
       cancel_settle_order( settle );
@@ -815,32 +820,37 @@ asset database::match( const call_order_object& call,
    return call_receives;
 } FC_CAPTURE_AND_RETHROW( (call)(settle)(match_price)(max_settlement) ) }
 
-bool database::fill_limit_order( const limit_order_object& order, const asset& pays, stored_value&& transport,
-                                 bool cull_if_small, const price& fill_price, bool already_paid, const bool is_maker )
+bool database::fill_limit_order( const limit_order_object& order, const asset& pays, stored_value&& receives,
+                                 bool cull_if_small, const price& fill_price,
+                                 fc::optional<stored_value>& transport, const bool is_maker )
 { try {
-   const auto receives = transport.get_value();
+   const auto received = receives.get_value();
 
    cull_if_small |= (head_block_time() < HARDFORK_555_TIME);
 
    FC_ASSERT( order.amount_for_sale().asset_id == pays.asset_id );
-   FC_ASSERT( pays.asset_id != receives.asset_id );
+   FC_ASSERT( pays.asset_id != received.asset_id );
 
    const account_object& seller = order.seller(*this);
-   const asset_object& recv_asset = receives.asset_id(*this);
+   const asset_object& recv_asset = received.asset_id(*this);
 
-   auto issuer_fees = pay_market_fees( &seller, recv_asset, std::move(transport) );
+   auto issuer_fees = pay_market_fees( &seller, recv_asset, std::move(receives) );
+   add_balance( seller.get_id(), std::move(receives) );
 
-   push_applied_operation( fill_order_operation( order.id, order.seller, pays, receives, issuer_fees, fill_price, is_maker ) );
+   push_applied_operation( fill_order_operation( order.id, order.seller, pays, received, issuer_fees, fill_price, is_maker ) );
 
-   pay_order( seller, std::move(transport), pays );
+   if( pays.asset_id == asset_id_type() )
+      modify( seller.statistics(*this), [&pays]( account_statistics_object& b ){
+         b.total_core_in_orders -= pays.amount;
+      });
 
    stored_value deferred_fee;
    stored_value deferred_paid_fee;
-   modify( order, [&pays,&transport,&deferred_fee,&deferred_paid_fee,already_paid] ( limit_order_object& loo ) {
+   modify( order, [&pays,&transport,&deferred_fee,&deferred_paid_fee] ( limit_order_object& loo ) {
       deferred_fee = std::move(loo.deferred_fee);
       deferred_paid_fee = std::move(loo.deferred_paid_fee);
-      if( !already_paid )
-         transport = loo.for_sale.split( pays.amount );
+      if( transport.valid() )
+         *transport = loo.for_sale.split( pays.amount );
    });
    // conditional because cheap integer comparison may allow us to avoid two expensive modify() and object lookups
    if( deferred_fee.get_amount() > 0 )
@@ -869,39 +879,39 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
       return maybe_cull_small_order( *this, order );
 
    return false;
-} FC_CAPTURE_AND_RETHROW( (order)(pays)(transport) ) }
+} FC_CAPTURE_AND_RETHROW( (order)(pays)(receives.get_value()) ) }
 
 
-bool database::fill_call_order( const call_order_object& order, const asset& pays, stored_value&& transport,
-                                const price& fill_price, bool already_paid, const bool is_maker )
+bool database::fill_call_order( const call_order_object& order, const asset& pays, stored_value&& receives,
+                                const price& fill_price, fc::optional<stored_value>& transport,
+                                const bool is_maker )
 { try {
-   const auto receives = transport.get_value();
+   const asset received = receives.get_value();
 
-   FC_ASSERT( order.debt_type() == receives.asset_id );
+   FC_ASSERT( order.debt_type() == receives.get_asset() );
    FC_ASSERT( order.collateral_type() == pays.asset_id );
    FC_ASSERT( order.collateral.get_amount() >= pays.amount );
 
    // TODO pass in mia and bitasset_data for better performance
-   const asset_object& mia = receives.asset_id(*this);
+   const asset_object& mia = receives.get_asset()(*this);
    FC_ASSERT( mia.is_market_issued() );
 
-   stored_value supply_to_burn = std::move(transport);
    // update current supply
    const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
-   modify( mia_ddo, [&supply_to_burn]( asset_dynamic_data_object& ao ){
-      ao.current_supply.burn( std::move(supply_to_burn) );
+   modify( mia_ddo, [&receives]( asset_dynamic_data_object& ao ){
+      ao.current_supply.burn( std::move(receives) );
    });
 
    stored_value debt_to_burn;
    const auto& bdo = (*mia.bitasset_data_id)(*this);
-   modify( bdo, [&receives,&debt_to_burn] ( asset_bitasset_data_object& _bdo ) {
-       debt_to_burn = _bdo.total_debt.split( receives.amount );
+   modify( bdo, [&received,&debt_to_burn] ( asset_bitasset_data_object& _bdo ) {
+       debt_to_burn = _bdo.total_debt.split( received.amount );
    });
 
    stored_value collateral_freed( order.collateral_type() );
-   modify( order, [&bdo,&pays,&debt_to_burn,&transport,&collateral_freed,already_paid,this]( call_order_object& o ){
+   modify( order, [&bdo,&pays,&debt_to_burn,&transport,&collateral_freed,this]( call_order_object& o ){
             o.debt.burn( std::move(debt_to_burn) );
-            if( !already_paid )
+            if( transport.valid() )
                transport = o.collateral.split( pays.amount );
             if( o.debt.get_amount() == 0 )
               collateral_freed = std::move( o.collateral );
@@ -930,7 +940,7 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
    // Adjust balance
    add_balance( order.borrower, std::move(collateral_freed) );
 
-   push_applied_operation( fill_order_operation( order.id, order.borrower, pays, receives,
+   push_applied_operation( fill_order_operation( order.id, order.borrower, pays, received,
                                                  asset(0, pays.asset_id), fill_price, is_maker ) );
 
    bool filled = order.collateral.get_amount() == 0;
@@ -1151,7 +1161,9 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
           transport = loo.for_sale.split(order_pays.amount);
        });
        // when for_new_limit_order is true, the call order is maker, otherwise the call order is taker
-       fill_call_order( call_order, call_pays, std::move(transport), match_price, false, for_new_limit_order );
+       fc::optional<stored_value> transport_debt = stored_value();
+       fill_call_order( call_order, call_pays, std::move(transport), match_price, transport_debt,
+                        for_new_limit_order );
        if( !before_core_hardfork_1270 )
           call_collateral_itr = call_collateral_index.lower_bound( call_min );
        else if( !before_core_hardfork_343 )
@@ -1159,7 +1171,9 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
        auto next_limit_itr = std::next( limit_itr );
        // when for_new_limit_order is true, the limit order is taker, otherwise the limit order is maker
-       bool really_filled = fill_limit_order( limit_order, order_pays, std::move(transport), true, match_price, true, !for_new_limit_order );
+       fc::optional<stored_value> ignore;
+       bool really_filled = fill_limit_order( limit_order, order_pays, std::move(*transport_debt), true,
+                                              match_price, ignore, !for_new_limit_order );
        if( really_filled || ( filled_limit && before_core_hardfork_453 ) )
           limit_itr = next_limit_itr;
 
@@ -1167,15 +1181,6 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
     return margin_called;
 } FC_CAPTURE_AND_RETHROW() }
-
-void database::pay_order( const account_object& receiver, stored_value&& receives, const asset& pays )
-{
-   if( receives.get_asset() == asset_id_type() )
-      modify( receiver.statistics(*this), [&pays]( account_statistics_object& b ){
-         b.total_core_in_orders -= pays.amount;
-      });
-   add_balance( receiver.get_id(), std::move(receives) );
-}
 
 share_type database::calculate_market_fee( const asset_object& trade_asset, const share_type trade_amount )
 {
