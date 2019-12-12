@@ -354,8 +354,8 @@ class call_order_backup : public call_order_master, public graphene::db::backup_
       call_order_backup( const call_order_object& original )
          : call_order_master( original )
       {
-         debt = original.debt.get_amount();
-         collateral = original.collateral.get_amount();
+         debt = original.debt.get_value();
+         collateral = original.collateral.get_value();
       }
 
       virtual object* recreate() { return graphene::db::backup_object<call_order_object>::recreate(); }
