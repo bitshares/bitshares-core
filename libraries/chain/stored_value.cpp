@@ -31,7 +31,7 @@ namespace graphene { namespace chain {
 
    stored_debt::~stored_debt()
    {
-      FC_ASSERT( _amount == 0 || std::current_exception() // should check for enabled undo_db in case of exception
+      FC_ASSERT( _amount == 0 || std::uncaught_exception() // should check for enabled undo_db in case of exception
                  , "Value leak detected: (${n],${a])!", ("n",_amount.value)("a",_asset) );
    }
 
