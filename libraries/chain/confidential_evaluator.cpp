@@ -80,7 +80,6 @@ void transfer_to_blind_evaluator::pay_fee()
 void_result transfer_from_blind_evaluator::do_evaluate( const transfer_from_blind_operation& o )
 { try {
    const auto& d = db();
-   o.fee.asset_id(d);  // verify fee is a legit asset 
    const auto& bbi = d.get_index_type<blinded_balance_index>();
    const auto& cidx = bbi.indices().get<by_commitment>();
    for( const auto& in : o.inputs )
@@ -103,12 +102,10 @@ void_result transfer_from_blind_evaluator::do_apply( const transfer_from_blind_o
       FC_ASSERT( itr != cidx.end() );
       db().remove( *itr );
    }
-   const auto& add = o.amount.asset_id(db()).dynamic_asset_data_id(db());
    stored_value transport;
-   db().modify( add, [&o,&transport]( asset_dynamic_data_object& obj ){
-      transport = obj.confidential_supply.split( o.amount.amount + o.fee.amount );
+   db().modify( *fee_asset_dd, [&o,&transport]( asset_dynamic_data_object& obj ){
+      transport = obj.confidential_supply.split( o.amount.amount );
    });
-   tmp_fee.burn( transport.split(o.fee.amount) );
    db().add_balance( o.to, std::move(transport) );
 
    return void_result();
@@ -118,8 +115,18 @@ void transfer_from_blind_evaluator::prepare_fee(account_id_type account_id, asse
 {
    FC_ASSERT( fee.amount >= 0 );
 
-   tmp_fee = stored_debt(fee.asset_id);                       // account_id borrows the fee temporarily,
-   db().add_balance( account_id, tmp_fee.issue(fee.amount) ); // which is paid back from the blinded balance
+   const auto& fee_asset = fee.asset_id(db());  // verify fee is a legit asset
+   fee_asset_dd = &fee_asset.dynamic_asset_data_id(db());
+
+   // This breaks the order we normally do things - do read-only evaluate() first,
+   // only when that's ok we do read-write apply(). Problem here is that the fee is
+   // logically paid from the blinded balance, but in fact paid by account_id before
+   // the blinded balance is un-blinded.
+   stored_value transport;
+   db().modify( *fee_asset_dd, [&transport,&fee] ( asset_dynamic_data_object& add ) {
+      transport = add.confidential_supply.split( fee.amount );
+   });
+   db().add_balance( account_id, std::move(transport) );
 
    generic_evaluator::prepare_fee( account_id, fee );
 }
@@ -135,7 +142,6 @@ void transfer_from_blind_evaluator::pay_fee()
 void_result blind_transfer_evaluator::do_evaluate( const blind_transfer_operation& o )
 { try {
    const auto& d = db();
-   o.fee.asset_id(d);  // verify fee is a legit asset 
    const auto& bbi = d.get_index_type<blinded_balance_index>();
    const auto& cidx = bbi.indices().get<by_commitment>();
    for( const auto& out : o.outputs )
@@ -171,10 +177,6 @@ void_result blind_transfer_evaluator::do_apply( const blind_transfer_operation& 
           obj.commitment = out.commitment;
       });
    }
-   const auto& add = o.fee.asset_id(db()).dynamic_asset_data_id(db());  
-   db().modify( add, [this,&o]( asset_dynamic_data_object& obj ){
-      tmp_fee.burn( obj.confidential_supply.split(o.fee.amount) );
-   });
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -183,8 +185,16 @@ void blind_transfer_evaluator::prepare_fee(account_id_type account_id, asset fee
 {
    FC_ASSERT( fee.amount >= 0 );
 
-   tmp_fee = stored_debt(fee.asset_id);                       // account_id borrows the fee temporarily,
-   db().add_balance( account_id, tmp_fee.issue(fee.amount) ); // which is paid back from the blinded balance
+   const auto& fee_asset = fee.asset_id(db());  // also verifies fee is a legit asset
+
+   // This breaks the order we normally do things - do read-only evaluate() first,
+   // only when that's ok we do read-write apply(). Problem here is that the fee is
+   // logically paid from the blinded balance, but in fact paid by account_id.
+   stored_value transport;
+   db().modify( fee_asset.dynamic_asset_data_id(db()), [&transport,&fee] ( asset_dynamic_data_object& add ) {
+      transport = add.confidential_supply.split( fee.amount );
+   });
+   db().add_balance( account_id, std::move(transport) );
 
    generic_evaluator::prepare_fee( account_id, fee );
 }
