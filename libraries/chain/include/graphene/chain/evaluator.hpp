@@ -149,10 +149,11 @@ namespace graphene { namespace chain {
          if( !trx_state->skip_fee_schedule_check )
          {
             share_type required_fee = calculate_fee_for_operation(op);
-            GRAPHENE_ASSERT( core_fee_paid.get_amount() >= required_fee,
+            share_type fee_to_pay = op.fee.asset_id == asset_id_type() ? fee_from_account.get_amount() : fee_from_pool;
+            GRAPHENE_ASSERT( fee_to_pay >= required_fee,
                        insufficient_fee,
                        "Insufficient Fee Paid",
-                       ("core_fee_paid",core_fee_paid.get_amount())("required", required_fee) );
+                       ("core_fee_to_pay",fee_to_pay)("required", required_fee) );
          }
 
          return eval->do_evaluate(op);
