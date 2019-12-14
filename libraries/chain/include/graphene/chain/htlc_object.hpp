@@ -25,6 +25,7 @@
 
 #include <graphene/protocol/htlc.hpp>
 #include <graphene/db/generic_index.hpp>
+#include <graphene/db/undo_database.hpp>
 
 #include <boost/multi_index/composite_key.hpp>
 
@@ -64,6 +65,8 @@ namespace graphene { namespace chain {
          typedef fc::time_point_sec result_type;
          const result_type& operator()(const htlc_master& o)const { return o.conditions.time_lock.expiration; }
       };
+
+      virtual const transfer_info_master& get_transfer_info()const { FC_ASSERT( !"Override in subclass!" ); }
    };
 
    class htlc_object : public htlc_master
@@ -88,6 +91,8 @@ namespace graphene { namespace chain {
          typedef account_id_type result_type;
          const result_type& operator()(const htlc_object& o)const { return o.transfer.to; }
       };
+
+      virtual const transfer_info_master& get_transfer_info()const { return transfer; }
 
    protected:
       virtual unique_ptr<graphene::db::object> backup()const;

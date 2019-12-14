@@ -129,6 +129,7 @@ class htlc_backup : public htlc_master, public graphene::db::backup_object<htlc_
       }
 
       virtual object* recreate() { return graphene::db::backup_object<htlc_object>::recreate(); }
+      virtual const transfer_info_master& get_transfer_info()const { return transfer; }
 };
 
 unique_ptr<object> htlc_object::backup()const
