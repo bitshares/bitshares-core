@@ -147,6 +147,8 @@ BOOST_AUTO_TEST_CASE( merge_test )
 
 BOOST_AUTO_TEST_CASE( direct_index_test )
 { try {
+   db._undo_db.disable();
+
    try {
       const graphene::db::primary_index< account_index, 6 > small_chunkbits( db );
       BOOST_FAIL( "Expected assertion failure!" );
@@ -228,6 +230,8 @@ BOOST_AUTO_TEST_CASE( direct_index_test )
    }), fc::assert_exception );
    // This is actually undefined behaviour. The object has been modified, but
    // but the secondary has not updated its representation
+
+   db._undo_db.enable();
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( required_approval_index_test ) // see https://github.com/bitshares/bitshares-core/issues/1719
