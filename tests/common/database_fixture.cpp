@@ -373,6 +373,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       trx.operations.emplace_back(bop);
       PUSH_TX(db, trx, ~0);
       trx.operations.clear();
+      generate_block();
    }
 
    asset_id_type mpa1_id(1);
