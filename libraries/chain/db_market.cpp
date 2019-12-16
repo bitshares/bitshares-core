@@ -257,6 +257,7 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
       deferred_fee = std::move( loo.deferred_fee );
       deferred_paid_fee = std::move( loo.deferred_paid_fee );
    });
+   const bool have_deferred_fee = deferred_paid_fee.get_amount() != 0;
    if( create_virtual_op )
    {
       vop.order = order.id;
@@ -273,7 +274,7 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
          {
             // handle originally paid fee if any:
             //    to_deduct = round_up( paid_fee * core_cancel_fee / deferred_core_fee_before_deduct )
-            if( deferred_paid_fee.get_amount() == 0 )
+            if( !have_deferred_fee )
             {
                vop.fee = asset( core_cancel_fee_amount );
             }
@@ -317,7 +318,7 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
 
    // refund fee
    // could be virtual op or real op here
-   if( deferred_paid_fee.get_amount() == 0 )
+   if( !have_deferred_fee )
    {
       // be here, order.create_time <= HARDFORK_CORE_604_TIME, or fee paid in CORE, or no fee to refund.
       // if order was created before hard fork 604 then cancelled no matter before or after hard fork 604,
@@ -328,11 +329,14 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
    {
       add_balance( order.seller, std::move(deferred_paid_fee) );
       // be here, must have: fee_asset != CORE
-      if( fee_asset_dyn_data == nullptr )
-         fee_asset_dyn_data = &deferred_paid_fee.get_asset()(*this).dynamic_asset_data_id(*this);
-      modify( *fee_asset_dyn_data, [&deferred_fee](asset_dynamic_data_object& addo) {
-         addo.fee_pool += std::move(deferred_fee);
-      });
+      if( deferred_fee.get_amount() > 0 )
+      {
+         if( fee_asset_dyn_data == nullptr )
+            fee_asset_dyn_data = &deferred_paid_fee.get_asset()(*this).dynamic_asset_data_id(*this);
+         modify( *fee_asset_dyn_data, [&deferred_fee](asset_dynamic_data_object& addo) {
+            addo.fee_pool += std::move(deferred_fee);
+         });
+      }
    }
 
    if( create_virtual_op )
