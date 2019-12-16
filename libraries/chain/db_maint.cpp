@@ -486,8 +486,8 @@ void database::process_budget()
          available_funds = std::move(_core.accumulated_fees);
          share_type required = rec.total_budget
                                - available_funds.get_amount()
-                               - rec.witness_budget
-                               + dpo.witness_budget.get_amount();
+                               + rec.witness_budget
+                               - dpo.witness_budget.get_amount();
          if( required > 0 )
             available_funds += _core.current_supply.issue( required );
       });
