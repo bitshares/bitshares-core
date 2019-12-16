@@ -244,15 +244,13 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
 
    stored_value transport_collateral;
    if( o.delta_collateral.amount > 0 )
-   {
       transport_collateral = d.reduce_balance( o.funding_account, o.delta_collateral  );
 
-      // Adjust the total core in orders accodingly
-      if( o.delta_collateral.asset_id == asset_id_type() )
-         d.modify(_paying_account->statistics(d), [&o](account_statistics_object& stats) {
-            stats.total_core_in_orders += o.delta_collateral.amount;
-         });
-   }
+   // Adjust the total core in orders accodingly
+   if( o.delta_collateral.amount != 0 && o.delta_collateral.asset_id == asset_id_type() )
+      d.modify(_paying_account->statistics(d), [&o](account_statistics_object& stats) {
+         stats.total_core_in_orders += o.delta_collateral.amount;
+      });
 
    const auto next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
    bool before_core_hardfork_1270 = ( next_maint_time <= HARDFORK_CORE_1270_TIME ); // call price caching issue

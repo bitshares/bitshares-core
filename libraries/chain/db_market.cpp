@@ -894,7 +894,7 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
 
    FC_ASSERT( order.debt_type() == receives.get_asset() );
    FC_ASSERT( order.collateral_type() == pays.asset_id );
-   FC_ASSERT( order.collateral.get_amount() >= pays.amount );
+   FC_ASSERT( !transport.valid() || order.collateral.get_amount() >= pays.amount );
 
    // TODO pass in mia and bitasset_data for better performance
    const asset_object& mia = receives.get_asset()(*this);
