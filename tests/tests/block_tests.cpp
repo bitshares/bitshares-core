@@ -871,7 +871,7 @@ BOOST_FIXTURE_TEST_CASE( maintenance_interval, database_fixture )
 {
    try {
       generate_block();
-      BOOST_CHECK_EQUAL(db.head_block_num(), 2u);
+      BOOST_CHECK_EQUAL(db.head_block_num(), 3u);
 
       fc::time_point_sec maintenence_time = db.get_dynamic_global_properties().next_maintenance_time;
       BOOST_CHECK_GT(maintenence_time.sec_since_epoch(), db.head_block_time().sec_since_epoch());
