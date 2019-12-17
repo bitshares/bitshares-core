@@ -732,18 +732,19 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
          pays = settled_amount.multiply_and_round_up( bitasset.settlement_price );
       }
 
-      stored_value transport = d.reduce_balance( op.account, pays );
-      d.modify( mia_dyn, [&transport]( asset_dynamic_data_object& obj ){
-         obj.current_supply.burn( std::move(transport) );
+      stored_value transport_debt = d.reduce_balance( op.account, pays );
+      d.modify( mia_dyn, [&transport_debt]( asset_dynamic_data_object& obj ){
+         obj.current_supply.burn( std::move(transport_debt) );
       });
 
       if( settled_amount.amount > 0 )
       {
-         d.modify( bitasset, [&transport,&settled_amount]( asset_bitasset_data_object& obj ){
-            transport = obj.settlement_fund.split( settled_amount.amount );
+         stored_value transport_collateral;
+         d.modify( bitasset, [&transport_collateral,&settled_amount]( asset_bitasset_data_object& obj ){
+            transport_collateral = obj.settlement_fund.split( settled_amount.amount );
          });
 
-         d.add_balance( op.account, std::move(transport) );
+         d.add_balance( op.account, std::move(transport_collateral) );
       }
 
       return settled_amount;
