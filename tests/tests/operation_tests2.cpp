@@ -1640,6 +1640,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    database db;
    const uint32_t skip_flags = database::skip_undo_history_check;
    fc::temp_directory td( graphene::utilities::temp_directory_path() );
+   genesis_state.initial_balances.clear();
    genesis_state.initial_balances.push_back({generate_private_key("n").get_public_key(), GRAPHENE_SYMBOL, 1});
    genesis_state.initial_balances.push_back({generate_private_key("x").get_public_key(), GRAPHENE_SYMBOL, 1});
    fc::time_point_sec starting_time = genesis_state.initial_timestamp + 3000;

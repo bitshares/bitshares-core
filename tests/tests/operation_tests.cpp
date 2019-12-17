@@ -1783,10 +1783,6 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
 
    const share_type prec = asset::scaled_precision( asset_id_type()(db).precision );
 
-   // there is an immediate maintenance interval in the first block
-   //   which will initialize last_budget_time
-   generate_block();
-
    // Make an account and upgrade it to prime, so that witnesses get some pay
    create_account("nathan", init_account_pub_key);
    transfer(account_id_type()(db), get_account("nathan"), asset(20000*prec));
