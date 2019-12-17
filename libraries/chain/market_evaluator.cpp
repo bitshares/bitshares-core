@@ -308,7 +308,7 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
             transport_debt = call.debt.issue( o.delta_debt.amount );
          else if( o.delta_debt.amount < 0 )
              call.debt.burn( std::move(transport_debt) );
-         if( before_core_hardfork_1270 ) // don't update call_price after core-1270 hard fork
+         if( before_core_hardfork_1270 && call.collateral.get_amount() > 0 ) // don't update call_price after core-1270 hard fork
          {
             call.call_price  =  price::call_price( call.get_debt(), call.get_collateral(),
                                                    _bitasset_data->current_feed.maintenance_collateral_ratio );
