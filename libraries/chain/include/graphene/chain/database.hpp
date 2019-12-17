@@ -528,7 +528,7 @@ namespace graphene { namespace chain {
 
          void initialize_budget_record( fc::time_point_sec now, budget_record& rec )const;
          void process_budget();
-         void pay_workers( stored_value&& budget );
+         void pay_workers( const fc::microseconds passed_time_ms, stored_value& budget );
          void perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props);
          void update_active_witnesses();
          void update_active_committee_members();

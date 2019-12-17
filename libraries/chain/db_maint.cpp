@@ -148,7 +148,7 @@ void database::update_worker_votes()
    }
 }
 
-void database::pay_workers( stored_value&& budget )
+void database::pay_workers( const fc::microseconds passed_time_ms, stored_value& budget )
 {
    const auto head_time = head_block_time();
 //   ilog("Processing payroll! Available budget is ${b}", ("b", budget));
@@ -170,8 +170,6 @@ void database::pay_workers( stored_value&& budget )
       return wa.id < wb.id;
    });
 
-   const auto last_budget_time = get_dynamic_global_properties().last_budget_time;
-   const auto passed_time_ms = head_time - last_budget_time;
    const auto passed_time_count = passed_time_ms.count();
    const auto day_count = fc::days(1).count();
    for( uint32_t i = 0; i < active_workers.size() && budget.get_amount() > 0; ++i )
@@ -492,7 +490,8 @@ void database::process_budget()
             available_funds += _core.current_supply.issue( required );
       });
 
-      modify(dpo, [now,&available_funds,&rec]( dynamic_global_property_object& _dpo )
+     const auto passed_time_ms = now - get_dynamic_global_properties().last_budget_time;
+     modify(dpo, [now,&available_funds,&rec]( dynamic_global_property_object& _dpo )
       {
          _dpo.last_budget_time = now;
          if( _dpo.witness_budget.get_amount() > rec.witness_budget )
@@ -511,7 +510,7 @@ void database::process_budget()
          rec.worker_budget = static_cast<uint64_t>(worker_budget_u128);
 
       stored_value worker_budget = available_funds.split( rec.worker_budget );
-      pay_workers( std::move(worker_budget) );
+      pay_workers( passed_time_ms, worker_budget );
       rec.leftover_worker_funds = worker_budget.get_amount();
       available_funds += std::move( worker_budget );
 
