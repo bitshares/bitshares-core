@@ -390,7 +390,7 @@ class force_settlement_backup
       force_settlement_backup( const force_settlement_object& original )
          : force_settlement_master( original )
       {
-         balance = original.balance.get_amount();
+         balance = original.balance.get_value();
       }
 
       virtual object* recreate() { return graphene::db::backup_object<force_settlement_object>::recreate(); }
