@@ -36,6 +36,7 @@
 
 #include <fc/log/appender.hpp>
 #include <fc/log/logger.hpp>
+#include <fc/thread/fibers.hpp>
 
 #include <boost/filesystem/path.hpp>
 #include <boost/fiber/fiber.hpp>
@@ -218,6 +219,8 @@ BOOST_AUTO_TEST_CASE( two_node_network )
    using namespace graphene::app;
    try {
       BOOST_TEST_MESSAGE( "Creating and initializing app1" );
+
+      fc::initialize_fibers();
 
       fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
 
