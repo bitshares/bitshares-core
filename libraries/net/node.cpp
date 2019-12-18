@@ -293,6 +293,7 @@ namespace graphene { namespace net { namespace detail {
       _maximum_number_of_connections(GRAPHENE_NET_DEFAULT_MAX_CONNECTIONS),
       _peer_connection_retry_timeout(GRAPHENE_NET_DEFAULT_PEER_CONNECTION_RETRY_TIME),
       _peer_inactivity_timeout(GRAPHENE_NET_PEER_HANDSHAKE_INACTIVITY_TIMEOUT),
+      _accept_loop(*this),
       _most_recent_blocks_accepted(_maximum_number_of_connections),
       _total_number_of_unfetched_items(0),
       _rate_limiter(0, 0),
