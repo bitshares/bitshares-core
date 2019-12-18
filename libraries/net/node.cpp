@@ -4007,8 +4007,6 @@ namespace graphene { namespace net { namespace detail {
                                                                                           fc::time_point::now() - fc::seconds(_peer_connection_retry_timeout));
           _potential_peer_db.update_entry(updated_peer_record);
         }
-
-        trigger_p2p_network_connect_loop();
       }
       catch (fc::exception& except)
       {
