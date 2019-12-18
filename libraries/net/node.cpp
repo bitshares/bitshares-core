@@ -3769,7 +3769,7 @@ namespace graphene { namespace net { namespace detail {
           _node->_handshaking_connections.insert( new_peer );
           _node->_rate_limiter.add_tcp_socket( &new_peer->get_socket() );
           std::weak_ptr<peer_connection> new_weak_peer(new_peer);
-          new_peer->accept_or_connect_task_done = fc::async( [this, new_weak_peer]() {
+          fc::async( [this, new_weak_peer]() {
             peer_connection_ptr new_peer(new_weak_peer.lock());
             assert(new_peer);
             if (!new_peer)
@@ -4157,7 +4157,7 @@ namespace graphene { namespace net { namespace detail {
         return;
 
       std::weak_ptr<peer_connection> new_weak_peer(new_peer);
-      new_peer->accept_or_connect_task_done = fc::async([this, new_weak_peer](){
+      fc::async([this, new_weak_peer](){
         peer_connection_ptr new_peer(new_weak_peer.lock());
         assert(new_peer);
         if (!new_peer)
