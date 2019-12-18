@@ -3,7 +3,7 @@
 use Text::Wrap;
 use IO::File;
 
-require 'doxygen/perlmod/DoxyDocs.pm';
+require './doxygen/perlmod/DoxyDocs.pm';
 
 my($outputFileName) = @ARGV;
 die "usage: $0 output_file_name" unless $outputFileName;
