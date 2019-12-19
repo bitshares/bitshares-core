@@ -117,7 +117,7 @@ try {
    // make sure Bob (or anyone) can see the details of the transaction
    graphene::app::database_api db_api(db);
    auto obj = db_api.get_objects( {alice_htlc_id }).front();
-   graphene::chain::htlc_object htlc = obj.template as<graphene::chain::htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS);
+   graphene::app::htlc_api_object htlc = obj.template as<graphene::app::htlc_api_object>(GRAPHENE_MAX_NESTED_OBJECTS);
 
    // someone else attempts to extend it (bob says he's alice, but he's not)
    {
