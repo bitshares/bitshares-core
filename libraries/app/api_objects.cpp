@@ -95,8 +95,15 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::app::account_balance_api_object,
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::app::account_statistics_api_object,
                     (graphene::chain::account_statistics_master),
                     (pending_fees)(pending_vested_fees) );
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::app::asset_bitasset_data_api_object,
+                    (graphene::chain::asset_bitasset_data_master), (settlement_fund) );
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::app::asset_dynamic_data_api_object,
+                    (graphene::chain::asset_dynamic_data_master),
+                    (current_supply)(confidential_supply)(accumulated_fees)(fee_pool) );
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::app::balance_api_object,
                     (graphene::chain::balance_master), (balance) );
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::app::fba_accumulator_api_object,
+                    (graphene::chain::fba_accumulator_master), (accumulated_fba_fees) );
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::app::limit_order_api_object,
                     (graphene::chain::limit_order_master), (for_sale)(deferred_fee)(deferred_paid_fee) );
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::app::call_order_api_object,
@@ -114,7 +121,10 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::app::dynamic_global_property_api_objec
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::app::account_balance_api_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::app::account_statistics_api_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::app::asset_bitasset_data_api_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::app::asset_dynamic_data_api_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::app::balance_api_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::app::fba_accumulator_api_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::app::limit_order_api_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::app::call_order_api_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::app::force_settlement_api_object )

@@ -110,11 +110,56 @@ fc::variants database_api_impl::get_objects( const vector<object_id_type>& ids, 
 
    std::transform(ids.begin(), ids.end(), std::back_inserter(result),
                   [this,to_subscribe](object_id_type id) -> fc::variant {
-      if(auto obj = _db.find_object(id))
+      if(const auto* obj = _db.find_object(id))
       {
          if( to_subscribe && !id.is<operation_history_id_type>() && !id.is<account_transaction_history_id_type>() )
             this->subscribe_to_item( id );
-         return obj->to_variant();
+         variant tmp;
+         switch( id.space_type() )
+         {
+            case account_balance_id_type::space_type():
+               to_variant( account_balance_api_object( *dynamic_cast<const account_balance_object*>(obj) ), tmp, MAX_NESTING );
+               break;
+            case account_statistics_id_type::space_type():
+               to_variant( account_statistics_api_object( *dynamic_cast<const account_statistics_object*>(obj) ), tmp, MAX_NESTING );
+               break;
+            case asset_dynamic_data_id_type::space_type():
+               to_variant( asset_dynamic_data_api_object( *dynamic_cast<const asset_dynamic_data_object*>(obj) ), tmp, MAX_NESTING );
+               break;
+            case asset_bitasset_data_id_type::space_type():
+               to_variant( asset_bitasset_data_api_object( *dynamic_cast<const asset_bitasset_data_object*>(obj) ), tmp, MAX_NESTING );
+               break;
+            case balance_id_type::space_type():
+               to_variant( balance_api_object( *dynamic_cast<const balance_object*>(obj) ), tmp, MAX_NESTING );
+               break;
+            case fba_accumulator_id_type::space_type():
+               to_variant( fba_accumulator_api_object( *dynamic_cast<const fba_accumulator_object*>(obj) ), tmp, MAX_NESTING );
+               break;
+            case dynamic_global_property_id_type::space_type():
+               to_variant( dynamic_global_property_api_object( *dynamic_cast<const dynamic_global_property_object*>(obj) ), tmp, MAX_NESTING );
+               break;
+            case htlc_id_type::space_type():
+               to_variant( htlc_api_object( *dynamic_cast<const htlc_object*>(obj) ), tmp, MAX_NESTING );
+               break;
+            case limit_order_id_type::space_type():
+               to_variant( limit_order_api_object( *dynamic_cast<const limit_order_object*>(obj) ), tmp, MAX_NESTING );
+               break;
+            case call_order_id_type::space_type():
+               to_variant( call_order_api_object( *dynamic_cast<const call_order_object*>(obj) ), tmp, MAX_NESTING );
+               break;
+            case force_settlement_id_type::space_type():
+               to_variant( force_settlement_api_object( *dynamic_cast<const force_settlement_object*>(obj) ), tmp, MAX_NESTING );
+               break;
+            case collateral_bid_id_type::space_type():
+               to_variant( collateral_bid_api_object( *dynamic_cast<const collateral_bid_object*>(obj) ), tmp, MAX_NESTING );
+               break;
+            case vesting_balance_id_type::space_type():
+               to_variant( vesting_balance_api_object( *dynamic_cast<const vesting_balance_object*>(obj) ), tmp, MAX_NESTING );
+               break;
+            default:
+               tmp = obj->to_variant();
+         }
+         return tmp;
       }
       return {};
    });
