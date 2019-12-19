@@ -27,7 +27,8 @@
 
 namespace graphene { namespace chain {
 
-   class balance_master : public abstract_object<balance_master>
+   class balance_object;
+   class balance_master : public abstract_object< balance_master, balance_object >
    {
       public:
          static constexpr uint8_t space_id = protocol_ids;

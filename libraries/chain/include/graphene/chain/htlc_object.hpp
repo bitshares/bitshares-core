@@ -38,7 +38,8 @@ namespace graphene { namespace chain {
     * This object is stored in the database while an HTLC is active. The HTLC will
     * become inactive at expiration or when unlocked via the preimage.
     */
-   class htlc_master : public graphene::db::abstract_object<htlc_master> {
+   class htlc_object;
+   class htlc_master : public graphene::db::abstract_object< htlc_master, htlc_object > {
       public:
          // uniquely identify this object in the database
          static constexpr uint8_t space_id = protocol_ids;

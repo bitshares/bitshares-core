@@ -44,7 +44,9 @@ namespace graphene { namespace chain {
     * separating the account data that changes frequently from the account data that is mostly static, which will
     * minimize the amount of data that must be backed up as part of the undo history everytime a transfer is made.
     */
-   class account_statistics_master : public graphene::db::abstract_object<account_statistics_master>
+   class account_statistics_object;
+   class account_statistics_master
+      : public graphene::db::abstract_object< account_statistics_master, account_statistics_object >
    {
       public:
          static constexpr uint8_t space_id = implementation_ids;
@@ -137,7 +139,8 @@ namespace graphene { namespace chain {
     * This object is indexed on owner and asset_type so that black swan
     * events in asset_type can be processed quickly.
     */
-   class account_balance_master : public abstract_object<account_balance_master>
+   class account_balance_object;
+   class account_balance_master : public abstract_object< account_balance_master, account_balance_object >
    {
       public:
          static constexpr uint8_t space_id = implementation_ids;

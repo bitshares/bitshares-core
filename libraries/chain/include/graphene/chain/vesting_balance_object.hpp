@@ -149,7 +149,8 @@ namespace graphene { namespace chain {
    /**
     * Vesting balance object is a balance that is locked by the blockchain for a period of time.
     */
-   class vesting_balance_master : public abstract_object<vesting_balance_master>
+   class vesting_balance_object;
+   class vesting_balance_master : public abstract_object< vesting_balance_master, vesting_balance_object >
    {
       public:
          static constexpr uint8_t space_id = protocol_ids;

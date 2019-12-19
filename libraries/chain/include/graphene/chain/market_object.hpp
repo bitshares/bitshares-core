@@ -42,7 +42,8 @@ using namespace graphene::db;
  *
  *  This limit_order_objects are indexed by @ref expiration and is automatically deleted on the first block after expiration.
  */
-class limit_order_master : public abstract_object<limit_order_master>
+class limit_order_object;
+class limit_order_master : public abstract_object< limit_order_master, limit_order_object >
 {
    public:
       static constexpr uint8_t space_id = protocol_ids;
@@ -119,7 +120,8 @@ typedef generic_index<limit_order_object, limit_order_multi_index_type> limit_or
  * There should only be one call_order_object per asset pair per account and
  * they will all have the same call price.
  */
-class call_order_master : public abstract_object<call_order_master>
+class call_order_object;
+class call_order_master : public abstract_object< call_order_master, call_order_object >
 {
    public:
       static constexpr uint8_t space_id = protocol_ids;
@@ -178,7 +180,8 @@ class call_order_object : public call_order_master
  *  On the @ref settlement_date the @ref balance will be converted to the collateral asset
  *  and paid to @ref owner and then this object will be deleted.
  */
-class force_settlement_master : public abstract_object<force_settlement_master>
+class force_settlement_object;
+class force_settlement_master : public abstract_object< force_settlement_master, force_settlement_object >
 {
    public:
       static constexpr uint8_t space_id = protocol_ids;
@@ -208,7 +211,8 @@ class force_settlement_object : public force_settlement_master
  * There should only be one collateral_bid_object per asset per account, and
  * only for smartcoin assets that have a global settlement_price.
  */
-class collateral_bid_master : public abstract_object<collateral_bid_master>
+class collateral_bid_object;
+class collateral_bid_master : public abstract_object< collateral_bid_master, collateral_bid_object >
 {
    public:
       static constexpr uint8_t space_id = implementation_ids;

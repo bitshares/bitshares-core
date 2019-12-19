@@ -260,24 +260,10 @@ string asset_object::amount_to_string(share_type amount) const
 
 } } // graphene::chain
 
-FC_REFLECT_DERIVED( graphene::chain::asset_dynamic_data_master, (graphene::db::object), )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_dynamic_data_object,
                     (graphene::chain::asset_dynamic_data_master),
                     (current_supply)(accumulated_fees)(fee_pool)(confidential_supply) )
 
-FC_REFLECT_DERIVED( graphene::chain::asset_bitasset_data_master, (graphene::db::object),
-                    (asset_id)
-                    (feeds)
-                    (current_feed)
-                    (current_feed_publication_time)
-                    (current_maintenance_collateralization)
-                    (options)
-                    (force_settled_volume)
-                    (is_prediction_market)
-                    (settlement_price)
-                    (asset_cer_updated)
-                    (feed_cer_updated)
-                  )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_bitasset_data_object,
                     (graphene::chain::asset_bitasset_data_master),
                     (settlement_fund)

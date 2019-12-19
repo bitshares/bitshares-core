@@ -134,8 +134,6 @@ void fba_accumulator_object::clear()
 
 } }
 
-FC_REFLECT_DERIVED( graphene::chain::fba_accumulator_master, (graphene::db::object),
-                                (designated_asset) )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::fba_accumulator_object, (graphene::chain::fba_accumulator_master),
                                 (accumulated_fba_fees) )
 

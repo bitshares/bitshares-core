@@ -92,7 +92,7 @@ namespace graphene { namespace db {
     *
     *  http://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
     */
-   template<typename DerivedClass>
+   template<typename DerivedClass, typename ObjectSubClass = DerivedClass>
    class abstract_object : public object
    {
       protected:
@@ -109,8 +109,8 @@ namespace graphene { namespace db {
 
          virtual object* recreate() { return this; }
       public:
-         virtual variant to_variant()const { return variant( static_cast<const DerivedClass&>(*this), MAX_NESTING ); }
-         virtual vector<char> pack()const  { return fc::raw::pack( static_cast<const DerivedClass&>(*this) ); }
+         virtual variant to_variant()const { return variant( static_cast<const ObjectSubClass&>(*this), MAX_NESTING ); }
+         virtual vector<char> pack()const  { return fc::raw::pack( static_cast<const ObjectSubClass&>(*this) ); }
    };
 
    typedef flat_map<uint8_t, object_id_type> annotation_map;

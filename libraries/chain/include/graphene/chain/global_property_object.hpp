@@ -62,7 +62,9 @@ namespace graphene { namespace chain {
     * This is an implementation detail. The values here are calculated during normal chain operations and reflect the
     * current values of global blockchain properties.
     */
-   class dynamic_global_property_master : public abstract_object<dynamic_global_property_master>
+   class dynamic_global_property_object;
+   class dynamic_global_property_master
+      : public abstract_object< dynamic_global_property_master, dynamic_global_property_object >
    {
       public:
          static constexpr uint8_t space_id = implementation_ids;

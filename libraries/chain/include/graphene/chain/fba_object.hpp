@@ -34,8 +34,9 @@ class database;
 /**
  * fba_accumulator_object accumulates fees to be paid out via buyback or other FBA mechanism.
  */
-
-class fba_accumulator_master : public graphene::db::abstract_object< fba_accumulator_master >
+class fba_accumulator_object;
+class fba_accumulator_master
+   : public graphene::db::abstract_object< fba_accumulator_master, fba_accumulator_object >
 {
    public:
       static constexpr uint8_t space_id = implementation_ids;
@@ -64,6 +65,7 @@ class fba_accumulator_object : public fba_accumulator_master
 
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::fba_accumulator_object)
 
+FC_REFLECT_DERIVED( graphene::chain::fba_accumulator_master, (graphene::db::object), (designated_asset) )
 FC_REFLECT_TYPENAME( graphene::chain::fba_accumulator_object )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::fba_accumulator_master )

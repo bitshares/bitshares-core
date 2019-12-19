@@ -56,7 +56,9 @@ namespace graphene { namespace chain {
     *  This object exists as an implementation detail and its ID should never be referenced by
     *  a blockchain operation.
     */
-   class asset_dynamic_data_master : public abstract_object<asset_dynamic_data_master>
+   class asset_dynamic_data_object;
+   class asset_dynamic_data_master
+      : public abstract_object< asset_dynamic_data_master, asset_dynamic_data_object >
    {
       public:
          static constexpr uint8_t space_id = implementation_ids;
@@ -182,7 +184,8 @@ namespace graphene { namespace chain {
     *  @ingroup object
     *  @ingroup implementation
     */
-   class asset_bitasset_data_master : public abstract_object<asset_bitasset_data_master>
+   class asset_bitasset_data_master
+      : public abstract_object< asset_bitasset_data_master, asset_bitasset_data_object >
    {
       public:
          static constexpr uint8_t space_id = implementation_ids;
@@ -356,6 +359,21 @@ FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (bitasset_data_id)
                     (buyback_account)
                   )
+
+FC_REFLECT_DERIVED( graphene::chain::asset_bitasset_data_master, (graphene::db::object),
+                    (asset_id)
+                    (feeds)
+                    (current_feed)
+                    (current_feed_publication_time)
+                    (current_maintenance_collateralization)
+                    (options)
+                    (force_settled_volume)
+                    (is_prediction_market)
+                    (settlement_price)
+                    (asset_cer_updated)
+                    (feed_cer_updated)
+                  )
+FC_REFLECT_DERIVED( graphene::chain::asset_dynamic_data_master, (graphene::db::object), )
 
 FC_REFLECT_TYPENAME( graphene::chain::asset_bitasset_data_object )
 FC_REFLECT_TYPENAME( graphene::chain::asset_dynamic_data_object )
