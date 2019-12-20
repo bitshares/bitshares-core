@@ -166,9 +166,9 @@ namespace graphene { namespace wallet { namespace detail {
       auto obj = _remote_db->get_objects( { id }, {}).front();
       if ( !obj.is_null() )
       {
-         return fc::optional<htlc_object>(obj.template as<htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS));
+         return fc::optional<htlc_api_object>(obj.template as<htlc_api_object>(GRAPHENE_MAX_NESTED_OBJECTS));
       }
-      return fc::optional<htlc_object>();
+      return fc::optional<htlc_api_object>();
    }
 
    signed_transaction wallet_api_impl::sell_asset(string seller_account, string amount_to_sell,
