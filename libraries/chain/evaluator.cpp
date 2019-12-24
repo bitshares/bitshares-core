@@ -65,7 +65,20 @@ database& generic_evaluator::db()const { return trx_state->db(); }
             ( "acct", fee_paying_account->id)("name", fee_paying_account->name)("a", fee_asset->id)
             ("sym", fee_asset->symbol) );
 
-      fee_from_account = db().reduce_balance( account_id, fee );
+      if( db().get_balance( account_id, fee.asset_id ).amount < fee.amount )
+      {
+         borrowed_fee = fee;
+         if( !fee_asset_dyn_data )
+            fee_asset_dyn_data = &fee_asset->dynamic_asset_data_id(d);
+         db().modify( *fee_asset_dyn_data, [this] ( asset_dynamic_data_object& add ) {
+            fee_from_account = add.borrowed_fees.issue( borrowed_fee.amount );
+         });
+      }
+      else
+      {
+         fee_from_account = db().reduce_balance( account_id, fee );
+         borrowed_fee = asset(0);
+      }
       if( fee.asset_id == asset_id_type() )
          fee_from_pool = 0;
       else
@@ -114,6 +127,17 @@ database& generic_evaluator::db()const { return trx_state->db(); }
       {
          _fba.accumulated_fba_fees += std::move(core_fee_paid);
       } );
+   }
+
+   void generic_evaluator::pay_back_borrowed_fee()
+   {
+      if( borrowed_fee.amount > 0 )
+      {
+         stored_value transport = db().reduce_balance( fee_paying_account->id, borrowed_fee );
+         db().modify( *fee_asset_dyn_data, [&transport] ( asset_dynamic_data_object& add ) {
+            add.borrowed_fees.burn( std::move(transport) );
+         });
+      }
    }
 
    share_type generic_evaluator::calculate_fee_for_operation(const operation& op) const

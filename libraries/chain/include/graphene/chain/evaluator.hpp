@@ -101,6 +101,8 @@ namespace graphene { namespace chain {
        */
       void pay_fba_fee( uint64_t fba_id );
 
+      void pay_back_borrowed_fee();
+
       // the next two functions are helpers that allow template functions declared in this 
       // header to call db() without including database.hpp, which would
       // cause a circular dependency
@@ -113,6 +115,7 @@ namespace graphene { namespace chain {
       const account_statistics_object* fee_paying_account_statistics = nullptr;
       const asset_object*              fee_asset          = nullptr;
       const asset_dynamic_data_object* fee_asset_dyn_data = nullptr;
+      asset                            borrowed_fee;
       transaction_evaluation_state*    trx_state;
    };
 
@@ -167,7 +170,11 @@ namespace graphene { namespace chain {
          convert_fee();
          pay_fee();
 
-         return eval->do_apply(op);
+         operation_result res = eval->do_apply(op);
+
+         pay_back_borrowed_fee();
+
+         return res;
       }
    };
 } }

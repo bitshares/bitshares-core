@@ -47,11 +47,6 @@ class transfer_from_blind_evaluator : public evaluator<transfer_from_blind_evalu
       void_result do_apply( const transfer_from_blind_operation& o ) ;
 
       virtual void pay_fee() override;
-
-   protected:
-      virtual void prepare_fee(account_id_type account_id, asset fee) override;
-
-      const asset_dynamic_data_object* fee_asset_dd;
 };
 
 class blind_transfer_evaluator : public evaluator<blind_transfer_evaluator>
@@ -63,9 +58,6 @@ class blind_transfer_evaluator : public evaluator<blind_transfer_evaluator>
       void_result do_apply( const blind_transfer_operation& o ) ;
 
       virtual void pay_fee() override;
-
-   protected:
-      virtual void prepare_fee(account_id_type account_id, asset fee) override;
 };
 
 } } // namespace graphene::chain

@@ -73,6 +73,7 @@ namespace graphene { namespace chain {
          stored_value accumulated_fees; ///< fees accumulate to be paid out over time
          stored_value fee_pool;         ///< in core asset
          stored_value confidential_supply; ///< total asset held in confidential balances
+         stored_debt borrowed_fees;
 
    protected:
       virtual unique_ptr<graphene::db::object> backup()const;

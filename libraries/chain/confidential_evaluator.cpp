@@ -89,6 +89,9 @@ void_result transfer_from_blind_evaluator::do_evaluate( const transfer_from_blin
       FC_ASSERT( itr->asset_id == o.fee.asset_id );
       FC_ASSERT( itr->owner == in.owner );
    }
+   if( !fee_asset_dyn_data )
+      fee_asset_dyn_data = &fee_asset->dynamic_asset_data_id(d);
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
@@ -103,33 +106,14 @@ void_result transfer_from_blind_evaluator::do_apply( const transfer_from_blind_o
       db().remove( *itr );
    }
    stored_value transport;
-   db().modify( *fee_asset_dd, [&o,&transport]( asset_dynamic_data_object& obj ){
-      transport = obj.confidential_supply.split( o.amount.amount );
+   db().modify( *fee_asset_dyn_data, [&o,&transport]( asset_dynamic_data_object& obj ){
+      transport = obj.confidential_supply.split( o.amount.amount + o.fee.amount );
    });
+   db().add_balance( o.fee_payer(), transport.split(o.fee.amount) );
    db().add_balance( o.to, std::move(transport) );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
-
-void transfer_from_blind_evaluator::prepare_fee(account_id_type account_id, asset fee)
-{
-   FC_ASSERT( fee.amount >= 0 );
-
-   const auto& fee_asset = fee.asset_id(db());  // verify fee is a legit asset
-   fee_asset_dd = &fee_asset.dynamic_asset_data_id(db());
-
-   // This breaks the order we normally do things - do read-only evaluate() first,
-   // only when that's ok we do read-write apply(). Problem here is that the fee is
-   // logically paid from the blinded balance, but in fact paid by account_id before
-   // the blinded balance is un-blinded.
-   stored_value transport;
-   db().modify( *fee_asset_dd, [&transport,&fee] ( asset_dynamic_data_object& add ) {
-      transport = add.confidential_supply.split( fee.amount );
-   });
-   db().add_balance( account_id, std::move(transport) );
-
-   generic_evaluator::prepare_fee( account_id, fee );
-}
 
 void transfer_from_blind_evaluator::pay_fee()
 {
@@ -177,27 +161,13 @@ void_result blind_transfer_evaluator::do_apply( const blind_transfer_operation& 
           obj.commitment = out.commitment;
       });
    }
-
+   stored_value transport;
+   db().modify( *fee_asset_dyn_data, [&o,&transport]( asset_dynamic_data_object& obj ){
+      transport = obj.confidential_supply.split( o.fee.amount );
+   });
+   db().add_balance( o.fee_payer(), std::move(transport) );
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
-
-void blind_transfer_evaluator::prepare_fee(account_id_type account_id, asset fee)
-{
-   FC_ASSERT( fee.amount >= 0 );
-
-   const auto& fee_asset = fee.asset_id(db());  // also verifies fee is a legit asset
-
-   // This breaks the order we normally do things - do read-only evaluate() first,
-   // only when that's ok we do read-write apply(). Problem here is that the fee is
-   // logically paid from the blinded balance, but in fact paid by account_id.
-   stored_value transport;
-   db().modify( fee_asset.dynamic_asset_data_id(db()), [&transport,&fee] ( asset_dynamic_data_object& add ) {
-      transport = add.confidential_supply.split( fee.amount );
-   });
-   db().add_balance( account_id, std::move(transport) );
-
-   generic_evaluator::prepare_fee( account_id, fee );
-}
 
 void blind_transfer_evaluator::pay_fee()
 {

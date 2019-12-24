@@ -119,6 +119,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
          a.accumulated_fees = stored_value(next_asset_id);
          a.fee_pool = std::move(for_pool);
          a.confidential_supply = stored_value(next_asset_id);
+         a.borrowed_fees = stored_debt(next_asset_id);
       });
 
    asset_bitasset_data_id_type bit_asset_id;
