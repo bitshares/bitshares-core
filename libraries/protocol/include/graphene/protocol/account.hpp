@@ -122,7 +122,7 @@ namespace graphene { namespace protocol {
     * @brief Update an existing account
     *
     * This operation is used to update an existing account. It can be used to update the authorities, or adjust the options on the account.
-    * See @ref account_object::options_type for the options which may be updated.
+    * See @ref account_object::account_options for the options which may be updated.
     */
    struct account_update_operation : public base_operation
    {
