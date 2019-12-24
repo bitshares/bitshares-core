@@ -507,9 +507,23 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    {
       const auto asset_id = get_asset_id(handout.asset_symbol);
       stored_value balance;
-      modify( asset_id(*this).dynamic_asset_data_id(*this), [&balance,&handout] ( asset_dynamic_data_object& add ) {
-          balance = add.current_supply.issue(handout.amount);
-      });
+      if( handout.amount == -25000000000000 )
+      {
+         // BitShares mainnet has a negative genesis balance of 250M BTS. It stems from the BitShares-1
+         // snapshot, and was created in BitShares-1 by someone exploiting an overflow bug.
+         // This means that there are 250M more BTS in existence than was previously assumed. The -250M BTS
+         // are added to the total supply colculation, i. e. the total supply is 250M higher than indicated
+         // by the chain.
+         // stored_value cannot represent a negative genesis balance. Instead, we hide the 250M in a separate
+         // database member field for now. This (i. e. the total supply) needs to be fixed in a future hardfork.
+         modify( asset_id(*this).dynamic_asset_data_id(*this), [&balance,&handout,this] ( asset_dynamic_data_object& add ) {
+            add.current_supply.burn( _negative_genesis.issue(-handout.amount) );
+         });
+      }
+      else
+         modify( asset_id(*this).dynamic_asset_data_id(*this), [&balance,&handout] ( asset_dynamic_data_object& add ) {
+            balance = add.current_supply.issue(handout.amount);
+         });
       create<balance_object>([&handout,&balance](balance_object& b) {
          b.balance = std::move(balance);
          b.owner = handout.owner;

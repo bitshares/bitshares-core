@@ -572,6 +572,7 @@ namespace graphene { namespace chain {
          vector<uint64_t>                  _witness_count_histogram_buffer;
          vector<uint64_t>                  _committee_count_histogram_buffer;
          uint64_t                          _total_voting_stake;
+         stored_debt                       _negative_genesis; // see explanation in init_genesis
 
          flat_map<uint32_t,block_id_type>  _checkpoints;
 
