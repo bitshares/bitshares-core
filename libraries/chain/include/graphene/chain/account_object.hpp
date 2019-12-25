@@ -194,7 +194,6 @@ namespace graphene { namespace chain {
          /// operations the account may perform.
          authority active;
 
-         typedef account_options  options_type;
          account_options options;
 
          /// The reference implementation records the account's statistics in a separate object. This field contains the
