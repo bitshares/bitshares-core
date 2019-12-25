@@ -109,7 +109,7 @@ void_result transfer_from_blind_evaluator::do_apply( const transfer_from_blind_o
    db().modify( *fee_asset_dyn_data, [&o,&transport]( asset_dynamic_data_object& obj ){
       transport = obj.confidential_supply.split( o.amount.amount + o.fee.amount );
    });
-   db().add_balance( o.fee_payer(), transport.split(o.fee.amount) );
+   borrowed_fee.burn( transport.split(o.fee.amount) );
    db().add_balance( o.to, std::move(transport) );
 
    return void_result();
@@ -161,11 +161,11 @@ void_result blind_transfer_evaluator::do_apply( const blind_transfer_operation& 
           obj.commitment = out.commitment;
       });
    }
-   stored_value transport;
-   db().modify( *fee_asset_dyn_data, [&o,&transport]( asset_dynamic_data_object& obj ){
-      transport = obj.confidential_supply.split( o.fee.amount );
+   if( !fee_asset_dyn_data )
+      fee_asset_dyn_data = &fee_asset->dynamic_asset_data_id(db());
+   db().modify( *fee_asset_dyn_data, [&o,this]( asset_dynamic_data_object& obj ){
+      borrowed_fee.burn( obj.confidential_supply.split( o.fee.amount ) );
    });
-   db().add_balance( o.fee_payer(), std::move(transport) );
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
