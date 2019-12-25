@@ -298,6 +298,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    const asset_dynamic_data_object& dyn_asset =
       create<asset_dynamic_data_object>([](asset_dynamic_data_object& a) {
          a.current_supply = stored_debt( asset_id_type() );
+         a.borrowed_fees = stored_debt( a.current_supply.get_asset() );
       });
    const asset_object& core_asset =
      create<asset_object>( [&genesis_state,&dyn_asset]( asset_object& a ) {
@@ -328,6 +329,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          create<asset_dynamic_data_object>([id](asset_dynamic_data_object& a) {
             a.current_supply = stored_debt( asset_id_type(id) );
             a.accumulated_fees = stored_value( asset_id_type(id) );
+            a.borrowed_fees = stored_debt( a.current_supply.get_asset() );
          });
       const asset_object& asset_obj = create<asset_object>( [id,&dyn_asset]( asset_object& a ) {
          a.symbol = "SPECIAL" + std::to_string( id );
@@ -482,6 +484,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       dynamic_data_id = create<asset_dynamic_data_object>([&asset,new_asset_id](asset_dynamic_data_object& d) {
          d.current_supply = stored_debt( new_asset_id );
          d.accumulated_fees = d.current_supply.issue( asset.accumulated_fees );
+         d.borrowed_fees = stored_debt( d.current_supply.get_asset() );
       }).id;
 
       total_supplies[ new_asset_id ] += asset.accumulated_fees;
