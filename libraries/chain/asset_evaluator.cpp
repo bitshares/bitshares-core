@@ -98,6 +98,7 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
 void asset_create_evaluator::pay_fee()
 {
+   fee_is_odd = core_fee_paid.get_amount().value & 1;
    for_pool = core_fee_paid.split( core_fee_paid.get_amount().value/2 );
    generic_evaluator::pay_fee();
 }
@@ -108,7 +109,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
 
    const auto next_asset_id = d.get_index_type<asset_index>().get_next_id();
 
-   if( (core_fee_paid.get_amount().value & 1) && d.head_block_time() <= HARDFORK_CORE_429_TIME )
+   if( fee_is_odd && d.head_block_time() <= HARDFORK_CORE_429_TIME )
       d.modify( d.get_core_dynamic_data(), [this]( asset_dynamic_data_object& dd ) {
          for_pool += dd.current_supply.issue(1);
       });
