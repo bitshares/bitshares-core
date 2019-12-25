@@ -115,7 +115,7 @@ namespace graphene { namespace chain {
       const account_statistics_object* fee_paying_account_statistics = nullptr;
       const asset_object*              fee_asset          = nullptr;
       const asset_dynamic_data_object* fee_asset_dyn_data = nullptr;
-      asset                            borrowed_fee;
+      asset                            borrowed_fee = asset(0);
       transaction_evaluation_state*    trx_state;
    };
 

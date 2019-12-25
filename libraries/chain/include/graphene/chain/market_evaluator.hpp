@@ -44,6 +44,8 @@ namespace graphene { namespace chain {
 
          asset calculate_market_fee( const asset_object* aobj, const asset& trade_amount );
 
+         virtual void prepare_fee(account_id_type account_id, asset fee) override;
+
          /** override the default behavior defined by generic_evalautor
           */
          virtual void convert_fee() override;

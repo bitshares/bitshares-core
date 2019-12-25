@@ -56,7 +56,7 @@ database& generic_evaluator::db()const { return trx_state->db(); }
       fee_paying_account_statistics = &fee_paying_account->statistics(d);
 
       fee_asset = &fee.asset_id(d);
-      if( fee_asset->get_id() != asset_id_type() )
+      if( !fee_asset_dyn_data && fee_asset->get_id() != asset_id_type() )
          fee_asset_dyn_data = &fee_asset->dynamic_asset_data_id(d);
 
       FC_ASSERT( is_authorized_asset( d, *fee_paying_account, *fee_asset ), 
@@ -75,10 +75,7 @@ database& generic_evaluator::db()const { return trx_state->db(); }
          });
       }
       else
-      {
          fee_from_account = db().reduce_balance( account_id, fee );
-         borrowed_fee = asset(0);
-      }
       if( fee.asset_id == asset_id_type() )
          fee_from_pool = 0;
       else

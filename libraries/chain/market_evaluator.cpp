@@ -76,6 +76,18 @@ void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_o
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
+void limit_order_create_evaluator::prepare_fee(account_id_type account_id, asset fee)
+{
+   borrowed_fee = fee;
+   fee_asset_dyn_data = &fee.asset_id(db()).dynamic_asset_data_id(db());
+   stored_value transport;
+   db().modify( *fee_asset_dyn_data, [this,&transport] ( asset_dynamic_data_object& add ) {
+      transport = add.borrowed_fees.issue( borrowed_fee.amount );
+   });
+   db().add_balance( account_id, std::move(transport) );
+   generic_evaluator::prepare_fee( account_id, fee );
+}
+
 void limit_order_create_evaluator::convert_fee()
 {
    if( db().head_block_time() <= HARDFORK_CORE_604_TIME || fee_asset->get_id() == asset_id_type() )
