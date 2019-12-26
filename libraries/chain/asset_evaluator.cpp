@@ -420,6 +420,8 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    {
       FC_ASSERT( asset_obj.dynamic_asset_data_id(d).current_supply.get_amount() == 0,
                  "Cannot update a bitasset if there is already a current supply." );
+      FC_ASSERT( current_bitasset_data.settlement_fund.get_amount() == 0,
+                 "Settlement fund is non-empty but debt is 0?!" );
 
       const asset_object& new_backing_asset = op.new_options.short_backing_asset(d); // check if the asset exists
 
@@ -503,7 +505,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
  * @param asset_to_update the asset_object related to this bitasset_data_object
  * @returns true if the feed price is changed, and after hf core-868-890
  */
-static bool update_bitasset_object_options(
+bool update_bitasset_object_options(
       const asset_update_bitasset_operation& op, database& db,
       asset_bitasset_data_object& bdo, const asset_object& asset_to_update )
 {
@@ -523,21 +525,23 @@ static bool update_bitasset_object_options(
    }
 
    // feeds must be reset if the backing asset is changed after hardfork core-868-890
-   bool backing_asset_changed = false;
+   bool backing_asset_changed = op.new_options.short_backing_asset != bdo.options.short_backing_asset;
    bool is_witness_or_committee_fed = false;
-   if( after_hf_core_868_890
-         && op.new_options.short_backing_asset != bdo.options.short_backing_asset )
+   if( backing_asset_changed )
    {
-      backing_asset_changed = true;
-      should_update_feeds = true;
-      if( asset_to_update.options.flags & ( witness_fed_asset | committee_fed_asset ) )
-         is_witness_or_committee_fed = true;
+      bdo.settlement_fund.restore( asset(0, op.new_options.short_backing_asset) ); // not nice
+      if( after_hf_core_868_890 )
+      {
+         should_update_feeds = true;
+         if( asset_to_update.options.flags & ( witness_fed_asset | committee_fed_asset ) )
+            is_witness_or_committee_fed = true;
+      }
    }
 
    bdo.options = op.new_options;
 
    // are we modifying the underlying? If so, reset the feeds
-   if( backing_asset_changed )
+   if( after_hf_core_868_890 && backing_asset_changed )
    {
       if( is_witness_or_committee_fed )
       {

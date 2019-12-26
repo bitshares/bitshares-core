@@ -25,7 +25,14 @@
 
 #include <graphene/protocol/asset.hpp>
 
-namespace graphene { namespace chain {
+namespace graphene {
+namespace protocol {
+   class asset_update_bitasset_operation;
+} // protocol
+namespace chain {
+   class asset_object;
+   class asset_bitasset_data_object;
+   class database;
    class stored_value;
 
    class stored_debt
@@ -77,6 +84,8 @@ namespace graphene { namespace chain {
       friend class force_settlement_object;
       friend class collateral_bid_object;
       friend class vesting_balance_object;
+      friend bool update_bitasset_object_options( const protocol::asset_update_bitasset_operation&, database&,
+                                                  asset_bitasset_data_object&, const asset_object& );
    };
 
    class stored_value : public stored_debt

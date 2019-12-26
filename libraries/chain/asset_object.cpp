@@ -262,7 +262,7 @@ string asset_object::amount_to_string(share_type amount) const
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_dynamic_data_object,
                     (graphene::chain::asset_dynamic_data_master),
-                    (current_supply)(accumulated_fees)(fee_pool)(confidential_supply)(borrowed_fees) )
+                    (current_supply)(accumulated_fees)(fee_pool)(confidential_supply) )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_bitasset_data_object,
                     (graphene::chain::asset_bitasset_data_master),
