@@ -37,7 +37,6 @@ class asset_dynamic_data_backup
       share_type accumulated_fees;
       share_type fee_pool;
       share_type confidential_supply;
-      share_type borrowed_fees;
       friend class asset_dynamic_data_object;
 
    public:
@@ -48,7 +47,6 @@ class asset_dynamic_data_backup
          accumulated_fees = original.accumulated_fees.get_amount();
          fee_pool = original.fee_pool.get_amount();
          confidential_supply = original.confidential_supply.get_amount();
-         borrowed_fees = original.borrowed_fees.get_amount();
       }
 
       virtual object* recreate() { return graphene::db::backup_object<asset_dynamic_data_object>::recreate(); }
@@ -66,7 +64,6 @@ void asset_dynamic_data_object::restore( object& obj )
    accumulated_fees.restore( asset( backup.accumulated_fees, backup.current_supply.asset_id ) );
    fee_pool.restore( asset( backup.fee_pool ) );
    confidential_supply.restore( asset( backup.confidential_supply, backup.current_supply.asset_id ) );
-   borrowed_fees.restore( asset( backup.borrowed_fees, current_supply.get_asset() ) );
    static_cast<asset_dynamic_data_master&>(*this) = std::move( backup );
 }
 
