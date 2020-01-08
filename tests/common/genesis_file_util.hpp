@@ -1,10 +1,14 @@
 #pragma once
 
-/////////
-/// @brief forward declaration, using as a hack to generate a genesis.json file
-/// for testing
-/////////
+#include <boost/filesystem.hpp>
+#include <fc/io/json.hpp>
+#include <graphene/chain/genesis_state.hpp>
+
 namespace graphene { namespace app { namespace detail {
+   /////////
+   /// @brief forward declaration, using as a hack to generate a genesis.json file
+   /// for testing
+   /////////
    graphene::chain::genesis_state_type create_example_genesis();
 } } } // graphene::app::detail
 

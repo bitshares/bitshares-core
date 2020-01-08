@@ -23,6 +23,7 @@
  */
 #pragma once
 
+#include <fc/thread/thread.hpp>
 #include <graphene/net/core_messages.hpp>
 #include <graphene/net/message.hpp>
 #include <graphene/net/peer_database.hpp>
@@ -198,8 +199,25 @@ namespace graphene { namespace net {
         void close();
 
         void      set_node_delegate( node_delegate* del );
+        /***
+         * Allows the caller to determine how to respond to requests for peers
+         * @param algo the algorithm to use ("exclude_list", "list", "nothing", "all")
+         * @param advertise_or_exclude_list a list of nodes to 
+         *     advertise (if algo = "list") or exclude (if algo is "exclude")
+         */
+        void set_advertise_algorithm( std::string algo,
+            const fc::optional<std::vector<std::string>>& advertise_or_exclude_list 
+            = fc::optional<std::vector<std::string>>() );
 
         void      load_configuration( const fc::path& configuration_directory );
+        
+        /**
+         * Specifies the network interface and port upon which incoming
+         *  connections should be accepted.
+         * @param ep the endpoint (network interface and port)
+         * @param wait_if_not_available keep retrying if port is not available
+         */
+        void set_listen_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available );
 
         virtual void      listen_to_p2p_network();
         virtual void      connect_to_p2p_network();
@@ -211,21 +229,45 @@ namespace graphene { namespace net {
          */
         void      add_node( const fc::ip::endpoint& ep );
 
+        /*****
+         * @brief add a list of nodes to seed the p2p network
+         * @param seeds a vector of url strings
+         */
+        void add_seed_nodes( std::vector<std::string> seeds );
+
+        /****
+         * @brief add a node to seed the p2p network
+         * @param in the url as a string
+         */
+        void add_seed_node( const std::string& in);
+
         /**
          *  Attempt to connect to the specified endpoint immediately.
          */
         virtual void connect_to_endpoint( const fc::ip::endpoint& ep );
 
         /**
-         *  Specifies the network interface and port upon which incoming
-         *  connections should be accepted.
+         * @brief Helper to convert a string to a collection of endpoints
+         *
+         * This converts a string (i.e. "bitshares.eu:665535" to a collection of endpoints.
+         * NOTE: Throws an exception if not in correct format or was unable to resolve URL.
+         *
+         * @param in the incoming string
+         * @returns a vector of endpoints
          */
-        void      listen_on_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available );
+        static std::vector<fc::ip::endpoint> resolve_string_to_ip_endpoints( const std::string& in );
 
-        /**
-         *  Call with true to enable listening for incoming connections
+         /**
+          * enable/disable listening for incoming connections
+          * @param accept set to true to listen for incoming connections, false otherwise
          */
-        void accept_incoming_connections(bool accept);
+         void set_accept_incoming_connections( bool accept );
+
+         /***
+          * enable/disable connection attempts when new connections are advertised
+          * @param connect true to attempt new connections, false otherwise
+          */
+         void set_connect_to_new_peers( bool connect );
 
         /**
          *  Specifies the port upon which incoming connections should be accepted.
@@ -235,11 +277,11 @@ namespace graphene { namespace net {
          *                               available.  If false and the port is not available,
          *                               just choose a random available port
          */
-        void      listen_on_port(uint16_t port, bool wait_if_not_available);
+        void set_listen_port( uint16_t port, bool wait_if_not_available );
 
         /**
          * Returns the endpoint the node is listening on.  This is usually the same
-         * as the value previously passed in to listen_on_endpoint, unless we
+         * as the value previously passed in to set_listen_endpoint, unless we
          * were unable to bind to that port.
          */
         virtual fc::ip::endpoint get_actual_listening_endpoint() const;
@@ -292,7 +334,7 @@ namespace graphene { namespace net {
 
         void disable_peer_advertising();
         fc::variant_object get_call_statistics() const;
-      private:
+      protected:
         std::unique_ptr<detail::node_impl, detail::node_impl_deleter> my;
    };
 

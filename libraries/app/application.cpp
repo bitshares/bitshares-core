@@ -43,7 +43,6 @@
 #include <fc/io/fstream.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/rpc/websocket_api.hpp>
-#include <fc/network/resolve.hpp>
 #include <fc/crypto/base64.hpp>
 
 #include <boost/filesystem/path.hpp>
@@ -125,41 +124,14 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    if( _options->count("seed-node") )
    {
       auto seeds = _options->at("seed-node").as<vector<string>>();
-      for( const string& endpoint_string : seeds )
-      {
-         try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
-            for (const fc::ip::endpoint& endpoint : endpoints)
-            {
-               ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-               _p2p_network->add_node(endpoint);
-               _p2p_network->connect_to_endpoint(endpoint);
-            }
-         } catch( const fc::exception& e ) {
-            wlog( "caught exception ${e} while adding seed node ${endpoint}",
-                     ("e", e.to_detail_string())("endpoint", endpoint_string) );
-         }
-      }
+      _p2p_network->add_seed_nodes(seeds);
    }
 
    if( _options->count("seed-nodes") )
    {
       auto seeds_str = _options->at("seed-nodes").as<string>();
       auto seeds = fc::json::from_string(seeds_str).as<vector<string>>(2);
-      for( const string& endpoint_string : seeds )
-      {
-         try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
-            for (const fc::ip::endpoint& endpoint : endpoints)
-            {
-               ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-               _p2p_network->add_node(endpoint);
-            }
-         } catch( const fc::exception& e ) {
-            wlog( "caught exception ${e} while adding seed node ${endpoint}",
-                     ("e", e.to_detail_string())("endpoint", endpoint_string) );
-         }
-      }
+      _p2p_network->add_seed_nodes(seeds);
    }
    else
    {
@@ -167,64 +139,48 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       vector<string> seeds = {
          #include "../egenesis/seed-nodes.txt"
       };
-      for( const string& endpoint_string : seeds )
+      _p2p_network->add_seed_nodes(seeds);
+   }
+
+   if ( _options->count( "disable-peer-advertising" ) )
+   {
+      if ( _options->at( "disable-peer-advertisng").as<bool>() )
       {
-         try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
-            for (const fc::ip::endpoint& endpoint : endpoints)
-            {
-               ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-               _p2p_network->add_node(endpoint);
-            }
-         } catch( const fc::exception& e ) {
-            wlog( "caught exception ${e} while adding seed node ${endpoint}",
-                     ("e", e.to_detail_string())("endpoint", endpoint_string) );
-         }
+         _p2p_network->disable_peer_advertising();
+      }
+   } 
+   else
+   {
+      if( _options->count( "advertise-peer-algorithm" ) )
+      {
+         std::string algo = _options->at("advertise-peer-algorithm").as<string>();
+         fc::optional<std::vector<std::string>> list;
+         if ( algo == "list" && _options->count("advertise-peer-list") )
+            list = _options->at("advertise-peer-list").as<std::vector<std::string>>();
+         else if ( algo == "exclude_list" && _options->count("exclude-peer-list") )
+            list = _options->at("exclude-peer-list").as<std::vector<std::string>>();
+         _p2p_network->set_advertise_algorithm( algo, list);
       }
    }
 
    if( _options->count("p2p-endpoint") )
-      _p2p_network->listen_on_endpoint(fc::ip::endpoint::from_string(_options->at("p2p-endpoint").as<string>()), true);
+      _p2p_network->set_listen_endpoint(fc::ip::endpoint::from_string(_options->at("p2p-endpoint").as<string>()), true);
    else
-      _p2p_network->listen_on_port(0, false);
+      _p2p_network->set_listen_port(0, false);
    _p2p_network->listen_to_p2p_network();
    ilog("Configured p2p node to listen on ${ip}", ("ip", _p2p_network->get_actual_listening_endpoint()));
+
+   if ( _options->count("accept-incoming-connections") )
+      _p2p_network->set_accept_incoming_connections( _options->at("accept-incoming-connections").as<bool>() );
+
+   if ( _options->count("connect-to-new-peers") )
+      _p2p_network->set_connect_to_new_peers( _options->at( "connect-to-new-peers" ).as<bool>() );
 
    _p2p_network->connect_to_p2p_network();
    _p2p_network->sync_from(net::item_id(net::core_message_type_enum::block_message_type,
                                         _chain_db->head_block_id()),
                            std::vector<uint32_t>());
 } FC_CAPTURE_AND_RETHROW() }
-
-std::vector<fc::ip::endpoint> application_impl::resolve_string_to_ip_endpoints(const std::string& endpoint_string)
-{
-   try
-   {
-      string::size_type colon_pos = endpoint_string.find(':');
-      if (colon_pos == std::string::npos)
-         FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
-                  ("endpoint_string", endpoint_string));
-      std::string port_string = endpoint_string.substr(colon_pos + 1);
-      try
-      {
-         uint16_t port = boost::lexical_cast<uint16_t>(port_string);
-
-         std::string hostname = endpoint_string.substr(0, colon_pos);
-         std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
-         if (endpoints.empty())
-            FC_THROW_EXCEPTION( fc::unknown_host_exception,
-                                "The host name can not be resolved: ${hostname}",
-                                ("hostname", hostname) );
-         return endpoints;
-      }
-      catch (const boost::bad_lexical_cast&)
-      {
-         FC_THROW("Bad port: ${port}", ("port", port_string));
-      }
-   }
-   FC_CAPTURE_AND_RETHROW((endpoint_string))
-}
-
 
 void application_impl::new_connection( const fc::http::websocket_connection_ptr& c )
 {
@@ -1100,6 +1056,16 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::get_withdraw_permissions_by_giver to set max limit value")
          ("api-limit-get-withdraw-permissions-by-recipient",boost::program_options::value<uint64_t>()->default_value(101),
           "For database_api_impl::get_withdraw_permissions_by_recipient to set max limit value")
+         ("accept-incoming-connections", bpo::value<bool>()->implicit_value(true), "Accept incoming connections")
+         ("connect-to-new-peers", bpo::value<bool>()->implicit_value(true), "Connect to new peers")
+         ("advertise-peer-algorithm", bpo::value<string>()->implicit_value("all"),
+            "Determines which peers are advertised. Algorithms: 'all', 'nothing', 'list', exclude_list'")
+         ("advertise-peer-list", bpo::value<vector<string>>()->composing(), 
+            "P2P nodes to advertise (may specify multiple times")
+         ("exclude-peer-list", bpo::value<vector<string>>()->composing(), 
+            "P2P nodes to not advertise (may specify multiple times")
+         ("disable-peer-advertising", bpo::value<bool>()->implicit_value(false), 
+            "Disable advertising your peers. Note: Overrides any advertise-peer-algorithm settings")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()

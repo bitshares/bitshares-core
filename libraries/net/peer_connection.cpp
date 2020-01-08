@@ -76,7 +76,6 @@ namespace graphene { namespace net
       _message_connection(this),
       _total_queued_messages_size(0),
       direction(peer_connection_direction::unknown),
-      is_firewalled(firewalled_state::unknown),
       our_state(our_connection_state::disconnected),
       they_have_requested_close(false),
       their_state(their_connection_state::disconnected),
