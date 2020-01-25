@@ -2,3 +2,4 @@
 "176.9.148.19:16543",               // Uptick.rocks
 "btstestnet.roelandp.nl:1779",      // Roelandp
 "seed-test.liondani.com:1776",      // liondani
+"bts-testnet-seed1.abit-more.com:1779", // Abit
