@@ -13,14 +13,14 @@ Nathan Hourt <themodprobe@protonmail.com>
 Vikram Rajkumar <vikramrajkumar@users.noreply.github.com>
 Eric Frias <efrias@syncad.com>
 Valera Cogut <info@valeracogut.com>
-cifer <maintianyu@gmail.com>
+Xiaodong Li <mantianyu@gmail.com>
 Fabian Schuh <Fabian@chainsquad.com>
 manikey123 <mansiimohan@gmail.com>
 lubos.ilcik <lubos.ilcik@touch4it.com>
 Matias Romeo <matias.romeo@gmail.com>
 OpenLedger <service.github@openledger.info>
 Sigve Kvalsvik <bitsharesblocks@gmail.com>
-朱礼廷 <zhuliting@gxb.io>
+albert <393259066@qq.com>
 Ryan R. Fox <ryan@ryanrfox.com>
 Valentine Zavgorodnev <i@valzav.com>
 crypto-ape <43807588+crypto-ape@users.noreply.github.com>
@@ -39,11 +39,10 @@ Zapata <marco.tessari@gmail.com>
 btcinshares <btcinshares@protonmail.com>
 Anzhy Cherrnyavski <a.chernyavski@pixelplex.io>
 Tiago Peralta <tperalta82@gmail.com>
-albert <393259066@qq.com>
-root <root@NC-PH-1346-07.web-hosting.com>
 SahkanDesertHawk <panasiuki@gmail.com>
 Scott Howard <showard314@gmail.com>
 Tydus <Tydus@Tydus.org>
+William <tmfc@homtail.com>
 crazybits <crazybits@users.noreply.github.com>
 d.yakovitsky <d.yakovitsky@aetsoft.by>
 iHashFury <iPerky@users.noreply.github.com>
@@ -62,16 +61,13 @@ Karl Semich <0xloem@gmail.com>
 Ken Code <ken@BitShares-Munich.de>
 Krzysztof Szumny <krzysztof.szumny@stxnext.pl>
 Paul Brossier <piem@piem.org>
+Roelandp <dnaleor@gmail.com>
 Thomas Freedman <thom@ozarkholler.com>
 Troglodactyl <troglodactyl@gmail.com>
 VoR0220 <catalanor0220@gmail.com>
 alt <pch957@163.com>
 bangzi1001 <36911788+bangzi1001@users.noreply.github.com>
+bitcube <root@seed.cubeconnex.com>
 lafona <lafona@protonmail.com>
 liondani <liondani@gmx.com>
-lixiaodongcifer <lixiaodongcifer@didichuxing.com>
 lososeg <ya.lososeg@gmail.com>
-roelandp <dnaleor@gmail.com>
-root <root@seed.cubeconnex.com>
-william <jinwei@gmail.com>
-william <tmfc@homtail.com>
