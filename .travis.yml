@@ -1,6 +1,9 @@
 language: c++
 
-cache: ccache
+cache:
+  ccache: true
+  directories:
+  - sonar_cache
 
 git:
   depth: 1
