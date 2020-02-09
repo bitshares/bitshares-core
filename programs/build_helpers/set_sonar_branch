@@ -22,54 +22,54 @@ clear_branch () {
     sed -i '/sonar\.branch/d' "$1"
 }
 
-TARGET=
+ORIGINAL_TARGET="$( grep 'sonar\.branch\.target' "$1" | sed 's=^.*[:=] *==' )"
+
+TARGET="$ORIGINAL_TARGET"
 FETCH=
 
 if [ -n "$TRAVIS_PULL_REQUEST" -a "$TRAVIS_PULL_REQUEST" != false ]; then
     # PRs work per default
     echo "Detected PR '$TRAVIS_PULL_REQUEST'"
-    clear_branch "$1"
     FETCH="$TRAVIS_BRANCH"
 elif [ -n "$TRAVIS_TAG" ]; then
     # Tag build is either master or testnet
     echo "Detected tag '$TRAVIS_TAG'"
-    clear_branch "$1"
     case "$TRAVIS_TAG" in
 	*test*) TARGET=testnet; FETCH=testnet; ;;
-	*)	FETCH=master; ;;
+	*)	TARGET=master;  FETCH=master; ;;
     esac
 else
     case "$TRAVIS_BRANCH" in
-	master|develop|testnet|next_hardfork)
+	master|develop|testnet|hardfork)
 	    # Long-lived branches stand for themselves
 	    echo "Detected long-lived branch '$TRAVIS_BRANCH'"
-	    clear_branch "$1"
+	    TARGET="$TRAVIS_BRANCH"
 	    FETCH="$TRAVIS_BRANCH"
 	    ;;
 	*test*release*)
 	    # Testnet release branch will be merged into testnet
 	    echo "Detected testnet release branch '$TRAVIS_BRANCH'"
-	    clear_branch "$1"
 	    TARGET=testnet
 	    FETCH=testnet
 	    ;;
 	*release*)
 	    # Release branch will be merged into default (master)
 	    echo "Detected release branch '$TRAVIS_BRANCH'"
-	    clear_branch "$1"
+	    TARGET=master
 	    FETCH=master
 	    ;;
 	*)
 	    # All other branches should have sonar.branch.target in their
 	    # sonar.properties, leave it unchanged
 	    echo "Detected normal branch '$TRAVIS_BRANCH'"
-	    FETCH="$( grep 'sonar\.branch\.target' "$1" | sed 's=^.*[:=] *==' )"
+	    FETCH="$TARGET"
     esac
 fi
 
 echo "Branch target '$TARGET', fetch target '$FETCH'"
 
-if [ -n "$TARGET" ]; then
+if [ -n "$TARGET" -a "$TARGET" != "$ORIGINAL_TARGET" ]; then
+    clear_branch "$1"
     echo "sonar.branch.target=$TARGET" >>"$1"
 fi
 #if [ -n "$FETCH" ]; then
