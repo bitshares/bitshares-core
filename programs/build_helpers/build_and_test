@@ -15,7 +15,7 @@ programs/build_helpers/buildstep prepare.sonar.part 1 "cp sonar-project.properti
 programs/build_helpers/buildstep run.sonar.part 1500 "which sonar-scanner && sonar-scanner" || true
 # The second pass, scan all files
 programs/build_helpers/buildstep prepare.sonar.full 1 "cp sonar-project.properties.bak sonar-project.properties"
-programs/build_helpers/buildstep run.sonar.full 1500 "which sonar-scanner && sonar-scanner" || true
+programs/build_helpers/buildstep run.sonar.full 2000 "which sonar-scanner && sonar-scanner" || true
 programs/build_helpers/buildstep end 0
 ccache -s
 
