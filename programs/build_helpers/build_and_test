@@ -11,7 +11,7 @@ programs/build_helpers/buildstep run.chain_test 240 "libraries/fc/tests/run-para
 programs/build_helpers/buildstep run.cli_test 60 "libraries/fc/tests/run-parallel-tests.sh tests/cli_test"
 programs/build_helpers/buildstep prepare.sonar 20 "find libraries/[acdenptuw]*/CMakeFiles/*.dir programs/[cdgjsw]*/CMakeFiles/*.dir -type d -print | while read d; do gcov -o \"\$d\" \"\${d/CMakeFiles*.dir//}\"/*.cpp; done >/dev/null; programs/build_helpers/set_sonar_branch sonar-project.properties"
 du -hs sonar_cache
-# The first pass, skip some files
+# The first pass, skip some files. This will remove the skipped files from the cache, but is an acceptable trade-off
 programs/build_helpers/buildstep prepare.sonar.part 1 "cp sonar-project.properties sonar-project.properties.bak; sed -i '/sonar\.exclusions=/d;s/#sonar\.exclusions.part/sonar.exclusions/' sonar-project.properties"
 programs/build_helpers/buildstep run.sonar.part 1500 "which sonar-scanner && sonar-scanner"
 du -hs sonar_cache
