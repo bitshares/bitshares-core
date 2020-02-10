@@ -10,7 +10,7 @@ file( MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/" )
 
 set( HARDFORK_REGENERATE TRUE )
 
-file( GLOB HARDFORKS "${CMAKE_CURRENT_SOURCE_DIR}/hardfork.d/*" )
+file( GLOB HARDFORKS "${CMAKE_CURRENT_SOURCE_DIR}/hardfork.d/*.hf" )
 foreach( HF ${HARDFORKS} )
   file( READ "${HF}" INCL )
   string( CONCAT HARDFORK_CONTENT ${HARDFORK_CONTENT} ${INCL} )
