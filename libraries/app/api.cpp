@@ -676,7 +676,7 @@ namespace graphene { namespace app {
          max_price = std::max( std::min( max_price, *start ), min_price );
 
       auto itr = limit_groups.lower_bound( limit_order_group_key( group, max_price ) );
-      // use an end itrator to try to avoid expensive price comparison
+      // use an end iterator to try to avoid expensive price comparison
       auto end = limit_groups.upper_bound( limit_order_group_key( group, min_price ) );
       while( itr != end && result.size() < limit )
       {
