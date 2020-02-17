@@ -91,7 +91,7 @@ void custom_operations_plugin_impl::onBlock()
          unpacked.visit(vtor);
       }
       catch (fc::exception& e) { // only api node will know if the unpack, validate or apply fails
-         dlog("Custom operations plugin serializing error: ${ex} in operation: ${op}",
+         wlog("Custom operations plugin serializing error: ${ex} in operation: ${op}",
                ("ex", e.to_detail_string())("op", fc::json::to_string(custom_op)));
          continue;
       }
