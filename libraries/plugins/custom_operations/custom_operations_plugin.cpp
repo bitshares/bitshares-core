@@ -40,7 +40,7 @@ class custom_operations_plugin_impl
       {  }
       virtual ~custom_operations_plugin_impl();
 
-      void onBlock( const signed_block& b );
+      void onBlock();
 
       graphene::chain::database& database()
       {
@@ -48,6 +48,8 @@ class custom_operations_plugin_impl
       }
 
       custom_operations_plugin& _self;
+
+      uint32_t _after_block = 1;
 
    private:
 
@@ -69,7 +71,7 @@ struct custom_op_visitor
    }
 };
 
-void custom_operations_plugin_impl::onBlock( const signed_block& b )
+void custom_operations_plugin_impl::onBlock()
 {
    graphene::chain::database& db = database();
    const vector<optional< operation_history_object > >& hist = db.get_applied_operations();
@@ -126,14 +128,25 @@ void custom_operations_plugin::plugin_set_program_options(
    boost::program_options::options_description& cfg
    )
 {
+   cli.add_options()
+         ("custom-operations-start-after-block", boost::program_options::value<uint32_t>(),
+          "Start processing custom operations transactions with the plugin only after this block(1)")
+         ;
+   cfg.add(cli);
+
 }
 
 void custom_operations_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
    database().add_index< primary_index< account_storage_index  > >();
 
+   if (options.count("custom-operations-start-after-block")) {
+      my->_after_block = options["elasticsearch-bulk-replay"].as<uint32_t>();
+   }
+
    database().applied_block.connect( [this]( const signed_block& b) {
-      my->onBlock(b);
+      if( b.block_num() >= my->_after_block )
+         my->onBlock();
    } );
 }
 
