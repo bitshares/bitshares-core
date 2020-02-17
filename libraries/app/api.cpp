@@ -697,11 +697,9 @@ namespace graphene { namespace app {
       vector<account_storage_object> results;
       const auto& storage_index = _app.chain_database()->get_index_type<account_storage_index>();
       const auto& by_account_catalog_idx = storage_index.indices().get<by_account_catalog>();
-      auto itr = by_account_catalog_idx.lower_bound(make_tuple(account_id, catalog));
-      while(itr != by_account_catalog_idx.end() && itr->account == account_id && itr->catalog == catalog) {
-         results.push_back(*itr);
-         ++itr;
-      }
+      auto range = by_account_catalog_idx.equal_range(make_tuple(account_id, catalog));
+      for( const account_storage_object& aso : boost::make_iterator_range( range.first, range.second ) )
+         results.push_back(aso);
       return results;
    }
 
