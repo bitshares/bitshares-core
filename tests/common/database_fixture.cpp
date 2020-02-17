@@ -344,6 +344,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       current_test_name == "custom_operations_account_storage_list_test") {
       auto custom_operations_plugin = app.register_plugin<graphene::custom_operations::custom_operations_plugin>();
       custom_operations_plugin->plugin_set_app(&app);
+      options.insert(std::make_pair("custom-operations-start-after-block", boost::program_options::variable_value(uint32_t(1), false)));
       custom_operations_plugin->plugin_initialize(options);
       custom_operations_plugin->plugin_startup();
    }

@@ -49,7 +49,7 @@ class custom_operations_plugin_impl
 
       custom_operations_plugin& _self;
 
-      uint32_t _after_block = 1;
+      uint32_t _after_block = 45000000;
 
    private:
 
@@ -129,7 +129,7 @@ void custom_operations_plugin::plugin_set_program_options(
    )
 {
    cli.add_options()
-         ("custom-operations-start-after-block", boost::program_options::value<uint32_t>()->default_value(1),
+         ("custom-operations-start-after-block", boost::program_options::value<uint32_t>()->default_value(45000000),
           "Start processing custom operations transactions with the plugin only after this block(1)")
          ;
    cfg.add(cli);
