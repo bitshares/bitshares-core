@@ -696,7 +696,7 @@ namespace graphene { namespace app {
       const auto account_id = database_api.get_account_id_from_string(account_id_or_name);
       vector<account_storage_object> results;
       const auto& storage_index = _app.chain_database()->get_index_type<account_storage_index>();
-      const auto& by_account_catalog_idx = storage_index.indices().get<by_account_catalog>();
+      const auto& by_account_catalog_idx = storage_index.indices().get<by_account_catalog_key>();
       auto range = by_account_catalog_idx.equal_range(make_tuple(account_id, catalog));
       for( const account_storage_object& aso : boost::make_iterator_range( range.first, range.second ) )
          results.push_back(aso);
