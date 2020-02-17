@@ -129,7 +129,7 @@ void custom_operations_plugin::plugin_set_program_options(
    )
 {
    cli.add_options()
-         ("custom-operations-start-after-block", boost::program_options::value<uint32_t>(),
+         ("custom-operations-start-after-block", boost::program_options::value<uint32_t>()->default_value(1),
           "Start processing custom operations transactions with the plugin only after this block(1)")
          ;
    cfg.add(cli);
@@ -141,7 +141,7 @@ void custom_operations_plugin::plugin_initialize(const boost::program_options::v
    database().add_index< primary_index< account_storage_index  > >();
 
    if (options.count("custom-operations-start-after-block")) {
-      my->_after_block = options["elasticsearch-bulk-replay"].as<uint32_t>();
+      my->_after_block = options["custom-operations-start-after-block"].as<uint32_t>();
    }
 
    database().applied_block.connect( [this]( const signed_block& b) {

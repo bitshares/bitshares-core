@@ -534,7 +534,7 @@ namespace graphene { namespace app {
          /**
           * @brief Get all stored objects of an account in a particular catalog
           *
-          * @param account Account name or ID to get info from
+          * @param account The account ID or name to get info from
           * @param catalog Category classification. Each account can store multiple catalogs.
           *
           * @return The vector of objects of the account or empty
