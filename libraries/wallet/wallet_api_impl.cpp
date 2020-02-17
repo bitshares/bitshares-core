@@ -59,7 +59,7 @@ namespace graphene { namespace wallet { namespace detail {
         _remote_hist(rapi->history())
    {
       try {
-         _custom_operations = rapi->custom();
+         _custom_operations = rapi->custom_operations();
       }
       catch(const fc::exception& e)
       {

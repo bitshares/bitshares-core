@@ -302,7 +302,7 @@ namespace graphene { namespace app {
        return *_debug_api;
     }
 
-    fc::api<custom_operations_api> login_api::custom() const
+    fc::api<custom_operations_api> login_api::custom_operations() const
     {
        FC_ASSERT(_custom_operations_api);
        return *_custom_operations_api;

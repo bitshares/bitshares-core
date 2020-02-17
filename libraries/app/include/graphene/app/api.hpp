@@ -598,7 +598,7 @@ namespace graphene { namespace app {
          /// @brief Retrieve the debug API (if available)
          fc::api<graphene::debug_witness::debug_api> debug()const;
          /// @brief Retrieve the custom operations API
-         fc::api<custom_operations_api> custom()const;
+         fc::api<custom_operations_api> custom_operations()const;
 
          /// @brief Called to enable an API, not reflected.
          void enable_api( const string& api_name );
@@ -695,5 +695,5 @@ FC_API(graphene::app::login_api,
        (asset)
        (orders)
        (debug)
-       (custom)
+       (custom_operations)
      )
