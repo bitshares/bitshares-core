@@ -49,7 +49,7 @@ class custom_operations_plugin_impl
 
       custom_operations_plugin& _self;
 
-      uint32_t _after_block = 45000000;
+      uint32_t _start_block = 45000000;
 
    private:
 
@@ -129,8 +129,8 @@ void custom_operations_plugin::plugin_set_program_options(
    )
 {
    cli.add_options()
-         ("custom-operations-start-after-block", boost::program_options::value<uint32_t>()->default_value(45000000),
-          "Start processing custom operations transactions with the plugin only after this block(1)")
+         ("custom-operations-start-block", boost::program_options::value<uint32_t>()->default_value(45000000),
+          "Start processing custom operations transactions with the plugin only after this block")
          ;
    cfg.add(cli);
 
@@ -140,12 +140,12 @@ void custom_operations_plugin::plugin_initialize(const boost::program_options::v
 {
    database().add_index< primary_index< account_storage_index  > >();
 
-   if (options.count("custom-operations-start-after-block")) {
-      my->_after_block = options["custom-operations-start-after-block"].as<uint32_t>();
+   if (options.count("custom-operations-start-block")) {
+      my->_start_block = options["custom-operations-start-block"].as<uint32_t>();
    }
 
    database().applied_block.connect( [this]( const signed_block& b) {
-      if( b.block_num() >= my->_after_block )
+      if( b.block_num() >= my->_start_block )
          my->onBlock();
    } );
 }
