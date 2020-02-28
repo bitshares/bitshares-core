@@ -534,12 +534,12 @@ namespace graphene { namespace app {
          /**
           * @brief Get all stored objects of an account in a particular catalog
           *
-          * @param account Account name to get info from
+          * @param account The account ID or name to get info from
           * @param catalog Category classification. Each account can store multiple catalogs.
           *
           * @return The vector of objects of the account or empty
           */
-         vector<account_storage_object> get_storage_info(std::string account, std::string catalog)const;
+         vector<account_storage_object> get_storage_info(std::string account_id_or_name, std::string catalog)const;
 
    private:
          application& _app;
@@ -598,7 +598,7 @@ namespace graphene { namespace app {
          /// @brief Retrieve the debug API (if available)
          fc::api<graphene::debug_witness::debug_api> debug()const;
          /// @brief Retrieve the custom operations API
-         fc::api<custom_operations_api> custom()const;
+         fc::api<custom_operations_api> custom_operations()const;
 
          /// @brief Called to enable an API, not reflected.
          void enable_api( const string& api_name );
@@ -695,5 +695,5 @@ FC_API(graphene::app::login_api,
        (asset)
        (orders)
        (debug)
-       (custom)
+       (custom_operations)
      )

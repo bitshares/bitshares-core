@@ -40,7 +40,7 @@ class custom_operations_plugin_impl
       {  }
       virtual ~custom_operations_plugin_impl();
 
-      void onBlock( const signed_block& b );
+      void onBlock();
 
       graphene::chain::database& database()
       {
@@ -48,6 +48,8 @@ class custom_operations_plugin_impl
       }
 
       custom_operations_plugin& _self;
+
+      uint32_t _start_block = 45000000;
 
    private:
 
@@ -69,7 +71,7 @@ struct custom_op_visitor
    }
 };
 
-void custom_operations_plugin_impl::onBlock( const signed_block& b )
+void custom_operations_plugin_impl::onBlock()
 {
    graphene::chain::database& db = database();
    const vector<optional< operation_history_object > >& hist = db.get_applied_operations();
@@ -88,8 +90,8 @@ void custom_operations_plugin_impl::onBlock( const signed_block& b )
          custom_op_visitor vtor(db, custom_op.fee_payer());
          unpacked.visit(vtor);
       }
-      catch (fc::exception e) { // only api node will know if the unpack, validate or apply fails
-         dlog("Custom operations plugin serializing error: ${ex} in operation: ${op}",
+      catch (fc::exception& e) { // only api node will know if the unpack, validate or apply fails
+         wlog("Custom operations plugin serializing error: ${ex} in operation: ${op}",
                ("ex", e.to_detail_string())("op", fc::json::to_string(custom_op)));
          continue;
       }
@@ -126,14 +128,25 @@ void custom_operations_plugin::plugin_set_program_options(
    boost::program_options::options_description& cfg
    )
 {
+   cli.add_options()
+         ("custom-operations-start-block", boost::program_options::value<uint32_t>()->default_value(45000000),
+          "Start processing custom operations transactions with the plugin only after this block")
+         ;
+   cfg.add(cli);
+
 }
 
 void custom_operations_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
    database().add_index< primary_index< account_storage_index  > >();
 
+   if (options.count("custom-operations-start-block")) {
+      my->_start_block = options["custom-operations-start-block"].as<uint32_t>();
+   }
+
    database().applied_block.connect( [this]( const signed_block& b) {
-      my->onBlock(b);
+      if( b.block_num() >= my->_start_block )
+         my->onBlock();
    } );
 }
 

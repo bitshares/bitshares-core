@@ -143,6 +143,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    );
    cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
    cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
+   cfg.emplace("custom-operations-start-block", boost::program_options::variable_value(uint32_t(1), false));
    app1->initialize(app_dir.path(), cfg);
 
    app1->initialize_plugins(cfg);
