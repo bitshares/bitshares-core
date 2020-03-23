@@ -75,6 +75,10 @@ template<typename I>
 const auto& to_num(const fc::safe<I>& i) { return i.value; }
 inline auto to_num(const fc::time_point_sec& t) { return t.sec_since_epoch(); }
 
+// Shorthand to convert a typelist into a static_variant of that typelist
+template<typename List>
+using to_sv = typelist::apply<List, static_variant>;
+
 namespace safenum = boost::safe_numerics::safe_compare;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -127,7 +131,7 @@ using comparable_types_list = typelist::list<int64_t, string, time_point_sec, ac
                                              proposal_id_type, withdraw_permission_id_type,
                                              vesting_balance_id_type, worker_id_type, balance_id_type>;
 // Valid for list functions (in, not_in, has_all, has_none)
-struct make_flat_set { template<typename T> struct transform { using type = flat_set<T>; }; };
+template<typename T> struct make_flat_set { using type = flat_set<T>; };
 using list_types_list = typelist::transform<typelist::concat<typelist::list<bool, public_key_type, fc::sha256>,
                                                              comparable_types_list>,
                                             make_flat_set>;
@@ -256,9 +260,15 @@ template<typename Field, typename Element>
 struct predicate_in<fc::optional<Field>, flat_set<Element>, std::enable_if_t<comparable_types<Field, Element>>> {
    // Check for optional value
    constexpr static bool valid = true;
+   template<typename F = Field, std::enable_if_t<!std::is_same<F, share_type>::value, bool> = true>
    bool operator()(const fc::optional<Field>& f, const flat_set<Element>& c) const {
       if (!f.valid()) return predicate_result::Rejection(predicate_result::null_optional);
-       return c.count(*f) != 0;
+      return c.count(*f) != 0;
+   }
+   template<typename F = Field, std::enable_if_t<std::is_same<F, share_type>::value, bool> = true>
+   bool operator()(const fc::optional<share_type>& f, const flat_set<Element>& c) const {
+      if (!f.valid()) return predicate_result::Rejection(predicate_result::null_optional);
+      return c.count(Element(f->value)) != 0;
    }
 };
 template<typename Container, typename Element>
@@ -470,32 +480,25 @@ object_restriction_predicate<Field> create_predicate_function(restriction_functi
    try {
       switch(func) {
       case restriction::func_eq:
-         return make_predicate<predicate_eq, Field>(static_variant<equality_types_list>::import_from(std::move(arg)));
+         return make_predicate<predicate_eq, Field>(to_sv<equality_types_list>::import_from(std::move(arg)));
       case restriction::func_ne:
-         return make_predicate<predicate_ne, Field>(static_variant<equality_types_list>::import_from(std::move(arg)));
+         return make_predicate<predicate_ne, Field>(to_sv<equality_types_list>::import_from(std::move(arg)));
       case restriction::func_lt:
-         return make_predicate<predicate_lt, Field>(static_variant<comparable_types_list>
-                                                    ::import_from(std::move(arg)));
+         return make_predicate<predicate_lt, Field>(to_sv<comparable_types_list>::import_from(std::move(arg)));
       case restriction::func_le:
-         return make_predicate<predicate_le, Field>(static_variant<comparable_types_list>
-                                                    ::import_from(std::move(arg)));
+         return make_predicate<predicate_le, Field>(to_sv<comparable_types_list>::import_from(std::move(arg)));
       case restriction::func_gt:
-         return make_predicate<predicate_gt, Field>(static_variant<comparable_types_list>
-                                                    ::import_from(std::move(arg)));
+         return make_predicate<predicate_gt, Field>(to_sv<comparable_types_list>::import_from(std::move(arg)));
       case restriction::func_ge:
-         return make_predicate<predicate_ge, Field>(static_variant<comparable_types_list>
-                                                    ::import_from(std::move(arg)));
+         return make_predicate<predicate_ge, Field>(to_sv<comparable_types_list>::import_from(std::move(arg)));
       case restriction::func_in:
-         return make_predicate<predicate_in, Field>(static_variant<list_types_list>::import_from(std::move(arg)));
+         return make_predicate<predicate_in, Field>(to_sv<list_types_list>::import_from(std::move(arg)));
       case restriction::func_not_in:
-         return make_predicate<predicate_not_in, Field>(static_variant<list_types_list>
-                                                        ::import_from(std::move(arg)));
+         return make_predicate<predicate_not_in, Field>(to_sv<list_types_list>::import_from(std::move(arg)));
       case restriction::func_has_all:
-         return make_predicate<predicate_has_all, Field>(static_variant<list_types_list>
-                                                         ::import_from(std::move(arg)));
+         return make_predicate<predicate_has_all, Field>(to_sv<list_types_list>::import_from(std::move(arg)));
       case restriction::func_has_none:
-         return make_predicate<predicate_has_none, Field>(static_variant<list_types_list>
-                                                          ::import_from(std::move(arg)));
+         return make_predicate<predicate_has_none, Field>(to_sv<list_types_list>::import_from(std::move(arg)));
       case restriction::func_attr:
          FC_ASSERT(arg.which() == restriction_argument::tag<vector<restriction>>::value,
                    "Argument type for attribute assertion must be restriction list");

@@ -52,6 +52,7 @@
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
+namespace TL = fc::typelist;
 
 namespace graphene { namespace protocol {
 bool operator==(const restriction& a, const restriction& b) {
@@ -59,7 +60,7 @@ bool operator==(const restriction& a, const restriction& b) {
       return false;
    if (a.argument.is_type<void_t>())
       return b.argument.is_type<void_t>();
-   using Value_Argument = static_variant<fc::typelist::slice<restriction::argument_type::list, 1>>;
+   using Value_Argument = TL::apply<TL::slice<restriction::argument_type::list, 1>, static_variant>;
    return Value_Argument::import_from(a.argument) == Value_Argument::import_from(b.argument);
 }
 } }

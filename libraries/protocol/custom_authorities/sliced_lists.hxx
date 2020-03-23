@@ -29,21 +29,25 @@
 namespace graphene { namespace protocol {
 namespace typelist = fc::typelist;
 
+// Shorthand to convert a typelist into a static_variant of that typelist
+template<typename List>
+using to_sv = typelist::apply<List, static_variant>;
+
 // To make the build gentler on RAM, break the operation list into several pieces to build over several files
-using operation_list_1 = static_variant<typelist::slice<operation::list, 0, 4>>;
-using operation_list_2 = static_variant<typelist::slice<operation::list, 5, 9>>;
-using operation_list_3 = static_variant<typelist::slice<operation::list, 9, 15>>;
-using operation_list_4 = static_variant<typelist::slice<operation::list, 15, 22>>;
-using operation_list_5 = static_variant<typelist::slice<operation::list, 22, 29>>;
-using operation_list_6 = static_variant<typelist::slice<operation::list, 29, 34>>;
-using operation_list_7 = static_variant<typelist::slice<operation::list, 34, 42>>;
-using operation_list_8 = static_variant<typelist::builder<>
-                                                ::add<asset_claim_fees_operation> // 43
-                                                ::add<bid_collateral_operation>   // 45
-                                                ::add_list<typelist::slice<operation::list, 47, 51>>
-                                                ::add<htlc_extend_operation>      // 52
-                                                ::finalize>;
-using operation_list_9 = static_variant<typelist::slice<operation::list, 54>>;
+using operation_list_1 = to_sv<typelist::slice<operation::list, 0, 4>>;
+using operation_list_2 = to_sv<typelist::slice<operation::list, 5, 9>>;
+using operation_list_3 = to_sv<typelist::slice<operation::list, 9, 15>>;
+using operation_list_4 = to_sv<typelist::slice<operation::list, 15, 22>>;
+using operation_list_5 = to_sv<typelist::slice<operation::list, 22, 29>>;
+using operation_list_6 = to_sv<typelist::slice<operation::list, 29, 34>>;
+using operation_list_7 = to_sv<typelist::slice<operation::list, 34, 42>>;
+using operation_list_8 = to_sv<typelist::builder<>
+                                       ::add<asset_claim_fees_operation> // 43
+                                       ::add<bid_collateral_operation>   // 45
+                                       ::add_list<typelist::slice<operation::list, 47, 51>>
+                                       ::add<htlc_extend_operation>      // 52
+                                       ::finalize>;
+using operation_list_9 = to_sv<typelist::slice<operation::list, 54>>;
 using virtual_operations_list = static_variant<fill_order_operation,          // 4
                                                asset_settle_cancel_operation, // 42
                                                fba_distribute_operation,      // 44
