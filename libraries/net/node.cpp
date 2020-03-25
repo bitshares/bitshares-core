@@ -862,7 +862,7 @@ namespace graphene { namespace net { namespace detail {
         // we'd like to realize the block isn't coming and fetch it from a different
         // peer before the next block comes in.
         // Increased to 6 from 1 in #1660 due to heavy load. May need to adjust further
-        // Note: #1160 is https://github.com/steemit/steem/issues/1660
+        // Note: #1660 is https://github.com/steemit/steem/issues/1660
         fc::microseconds active_ignored_request_timeout = fc::seconds(6);
 
         fc::time_point active_disconnect_threshold = fc::time_point::now() - fc::seconds(active_disconnect_timeout);
