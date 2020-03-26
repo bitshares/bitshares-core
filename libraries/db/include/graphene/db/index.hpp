@@ -120,13 +120,14 @@ namespace graphene { namespace db {
 
          /**
           *   When forming your lambda to modify obj, it is natural to have Object& be the signature, but
-          *   that is not compatible with the type erasue required by the virtual method.  This method
+          *   that is not compatible with the type erasure required by the virtual method.  This method
           *   provides a helper to wrap the lambda in a form compatible with the virtual modify call.
           *   @note Lambda should have the signature:  void(Object&)
           */
          template<typename Object, typename Lambda>
          void modify( const Object& obj, const Lambda& l ) {
-            modify( static_cast<const object&>(obj), std::function<void(object&)>( [&]( object& o ){ l( static_cast<Object&>(o) ); } ) );
+            modify( static_cast<const object&>(obj),
+                    std::function<void(object&)>( [&l]( object& o ){ l( static_cast<Object&>(o) ); } ) );
          }
 
          virtual void               inspect_all_objects(std::function<void(const object&)> inspector)const = 0;

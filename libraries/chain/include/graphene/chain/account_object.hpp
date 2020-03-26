@@ -24,6 +24,7 @@
 #pragma once
 
 #include <graphene/chain/types.hpp>
+#include <graphene/chain/stored_value.hpp>
 #include <graphene/db/generic_index.hpp>
 #include <graphene/protocol/account.hpp>
 
@@ -43,7 +44,9 @@ namespace graphene { namespace chain {
     * separating the account data that changes frequently from the account data that is mostly static, which will
     * minimize the amount of data that must be backed up as part of the undo history everytime a transfer is made.
     */
-   class account_statistics_object : public graphene::db::abstract_object<account_statistics_object>
+   class account_statistics_object;
+   class account_statistics_master
+      : public graphene::db::abstract_object< account_statistics_master, account_statistics_object >
    {
       public:
          static constexpr uint8_t space_id = implementation_ids;
@@ -87,7 +90,11 @@ namespace graphene { namespace chain {
           * Tracks the total fees paid by this account for the purpose of calculating bulk discounts.
           */
          share_type lifetime_fees_paid;
+   };
 
+   class account_statistics_object : public account_statistics_master
+   {
+      public:
          /**
           * Tracks the fees paid by this account which have not been disseminated to the various parties that receive
           * them yet (registrar, referrer, lifetime referrer, network, etc). This is used as an optimization to avoid
@@ -96,15 +103,17 @@ namespace graphene { namespace chain {
           * These fees will be paid out as vesting cash-back, and this counter will reset during the maintenance
           * interval.
           */
-         share_type pending_fees;
+         stored_value pending_fees;
          /**
           * Same as @ref pending_fees, except these fees will be paid out as pre-vested cash-back (immediately
           * available for withdrawal) rather than requiring the normal vesting period.
           */
-         share_type pending_vested_fees;
+         stored_value pending_vested_fees;
 
          /// Whether this account has pending fees, no matter vested or not
-         inline bool has_pending_fees() const { return pending_fees > 0 || pending_vested_fees > 0; }
+         inline bool has_pending_fees() const {
+            return pending_fees.get_amount() > 0 || pending_vested_fees.get_amount() > 0;
+         }
 
          /// Whether need to process this account during the maintenance interval
          inline bool need_maintenance() const { return has_some_core_voting() || has_pending_fees(); }
@@ -115,7 +124,12 @@ namespace graphene { namespace chain {
          /**
           * Core fees are paid into the account_statistics_object by this method
           */
-         void pay_fee( share_type core_fee, share_type cashback_vesting_threshold );
+         void pay_fee( stored_value&& core_fee, share_type cashback_vesting_threshold );
+
+      protected:
+         virtual unique_ptr<graphene::db::object> backup()const;
+         virtual void restore( graphene::db::object& obj );
+         virtual void clear();
    };
 
    /**
@@ -125,21 +139,33 @@ namespace graphene { namespace chain {
     * This object is indexed on owner and asset_type so that black swan
     * events in asset_type can be processed quickly.
     */
-   class account_balance_object : public abstract_object<account_balance_object>
+   class account_balance_object;
+   class account_balance_master : public abstract_object< account_balance_master, account_balance_object >
    {
       public:
          static constexpr uint8_t space_id = implementation_ids;
          static constexpr uint8_t type_id  = impl_account_balance_object_type;
 
          account_id_type   owner;
-         asset_id_type     asset_type;
-         share_type        balance;
          bool              maintenance_flag = false; ///< Whether need to process this balance object in maintenance interval
-
-         asset get_balance()const { return asset(balance, asset_type); }
-         void  adjust_balance(const asset& delta);
    };
 
+   class account_balance_object : public account_balance_master
+   {
+      public:
+         stored_value      balance;
+
+         asset get_balance()const { return balance.get_value(); }
+         asset_id_type get_asset()const { return balance.get_asset(); }
+         share_type get_amount()const { return balance.get_amount(); }
+         void add_balance( stored_value&& delta );
+         stored_value reduce_balance( share_type delta );
+
+      protected:
+         virtual unique_ptr<graphene::db::object> backup()const;
+         virtual void restore( graphene::db::object& obj );
+         virtual void clear();
+   };
 
    /**
     * @brief This class represents an account on the object graph
@@ -357,13 +383,13 @@ namespace graphene { namespace chain {
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_non_unique< tag<by_maintenance_flag>,
-                             member< account_balance_object, bool, &account_balance_object::maintenance_flag > >,
+                             member< account_balance_master, bool, &account_balance_master::maintenance_flag > >,
          ordered_unique< tag<by_asset_balance>,
             composite_key<
                account_balance_object,
-               member<account_balance_object, asset_id_type, &account_balance_object::asset_type>,
-               member<account_balance_object, share_type, &account_balance_object::balance>,
-               member<account_balance_object, account_id_type, &account_balance_object::owner>
+               const_mem_fun<account_balance_object, asset_id_type, &account_balance_object::get_asset>,
+               const_mem_fun<account_balance_object, share_type, &account_balance_object::get_amount>,
+               member<account_balance_master, account_id_type, &account_balance_master::owner>
             >,
             composite_key_compare<
                std::less< asset_id_type >,
@@ -408,12 +434,12 @@ namespace graphene { namespace chain {
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_unique< tag<by_owner>,
-                         member< account_statistics_object, account_id_type, &account_statistics_object::owner > >,
+                         member< account_statistics_master, account_id_type, &account_statistics_master::owner > >,
          ordered_unique< tag<by_maintenance_seq>,
             composite_key<
                account_statistics_object,
                const_mem_fun<account_statistics_object, bool, &account_statistics_object::need_maintenance>,
-               member<account_statistics_object, string, &account_statistics_object::name>
+               member<account_statistics_master, string, &account_statistics_master::name>
             >
          >
       >
@@ -430,10 +456,29 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::account_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::account_balance_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::account_statistics_object)
 
+FC_REFLECT_DERIVED( graphene::chain::account_balance_master,
+                    (graphene::db::object),
+                    (owner)(maintenance_flag) )
+
+FC_REFLECT_DERIVED( graphene::chain::account_statistics_master,
+                    (graphene::db::object),
+                    (owner)(name)
+                    (most_recent_op)
+                    (total_ops)(removed_ops)
+                    (total_core_in_orders)
+                    (core_in_balance)
+                    (has_cashback_vb)
+                    (is_voting)
+                    (last_vote_time)
+                    (lifetime_fees_paid)
+                  )
+
 FC_REFLECT_TYPENAME( graphene::chain::account_object )
 FC_REFLECT_TYPENAME( graphene::chain::account_balance_object )
 FC_REFLECT_TYPENAME( graphene::chain::account_statistics_object )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::account_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::account_balance_master )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::account_balance_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::account_statistics_master )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::account_statistics_object )

@@ -592,7 +592,7 @@ namespace graphene { namespace app {
           if( result.size() >= limit )
              break;
 
-          if( bal.balance.value == 0 )
+          if( bal.balance.get_amount() == 0 )
              continue;
 
           if( index++ < start )
@@ -603,7 +603,7 @@ namespace graphene { namespace app {
           account_asset_balance aab;
           aab.name       = account->name;
           aab.account_id = account->id;
-          aab.amount     = bal.balance.value;
+          aab.amount     = bal.balance.get_amount();
 
           result.push_back(aab);
        }

@@ -464,7 +464,7 @@ BOOST_AUTO_TEST_CASE(last_voting_date)
       // we are going to vote for this witness
       auto witness1 = witness_id_type(1)(db);
 
-      auto stats_obj = db.get_account_stats_by_owner(alice_id);
+      const auto& stats_obj = db.get_account_stats_by_owner(alice_id);
       BOOST_CHECK_EQUAL(stats_obj.last_vote_time.sec_since_epoch(), 0u);
 
       // alice votes
@@ -479,7 +479,6 @@ BOOST_AUTO_TEST_CASE(last_voting_date)
       auto now = db.head_block_time().sec_since_epoch();
 
       // last_vote_time is updated for alice
-      stats_obj = db.get_account_stats_by_owner(alice_id);
       BOOST_CHECK_EQUAL(stats_obj.last_vote_time.sec_since_epoch(), now);
 
    } FC_LOG_AND_RETHROW()
@@ -510,7 +509,7 @@ BOOST_AUTO_TEST_CASE(last_voting_date_proxy)
          PUSH_TX( db, trx, ~0 );
       }
       // alice last_vote_time is updated
-      auto alice_stats_obj = db.get_account_stats_by_owner(alice_id);
+      const auto& alice_stats_obj = db.get_account_stats_by_owner(alice_id);
       auto round1 = db.head_block_time().sec_since_epoch();
       BOOST_CHECK_EQUAL(alice_stats_obj.last_vote_time.sec_since_epoch(), round1);
 
@@ -527,7 +526,6 @@ BOOST_AUTO_TEST_CASE(last_voting_date_proxy)
          PUSH_TX( db, trx, ~0 );
       }
       // last_vote_time is not updated
-      alice_stats_obj = db.get_account_stats_by_owner(alice_id);
       BOOST_CHECK_EQUAL(alice_stats_obj.last_vote_time.sec_since_epoch(), round1);
 
       generate_block();
@@ -546,7 +544,7 @@ BOOST_AUTO_TEST_CASE(last_voting_date_proxy)
 
       // last_vote_time for bob is updated as he voted
       auto round3 = db.head_block_time().sec_since_epoch();
-      auto bob_stats_obj = db.get_account_stats_by_owner(bob_id);
+      const auto& bob_stats_obj = db.get_account_stats_by_owner(bob_id);
       BOOST_CHECK_EQUAL(bob_stats_obj.last_vote_time.sec_since_epoch(), round3);
 
       generate_block();
@@ -564,15 +562,13 @@ BOOST_AUTO_TEST_CASE(last_voting_date_proxy)
 
       // proxy just voted so the last_vote_time is updated
       auto round4 = db.head_block_time().sec_since_epoch();
-      auto proxy_stats_obj = db.get_account_stats_by_owner(proxy_id);
+      const auto& proxy_stats_obj = db.get_account_stats_by_owner(proxy_id);
       BOOST_CHECK_EQUAL(proxy_stats_obj.last_vote_time.sec_since_epoch(), round4);
 
       // alice haves proxy, proxy votes but last_vote_time is not updated for alice
-      alice_stats_obj = db.get_account_stats_by_owner(alice_id);
       BOOST_CHECK_EQUAL(alice_stats_obj.last_vote_time.sec_since_epoch(), round1);
 
       // bob haves nothing to do with proxy so last_vote_time is not updated
-      bob_stats_obj = db.get_account_stats_by_owner(bob_id);
       BOOST_CHECK_EQUAL(bob_stats_obj.last_vote_time.sec_since_epoch(), round3);
 
    } FC_LOG_AND_RETHROW()

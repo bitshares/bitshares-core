@@ -23,6 +23,7 @@
  */
 #pragma once
 #include <graphene/chain/types.hpp>
+#include <graphene/chain/stored_value.hpp>
 #include <graphene/db/generic_index.hpp>
 #include <graphene/protocol/asset_ops.hpp>
 
@@ -55,17 +56,28 @@ namespace graphene { namespace chain {
     *  This object exists as an implementation detail and its ID should never be referenced by
     *  a blockchain operation.
     */
-   class asset_dynamic_data_object : public abstract_object<asset_dynamic_data_object>
+   class asset_dynamic_data_object;
+   class asset_dynamic_data_master
+      : public abstract_object< asset_dynamic_data_master, asset_dynamic_data_object >
    {
       public:
          static constexpr uint8_t space_id = implementation_ids;
          static constexpr uint8_t type_id  = impl_asset_dynamic_data_object_type;
+   };
 
+   class asset_dynamic_data_object : public asset_dynamic_data_master
+   {
+      public:
          /// The number of shares currently in existence
-         share_type current_supply;
-         share_type confidential_supply; ///< total asset held in confidential balances
-         share_type accumulated_fees; ///< fees accumulate to be paid out over time
-         share_type fee_pool;         ///< in core asset
+         stored_debt current_supply;
+         stored_value accumulated_fees; ///< fees accumulate to be paid out over time
+         stored_value fee_pool;         ///< in core asset
+         stored_value confidential_supply; ///< total asset held in confidential balances
+
+   protected:
+      virtual unique_ptr<graphene::db::object> backup()const;
+      virtual void restore( graphene::db::object& obj );
+      virtual void clear();
    };
 
    /**
@@ -163,7 +175,7 @@ namespace graphene { namespace chain {
           */
          template<class DB>
          share_type reserved( const DB& db )const
-         { return options.max_supply - dynamic_data(db).current_supply; }
+         { return options.max_supply - dynamic_data(db).current_supply.get_amount(); }
    };
 
    /**
@@ -172,7 +184,8 @@ namespace graphene { namespace chain {
     *  @ingroup object
     *  @ingroup implementation
     */
-   class asset_bitasset_data_object : public abstract_object<asset_bitasset_data_object>
+   class asset_bitasset_data_master
+      : public abstract_object< asset_bitasset_data_master, asset_bitasset_data_object >
    {
       public:
          static constexpr uint8_t space_id = implementation_ids;
@@ -217,8 +230,6 @@ namespace graphene { namespace chain {
          ///@{
          /// Price at which force settlements of a black swanned asset will occur
          price settlement_price;
-         /// Amount of collateral which is available for force settlement
-         share_type settlement_fund;
          ///@}
 
          /// Track whether core_exchange_rate in corresponding asset_object has updated
@@ -261,6 +272,22 @@ namespace graphene { namespace chain {
          void update_median_feeds(time_point_sec current_time, time_point_sec next_maintenance_time);
    };
 
+   class asset_bitasset_data_object : public asset_bitasset_data_master
+   {
+      public:
+         ///@{
+         /// Amount of collateral which is available for force settlement
+         stored_value settlement_fund;
+         /// Counterpart for individual debt positions
+         stored_value total_debt;
+         ///@}
+
+   protected:
+      virtual unique_ptr<graphene::db::object> backup()const;
+      virtual void restore( graphene::db::object& obj );
+      virtual void clear();
+   };
+
    // key extractor for short backing asset
    struct bitasset_short_backing_asset_extractor
    {
@@ -282,12 +309,12 @@ namespace graphene { namespace chain {
          ordered_non_unique< tag<by_short_backing_asset>, bitasset_short_backing_asset_extractor >,
          ordered_unique< tag<by_feed_expiration>,
             composite_key< asset_bitasset_data_object,
-               const_mem_fun< asset_bitasset_data_object, time_point_sec, &asset_bitasset_data_object::feed_expiration_time >,
-               member< asset_bitasset_data_object, asset_id_type, &asset_bitasset_data_object::asset_id >
+               const_mem_fun< asset_bitasset_data_master, time_point_sec, &asset_bitasset_data_master::feed_expiration_time >,
+               member< asset_bitasset_data_master, asset_id_type, &asset_bitasset_data_master::asset_id >
             >
          >,
          ordered_non_unique< tag<by_cer_update>,
-                             const_mem_fun< asset_bitasset_data_object, bool, &asset_bitasset_data_object::need_to_update_cer >
+                             const_mem_fun< asset_bitasset_data_master, bool, &asset_bitasset_data_master::need_to_update_cer >
          >
       >
    > asset_bitasset_data_object_multi_index_type;
@@ -333,9 +360,26 @@ FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (buyback_account)
                   )
 
+FC_REFLECT_DERIVED( graphene::chain::asset_bitasset_data_master, (graphene::db::object),
+                    (asset_id)
+                    (feeds)
+                    (current_feed)
+                    (current_feed_publication_time)
+                    (current_maintenance_collateralization)
+                    (options)
+                    (force_settled_volume)
+                    (is_prediction_market)
+                    (settlement_price)
+                    (asset_cer_updated)
+                    (feed_cer_updated)
+                  )
+FC_REFLECT_DERIVED( graphene::chain::asset_dynamic_data_master, (graphene::db::object), )
+
 FC_REFLECT_TYPENAME( graphene::chain::asset_bitasset_data_object )
 FC_REFLECT_TYPENAME( graphene::chain::asset_dynamic_data_object )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::asset_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::asset_bitasset_data_master )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::asset_bitasset_data_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::asset_dynamic_data_master )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::asset_dynamic_data_object )

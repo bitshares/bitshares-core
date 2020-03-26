@@ -36,7 +36,10 @@ object_database::object_database()
    _undo_db.enable();
 }
 
-object_database::~object_database(){}
+object_database::~object_database()
+{
+   clear_objects();
+}
 
 void object_database::close()
 {
@@ -124,6 +127,25 @@ void object_database::open(const fc::path& data_dir)
 
 } FC_CAPTURE_AND_RETHROW( (data_dir) ) }
 
+void object_database::clear_objects()
+{
+   bool undo_was_enabled = _undo_db.enabled();
+   _undo_db.disable();
+   std::vector<fc::future<void>> tasks;
+   tasks.reserve(200);
+   for( uint32_t space = 0; space < _index.size(); ++space )
+      for( uint32_t type = 0; type  < _index[space].size(); ++type )
+         if( _index[space][type] )
+            tasks.push_back( fc::do_parallel( [this,space,type] () {
+               auto& index = _index[space][type];
+               index->inspect_all_objects( [&index] ( const graphene::db::object& object ) {
+                  index->modify( object, [] (graphene::db::object& o) { o.clear(); } );
+               });
+            } ) );
+   for( auto& task : tasks )
+      task.wait();
+   if( undo_was_enabled ) _undo_db.enable();
+}
 
 void object_database::pop_undo()
 { try {

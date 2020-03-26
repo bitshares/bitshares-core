@@ -45,7 +45,6 @@
 
 namespace graphene { namespace chain {
    using graphene::db::abstract_object;
-   using graphene::db::object;
    class op_evaluator;
    class transaction_evaluation_state;
    class proposal_object;
@@ -57,6 +56,7 @@ namespace graphene { namespace chain {
    class limit_order_object;
    class collateral_bid_object;
    class call_order_object;
+   class stored_value;
 
    struct budget_record;
    enum class vesting_balance_type;
@@ -312,9 +312,10 @@ namespace graphene { namespace chain {
           * @param account ID of account whose balance should be adjusted
           * @param delta Asset ID and amount to adjust balance by
           */
-         void adjust_balance(account_id_type account, asset delta);
+         void add_balance( account_id_type account, stored_value&& what );
+         stored_value reduce_balance( account_id_type account, const asset& delta );
 
-         void deposit_market_fee_vesting_balance(const account_id_type &account_id, const asset &delta);
+         void deposit_market_fee_vesting_balance(const account_id_type &account_id, stored_value&& delta);
         /**
           * @brief Retrieve a particular account's market fee vesting balance in a given asset
           * @param owner Account whose balance should be retrieved
@@ -338,16 +339,16 @@ namespace graphene { namespace chain {
           */
          optional< vesting_balance_id_type > deposit_lazy_vesting(
             const optional< vesting_balance_id_type >& ovbid,
-            share_type amount,
+            stored_value&& amount,
             uint32_t req_vesting_seconds,
             vesting_balance_type balance_type,
             account_id_type req_owner,
             bool require_vesting );
 
          // helper to handle cashback rewards
-         void deposit_cashback(const account_object& acct, share_type amount, bool require_vesting = true);
+         void deposit_cashback(const account_object& acct, stored_value&& amount, bool require_vesting = true);
          // helper to handle witness pay
-         void deposit_witness_pay(const witness_object& wit, share_type amount);
+         void deposit_witness_pay(const witness_object& wit, stored_value&& amount);
 
          //////////////////// db_debug.cpp ////////////////////
 
@@ -363,7 +364,8 @@ namespace graphene { namespace chain {
          void cancel_limit_order(const limit_order_object& order, bool create_virtual_op = true, bool skip_cancel_fee = false);
          void revive_bitasset( const asset_object& bitasset );
          void cancel_bid(const collateral_bid_object& bid, bool create_virtual_op = true);
-         void execute_bid( const collateral_bid_object& bid, share_type debt_covered, share_type collateral_from_fund, const price_feed& current_feed );
+         void execute_bid( const collateral_bid_object& bid, share_type debt_covered,
+                           stored_value&& collateral_from_fund, const price_feed& current_feed );
 
          /**
           * @brief Process a new limit order through the markets
@@ -406,21 +408,19 @@ namespace graphene { namespace chain {
          /**
           * @return true if the order was completely filled and thus freed.
           */
-         bool fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small,
-                                const price& fill_price, const bool is_maker );
-         bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
-                               const price& fill_price, const bool is_maker );
-         bool fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
-                                 const price& fill_price, const bool is_maker );
+         bool fill_limit_order( const limit_order_object& order, const asset& pays, stored_value&& receives,
+                                bool cull_if_small, const price& fill_price, fc::optional<stored_value>& transport, const bool is_maker );
+         bool fill_call_order( const call_order_object& order, const asset& pays, stored_value&& receives,
+                               const price& fill_price, fc::optional<stored_value>& transport_debt, const bool is_maker );
+         void fill_settle_order( const force_settlement_object& settle, const asset& pays,
+                                 stored_value&& receives, const price& fill_price );
 
          bool check_call_orders( const asset_object& mia, bool enable_black_swan = true, bool for_new_limit_order = false,
                                  const asset_bitasset_data_object* bitasset_ptr = nullptr );
 
          // helpers to fill_order
-         void pay_order( const account_object& receiver, const asset& receives, const asset& pays );
-
-         asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
-         asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives );
+         share_type calculate_market_fee(const asset_object& recv_asset, const share_type trade_amount);
+         asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, stored_value&& receives );
          ///@}
 
 
@@ -528,7 +528,7 @@ namespace graphene { namespace chain {
 
          void initialize_budget_record( fc::time_point_sec now, budget_record& rec )const;
          void process_budget();
-         void pay_workers( share_type& budget );
+         void pay_workers( const fc::microseconds passed_time_ms, stored_value& budget );
          void perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props);
          void update_active_witnesses();
          void update_active_committee_members();
@@ -572,6 +572,7 @@ namespace graphene { namespace chain {
          vector<uint64_t>                  _witness_count_histogram_buffer;
          vector<uint64_t>                  _committee_count_histogram_buffer;
          uint64_t                          _total_voting_stake;
+         stored_debt                       _negative_genesis; // see explanation in init_genesis
 
          flat_map<uint32_t,block_id_type>  _checkpoints;
 

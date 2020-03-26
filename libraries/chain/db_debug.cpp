@@ -53,34 +53,30 @@ void database::debug_dump()
 
    for( const account_balance_object& a : balance_index )
    {
-    //  idump(("balance")(a));
-      total_balances[a.asset_type] += a.balance;
+      total_balances[a.get_asset()] += a.get_amount();
    }
    for( const force_settlement_object& s : settle_index )
    {
-      total_balances[s.balance.asset_id] += s.balance.amount;
+      total_balances[s.balance.get_asset()] += s.balance.get_amount();
    }
    for( const vesting_balance_object& vbo : db.get_index_type< vesting_balance_index >().indices() )
-      total_balances[ vbo.balance.asset_id ] += vbo.balance.amount;
+      total_balances[ vbo.balance.get_asset() ] += vbo.balance.get_amount();
    for( const fba_accumulator_object& fba : db.get_index_type< simple_index< fba_accumulator_object > >() )
-      total_balances[ asset_id_type() ] += fba.accumulated_fba_fees;
+      total_balances[ asset_id_type() ] += fba.accumulated_fba_fees.get_amount();
    for( const account_statistics_object& s : statistics_index )
    {
-    //  idump(("statistics")(s));
       reported_core_in_orders += s.total_core_in_orders;
    }
    for( const collateral_bid_object& b : bids )
-      total_balances[b.inv_swan_price.base.asset_id] += b.inv_swan_price.base.amount;
+      total_balances[b.collateral_offered.get_asset()] += b.collateral_offered.get_amount();
    for( const limit_order_object& o : db.get_index_type<limit_order_index>().indices() )
    {
- //     idump(("limit_order")(o));
       auto for_sale = o.amount_for_sale();
       if( for_sale.asset_id == asset_id_type() ) core_in_orders += for_sale.amount;
       total_balances[for_sale.asset_id] += for_sale.amount;
    }
    for( const call_order_object& o : db.get_index_type<call_order_index>().indices() )
    {
-//      idump(("call_order")(o));
       auto col = o.get_collateral();
       if( col.asset_id == asset_id_type() ) core_in_orders += col.amount;
       total_balances[col.asset_id] += col.amount;
@@ -88,26 +84,16 @@ void database::debug_dump()
    }
    for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )
    {
-      total_balances[asset_obj.id] += asset_obj.dynamic_asset_data_id(db).accumulated_fees;
-      total_balances[asset_id_type()] += asset_obj.dynamic_asset_data_id(db).fee_pool;
-//      edump((total_balances[asset_obj.id])(asset_obj.dynamic_asset_data_id(db).current_supply ) );
+      total_balances[asset_obj.id] += asset_obj.dynamic_asset_data_id(db).accumulated_fees.get_amount();
+      total_balances[asset_id_type()] += asset_obj.dynamic_asset_data_id(db).fee_pool.get_amount();
    }
 
-   if( total_balances[asset_id_type()].value != core_asset_data.current_supply.value )
+   if( total_balances[asset_id_type()].value != core_asset_data.current_supply.get_amount() )
    {
       FC_THROW( "computed balance of CORE mismatch",
                 ("computed value",total_balances[asset_id_type()].value)
-                ("current supply",core_asset_data.current_supply.value) );
+                ("current supply",core_asset_data.current_supply.get_amount()) );
    }
-
-
-   /*
-   const auto& vbidx = db.get_index_type<simple_index<vesting_balance_object>>();
-   for( const auto& s : vbidx )
-   {
-//      idump(("vesting_balance")(s));
-   }
-   */
 }
 
 void debug_apply_update( database& db, const fc::variant_object& vo )

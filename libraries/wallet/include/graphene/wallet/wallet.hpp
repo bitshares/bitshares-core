@@ -24,7 +24,6 @@
 #pragma once
 
 #include <fc/optional.hpp>
-#include <graphene/chain/htlc_object.hpp>
 #include <graphene/app/api.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include "wallet_structs.hpp"
@@ -180,7 +179,7 @@ class wallet_api
        *    if \c ostart_id is specified and valid, its price will be used to do page query preferentially,
        *    otherwise the \c ostart_price will be used
        */
-      vector<limit_order_object>        get_account_limit_orders( const string& name_or_id,
+      vector<graphene::app::limit_order_api_object> get_account_limit_orders( const string& name_or_id,
                                             const string &base,
                                             const string &quote,
                                             uint32_t limit = 101,
@@ -194,7 +193,7 @@ class wallet_api
        * @param limit Maximum number of orders to retrieve
        * @return The limit orders, ordered from least price to greatest
        */
-      vector<limit_order_object>        get_limit_orders(string a, string b, uint32_t limit)const;
+      vector<graphene::app::limit_order_api_object> get_limit_orders(string a, string b, uint32_t limit)const;
 
       /**
        * @brief Get call orders (aka margin positions) for a given asset
@@ -202,7 +201,7 @@ class wallet_api
        * @param limit Maximum number of orders to retrieve
        * @return The call orders, ordered from earliest to be called to latest
        */
-      vector<call_order_object>         get_call_orders(string a, uint32_t limit)const;
+      vector<graphene::app::call_order_api_object> get_call_orders(string a, uint32_t limit)const;
 
       /**
        * @brief Get forced settlement orders in a given asset
@@ -210,7 +209,7 @@ class wallet_api
        * @param limit Maximum number of orders to retrieve
        * @return The settle orders, ordered from earliest settlement date to latest
        */
-      vector<force_settlement_object>   get_settle_orders(string a, uint32_t limit)const;
+      vector<graphene::app::force_settlement_api_object> get_settle_orders(string a, uint32_t limit)const;
 
       /** Returns the collateral_bid object for the given MPA
        *
@@ -219,7 +218,7 @@ class wallet_api
        * @param start the sequence number where to start looping back throw the history
        * @returns a list of \c collateral_bid_objects
        */
-      vector<collateral_bid_object> get_collateral_bids(string asset, uint32_t limit = 100, uint32_t start = 0)const;
+      vector<graphene::app::collateral_bid_api_object> get_collateral_bids(string asset, uint32_t limit = 100, uint32_t start = 0)const;
 
       /** Returns the block chain's slowly-changing settings.
        * This object contains all of the properties of the blockchain that are fixed
@@ -250,7 +249,7 @@ class wallet_api
        * @see \c get_global_properties() for less-frequently changing properties
        * @returns the dynamic global properties
        */
-      dynamic_global_property_object    get_dynamic_global_properties() const;
+      graphene::app::dynamic_global_property_api_object get_dynamic_global_properties() const;
 
       /** Returns information about the given account.
        *
@@ -271,7 +270,7 @@ class wallet_api
        * @param asset_name_or_id the symbol or id of the BitAsset in question
        * @returns the BitAsset-specific data for this asset
        */
-      asset_bitasset_data_object        get_bitasset_data(string asset_name_or_id)const;
+      variant        get_bitasset_data(string asset_name_or_id)const;
 
       /**
        * Returns information about the given HTLC object.

@@ -81,7 +81,7 @@ void undo_database::on_modify( const object& obj )
       return;
    auto itr =  state.old_values.find(obj.id);
    if( itr != state.old_values.end() ) return;
-   state.old_values[obj.id] = obj.clone();
+   state.old_values[obj.id] = obj.backup();
 }
 void undo_database::on_remove( const object& obj )
 {
@@ -102,7 +102,7 @@ void undo_database::on_remove( const object& obj )
       return;
    }
    if( state.removed.count(obj.id) ) return;
-   state.removed[obj.id] = obj.clone();
+   state.removed[obj.id] = obj.backup();
 }
 
 void undo_database::undo()
@@ -110,30 +110,36 @@ void undo_database::undo()
    FC_ASSERT( !_disabled );
    FC_ASSERT( _active_sessions > 0 );
    disable();
-
-   auto& state = _stack.back();
-   for( auto& item : state.old_values )
-   {
-      _db.modify( _db.get_object( item.second->id ), [&]( object& obj ){ obj.move_from( *item.second ); } );
-   }
-
-   for( auto ritr = state.new_ids.begin(); ritr != state.new_ids.end(); ++ritr  )
-   {
-      _db.remove( _db.get_object(*ritr) );
-   }
-
-   for( auto& item : state.old_index_next_ids )
-   {
-      _db.get_mutable_index( item.first.space(), item.first.type() ).set_next_id( item.second );
-   }
-
-   for( auto& item : state.removed )
-      _db.insert( std::move(*item.second) );
-
-   _stack.pop_back();
+   _undo_last();
    enable();
    --_active_sessions;
 } FC_CAPTURE_AND_RETHROW() }
+
+void undo_database::_undo_last()
+{
+   auto& state = _stack.back();
+   for( auto& item : state.old_values )
+      _db.modify( _db.get_object( item.second->id ), [&item]( object& obj ){ obj.restore( *item.second ); } );
+
+   for( auto ritr = state.new_ids.begin(); ritr != state.new_ids.end(); ++ritr  )
+   {
+      const auto& obj = _db.get_object(*ritr);
+      _db.modify( obj, [] ( object& o ) { o.clear(); } );
+      _db.remove( obj );
+   }
+
+   for( auto& item : state.old_index_next_ids )
+      _db.get_mutable_index( item.first.space(), item.first.type() ).set_next_id( item.second );
+
+   for( auto& item : state.removed )
+   {
+      object* tmp = item.second->recreate();
+      tmp->restore( *item.second );
+      _db.insert( std::move(*tmp) );
+   }
+
+   _stack.pop_back();
+}
 
 void undo_database::merge()
 {
@@ -268,27 +274,7 @@ void undo_database::pop_commit()
 
    disable();
    try {
-      auto& state = _stack.back();
-
-      for( auto& item : state.old_values )
-      {
-         _db.modify( _db.get_object( item.second->id ), [&]( object& obj ){ obj.move_from( *item.second ); } );
-      }
-
-      for( auto ritr = state.new_ids.begin(); ritr != state.new_ids.end(); ++ritr  )
-      {
-         _db.remove( _db.get_object(*ritr) );
-      }
-
-      for( auto& item : state.old_index_next_ids )
-      {
-         _db.get_mutable_index( item.first.space(), item.first.type() ).set_next_id( item.second );
-      }
-
-      for( auto& item : state.removed )
-         _db.insert( std::move(*item.second) );
-
-      _stack.pop_back();
+      _undo_last();
    }
    catch ( const fc::exception& e )
    {

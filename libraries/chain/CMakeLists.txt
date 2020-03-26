@@ -53,6 +53,7 @@ add_library( graphene_chain
              special_authority_evaluation.cpp
              buyback.cpp
 
+	     stored_value.cpp
              account_object.cpp
              asset_object.cpp
              fba_object.cpp

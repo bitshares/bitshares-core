@@ -78,18 +78,13 @@ void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_o
 
 void limit_order_create_evaluator::convert_fee()
 {
-   if( db().head_block_time() <= HARDFORK_CORE_604_TIME )
+   if( db().head_block_time() <= HARDFORK_CORE_604_TIME || fee_asset->get_id() == asset_id_type() )
       generic_evaluator::convert_fee();
    else
       if( !trx_state->skip_fee )
-      {
-         if( fee_asset->get_id() != asset_id_type() )
-         {
-            db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
-               d.fee_pool -= core_fee_paid;
-            });
-         }
-      }
+         db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
+            core_fee_paid = d.fee_pool.split( fee_from_pool );
+         });
 }
 
 void limit_order_create_evaluator::pay_fee()
@@ -98,9 +93,9 @@ void limit_order_create_evaluator::pay_fee()
       generic_evaluator::pay_fee();
    else
    {
-      _deferred_fee = core_fee_paid;
+      _deferred_fee = std::move(core_fee_paid);
       if( db().head_block_time() > HARDFORK_CORE_604_TIME && fee_asset->get_id() != asset_id_type() )
-         _deferred_paid_fee = fee_from_account;
+         _deferred_paid_fee = std::move(fee_from_account);
    }
 }
 
@@ -113,15 +108,15 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
       });
    }
 
-   db().adjust_balance(op.seller, -op.amount_to_sell);
+   stored_value transport = db().reduce_balance(op.seller, op.amount_to_sell);
 
-   const auto& new_order_object = db().create<limit_order_object>([&](limit_order_object& obj){
-       obj.seller   = _seller->id;
-       obj.for_sale = op.amount_to_sell.amount;
+   const auto& new_order_object = db().create<limit_order_object>([&op,this,&transport](limit_order_object& obj){
+       obj.seller   = op.seller;
+       obj.for_sale = std::move(transport);
        obj.sell_price = op.get_price();
        obj.expiration = op.expiration;
-       obj.deferred_fee = _deferred_fee;
-       obj.deferred_paid_fee = _deferred_paid_fee;
+       obj.deferred_fee = std::move(_deferred_fee);
+       obj.deferred_paid_fee = std::move(_deferred_paid_fee);
    });
    limit_order_id_type order_id = new_order_object.id; // save this because we may remove the object by filling it
    bool filled;
@@ -196,11 +191,11 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
     */
    if (next_maintenance_time > HARDFORK_CORE_1465_TIME)
    {
-      FC_ASSERT( _dynamic_data_obj->current_supply + o.delta_debt.amount <= _debt_asset->options.max_supply,
+      FC_ASSERT( _dynamic_data_obj->current_supply.get_amount() + o.delta_debt.amount <= _debt_asset->options.max_supply,
             "Borrowing this quantity would exceed MAX_SUPPLY" );
    }
    
-   FC_ASSERT( _dynamic_data_obj->current_supply + o.delta_debt.amount >= 0,
+   FC_ASSERT( _dynamic_data_obj->current_supply.get_amount() + o.delta_debt.amount >= 0,
          "This transaction would bring current supply below zero.");
 
    _bitasset_data  = &_debt_asset->bitasset_data(d);
@@ -229,28 +224,33 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
 { try {
    database& d = db();
 
-   if( o.delta_debt.amount != 0 )
+   stored_value transport_debt;
+   if( o.delta_debt.amount > 0 )
    {
-      d.adjust_balance( o.funding_account, o.delta_debt );
-
       // Deduct the debt paid from the total supply of the debt asset.
-      d.modify(*_dynamic_data_obj, [&](asset_dynamic_data_object& dynamic_asset) {
-         dynamic_asset.current_supply += o.delta_debt.amount;
+      d.modify(*_dynamic_data_obj, [&o,&transport_debt](asset_dynamic_data_object& dynamic_asset) {
+         transport_debt = dynamic_asset.current_supply.issue( o.delta_debt.amount );
+      });
+      d.add_balance( o.funding_account, std::move(transport_debt) );
+   }
+   else if( o.delta_debt.amount < 0 )
+   {
+      transport_debt = d.reduce_balance( o.funding_account, -o.delta_debt );
+      // Deduct the debt paid from the total supply of the debt asset.
+      d.modify(*_dynamic_data_obj, [&o,&transport_debt](asset_dynamic_data_object& dynamic_asset) {
+         dynamic_asset.current_supply.burn( std::move(transport_debt) );
       });
    }
 
-   if( o.delta_collateral.amount != 0 )
-   {
-      d.adjust_balance( o.funding_account, -o.delta_collateral  );
+   stored_value transport_collateral;
+   if( o.delta_collateral.amount > 0 )
+      transport_collateral = d.reduce_balance( o.funding_account, o.delta_collateral  );
 
-      // Adjust the total core in orders accodingly
-      if( o.delta_collateral.asset_id == asset_id_type() )
-      {
-         d.modify(_paying_account->statistics(d), [&](account_statistics_object& stats) {
-               stats.total_core_in_orders += o.delta_collateral.amount;
-         });
-      }
-   }
+   // Adjust the total core in orders accodingly
+   if( o.delta_collateral.amount != 0 && o.delta_collateral.asset_id == asset_id_type() )
+      d.modify(_paying_account->statistics(d), [&o](account_statistics_object& stats) {
+         stats.total_core_in_orders += o.delta_collateral.amount;
+      });
 
    const auto next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
    bool before_core_hardfork_1270 = ( next_maint_time <= HARDFORK_CORE_1270_TIME ); // call price caching issue
@@ -268,10 +268,12 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
       FC_ASSERT( o.delta_collateral.amount > 0, "Delta collateral amount of new debt position should be positive" );
       FC_ASSERT( o.delta_debt.amount > 0, "Delta debt amount of new debt position should be positive" );
 
-      call_obj = &d.create<call_order_object>( [&o,this,before_core_hardfork_1270]( call_order_object& call ){
+      call_obj = &d.create<call_order_object>(
+       [&o,this,before_core_hardfork_1270,&transport_debt,&transport_collateral]( call_order_object& call ){
          call.borrower = o.funding_account;
-         call.collateral = o.delta_collateral.amount;
-         call.debt = o.delta_debt.amount;
+         call.collateral = std::move(transport_collateral);
+         call.debt = stored_debt(o.delta_debt.asset_id);
+         transport_debt = call.debt.issue( o.delta_debt.amount );
          if( before_core_hardfork_1270 ) // before core-1270 hard fork, calculate call_price here and cache it
             call.call_price = price::call_price( o.delta_debt, o.delta_collateral,
                                                  _bitasset_data->current_feed.maintenance_collateral_ratio );
@@ -280,37 +282,53 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
          call.target_collateral_ratio = o.extensions.value.target_collateral_ratio;
       });
       call_order_id = call_obj->id;
+
+      d.modify( *_bitasset_data, [&transport_debt] ( asset_bitasset_data_object& bdo ) {
+         bdo.total_debt += std::move(transport_debt);
+      });
    }
    else // updating existing debt position
    {
       call_obj = &*itr;
-      auto new_collateral = call_obj->collateral + o.delta_collateral.amount;
-      auto new_debt = call_obj->debt + o.delta_debt.amount;
       call_order_id = call_obj->id;
-
-      if( new_debt == 0 )
-      {
-         FC_ASSERT( new_collateral == 0, "Should claim all collateral when closing debt position" );
-         d.remove( *call_obj );
-         return call_order_id;
-      }
-
-      FC_ASSERT( new_collateral > 0 && new_debt > 0,
-                 "Both collateral and debt should be positive after updated a debt position if not to close it" );
-
       old_collateralization = call_obj->collateralization();
-      old_debt = call_obj->debt;
+      old_debt = call_obj->debt.get_amount();
 
-      d.modify( *call_obj, [&o,new_debt,new_collateral,this,before_core_hardfork_1270]( call_order_object& call ){
-         call.collateral = new_collateral;
-         call.debt       = new_debt;
-         if( before_core_hardfork_1270 ) // don't update call_price after core-1270 hard fork
+      if( o.delta_debt.amount < 0 )
+         d.modify( *_bitasset_data, [&o,&transport_debt] ( asset_bitasset_data_object& bdo ) {
+            transport_debt = bdo.total_debt.split( -o.delta_debt.amount );
+         });
+      d.modify( *call_obj,
+       [&o,&transport_debt,&transport_collateral,this,before_core_hardfork_1270]( call_order_object& call ){
+         if( o.delta_collateral.amount > 0 )
+            call.collateral += std::move(transport_collateral);
+         else if( o.delta_collateral.amount < 0 )
+            transport_collateral = call.collateral.split( -o.delta_collateral.amount );
+         if( o.delta_debt.amount > 0 )
+            transport_debt = call.debt.issue( o.delta_debt.amount );
+         else if( o.delta_debt.amount < 0 )
+             call.debt.burn( std::move(transport_debt) );
+         if( before_core_hardfork_1270 && call.collateral.get_amount() > 0 ) // don't update call_price after core-1270 hard fork
          {
             call.call_price  =  price::call_price( call.get_debt(), call.get_collateral(),
                                                    _bitasset_data->current_feed.maintenance_collateral_ratio );
          }
          call.target_collateral_ratio = o.extensions.value.target_collateral_ratio;
       });
+      if( transport_debt.get_amount() > 0 )
+         d.modify( *_bitasset_data, [&transport_debt] ( asset_bitasset_data_object& bdo ) {
+            bdo.total_debt += std::move(transport_debt);
+         });
+      if( transport_collateral.get_amount() > 0 ) // negative delta_collateral
+         d.add_balance( o.funding_account, std::move(transport_collateral) );
+
+      if( call_obj->debt.get_amount() == 0 )
+      {
+         FC_ASSERT( call_obj->collateral.get_amount() == 0,
+                    "Should claim all collateral when closing debt position" );
+         d.remove( *call_obj );
+         return call_order_id;
+      }
    }
 
    // then we must check for margin calls and other issues
@@ -365,12 +383,12 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
             FC_ASSERT( ( !before_core_hardfork_1270
                             && call_obj->collateralization() > _bitasset_data->current_maintenance_collateralization )
                        || ( before_core_hardfork_1270 && ~call_obj->call_price < _bitasset_data->current_feed.settlement_price )
-                       || ( old_collateralization.valid() && call_obj->debt <= *old_debt
+                       || ( old_collateralization.valid() && call_obj->debt.get_amount() <= *old_debt
                                                           && call_obj->collateralization() > *old_collateralization ),
                "Can only increase collateral ratio without increasing debt if would trigger a margin call that "
                "cannot be fully filled",
                ("old_debt", old_debt)
-               ("new_debt", call_obj->debt)
+               ("new_debt", call_obj->debt.get_amount())
                ("old_collateralization", old_collateralization)
                ("new_collateralization", call_obj->collateralization() )
                );
@@ -428,11 +446,12 @@ void_result bid_collateral_evaluator::do_apply(const bid_collateral_operation& o
 
    if( o.debt_covered.amount == 0 ) return void_result();
 
-   d.adjust_balance( o.bidder, -o.additional_collateral  );
+   stored_value transport = d.reduce_balance( o.bidder, o.additional_collateral  );
 
-   _bid = &d.create<collateral_bid_object>([&]( collateral_bid_object& bid ) {
+   _bid = &d.create<collateral_bid_object>([&o,&transport]( collateral_bid_object& bid ) {
       bid.bidder = o.bidder;
-      bid.inv_swan_price = o.additional_collateral / o.debt_covered;
+      bid.collateral_offered = std::move(transport);
+      bid.debt_covered = o.debt_covered;
    });
 
    // Note: CORE asset in collateral_bid_object is not counted in account_stats.total_core_in_orders

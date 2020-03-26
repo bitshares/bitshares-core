@@ -25,6 +25,7 @@
 
 #include <graphene/protocol/chain_parameters.hpp>
 #include <graphene/chain/types.hpp>
+#include <graphene/chain/stored_value.hpp>
 #include <graphene/db/object.hpp>
 
 namespace graphene { namespace chain {
@@ -61,7 +62,9 @@ namespace graphene { namespace chain {
     * This is an implementation detail. The values here are calculated during normal chain operations and reflect the
     * current values of global blockchain properties.
     */
-   class dynamic_global_property_object : public abstract_object<dynamic_global_property_object>
+   class dynamic_global_property_object;
+   class dynamic_global_property_master
+      : public abstract_object< dynamic_global_property_master, dynamic_global_property_object >
    {
       public:
          static constexpr uint8_t space_id = implementation_ids;
@@ -73,7 +76,6 @@ namespace graphene { namespace chain {
          witness_id_type   current_witness;
          time_point_sec    next_maintenance_time;
          time_point_sec    last_budget_time;
-         share_type        witness_budget;
          uint32_t          accounts_registered_this_interval = 0;
          /**
           *  Every time a block is missed this increases by
@@ -118,13 +120,40 @@ namespace graphene { namespace chain {
             maintenance_flag = 0x01
          };
    };
+
+   class dynamic_global_property_object : public dynamic_global_property_master
+   {
+      public:
+         stored_value witness_budget;
+
+   protected:
+      virtual unique_ptr<graphene::db::object> backup()const;
+      virtual void restore( graphene::db::object& obj );
+      virtual void clear();
+   };
 }}
 
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::dynamic_global_property_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::global_property_object)
 
+FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_master, (graphene::db::object),
+                    (head_block_number)
+                    (head_block_id)
+                    (time)
+                    (current_witness)
+                    (next_maintenance_time)
+                    (last_budget_time)
+                    (accounts_registered_this_interval)
+                    (recently_missed_count)
+                    (current_aslot)
+                    (recent_slots_filled)
+                    (dynamic_flags)
+                    (last_irreversible_block_num)
+                  )
+
 FC_REFLECT_TYPENAME( graphene::chain::dynamic_global_property_object )
 FC_REFLECT_TYPENAME( graphene::chain::global_property_object )
 
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::dynamic_global_property_master )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::dynamic_global_property_object )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::global_property_object )

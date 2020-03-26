@@ -23,6 +23,7 @@
  */
 #pragma once
 #include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/stored_value.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 #include <graphene/protocol/operations.hpp>
 
@@ -70,29 +71,24 @@ namespace graphene { namespace chain {
 
       database& db()const;
 
-      //void check_required_authorities(const operation& op);
    protected:
       /**
        * @brief Fetch objects relevant to fee payer and set pointer members
        * @param account_id Account which is paying the fee
        * @param fee The fee being paid. May be in assets other than core.
        *
-       * This method verifies that the fee is valid and sets the object pointer members and the fee fields. It should
-       * be called during do_evaluate.
+       * This method verifies that the fee is valid and sets the object pointer members and the fee fields.
+       * It should be called during do_evaluate.
        *
-       * In particular, core_fee_paid field is set by prepare_fee().
+       * In particular, fee_from_account and fee_from_pool fields are set by prepare_fee().
        */
-      void prepare_fee(account_id_type account_id, asset fee);
+      virtual void prepare_fee(account_id_type account_id, asset fee);
 
       /**
        * Convert the fee into BTS through the exchange pool.
        *
-       * Reads core_fee_paid field for how much CORE is deducted from the exchange pool,
+       * Reads fee_from_pool field for how much CORE is deducted from the exchange pool,
        * and fee_from_account for how much USD is added to the pool.
-       *
-       * Since prepare_fee() does the validation checks ensuring the account and fee pool
-       * have sufficient balance and the exchange rate is correct,
-       * those validation checks are not replicated here.
        *
        * Rather than returning a value, this method fills in core_fee_paid field.
        */
@@ -105,14 +101,17 @@ namespace graphene { namespace chain {
        */
       void pay_fba_fee( uint64_t fba_id );
 
+      void pay_back_borrowed_fee();
+
       // the next two functions are helpers that allow template functions declared in this 
       // header to call db() without including database.hpp, which would
       // cause a circular dependency
       share_type calculate_fee_for_operation(const operation& op) const;
-      void db_adjust_balance(const account_id_type& fee_payer, asset fee_from_account);
 
-      asset                            fee_from_account;
-      share_type                       core_fee_paid;
+      stored_value                     fee_from_account;
+      share_type                       fee_from_pool;
+      stored_value                     core_fee_paid;
+      stored_debt                      borrowed_fee;
       const account_object*            fee_paying_account = nullptr;
       const account_statistics_object* fee_paying_account_statistics = nullptr;
       const asset_object*              fee_asset          = nullptr;
@@ -153,10 +152,11 @@ namespace graphene { namespace chain {
          if( !trx_state->skip_fee_schedule_check )
          {
             share_type required_fee = calculate_fee_for_operation(op);
-            GRAPHENE_ASSERT( core_fee_paid >= required_fee,
+            share_type fee_to_pay = op.fee.asset_id == asset_id_type() ? fee_from_account.get_amount() : fee_from_pool;
+            GRAPHENE_ASSERT( fee_to_pay >= required_fee,
                        insufficient_fee,
                        "Insufficient Fee Paid",
-                       ("core_fee_paid",core_fee_paid)("required", required_fee) );
+                       ("core_fee_to_pay",fee_to_pay)("required", required_fee) );
          }
 
          return eval->do_evaluate(op);
@@ -170,11 +170,11 @@ namespace graphene { namespace chain {
          convert_fee();
          pay_fee();
 
-         auto result = eval->do_apply(op);
+         operation_result res = eval->do_apply(op);
 
-         db_adjust_balance(op.fee_payer(), -fee_from_account);
+         pay_back_borrowed_fee();
 
-         return result;
+         return res;
       }
    };
 } }

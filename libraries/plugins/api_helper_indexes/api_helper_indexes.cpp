@@ -35,17 +35,17 @@ void amount_in_collateral_index::object_inserted( const object& objct )
    {
       auto itr = in_collateral.find( o.collateral_type() );
       if( itr == in_collateral.end() )
-         in_collateral[o.collateral_type()] = o.collateral;
+         in_collateral[o.collateral_type()] = o.collateral.get_amount();
       else
-         itr->second += o.collateral;
+         itr->second += o.collateral.get_amount();
    }
 
    {
       auto itr = backing_collateral.find( o.debt_type() );
       if( itr == backing_collateral.end() )
-         backing_collateral[o.debt_type()] = o.collateral;
+         backing_collateral[o.debt_type()] = o.collateral.get_amount();
       else
-         itr->second += o.collateral;
+         itr->second += o.collateral.get_amount();
    }
 
 } FC_CAPTURE_AND_RETHROW( (objct) ); }
@@ -57,13 +57,13 @@ void amount_in_collateral_index::object_removed( const object& objct )
    {
       auto itr = in_collateral.find( o.collateral_type() );
       if( itr != in_collateral.end() ) // should always be true
-         itr->second -= o.collateral;
+         itr->second -= o.collateral.get_amount();
    }
 
    {
       auto itr = backing_collateral.find( o.debt_type() );
       if( itr != backing_collateral.end() ) // should always be true
-         itr->second -= o.collateral;
+         itr->second -= o.collateral.get_amount();
    }
 
 } FC_CAPTURE_AND_RETHROW( (objct) ); }

@@ -41,11 +41,119 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/witness_schedule_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/db/undo_database.hpp>
 
 #include <fc/io/raw.hpp>
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::balance_object, (graphene::db::object),
-                    (owner)(balance)(vesting_policy)(last_claim_date) )
+namespace graphene { namespace chain {
+
+class balance_backup : public balance_master, public graphene::db::backup_object<balance_object>
+{
+      asset balance;
+      friend class balance_object;
+
+   public:
+      balance_backup( const balance_object& original )
+         : balance_master( original )
+      {
+         balance = original.balance.get_value();
+      }
+
+      virtual object* recreate() { return graphene::db::backup_object<balance_object>::recreate(); }
+};
+
+unique_ptr<object> balance_object::backup()const
+{
+   return std::make_unique<balance_backup>( *this );
+}
+
+void balance_object::restore( object& obj )
+{
+   const auto& backup = static_cast<balance_backup&>(obj);
+   balance.restore( backup.balance );
+   static_cast<balance_master&>(*this) = std::move( backup );
+}
+
+void balance_object::clear()
+{
+   balance.clear();
+}
+
+class dynamic_global_property_backup
+   : public dynamic_global_property_master, public graphene::db::backup_object<dynamic_global_property_object>
+{
+      asset witness_budget;
+      friend class dynamic_global_property_object;
+
+   public:
+      dynamic_global_property_backup( const dynamic_global_property_object& original )
+         : dynamic_global_property_master( original )
+      {
+         witness_budget = original.witness_budget.get_value();
+      }
+
+      virtual object* recreate() {
+         return graphene::db::backup_object<dynamic_global_property_object>::recreate();
+      }
+};
+
+unique_ptr<object> dynamic_global_property_object::backup()const
+{
+   return std::make_unique<dynamic_global_property_backup>( *this );
+}
+
+void dynamic_global_property_object::restore( object& obj )
+{
+   const auto& backup = static_cast<dynamic_global_property_backup&>(obj);
+   witness_budget.restore( backup.witness_budget );
+   static_cast<dynamic_global_property_master&>(*this) = std::move( backup );
+}
+
+void dynamic_global_property_object::clear()
+{
+   witness_budget.clear();
+}
+
+class htlc_backup : public htlc_master, public graphene::db::backup_object<htlc_object>
+{
+      asset amount;
+      transfer_info_master transfer;
+      friend class htlc_object;
+
+   public:
+      htlc_backup( const htlc_object& original )
+         : htlc_master( original )
+      {
+         transfer = original.transfer;
+         amount = original.transfer.amount.get_value();
+      }
+
+      virtual object* recreate() { return graphene::db::backup_object<htlc_object>::recreate(); }
+      virtual const transfer_info_master& get_transfer_info()const { return transfer; }
+};
+
+unique_ptr<object> htlc_object::backup()const
+{
+   return std::make_unique<htlc_backup>( *this );
+}
+
+void htlc_object::restore( object& obj )
+{
+   const auto& backup = static_cast<htlc_backup&>(obj);
+   static_cast<transfer_info_master&>(transfer) = backup.transfer;
+   transfer.amount.restore( backup.amount );
+   static_cast<htlc_master&>(*this) = std::move( backup );
+}
+
+void htlc_object::clear()
+{
+   transfer.amount.clear();
+}
+
+} } // graphene::chain
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::balance_object, (graphene::chain::balance_master),
+                    (balance) )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::block_summary_object, (graphene::db::object), (block_id) )
 
@@ -91,23 +199,8 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::committee_member_object, (graph
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::blinded_balance_object, (graphene::db::object),
                                 (commitment)(asset_id)(owner) )
 
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::fba_accumulator_object, (graphene::db::object),
-                                (accumulated_fba_fees)(designated_asset) )
-
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::dynamic_global_property_object, (graphene::db::object),
-                    (head_block_number)
-                    (head_block_id)
-                    (time)
-                    (current_witness)
-                    (next_maintenance_time)
-                    (last_budget_time)
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::dynamic_global_property_object, (graphene::chain::dynamic_global_property_master),
                     (witness_budget)
-                    (accounts_registered_this_interval)
-                    (recently_missed_count)
-                    (current_aslot)
-                    (recent_slots_filled)
-                    (dynamic_flags)
-                    (last_irreversible_block_num)
                   )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::global_property_object, (graphene::db::object),
@@ -118,16 +211,11 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::global_property_object, (graphe
                     (active_witnesses)
                   )
 
-FC_REFLECT( graphene::chain::htlc_object::transfer_info,
-   (from) (to) (amount) (asset_id) )
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::condition_info::hash_lock_info, BOOST_PP_SEQ_NIL,
-   (preimage_hash) (preimage_size) )
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::condition_info::time_lock_info, BOOST_PP_SEQ_NIL,
-   (expiration) )
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::condition_info, BOOST_PP_SEQ_NIL,
-   (hash_lock)(time_lock) )
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object, (graphene::db::object),
-               (transfer) (conditions) )
+FC_REFLECT_DERIVED( graphene::chain::htlc_object::transfer_info,
+                    (graphene::chain::htlc_master::transfer_info_master),
+                    (amount) )
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object, (graphene::chain::htlc_master),
+               (transfer) )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::operation_history_object, (graphene::chain::object),
                     (op)(result)(block_num)(trx_in_block)(op_in_trx)(virtual_op) )
@@ -189,6 +277,7 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::worker_object, (graphene::db::o
                     (url)
                   )
 
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::balance_master )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::balance_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::block_summary_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::budget_record )
@@ -198,9 +287,10 @@ GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::immutable_chain_para
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::chain_property_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::committee_member_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::blinded_balance_object )
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::fba_accumulator_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::dynamic_global_property_master )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::dynamic_global_property_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::global_property_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::htlc_master )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::htlc_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::operation_history_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::account_transaction_history_object )

@@ -43,6 +43,7 @@ namespace graphene { namespace db {
          ~object_database();
 
          void reset_indexes() { _index.clear(); _index.resize(255); }
+         void clear_objects();
 
          void open(const fc::path& data_dir );
 
@@ -87,7 +88,7 @@ namespace graphene { namespace db {
          const object& insert( object&& obj ) { return get_mutable_index(obj.id).insert( std::move(obj) ); }
          void          remove( const object& obj ) { get_mutable_index(obj.id).remove( obj ); }
          template<typename T, typename Lambda>
-         void modify( const T& obj, const Lambda& m ) {
+         void modify( const T& obj, Lambda&& m ) {
             get_mutable_index(obj.id).modify(obj,m);
          }
 

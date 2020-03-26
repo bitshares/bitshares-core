@@ -74,7 +74,7 @@ class es_objects_plugin_impl
 
    private:
       template<typename T>
-      void prepareTemplate(T blockchain_object, string index_name);
+      void prepareTemplate(const T& blockchain_object, string index_name);
 };
 
 bool es_objects_plugin_impl::genesis()
@@ -234,7 +234,7 @@ void es_objects_plugin_impl::remove_from_database( object_id_type id, std::strin
 }
 
 template<typename T>
-void es_objects_plugin_impl::prepareTemplate(T blockchain_object, string index_name)
+void es_objects_plugin_impl::prepareTemplate(const T& blockchain_object, string index_name)
 {
    fc::mutable_variant_object bulk_header;
    bulk_header["_index"] = _es_objects_index_prefix + index_name;

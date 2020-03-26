@@ -51,6 +51,7 @@ genesis_state_type make_genesis() {
    genesis_state.initial_timestamp = time_point_sec( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
 
    auto init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
+   const public_key_type init_account_pub_key  = init_account_priv_key.get_public_key();
    genesis_state.initial_active_witnesses = 10;
    genesis_state.immutable_parameters.min_committee_member_count = INITIAL_COMMITTEE_MEMBER_COUNT;
    genesis_state.immutable_parameters.min_witness_count = INITIAL_WITNESS_COUNT;
@@ -58,14 +59,14 @@ genesis_state_type make_genesis() {
    for( unsigned int i = 0; i < genesis_state.initial_active_witnesses; ++i )
    {
       auto name = "init"+fc::to_string(i);
-      genesis_state.initial_accounts.emplace_back(name,
-                                                  init_account_priv_key.get_public_key(),
-                                                  init_account_priv_key.get_public_key(),
-                                                  true);
+      genesis_state.initial_accounts.emplace_back(name, init_account_pub_key, init_account_pub_key, true);
       genesis_state.initial_committee_candidates.push_back({name});
-      genesis_state.initial_witness_candidates.push_back({name, init_account_priv_key.get_public_key()});
+      genesis_state.initial_witness_candidates.push_back({name, init_account_pub_key});
    }
    genesis_state.initial_parameters.get_mutable_fees().zero_all_fees();
+   genesis_state_type::initial_balance_type initial_core{ address(init_account_pub_key), GRAPHENE_SYMBOL,
+                                                          GRAPHENE_MAX_SHARE_SUPPLY };
+   genesis_state.initial_balances.push_back(initial_core);
    return genesis_state;
 }
 
@@ -583,6 +584,11 @@ BOOST_AUTO_TEST_CASE( undo_pending )
             signed_transaction trx;
             set_expiration( db, trx );
 
+            balance_claim_operation bop;
+            bop.balance_owner_key = init_account_pub_key;
+            bop.total_claimed = asset( GRAPHENE_MAX_SHARE_SUPPLY );
+            trx.operations.push_back(bop);
+
             trx.operations.push_back(t);
             PUSH_TX( db, trx, ~0 );
 
@@ -706,6 +712,12 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
 
       signed_transaction trx;
       set_expiration( db1, trx );
+
+      balance_claim_operation bop;
+      bop.balance_owner_key = init_account_pub_key;
+      bop.total_claimed = asset( GRAPHENE_MAX_SHARE_SUPPLY );
+      trx.operations.push_back(bop);
+
       account_id_type nathan_id = account_idx.get_next_id();
       account_create_operation cop;
       cop.name = "nathan";
@@ -771,10 +783,12 @@ BOOST_AUTO_TEST_CASE( tapos )
       b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
       trx.clear();
 
-      transfer_operation t;
-      t.to = nathan_id;
-      t.amount = asset(50);
-      trx.operations.push_back(t);
+
+      balance_claim_operation bop;
+      bop.deposit_to_account = nathan_id;
+      bop.balance_owner_key = init_account_pub_key;
+      bop.total_claimed = asset( GRAPHENE_MAX_SHARE_SUPPLY );
+      trx.operations.push_back(bop);
       trx.sign( init_account_priv_key, db1.get_chain_id() );
       //relative_expiration is 1, but ref block is 2 blocks old, so this should fail.
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db1, trx, database::skip_transaction_signatures ), fc::exception);
@@ -857,7 +871,7 @@ BOOST_FIXTURE_TEST_CASE( maintenance_interval, database_fixture )
 {
    try {
       generate_block();
-      BOOST_CHECK_EQUAL(db.head_block_num(), 2u);
+      BOOST_CHECK_EQUAL(db.head_block_num(), 3u);
 
       fc::time_point_sec maintenence_time = db.get_dynamic_global_properties().next_maintenance_time;
       BOOST_CHECK_GT(maintenence_time.sec_since_epoch(), db.head_block_time().sec_since_epoch());
@@ -928,7 +942,7 @@ BOOST_FIXTURE_TEST_CASE( limit_order_expiration, database_fixture )
    BOOST_CHECK_EQUAL( get_balance(*nathan, *core), 49500 );
 
    auto ptrx_id = ptrx.operation_results.back().get<object_id_type>();
-   auto limit_index = db.get_index_type<limit_order_index>().indices();
+   auto& limit_index = db.get_index_type<limit_order_index>().indices();
    auto limit_itr = limit_index.begin();
    BOOST_REQUIRE( limit_itr != limit_index.end() );
    BOOST_REQUIRE( limit_itr->id == ptrx_id );

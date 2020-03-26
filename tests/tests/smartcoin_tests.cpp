@@ -130,6 +130,8 @@ BOOST_AUTO_TEST_CASE(bsip36)
       generate_block();
       trx.clear();
 
+      const asset_bitasset_data_object& bitasset_data = bit_usd_id(db).bitasset_data(db);
+
       // Check current default witnesses, default chain is configured with 10 witnesses
       auto witnesses = db.get_global_properties().active_witnesses;
       BOOST_CHECK_EQUAL(witnesses.size(), INITIAL_WITNESS_COUNT);
@@ -196,7 +198,6 @@ BOOST_AUTO_TEST_CASE(bsip36)
       feed.settlement_price = bit_usd_id(db).amount(1) / core.amount(5);
       publish_feed(bit_usd_id(db), witness0_id(db), feed);
 
-      asset_bitasset_data_object bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 1u);
       auto itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 16u);
@@ -204,7 +205,6 @@ BOOST_AUTO_TEST_CASE(bsip36)
       feed.settlement_price = bit_usd_id(db).amount(2) / core.amount(5);
       publish_feed(bit_usd_id(db), witness1_id(db), feed);
 
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 2u);
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 16u);
@@ -247,15 +247,13 @@ BOOST_AUTO_TEST_CASE(bsip36)
 
       // witness0 has been removed but it was a feeder before
       // Feed persist in the blockchain, this reproduces the issue
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 2u);
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 16u);
 
       // Feed persist after expiration
-      const auto feed_lifetime = bit_usd_id(db).bitasset_data(db).options.feed_lifetime_sec;
+      const auto feed_lifetime = bitasset_data.options.feed_lifetime_sec;
       generate_blocks(db.head_block_time() + feed_lifetime + 1);
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 2u);
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 16u);
@@ -267,14 +265,13 @@ BOOST_AUTO_TEST_CASE(bsip36)
       publish_feed(bit_usd_id(db), witness3_id(db), feed);
 
       // But the one from witness0 is never removed
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 4u);
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 16u);
 
       // Feed from witness1 is also expired but never deleted
       // All feeds should be deleted at this point
-      const auto minimum_feeds = bit_usd_id(db).bitasset_data(db).options.minimum_feeds;
+      const auto minimum_feeds = bitasset_data.options.minimum_feeds;
       BOOST_CHECK_EQUAL(minimum_feeds, 1u);
       BOOST_CHECK_EQUAL(itr[1].first.instance.value, 17u);
 
@@ -285,13 +282,11 @@ BOOST_AUTO_TEST_CASE(bsip36)
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
       //  All expired feeds are deleted
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 0u);
 
       // witness1 start feed producing again
       feed.settlement_price = bit_usd_id(db).amount(1) / core.amount(5);
       publish_feed(bit_usd_id(db), witness1_id(db), feed);
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 1u);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 17u);
@@ -302,7 +297,6 @@ BOOST_AUTO_TEST_CASE(bsip36)
       // add another feed with witness2
       feed.settlement_price = bit_usd_id(db).amount(1) / core.amount(5);
       publish_feed(bit_usd_id(db), witness2_id(db), feed);
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 2u);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 17u);
@@ -313,7 +307,6 @@ BOOST_AUTO_TEST_CASE(bsip36)
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
       // feed from witness0 expires and gets deleted, feed from witness is on time so persist
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 1u);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 18u);
@@ -321,13 +314,11 @@ BOOST_AUTO_TEST_CASE(bsip36)
       // expire everything
       generate_blocks(itr[0].second.first + feed_lifetime + 1);
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 0u);
 
       // add new feed with witness1
       feed.settlement_price = bit_usd_id(db).amount(1) / core.amount(5);
       publish_feed(bit_usd_id(db), witness1_id(db), feed);
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 1u);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 17u);
@@ -376,7 +367,6 @@ BOOST_AUTO_TEST_CASE(bsip36)
       generate_blocks(itr[0].second.first + feed_lifetime + 1);
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 0u);
 
    } FC_LOG_AND_RETHROW()
@@ -393,8 +383,8 @@ BOOST_AUTO_TEST_CASE(bsip36_update_feed_producers)
       const asset_id_type bit_usd_id = create_bitasset("USDBIT").id;
 
       // Update asset issuer
-      const asset_object &asset_obj = bit_usd_id(db);
       {
+         const asset_object &asset_obj = bit_usd_id(db);
          asset_update_operation op;
          op.asset_to_update = bit_usd_id;
          op.issuer = asset_obj.issuer;
@@ -421,7 +411,7 @@ BOOST_AUTO_TEST_CASE(bsip36_update_feed_producers)
       }
 
       // Bitshares will create entries in the field feed after feed producers are added
-      auto bitasset_data = bit_usd_id(db).bitasset_data(db);
+      const auto& bitasset_data = bit_usd_id(db).bitasset_data(db);
 
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 3u);
       auto itr = bitasset_data.feeds.begin();
@@ -443,16 +433,14 @@ BOOST_AUTO_TEST_CASE(bsip36_update_feed_producers)
       }
 
       // Feed for removed producer is removed
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 2u);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 17u);
       BOOST_CHECK_EQUAL(itr[1].first.instance.value, 18u);
 
       // Feed persist after expiration
-      const auto feed_lifetime = bit_usd_id(db).bitasset_data(db).options.feed_lifetime_sec;
+      const auto feed_lifetime = bitasset_data.options.feed_lifetime_sec;
       generate_blocks(db.head_block_time() + feed_lifetime + 1);
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 2u);
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 17u);
@@ -465,7 +453,6 @@ BOOST_AUTO_TEST_CASE(bsip36_update_feed_producers)
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
       // Expired feeds persist, no changes
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 2u);
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 17u);
@@ -511,7 +498,7 @@ BOOST_AUTO_TEST_CASE(bsip36_additional)
       price_feed feed;
       feed.settlement_price = bit_usd_id(db).amount(1) / core_id(db).amount(5);
       publish_feed(bit_usd_id(db), witness5_id(db), feed);
-      auto bitasset_data = bit_usd_id(db).bitasset_data(db);
+      const auto& bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 1u);
       auto itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 21u);
@@ -521,7 +508,6 @@ BOOST_AUTO_TEST_CASE(bsip36_additional)
 
       feed.settlement_price = bit_usd_id(db).amount(1) / core_id(db).amount(5);
       publish_feed(bit_usd_id(db), witness6_id(db), feed);
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 2u);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 21u);
@@ -532,7 +518,6 @@ BOOST_AUTO_TEST_CASE(bsip36_additional)
 
       feed.settlement_price = bit_usd_id(db).amount(1) / core_id(db).amount(5);
       publish_feed(bit_usd_id(db), witness7_id(db), feed);
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 3u);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 21u);
@@ -544,7 +529,6 @@ BOOST_AUTO_TEST_CASE(bsip36_additional)
 
       feed.settlement_price = bit_usd_id(db).amount(1) / core_id(db).amount(5);
       publish_feed(bit_usd_id(db), witness8_id(db), feed);
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 4u);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 21u);
@@ -557,7 +541,6 @@ BOOST_AUTO_TEST_CASE(bsip36_additional)
 
       feed.settlement_price = bit_usd_id(db).amount(1) / core_id(db).amount(5);
       publish_feed(bit_usd_id(db), witness9_id(db), feed);
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 5u);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 21u);
@@ -571,7 +554,6 @@ BOOST_AUTO_TEST_CASE(bsip36_additional)
 
       feed.settlement_price = bit_usd_id(db).amount(1) / core_id(db).amount(5);
       publish_feed(bit_usd_id(db), witness10_id(db), feed);
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 6u);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 21u);
@@ -585,7 +567,6 @@ BOOST_AUTO_TEST_CASE(bsip36_additional)
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       generate_block();
 
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 5u);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 22u);
@@ -600,7 +581,6 @@ BOOST_AUTO_TEST_CASE(bsip36_additional)
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       generate_block();
 
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 3u);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 24u);
@@ -610,7 +590,6 @@ BOOST_AUTO_TEST_CASE(bsip36_additional)
       // witness5 add new feed, feeds are sorted by witness_id not by feed_time
       feed.settlement_price = bit_usd_id(db).amount(1) / core_id(db).amount(5);
       publish_feed(bit_usd_id(db), witness5_id(db), feed);
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 4u);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 21u);
@@ -621,7 +600,6 @@ BOOST_AUTO_TEST_CASE(bsip36_additional)
       // another feed expires
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       generate_block();
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 3u);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 21u);
@@ -631,7 +609,6 @@ BOOST_AUTO_TEST_CASE(bsip36_additional)
       // another feed expires
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       generate_block();
-      bitasset_data = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 2u);
       itr = bitasset_data.feeds.begin();
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 21u);

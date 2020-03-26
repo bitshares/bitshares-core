@@ -178,7 +178,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1 )
       // the order is filled immediately
       BOOST_CHECK( !create_sell_order( buyer, test.amount(25), core.amount(2) ) );
 
-      BOOST_CHECK_EQUAL( sell_id(db).for_sale.value, 1 ); // 2 core sold, 1 remaining
+      BOOST_CHECK_EQUAL( sell_id(db).for_sale.get_amount().value, 1 ); // 2 core sold, 1 remaining
 
       BOOST_CHECK_EQUAL(get_balance(seller, core), 99999997);
       BOOST_CHECK_EQUAL(get_balance(seller, test), 25); // seller got 25 test
@@ -194,7 +194,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1 )
       generate_block();
 
       BOOST_CHECK( !db.find_object( sell_id ) ); // sell order is filled
-      BOOST_CHECK_EQUAL( buy_id(db).for_sale.value, 15 ); // 10 test sold, 15 remaining
+      BOOST_CHECK_EQUAL( buy_id(db).for_sale.get_amount().value, 15 ); // 10 test sold, 15 remaining
 
       BOOST_CHECK_EQUAL(get_balance(seller_id, core_id), 99999997);
       BOOST_CHECK_EQUAL(get_balance(seller_id, test_id), 35); // seller got 10 more test
@@ -244,7 +244,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1_after_hf_342 )
       // the order is filled immediately
       BOOST_CHECK( !create_sell_order( buyer, test.amount(25), core.amount(2) ) );
 
-      BOOST_CHECK_EQUAL( sell_id(db).for_sale.value, 1 ); // 2 core sold, 1 remaining
+      BOOST_CHECK_EQUAL( sell_id(db).for_sale.get_amount().value, 1 ); // 2 core sold, 1 remaining
 
       BOOST_CHECK_EQUAL(get_balance(buyer, core), 2); // buyer got 2 core
       BOOST_CHECK_EQUAL(get_balance(buyer, test), 9999979); // buyer actually paid 21 test according to price 10.33
@@ -260,7 +260,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1_after_hf_342 )
       generate_block();
 
       BOOST_CHECK( !db.find_object( sell_id ) ); // sell order is filled
-      BOOST_CHECK_EQUAL( buy_id(db).for_sale.value, 15 ); // 10 test sold according to price 10.33, and 15 remaining
+      BOOST_CHECK_EQUAL( buy_id(db).for_sale.get_amount().value, 15 ); // 10 test sold according to price 10.33, and 15 remaining
 
       BOOST_CHECK_EQUAL(get_balance(buyer_id, core_id), 3); // buyer got 1 more core
       BOOST_CHECK_EQUAL(get_balance(buyer_id, test_id), 9999954);
@@ -306,7 +306,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2 )
       limit_order_id_type sell_id = create_sell_order( seller, core.amount(33), test.amount(5) )->id;
 
       BOOST_CHECK( !db.find_object( tmp_buy_id ) ); // buy order is filled
-      BOOST_CHECK_EQUAL( sell_id(db).for_sale.value, 16 ); // 17 core sold, 16 remaining
+      BOOST_CHECK_EQUAL( sell_id(db).for_sale.get_amount().value, 16 ); // 17 core sold, 16 remaining
 
       BOOST_CHECK_EQUAL(get_balance(seller, core), 99999967);
       BOOST_CHECK_EQUAL(get_balance(seller, test), 3); // seller got 3 test
@@ -323,7 +323,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2 )
       generate_block();
 
       BOOST_CHECK( !db.find_object( sell_id ) ); // sell order is filled
-      BOOST_CHECK_EQUAL( buy_id(db).for_sale.value, 1 ); // 2 test sold, 1 remaining
+      BOOST_CHECK_EQUAL( buy_id(db).for_sale.get_amount().value, 1 ); // 2 test sold, 1 remaining
 
       BOOST_CHECK_EQUAL(get_balance(seller_id, core_id), 99999967); // seller paid the 16 core which was remaining in the order
       BOOST_CHECK_EQUAL(get_balance(seller_id, test_id), 5); // seller got 2 more test
@@ -373,7 +373,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2_after_hf_342 )
       limit_order_id_type sell_id = create_sell_order( seller, core.amount(33), test.amount(5) )->id;
 
       BOOST_CHECK( !db.find_object( tmp_buy_id ) ); // buy order is filled
-      BOOST_CHECK_EQUAL( sell_id(db).for_sale.value, 16 ); // 17 core sold, 16 remaining
+      BOOST_CHECK_EQUAL( sell_id(db).for_sale.get_amount().value, 16 ); // 17 core sold, 16 remaining
 
       BOOST_CHECK_EQUAL(get_balance(seller, core), 99999967);
       BOOST_CHECK_EQUAL(get_balance(seller, test), 3); // seller got 3 test
@@ -390,7 +390,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2_after_hf_342 )
       generate_block();
 
       BOOST_CHECK( !db.find_object( sell_id ) ); // sell order is filled
-      BOOST_CHECK_EQUAL( buy_id(db).for_sale.value, 1 ); // 2 test sold, 1 remaining
+      BOOST_CHECK_EQUAL( buy_id(db).for_sale.get_amount().value, 1 ); // 2 test sold, 1 remaining
 
       BOOST_CHECK_EQUAL(get_balance(buyer_id, core_id), 31); // buyer got 14 more core according to price 0.1515
       BOOST_CHECK_EQUAL(get_balance(buyer_id, test_id), 9999994);
@@ -444,12 +444,12 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1 )
    transfer(borrower2, seller, bitusd.amount(100000));
    transfer(borrower3, seller, bitusd.amount(100000));
 
-   BOOST_CHECK_EQUAL( 10, call.debt.value );
-   BOOST_CHECK_EQUAL( 1, call.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call2.debt.value );
-   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 10, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 1, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.get_amount().value );
 
    BOOST_CHECK_EQUAL( 200010, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -516,10 +516,10 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2 )
    transfer(borrower, seller, bitusd.amount(10));
    transfer(borrower3, seller, bitusd.amount(100000));
 
-   BOOST_CHECK_EQUAL( 10, call.debt.value );
-   BOOST_CHECK_EQUAL( 1, call.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 10, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 1, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.get_amount().value );
 
    BOOST_CHECK_EQUAL( 100010, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -538,7 +538,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2 )
    BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100010-33, get_balance(seller, bitusd) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) ); // the seller got nothing
-   BOOST_CHECK_EQUAL( 33-10, sell_id(db).for_sale.value ); // the sell order has some USD left
+   BOOST_CHECK_EQUAL( 33-10, sell_id(db).for_sale.get_amount().value ); // the sell order has some USD left
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
    BOOST_CHECK_EQUAL( init_balance, get_balance(borrower, core) );
 
@@ -589,10 +589,10 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
    transfer(borrower, seller, bitusd.amount(10));
    transfer(borrower3, seller, bitusd.amount(100000));
 
-   BOOST_CHECK_EQUAL( 10, call.debt.value );
-   BOOST_CHECK_EQUAL( 1, call.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 10, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 1, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.get_amount().value );
 
    BOOST_CHECK_EQUAL( 100010, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -601,7 +601,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
 
    // create a limit order which will be matched later
    limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
-   BOOST_CHECK_EQUAL( 33, sell_id(db).for_sale.value );
+   BOOST_CHECK_EQUAL( 33, sell_id(db).for_sale.get_amount().value );
    BOOST_CHECK_EQUAL( 100010-33, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
@@ -618,7 +618,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
    BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100010-33, get_balance(seller_id, bitusd_id) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 0, get_balance(seller_id, core_id) ); // the seller got nothing
-   BOOST_CHECK_EQUAL( 33-10, sell_id(db).for_sale.value ); // the sell order has some USD left
+   BOOST_CHECK_EQUAL( 33-10, sell_id(db).for_sale.get_amount().value ); // the sell order has some USD left
    BOOST_CHECK_EQUAL( 0, get_balance(borrower_id, bitusd_id) );
    BOOST_CHECK_EQUAL( init_balance, get_balance(borrower_id, core_id) );
 
@@ -667,12 +667,12 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1_after_hardfork )
    transfer(borrower2, seller, bitusd.amount(100000));
    transfer(borrower3, seller, bitusd.amount(100000));
 
-   BOOST_CHECK_EQUAL( 10, call.debt.value );
-   BOOST_CHECK_EQUAL( 1, call.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call2.debt.value );
-   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 10, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 1, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call2.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.get_amount().value );
 
    BOOST_CHECK_EQUAL( 200010, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -740,10 +740,10 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2_after_hardfork )
    transfer(borrower, seller, bitusd.amount(10));
    transfer(borrower3, seller, bitusd.amount(100000));
 
-   BOOST_CHECK_EQUAL( 10, call.debt.value );
-   BOOST_CHECK_EQUAL( 1, call.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 10, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 1, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.get_amount().value );
 
    BOOST_CHECK_EQUAL( 100010, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -763,7 +763,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2_after_hardfork )
    BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100010-33, get_balance(seller, bitusd) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 1, get_balance(seller, core) ); // the seller got 1 CORE
-   BOOST_CHECK_EQUAL( 33-10, sell_id(db).for_sale.value ); // the sell order has some USD left
+   BOOST_CHECK_EQUAL( 33-10, sell_id(db).for_sale.get_amount().value ); // the sell order has some USD left
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
    BOOST_CHECK_EQUAL( init_balance-1, get_balance(borrower, core) );
 
@@ -815,10 +815,10 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
    transfer(borrower, seller, bitusd.amount(10));
    transfer(borrower3, seller, bitusd.amount(100000));
 
-   BOOST_CHECK_EQUAL( 10, call.debt.value );
-   BOOST_CHECK_EQUAL( 1, call.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 10, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 1, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.get_amount().value );
 
    BOOST_CHECK_EQUAL( 100010, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -827,7 +827,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
 
    // create a limit order which will be matched later
    limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
-   BOOST_CHECK_EQUAL( 33, sell_id(db).for_sale.value );
+   BOOST_CHECK_EQUAL( 33, sell_id(db).for_sale.get_amount().value );
    BOOST_CHECK_EQUAL( 100010-33, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
@@ -844,7 +844,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
    BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100010-33, get_balance(seller_id, bitusd_id) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 1, get_balance(seller_id, core_id) ); // the seller got 1 CORE
-   BOOST_CHECK_EQUAL( 33-10, sell_id(db).for_sale.value ); // the sell order has some USD left
+   BOOST_CHECK_EQUAL( 33-10, sell_id(db).for_sale.get_amount().value ); // the sell order has some USD left
    BOOST_CHECK_EQUAL( 0, get_balance(borrower_id, bitusd_id) );
    BOOST_CHECK_EQUAL( init_balance-1, get_balance(borrower_id, core_id) );
 
@@ -891,10 +891,10 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test1 )
    transfer(borrower, seller, bitusd.amount(20));
    transfer(borrower3, seller, bitusd.amount(100000));
 
-   BOOST_CHECK_EQUAL( 20, call.debt.value );
-   BOOST_CHECK_EQUAL( 2, call.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 20, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 2, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.get_amount().value );
 
    BOOST_CHECK_EQUAL( 100020, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -914,7 +914,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test1 )
    BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100020-33, get_balance(seller, bitusd) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 1, get_balance(seller, core) ); // the seller got 1 CORE
-   BOOST_CHECK_EQUAL( 33-20, sell_id(db).for_sale.value ); // the sell order has some USD left
+   BOOST_CHECK_EQUAL( 33-20, sell_id(db).for_sale.get_amount().value ); // the sell order has some USD left
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
    BOOST_CHECK_EQUAL( init_balance-1, get_balance(borrower, core) );
 
@@ -962,10 +962,10 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test1_after_hf_342 )
    transfer(borrower, seller, bitusd.amount(20));
    transfer(borrower3, seller, bitusd.amount(100000));
 
-   BOOST_CHECK_EQUAL( 20, call.debt.value );
-   BOOST_CHECK_EQUAL( 2, call.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 20, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 2, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.get_amount().value );
 
    BOOST_CHECK_EQUAL( 100020, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -986,7 +986,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test1_after_hf_342 )
    BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100020-33, get_balance(seller, bitusd) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 2, get_balance(seller, core) ); // the seller got 2 CORE
-   BOOST_CHECK_EQUAL( 33-20, sell_id(db).for_sale.value ); // the sell order has some USD left
+   BOOST_CHECK_EQUAL( 33-20, sell_id(db).for_sale.get_amount().value ); // the sell order has some USD left
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
    BOOST_CHECK_EQUAL( init_balance-2, get_balance(borrower, core) );
 
@@ -1036,10 +1036,10 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test2 )
    transfer(borrower, seller, bitusd.amount(20));
    transfer(borrower3, seller, bitusd.amount(100000));
 
-   BOOST_CHECK_EQUAL( 20, call.debt.value );
-   BOOST_CHECK_EQUAL( 2, call.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 20, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 2, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.get_amount().value );
 
    BOOST_CHECK_EQUAL( 100020, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -1056,8 +1056,8 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test2 )
    //   effective price is 15/1.
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(15), core.amount(1)) ); // the sell order is filled
    BOOST_CHECK( db.find<call_order_object>( call_id ) != nullptr ); // the first call order did not get filled
-   BOOST_CHECK_EQUAL( 20-15, call.debt.value ); // call paid 15 USD
-   BOOST_CHECK_EQUAL( 2-1, call.collateral.value ); // call got 1 CORE
+   BOOST_CHECK_EQUAL( 20-15, call.debt.get_amount().value ); // call paid 15 USD
+   BOOST_CHECK_EQUAL( 2-1, call.collateral.get_amount().value ); // call got 1 CORE
    BOOST_CHECK_EQUAL( 100020-15, get_balance(seller, bitusd) ); // the seller paid 15 USD
    BOOST_CHECK_EQUAL( 1, get_balance(seller, core) ); // the seller got 1 CORE
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
@@ -1108,10 +1108,10 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test2_after_hf_342 )
    transfer(borrower, seller, bitusd.amount(20));
    transfer(borrower3, seller, bitusd.amount(100000));
 
-   BOOST_CHECK_EQUAL( 20, call.debt.value );
-   BOOST_CHECK_EQUAL( 2, call.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 20, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 2, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.get_amount().value );
 
    BOOST_CHECK_EQUAL( 100020, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -1129,8 +1129,8 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test2_after_hf_342 )
    //     effective price is 11/1 which is close to 120/11.
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(15), core.amount(1)) ); // the sell order is filled
    BOOST_CHECK( db.find<call_order_object>( call_id ) != nullptr ); // the first call order did not get filled
-   BOOST_CHECK_EQUAL( 20-11, call.debt.value ); // call paid 11 USD
-   BOOST_CHECK_EQUAL( 2-1, call.collateral.value ); // call got 1 CORE
+   BOOST_CHECK_EQUAL( 20-11, call.debt.get_amount().value ); // call paid 11 USD
+   BOOST_CHECK_EQUAL( 2-1, call.collateral.get_amount().value ); // call got 1 CORE
    BOOST_CHECK_EQUAL( 100020-11, get_balance(seller, bitusd) ); // the seller paid 11 USD
    BOOST_CHECK_EQUAL( 1, get_balance(seller, core) ); // the seller got 1 CORE
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
@@ -1181,10 +1181,10 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1 )
    transfer(borrower, seller, bitusd.amount(20));
    transfer(borrower3, seller, bitusd.amount(100000));
 
-   BOOST_CHECK_EQUAL( 20, call.debt.value );
-   BOOST_CHECK_EQUAL( 2, call.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 20, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 2, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.get_amount().value );
 
    BOOST_CHECK_EQUAL( 100020, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -1193,7 +1193,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1 )
 
    // create a limit order which will be matched later
    limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
-   BOOST_CHECK_EQUAL( 33, sell_id(db).for_sale.value );
+   BOOST_CHECK_EQUAL( 33, sell_id(db).for_sale.get_amount().value );
    BOOST_CHECK_EQUAL( 100020-33, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
@@ -1211,7 +1211,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1 )
    BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100020-33, get_balance(seller_id, bitusd_id) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 1, get_balance(seller_id, core_id) ); // the seller got 1 CORE
-   BOOST_CHECK_EQUAL( 33-20, sell_id(db).for_sale.value ); // the sell order has some USD left
+   BOOST_CHECK_EQUAL( 33-20, sell_id(db).for_sale.get_amount().value ); // the sell order has some USD left
    BOOST_CHECK_EQUAL( 0, get_balance(borrower_id, bitusd_id) );
    BOOST_CHECK_EQUAL( init_balance-1, get_balance(borrower_id, core_id) );
 
@@ -1261,10 +1261,10 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1_after_hf_342 )
    transfer(borrower, seller, bitusd.amount(20));
    transfer(borrower3, seller, bitusd.amount(100000));
 
-   BOOST_CHECK_EQUAL( 20, call.debt.value );
-   BOOST_CHECK_EQUAL( 2, call.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 20, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 2, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.get_amount().value );
 
    BOOST_CHECK_EQUAL( 100020, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -1273,7 +1273,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1_after_hf_342 )
 
    // create a limit order which will be matched later
    limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
-   BOOST_CHECK_EQUAL( 33, sell_id(db).for_sale.value );
+   BOOST_CHECK_EQUAL( 33, sell_id(db).for_sale.get_amount().value );
    BOOST_CHECK_EQUAL( 100020-33, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
@@ -1291,7 +1291,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1_after_hf_342 )
    BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
    BOOST_CHECK_EQUAL( 100020-33, get_balance(seller_id, bitusd_id) ); // the seller paid 33 USD
    BOOST_CHECK_EQUAL( 2, get_balance(seller_id, core_id) ); // the seller got 2 CORE
-   BOOST_CHECK_EQUAL( 33-20, sell_id(db).for_sale.value ); // the sell order has some USD left
+   BOOST_CHECK_EQUAL( 33-20, sell_id(db).for_sale.get_amount().value ); // the sell order has some USD left
    BOOST_CHECK_EQUAL( 0, get_balance(borrower_id, bitusd_id) );
    BOOST_CHECK_EQUAL( init_balance-2, get_balance(borrower_id, core_id) );
 
@@ -1340,10 +1340,10 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2 )
    transfer(borrower, seller, bitusd.amount(50));
    transfer(borrower3, seller2, bitusd.amount(100000));
 
-   BOOST_CHECK_EQUAL( 50, call.debt.value );
-   BOOST_CHECK_EQUAL( 5, call.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 50, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 5, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.get_amount().value );
 
    BOOST_CHECK_EQUAL( 50, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 100000, get_balance(seller2, bitusd) );
@@ -1353,7 +1353,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2 )
 
    // create a buy order which will be matched
    limit_order_id_type buy_id = create_sell_order(buyer, core.amount(1), bitusd.amount(10))->id;
-   BOOST_CHECK_EQUAL( 1, buy_id(db).for_sale.value );
+   BOOST_CHECK_EQUAL( 1, buy_id(db).for_sale.get_amount().value );
    BOOST_CHECK_EQUAL( 1000000-1, get_balance(buyer, core) );
    BOOST_CHECK_EQUAL( 0, get_balance(buyer, bitusd) );
 
@@ -1362,13 +1362,13 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2 )
    BOOST_CHECK( !db.find<limit_order_object>( buy_id ) ); // the buy order is filled
    BOOST_CHECK_EQUAL( 1000000-1, get_balance(buyer, core) );
    BOOST_CHECK_EQUAL( 10, get_balance(buyer, bitusd) ); // buyer got 10 usd
-   BOOST_CHECK_EQUAL( 21, sell_id(db).for_sale.value ); // remaining amount of sell order is 21
+   BOOST_CHECK_EQUAL( 21, sell_id(db).for_sale.get_amount().value ); // remaining amount of sell order is 21
    BOOST_CHECK_EQUAL( 50-31, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 1, get_balance(seller, core) ); // seller got 1 core
 
    // create another limit order which will be matched later
    limit_order_id_type sell_id2 = create_sell_order(seller2, bitusd.amount(14), core.amount(1))->id;
-   BOOST_CHECK_EQUAL( 14, sell_id2(db).for_sale.value );
+   BOOST_CHECK_EQUAL( 14, sell_id2(db).for_sale.get_amount().value );
    BOOST_CHECK_EQUAL( 100000-14, get_balance(seller2, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller2, core) );
 
@@ -1388,8 +1388,8 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2 )
    BOOST_CHECK( !db.find<limit_order_object>( sell_id ) ); // the sell order is filled
    BOOST_CHECK( !db.find<limit_order_object>( sell_id2 ) ); // the other sell order is filled
    BOOST_CHECK( db.find<call_order_object>( call_id ) != nullptr ); // the first call order did not get filled
-   BOOST_CHECK_EQUAL( 50-14-21, call_id(db).debt.value ); // call paid 14 USD and 21 USD
-   BOOST_CHECK_EQUAL( 5-1-1, call_id(db).collateral.value ); // call got 1 CORE and 1 CORE
+   BOOST_CHECK_EQUAL( 50-14-21, call_id(db).debt.get_amount().value ); // call paid 14 USD and 21 USD
+   BOOST_CHECK_EQUAL( 5-1-1, call_id(db).collateral.get_amount().value ); // call got 1 CORE and 1 CORE
    BOOST_CHECK_EQUAL( 50-31, get_balance(seller_id, bitusd_id) ); // seller paid 31 USD in total
    BOOST_CHECK_EQUAL( 1+1, get_balance(seller_id, core_id) ); // seller got 1 more CORE
    BOOST_CHECK_EQUAL( 100000-14, get_balance(seller2_id, bitusd_id) ); // seller2 paid 14 USD
@@ -1443,10 +1443,10 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2_after_hf_342 )
    transfer(borrower, seller, bitusd.amount(50));
    transfer(borrower3, seller2, bitusd.amount(100000));
 
-   BOOST_CHECK_EQUAL( 50, call.debt.value );
-   BOOST_CHECK_EQUAL( 5, call.collateral.value );
-   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 50, call.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 5, call.collateral.get_amount().value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.get_amount().value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.get_amount().value );
 
    BOOST_CHECK_EQUAL( 50, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 100000, get_balance(seller2, bitusd) );
@@ -1456,7 +1456,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2_after_hf_342 )
 
    // create a buy order which will be matched
    limit_order_id_type buy_id = create_sell_order(buyer, core.amount(1), bitusd.amount(10))->id;
-   BOOST_CHECK_EQUAL( 1, buy_id(db).for_sale.value );
+   BOOST_CHECK_EQUAL( 1, buy_id(db).for_sale.get_amount().value );
    BOOST_CHECK_EQUAL( 1000000-1, get_balance(buyer, core) );
    BOOST_CHECK_EQUAL( 0, get_balance(buyer, bitusd) );
 
@@ -1465,13 +1465,13 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2_after_hf_342 )
    BOOST_CHECK( !db.find<limit_order_object>( buy_id ) ); // the buy order is filled
    BOOST_CHECK_EQUAL( 1000000-1, get_balance(buyer, core) );
    BOOST_CHECK_EQUAL( 10, get_balance(buyer, bitusd) ); // buyer got 10 usd
-   BOOST_CHECK_EQUAL( 21, sell_id(db).for_sale.value ); // remaining amount of sell order is 21
+   BOOST_CHECK_EQUAL( 21, sell_id(db).for_sale.get_amount().value ); // remaining amount of sell order is 21
    BOOST_CHECK_EQUAL( 50-31, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 1, get_balance(seller, core) ); // seller got 1 core
 
    // create another limit order which will be matched later
    limit_order_id_type sell_id2 = create_sell_order(seller2, bitusd.amount(14), core.amount(1))->id;
-   BOOST_CHECK_EQUAL( 14, sell_id2(db).for_sale.value );
+   BOOST_CHECK_EQUAL( 14, sell_id2(db).for_sale.get_amount().value );
    BOOST_CHECK_EQUAL( 100000-14, get_balance(seller2, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller2, core) );
 
@@ -1493,8 +1493,8 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2_after_hf_342 )
    BOOST_CHECK( !db.find<limit_order_object>( sell_id ) ); // the sell order is filled
    BOOST_CHECK( !db.find<limit_order_object>( sell_id2 ) ); // the other sell order is filled
    BOOST_CHECK( db.find<call_order_object>( call_id ) != nullptr ); // the first call order did not get filled
-   BOOST_CHECK_EQUAL( 50-14-16, call_id(db).debt.value ); // call paid 14 USD and 16 USD
-   BOOST_CHECK_EQUAL( 5-1-1, call_id(db).collateral.value ); // call got 1 CORE and 1 CORE
+   BOOST_CHECK_EQUAL( 50-14-16, call_id(db).debt.get_amount().value ); // call paid 14 USD and 16 USD
+   BOOST_CHECK_EQUAL( 5-1-1, call_id(db).collateral.get_amount().value ); // call got 1 CORE and 1 CORE
    BOOST_CHECK_EQUAL( 50-31+(21-16), get_balance(seller_id, bitusd_id) ); // seller paid 31 USD then get refunded 5 USD
    BOOST_CHECK_EQUAL( 1+1, get_balance(seller_id, core_id) ); // seller got 1 more CORE
    BOOST_CHECK_EQUAL( 100000-14, get_balance(seller2_id, bitusd_id) ); // seller2 paid 14 USD

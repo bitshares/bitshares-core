@@ -28,6 +28,7 @@
 
 namespace graphene { namespace chain {
 class database;
+class stored_value;
 
 /**
   * @defgroup worker_types Implementations of the various worker types in the system
@@ -63,7 +64,7 @@ struct refund_worker_type
    /// Record of how much this worker has burned in his lifetime
    share_type total_burned;
 
-   void pay_worker(share_type pay, database&);
+   void pay_worker(stored_value&& pay, database&);
 };
 
 /**
@@ -76,7 +77,7 @@ struct vesting_balance_worker_type
    /// The balance this worker pays into
    vesting_balance_id_type balance;
 
-   void pay_worker(share_type pay, database& db);
+   void pay_worker(stored_value&& pay, database& db);
 };
 
 /**
@@ -89,7 +90,7 @@ struct burn_worker_type
    /// Record of how much this worker has burned in his lifetime
    share_type total_burned;
 
-   void pay_worker(share_type pay, database&);
+   void pay_worker(stored_value&& pay, database&);
 };
 ///@}
 

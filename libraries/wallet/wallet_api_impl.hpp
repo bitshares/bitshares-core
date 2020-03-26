@@ -151,7 +151,7 @@ public:
 
    chain_property_object get_chain_properties() const;
    global_property_object get_global_properties() const;
-   dynamic_global_property_object get_dynamic_global_properties() const;
+   graphene::app::dynamic_global_property_api_object get_dynamic_global_properties() const;
 
    account_object get_account(account_id_type id) const;
    account_object get_account(string account_name_or_id) const;
@@ -167,7 +167,7 @@ public:
 
    extended_asset_object get_asset(string asset_symbol_or_id)const;
 
-   fc::optional<htlc_object> get_htlc(string htlc_id) const;
+   fc::optional<htlc_api_object> get_htlc(string htlc_id) const;
 
    asset_id_type get_asset_id(string asset_symbol_or_id) const;
 

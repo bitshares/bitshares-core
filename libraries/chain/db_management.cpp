@@ -24,6 +24,7 @@
 
 #include <graphene/chain/database.hpp>
 
+#include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/witness_schedule_object.hpp>
 #include <graphene/chain/special_authority_object.hpp>
@@ -32,6 +33,7 @@
 #include <graphene/protocol/fee_schedule.hpp>
 
 #include <fc/io/fstream.hpp>
+#include <fc/thread/parallel.hpp>
 
 #include <fstream>
 #include <functional>
@@ -258,6 +260,10 @@ void database::close(bool rewind)
    // we have to clear_pending() after we're done popping to get a clean
    // DB state (issue #336).
    clear_pending();
+
+   modify( get_core_dynamic_data(), [this] ( asset_dynamic_data_object& add ) {
+      _negative_genesis.burn( add.current_supply.issue(_negative_genesis.get_amount()) );
+   });
 
    object_database::flush();
    object_database::close();

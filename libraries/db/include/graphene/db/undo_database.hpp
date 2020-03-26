@@ -127,6 +127,7 @@ namespace graphene { namespace db {
          void undo();
          void merge();
          void commit();
+         void _undo_last();
 
          uint32_t                _active_sessions = 0;
          bool                    _disabled = true;
@@ -135,4 +136,17 @@ namespace graphene { namespace db {
          size_t                  _max_size = 256;
    };
 
+   template<typename Original>
+   class backup_object
+   {
+      std::unique_ptr<Original> tmp;
+   protected:
+      virtual object* recreate()
+      {
+         if( !tmp )
+            tmp = std::make_unique<Original>();
+         return tmp.get();
+      }
+      friend class undo_database;
+   };
 } } // graphene::db

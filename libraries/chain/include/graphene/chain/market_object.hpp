@@ -24,6 +24,7 @@
 #pragma once
 
 #include <graphene/chain/types.hpp>
+#include <graphene/chain/stored_value.hpp>
 #include <graphene/db/generic_index.hpp>
 #include <graphene/protocol/asset.hpp>
 
@@ -41,7 +42,8 @@ using namespace graphene::db;
  *
  *  This limit_order_objects are indexed by @ref expiration and is automatically deleted on the first block after expiration.
  */
-class limit_order_object : public abstract_object<limit_order_object>
+class limit_order_object;
+class limit_order_master : public abstract_object< limit_order_master, limit_order_object >
 {
    public:
       static constexpr uint8_t space_id = protocol_ids;
@@ -49,10 +51,7 @@ class limit_order_object : public abstract_object<limit_order_object>
 
       time_point_sec   expiration;
       account_id_type  seller;
-      share_type       for_sale; ///< asset id is sell_price.base.asset_id
       price            sell_price;
-      share_type       deferred_fee; ///< fee converted to CORE
-      asset            deferred_paid_fee; ///< originally paid fee
 
       pair<asset_id_type,asset_id_type> get_market()const
       {
@@ -61,10 +60,24 @@ class limit_order_object : public abstract_object<limit_order_object>
          return tmp;
       }
 
-      asset amount_for_sale()const   { return asset( for_sale, sell_price.base.asset_id ); }
-      asset amount_to_receive()const { return amount_for_sale() * sell_price; }
       asset_id_type sell_asset_id()const    { return sell_price.base.asset_id;  }
       asset_id_type receive_asset_id()const { return sell_price.quote.asset_id; }
+};
+
+class limit_order_object : public limit_order_master
+{
+   public:
+      stored_value for_sale; ///< asset id is sell_price.base.asset_id
+      stored_value deferred_fee; ///< fee converted to CORE
+      stored_value deferred_paid_fee; ///< originally paid fee
+
+      asset amount_for_sale()const   { return for_sale.get_value(); }
+      asset amount_to_receive()const { return amount_for_sale() * sell_price; }
+
+   protected:
+      virtual unique_ptr<graphene::db::object> backup()const;
+      virtual void restore( graphene::db::object& obj );
+      virtual void clear();
 };
 
 struct by_price;
@@ -76,21 +89,21 @@ typedef multi_index_container<
       ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
       ordered_unique< tag<by_expiration>,
          composite_key< limit_order_object,
-            member< limit_order_object, time_point_sec, &limit_order_object::expiration>,
+            member< limit_order_master, time_point_sec, &limit_order_master::expiration>,
             member< object, object_id_type, &object::id>
          >
       >,
       ordered_unique< tag<by_price>,
          composite_key< limit_order_object,
-            member< limit_order_object, price, &limit_order_object::sell_price>,
+            member< limit_order_master, price, &limit_order_master::sell_price>,
             member< object, object_id_type, &object::id>
          >,
          composite_key_compare< std::greater<price>, std::less<object_id_type> >
       >,
       ordered_unique< tag<by_account>,
          composite_key< limit_order_object,
-            member<limit_order_object, account_id_type, &limit_order_object::seller>,
-            member<limit_order_object, price, &limit_order_object::sell_price>,
+            member<limit_order_master, account_id_type, &limit_order_master::seller>,
+            member<limit_order_master, price, &limit_order_master::sell_price>,
             member<object, object_id_type, &object::id>
          >,
          composite_key_compare<std::less<account_id_type>, std::greater<price>, std::less<object_id_type>>
@@ -107,22 +120,17 @@ typedef generic_index<limit_order_object, limit_order_multi_index_type> limit_or
  * There should only be one call_order_object per asset pair per account and
  * they will all have the same call price.
  */
-class call_order_object : public abstract_object<call_order_object>
+class call_order_object;
+class call_order_master : public abstract_object< call_order_master, call_order_object >
 {
    public:
       static constexpr uint8_t space_id = protocol_ids;
       static constexpr uint8_t type_id  = call_order_object_type;
 
-      asset get_collateral()const { return asset( collateral, call_price.base.asset_id ); }
-      asset get_debt()const { return asset( debt, debt_type() ); }
-      asset amount_to_receive()const { return get_debt(); }
       asset_id_type debt_type()const { return call_price.quote.asset_id; }
       asset_id_type collateral_type()const { return call_price.base.asset_id; }
-      price collateralization()const { return get_collateral() / get_debt(); }
 
       account_id_type  borrower;
-      share_type       collateral;  ///< call_price.base.asset_id, access via get_collateral
-      share_type       debt;        ///< call_price.quote.asset_id, access via get_debt
       price            call_price;  ///< Collateral / Debt
 
       optional<uint16_t> target_collateral_ratio; ///< maximum CR to maintain when selling collateral on margin call
@@ -133,6 +141,17 @@ class call_order_object : public abstract_object<call_order_object>
          if( tmp.first > tmp.second ) std::swap( tmp.first, tmp.second );
          return tmp;
       }
+};
+
+class call_order_object : public call_order_master
+{
+   public:
+      stored_debt  debt;
+      stored_value collateral;
+
+      asset get_debt()const { return debt.get_value(); }
+      asset get_collateral()const { return collateral.get_value(); }
+      price collateralization()const { return get_collateral() / get_debt(); }
 
       /**
        *  Calculate maximum quantity of debt to cover to satisfy @ref target_collateral_ratio.
@@ -148,6 +167,11 @@ class call_order_object : public abstract_object<call_order_object>
                                         price feed_price,
                                         const uint16_t maintenance_collateral_ratio,
                                         const optional<price>& maintenance_collateralization = optional<price>() )const;
+
+   protected:
+      virtual unique_ptr<graphene::db::object> backup()const;
+      virtual void restore( graphene::db::object& obj );
+      virtual void clear();
 };
 
 /**
@@ -156,18 +180,28 @@ class call_order_object : public abstract_object<call_order_object>
  *  On the @ref settlement_date the @ref balance will be converted to the collateral asset
  *  and paid to @ref owner and then this object will be deleted.
  */
-class force_settlement_object : public abstract_object<force_settlement_object>
+class force_settlement_object;
+class force_settlement_master : public abstract_object< force_settlement_master, force_settlement_object >
 {
    public:
       static constexpr uint8_t space_id = protocol_ids;
       static constexpr uint8_t type_id  = force_settlement_object_type;
 
       account_id_type   owner;
-      asset             balance;
       time_point_sec    settlement_date;
+};
 
-      asset_id_type settlement_asset_id()const
-      { return balance.asset_id; }
+class force_settlement_object : public force_settlement_master
+{
+   public:
+      stored_value balance;
+
+      asset_id_type settlement_asset_id()const { return balance.get_asset(); }
+
+   protected:
+      virtual unique_ptr<graphene::db::object> backup()const;
+      virtual void restore( graphene::db::object& obj );
+      virtual void clear();
 };
 
 /**
@@ -177,18 +211,30 @@ class force_settlement_object : public abstract_object<force_settlement_object>
  * There should only be one collateral_bid_object per asset per account, and
  * only for smartcoin assets that have a global settlement_price.
  */
-class collateral_bid_object : public abstract_object<collateral_bid_object>
+class collateral_bid_object;
+class collateral_bid_master : public abstract_object< collateral_bid_master, collateral_bid_object >
 {
    public:
       static constexpr uint8_t space_id = implementation_ids;
       static constexpr uint8_t type_id  = impl_collateral_bid_object_type;
 
-      asset get_additional_collateral()const { return inv_swan_price.base; }
-      asset get_debt_covered()const { return inv_swan_price.quote; }
-      asset_id_type debt_type()const { return inv_swan_price.quote.asset_id; }
+      asset_id_type debt_type()const { return debt_covered.asset_id; }
 
       account_id_type  bidder;
-      price            inv_swan_price;  // Collateral / Debt
+      asset            debt_covered;
+};
+
+class collateral_bid_object : public collateral_bid_master
+{
+   public:
+      price get_inv_swan_price()const { return collateral_offered.get_value() / debt_covered; }
+
+      stored_value     collateral_offered;  // Collateral / Debt
+
+   protected:
+      virtual unique_ptr<graphene::db::object> backup()const;
+      virtual void restore( graphene::db::object& obj );
+      virtual void clear();
 };
 
 struct by_collateral;
@@ -201,15 +247,15 @@ typedef multi_index_container<
          member< object, object_id_type, &object::id > >,
       ordered_unique< tag<by_price>,
          composite_key< call_order_object,
-            member< call_order_object, price, &call_order_object::call_price>,
+            member< call_order_master, price, &call_order_master::call_price>,
             member< object, object_id_type, &object::id>
          >,
          composite_key_compare< std::less<price>, std::less<object_id_type> >
       >,
       ordered_unique< tag<by_account>,
          composite_key< call_order_object,
-            member< call_order_object, account_id_type, &call_order_object::borrower >,
-            const_mem_fun< call_order_object, asset_id_type, &call_order_object::debt_type>
+            member< call_order_master, account_id_type, &call_order_master::borrower >,
+            const_mem_fun< call_order_master, asset_id_type, &call_order_master::debt_type>
          >
       >,
       ordered_unique< tag<by_collateral>,
@@ -228,14 +274,14 @@ typedef multi_index_container<
       ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
       ordered_unique< tag<by_account>,
          composite_key< force_settlement_object,
-            member<force_settlement_object, account_id_type, &force_settlement_object::owner>,
+            member<force_settlement_master, account_id_type, &force_settlement_master::owner>,
             member< object, object_id_type, &object::id >
          >
       >,
       ordered_unique< tag<by_expiration>,
          composite_key< force_settlement_object,
             const_mem_fun<force_settlement_object, asset_id_type, &force_settlement_object::settlement_asset_id>,
-            member<force_settlement_object, time_point_sec, &force_settlement_object::settlement_date>,
+            member<force_settlement_master, time_point_sec, &force_settlement_master::settlement_date>,
             member< object, object_id_type, &object::id >
          >
       >
@@ -249,14 +295,14 @@ typedef multi_index_container<
          member< object, object_id_type, &object::id > >,
       ordered_unique< tag<by_account>,
          composite_key< collateral_bid_object,
-            const_mem_fun< collateral_bid_object, asset_id_type, &collateral_bid_object::debt_type>,
-            member< collateral_bid_object, account_id_type, &collateral_bid_object::bidder>
+            const_mem_fun< collateral_bid_master, asset_id_type, &collateral_bid_master::debt_type>,
+            member< collateral_bid_master, account_id_type, &collateral_bid_master::bidder>
          >
       >,
       ordered_unique< tag<by_price>,
          composite_key< collateral_bid_object,
-            const_mem_fun< collateral_bid_object, asset_id_type, &collateral_bid_object::debt_type>,
-            member< collateral_bid_object, price, &collateral_bid_object::inv_swan_price >,
+            const_mem_fun< collateral_bid_master, asset_id_type, &collateral_bid_master::debt_type>,
+            const_mem_fun< collateral_bid_object, price, &collateral_bid_object::get_inv_swan_price >,
             member< object, object_id_type, &object::id >
          >,
          composite_key_compare< std::less<asset_id_type>, std::greater<price>, std::less<object_id_type> >
@@ -275,12 +321,29 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::call_order_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::force_settlement_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::collateral_bid_object)
 
+FC_REFLECT_DERIVED( graphene::chain::limit_order_master,
+                    (graphene::db::object),
+                    (expiration)(seller)(sell_price)
+                  )
+FC_REFLECT_DERIVED( graphene::chain::call_order_master, (graphene::db::object),
+                    (borrower)(call_price)(target_collateral_ratio) )
+FC_REFLECT_DERIVED( graphene::chain::force_settlement_master,
+                    (graphene::db::object),
+                    (owner)(settlement_date)
+                  )
+FC_REFLECT_DERIVED( graphene::chain::collateral_bid_master, (graphene::db::object),
+                    (bidder)(debt_covered) )
+
 FC_REFLECT_TYPENAME( graphene::chain::limit_order_object )
 FC_REFLECT_TYPENAME( graphene::chain::call_order_object )
 FC_REFLECT_TYPENAME( graphene::chain::force_settlement_object )
 FC_REFLECT_TYPENAME( graphene::chain::collateral_bid_object )
 
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::limit_order_master )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::limit_order_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::call_order_master )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::call_order_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::force_settlement_master )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::force_settlement_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::collateral_bid_master )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::collateral_bid_object )

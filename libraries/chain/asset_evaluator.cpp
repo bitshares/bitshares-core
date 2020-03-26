@@ -98,8 +98,8 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
 void asset_create_evaluator::pay_fee()
 {
-   fee_is_odd = core_fee_paid.value & 1;
-   core_fee_paid -= core_fee_paid.value/2;
+   fee_is_odd = core_fee_paid.get_amount().value & 1;
+   for_pool = core_fee_paid.split( core_fee_paid.get_amount().value/2 );
    generic_evaluator::pay_fee();
 }
 
@@ -107,30 +107,30 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
 { try {
    database& d = db();
 
-   bool hf_429 = fee_is_odd && d.head_block_time() > HARDFORK_CORE_429_TIME;
+   const auto next_asset_id = d.get_index_type<asset_index>().get_next_id();
+
+   if( fee_is_odd && d.head_block_time() <= HARDFORK_CORE_429_TIME )
+      d.modify( d.get_core_dynamic_data(), [this]( asset_dynamic_data_object& dd ) {
+         for_pool += dd.current_supply.issue(1);
+      });
 
    const asset_dynamic_data_object& dyn_asset =
-      d.create<asset_dynamic_data_object>( [hf_429,this]( asset_dynamic_data_object& a ) {
-         a.current_supply = 0;
-         a.fee_pool = core_fee_paid - (hf_429 ? 1 : 0);
+      d.create<asset_dynamic_data_object>( [this,next_asset_id]( asset_dynamic_data_object& a ) {
+         a.current_supply = stored_debt(next_asset_id);
+         a.accumulated_fees = stored_value(next_asset_id);
+         a.fee_pool = std::move(for_pool);
+         a.confidential_supply = stored_value(next_asset_id);
       });
-
-   if( fee_is_odd && !hf_429 )
-   {
-      d.modify( d.get_core_dynamic_data(), []( asset_dynamic_data_object& dd ) {
-         dd.current_supply++;
-      });
-   }
 
    asset_bitasset_data_id_type bit_asset_id;
-
-   auto next_asset_id = d.get_index_type<asset_index>().get_next_id();
 
    if( op.bitasset_opts.valid() )
       bit_asset_id = d.create<asset_bitasset_data_object>( [&op,next_asset_id]( asset_bitasset_data_object& a ) {
             a.options = *op.bitasset_opts;
             a.is_prediction_market = op.is_prediction_market;
             a.asset_id = next_asset_id;
+            a.total_debt = stored_value(next_asset_id);
+            a.settlement_fund = stored_value(a.options.short_backing_asset);
          }).id;
 
    const asset_object& new_asset =
@@ -164,18 +164,19 @@ void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
    FC_ASSERT( is_authorized_asset( d, *to_account, a ) );
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
-   FC_ASSERT( (asset_dyn_data->current_supply + o.asset_to_issue.amount) <= a.options.max_supply );
+   FC_ASSERT( (asset_dyn_data->current_supply.get_amount() + o.asset_to_issue.amount) <= a.options.max_supply );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result asset_issue_evaluator::do_apply( const asset_issue_operation& o )
 { try {
-   db().adjust_balance( o.issue_to_account, o.asset_to_issue );
-
-   db().modify( *asset_dyn_data, [&o]( asset_dynamic_data_object& data ){
-        data.current_supply += o.asset_to_issue.amount;
+   stored_value transport;
+   db().modify( *asset_dyn_data, [&o,&transport]( asset_dynamic_data_object& data ){
+      transport = data.current_supply.issue( o.asset_to_issue.amount );
    });
+
+   db().add_balance( o.issue_to_account, std::move(transport) );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -196,17 +197,17 @@ void_result asset_reserve_evaluator::do_evaluate( const asset_reserve_operation&
    FC_ASSERT( is_authorized_asset( d, *from_account, a ) );
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
-   FC_ASSERT( (asset_dyn_data->current_supply - o.amount_to_reserve.amount) >= 0 );
+   FC_ASSERT( (asset_dyn_data->current_supply.get_amount() - o.amount_to_reserve.amount) >= 0 );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result asset_reserve_evaluator::do_apply( const asset_reserve_operation& o )
 { try {
-   db().adjust_balance( o.payer, -o.amount_to_reserve );
+   stored_value transport = db().reduce_balance( o.payer, o.amount_to_reserve );
 
-   db().modify( *asset_dyn_data, [&o]( asset_dynamic_data_object& data ){
-        data.current_supply -= o.amount_to_reserve.amount;
+   db().modify( *asset_dyn_data, [&transport]( asset_dynamic_data_object& data ){
+        data.current_supply.burn( std::move(transport) );
    });
 
    return void_result();
@@ -225,10 +226,10 @@ void_result asset_fund_fee_pool_evaluator::do_evaluate(const asset_fund_fee_pool
 
 void_result asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool_operation& o)
 { try {
-   db().adjust_balance(o.from_account, -o.amount);
+   stored_value transport = db().reduce_balance( o.from_account, o.amount );
 
-   db().modify( *asset_dyn_data, [&o]( asset_dynamic_data_object& data ) {
-      data.fee_pool += o.amount;
+   db().modify( *asset_dyn_data, [&transport]( asset_dynamic_data_object& data ) {
+      data.fee_pool += std::move(transport);
    });
 
    return void_result();
@@ -267,7 +268,7 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       validate_new_issuer( d, a, *o.new_issuer );
    }
 
-   if( a.dynamic_asset_data_id(d).current_supply != 0 )
+   if( a.dynamic_asset_data_id(d).current_supply.get_amount() != 0 )
    {
       // new issuer_permissions must be subset of old issuer permissions
       FC_ASSERT(!(o.new_options.issuer_permissions & ~a.options.issuer_permissions),
@@ -417,8 +418,10 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    // Are we changing the backing asset?
    if( op.new_options.short_backing_asset != current_bitasset_data.options.short_backing_asset )
    {
-      FC_ASSERT( asset_obj.dynamic_asset_data_id(d).current_supply == 0,
+      FC_ASSERT( asset_obj.dynamic_asset_data_id(d).current_supply.get_amount() == 0,
                  "Cannot update a bitasset if there is already a current supply." );
+      FC_ASSERT( current_bitasset_data.settlement_fund.get_amount() == 0,
+                 "Settlement fund is non-empty but debt is 0?!" );
 
       const asset_object& new_backing_asset = op.new_options.short_backing_asset(d); // check if the asset exists
 
@@ -502,7 +505,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
  * @param asset_to_update the asset_object related to this bitasset_data_object
  * @returns true if the feed price is changed, and after hf core-868-890
  */
-static bool update_bitasset_object_options(
+bool update_bitasset_object_options(
       const asset_update_bitasset_operation& op, database& db,
       asset_bitasset_data_object& bdo, const asset_object& asset_to_update )
 {
@@ -522,21 +525,23 @@ static bool update_bitasset_object_options(
    }
 
    // feeds must be reset if the backing asset is changed after hardfork core-868-890
-   bool backing_asset_changed = false;
+   bool backing_asset_changed = op.new_options.short_backing_asset != bdo.options.short_backing_asset;
    bool is_witness_or_committee_fed = false;
-   if( after_hf_core_868_890
-         && op.new_options.short_backing_asset != bdo.options.short_backing_asset )
+   if( backing_asset_changed )
    {
-      backing_asset_changed = true;
-      should_update_feeds = true;
-      if( asset_to_update.options.flags & ( witness_fed_asset | committee_fed_asset ) )
-         is_witness_or_committee_fed = true;
+      bdo.settlement_fund.restore( asset(0, op.new_options.short_backing_asset) ); // not nice
+      if( after_hf_core_868_890 )
+      {
+         should_update_feeds = true;
+         if( asset_to_update.options.flags & ( witness_fed_asset | committee_fed_asset ) )
+            is_witness_or_committee_fed = true;
+      }
    }
 
    bdo.options = op.new_options;
 
    // are we modifying the underlying? If so, reset the feeds
-   if( backing_asset_changed )
+   if( after_hf_core_868_890 && backing_asset_changed )
    {
       if( is_witness_or_committee_fed )
       {
@@ -658,7 +663,8 @@ void_result asset_global_settle_evaluator::do_evaluate(const asset_global_settle
    FC_ASSERT( asset_to_settle->is_market_issued(), "Can only globally settle market-issued assets" );
    FC_ASSERT( asset_to_settle->can_global_settle(), "The global_settle permission of this asset is disabled" );
    FC_ASSERT( asset_to_settle->issuer == op.issuer, "Only asset issuer can globally settle an asset" );
-   FC_ASSERT( asset_to_settle->dynamic_data(d).current_supply > 0, "Can not globally settle an asset with zero supply" );
+   FC_ASSERT( asset_to_settle->dynamic_data(d).current_supply.get_amount() > 0,
+              "Can not globally settle an asset with zero supply" );
 
    const asset_bitasset_data_object& _bitasset_data  = asset_to_settle->bitasset_data(d);
    // if there is a settlement for this asset, then no further global settle may be taken
@@ -710,10 +716,10 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
       const auto& mia_dyn = asset_to_settle->dynamic_asset_data_id(d);
 
       auto settled_amount = op.amount * bitasset.settlement_price; // round down, in favor of global settlement fund
-      if( op.amount.amount == mia_dyn.current_supply )
-         settled_amount.amount = bitasset.settlement_fund; // avoid rounding problems
+      if( op.amount.amount == mia_dyn.current_supply.get_amount() )
+         settled_amount.amount = bitasset.settlement_fund.get_amount(); // avoid rounding problems
       else
-         FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund ); // should be strictly < except for PM with zero outcome
+         FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund.get_amount() ); // should be strictly < except for PM with zero outcome
 
       if( settled_amount.amount == 0 && !bitasset.is_prediction_market )
       {
@@ -724,37 +730,37 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
       }
 
       asset pays = op.amount;
-      if( op.amount.amount != mia_dyn.current_supply
+      if( op.amount.amount != mia_dyn.current_supply.get_amount()
             && settled_amount.amount != 0
             && d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_342_TIME )
       {
          pays = settled_amount.multiply_and_round_up( bitasset.settlement_price );
       }
 
-      d.adjust_balance( op.account, -pays );
+      stored_value transport_debt = d.reduce_balance( op.account, pays );
+      d.modify( mia_dyn, [&transport_debt]( asset_dynamic_data_object& obj ){
+         obj.current_supply.burn( std::move(transport_debt) );
+      });
 
       if( settled_amount.amount > 0 )
       {
-         d.modify( bitasset, [&]( asset_bitasset_data_object& obj ){
-            obj.settlement_fund -= settled_amount.amount;
+         stored_value transport_collateral;
+         d.modify( bitasset, [&transport_collateral,&settled_amount]( asset_bitasset_data_object& obj ){
+            transport_collateral = obj.settlement_fund.split( settled_amount.amount );
          });
 
-         d.adjust_balance( op.account, settled_amount );
+         d.add_balance( op.account, std::move(transport_collateral) );
       }
-
-      d.modify( mia_dyn, [&]( asset_dynamic_data_object& obj ){
-         obj.current_supply -= pays.amount;
-      });
 
       return settled_amount;
    }
    else
    {
-      d.adjust_balance( op.account, -op.amount );
-      return d.create<force_settlement_object>([&](force_settlement_object& s) {
+      stored_value to_settle = d.reduce_balance( op.account, op.amount );
+      return d.create<force_settlement_object>([&op,&to_settle,this](force_settlement_object& s) {
          s.owner = op.account;
-         s.balance = op.amount;
-         s.settlement_date = d.head_block_time() + asset_to_settle->bitasset_data(d).options.force_settlement_delay_sec;
+         s.balance = std::move(to_settle);
+         s.settlement_date = db().head_block_time() + asset_to_settle->bitasset_data(db()).options.force_settlement_delay_sec;
       }).id;
    }
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -842,23 +848,21 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
       {
          bool should_revive = false;
          const auto& mia_dyn = base.dynamic_asset_data_id(d);
-         if( mia_dyn.current_supply == 0 ) // if current supply is zero, revive the asset
+         if( mia_dyn.current_supply.get_amount() == 0 ) // if current supply is zero, revive the asset
             should_revive = true;
          else // if current supply is not zero, when collateral ratio of settlement fund is greater than MCR, revive the asset
          {
             if( next_maint_time <= HARDFORK_CORE_1270_TIME )
             {
                // before core-1270 hard fork, calculate call_price and compare to median feed
-               if( ~price::call_price( asset(mia_dyn.current_supply, o.asset_id),
-                                       asset(bad.settlement_fund, bad.options.short_backing_asset),
+               if( ~price::call_price( mia_dyn.current_supply.get_value(), bad.settlement_fund.get_value(),
                                        bad.current_feed.maintenance_collateral_ratio ) < bad.current_feed.settlement_price )
                   should_revive = true;
             }
             else
             {
                // after core-1270 hard fork, calculate collateralization and compare to maintenance_collateralization
-               if( price( asset( bad.settlement_fund, bad.options.short_backing_asset ),
-                          asset( mia_dyn.current_supply, o.asset_id ) ) > bad.current_maintenance_collateralization )
+               if( price( bad.settlement_fund.get_value(), mia_dyn.current_supply.get_value() ) > bad.current_maintenance_collateralization )
                   should_revive = true;
             }
          }
@@ -887,13 +891,15 @@ void_result asset_claim_fees_evaluator::do_apply( const asset_claim_fees_operati
 
    const asset_object& a = o.amount_to_claim.asset_id(d);
    const asset_dynamic_data_object& addo = a.dynamic_asset_data_id(d);
-   FC_ASSERT( o.amount_to_claim.amount <= addo.accumulated_fees, "Attempt to claim more fees than have accumulated", ("addo",addo) );
+   FC_ASSERT( o.amount_to_claim.amount <= addo.accumulated_fees.get_amount(),
+              "Attempt to claim more fees than have accumulated", ("addo",addo) );
 
-   d.modify( addo, [&]( asset_dynamic_data_object& _addo  ) {
-     _addo.accumulated_fees -= o.amount_to_claim.amount;
+   stored_value transport;
+   d.modify( addo, [&transport,&o]( asset_dynamic_data_object& _addo  ) {
+      transport = _addo.accumulated_fees.split( o.amount_to_claim.amount );
    });
 
-   d.adjust_balance( o.issuer, o.amount_to_claim );
+   d.add_balance( o.issuer, std::move(transport) );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -912,13 +918,15 @@ void_result asset_claim_pool_evaluator::do_apply( const asset_claim_pool_operati
 
     const asset_object& a = o.asset_id(d);
     const asset_dynamic_data_object& addo = a.dynamic_asset_data_id(d);
-    FC_ASSERT( o.amount_to_claim.amount <= addo.fee_pool, "Attempt to claim more fees than is available", ("addo",addo) );
+    FC_ASSERT( o.amount_to_claim.amount <= addo.fee_pool.get_amount(),
+               "Attempt to claim more fees than is available", ("addo",addo) );
 
-    d.modify( addo, [&o]( asset_dynamic_data_object& _addo  ) {
-        _addo.fee_pool -= o.amount_to_claim.amount;
+   stored_value transport;
+    d.modify( addo, [&o,&transport]( asset_dynamic_data_object& _addo  ) {
+        transport = _addo.fee_pool.split( o.amount_to_claim.amount );
     });
 
-    d.adjust_balance( o.issuer, o.amount_to_claim );
+    d.add_balance( o.issuer, std::move(transport) );
 
     return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

@@ -300,11 +300,11 @@ namespace graphene { namespace wallet { namespace detail {
          return result;
       }
 
-      vector< vesting_balance_object > vbos = _remote_db->get_vesting_balances( account_name );
+      vector< vesting_balance_api_object > vbos = _remote_db->get_vesting_balances( account_name );
       if( vbos.size() == 0 )
          return result;
 
-      for( const vesting_balance_object& vbo : vbos )
+      for( const auto& vbo : vbos )
          result.emplace_back( vbo, now );
 
       return result;
@@ -315,7 +315,7 @@ namespace graphene { namespace wallet { namespace detail {
          const vector<string>& wif_keys, bool broadcast )
    { try {
       FC_ASSERT(!is_locked());
-      const dynamic_global_property_object& dpo = _remote_db->get_dynamic_global_properties();
+      const auto dpo = _remote_db->get_dynamic_global_properties();
       account_object claimer = get_account( name_or_id );
       uint32_t max_ops_per_tx = 30;
 
@@ -365,11 +365,11 @@ namespace graphene { namespace wallet { namespace detail {
          }
       }
 
-      vector< balance_object > balances = _remote_db->get_balance_objects( addrs );
+      vector< balance_api_object > balances = _remote_db->get_balance_objects( addrs );
       addrs.clear();
 
       set<asset_id_type> bal_types;
-      for( auto b : balances ) bal_types.insert( b.balance.asset_id );
+      for( const auto& b : balances ) bal_types.insert( b.balance.asset_id );
 
       struct claim_tx
       {
@@ -382,11 +382,11 @@ namespace graphene { namespace wallet { namespace detail {
       {
          balance_claim_operation op;
          op.deposit_to_account = claimer.id;
-         for( const balance_object& b : balances )
+         for( const auto& b : balances )
          {
             if( b.balance.asset_id == a )
             {
-               op.total_claimed = b.available( dpo.time );
+               op.total_claimed = b.available( b.balance, dpo.time );
                if( op.total_claimed.amount == 0 )
                   continue;
                op.balance_to_claim = b.id;

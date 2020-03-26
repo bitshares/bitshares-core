@@ -91,14 +91,15 @@ object_id_type vesting_balance_create_evaluator::do_apply( const vesting_balance
    const time_point_sec now = d.head_block_time();
 
    FC_ASSERT( d.get_balance( op.creator, op.amount.asset_id ) >= op.amount );
-   d.adjust_balance( op.creator, -op.amount );
 
-   const vesting_balance_object& vbo = d.create< vesting_balance_object >( [&]( vesting_balance_object& obj )
+   stored_value transport = d.reduce_balance( op.creator, op.amount );
+
+   const vesting_balance_object& vbo = d.create< vesting_balance_object >( [&op,now,&transport]( vesting_balance_object& obj )
    {
       //WARNING: The logic to create a vesting balance object is replicated in vesting_balance_worker_type::initializer::init.
       // If making changes to this logic, check if those changes should also be made there as well.
       obj.owner = op.owner;
-      obj.balance = op.amount;
+      obj.balance = std::move(transport);
       op.policy.visit( init_policy_visitor( obj.policy, op.amount.amount, now ) );
    } );
 
@@ -114,7 +115,7 @@ void_result vesting_balance_withdraw_evaluator::do_evaluate( const vesting_balan
    const vesting_balance_object& vbo = op.vesting_balance( d );
    FC_ASSERT( op.owner == vbo.owner, "", ("op.owner", op.owner)("vbo.owner", vbo.owner) );
    FC_ASSERT( vbo.is_withdraw_allowed( now, op.amount ), "", ("now", now)("op", op)("vbo", vbo) );
-   assert( op.amount <= vbo.balance );      // is_withdraw_allowed should fail before this check is reached
+   assert( op.amount <= vbo.balance.get_value() );      // is_withdraw_allowed should fail before this check is reached
 
    /* const account_object& owner_account = */ op.owner( d );
    // TODO: Check asset authorizations and withdrawals
@@ -131,13 +132,13 @@ void_result vesting_balance_withdraw_evaluator::do_apply( const vesting_balance_
    // Allow zero balance objects to stick around, (1) to comply
    // with the chain's "objects live forever" design principle, (2)
    // if it's cashback or worker, it'll be filled up again.
-
-   d.modify( vbo, [&]( vesting_balance_object& vbo )
+   stored_value transport;
+   d.modify( vbo, [&transport,now,&op]( vesting_balance_object& vbo )
    {
-      vbo.withdraw( now, op.amount );
+      transport = vbo.withdraw( now, op.amount );
    } );
 
-   d.adjust_balance( op.owner, op.amount );
+   d.add_balance( op.owner, std::move(transport) );
 
    // TODO: Check asset authorizations and withdrawals
    return void_result();

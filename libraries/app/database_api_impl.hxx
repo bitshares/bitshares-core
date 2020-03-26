@@ -60,7 +60,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       global_property_object get_global_properties()const;
       fc::variant_object get_config()const;
       chain_id_type get_chain_id()const;
-      dynamic_global_property_object get_dynamic_global_properties()const;
+      const dynamic_global_property_object& get_dynamic_global_properties()const;
 
       // Keys
       vector<flat_set<account_id_type>> get_key_references( vector<public_key_type> key )const;
@@ -84,9 +84,9 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<asset> get_account_balances( const std::string& account_name_or_id,
                                           const flat_set<asset_id_type>& assets )const;
       vector<asset> get_named_account_balances(const std::string& name, const flat_set<asset_id_type>& assets)const;
-      vector<balance_object> get_balance_objects( const vector<address>& addrs )const;
+      vector<balance_api_object> get_balance_objects( const vector<address>& addrs )const;
       vector<asset> get_vested_balances( const vector<balance_id_type>& objs )const;
-      vector<vesting_balance_object> get_vesting_balances( const std::string account_id_or_name )const;
+      vector<vesting_balance_api_object> get_vesting_balances( const std::string account_id_or_name )const;
 
       // Assets
       uint64_t get_asset_count()const;
@@ -99,22 +99,22 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
                                                                    asset_id_type start, uint32_t limit)const;
 
       // Markets / feeds
-      vector<limit_order_object>         get_limit_orders( const std::string& a, const std::string& b,
+      vector<limit_order_api_object>         get_limit_orders( const std::string& a, const std::string& b,
                                                            uint32_t limit)const;
-      vector<limit_order_object>         get_account_limit_orders( const string& account_name_or_id,
+      vector<limit_order_api_object>         get_account_limit_orders( const string& account_name_or_id,
                                                                    const string &base,
                                                                    const string &quote, uint32_t limit,
                                                                    optional<limit_order_id_type> ostart_id,
                                                                    optional<price> ostart_price );
-      vector<call_order_object>          get_call_orders(const std::string& a, uint32_t limit)const;
-      vector<call_order_object>          get_call_orders_by_account(const std::string& account_name_or_id,
+      vector<call_order_api_object>          get_call_orders(const std::string& a, uint32_t limit)const;
+      vector<call_order_api_object>          get_call_orders_by_account(const std::string& account_name_or_id,
                                                                     asset_id_type start, uint32_t limit)const;
-      vector<force_settlement_object>    get_settle_orders(const std::string& a, uint32_t limit)const;
-      vector<force_settlement_object>    get_settle_orders_by_account(const std::string& account_name_or_id,
+      vector<force_settlement_api_object>    get_settle_orders(const std::string& a, uint32_t limit)const;
+      vector<force_settlement_api_object>    get_settle_orders_by_account(const std::string& account_name_or_id,
                                                                       force_settlement_id_type start,
                                                                       uint32_t limit)const;
-      vector<call_order_object>          get_margin_positions( const std::string account_id_or_name )const;
-      vector<collateral_bid_object>      get_collateral_bids( const std::string& asset,
+      vector<call_order_api_object>          get_margin_positions( const std::string account_id_or_name )const;
+      vector<collateral_bid_api_object>      get_collateral_bids( const std::string& asset,
                                                               uint32_t limit, uint32_t start)const;
 
       void subscribe_to_market( std::function<void(const variant&)> callback,
@@ -187,12 +187,12 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
                                                                                 uint32_t limit )const;
 
       // HTLC
-      optional<htlc_object> get_htlc( htlc_id_type id, optional<bool> subscribe ) const;
-      vector<htlc_object> get_htlc_by_from( const std::string account_id_or_name,
+      optional<htlc_api_object> get_htlc( htlc_id_type id, optional<bool> subscribe ) const;
+      vector<htlc_api_object> get_htlc_by_from( const std::string account_id_or_name,
                                             htlc_id_type start, uint32_t limit ) const;
-      vector<htlc_object> get_htlc_by_to( const std::string account_id_or_name,
+      vector<htlc_api_object> get_htlc_by_to( const std::string account_id_or_name,
                                           htlc_id_type start, uint32_t limit) const;
-      vector<htlc_object> list_htlcs(const htlc_id_type lower_bound_id, uint32_t limit) const;
+      vector<htlc_api_object> list_htlcs(const htlc_id_type lower_bound_id, uint32_t limit) const;
 
    //private:
 
@@ -232,7 +232,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       ////////////////////////////////////////////////
 
       // helper function
-      vector<limit_order_object> get_limit_orders( const asset_id_type a, const asset_id_type b,
+      vector<limit_order_api_object> get_limit_orders( const asset_id_type a, const asset_id_type b,
                                                    const uint32_t limit )const;
 
       ////////////////////////////////////////////////
@@ -300,8 +300,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       const std::pair<asset_id_type,asset_id_type> get_order_market( const force_settlement_object& order )
       {
          // TODO cache the result to avoid repeatly fetching from db
-         asset_id_type backing_id = order.balance.asset_id( _db ).bitasset_data( _db ).options.short_backing_asset;
-         auto tmp = std::make_pair( order.balance.asset_id, backing_id );
+         asset_id_type backing_id = order.balance.get_asset()( _db ).bitasset_data( _db ).options.short_backing_asset;
+         auto tmp = std::make_pair( order.balance.get_asset(), backing_id );
          if( tmp.first > tmp.second ) std::swap( tmp.first, tmp.second );
          return tmp;
       }

@@ -49,7 +49,7 @@ void_result balance_claim_evaluator::do_evaluate(const balance_claim_operation& 
    {
       GRAPHENE_ASSERT(
          balance->vesting_policy->is_withdraw_allowed(
-            { balance->balance,
+            { balance->balance.get_value(),
               d.head_block_time(),
               op.total_claimed } ),
          balance_claim_invalid_claim_amount,
@@ -64,7 +64,7 @@ void_result balance_claim_evaluator::do_evaluate(const balance_claim_operation& 
       return {};
    }
 
-   FC_ASSERT(op.total_claimed == balance->balance);
+   FC_ASSERT( op.total_claimed.amount == balance->balance.get_amount() );
    return {};
 }
 
@@ -76,16 +76,17 @@ void_result balance_claim_evaluator::do_apply(const balance_claim_operation& op)
 {
    database& d = db();
 
-   if( balance->is_vesting_balance() && op.total_claimed < balance->balance )
-      d.modify(*balance, [&](balance_object& b) {
-         b.vesting_policy->on_withdraw({b.balance, d.head_block_time(), op.total_claimed});
-         b.balance -= op.total_claimed;
-         b.last_claim_date = d.head_block_time();
-      });
-   else
+   stored_value claim;
+   d.modify(*balance, [&claim,&d,&op](balance_object& b) {
+      if( b.is_vesting_balance() )
+         b.vesting_policy->on_withdraw({b.balance.get_value(), d.head_block_time(), op.total_claimed});
+      claim = b.balance.split( op.total_claimed.amount );
+      b.last_claim_date = d.head_block_time();
+   });
+   if( balance->balance.get_amount() == 0 )
       d.remove(*balance);
 
-   d.adjust_balance(op.deposit_to_account, op.total_claimed);
+   d.add_balance( op.deposit_to_account, std::move(claim) );
    return {};
 }
 } } // namespace graphene::chain

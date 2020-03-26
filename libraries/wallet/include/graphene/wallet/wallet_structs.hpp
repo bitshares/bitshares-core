@@ -236,9 +236,9 @@ struct signed_block_with_info : public signed_block
    vector< transaction_id_type > transaction_ids;
 };
 
-struct vesting_balance_object_with_info : public vesting_balance_object
+struct vesting_balance_object_with_info : public graphene::app::vesting_balance_api_object
 {
-   vesting_balance_object_with_info( const vesting_balance_object& vbo, fc::time_point_sec now );
+   vesting_balance_object_with_info( const graphene::app::vesting_balance_api_object& vbo, fc::time_point_sec now );
    vesting_balance_object_with_info( const vesting_balance_object_with_info& vbo ) = default;
 
    /**
@@ -375,7 +375,8 @@ FC_REFLECT( graphene::wallet::worker_vote_delta,
 FC_REFLECT_DERIVED( graphene::wallet::signed_block_with_info, (graphene::chain::signed_block),
    (block_id)(signing_key)(transaction_ids) )
 
-FC_REFLECT_DERIVED( graphene::wallet::vesting_balance_object_with_info, (graphene::chain::vesting_balance_object),
+FC_REFLECT_DERIVED( graphene::wallet::vesting_balance_object_with_info,
+   (graphene::app::vesting_balance_api_object),
    (allowed_withdraw)(allowed_withdraw_time) )
 
 FC_REFLECT( graphene::wallet::operation_detail,

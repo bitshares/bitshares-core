@@ -1134,8 +1134,8 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
       BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250 - i)));
    }
 
-   std::vector<limit_order_object> results;
-   limit_order_object o;
+   std::vector<graphene::app::limit_order_api_object> results;
+   graphene::app::limit_order_api_object o;
 
    // query with no constraint, expected:
    // 1. up to 101 orders returned
@@ -1186,7 +1186,7 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
    //    id should greater than specified
    // 2. returned orders sorted by price desendingly
    // 3. the first order's sell price equal to specified
-   cancel_limit_order(o); // NOTE 1: this canceled order was in scope of the
+   cancel_limit_order( db.get<limit_order_object>(o.id) ); // NOTE 1: this canceled order was in scope of the
                           // first created 50 orders, so with price 2.5 BTS/CNY
    results = db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY", 50,
        limit_order_id_type(o.id), o.sell_price);
@@ -1204,7 +1204,7 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
    o = results.back();
    results.clear();
 
-   cancel_limit_order(o); // NOTE 3: this time the canceled order was in scope
+   cancel_limit_order( db.get<limit_order_object>(o.id) ); // NOTE 3: this time the canceled order was in scope
                           // of the lowest price 150 orders
    results = db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY", 101,
        limit_order_id_type(o.id), o.sell_price);
@@ -1568,7 +1568,7 @@ BOOST_AUTO_TEST_CASE( api_limit_get_limit_orders ){
    fc::usleep(fc::milliseconds(100));
    GRAPHENE_CHECK_THROW(db_api.get_limit_orders(std::string(static_cast<object_id_type>(asset_id_type())),
       std::string(static_cast<object_id_type>(bit_jmj_id)), 370), fc::exception);
-   vector<limit_order_object>  limit_orders =db_api.get_limit_orders(std::string(
+   vector<graphene::app::limit_order_api_object>  limit_orders =db_api.get_limit_orders(std::string(
       static_cast<object_id_type>(asset_id_type())),
       std::string(static_cast<object_id_type>(bit_jmj_id)), 340);
    BOOST_REQUIRE_EQUAL( limit_orders.size(), 0u);
@@ -1592,7 +1592,7 @@ BOOST_AUTO_TEST_CASE( api_limit_get_call_orders ){
    BOOST_CHECK( bitusd_id(db).is_market_issued() );
    GRAPHENE_CHECK_THROW(db_api.get_call_orders(std::string(static_cast<object_id_type>(bitusd_id)),
 	   370), fc::exception);
-   vector< call_order_object>  call_order =db_api.get_call_orders(std::string(
+   vector< graphene::app::call_order_api_object>  call_order =db_api.get_call_orders(std::string(
 	   static_cast<object_id_type>(bitusd_id)), 340);
    BOOST_REQUIRE_EQUAL( call_order.size(), 0u);
    }catch (fc::exception& e) {
@@ -1613,7 +1613,7 @@ BOOST_AUTO_TEST_CASE( api_limit_get_settle_orders ){
    fc::usleep(fc::milliseconds(100));
    GRAPHENE_CHECK_THROW(db_api.get_settle_orders(
    	std::string(static_cast<object_id_type>(bitusd_id)), 370), fc::exception);
-   vector<force_settlement_object> result =db_api.get_settle_orders(
+   vector<graphene::app::force_settlement_api_object> result =db_api.get_settle_orders(
    	std::string(static_cast<object_id_type>(bitusd_id)), 340);
    BOOST_REQUIRE_EQUAL( result.size(), 0u);
    }catch (fc::exception& e) {
@@ -1972,7 +1972,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_collateral_bids) {
 
 
       //validating normal case; total_bids =3 ; result_bids=3
-      vector<collateral_bid_object> result_bids = db_api.get_collateral_bids(swan_symbol, 250, 0);
+      vector<graphene::app::collateral_bid_api_object> result_bids = db_api.get_collateral_bids(swan_symbol, 250, 0);
       BOOST_CHECK_EQUAL( 3u, result_bids.size() );
 
       //verify skip /// inefficient code test
@@ -2021,7 +2021,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_account_limit_orders) {
       }
 
 
-      std::vector<limit_order_object> results=db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY",250);
+      std::vector<graphene::app::limit_order_api_object> results=db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY",250);
       BOOST_REQUIRE_EQUAL( results.size(), 250u);
       GRAPHENE_CHECK_THROW( db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY",251), fc::exception);
 

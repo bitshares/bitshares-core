@@ -351,8 +351,8 @@ BOOST_AUTO_TEST_CASE( recollateralize )
       // can't bid wrong collateral type
       GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), bitcny.amount(100), swan().amount(100) ), fc::exception );
 
-      BOOST_CHECK( swan().dynamic_data(db).current_supply == 1400 );
-      BOOST_CHECK( swan().bitasset_data(db).settlement_fund == 2800 );
+      BOOST_CHECK( swan().dynamic_data(db).current_supply.get_amount() == 1400 );
+      BOOST_CHECK( swan().bitasset_data(db).settlement_fund.get_amount() == 2800 );
       BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
       BOOST_CHECK( swan().bitasset_data(db).current_feed.settlement_price.is_null() );
 
@@ -383,7 +383,7 @@ BOOST_AUTO_TEST_CASE( recollateralize )
       graphene::app::database_api db_api( db, &( app.get_options() ));
       GRAPHENE_REQUIRE_THROW( db_api.get_collateral_bids(back().symbol, 100, 0), fc::assert_exception );
       auto swan_symbol = _swan(db).symbol;
-      vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 1);
+      vector<graphene::app::collateral_bid_api_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 1);
       BOOST_CHECK_EQUAL( 1u, bids.size() );
       FC_ASSERT( _borrower2 == bids[0].bidder );
       bids = db_api.get_collateral_bids(swan_symbol, 1, 0);
@@ -421,8 +421,8 @@ BOOST_AUTO_TEST_CASE( revive_empty_recovered )
       cancel_limit_order( oid(db) );
       force_settle( borrower(), swan().amount(1000) );
       force_settle( borrower2(), swan().amount(1000) );
-      BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.value );
-      BOOST_CHECK_EQUAL( 0, swan().bitasset_data(db).settlement_fund.value );
+      BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.get_amount().value );
+      BOOST_CHECK_EQUAL( 0, swan().bitasset_data(db).settlement_fund.get_amount().value );
       BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
 
       // revive after price recovers
@@ -452,7 +452,7 @@ BOOST_AUTO_TEST_CASE( revive_empty )
       cancel_limit_order( oid(db) );
       force_settle( borrower(), swan().amount(1000) );
       force_settle( borrower2(), swan().amount(1000) );
-      BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.value );
+      BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.get_amount().value );
 
       BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
 
@@ -491,8 +491,8 @@ BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
       force_settle( borrower(), swan().amount(500) );
       force_settle( borrower2(), swan().amount(667) );
       force_settle( borrower2(), swan().amount(333) );
-      BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.value );
-      BOOST_CHECK_EQUAL( 0, swan().bitasset_data(db).settlement_fund.value );
+      BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.get_amount().value );
+      BOOST_CHECK_EQUAL( 0, swan().bitasset_data(db).settlement_fund.get_amount().value );
 
       bid_collateral( borrower(), back().amount(3000), swan().amount(700) );
 
@@ -503,7 +503,7 @@ BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
       BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
       graphene::app::database_api db_api( db, &( app.get_options() ));
       auto swan_symbol = _swan(db).symbol;
-      vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      vector<graphene::app::collateral_bid_api_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
       BOOST_CHECK( bids.empty() );
 
       auto& call_idx = db.get_index_type<call_order_index>().indices().get<by_account>();
@@ -577,10 +577,10 @@ BOOST_AUTO_TEST_CASE( overflow )
    auto& call_idx = db.get_index_type<call_order_index>().indices().get<by_account>();
    auto itr = call_idx.find( boost::make_tuple(_borrower, _swan) );
    BOOST_REQUIRE( itr != call_idx.end() );
-   BOOST_CHECK_EQUAL( 1, itr->debt.value );
+   BOOST_CHECK_EQUAL( 1, itr->debt.get_amount().value );
    itr = call_idx.find( boost::make_tuple(_borrower2, _swan) );
    BOOST_REQUIRE( itr != call_idx.end() );
-   BOOST_CHECK_EQUAL( 1399, itr->debt.value );
+   BOOST_CHECK_EQUAL( 1399, itr->debt.get_amount().value );
 
    BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
 } FC_LOG_AND_RETHROW() }

@@ -315,7 +315,7 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
            accounts.insert( aobj->issuer );
            break;
         } case force_settlement_object_type:{
-           const auto& aobj = dynamic_cast<const force_settlement_object*>(obj);
+           const auto& aobj = dynamic_cast<const force_settlement_master*>(obj);
            FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->owner );
            break;
@@ -330,12 +330,12 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
            accounts.insert( aobj->witness_account );
            break;
         } case limit_order_object_type:{
-           const auto& aobj = dynamic_cast<const limit_order_object*>(obj);
+           const auto& aobj = dynamic_cast<const limit_order_master*>(obj);
            FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->seller );
            break;
         } case call_order_object_type:{
-           const auto& aobj = dynamic_cast<const call_order_object*>(obj);
+           const auto& aobj = dynamic_cast<const call_order_master*>(obj);
            FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->borrower );
            break;
@@ -358,7 +358,7 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
            accounts.insert( aobj->authorized_account );
            break;
         } case vesting_balance_object_type:{
-           const auto& aobj = dynamic_cast<const vesting_balance_object*>(obj);
+           const auto& aobj = dynamic_cast<const vesting_balance_master*>(obj);
            FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->owner );
            break;
@@ -371,11 +371,11 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
            /** these are free from any accounts */
            break;
         } case htlc_object_type:{
-              const auto& htlc_obj = dynamic_cast<const htlc_object*>(obj);
-              FC_ASSERT( htlc_obj != nullptr );
-              accounts.insert( htlc_obj->transfer.from );
-              accounts.insert( htlc_obj->transfer.to );
-              break;
+           const auto htlc_obj = dynamic_cast<const htlc_master*>(obj);
+           FC_ASSERT( htlc_obj != nullptr );
+           accounts.insert( htlc_obj->get_transfer_info().from );
+           accounts.insert( htlc_obj->get_transfer_info().to );
+           break;
         }
       }
    }
@@ -394,12 +394,12 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
              case impl_asset_bitasset_data_object_type:
               break;
              case impl_account_balance_object_type:{
-              const auto& aobj = dynamic_cast<const account_balance_object*>(obj);
+              const auto& aobj = dynamic_cast<const account_balance_master*>(obj);
               FC_ASSERT( aobj != nullptr );
               accounts.insert( aobj->owner );
               break;
            } case impl_account_statistics_object_type:{
-              const auto& aobj = dynamic_cast<const account_statistics_object*>(obj);
+              const auto& aobj = dynamic_cast<const account_statistics_master*>(obj);
               FC_ASSERT( aobj != nullptr );
               accounts.insert( aobj->owner );
               break;
@@ -434,7 +434,7 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
              case impl_fba_accumulator_object_type:
               break;
              case impl_collateral_bid_object_type:{
-              const auto& aobj = dynamic_cast<const collateral_bid_object*>(obj);
+              const auto& aobj = dynamic_cast<const collateral_bid_master*>(obj);
               FC_ASSERT( aobj != nullptr );
               accounts.insert( aobj->bidder );
               break;
