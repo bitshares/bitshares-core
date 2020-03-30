@@ -86,6 +86,7 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
                     "May not create a blockchain-controlled market asset which is not backed by CORE.");
       FC_ASSERT( op.bitasset_opts->feed_lifetime_sec > chain_parameters.block_interval &&
                  op.bitasset_opts->force_settlement_delay_sec > chain_parameters.block_interval );
+      FC_ASSERT( d.head_block_time() > HARDFORK_CORE_BSIP74_TIME || !op.bitasset_opts->extensions.value.margin_call_fee_ratio.valid() );
    }
    if( op.is_prediction_market )
    {
@@ -413,6 +414,11 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 
    // hf 922_931 is a consensus/logic change. This hf cannot be removed.
    bool after_hf_core_922_931 = ( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_922_931_TIME );
+
+   // hf BSIP74
+   FC_ASSERT( d.head_block_time() >= HARDFORK_CORE_BSIP74_TIME 
+         || !op.new_options.extensions.value.margin_call_fee_ratio.valid(),
+         "A BitAsset's MCFR cannot be set before Hardfork BSIP74");
 
    // Are we changing the backing asset?
    if( op.new_options.short_backing_asset != current_bitasset_data.options.short_backing_asset )

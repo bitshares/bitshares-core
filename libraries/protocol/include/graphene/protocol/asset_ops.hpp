@@ -113,7 +113,12 @@ namespace graphene { namespace protocol {
       /// This speicifies which asset type is used to collateralize short sales
       /// This field may only be updated if the current supply of the asset is zero.
       asset_id_type short_backing_asset;
-      extensions_type extensions;
+
+      struct ext
+      {
+         optional<uint16_t> margin_call_fee_ratio;
+      };
+      extension<ext> extensions;
 
       /// Perform internal consistency checks.
       /// @throws fc::exception if any check fails
@@ -519,6 +524,10 @@ FC_REFLECT( graphene::protocol::asset_claim_fees_operation, (fee)(issuer)(amount
 FC_REFLECT( graphene::protocol::asset_claim_fees_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::protocol::asset_claim_pool_operation, (fee)(issuer)(asset_id)(amount_to_claim)(extensions) )
 FC_REFLECT( graphene::protocol::asset_claim_pool_operation::fee_parameters_type, (fee) )
+
+FC_REFLECT( graphene::protocol::bitasset_options::ext,
+      (margin_call_fee_ratio)
+)
 
 FC_REFLECT( graphene::protocol::asset_options,
             (max_supply)

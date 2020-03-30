@@ -1403,4 +1403,98 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
 
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
+{
+   ACTOR(alice);
+   transfer( committee_account(db), alice, asset(100000) );
+
+   asset_id_type my_asset_id;
+   // MCFR (margin call fee ratio) should not be adjustable until HF BSIP74
+   {
+      BOOST_TEST_MESSAGE( "Attempt to create a bitasset before HF");
+      bitasset_options::ext extras;
+      extras.margin_call_fee_ratio = 100;
+      bitasset_options bit_options{};
+      bit_options.short_backing_asset = asset_id_type();
+      bit_options.extensions.value = extras; 
+
+      asset_create_operation create;
+      create.issuer = alice_id;
+      create.fee = asset();
+      create.symbol = "JMJCOIN";
+      create.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
+      create.common_options.market_fee_percent = 1 * GRAPHENE_100_PERCENT; // 1%
+      create.is_prediction_market = false;
+      create.bitasset_opts = bit_options;
+      create.common_options.core_exchange_rate = graphene::protocol::price(asset(1,asset_id_type(1)),asset(1));
+      trx.operations.push_back( std::move(create) );
+      sign(trx, alice_private_key);
+      GRAPHENE_CHECK_THROW( PUSH_TX(db, trx), fc::exception );
+      trx.clear();
+
+      BOOST_TEST_MESSAGE("To test the update evaluator, we first need to create a bitasset");
+      bitasset_options better_bit_options{};
+      better_bit_options.short_backing_asset = asset_id_type();
+
+      create = asset_create_operation();
+      create.issuer = alice_id;
+      create.fee = asset();
+      create.symbol = "JMJCOIN";
+      create.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
+      create.common_options.market_fee_percent = 1 * GRAPHENE_100_PERCENT; // 1%
+      create.is_prediction_market = false;
+      create.bitasset_opts = better_bit_options;
+      create.common_options.core_exchange_rate = graphene::protocol::price(asset(1,asset_id_type(1)),asset(1));
+      trx.operations.push_back( std::move(create) );
+      sign(trx, alice_private_key);
+      my_asset_id = PUSH_TX(db, trx).operation_results[0].get<object_id_type>();
+      trx.clear();
+
+      BOOST_TEST_MESSAGE("Now attempt to update.");
+      asset_update_bitasset_operation update;
+      update.issuer = alice_id;
+      update.fee = asset();
+      update.asset_to_update = my_asset_id;
+      update.new_options = bit_options; // this should cause an exception
+      trx.operations.push_back( std::move(update) );
+      sign(trx, alice_private_key);
+      GRAPHENE_CHECK_THROW( PUSH_TX(db, trx), fc::exception );
+      trx.clear();
+   }
+
+   BOOST_TEST_MESSAGE("Advancing past Hardfork BSIP74");
+   generate_blocks( HARDFORK_CORE_BSIP74_TIME);
+   set_expiration( db, trx );
+   BOOST_TEST_MESSAGE("Existing Coins should have margin_call_fee_ratio set");
+   BOOST_CHECK(  my_asset_id(db).bitasset_data(db).options.extensions.value.margin_call_fee_ratio.valid() );
+   BOOST_CHECK_EQUAL( *my_asset_id(db).bitasset_data(db).options.extensions.value.margin_call_fee_ratio, 0 );
+
+   // now we should be able to update the ratio
+   {
+      bitasset_options::ext extras;
+      extras.margin_call_fee_ratio = 100;
+      bitasset_options bit_options{};
+      bit_options.short_backing_asset = asset_id_type();
+      bit_options.extensions.value = extras;  
+
+      asset_update_bitasset_operation update;
+      update.issuer = alice_id;
+      update.fee = asset();
+      update.asset_to_update = my_asset_id;
+      update.new_options = bit_options; // this should cause an exception
+      trx.operations.push_back( std::move(update) );
+      sign(trx, alice_private_key);
+      try {
+         PUSH_TX(db, trx);
+      }
+      catch( const fc::exception& ex) 
+      {
+         BOOST_FAIL( ex.to_detail_string() );
+      }
+      trx.clear();      
+   }
+   BOOST_CHECK(  my_asset_id(db).bitasset_data(db).options.extensions.value.margin_call_fee_ratio.valid() );
+   BOOST_CHECK_EQUAL( *my_asset_id(db).bitasset_data(db).options.extensions.value.margin_call_fee_ratio, 100 );
+}
+
 BOOST_AUTO_TEST_SUITE_END()
