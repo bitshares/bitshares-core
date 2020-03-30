@@ -50,7 +50,7 @@ namespace detail {
 void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
 { try {
 
-   database& d = db();
+   const database& d = db();
 
    const auto& chain_parameters = d.get_global_properties().parameters;
    FC_ASSERT( op.common_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
@@ -69,7 +69,8 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    FC_ASSERT( asset_symbol_itr == asset_indx.end() );
 
    // This must remain due to "BOND.CNY" being allowed before this HF
-   if( d.head_block_time() > HARDFORK_385_TIME )
+   const time_point_sec now = d.head_block_time();
+   if( now > HARDFORK_385_TIME )
    {
       auto dotpos = op.symbol.rfind( '.' );
       if( dotpos != std::string::npos )
@@ -105,6 +106,11 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    {
       FC_ASSERT( op.bitasset_opts );
       FC_ASSERT( op.precision == op.bitasset_opts->short_backing_asset(d).precision );
+   }
+
+   if(now <= HARDFORK_BSIP_81_TIME) {
+      // Taker fees should be zero until activation of BSIP81
+      FC_ASSERT(op.common_options.taker_fee_percent == 0, "Simple maker-taker fees are not yet activated");
    }
 
    return void_result();
@@ -267,7 +273,8 @@ static void validate_new_issuer( const database& d, const asset_object& a, accou
 
 void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 { try {
-   database& d = db();
+   const database& d = db();
+   const time_point_sec now = d.head_block_time();
 
    const asset_object& a = o.asset_to_update(d);
    auto a_copy = a;
@@ -276,7 +283,7 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 
    if( o.new_issuer )
    {
-      FC_ASSERT( d.head_block_time() < HARDFORK_CORE_199_TIME,
+      FC_ASSERT( now  < HARDFORK_CORE_199_TIME,
                  "Since Hardfork #199, updating issuer requires the use of asset_update_issuer_operation.");
       validate_new_issuer( d, a, *o.new_issuer );
    }
@@ -307,6 +314,11 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    FC_ASSERT( o.new_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    for( auto id : o.new_options.blacklist_authorities )
       d.get_object(id);
+
+   if(now <= HARDFORK_BSIP_81_TIME) {
+      // Taker fees should be zero until activation of BSIP81
+      FC_ASSERT(o.new_options.taker_fee_percent == 0, "Simple maker-taker fees are not yet activated");
+   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
