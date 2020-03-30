@@ -1079,6 +1079,23 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
    } // for each market issued asset
 }
 
+/****
+ * @brief a one-time data process to assign default taker fees for BSIP81
+ */
+void process_hf_bsip81(database &db) {
+   // for each asset
+   const auto &asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
+   for (auto asset_itr = asset_idx.cbegin(); asset_itr != asset_idx.cend(); ++asset_itr) {
+      const asset_object &asset = *asset_itr;
+      const uint16_t raw_market_fee_percent = asset.options.market_fee_percent;
+      wlog("Setting default taker fee of ${asset} to ${raw_market_fee_percent}.",
+              ("asset", asset.symbol) ("raw_market_fee_percent", raw_market_fee_percent));
+      db.modify<asset_object>(asset, [raw_market_fee_percent](asset_object &obj) {
+         obj.options.taker_fee_percent = raw_market_fee_percent;
+      });
+   }
+}
+
 /**
  * @brief Remove any custom active authorities whose expiration dates are in the past
  * @param db A mutable database reference
@@ -1239,6 +1256,10 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    bool to_update_and_match_call_orders_for_hf_1270 = false;
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_1270_TIME) && (next_maintenance_time > HARDFORK_CORE_1270_TIME) )
       to_update_and_match_call_orders_for_hf_1270 = true;
+
+   // To set the default taker fee to equal the market fees, for hard fork BSIP81
+   if( (dgpo.next_maintenance_time <= HARDFORK_BSIP_81_TIME) && (next_maintenance_time > HARDFORK_BSIP_81_TIME) )
+      process_hf_bsip81(*this);
 
    // make sure current_supply is less than or equal to max_supply
    if ( dgpo.next_maintenance_time <= HARDFORK_CORE_1465_TIME && next_maintenance_time > HARDFORK_CORE_1465_TIME )
