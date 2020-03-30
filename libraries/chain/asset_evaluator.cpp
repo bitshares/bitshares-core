@@ -86,7 +86,9 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
                     "May not create a blockchain-controlled market asset which is not backed by CORE.");
       FC_ASSERT( op.bitasset_opts->feed_lifetime_sec > chain_parameters.block_interval &&
                  op.bitasset_opts->force_settlement_delay_sec > chain_parameters.block_interval );
-      FC_ASSERT( d.head_block_time() > HARDFORK_CORE_BSIP74_TIME || !op.bitasset_opts->extensions.value.margin_call_fee_ratio.valid() );
+      FC_ASSERT( d.head_block_time() >= HARDFORK_CORE_BSIP74_TIME 
+            || !op.bitasset_opts->extensions.value.margin_call_fee_ratio.valid(),
+            "A BitAsset's MCFR cannot be set before Hardfork BSIP74" );
    }
    if( op.is_prediction_market )
    {

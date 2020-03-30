@@ -1463,11 +1463,11 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
    }
 
    BOOST_TEST_MESSAGE("Advancing past Hardfork BSIP74");
-   generate_blocks( HARDFORK_CORE_BSIP74_TIME);
+   generate_blocks( HARDFORK_CORE_BSIP74_TIME + 3);
+   generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
    set_expiration( db, trx );
-   BOOST_TEST_MESSAGE("Existing Coins should have margin_call_fee_ratio set");
-   BOOST_CHECK(  my_asset_id(db).bitasset_data(db).options.extensions.value.margin_call_fee_ratio.valid() );
-   BOOST_CHECK_EQUAL( *my_asset_id(db).bitasset_data(db).options.extensions.value.margin_call_fee_ratio, 0 );
+   BOOST_TEST_MESSAGE("Existing Coins should still not have margin_call_fee_ratio set");
+   BOOST_CHECK(  !my_asset_id(db).bitasset_data(db).options.extensions.value.margin_call_fee_ratio.valid() );
 
    // now we should be able to update the ratio
    {

@@ -970,17 +970,6 @@ void process_hf_1465( database& db )
    }
 }
 
-void process_hf_bsip74( database& db )
-{
-   // set margin call fee ratio to 0 for all bitassets
-   for( const auto& d : db.get_index_type<asset_bitasset_data_index>().indices() )
-   {
-      db.modify<asset_bitasset_data_object>( d, [](asset_bitasset_data_object& obj) {
-            obj.options.extensions.value.margin_call_fee_ratio = 0;
-      });
-   }
-}
-
 void update_median_feeds(database& db)
 {
    time_point_sec head_time = db.head_block_time();
@@ -1228,10 +1217,6 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    // Process inconsistent price feeds
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_868_890_TIME) && (next_maintenance_time > HARDFORK_CORE_868_890_TIME) )
       process_hf_868_890( *this, to_update_and_match_call_orders_for_hf_343 );
-
-   // margin_call_fee_ratio
-   if ( dgpo.next_maintenance_time <= HARDFORK_CORE_BSIP74_TIME && next_maintenance_time > HARDFORK_CORE_BSIP74_TIME )
-      process_hf_bsip74( *this );
 
    // To reset call_price of all call orders, then match by new rule, for hard fork core-1270
    bool to_update_and_match_call_orders_for_hf_1270 = false;

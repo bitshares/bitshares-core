@@ -410,6 +410,16 @@ namespace graphene { namespace chain {
           */
          ///@{
          int match( const limit_order_object& taker, const limit_order_object& maker, const price& trade_price );
+         /***
+          * @brief Match the two orders
+          * @param taker the taker
+          * @param maker the maker
+          * @param trade_price the price the trade should execute at
+          * @param feed_price the price of the current feed
+          * @param maintenance_collateral_ratio the maintenance collateral ratio
+          * @param maintenance_collateralization the maintenance collateralization
+          * @returns 0 if no orders were matched, 1 if taker was filled, 2 if maker was filled, 3 if both were filled
+          */
          int match( const limit_order_object& taker, const call_order_object& maker, const price& trade_price,
                     const price& feed_price, const uint16_t maintenance_collateral_ratio,
                     const optional<price>& maintenance_collateralization );
@@ -428,6 +438,15 @@ namespace graphene { namespace chain {
           */
          bool fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small,
                                 const price& fill_price, const bool is_maker );
+         /***
+          * @brief attempt to fill a call order
+          * @param order the order
+          * @param pays what the buyer pays for the collateral
+          * @param receives the collateral received by the buyer
+          * @param fill_price the price the transaction executed at
+          * @param is_maker TRUE if the buyer is the maker, FALSE if the buyer is the taker
+          * @returns TRUE if the order was completely filled
+          */
          bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
                                const price& fill_price, const bool is_maker );
          bool fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
