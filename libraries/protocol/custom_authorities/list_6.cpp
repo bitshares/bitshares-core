@@ -23,6 +23,7 @@
  */
 
 #include "restriction_predicate.hxx"
+#include "sliced_lists.hxx"
 
 namespace graphene { namespace protocol {
 
