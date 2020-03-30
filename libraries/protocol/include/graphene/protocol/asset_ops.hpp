@@ -49,7 +49,11 @@ namespace graphene { namespace protocol {
       /// When this asset is traded on the markets, this percentage of the total traded will be exacted and paid
       /// to the issuer. This is a fixed point value, representing hundredths of a percent, i.e. a value of 100
       /// in this field means a 1% fee is charged on market trades of this asset.
+      // BSIP81: Asset owners may specify different market fee rate for maker orders and taker orders
+      // After BSIP81 activation, market_fee_percent is the maker fee
       uint16_t market_fee_percent = 0;
+      // After BSIP81 activation, taker_fee_percent is the taker fee
+      uint16_t taker_fee_percent = 0;
       /// Market fees calculated as @ref market_fee_percent of the traded volume are capped to this value
       share_type max_market_fee = GRAPHENE_MAX_SHARE_SUPPLY;
 
@@ -523,6 +527,7 @@ FC_REFLECT( graphene::protocol::asset_claim_pool_operation::fee_parameters_type,
 FC_REFLECT( graphene::protocol::asset_options,
             (max_supply)
             (market_fee_percent)
+            (taker_fee_percent)
             (max_market_fee)
             (issuer_permissions)
             (flags)
