@@ -122,7 +122,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, database_fixture)
          ACTORS((smartissuer)(feedproducer));
 
          // Initialize tokens
-         const auto &bitsmart = create_bitasset("SMARTBIT", smartissuer.id);
+         const asset_object &bitsmart = create_bitasset("SMARTBIT", smartissuer.id);
 
 
          generate_blocks(HARDFORK_615_TIME); // get around Graphene issue #615 feed expiration bug
@@ -195,6 +195,216 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, database_fixture)
          updated_asset = bitsmart.get_id()(db);
          expected_taker_fee_percent = new_taker_fee_percent;
          BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+
+      } FC_LOG_AND_RETHROW()
+   }
+
+
+   /**
+    * Test the default taker fee values of multiple different assets after HF
+    */
+   BOOST_AUTO_TEST_CASE(default_taker_fees) {
+      try {
+         // Initialize for the current time
+         trx.clear();
+         set_expiration(db, trx);
+
+         // Initialize actors
+         ACTORS((alice)(bob)(charlie)(smartissuer));
+
+         // Initialize tokens with custom market fees
+         price price(asset(1, asset_id_type(1)), asset(1));
+
+         const uint16_t alice1coin_market_fee_percent = 1 * GRAPHENE_1_PERCENT;
+         const asset_object alice1coin = create_user_issued_asset("ALICE1COIN", alice, charge_market_fee, price, 2,
+                                                                  alice1coin_market_fee_percent);
+
+         const uint16_t alice2coin_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
+         const asset_object alice2coin = create_user_issued_asset("ALICE2COIN", alice, charge_market_fee, price, 2,
+                                                                  alice2coin_market_fee_percent);
+
+         const uint16_t bob1coin_market_fee_percent = 3 * GRAPHENE_1_PERCENT;
+         const asset_object bob1coin = create_user_issued_asset("BOB1COIN", alice, charge_market_fee, price, 2,
+                                                                bob1coin_market_fee_percent);
+
+         const uint16_t bob2coin_market_fee_percent = 4 * GRAPHENE_1_PERCENT;
+         const asset_object bob2coin = create_user_issued_asset("BOB2COIN", alice, charge_market_fee, price, 2,
+                                                                bob2coin_market_fee_percent);
+
+         const uint16_t charlie1coin_market_fee_percent = 4 * GRAPHENE_1_PERCENT;
+         const asset_object charlie1coin = create_user_issued_asset("CHARLIE1COIN", alice, charge_market_fee, price, 2,
+                                                                    charlie1coin_market_fee_percent);
+
+         const uint16_t charlie2coin_market_fee_percent = 5 * GRAPHENE_1_PERCENT;
+         const asset_object charlie2coin = create_user_issued_asset("CHARLIE2COIN", alice, charge_market_fee, price, 2,
+                                                                    charlie2coin_market_fee_percent);
+
+         const uint16_t bitsmart1coin_market_fee_percent = 7 * GRAPHENE_1_PERCENT;
+         create_bitasset("SMARTBIT1", smartissuer.id, bitsmart1coin_market_fee_percent);
+         generate_blocks(1); // The smart asset's ID will be updated after a block is generated
+         const asset_object &bitsmart1 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SMARTBIT1");
+
+         const uint16_t bitsmart2coin_market_fee_percent = 8 * GRAPHENE_1_PERCENT;
+         create_bitasset("SMARTBIT2", smartissuer.id, bitsmart2coin_market_fee_percent);
+         generate_blocks(1); // The smart asset's ID will be updated after a block is generated
+         const asset_object &bitsmart2 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SMARTBIT2");
+
+
+         //////
+         // Before HF, test the market/maker fees for each asset
+         //////
+         asset_object updated_asset;
+         uint16_t expected_fee_percent;
+
+         updated_asset = alice1coin.get_id()(db);
+         expected_fee_percent = alice1coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+         updated_asset = alice2coin.get_id()(db);
+         expected_fee_percent = alice2coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+         updated_asset = bob1coin.get_id()(db);
+         expected_fee_percent = bob1coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+         updated_asset = bob2coin.get_id()(db);
+         expected_fee_percent = bob2coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+         updated_asset = charlie1coin.get_id()(db);
+         expected_fee_percent = charlie1coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+         updated_asset = charlie2coin.get_id()(db);
+         expected_fee_percent = charlie2coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+         updated_asset = bitsmart1.get_id()(db);
+         expected_fee_percent = bitsmart1coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+         updated_asset = bitsmart2.get_id()(db);
+         expected_fee_percent = bitsmart2coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+
+         //////
+         // Before HF, test that taker fees are set to zero
+         //////
+         // Check the taker fee
+         updated_asset = alice1coin.get_id()(db);
+         expected_fee_percent = 0; // Before the HF it should be set to 0
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+
+         updated_asset = alice2coin.get_id()(db);
+         expected_fee_percent = 0; // Before the HF it should be set to 0
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+
+         updated_asset = bob1coin.get_id()(db);
+         expected_fee_percent = 0; // Before the HF it should be set to 0
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+
+         updated_asset = bob2coin.get_id()(db);
+         expected_fee_percent = 0; // Before the HF it should be set to 0
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+
+         updated_asset = charlie1coin.get_id()(db);
+         expected_fee_percent = 0; // Before the HF it should be set to 0
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+
+         updated_asset = charlie2coin.get_id()(db);
+         expected_fee_percent = 0; // Before the HF it should be set to 0
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+
+         updated_asset = bitsmart1.get_id()(db);
+         expected_fee_percent = 0; // Before the HF it should be set to 0
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+
+         updated_asset = bitsmart2.get_id()(db);
+         expected_fee_percent = 0; // Before the HF it should be set to 0
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+
+
+         //////
+         // Advance to activate hardfork
+         //////
+         generate_blocks(HARDFORK_BSIP_81_TIME);
+         generate_block();
+         trx.clear();
+         set_expiration(db, trx);
+
+
+         //////
+         // After HF, test the maker fees for each asset are unchanged
+         //////
+         updated_asset = alice1coin.get_id()(db);
+         expected_fee_percent = alice1coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+         updated_asset = alice2coin.get_id()(db);
+         expected_fee_percent = alice2coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+         updated_asset = bob1coin.get_id()(db);
+         expected_fee_percent = bob1coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+         updated_asset = bob2coin.get_id()(db);
+         expected_fee_percent = bob2coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+         updated_asset = charlie1coin.get_id()(db);
+         expected_fee_percent = charlie1coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+         updated_asset = charlie2coin.get_id()(db);
+         expected_fee_percent = charlie2coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+         updated_asset = bitsmart1.get_id()(db);
+         expected_fee_percent = bitsmart1coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+         updated_asset = bitsmart2.get_id()(db);
+         expected_fee_percent = bitsmart2coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.market_fee_percent);
+
+
+         //////
+         // After HF, test the taker fees for each asset are set, by default, to the maker fees
+         //////
+         updated_asset = alice1coin.get_id()(db);
+         expected_fee_percent = alice1coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+
+         updated_asset = alice2coin.get_id()(db);
+         expected_fee_percent = alice2coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+
+         updated_asset = bob1coin.get_id()(db);
+         expected_fee_percent = bob1coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+
+         updated_asset = bob2coin.get_id()(db);
+         expected_fee_percent = bob2coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+
+         updated_asset = charlie1coin.get_id()(db);
+         expected_fee_percent = charlie1coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+
+         updated_asset = charlie2coin.get_id()(db);
+         expected_fee_percent = charlie2coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+
+         updated_asset = bitsmart1.get_id()(db);
+         expected_fee_percent = bitsmart1coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+
+         updated_asset = bitsmart2.get_id()(db);
+         expected_fee_percent = bitsmart2coin_market_fee_percent;
+         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
 
       } FC_LOG_AND_RETHROW()
    }
