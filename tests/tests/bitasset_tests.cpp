@@ -1405,8 +1405,20 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
 
 BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
 {
-   ACTOR(alice);
-   transfer( committee_account(db), alice, asset(100000) );
+   const auto& prec = GRAPHENE_BLOCKCHAIN_PRECISION;
+   enable_fees();
+   const auto fees = db.get_global_properties().parameters.current_fees;
+   ACTORS( (alice)  (bob) (feeder1) (feeder2) (feeder3) );
+   const auto& core = asset_id_type()(db);
+   const auto& core_id = core.id;
+   transfer( committee_account(db), alice, asset(100000 * prec) );
+   transfer( committee_account(db), bob,   asset(100000 * prec) );
+   transfer( committee_account(db), feeder1, asset(100 * prec) );
+   transfer( committee_account(db), feeder2, asset(100 * prec) );
+   transfer( committee_account(db), feeder3, asset(100 * prec) );
+
+   int64_t expected_core_balance_alice = 100000 * prec;
+   int64_t expected_core_balance_bob = 100000 * prec;
 
    asset_id_type my_asset_id;
    // MCFR (margin call fee ratio) should not be adjustable until HF BSIP74
@@ -1415,51 +1427,61 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
       bitasset_options::ext extras;
       extras.margin_call_fee_ratio = 100;
       bitasset_options bit_options{};
-      bit_options.short_backing_asset = asset_id_type();
+      bit_options.short_backing_asset = core_id;
       bit_options.extensions.value = extras; 
 
       asset_create_operation create;
       create.issuer = alice_id;
-      create.fee = asset();
+      create.fee = fees->calculate_fee(create);
       create.symbol = "JMJCOIN";
       create.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
       create.common_options.market_fee_percent = 1 * GRAPHENE_100_PERCENT; // 1%
       create.is_prediction_market = false;
       create.bitasset_opts = bit_options;
-      create.common_options.core_exchange_rate = graphene::protocol::price(asset(1,asset_id_type(1)),asset(1));
+      create.common_options.core_exchange_rate = price( asset(1,asset_id_type(1)), asset(1, core_id) );
       trx.operations.push_back( std::move(create) );
       sign(trx, alice_private_key);
       GRAPHENE_CHECK_THROW( PUSH_TX(db, trx), fc::exception );
       trx.clear();
 
+      BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance( alice, core) );
       BOOST_TEST_MESSAGE("To test the update evaluator, we first need to create a bitasset");
       bitasset_options better_bit_options{};
-      better_bit_options.short_backing_asset = asset_id_type();
+      better_bit_options.short_backing_asset = core_id;
 
       create = asset_create_operation();
       create.issuer = alice_id;
-      create.fee = asset();
+      create.fee = fees->calculate_fee(create);
+      expected_core_balance_alice -= create.fee.amount.value;
       create.symbol = "JMJCOIN";
       create.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
       create.common_options.market_fee_percent = 1 * GRAPHENE_100_PERCENT; // 1%
       create.is_prediction_market = false;
       create.bitasset_opts = better_bit_options;
-      create.common_options.core_exchange_rate = graphene::protocol::price(asset(1,asset_id_type(1)),asset(1));
+      create.common_options.core_exchange_rate = graphene::protocol::price( asset(1,asset_id_type(1)), asset(1, core_id));
       trx.operations.push_back( std::move(create) );
       sign(trx, alice_private_key);
       my_asset_id = PUSH_TX(db, trx).operation_results[0].get<object_id_type>();
       trx.clear();
 
+      BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance( alice, core) );
       BOOST_TEST_MESSAGE("Now attempt to update.");
       asset_update_bitasset_operation update;
       update.issuer = alice_id;
-      update.fee = asset();
+      update.fee = fees->calculate_fee(update);
       update.asset_to_update = my_asset_id;
       update.new_options = bit_options; // this should cause an exception
       trx.operations.push_back( std::move(update) );
       sign(trx, alice_private_key);
       GRAPHENE_CHECK_THROW( PUSH_TX(db, trx), fc::exception );
       trx.clear();
+
+      BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance( alice, core) );
+      const asset_object& my_asset = my_asset_id(db);
+      flat_set<account_id_type> feeders = { feeder1_id, feeder2_id, feeder3_id };
+      update_feed_producers( my_asset, feeders );
+      expected_core_balance_alice -= fees->calculate_fee( asset_update_feed_producers_operation() ).amount.value;
+      BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance( alice, core) );
    }
 
    BOOST_TEST_MESSAGE("Advancing past Hardfork BSIP74");
@@ -1468,20 +1490,22 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
    set_expiration( db, trx );
    BOOST_TEST_MESSAGE("Existing Coins should still not have margin_call_fee_ratio set");
    BOOST_CHECK(  !my_asset_id(db).bitasset_data(db).options.extensions.value.margin_call_fee_ratio.valid() );
+   BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance( alice, core) );
 
    // now we should be able to update the ratio
    {
       bitasset_options::ext extras;
-      extras.margin_call_fee_ratio = 100;
+      extras.margin_call_fee_ratio = 50;
       bitasset_options bit_options{};
-      bit_options.short_backing_asset = asset_id_type();
+      bit_options.short_backing_asset = core_id;
       bit_options.extensions.value = extras;  
 
       asset_update_bitasset_operation update;
       update.issuer = alice_id;
-      update.fee = asset();
+      update.fee = fees->calculate_fee(update);
+      expected_core_balance_alice -= update.fee.amount.value;
       update.asset_to_update = my_asset_id;
-      update.new_options = bit_options; // this should cause an exception
+      update.new_options = bit_options; // this should no longer cause an exception
       trx.operations.push_back( std::move(update) );
       sign(trx, alice_private_key);
       try {
@@ -1491,10 +1515,112 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
       {
          BOOST_FAIL( ex.to_detail_string() );
       }
-      trx.clear();      
+      trx.clear();   
+
+      BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance( alice, core) );
+   
    }
-   BOOST_CHECK(  my_asset_id(db).bitasset_data(db).options.extensions.value.margin_call_fee_ratio.valid() );
-   BOOST_CHECK_EQUAL( *my_asset_id(db).bitasset_data(db).options.extensions.value.margin_call_fee_ratio, 100 );
+   BOOST_CHECK( my_asset_id(db).bitasset_data(db).options.extensions.value.margin_call_fee_ratio.valid() );
+   BOOST_CHECK_EQUAL( *my_asset_id(db).bitasset_data(db).options.extensions.value.margin_call_fee_ratio, 50 );
+
+   // must create some price feeds before we can borrow
+   {
+      price_feed feed1;
+      feed1.core_exchange_rate = price( asset( 100, my_asset_id ), asset( 100, core_id ) );
+      feed1.settlement_price = price( asset( 100, my_asset_id ), asset( 100, core_id ) );
+      feed1.maintenance_collateral_ratio = GRAPHENE_MIN_COLLATERAL_RATIO;
+      try
+      {
+         publish_feed( my_asset_id(db), feeder1, feed1 );
+         publish_feed( my_asset_id(db), feeder2, feed1 );
+         publish_feed( my_asset_id(db), feeder3, feed1 );
+      }
+      catch(const fc::exception& fe)
+      {
+         BOOST_FAIL( fe.to_detail_string() );
+      }
+   }
+
+   // make a normal trade to assure the trading fee is correct
+   {
+      // alice will short some JMJCOIN into existence
+      borrow( alice, asset(100 * prec, my_asset_id), asset(200 * prec) );
+      call_order_update_operation op;
+      expected_core_balance_alice -= fees->calculate_fee(op).amount.value;
+      expected_core_balance_alice -= 200 * prec;
+      BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance( alice, core) );
+            
+      // now check what is in Alice's account
+      BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance(alice, core ) );
+      BOOST_CHECK_EQUAL( 100 * prec, get_balance( alice, my_asset_id(db) ) );
+      // attempt to sell the 100 JMJCOIN
+      try 
+      {
+         create_sell_order( alice_id, asset(95 * prec, my_asset_id), asset(95 * prec, core_id), 
+               fc::time_point_sec::maximum(), 
+               price( asset(100, my_asset_id), asset(100, core_id ) ) );
+         create_sell_order( bob_id, asset(95 * prec, core_id), asset(95 * prec, my_asset_id), fc::time_point_sec::maximum(),
+               price( asset(100, my_asset_id), asset(100, core_id ) ) );
+         expected_core_balance_alice += 95 * prec; // 95 sold + 5 JMJCoin fee. Ouch!
+         expected_core_balance_bob -= 95 * prec; // 95 JMJCoin bought for 95 CORE
+      }
+      catch( const fc::exception& fce)
+      {
+         BOOST_FAIL( fce.to_detail_string() );
+      }
+      // now alice holds only core, but has debt in JMJCOIN
+      BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance(alice, core) );
+      BOOST_CHECK_EQUAL( 0, get_balance(alice, my_asset_id(db) ) );
+      // and bob hold core and JMJCOIN
+      BOOST_CHECK_EQUAL( expected_core_balance_bob, get_balance( bob, core) );
+      BOOST_CHECK_EQUAL( 90 * prec, get_balance(bob, my_asset_id(db) ) ); // received 90 due to JMJCoin fee. Ouch!
+   }
+   
+   // is there a call order out there?
+   const auto& call_index = db.get_index_type<call_order_index>().indices().get<by_collateral>();
+   uint8_t count = 0;
+   std::for_each( call_index.begin(), call_index.end(), [&count](const call_order_object& obj) {
+      count++; 
+   });  
+
+   // now the price of CORE drops, pushing Alice's loan into margin call territory
+   // at 100:100 (1:1), alice was collateralized at 200% (1:2). A drop to 100:85 puts her at 170%.
+   {
+      price_feed feed1;
+      feed1.core_exchange_rate = price( asset( 100, my_asset_id ), asset( 85, core_id ) );
+      feed1.settlement_price = price( asset( 100, my_asset_id ), asset( 100, core_id ) );
+      feed1.maintenance_collateral_ratio = GRAPHENE_MIN_COLLATERAL_RATIO;
+      try
+      {
+         publish_feed( my_asset_id(db), feeder1, feed1 );
+         publish_feed( my_asset_id(db), feeder2, feed1 );
+         publish_feed( my_asset_id(db), feeder3, feed1 );
+      }
+      catch(const fc::exception& fe)
+      {
+         BOOST_FAIL( fe.to_detail_string() );
+      }
+   }
+
+   // is the call order out there?
+   const auto& call_index2 = db.get_index_type<call_order_index>().indices().get<by_collateral>();
+   count = 0;
+   std::for_each( call_index2.begin(), call_index2.end(), [&count](const call_order_object& obj) 
+   {
+      BOOST_TEST_MESSAGE( "Debt asset: " + std::to_string(obj.get_debt().asset_id.instance.value)
+         + " amount: " + std::to_string(obj.get_debt().amount.value)
+         + " price: " + std::to_string( obj.call_price.base.amount.value )
+         + " of " + std::to_string( obj.call_price.base.asset_id.instance.value )
+         + " against " + std::to_string( obj.call_price.quote.amount.value )
+         + " of " + std::to_string( obj.call_price.quote.asset_id.instance.value )
+          );
+      count++; 
+   });
+   BOOST_CHECK_EQUAL( 1, count);
+
+   // Bob places an order just above that level...
+   create_sell_order( bob_id, asset( 90 * prec, my_asset_id ), asset(105 * prec, my_asset_id) );
+
 }
 
 BOOST_AUTO_TEST_SUITE_END()
