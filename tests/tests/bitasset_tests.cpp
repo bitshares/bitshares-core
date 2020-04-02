@@ -1403,22 +1403,44 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
 
 } FC_LOG_AND_RETHROW() }
 
-BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
+int num_limit_orders_on_books( graphene::chain::database& db )
 {
+   const auto& limit_index = db.get_index_type<limit_order_index>().indices().get<by_price>();
+   int count = 0;
+   std::for_each( limit_index.begin(), limit_index.end(), [&count](const limit_order_object& obj) {
+      count++; 
+   });  
+   return count; 
+}
+
+int num_call_orders_on_books( graphene::chain::database& db )
+{
+   const auto& call_index = db.get_index_type<call_order_index>().indices().get<by_collateral>();
+   int count = 0;
+   std::for_each( call_index.begin(), call_index.end(), [&count](const call_order_object& obj) {
+      count++; 
+   }); 
+   return count;  
+}
+
+BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
+{ try {
    const auto& prec = GRAPHENE_BLOCKCHAIN_PRECISION;
    enable_fees();
    const auto fees = db.get_global_properties().parameters.current_fees;
-   ACTORS( (alice)  (bob) (feeder1) (feeder2) (feeder3) );
+   ACTORS( (alice)  (bob) (charlie) (feeder1) (feeder2) (feeder3) );
    const auto& core = asset_id_type()(db);
    const auto& core_id = core.id;
    transfer( committee_account(db), alice, asset(100000 * prec) );
    transfer( committee_account(db), bob,   asset(100000 * prec) );
+   transfer( committee_account(db), charlie, asset(100000 * prec) );
    transfer( committee_account(db), feeder1, asset(100 * prec) );
    transfer( committee_account(db), feeder2, asset(100 * prec) );
    transfer( committee_account(db), feeder3, asset(100 * prec) );
 
    int64_t expected_core_balance_alice = 100000 * prec;
    int64_t expected_core_balance_bob = 100000 * prec;
+   int64_t expected_jmj_balance_bob = 0;
 
    asset_id_type my_asset_id;
    // MCFR (margin call fee ratio) should not be adjustable until HF BSIP74
@@ -1508,13 +1530,7 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
       update.new_options = bit_options; // this should no longer cause an exception
       trx.operations.push_back( std::move(update) );
       sign(trx, alice_private_key);
-      try {
-         PUSH_TX(db, trx);
-      }
-      catch( const fc::exception& ex) 
-      {
-         BOOST_FAIL( ex.to_detail_string() );
-      }
+      PUSH_TX(db, trx);
       trx.clear();   
 
       BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance( alice, core) );
@@ -1528,23 +1544,18 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
       price_feed feed1;
       feed1.core_exchange_rate = price( asset( 100, my_asset_id ), asset( 100, core_id ) );
       feed1.settlement_price = price( asset( 100, my_asset_id ), asset( 100, core_id ) );
-      feed1.maintenance_collateral_ratio = GRAPHENE_MIN_COLLATERAL_RATIO;
-      try
-      {
-         publish_feed( my_asset_id(db), feeder1, feed1 );
-         publish_feed( my_asset_id(db), feeder2, feed1 );
-         publish_feed( my_asset_id(db), feeder3, feed1 );
-      }
-      catch(const fc::exception& fe)
-      {
-         BOOST_FAIL( fe.to_detail_string() );
-      }
+      feed1.maintenance_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
+      publish_feed( my_asset_id(db), feeder1, feed1 );
+      publish_feed( my_asset_id(db), feeder2, feed1 );
+      publish_feed( my_asset_id(db), feeder3, feed1 );
    }
 
    // make a normal trade to assure the trading fee is correct
    {
       // alice will short some JMJCOIN into existence
       borrow( alice, asset(100 * prec, my_asset_id), asset(200 * prec) );
+      // charlie will do the same, but at a safer ratio.
+      borrow( charlie, asset( 100 * prec, my_asset_id), asset(300 * prec) );
       call_order_update_operation op;
       expected_core_balance_alice -= fees->calculate_fee(op).amount.value;
       expected_core_balance_alice -= 200 * prec;
@@ -1553,74 +1564,72 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
       // now check what is in Alice's account
       BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance(alice, core ) );
       BOOST_CHECK_EQUAL( 100 * prec, get_balance( alice, my_asset_id(db) ) );
-      // attempt to sell the 100 JMJCOIN
-      try 
-      {
-         create_sell_order( alice_id, asset(95 * prec, my_asset_id), asset(95 * prec, core_id), 
-               fc::time_point_sec::maximum(), 
-               price( asset(100, my_asset_id), asset(100, core_id ) ) );
-         create_sell_order( bob_id, asset(95 * prec, core_id), asset(95 * prec, my_asset_id), fc::time_point_sec::maximum(),
-               price( asset(100, my_asset_id), asset(100, core_id ) ) );
-         expected_core_balance_alice += 95 * prec; // 95 sold + 5 JMJCoin fee. Ouch!
-         expected_core_balance_bob -= 95 * prec; // 95 JMJCoin bought for 95 CORE
-      }
-      catch( const fc::exception& fce)
-      {
-         BOOST_FAIL( fce.to_detail_string() );
-      }
+      // Alice and Charlie attempt to sell the 100 JMJCOIN
+      create_sell_order( alice_id, asset(95 * prec, my_asset_id), asset(95 * prec, core_id), 
+            fc::time_point_sec::maximum(), 
+            price( asset(100, my_asset_id), asset(100, core_id ) ) );
+      expected_core_balance_alice += 95 * prec; // 95 sold + 5 JMJCoin fee. Ouch!
+      create_sell_order( charlie_id, asset(95 * prec, my_asset_id), asset(95 * prec, core_id), 
+            fc::time_point_sec::maximum(), 
+            price( asset(100, my_asset_id), asset(100, core_id ) ) );
+      // Bob buys all he can
+      create_sell_order( bob_id, asset(190 * prec, core_id), asset(190 * prec, my_asset_id), fc::time_point_sec::maximum(),
+            price( asset(100, my_asset_id), asset(100, core_id ) ) );     
+      expected_core_balance_bob -= 190 * prec; // 190 JMJCoin bought for 190 CORE
+      expected_jmj_balance_bob = 185 * prec; // don't forget the 5JMJ fee for JMJ coin;
       // now alice holds only core, but has debt in JMJCOIN
       BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance(alice, core) );
       BOOST_CHECK_EQUAL( 0, get_balance(alice, my_asset_id(db) ) );
       // and bob hold core and JMJCOIN
       BOOST_CHECK_EQUAL( expected_core_balance_bob, get_balance( bob, core) );
-      BOOST_CHECK_EQUAL( 90 * prec, get_balance(bob, my_asset_id(db) ) ); // received 90 due to JMJCoin fee. Ouch!
+      BOOST_CHECK_EQUAL( expected_jmj_balance_bob, get_balance(bob, my_asset_id(db) ) ); // received 185 due to JMJCoin fee. Ouch!
    }
    
-   // is there a call order out there?
-   const auto& call_index = db.get_index_type<call_order_index>().indices().get<by_collateral>();
-   uint8_t count = 0;
-   std::for_each( call_index.begin(), call_index.end(), [&count](const call_order_object& obj) {
-      count++; 
-   });  
+   BOOST_CHECK_EQUAL( 0, num_limit_orders_on_books( db ) );
+   BOOST_CHECK_EQUAL( 2, num_call_orders_on_books( db ) );
+
+   // Bob places an order that will eventually executed against Alice's call order
+   // NOTE: This must be done first to prevent a global settlement event
+   {
+      create_sell_order( bob_id, asset( 100 * prec, my_asset_id ), asset(45 * prec, core_id) );
+      expected_core_balance_bob -= fees->calculate_fee( limit_order_create_operation() ).amount.value;
+      expected_jmj_balance_bob -= 100 * prec;
+      BOOST_CHECK_EQUAL( expected_core_balance_bob, get_balance( bob, core) ); // the fee should be taken out
+      BOOST_CHECK_EQUAL( expected_jmj_balance_bob, get_balance(bob, my_asset_id(db) ) ); // Order is executed
+      // verify that the limit order still exists  
+      BOOST_CHECK_EQUAL( 1, num_limit_orders_on_books( db ) );
+   }   
 
    // now the price of CORE drops, pushing Alice's loan into margin call territory
-   // at 100:100 (1:1), alice was collateralized at 200% (1:2). A drop to 100:85 puts her at 170%.
+   // at a price of 100:100 (1:1), alice was collateralized at 200% (1:2). 
+   // A drop in price to 100:145 puts her below 170%.
    {
       price_feed feed1;
-      feed1.core_exchange_rate = price( asset( 100, my_asset_id ), asset( 85, core_id ) );
-      feed1.settlement_price = price( asset( 100, my_asset_id ), asset( 100, core_id ) );
-      feed1.maintenance_collateral_ratio = GRAPHENE_MIN_COLLATERAL_RATIO;
-      try
-      {
-         publish_feed( my_asset_id(db), feeder1, feed1 );
-         publish_feed( my_asset_id(db), feeder2, feed1 );
-         publish_feed( my_asset_id(db), feeder3, feed1 );
-      }
-      catch(const fc::exception& fe)
-      {
-         BOOST_FAIL( fe.to_detail_string() );
-      }
+      feed1.core_exchange_rate = price( asset( 100, my_asset_id ), asset( 145, core_id ) );
+      feed1.settlement_price = price( asset( 100, my_asset_id ), asset( 145, core_id ) );
+      feed1.maintenance_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
+      publish_feed( my_asset_id(db), feeder1, feed1 );
+      publish_feed( my_asset_id(db), feeder2, feed1 );
+      publish_feed( my_asset_id(db), feeder3, feed1 );
    }
 
-   // is the call order out there?
-   const auto& call_index2 = db.get_index_type<call_order_index>().indices().get<by_collateral>();
-   count = 0;
-   std::for_each( call_index2.begin(), call_index2.end(), [&count](const call_order_object& obj) 
-   {
-      BOOST_TEST_MESSAGE( "Debt asset: " + std::to_string(obj.get_debt().asset_id.instance.value)
-         + " amount: " + std::to_string(obj.get_debt().amount.value)
-         + " price: " + std::to_string( obj.call_price.base.amount.value )
-         + " of " + std::to_string( obj.call_price.base.asset_id.instance.value )
-         + " against " + std::to_string( obj.call_price.quote.amount.value )
-         + " of " + std::to_string( obj.call_price.quote.asset_id.instance.value )
-          );
-      count++; 
-   });
-   BOOST_CHECK_EQUAL( 1, count);
+   // this should not cause a GS
+   BOOST_CHECK( !my_asset_id(db).bitasset_data(db).has_settlement() );
 
-   // Bob places an order just above that level...
-   create_sell_order( bob_id, asset( 90 * prec, my_asset_id ), asset(105 * prec, my_asset_id) );
+   // Alice's call should be gone, so should Bob's limit order
+   BOOST_CHECK_EQUAL( 1, num_call_orders_on_books( db ) );
+   BOOST_CHECK_EQUAL( 0, num_limit_orders_on_books( db ) );
 
-}
+   // the order should have executed, giving Alice some CORE
+   expected_core_balance_alice += 155 * prec; // return of what's left of collateral
+   BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance(alice, core) );
+   BOOST_CHECK_EQUAL( 0, get_balance(alice, my_asset_id(db) ) );
+   // and here are Bob's holdings
+   expected_core_balance_bob += 45 * prec; // received from limit order for sale of JMJCoin
+   BOOST_CHECK_EQUAL( expected_core_balance_bob, get_balance( bob, core) );
+   BOOST_CHECK_EQUAL( expected_jmj_balance_bob, get_balance(bob, my_asset_id(db) ) ); 
+
+
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
