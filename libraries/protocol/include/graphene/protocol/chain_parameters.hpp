@@ -87,7 +87,6 @@ namespace graphene { namespace protocol {
 
       extension<ext> extensions;
 
-      /** defined in fee_schedule.cpp */
       void validate()const;
       
       chain_parameters();
