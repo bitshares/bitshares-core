@@ -101,6 +101,17 @@ namespace graphene { namespace protocol {
                  "Maximum transaction expiration time must be greater than a block interval" );
       FC_ASSERT( maximum_proposal_lifetime - committee_proposal_review_period > block_interval,
                  "Committee proposal review period must be less than the maximum proposal lifetime" );
+      if( extensions.value.market_fee_network_percent.valid() )
+      {
+         FC_ASSERT( *extensions.value.market_fee_network_percent <= GRAPHENE_100_PERCENT,
+                    "The market_fee_network_percent parameter can not exceed 100%" );
+      }
+   }
+
+   uint16_t chain_parameters::get_market_fee_network_percent() const
+   {
+      return extensions.value.market_fee_network_percent.valid() ?
+                *extensions.value.market_fee_network_percent : 0;
    }
 
 }}

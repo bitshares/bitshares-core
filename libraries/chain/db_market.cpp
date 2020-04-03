@@ -1186,9 +1186,28 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
 
 asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives )
 {
-   const auto issuer_fees = calculate_market_fee( recv_asset, receives );
+   auto issuer_fees = calculate_market_fee( recv_asset, receives );
    FC_ASSERT( issuer_fees <= receives, "Market fee shouldn't be greater than receives");
    //Don't dirty undo state if not actually collecting any fees
+   if ( issuer_fees.amount > 0 )
+   {
+      // Share market fees to the network
+      const uint16_t network_percent = get_global_properties().parameters.get_market_fee_network_percent();
+      if( network_percent > 0 )
+      {
+         const auto network_fees_amt = detail::calculate_percent( issuer_fees.amount, network_percent );
+         FC_ASSERT( network_fees_amt <= issuer_fees.amount,
+                    "Fee shared to the network shouldn't be greater than total market fee" );
+         if( network_fees_amt > 0 )
+         {
+            const asset network_fees = recv_asset.amount( network_fees_amt );
+            deposit_market_fee_vesting_balance( GRAPHENE_COMMITTEE_ACCOUNT, network_fees );
+            issuer_fees -= network_fees;
+         }
+      }
+   }
+
+   // Process the remaining fees
    if ( issuer_fees.amount > 0 )
    {
       // calculate and pay rewards
