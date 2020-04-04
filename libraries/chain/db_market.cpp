@@ -1186,7 +1186,8 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
 
 asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives )
 {
-   auto issuer_fees = calculate_market_fee( recv_asset, receives );
+   const auto market_fees = calculate_market_fee( recv_asset, receives );
+   auto issuer_fees = market_fees;
    FC_ASSERT( issuer_fees <= receives, "Market fee shouldn't be greater than receives");
    //Don't dirty undo state if not actually collecting any fees
    if ( issuer_fees.amount > 0 )
@@ -1258,7 +1259,7 @@ asset database::pay_market_fees(const account_object* seller, const asset_object
       });
    }
 
-   return issuer_fees;
+   return market_fees;
 }
 
 } }
