@@ -803,9 +803,8 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
    FC_ASSERT( pays.asset_id != receives.asset_id );
 
    const account_object& seller = order.seller(*this);
-   const asset_object& recv_asset = receives.asset_id(*this);
 
-   auto issuer_fees = pay_market_fees(&seller, recv_asset, receives);
+   auto issuer_fees = pay_market_fees(&seller, receives.asset_id(*this), receives);
 
    pay_order( seller, receives - issuer_fees, pays );
 
@@ -847,9 +846,18 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
    }
 } FC_CAPTURE_AND_RETHROW( (order)(pays)(receives) ) }
 
-
+/***
+ * @brief fill a call order in the specified amounts
+ * @param order the call order
+ * @param pays What the call order will give to the other party
+ * @param receives what the call order will receive from the other party
+ * @param fill_price the price at which the call order will execute
+ * @param is_maker TRUE if the call order is the maker, FALSE if it is the taker
+ * @param is_margin_call TRUE if this method was called due to a margin call
+ * @returns TRUE if the call order was completely filled
+ */
 bool database::fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
-                                const price& fill_price, const bool is_maker )
+      const price& fill_price, const bool is_maker, bool is_margin_call )
 { try {
    FC_ASSERT( order.debt_type() == receives.asset_id );
    FC_ASSERT( order.collateral_type() == pays.asset_id );
@@ -859,38 +867,51 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
    const asset_object& mia = receives.asset_id(*this);
    FC_ASSERT( mia.is_market_issued() );
 
+   // calculate any margin call fees
+   asset margin_fee(0, pays.asset_id);
+   if (is_margin_call)
+   {
+      margin_fee = calculate_margin_fee( mia, pays );
+      FC_ASSERT( margin_fee.asset_id == pays.asset_id ); // margin fee should be paid in the debt asset
+      FC_ASSERT( margin_fee.amount < pays.amount ); // margin fee should never be more than what the call order is receiving
+   }
+
    optional<asset> collateral_freed;
-   modify( order, [&]( call_order_object& o ){
-            o.debt       -= receives.amount;
-            o.collateral -= pays.amount;
-            if( o.debt == 0 )
+   // adjust the order
+   modify( order, [&]( call_order_object& o ) {
+         o.debt       -= receives.amount;
+         o.collateral -= pays.amount;
+         if( o.debt == 0 ) // is the whole debt paid?
+         {
+            collateral_freed = o.get_collateral();
+            o.collateral = 0;
+         }
+         else // the debt was not completely paid
+         {
+            auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+            // update call_price after core-343 hard fork,
+            // but don't update call_price after core-1270 hard fork
+            if( maint_time <= HARDFORK_CORE_1270_TIME && maint_time > HARDFORK_CORE_343_TIME )
             {
-              collateral_freed = o.get_collateral();
-              o.collateral = 0;
+               o.call_price = price::call_price( o.get_debt(), o.get_collateral(),
+                     mia.bitasset_data(*this).current_feed.maintenance_collateral_ratio );
             }
-            else
-            {
-               auto maint_time = get_dynamic_global_properties().next_maintenance_time;
-               // update call_price after core-343 hard fork,
-               // but don't update call_price after core-1270 hard fork
-               if( maint_time <= HARDFORK_CORE_1270_TIME && maint_time > HARDFORK_CORE_343_TIME )
-               {
-                  o.call_price = price::call_price( o.get_debt(), o.get_collateral(),
-                                                    mia.bitasset_data(*this).current_feed.maintenance_collateral_ratio );
-               }
-            }
+         }
       });
+
+   // distribute the margin fee
+   if (margin_fee.amount > 0)
+      distribute_market_fees( &order.borrower(*this), margin_fee.asset_id(*this), margin_fee );
 
    // update current supply
    const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
-
    modify( mia_ddo, [&receives]( asset_dynamic_data_object& ao ){
          ao.current_supply -= receives.amount;
       });
 
-   // Adjust balance
+   // If the whole debt is paid, adjust borrower's collateral balance
    if( collateral_freed.valid() )
-      adjust_balance( order.borrower, *collateral_freed );
+      adjust_balance( order.borrower, *collateral_freed - margin_fee );
 
    // Update account statistics. We know that order.collateral_type() == pays.asset_id
    if( pays.asset_id == asset_id_type() )
@@ -902,9 +923,11 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
       });
    }
 
+   // virtual operation for account history
    push_applied_operation( fill_order_operation( order.id, order.borrower, pays, receives,
-                                                 asset(0, pays.asset_id), fill_price, is_maker ) );
+         asset(0, pays.asset_id), fill_price, is_maker ) );
 
+   // Call order completely filled, remove it
    if( collateral_freed.valid() )
       remove( order );
 
@@ -916,7 +939,7 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
 { try {
    bool filled = false;
 
-   auto issuer_fees = pay_market_fees( nullptr, get(receives.asset_id), receives);
+   auto issuer_fees = pay_market_fees( nullptr, receives.asset_id(*this), receives);
 
    if( pays < settle.balance )
    {
@@ -927,6 +950,7 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
    } else {
       filled = true;
    }
+
    adjust_balance(settle.owner, receives - issuer_fees);
 
    assert( pays.asset_id != receives.asset_id );
@@ -1137,7 +1161,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        if( filled_call && before_core_hardfork_343 )
           ++call_price_itr;
        // when for_new_limit_order is true, the call order is maker, otherwise the call order is taker
-       fill_call_order( call_order, call_pays, call_receives, match_price, for_new_limit_order );
+       fill_call_order( call_order, call_pays, call_receives, match_price, for_new_limit_order, true );
        if( !before_core_hardfork_1270 )
           call_collateral_itr = call_collateral_index.lower_bound( call_min );
        else if( !before_core_hardfork_343 )
@@ -1184,59 +1208,94 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
    return percent_fee;
 }
 
+/***
+ * @brief calculate the margin fee
+ * 
+ * Note that the trade_asset controls the fee percentage, but trade_amount controls the asset the fee is paid in
+ * @param trade_asset the asset that controls the fee
+ * @param trade_amount the asset that the fee should be paid in
+ * @returns the amount to be paid
+ */
+asset database::calculate_margin_fee( const asset_object& trade_asset, const asset& trade_amount)
+{
+   assert( trade_asset.id != trade_amount.asset_id );
+
+   if( !trade_asset.charges_market_fees() )
+      return asset(0, trade_amount.asset_id);
+   if( !trade_asset.options.extensions.value.margin_call_fee_ratio.valid() 
+         || *trade_asset.options.extensions.value.margin_call_fee_ratio == 0 )
+      return asset(0, trade_amount.asset_id);
+
+   auto value = detail::calculate_percent(trade_amount.amount, *trade_asset.options.extensions.value.margin_call_fee_ratio);
+   asset percent_fee(value, trade_amount.asset_id);
+
+   // TODO: This check should be based on exchange rate
+   /*
+   if( percent_fee.amount > trade_asset.options.max_market_fee )
+      percent_fee.amount = trade_asset.options.max_market_fee;
+   */
+   return percent_fee;
+}
+
+void database::distribute_market_fees( const account_object* seller, const asset_object& recv_asset, const asset& issuer_fees)
+{
+   // calculate and pay rewards
+   asset reward = recv_asset.amount(0);
+
+   auto is_rewards_allowed = [&recv_asset, seller]() {
+      if (seller == nullptr)
+         return false;
+      const auto &white_list = recv_asset.options.extensions.value.whitelist_market_fee_sharing;
+      return ( !white_list || (*white_list).empty() 
+            || ( (*white_list).find(seller->registrar) != (*white_list).end() ) );
+   };
+
+   if ( is_rewards_allowed() )
+   {
+      const auto reward_percent = recv_asset.options.extensions.value.reward_percent;
+      if ( reward_percent && *reward_percent )
+      {
+         const auto reward_value = detail::calculate_percent(issuer_fees.amount, *reward_percent);
+         if ( reward_value > 0 && is_authorized_asset(*this, seller->registrar(*this), recv_asset) )
+         {
+            reward = recv_asset.amount(reward_value);
+            FC_ASSERT( reward < issuer_fees, "Market reward should be less than issuer fees");
+            // cut referrer percent from reward
+            auto registrar_reward = reward;
+            if( seller->referrer != seller->registrar )
+            {
+               const auto referrer_rewards_value = detail::calculate_percent( reward.amount,
+                                                                              seller->referrer_rewards_percentage );
+
+               if ( referrer_rewards_value > 0 && is_authorized_asset(*this, seller->referrer(*this), recv_asset) )
+               {
+                  FC_ASSERT ( referrer_rewards_value <= reward.amount.value,
+                              "Referrer reward shouldn't be greater than total reward" );
+                  const asset referrer_reward = recv_asset.amount(referrer_rewards_value);
+                  registrar_reward -= referrer_reward;
+                  deposit_market_fee_vesting_balance(seller->referrer, referrer_reward);
+               }
+            }
+            deposit_market_fee_vesting_balance(seller->registrar, registrar_reward);
+         }
+      }
+   }
+
+   const auto& recv_dyn_data = recv_asset.dynamic_asset_data_id(*this);
+   modify( recv_dyn_data, [&issuer_fees, &reward]( asset_dynamic_data_object& obj ){
+      obj.accumulated_fees += issuer_fees.amount - reward.amount;
+   }); 
+}
+
 asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives )
 {
-   const auto issuer_fees = calculate_market_fee( recv_asset, receives );
+   // market fee calculation
+   auto issuer_fees = calculate_market_fee( recv_asset, receives );
    FC_ASSERT( issuer_fees <= receives, "Market fee shouldn't be greater than receives");
    //Don't dirty undo state if not actually collecting any fees
    if ( issuer_fees.amount > 0 )
    {
-      // calculate and pay rewards
-      asset reward = recv_asset.amount(0);
-
-      auto is_rewards_allowed = [&recv_asset, seller]() {
-         if (seller == nullptr)
-            return false;
-         const auto &white_list = recv_asset.options.extensions.value.whitelist_market_fee_sharing;
-         return ( !white_list || (*white_list).empty() 
-               || ( (*white_list).find(seller->registrar) != (*white_list).end() ) );
-      };
-
-      if ( is_rewards_allowed() )
-      {
-         const auto reward_percent = recv_asset.options.extensions.value.reward_percent;
-         if ( reward_percent && *reward_percent )
-         {
-            const auto reward_value = detail::calculate_percent(issuer_fees.amount, *reward_percent);
-            if ( reward_value > 0 && is_authorized_asset(*this, seller->registrar(*this), recv_asset) )
-            {
-               reward = recv_asset.amount(reward_value);
-               FC_ASSERT( reward < issuer_fees, "Market reward should be less than issuer fees");
-               // cut referrer percent from reward
-               auto registrar_reward = reward;
-               if( seller->referrer != seller->registrar )
-               {
-                  const auto referrer_rewards_value = detail::calculate_percent( reward.amount,
-                                                                                 seller->referrer_rewards_percentage );
-
-                  if ( referrer_rewards_value > 0 && is_authorized_asset(*this, seller->referrer(*this), recv_asset) )
-                  {
-                     FC_ASSERT ( referrer_rewards_value <= reward.amount.value,
-                                 "Referrer reward shouldn't be greater than total reward" );
-                     const asset referrer_reward = recv_asset.amount(referrer_rewards_value);
-                     registrar_reward -= referrer_reward;
-                     deposit_market_fee_vesting_balance(seller->referrer, referrer_reward);
-                  }
-               }
-               deposit_market_fee_vesting_balance(seller->registrar, registrar_reward);
-            }
-         }
-      }
-
-      const auto& recv_dyn_data = recv_asset.dynamic_asset_data_id(*this);
-      modify( recv_dyn_data, [&issuer_fees, &reward]( asset_dynamic_data_object& obj ){
-         obj.accumulated_fees += issuer_fees.amount - reward.amount;
-      });
+      distribute_market_fees(seller, recv_asset, issuer_fees);
    }
 
    return issuer_fees;

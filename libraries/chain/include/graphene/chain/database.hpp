@@ -448,7 +448,7 @@ namespace graphene { namespace chain {
           * @returns TRUE if the order was completely filled
           */
          bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
-                               const price& fill_price, const bool is_maker );
+                               const price& fill_price, const bool is_maker, bool is_margin_call = false );
          bool fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
                                  const price& fill_price, const bool is_maker );
 
@@ -458,8 +458,17 @@ namespace graphene { namespace chain {
          // helpers to fill_order
          void pay_order( const account_object& receiver, const asset& receives, const asset& pays );
 
+         /**
+          * Calculate the market fee that is to be taken
+          * @param recv_asset the asset that is to be given
+          * @param trade_amount the quantity
+          * @param is_margin_trading TRUE if this is a limit order going against a call order
+          */
          asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
+         asset calculate_margin_fee(const asset_object& pays_asset, const asset& trade_amount);
          asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives );
+         void distribute_market_fees( const account_object* seller, const asset_object& recv_asset, const asset& issuer_fees);
+
          ///@}
 
 
