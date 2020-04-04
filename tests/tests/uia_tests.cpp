@@ -161,6 +161,9 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       BOOST_CHECK(is_authorized_asset( db, nathan_id(db), uia_id(db) ));
       BOOST_CHECK_EQUAL(get_balance(nathan_id, uia_id), 1000);
 
+      // committee-account is free as well
+      BOOST_CHECK( is_authorized_asset( db, account_id_type()(db), uia_id(db) ) );
+
       // Make a whitelist, now it should fail
       {
          BOOST_TEST_MESSAGE( "Changing the whitelist authority" );
@@ -177,6 +180,9 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       // Fail because there is a whitelist authority and I'm not whitelisted
       trx.operations.back() = op;
       GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+      // committee-account is blocked as well
+      BOOST_CHECK( !is_authorized_asset( db, account_id_type()(db), uia_id(db) ) );
 
       account_whitelist_operation wop;
       wop.authorizing_account = izzy_id;
@@ -203,6 +209,19 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       // Finally succeed when we were whitelisted
       PUSH_TX( db, trx, ~0 );
       BOOST_CHECK_EQUAL(get_balance(nathan_id, uia_id), 2000);
+
+      // committee-account is still blocked
+      BOOST_CHECK( !is_authorized_asset( db, account_id_type()(db), uia_id(db) ) );
+      // izzy is still blocked
+      BOOST_CHECK( !is_authorized_asset( db, izzy_id(db), uia_id(db) ) );
+
+      // Pass BSIP 86 hardfork
+      generate_blocks( HARDFORK_BSIP_86_TIME );
+
+      // committee-account is now unblocked
+      BOOST_CHECK( is_authorized_asset( db, account_id_type()(db), uia_id(db) ) );
+      // izzy is still blocked
+      BOOST_CHECK( !is_authorized_asset( db, izzy_id(db), uia_id(db) ) );
 
    } catch(fc::exception& e) {
       edump((e.to_detail_string()));
