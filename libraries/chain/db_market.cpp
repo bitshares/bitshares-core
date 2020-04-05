@@ -932,7 +932,9 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
 { try {
    bool filled = false;
 
-   auto issuer_fees = pay_market_fees(get(receives.asset_id), receives);
+   auto issuer_fees = ( head_block_time() < HARDFORK_CORE_1780_TIME ) ?
+      pay_market_fees(get(receives.asset_id), receives) :
+      pay_market_fees(settle.owner(*this), get(receives.asset_id), receives);
 
    if( pays < settle.balance )
    {
