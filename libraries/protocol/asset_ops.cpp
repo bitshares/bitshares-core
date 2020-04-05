@@ -239,7 +239,7 @@ void asset_options::validate()const
       FC_ASSERT( whitelist_markets.find(item) == whitelist_markets.end() );
    }
    if( extensions.value.reward_percent.valid() )
-      FC_ASSERT( *extensions.value.reward_percent < GRAPHENE_100_PERCENT );
+      FC_ASSERT( *extensions.value.reward_percent <= GRAPHENE_100_PERCENT );
 }
 
 void asset_claim_fees_operation::validate()const {

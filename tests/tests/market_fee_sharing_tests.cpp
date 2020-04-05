@@ -96,6 +96,12 @@ struct reward_database_fixture : database_fixture
       database_fixture::generate_block();
    }
 
+   void generate_blocks_past_hf1774()
+   {
+      database_fixture::generate_blocks( HARDFORK_1774_TIME );
+      database_fixture::generate_block();
+   }
+
    asset core_asset(int64_t x )
    {
        return asset( x*core_precision );
@@ -139,7 +145,7 @@ BOOST_AUTO_TEST_CASE(cannot_create_asset_with_additional_options_before_hf)
    FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE(create_asset_with_additional_options_after_hf)
+BOOST_AUTO_TEST_CASE(create_asset_with_additional_options_after_hf1268)
 {
    try
    {
@@ -193,7 +199,7 @@ BOOST_AUTO_TEST_CASE(create_asset_with_additional_options_after_hf)
    FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE(cannot_update_additional_options_before_hf)
+BOOST_AUTO_TEST_CASE(cannot_update_additional_options_before_hf1268)
 {
    try
    {
@@ -209,7 +215,7 @@ BOOST_AUTO_TEST_CASE(cannot_update_additional_options_before_hf)
    FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE(update_additional_options_after_hf)
+BOOST_AUTO_TEST_CASE(update_additional_options_after_hf1268)
 {
    try
    {
@@ -235,6 +241,59 @@ BOOST_AUTO_TEST_CASE(update_additional_options_after_hf)
 
       asset_object updated_asset = usd_asset.get_id()(db);
       additional_asset_options options = updated_asset.options.extensions.value;
+      BOOST_CHECK_EQUAL(reward_percent, *options.reward_percent);
+      BOOST_CHECK(whitelist == *options.whitelist_market_fee_sharing);
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE(create_asset_with_reward_percent_of_100_after_hf1774)
+{
+   try
+   {
+      ACTOR(issuer);
+
+      generate_blocks_past_hf1774();
+
+      uint16_t reward_percent = GRAPHENE_100_PERCENT; // 100.00%
+      flat_set<account_id_type> whitelist = {issuer_id};
+      price price(asset(1, asset_id_type(1)), asset(1));
+      uint16_t market_fee_percent = 100;
+
+      additional_asset_options_t options;
+      options.value.reward_percent = reward_percent;
+      options.value.whitelist_market_fee_sharing = whitelist;
+
+      asset_object usd_asset = create_user_issued_asset("USD",
+                                                        issuer,
+                                                        charge_market_fee,
+                                                        price,
+                                                        2,
+                                                        market_fee_percent,
+                                                        options);
+
+      additional_asset_options usd_options = usd_asset.options.extensions.value;
+      BOOST_CHECK_EQUAL(reward_percent, *usd_options.reward_percent);
+      BOOST_CHECK(whitelist == *usd_options.whitelist_market_fee_sharing);
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE(set_reward_percent_to_100_after_hf1774)
+{
+   try
+   {
+      ACTOR(issuer);
+
+      asset_object usd_asset = create_user_issued_asset("USD", issuer, charge_market_fee);
+
+      generate_blocks_past_hf1774();
+
+      uint16_t reward_percent = GRAPHENE_100_PERCENT; // 100.00%
+      flat_set<account_id_type> whitelist = {issuer_id};
+      update_asset(issuer_id, issuer_private_key, usd_asset.get_id(), reward_percent, whitelist);
+
+      additional_asset_options options = usd_asset.get_id()(db).options.extensions.value;
       BOOST_CHECK_EQUAL(reward_percent, *options.reward_percent);
       BOOST_CHECK(whitelist == *options.whitelist_market_fee_sharing);
    }
@@ -1001,5 +1060,58 @@ BOOST_AUTO_TEST_CASE( create_vesting_balance_object_test )
       GRAPHENE_CHECK_THROW(create_vesting_balance_object(actor_id, vesting_balance_type::market_fee_sharing), fc::exception);
 
 } FC_LOG_AND_RETHROW() }
+
+
+BOOST_AUTO_TEST_CASE( possibility_to_set_100_reward_percent_after_hf1774 )
+{
+   try
+   {
+      INVOKE(create_actors);
+
+      generate_blocks_past_hf1774();
+      GET_ACTOR(jill);
+
+      constexpr auto jillcoin_reward_percent = 100*GRAPHENE_1_PERCENT;
+      const asset_object &jillcoin = get_asset("JCOIN");
+
+      update_asset(jill_id, jill_private_key, jillcoin.get_id(), jillcoin_reward_percent);
+
+      GET_ACTOR(izzyregistrar);
+      GET_ACTOR(izzyreferrer);
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyregistrar, jillcoin ), 0 );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyreferrer, jillcoin ), 0 );
+
+      GET_ACTOR(alice);
+      GET_ACTOR(bob);
+
+      const share_type sell_amount = 100000;
+
+      // Alice and Bob place orders which match
+      create_sell_order( alice, jillcoin.amount(sell_amount), core_asset(1) );
+      create_sell_order( bob, core_asset(1), jillcoin.amount(sell_amount) );
+
+      const auto izzyregistrar_reward = get_market_fee_reward( izzyregistrar, jillcoin );
+      const auto izzyreferrer_reward = get_market_fee_reward( izzyreferrer, jillcoin );
+
+      BOOST_CHECK_GT(izzyregistrar_reward , 0);
+      BOOST_CHECK_GT(izzyreferrer_reward , 0);
+
+      auto calculate_percent = [](const share_type& value, uint16_t percent)
+      {
+         auto a(value.value);
+         a *= percent;
+         a /= GRAPHENE_100_PERCENT;
+         return a;
+      };
+      //jillcoin has 20% market fee percent, see create_actors
+      //all market fees are distributed between registrar and referrer
+      auto acc_rewards = izzyregistrar_reward + izzyreferrer_reward;
+      BOOST_CHECK_EQUAL( calculate_percent(sell_amount, 20*GRAPHENE_1_PERCENT), acc_rewards);
+
+      //check referrer reward
+      BOOST_CHECK_EQUAL( calculate_percent(acc_rewards, alice.referrer_rewards_percentage), izzyreferrer_reward);
+   }
+   FC_LOG_AND_RETHROW()
+}
 
 BOOST_AUTO_TEST_SUITE_END()
