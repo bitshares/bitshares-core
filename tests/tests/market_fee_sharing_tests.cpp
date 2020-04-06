@@ -92,8 +92,9 @@ struct reward_database_fixture : database_fixture
 
    void generate_blocks_past_hf1774()
    {
-      database_fixture::generate_blocks( HARDFORK_1774_TIME );
-      database_fixture::generate_block();
+      generate_blocks( HARDFORK_1774_TIME );
+      generate_block();
+      set_expiration(db, trx);
    }
 
    asset core_asset(int64_t x )
