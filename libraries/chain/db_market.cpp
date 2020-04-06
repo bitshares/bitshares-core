@@ -1240,10 +1240,13 @@ asset database::pay_market_fees(const account_object* seller, const asset_object
          }
       }
 
-      const auto& recv_dyn_data = recv_asset.dynamic_asset_data_id(*this);
-      modify( recv_dyn_data, [&issuer_fees, &reward]( asset_dynamic_data_object& obj ){
-         obj.accumulated_fees += issuer_fees.amount - reward.amount;
-      });
+      if( issuer_fees.amount > reward.amount )
+      {
+         const auto& recv_dyn_data = recv_asset.dynamic_asset_data_id(*this);
+         modify( recv_dyn_data, [&issuer_fees, &reward]( asset_dynamic_data_object& obj ){
+            obj.accumulated_fees += issuer_fees.amount - reward.amount;
+         });
+      }
    }
 
    return issuer_fees;
