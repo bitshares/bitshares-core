@@ -32,9 +32,20 @@
 
 #include <functional>
 
-#include <locale>
-
 namespace graphene { namespace chain {
+namespace detail {
+
+   // TODO review and remove code below and links to it after hf_1774
+   void check_asset_options_hf_1774(const fc::time_point_sec& block_time, const asset_options& options)
+   {
+      if( block_time < HARDFORK_1774_TIME )
+      {
+         FC_ASSERT( !options.extensions.value.reward_percent.valid() ||
+                    *options.extensions.value.reward_percent < GRAPHENE_100_PERCENT,
+            "Asset extension reward percent must be less than 100% till HARDFORK_1774_TIME!");
+      }
+   }
+}
 
 void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
 { try {
@@ -44,6 +55,8 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    const auto& chain_parameters = d.get_global_properties().parameters;
    FC_ASSERT( op.common_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    FC_ASSERT( op.common_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
+
+   detail::check_asset_options_hf_1774(d.head_block_time(), op.common_options);
 
    // Check that all authorities do exist
    for( auto id : op.common_options.whitelist_authorities )
@@ -267,6 +280,8 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
                  "Since Hardfork #199, updating issuer requires the use of asset_update_issuer_operation.");
       validate_new_issuer( d, a, *o.new_issuer );
    }
+
+   detail::check_asset_options_hf_1774(d.head_block_time(), o.new_options);
 
    if( a.dynamic_asset_data_id(d).current_supply != 0 )
    {

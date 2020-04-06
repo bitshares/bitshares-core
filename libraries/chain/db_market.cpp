@@ -1211,7 +1211,13 @@ asset database::pay_market_fees(const account_object* seller, const asset_object
             if ( reward_value > 0 && is_authorized_asset(*this, seller->registrar(*this), recv_asset) )
             {
                reward = recv_asset.amount(reward_value);
-               FC_ASSERT( reward < issuer_fees, "Market reward should be less than issuer fees");
+               // TODO after hf_1774, remove the `if` check, keep the code in `else`
+               if( head_block_time() < HARDFORK_1774_TIME ){
+                  FC_ASSERT( reward < issuer_fees, "Market reward should be less than issuer fees");
+               }
+               else{
+                  FC_ASSERT( reward <= issuer_fees, "Market reward should not be greater than issuer fees");
+               }
                // cut referrer percent from reward
                auto registrar_reward = reward;
                if( seller->referrer != seller->registrar )
@@ -1228,7 +1234,8 @@ asset database::pay_market_fees(const account_object* seller, const asset_object
                      deposit_market_fee_vesting_balance(seller->referrer, referrer_reward);
                   }
                }
-               deposit_market_fee_vesting_balance(seller->registrar, registrar_reward);
+               if( registrar_reward.amount > 0 )
+                  deposit_market_fee_vesting_balance(seller->registrar, registrar_reward);
             }
          }
       }
