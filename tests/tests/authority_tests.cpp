@@ -1885,10 +1885,8 @@ BOOST_AUTO_TEST_CASE( custom_operation_required_auths_before_fork ) {
       fund(alice, asset(10000000));
       enable_fees();
 
-      if (db.head_block_time() >= HARDFORK_CORE_210_TIME) {
-          wlog("Unable to test custom_operation required auths before fork: hardfork already passed");
-          return;
-      }
+      // Unable to test custom_operation required auths before fork if hardfork already passed
+      BOOST_REQUIRE(db.head_block_time() < HARDFORK_CORE_210_TIME);
 
       signed_transaction trx;
       custom_operation op;
