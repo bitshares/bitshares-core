@@ -1211,6 +1211,7 @@ asset database::pay_market_fees(const account_object* seller, const asset_object
             if ( reward_value > 0 && is_authorized_asset(*this, seller->registrar(*this), recv_asset) )
             {
                reward = recv_asset.amount(reward_value);
+               // TODO after hf_1774, remove the `if` check, keep the code in `else`
                if( head_block_time() < HARDFORK_1774_TIME ){
                   FC_ASSERT( reward < issuer_fees, "Market reward should be less than issuer fees");
                }
