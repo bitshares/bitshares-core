@@ -49,7 +49,7 @@ namespace graphene { namespace protocol {
 
        operator std::string()const; ///< converts to base58 + checksum
 
-       std::array<char,25> addr; ///< binary representation of address
+       std::array<char,25> addr{}; ///< binary representation of address, 0-initialized
    };
 
    inline bool operator == ( const pts_address& a, const pts_address& b ) { return a.addr == b.addr; }

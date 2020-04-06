@@ -27,7 +27,18 @@
 // support the wallet, e.g. allow specifying operations by name
 // instead of ID.
 
+#include <string>
+#include <vector>
+#include <boost/container/flat_map.hpp>
+#include <fc/exception/exception.hpp>
+#include <fc/variant.hpp>
+
 namespace graphene { namespace wallet {
+
+using std::string;
+using std::vector;
+using boost::container::flat_map;
+using fc::variant;
 
 struct static_variant_map
 {
@@ -37,20 +48,7 @@ struct static_variant_map
 
 namespace impl {
 
-std::string clean_name( const std::string& name )
-{
-   const static std::string prefix = "graphene::protocol::";
-   const static std::string suffix = "_operation";
-   // graphene::protocol::.*_operation
-   if(    (name.size() >= prefix.size() + suffix.size())
-       && (name.substr( 0, prefix.size() ) == prefix)
-       && (name.substr( name.size()-suffix.size(), suffix.size() ) == suffix )
-     )
-        return name.substr( prefix.size(), name.size() - prefix.size() - suffix.size() );
-
-   wlog( "don't know how to clean name: ${name}", ("name", name) );
-   return name;
-}
+std::string clean_name( const std::string& name );
 
 struct static_variant_map_visitor
 {

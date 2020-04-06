@@ -89,12 +89,12 @@ namespace graphene { namespace protocol {
 
    address::operator std::string()const
    {
-        std::array<char,24> bin_addr;
-        static_assert( bin_addr.size() >= sizeof(addr) + 4, "address size mismatch" );
-        memcpy( bin_addr.data(), addr.data(), sizeof(addr) );
+        char bin_addr[24];
+        static_assert( sizeof(bin_addr) >= sizeof(addr) + 4, "address size mismatch" );
+        memcpy( bin_addr, addr.data(), sizeof(addr) );
         auto checksum = fc::ripemd160::hash( addr.data(), sizeof(addr) );
-        memcpy( bin_addr.data() + 20, (char*)&checksum._hash[0], 4 );
-        return GRAPHENE_ADDRESS_PREFIX + fc::to_base58( bin_addr.data(), bin_addr.size() );
+        memcpy( bin_addr + sizeof(addr), (char*)&checksum._hash[0], 4 );
+        return GRAPHENE_ADDRESS_PREFIX + fc::to_base58( bin_addr, sizeof(bin_addr) );
    }
 
 } } // namespace graphene::protocol

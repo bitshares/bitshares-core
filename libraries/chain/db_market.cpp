@@ -99,14 +99,7 @@ void database::globally_settle_asset_impl( const asset_object& mia,
       ++call_itr;
 
       if( before_core_hardfork_342 )
-      {
          pays = order.get_debt() * settlement_price; // round down, in favor of call order
-
-         // Be here, the call order can be paying nothing
-         if( pays.amount == 0 && !bitasset.is_prediction_market ) // TODO remove this warning after hard fork core-342
-            wlog( "Something for nothing issue (#184, variant E) occurred at block #${block}",
-                  ("block",head_block_num()) );
-      }
       else
          pays = order.get_debt().multiply_and_round_up( settlement_price ); // round up in favor of global-settle fund
 
@@ -353,8 +346,7 @@ bool maybe_cull_small_order( database& db, const limit_order_object& order )
    if( order.amount_to_receive().amount == 0 )
    {
       if( order.deferred_fee > 0 && db.head_block_time() <= HARDFORK_CORE_604_TIME )
-      { // TODO remove this warning after hard fork core-604
-         wlog( "At block ${n}, cancelling order without charging a fee: ${o}", ("n",db.head_block_num())("o",order) );
+      {
          db.cancel_limit_order( order, true, true );
       }
       else
@@ -660,17 +652,6 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    FC_ASSERT( bid.receive_asset_id() == ask.collateral_type() );
    FC_ASSERT( bid.for_sale > 0 && ask.debt > 0 && ask.collateral > 0 );
 
-   auto maint_time = get_dynamic_global_properties().next_maintenance_time;
-   // TODO remove when we're sure it's always false
-   bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
-   // TODO remove when we're sure it's always false
-   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
-   // TODO remove when we're sure it's always false
-   if( before_core_hardfork_184 )
-      ilog( "match(limit,call) is called before hardfork core-184 at block #${block}", ("block",head_block_num()) );
-   if( before_core_hardfork_342 )
-      ilog( "match(limit,call) is called before hardfork core-342 at block #${block}", ("block",head_block_num()) );
-
    bool cull_taker = false;
 
    asset usd_for_sale = bid.amount_for_sale();
@@ -684,34 +665,20 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
 
       // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
       // In this case, we see it as filled and cancel it later
-      // TODO remove hardfork check when we're sure it's always after hard fork (but keep the zero amount check)
-      if( order_receives.amount == 0 && !before_core_hardfork_184 )
+      if( order_receives.amount == 0 )
          return 1;
 
-      if( before_core_hardfork_342 ) // TODO remove this "if" when we're sure it's always false (keep the code in else)
-         call_receives = usd_for_sale;
-      else
-      {
-         // The remaining amount in the limit order would be too small,
-         //   so we should cull the order in fill_limit_order() below.
-         // The order would receive 0 even at `match_price`, so it would receive 0 at its own price,
-         //   so calling maybe_cull_small() will always cull it.
-         call_receives = order_receives.multiply_and_round_up( match_price );
-         cull_taker = true;
-      }
+      // The remaining amount in the limit order would be too small,
+      //   so we should cull the order in fill_limit_order() below.
+      // The order would receive 0 even at `match_price`, so it would receive 0 at its own price,
+      //   so calling maybe_cull_small() will always cull it.
+      call_receives = order_receives.multiply_and_round_up( match_price );
+      cull_taker = true;
    }
    else
    {  // fill call order
       call_receives  = usd_to_buy;
-      if( before_core_hardfork_342 ) // TODO remove this "if" when we're sure it's always false (keep the code in else)
-      {
-         order_receives = usd_to_buy * match_price; // round down here, in favor of call order
-         // TODO remove hardfork check when we're sure it's always after hard fork (but keep the zero amount check)
-         if( order_receives.amount == 0 && !before_core_hardfork_184 )
-            return 1;
-      }
-      else // has hardfork core-342
-         order_receives = usd_to_buy.multiply_and_round_up( match_price ); // round up here, in favor of limit order
+      order_receives = usd_to_buy.multiply_and_round_up( match_price ); // round up here, in favor of limit order
    }
 
    call_pays  = order_receives;
@@ -753,14 +720,12 @@ asset database::match( const call_order_object& call,
       {
          if( call_receives == call_debt ) // the call order is smaller than or equal to the settle order
          {
-            wlog( "Something for nothing issue (#184, variant C-1) handled at block #${block}", ("block",head_block_num()) );
             call_pays.amount = 1;
          }
          else
          {
             if( call_receives == settle.balance ) // the settle order is smaller
             {
-               wlog( "Something for nothing issue (#184, variant C-2) handled at block #${block}", ("block",head_block_num()) );
                cancel_settle_order( settle );
             }
             // else do nothing: neither order will be completely filled, perhaps due to max_settlement too small
@@ -768,8 +733,7 @@ asset database::match( const call_order_object& call,
             return asset( 0, settle.balance.asset_id );
          }
       }
-      else // TODO remove this warning after hard fork core-184
-         wlog( "Something for nothing issue (#184, variant C) occurred at block #${block}", ("block",head_block_num()) );
+
    }
    else // the call order is not paying nothing, but still possible it's paying more than minimum required due to rounding
    {
@@ -815,8 +779,6 @@ asset database::match( const call_order_object& call,
    if( before_core_hardfork_342 )
    {
       auto call_collateral = call.get_collateral();
-      if( call_pays == call_collateral ) // TODO remove warning after hard fork core-342
-         wlog( "Incorrectly captured black swan event at block #${block}", ("block",head_block_num()) );
       GRAPHENE_ASSERT( call_pays < call_collateral, black_swan_exception, "" );
 
       assert( settle_pays == settle_for_sale || call_receives == call.get_debt() );
@@ -843,9 +805,7 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
    const account_object& seller = order.seller(*this);
    const asset_object& recv_asset = receives.asset_id(*this);
 
-   auto issuer_fees = ( head_block_time() < HARDFORK_1268_TIME ) ? 
-      pay_market_fees(recv_asset, receives) : 
-      pay_market_fees(seller, recv_asset, receives);
+   auto issuer_fees = pay_market_fees(&seller, recv_asset, receives);
 
    pay_order( seller, receives - issuer_fees, pays );
 
@@ -956,7 +916,7 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
 { try {
    bool filled = false;
 
-   auto issuer_fees = pay_market_fees(get(receives.asset_id), receives);
+   auto issuer_fees = pay_market_fees( nullptr, get(receives.asset_id), receives);
 
    if( pays < settle.balance )
    {
@@ -1068,7 +1028,6 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     bool before_hardfork_615 = ( head_time < HARDFORK_615_TIME );
     bool after_hardfork_436 = ( head_time > HARDFORK_436_TIME );
 
-    bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
     bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
     bool before_core_hardfork_343 = ( maint_time <= HARDFORK_CORE_343_TIME ); // update call_price after partially filled
     bool before_core_hardfork_453 = ( maint_time <= HARDFORK_CORE_453_TIME ); // multiple matching issue
@@ -1138,13 +1097,6 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
           //   * when the limit order is a taker, it could be paying something for nothing only when
           //     the call order is smaller and is too small
           //   * when the limit order is a maker, it won't be paying something for nothing
-          if( order_receives.amount == 0 ) // TODO this should not happen. remove the warning after confirmed
-          {
-             if( before_core_hardfork_184 )
-                wlog( "Something for nothing issue (#184, variant D-1) occurred at block #${block}", ("block",head_num) );
-             else
-                wlog( "Something for nothing issue (#184, variant D-2) occurred at block #${block}", ("block",head_num) );
-          }
 
           if( before_core_hardfork_342 )
              call_receives = usd_for_sale;
@@ -1163,10 +1115,6 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
           if( before_core_hardfork_342 )
           {
              order_receives = usd_to_buy * match_price; // round down, in favor of call order
-
-             // Be here, the limit order would be paying something for nothing
-             if( order_receives.amount == 0 ) // TODO remove warning after hard fork core-342
-                wlog( "Something for nothing issue (#184, variant D) occurred at block #${block}", ("block",head_num) );
           }
           else
              order_receives = usd_to_buy.multiply_and_round_up( match_price ); // round up, in favor of limit order
@@ -1175,9 +1123,9 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
           if( usd_to_buy == usd_for_sale )
              filled_limit = true;
-          else if( filled_limit && maint_time <= HARDFORK_CORE_453_TIME ) // TODO remove warning after hard fork core-453
+          else if( filled_limit && maint_time <= HARDFORK_CORE_453_TIME )
           {
-             wlog( "Multiple limit match problem (issue 453) occurred at block #${block}", ("block",head_num) );
+             //NOTE: Multiple limit match problem (see issue 453, yes this happened)
              if( before_hardfork_615 )
                 _issue_453_affected_assets.insert( bitasset.asset_id );
           }
@@ -1236,25 +1184,7 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
    return percent_fee;
 }
 
-asset database::pay_market_fees( const asset_object& recv_asset, const asset& receives )
-{
-   auto issuer_fees = calculate_market_fee( recv_asset, receives );
-   FC_ASSERT( issuer_fees <= receives, "Market fee shouldn't be greater than receives");
-
-   //Don't dirty undo state if not actually collecting any fees
-   if( issuer_fees.amount > 0 )
-   {
-      const auto& recv_dyn_data = recv_asset.dynamic_asset_data_id(*this);
-      modify( recv_dyn_data, [&]( asset_dynamic_data_object& obj ){
-                   //idump((issuer_fees));
-         obj.accumulated_fees += issuer_fees.amount;
-      });
-   }
-
-   return issuer_fees;
-}
-
-asset database::pay_market_fees(const account_object& seller, const asset_object& recv_asset, const asset& receives )
+asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives )
 {
    const auto issuer_fees = calculate_market_fee( recv_asset, receives );
    FC_ASSERT( issuer_fees <= receives, "Market fee shouldn't be greater than receives");
@@ -1264,9 +1194,12 @@ asset database::pay_market_fees(const account_object& seller, const asset_object
       // calculate and pay rewards
       asset reward = recv_asset.amount(0);
 
-      auto is_rewards_allowed = [&recv_asset, &seller]() {
+      auto is_rewards_allowed = [&recv_asset, seller]() {
+         if (seller == nullptr)
+            return false;
          const auto &white_list = recv_asset.options.extensions.value.whitelist_market_fee_sharing;
-         return ( !white_list || (*white_list).empty() || ( (*white_list).find(seller.registrar) != (*white_list).end() ) );
+         return ( !white_list || (*white_list).empty() 
+               || ( (*white_list).find(seller->registrar) != (*white_list).end() ) );
       };
 
       if ( is_rewards_allowed() )
@@ -1275,7 +1208,7 @@ asset database::pay_market_fees(const account_object& seller, const asset_object
          if ( reward_percent && *reward_percent )
          {
             const auto reward_value = detail::calculate_percent(issuer_fees.amount, *reward_percent);
-            if ( reward_value > 0 && is_authorized_asset(*this, seller.registrar(*this), recv_asset) )
+            if ( reward_value > 0 && is_authorized_asset(*this, seller->registrar(*this), recv_asset) )
             {
                reward = recv_asset.amount(reward_value);
                if( head_block_time() < HARDFORK_1774_TIME ){
@@ -1286,21 +1219,21 @@ asset database::pay_market_fees(const account_object& seller, const asset_object
                }
                // cut referrer percent from reward
                auto registrar_reward = reward;
-               if( seller.referrer != seller.registrar )
+               if( seller->referrer != seller->registrar )
                {
                   const auto referrer_rewards_value = detail::calculate_percent( reward.amount,
-                                                                                 seller.referrer_rewards_percentage );
+                                                                                 seller->referrer_rewards_percentage );
 
-                  if ( referrer_rewards_value > 0 && is_authorized_asset(*this, seller.referrer(*this), recv_asset) )
+                  if ( referrer_rewards_value > 0 && is_authorized_asset(*this, seller->referrer(*this), recv_asset) )
                   {
                      FC_ASSERT ( referrer_rewards_value <= reward.amount.value,
                                  "Referrer reward shouldn't be greater than total reward" );
                      const asset referrer_reward = recv_asset.amount(referrer_rewards_value);
                      registrar_reward -= referrer_reward;
-                     deposit_market_fee_vesting_balance(seller.referrer, referrer_reward);
+                     deposit_market_fee_vesting_balance(seller->referrer, referrer_reward);
                   }
                }
-               deposit_market_fee_vesting_balance(seller.registrar, registrar_reward);
+               deposit_market_fee_vesting_balance(seller->registrar, registrar_reward);
             }
          }
       }

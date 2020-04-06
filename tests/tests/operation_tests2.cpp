@@ -2009,8 +2009,6 @@ BOOST_AUTO_TEST_CASE( top_n_special )
 {
    ACTORS( (alice)(bob)(chloe)(dan)(izzy)(stan) );
 
-   generate_blocks( HARDFORK_516_TIME );
-
    try
    {
       {

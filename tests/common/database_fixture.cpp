@@ -31,6 +31,7 @@
 #include <graphene/elasticsearch/elasticsearch_plugin.hpp>
 #include <graphene/api_helper_indexes/api_helper_indexes.hpp>
 #include <graphene/es_objects/es_objects.hpp>
+#include <graphene/custom_operations/custom_operations_plugin.hpp>
 
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
@@ -60,6 +61,8 @@ namespace graphene { namespace chain {
 using std::cout;
 using std::cerr;
 
+namespace buf = boost::unit_test::framework;
+
 void clearable_block::clear()
 {
    _calculated_merkle_root = checksum_type();
@@ -71,16 +74,20 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    : app(), db( *app.chain_database() )
 {
    try {
-   int argc = boost::unit_test::framework::master_test_suite().argc;
-   char** argv = boost::unit_test::framework::master_test_suite().argv;
+   int argc = buf::master_test_suite().argc;
+   char** argv = buf::master_test_suite().argv;
    for( int i=1; i<argc; i++ )
    {
       const std::string arg = argv[i];
       if( arg == "--record-assert-trip" )
          fc::enable_record_assert_trip = true;
       if( arg == "--show-test-names" )
-         std::cout << "running test " << boost::unit_test::framework::current_test_case().p_name << std::endl;
+         std::cout << "running test " << buf::current_test_case().p_name << std::endl;
    }
+
+   const auto current_test_name = buf::current_test_case().p_name.value;
+   const auto current_test_suite_id = buf::current_test_case().p_parent_id;
+   const auto current_suite_name = buf::get<boost::unit_test::test_suite>(current_test_suite_id).p_name.value;
    auto mhplugin = app.register_plugin<graphene::market_history::market_history_plugin>();
    auto goplugin = app.register_plugin<graphene::grouped_orders::grouped_orders_plugin>();
    init_account_pub_key = init_account_priv_key.get_public_key();
@@ -89,7 +96,8 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
 
    genesis_state.initial_timestamp = initial_timestamp;
 
-   if(boost::unit_test::framework::current_test_case().p_name.value == "hf_935_test") {
+   if(current_test_name == "hf_1270_test")
+   {
       genesis_state.initial_active_witnesses = 20;
    }
    else {
@@ -126,8 +134,6 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    /**
     * Test specific settings
     */
-   auto current_test_name = boost::unit_test::framework::current_test_case().p_name.value;
-   auto current_test_suite_id = boost::unit_test::framework::current_test_case().p_parent_id;
    if (current_test_name == "get_account_history_operations")
    {
       options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)75, false)));
@@ -272,8 +278,8 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       options.insert(std::make_pair("track-account", boost::program_options::variable_value(track_account, false)));
    }
    // standby votes tracking
-   if( boost::unit_test::framework::current_test_case().p_name.value == "track_votes_witnesses_disabled" ||
-       boost::unit_test::framework::current_test_case().p_name.value == "track_votes_committee_disabled") {
+   if( current_test_name == "track_votes_witnesses_disabled"
+          || current_test_name == "track_votes_committee_disabled") {
       app.chain_database()->enable_standby_votes_tracking( false );
    }
    if(current_test_name == "elasticsearch_account_history" || current_test_name == "elasticsearch_suite" ||
@@ -293,7 +299,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       esplugin->plugin_initialize(options);
       esplugin->plugin_startup();
    }
-   else if( boost::unit_test::framework::get<boost::unit_test::test_suite>(current_test_suite_id).p_name.value != "performance_tests" )
+   else if( current_suite_name != "performance_tests" )
    {
       auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
       ahplugin->plugin_set_app(&app);
@@ -324,12 +330,23 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       esobjects_plugin->plugin_initialize(options);
       esobjects_plugin->plugin_startup();
    }
-   else if( current_test_name == "asset_in_collateral" )
+   else if( current_test_name == "asset_in_collateral"
+            || current_test_name == "htlc_database_api"
+            || current_suite_name == "database_api_tests" )
    {
       auto ahiplugin = app.register_plugin<graphene::api_helper_indexes::api_helper_indexes>();
       ahiplugin->plugin_set_app(&app);
       ahiplugin->plugin_initialize(options);
       ahiplugin->plugin_startup();
+   }
+
+   if(current_test_name == "custom_operations_account_storage_map_test" ||
+      current_test_name == "custom_operations_account_storage_list_test") {
+      auto custom_operations_plugin = app.register_plugin<graphene::custom_operations::custom_operations_plugin>();
+      custom_operations_plugin->plugin_set_app(&app);
+      options.insert(std::make_pair("custom-operations-start-block", boost::program_options::variable_value(uint32_t(1), false)));
+      custom_operations_plugin->plugin_initialize(options);
+      custom_operations_plugin->plugin_startup();
    }
 
    options.insert(std::make_pair("bucket-size", boost::program_options::variable_value(string("[15]"),false)));
@@ -432,7 +449,7 @@ string database_fixture::generate_anon_acct_name()
    //    to workaround issue #46
    return "anon-acct-x" + std::to_string( anon_acct_count++ );
 }
-bool database_fixture::validation_current_test_name_for_setting_api_limit(string & current_test_name) const
+bool database_fixture::validation_current_test_name_for_setting_api_limit( const string& current_test_name ) const
 {
    vector <string> valid_testcase {"api_limit_get_account_history_operations","api_limit_get_account_history"
       ,"api_limit_get_grouped_limit_orders","api_limit_get_relative_account_history"

@@ -44,6 +44,11 @@ namespace graphene { namespace net {
   {
      boost::endian::little_uint32_buf_t size;   // number of bytes in message, capped at MAX_MESSAGE_SIZE
      boost::endian::little_uint32_buf_t msg_type;  // every channel gets a 16 bit message type specifier
+     message_header()
+     {
+        size = 0;
+        msg_type = 0;
+     }
   };
 
   typedef fc::uint160_t message_hash_type;
