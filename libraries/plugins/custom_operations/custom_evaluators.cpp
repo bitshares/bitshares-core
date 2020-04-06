@@ -37,8 +37,9 @@ custom_generic_evaluator::custom_generic_evaluator(database& db, const account_i
 
 vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_map& op)
 {
-   auto &index = _db->get_index_type<account_storage_index>().indices().get<by_account_catalog_key>();
+   const auto &index = _db->get_index_type<account_storage_index>().indices().get<by_account_catalog_key>();
    vector<object_id_type> results;
+   results.reserve( op.key_values.size() );
 
    if (op.remove)
    {
@@ -61,9 +62,10 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
          if(itr == index.end())
          {
             try {
-               auto created = _db->create<account_storage_object>( [&op, this, &row]( account_storage_object& aso ) {
-                  aso.catalog = op.catalog;
+               const auto& created = _db->create<account_storage_object>(
+                                        [&op, this, &row]( account_storage_object& aso ) {
                   aso.account = _account;
+                  aso.catalog = op.catalog;
                   aso.key = row.first;
                   if(row.second.valid())
                      aso.value = fc::json::from_string(*row.second);
@@ -76,7 +78,6 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
          {
             try {
                _db->modify(*itr, [&op, this, &row](account_storage_object &aso) {
-                  aso.key = row.first;
                   if(row.second.valid())
                      aso.value = fc::json::from_string(*row.second);
                   else
