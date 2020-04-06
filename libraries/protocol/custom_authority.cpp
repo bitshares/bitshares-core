@@ -31,6 +31,8 @@ namespace graphene { namespace protocol {
 
 share_type custom_authority_create_operation::calculate_fee(const fee_parameters_type& k)const {
    share_type core_fee_required = k.basic_fee;
+   // Note: practically the `*` won't cause an integer overflow, because k.price_per_byte is 32 bit
+   //       and the results of pack_size() won't be too big
    core_fee_required += k.price_per_byte * (fc::raw::pack_size(restrictions) + fc::raw::pack_size(auth));
    return core_fee_required;
 }
@@ -58,6 +60,8 @@ void custom_authority_create_operation::validate()const {
 
 share_type custom_authority_update_operation::calculate_fee(const fee_parameters_type& k)const {
    share_type core_fee_required = k.basic_fee;
+   // Note: practically the `*` won't cause an integer overflow, because k.price_per_byte is 32 bit
+   //       and the results of pack_size() won't be too big
    core_fee_required += k.price_per_byte * fc::raw::pack_size(restrictions_to_add);
    if (new_auth)
       core_fee_required += k.price_per_byte * fc::raw::pack_size(*new_auth);
