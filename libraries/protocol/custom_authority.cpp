@@ -82,6 +82,9 @@ void custom_authority_update_operation::validate()const {
       FC_ASSERT(!new_auth->is_impossible(), "Cannot use an impossible authority threshold");
       FC_ASSERT(new_auth->address_auths.size() == 0, "Address auth is not supported");
    }
+   FC_ASSERT( new_enabled.valid() || new_valid_from.valid() || new_valid_to.valid() || new_auth.valid()
+              || !restrictions_to_remove.empty() || !restrictions_to_add.empty(),
+              "Must update something" );
 }
 
 } } // graphene::protocol
