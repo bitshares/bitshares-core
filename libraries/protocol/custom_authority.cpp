@@ -87,4 +87,14 @@ void custom_authority_update_operation::validate()const {
               "Must update something" );
 }
 
+void custom_authority_delete_operation::validate()const {
+   FC_ASSERT(fee.amount >= 0, "Fee amount can not be negative");
+
+   FC_ASSERT(account != GRAPHENE_TEMP_ACCOUNT
+             && account != GRAPHENE_COMMITTEE_ACCOUNT
+             && account != GRAPHENE_WITNESS_ACCOUNT
+             && account != GRAPHENE_RELAXED_COMMITTEE_ACCOUNT,
+             "Can not delete custom authority for special accounts");
+}
+
 } } // graphene::protocol
