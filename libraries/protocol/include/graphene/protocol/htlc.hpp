@@ -129,8 +129,9 @@ namespace graphene { namespace protocol {
          struct fee_parameters_type {};
 
          htlc_redeemed_operation() {}
-         htlc_redeemed_operation( htlc_id_type htlc_id, account_id_type from, account_id_type to, account_id_type redeemer, asset amount ) :
-               htlc_id(htlc_id), from(from), to(to), redeemer(redeemer), amount(amount) {}
+         htlc_redeemed_operation( htlc_id_type htlc_id, account_id_type from, account_id_type to, 
+               account_id_type redeemer, asset amount, std::vector<char> preimage ) :
+               htlc_id(htlc_id), from(from), to(to), redeemer(redeemer), amount(amount), preimage(preimage) {}
 
          account_id_type fee_payer()const { return to; }
          void validate()const { FC_ASSERT( !"virtual operation" ); }
@@ -141,6 +142,7 @@ namespace graphene { namespace protocol {
          account_id_type from, to, redeemer;
          asset amount;
          asset fee;
+         std::vector<char> preimage;
       };
 
       struct htlc_extend_operation : public base_operation

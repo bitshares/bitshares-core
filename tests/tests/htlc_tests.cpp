@@ -177,6 +177,68 @@ try {
 } FC_LOG_AND_RETHROW()
 }
 
+class display_operation_history
+{
+   public:
+   display_operation_history( std::vector< operation_history_object > history, const account_object& acct );
+   const account_object& acct;
+};
+
+class op_printer
+{
+   public:
+   op_printer( std::ostream& out, display_operation_history* displayer, const operation_history_object& obj )
+         : out(out), caller(displayer), obj(obj) {}
+   typedef std::string result_type;
+
+   template<typename T>
+   std::string operator()(const T& op)const
+   {
+      return ""; 
+   }
+
+   std::string operator()(const htlc_redeemed_operation& op)const
+   {
+      out << "Called by " << caller->acct.name
+            << " Redeemer: " << id_to_string(op.redeemer) 
+            << " Preimage: " << preimage_to_string(op.preimage);
+      return "";
+   }
+
+   std::string operator()(const htlc_redeem_operation& op)const
+   {
+      out << "Called by " << caller->acct.name
+            << " Redeemer: " << id_to_string(op.redeemer) 
+            << " Preimage: " << preimage_to_string(op.preimage);
+      return "";
+   }
+
+   private:
+   std::ostream& out;
+   display_operation_history* caller;
+   const operation_history_object& obj;
+   static std::string id_to_string( object_id_type id) 
+         { return "" + std::to_string(id.space()) + "." + std::to_string(id.type()) + "." + std::to_string(id.instance()); }    
+   static std::string preimage_to_string( std::vector<char> in) { 
+         std::string out;
+         std::for_each(in.begin(), in.end(), [&out](const char& in) 
+               { out += std::to_string((int)in); });
+         return out; 
+      }
+};
+
+display_operation_history::display_operation_history( std::vector<operation_history_object> history, const account_object& acct)
+      : acct(acct)
+{
+   for( auto itr = history.begin(); itr != history.end(); itr++) 
+   {
+      std::stringstream ss;
+      (*itr).op.visit( op_printer(ss, this, *itr) );
+      if ( ss.rdbuf()->in_avail() > 0 )
+         BOOST_TEST_MESSAGE( ss.str() );
+   };
+}
+
 BOOST_AUTO_TEST_CASE( htlc_hf_bsip64 )
 {
 try {
@@ -310,9 +372,15 @@ try {
    // verify funds remain out of Alice's acount ( 100 - 3 - 4 )
    BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 93 * GRAPHENE_BLOCKCHAIN_PRECISION );
    // verify all three get notified
-   BOOST_CHECK_EQUAL( get_operation_history(alice_id).size(), alice_num_history + 1);
-   BOOST_CHECK_EQUAL( get_operation_history(bob_id).size(), bob_num_history + 1);
-   BOOST_CHECK_EQUAL( get_operation_history(joker_id).size(), joker_num_history + 1);
+   std::vector<operation_history_object> history = get_operation_history(alice_id);
+   BOOST_CHECK_EQUAL( history.size(), alice_num_history + 1);
+   display_operation_history{ history, alice };
+   history = get_operation_history(bob_id);
+   BOOST_CHECK_EQUAL( history.size(), bob_num_history + 1);
+   display_operation_history{ history, bob };
+   history = get_operation_history(joker_id);
+   BOOST_CHECK_EQUAL( history.size(), joker_num_history + 1);
+   display_operation_history{ history, joker };
 } FC_LOG_AND_RETHROW()
 }
 
@@ -1062,7 +1130,5 @@ try {
       throw;
    }
 }
-
-
 
 BOOST_AUTO_TEST_SUITE_END()

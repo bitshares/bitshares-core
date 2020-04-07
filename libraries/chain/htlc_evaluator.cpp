@@ -126,7 +126,7 @@ namespace graphene {
          db().adjust_balance(htlc_obj->transfer.to, asset(htlc_obj->transfer.amount, htlc_obj->transfer.asset_id) );
          // notify related parties
          htlc_redeemed_operation virt_op( htlc_obj->id, htlc_obj->transfer.from, htlc_obj->transfer.to,
-               o.redeemer, asset(htlc_obj->transfer.amount, htlc_obj->transfer.asset_id ) );
+               o.redeemer, asset(htlc_obj->transfer.amount, htlc_obj->transfer.asset_id ), o.preimage );
          db().push_applied_operation( virt_op );
          db().remove(*htlc_obj);
          return void_result();
