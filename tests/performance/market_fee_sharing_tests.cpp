@@ -25,6 +25,7 @@
 
 #include <chrono>
 #include <graphene/chain/hardfork.hpp>
+#include <fc/time.hpp>
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;
@@ -48,7 +49,6 @@ BOOST_FIXTURE_TEST_CASE(mfs_performance_test, database_fixture)
          registrators.push_back(std::move(account));
       }
 
-      generate_blocks(HARDFORK_1268_TIME);
       generate_block();
 
       additional_asset_options_t options;

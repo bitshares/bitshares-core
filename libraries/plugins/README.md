@@ -12,6 +12,7 @@ Folder                             | Name                     | Description     
 -----------------------------------|--------------------------|-----------------------------------------------------------------------------|----------------|---------------|--------------|
 [account_history](account_history) | Account History          | Save account history data                                                   | History        | Stable        | 4
 [api_helper_indexes](api_helper_indexes) | API Helper Indexes | Provides some helper indexes used by various API calls                                                 | Database API   | Stable        | 
+[custom_operations](custom_operations) | Custom Operations    | Store and retrieve account catalogs of key=>value data using custom operations | Additional data   | Experimental        | 7
 [debug_witness](debug_witness)     | Debug Witness            | Run "what-if" tests                                                         | Debug          | Stable        |
 [delayed_node](delayed_node)       | Delayed Node             | Avoid forks by running a several times confirmed and delayed blockchain     | Business       | Stable        |
 [elasticsearch](elasticsearch)     | ElasticSearch Operations | Save account history data into elasticsearch database                       | History        | Experimental  | 6

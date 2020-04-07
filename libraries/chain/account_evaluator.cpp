@@ -120,11 +120,6 @@ void verify_account_votes( const database& db, const account_options& options )
 void_result account_create_evaluator::do_evaluate( const account_create_operation& op )
 { try {
    database& d = db();
-   if( d.head_block_time() < HARDFORK_516_TIME )
-   {
-      FC_ASSERT( !op.extensions.value.owner_special_authority.valid() );
-      FC_ASSERT( !op.extensions.value.active_special_authority.valid() );
-   }
 
    FC_ASSERT( fee_paying_account->is_lifetime_member(), "Only Lifetime members may register an account." );
    FC_ASSERT( op.referrer(d).is_member(d.head_block_time()), "The referrer must be either a lifetime or annual subscriber." );
@@ -213,17 +208,6 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          }
    });
 
-   /*
-   if( has_small_percent )
-   {
-      wlog( "Account affected by #453 registered in block ${n}:  ${na} reg=${reg} ref=${ref}:${refp} ltr=${ltr}:${ltrp}",
-         ("n", db().head_block_num()) ("na", new_acnt_object.id)
-         ("reg", o.registrar) ("ref", o.referrer) ("ltr", new_acnt_object.lifetime_referrer)
-         ("refp", new_acnt_object.referrer_rewards_percentage) ("ltrp", new_acnt_object.lifetime_referrer_fee_percentage) );
-      wlog( "Affected account object is ${o}", ("o", new_acnt_object) );
-   }
-   */
-
    const auto& dynamic_properties = d.get_dynamic_global_properties();
    d.modify(dynamic_properties, [](dynamic_global_property_object& p) {
       ++p.accounts_registered_this_interval;
@@ -268,11 +252,6 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
 void_result account_update_evaluator::do_evaluate( const account_update_operation& o )
 { try {
    database& d = db();
-   if( d.head_block_time() < HARDFORK_516_TIME )
-   {
-      FC_ASSERT( !o.extensions.value.owner_special_authority.valid() );
-      FC_ASSERT( !o.extensions.value.active_special_authority.valid() );
-   }
 
    try
    {

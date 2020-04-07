@@ -29,8 +29,7 @@
 namespace graphene { namespace chain {
 
 namespace detail {
-   void check_asset_options_hf_1268(const fc::time_point_sec& block_time, const asset_options& options);
-   void check_vesting_balance_policy_hf_1268(const fc::time_point_sec& block_time, const vesting_policy_initializer& policy);
+   void check_asset_options_hf_1774(const fc::time_point_sec& block_time, const asset_options& options);   
 }
 
 struct proposal_operation_hardfork_visitor
@@ -46,59 +45,31 @@ struct proposal_operation_hardfork_visitor
    template<typename T>
    void operator()(const T &v) const {}
 
-   void operator()(const graphene::chain::call_order_update_operation &v) const {
-
-      // TODO If this never ASSERTs before HF 1465, it can be removed
-      FC_ASSERT( block_time < SOFTFORK_CORE_1465_TIME 
-            || block_time > HARDFORK_CORE_1465_TIME
-            || v.delta_debt.asset_id == asset_id_type(113) // CNY
-            || v.delta_debt.amount < 0 
-            || (v.delta_debt.asset_id( db ).bitasset_data_id
-            && (*(v.delta_debt.asset_id( db ).bitasset_data_id))( db ).is_prediction_market )
-            , "Soft fork - preventing proposal with call_order_update!" );
-   }
-   // hf_1268
+   // hf_1774
    void operator()(const graphene::chain::asset_create_operation &v) const {
-      detail::check_asset_options_hf_1268(block_time, v.common_options);
+      detail::check_asset_options_hf_1774(block_time, v.common_options);
    }
-   // hf_1268
+   // hf_1774
    void operator()(const graphene::chain::asset_update_operation &v) const {
-      detail::check_asset_options_hf_1268(block_time, v.new_options);
+      detail::check_asset_options_hf_1774(block_time, v.new_options);
    }
-   // hf_1268
-   void operator()(const graphene::chain::vesting_balance_create_operation &v) const {
-      detail::check_vesting_balance_policy_hf_1268(block_time, v.policy);
-   }
-   // hf_588
-   // issue #588
-   //
-   // As a virtual operation which has no evaluator `asset_settle_cancel_operation`
-   // originally won't be packed into blocks, yet its loose `validate()` method
-   // make it able to slip into blocks.
-   //
-   // We need to forbid this operation being packed into blocks via proposal but
-   // this will lead to a hardfork (this operation in proposal will denied by new
-   // node while accept by old node), so a hardfork guard code needed and a
-   // consensus upgrade over all nodes needed in future. And because the
-   // `validate()` method not suitable to check database status, so we put the
-   // code here.
-   //
-   // After the hardfork, all nodes will deny packing this operation into a block,
-   // and then we will check whether exists a proposal containing this kind of
-   // operation, if not exists, we can harden the `validate()` method to deny
-   // it in a earlier stage.
-   //
-   void operator()(const graphene::chain::asset_settle_cancel_operation &v) const {
-      if (block_time > HARDFORK_CORE_588_TIME) {
-         FC_ASSERT(!"Virtual operation");
-      }
-   }
+
    void operator()(const graphene::chain::committee_member_update_global_parameters_operation &op) const {
       if (block_time < HARDFORK_CORE_1468_TIME) {
          FC_ASSERT(!op.new_parameters.extensions.value.updatable_htlc_options.valid(), "Unable to set HTLC options before hardfork 1468");
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_create_operation>());
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_redeem_operation>());
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_extend_operation>());
+      }
+      if (!HARDFORK_BSIP_40_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.extensions.value.custom_authority_options.valid(),
+                   "Unable to set Custom Authority Options before hardfork BSIP 40");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<custom_authority_create_operation>(),
+                   "Unable to define fees for custom authority operations prior to hardfork BSIP 40");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<custom_authority_update_operation>(),
+                   "Unable to define fees for custom authority operations prior to hardfork BSIP 40");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<custom_authority_delete_operation>(),
+                   "Unable to define fees for custom authority operations prior to hardfork BSIP 40");
       }
    }
    void operator()(const graphene::chain::htlc_create_operation &op) const {
@@ -110,11 +81,18 @@ struct proposal_operation_hardfork_visitor
    void operator()(const graphene::chain::htlc_extend_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
    }
-   // bsip 47
-   void operator()(const graphene::chain::account_update_votes_operation &op) const {
-      FC_ASSERT( block_time >= HARDFORK_BSIP_47_TIME, "Not allowed until BSIP47 hardfork" );
+   void operator()(const graphene::chain::custom_authority_create_operation&) const {
+      FC_ASSERT( HARDFORK_BSIP_40_PASSED(block_time), "Not allowed until hardfork BSIP 40" );
    }
-
+   void operator()(const graphene::chain::custom_authority_update_operation&) const {
+      FC_ASSERT( HARDFORK_BSIP_40_PASSED(block_time), "Not allowed until hardfork BSIP 40" );
+   }
+   void operator()(const graphene::chain::custom_authority_delete_operation&) const {
+      FC_ASSERT( HARDFORK_BSIP_40_PASSED(block_time), "Not allowed until hardfork BSIP 40" );
+   }
+   void operator()(const graphene::chain::account_update_votes_operation &op) const {
+      FC_ASSERT( block_time >= HARDFORK_BSIP_47_TIME, "Not allowed until hardfork BSIP 47" );
+   }
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {
       bool already_contains_proposal_update = false;
@@ -253,13 +231,13 @@ object_id_type proposal_create_evaluator::do_apply( const proposal_create_operat
                     "Cannot update/delete a proposal with a future id!" );
       else if( vtor_1479.nested_update_count > 0 && proposal.id.instance() <= vtor_1479.max_update_instance )
       {
+         // Note: This happened on mainnet, proposal 1.10.17503
          // prevent approval
          transfer_operation top;
          top.from = GRAPHENE_NULL_ACCOUNT;
          top.to = GRAPHENE_RELAXED_COMMITTEE_ACCOUNT;
          top.amount = asset( GRAPHENE_MAX_SHARE_SUPPLY );
          proposal.proposed_transaction.operations.emplace_back( top );
-         wlog( "Issue 1479: ${p}", ("p",proposal) );
       }
    });
 

@@ -28,6 +28,7 @@
 #include <graphene/chain/get_config.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/protocol/pts_address.hpp>
+#include <graphene/protocol/restriction_predicate.hpp>
 
 #include <fc/crypto/hex.hpp>
 #include <fc/rpc/api_connection.hpp>
@@ -510,7 +511,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       // Add the account's balances
       const auto& balances = _db.get_index_type< primary_index< account_balance_index > >().
             get_secondary_index< balances_by_account_index >().get_account_balances( account->id );
-      for( const auto balance : balances )
+      for( const auto& balance : balances )
       {
          if(acnt.balances.size() >= api_limit_get_full_accounts_lists) {
             acnt.more_data_available.balances = true;
@@ -738,7 +739,7 @@ vector<asset> database_api_impl::get_account_balances( const std::string& accoun
       const auto& balance_index = _db.get_index_type< primary_index< account_balance_index > >();
       const auto& balances = balance_index.get_secondary_index< balances_by_account_index >()
                                           .get_account_balances( acnt );
-      for( const auto balance : balances )
+      for( const auto& balance : balances )
          result.push_back( balance.second->get_balance() );
    }
    else
@@ -2002,6 +2003,8 @@ bool database_api_impl::verify_authority( const signed_transaction& trx )const
    trx.verify_authority( _db.get_chain_id(),
                          [this]( account_id_type id ){ return &id(_db).active; },
                          [this]( account_id_type id ){ return &id(_db).owner; },
+                         [this]( account_id_type id, const operation& op, rejected_predicate_map* rejects ) {
+                           return _db.get_viable_custom_authorities(id, op, rejects); },
                          allow_non_immediate_owner,
                          _db.get_global_properties().parameters.max_authority_depth );
    return true;
@@ -2027,6 +2030,8 @@ bool database_api_impl::verify_account_authority( const string& account_name_or_
       graphene::chain::verify_authority(ops, keys,
             [this]( account_id_type id ){ return &id(_db).active; },
             [this]( account_id_type id ){ return &id(_db).owner; },
+            // Use a no-op lookup for custom authorities; we don't want it even if one does apply for our dummy op
+            [](auto, auto, auto*) { return vector<authority>(); },
             true, MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(_db.head_block_time()) );
    } 
    catch (fc::exception& ex)

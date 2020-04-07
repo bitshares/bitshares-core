@@ -59,7 +59,7 @@ class es_objects_plugin_impl
       bool _es_objects_accounts = true;
       bool _es_objects_assets = true;
       bool _es_objects_balances = true;
-      bool _es_objects_limit_orders = true;
+      bool _es_objects_limit_orders = false;
       bool _es_objects_asset_bitasset = true;
       std::string _es_objects_index_prefix = "objects-";
       uint32_t _es_objects_start_es_after_block = 0;
@@ -306,7 +306,7 @@ void es_objects_plugin::plugin_set_program_options(
          ("es-objects-accounts", boost::program_options::value<bool>(), "Store account objects(true)")
          ("es-objects-assets", boost::program_options::value<bool>(), "Store asset objects(true)")
          ("es-objects-balances", boost::program_options::value<bool>(), "Store balances objects(true)")
-         ("es-objects-limit-orders", boost::program_options::value<bool>(), "Store limit order objects(true)")
+         ("es-objects-limit-orders", boost::program_options::value<bool>(), "Store limit order objects(false)")
          ("es-objects-asset-bitasset", boost::program_options::value<bool>(), "Store feed data(true)")
          ("es-objects-index-prefix", boost::program_options::value<std::string>(),
                "Add a prefix to the index(objects-)")

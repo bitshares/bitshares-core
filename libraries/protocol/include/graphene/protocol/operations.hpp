@@ -30,6 +30,7 @@
 #include <graphene/protocol/custom.hpp>
 #include <graphene/protocol/committee_member.hpp>
 #include <graphene/protocol/confidential.hpp>
+#include <graphene/protocol/custom_authority.hpp>
 #include <graphene/protocol/fba.hpp>
 #include <graphene/protocol/market.hpp>
 #include <graphene/protocol/proposal.hpp>
@@ -102,8 +103,11 @@ namespace graphene { namespace protocol {
             htlc_redeemed_operation,         // VIRTUAL
             htlc_extend_operation,
             htlc_refund_operation,           // VIRTUAL
+            custom_authority_create_operation,
+            custom_authority_update_operation,
+            custom_authority_delete_operation
             account_update_votes_operation
-         > operation;
+   > operation;
 
    /// @} // operations group
 
