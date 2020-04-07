@@ -157,6 +157,7 @@ public:
    std::string operator()(const asset_create_operation& op)const;
    std::string operator()(const htlc_create_operation& op)const;
    std::string operator()(const htlc_redeem_operation& op)const;
+   std::string operator()(const htlc_redeemed_operation& op)const;
 };
 
 template<class T>
@@ -3209,6 +3210,19 @@ std::string operation_printer::operator()(const asset_create_operation& op) cons
 }
 
 std::string operation_printer::operator()(const htlc_redeem_operation& op) const
+{
+   out << "Redeem HTLC with database id "
+         << std::to_string(op.htlc_id.space_id)
+         << "." << std::to_string(op.htlc_id.type_id)
+         << "." << std::to_string((uint64_t)op.htlc_id.instance)
+         << " with preimage \"";
+   for (unsigned char c : op.preimage)
+      out << c;
+   out << "\"";
+   return fee(op.fee);
+}
+
+std::string operation_printer::operator()(const htlc_redeemed_operation& op) const
 {
    out << "Redeem HTLC with database id "
          << std::to_string(op.htlc_id.space_id)
