@@ -30,6 +30,7 @@ namespace graphene { namespace chain {
 
 namespace detail {
    void check_asset_options_hf_1774(const fc::time_point_sec& block_time, const asset_options& options);   
+   void check_asset_options_hf_bsip81(const fc::time_point_sec& block_time, const asset_options& options);
 }
 
 struct proposal_operation_hardfork_visitor
@@ -45,13 +46,19 @@ struct proposal_operation_hardfork_visitor
    template<typename T>
    void operator()(const T &v) const {}
 
-   // hf_1774
    void operator()(const graphene::chain::asset_create_operation &v) const {
+      // hf_1774
       detail::check_asset_options_hf_1774(block_time, v.common_options);
+
+      // HARDFORK_BSIP_81
+      detail::check_asset_options_hf_bsip81(block_time, v.common_options);
    }
-   // hf_1774
    void operator()(const graphene::chain::asset_update_operation &v) const {
+      // hf_1774
       detail::check_asset_options_hf_1774(block_time, v.new_options);
+
+      // HARDFORK_BSIP_81
+      detail::check_asset_options_hf_bsip81(block_time, v.new_options);
    }
 
    void operator()(const graphene::chain::committee_member_update_global_parameters_operation &op) const {
@@ -94,6 +101,7 @@ struct proposal_operation_hardfork_visitor
    void operator()(const graphene::chain::custom_authority_delete_operation&) const {
       FC_ASSERT( HARDFORK_BSIP_40_PASSED(block_time), "Not allowed until hardfork BSIP 40" );
    }
+
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {
       bool already_contains_proposal_update = false;

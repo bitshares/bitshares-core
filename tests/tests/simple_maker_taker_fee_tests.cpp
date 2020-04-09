@@ -46,6 +46,28 @@ struct simple_maker_taker_database_fixture : database_fixture {
 
       return sell_order;
    }
+
+   const asset_create_operation create_user_issued_asset_operation(const string &name, const account_object &issuer,
+                                                                   uint16_t flags, const price &core_exchange_rate,
+                                                                   uint8_t precision, uint16_t maker_fee_percent,
+                                                                   uint16_t taker_fee_percent) {
+      asset_create_operation creator;
+      creator.issuer = issuer.id;
+      creator.fee = asset();
+      creator.symbol = name;
+      creator.common_options.max_supply = 0;
+      creator.precision = precision;
+
+      creator.common_options.core_exchange_rate = core_exchange_rate;
+      creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      creator.common_options.flags = flags;
+      creator.common_options.issuer_permissions = flags;
+      creator.common_options.market_fee_percent = maker_fee_percent;
+      creator.common_options.taker_fee_percent = taker_fee_percent;
+
+      return creator;
+
+   }
 };
 
 
@@ -68,8 +90,6 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          account_id_type issuer_id = jill.id;
          fc::ecc::private_key issuer_private_key = jill_private_key;
 
-         upgrade_to_lifetime_member(izzy);
-
          // Initialize tokens
          price price(asset(1, asset_id_type(1)), asset(1));
          uint16_t market_fee_percent = 20 * GRAPHENE_1_PERCENT;
@@ -89,13 +109,69 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          trx.operations.push_back(uop);
          db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, issuer_private_key);
-         GRAPHENE_CHECK_THROW(PUSH_TX(db, trx), fc::exception); // An exception should be thrown indicating the reason
-         // TOOD: Check the specific exception?
+         GRAPHENE_CHECK_THROW(PUSH_TX(db, trx), fc::exception);
+         // TODO: Check the specific exception?
 
          // Check the taker fee
          asset_object updated_asset = jillcoin.get_id()(db);
          uint16_t expected_taker_fee_percent = 0; // Before the HF it should be set to 0
          BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+
+
+         //////
+         // Before HF, test inability to set taker fees with an asset update operation inside of a proposal
+         //////
+         {
+            trx.clear();
+            set_expiration(db, trx);
+
+            uint64_t alternate_taker_fee_percent = new_taker_fee_percent * 2;
+            uop.new_options.taker_fee_percent = alternate_taker_fee_percent;
+
+            proposal_create_operation cop;
+            cop.review_period_seconds = 86400;
+            uint32_t buffer_seconds = 60 * 60;
+            cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + buffer_seconds;
+            cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+            cop.proposed_ops.emplace_back(uop);
+
+            trx.operations.push_back(cop);
+            // sign(trx, issuer_private_key);
+            GRAPHENE_CHECK_THROW(PUSH_TX(db, trx), fc::exception);
+
+            // Check the taker fee is not changed because the proposal has not been approved
+            updated_asset = jillcoin.get_id()(db);
+            expected_taker_fee_percent = 0; // Before the HF it should be set to 0
+            BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         }
+
+
+         //////
+         // Before HF, test inability to set taker fees with an asset create operation inside of a proposal
+         //////
+         {
+            trx.clear();
+            set_expiration(db, trx);
+
+            uint64_t maker_fee_percent = 10 * GRAPHENE_1_PERCENT;
+            uint64_t taker_fee_percent = 2 * GRAPHENE_1_PERCENT;
+            asset_create_operation ac_op = create_user_issued_asset_operation("JCOIN2", jill, charge_market_fee, price,
+                                                                              2,
+                                                                              maker_fee_percent, taker_fee_percent);
+
+            proposal_create_operation cop;
+            cop.review_period_seconds = 86400;
+            uint32_t buffer_seconds = 60 * 60;
+            cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + buffer_seconds;
+            cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+            cop.proposed_ops.emplace_back(ac_op);
+
+            trx.operations.push_back(cop);
+            // sign(trx, issuer_private_key);
+
+            GRAPHENE_CHECK_THROW(PUSH_TX(db, trx), fc::exception); // The proposal should be rejected
+
+         }
 
 
          //////
@@ -126,7 +202,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, issuer_private_key);
          GRAPHENE_CHECK_THROW(PUSH_TX(db, trx), fc::exception); // An exception should be thrown indicating the reason
-         // TOOD: Check the specific exception?
+         // TODO: Check the specific exception?
 
 
          //////
@@ -143,6 +219,116 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          updated_asset = jillcoin.get_id()(db);
          expected_taker_fee_percent = new_taker_fee_percent;
          BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+
+
+         //////
+         // After HF, test ability to set taker fees with an asset update operation inside of a proposal
+         //////
+         {
+            trx.clear();
+            set_expiration(db, trx);
+
+            uint64_t alternate_taker_fee_percent = new_taker_fee_percent * 2;
+            uop.new_options.taker_fee_percent = alternate_taker_fee_percent;
+
+            proposal_create_operation cop;
+            cop.review_period_seconds = 86400;
+            uint32_t buffer_seconds = 60 * 60;
+            cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + buffer_seconds;
+            cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+            cop.proposed_ops.emplace_back(uop);
+
+            trx.operations.push_back(cop);
+            // sign(trx, issuer_private_key);
+            processed_transaction processed = PUSH_TX(db, trx); // No exception should be thrown
+
+            // Check the taker fee is not changed because the proposal has not been approved
+            updated_asset = jillcoin.get_id()(db);
+            expected_taker_fee_percent = new_taker_fee_percent;
+            BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+
+
+            // Approve the proposal
+            trx.clear();
+            proposal_id_type pid = processed.operation_results[0].get<object_id_type>();
+
+            proposal_update_operation pup;
+            pup.fee_paying_account = jill.id;
+            pup.proposal = pid;
+            pup.active_approvals_to_add.insert(jill.id);
+            trx.operations.push_back(pup);
+            set_expiration(db, trx);
+            sign(trx, jill_private_key);
+
+            PUSH_TX(db, trx); // No exception should be thrown
+
+            // Advance to after proposal expires
+            generate_blocks(cop.expiration_time);
+
+            // Check the taker fee is not changed because the proposal has not been approved
+            updated_asset = jillcoin.get_id()(db);
+            expected_taker_fee_percent = alternate_taker_fee_percent;
+            BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+
+         }
+
+
+         //////
+         // After HF, test ability to set taker fees with an asset create operation inside of a proposal
+         //////
+         {
+            trx.clear();
+            set_expiration(db, trx);
+
+            uint64_t maker_fee_percent = 10 * GRAPHENE_1_PERCENT;
+            uint64_t taker_fee_percent = 2 * GRAPHENE_1_PERCENT;
+            asset_create_operation ac_op = create_user_issued_asset_operation("JCOIN2", jill, charge_market_fee, price,
+                                                                              2,
+                                                                              maker_fee_percent, taker_fee_percent);
+
+            proposal_create_operation cop;
+            cop.review_period_seconds = 86400;
+            uint32_t buffer_seconds = 60 * 60;
+            cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + buffer_seconds;
+            cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+            cop.proposed_ops.emplace_back(ac_op);
+
+            trx.operations.push_back(cop);
+            // sign(trx, issuer_private_key);
+
+            processed_transaction processed = PUSH_TX(db, trx); // No exception should be thrown
+
+            // Check the asset does not exist because the proposal has not been approved
+            const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_symbol>();
+            const auto itr = asset_idx.find("JCOIN2");
+            BOOST_CHECK(itr == asset_idx.end());
+
+            // Approve the proposal
+            trx.clear();
+            proposal_id_type pid = processed.operation_results[0].get<object_id_type>();
+
+            proposal_update_operation pup;
+            pup.fee_paying_account = jill.id;
+            pup.proposal = pid;
+            pup.active_approvals_to_add.insert(jill.id);
+            trx.operations.push_back(pup);
+            set_expiration(db, trx);
+            sign(trx, jill_private_key);
+
+            PUSH_TX(db, trx); // No exception should be thrown
+
+            // Advance to after proposal expires
+            generate_blocks(cop.expiration_time);
+
+            // Check the taker fee is not changed because the proposal has not been approved
+            BOOST_CHECK(asset_idx.find("JCOIN2") != asset_idx.end());
+            updated_asset = *asset_idx.find("JCOIN2");
+            expected_taker_fee_percent = taker_fee_percent;
+            BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+            uint16_t expected_maker_fee_percent = maker_fee_percent;
+            BOOST_CHECK_EQUAL(expected_maker_fee_percent, updated_asset.options.market_fee_percent);
+
+         }
 
       } FC_LOG_AND_RETHROW()
    }
@@ -181,7 +367,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, smartissuer_private_key);
          GRAPHENE_CHECK_THROW(PUSH_TX(db, trx), fc::exception); // An exception should be thrown indicating the reason
-         // TOOD: Check the specific exception?
+         // TODO: Check the specific exception?
 
          // Check the taker fee
          asset_object updated_asset = bitsmart.get_id()(db);
@@ -217,7 +403,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          db.current_fee_schedule().set_fee(trx.operations.back());
          sign(trx, smartissuer_private_key);
          GRAPHENE_CHECK_THROW(PUSH_TX(db, trx), fc::exception); // An exception should be thrown indicating the reason
-         // TOOD: Check the specific exception?
+         // TODO: Check the specific exception?
 
 
          //////

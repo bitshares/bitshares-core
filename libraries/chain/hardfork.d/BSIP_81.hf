@@ -2,5 +2,4 @@
 #ifndef HARDFORK_BSIP_81_TIME
 // Jan 1 2030, midnight this is a dummy date until a hardfork date is scheduled
 #define HARDFORK_BSIP_81_TIME (fc::time_point_sec( 1893456000 ))
-#define HARDFORK_BSIP_81_PASSED(now) (now >= HARDFORK_BSIP_81_TIME)
 #endif

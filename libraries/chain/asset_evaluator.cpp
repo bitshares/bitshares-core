@@ -45,6 +45,15 @@ namespace detail {
             "Asset extension reward percent must be less than 100% till HARDFORK_1774_TIME!");
       }
    }
+
+   // TODO review and remove code below and links to it after HARDFORK_BSIP_81_TIME
+   void check_asset_options_hf_bsip81(const fc::time_point_sec& block_time, const asset_options& options)
+   {
+      if (block_time < HARDFORK_BSIP_81_TIME) {
+         // Taker fees should be zero until activation of BSIP81
+         FC_ASSERT(options.taker_fee_percent == 0, "Taker fee must be 0% until HARDFORK_BSIP_81_TIME");
+      }
+   }
 }
 
 void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
