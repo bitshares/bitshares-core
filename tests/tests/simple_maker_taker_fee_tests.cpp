@@ -788,4 +788,176 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
    }
 
 
+   /**
+    * Test of different maker and taker fees charged when filling limit orders after HF for a smart asset
+    */
+   BOOST_AUTO_TEST_CASE(simple_match_and_fill_with_different_fees_smart_asset) {
+      try {
+         // Initialize for the current time
+         trx.clear();
+         set_expiration(db, trx);
+
+         // Initialize actors
+         ACTORS((jill)(izzy)(alice)(bob));
+         ACTORS((smartissuer)(feedproducer));
+
+         // Initialize tokens
+         price price(asset(1, asset_id_type(1)), asset(1));
+         const uint16_t JILL_PRECISION = 100;
+         const uint16_t jill_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
+         const asset_object jillcoin = create_user_issued_asset("JCOIN", jill, charge_market_fee, price, 2,
+                                                                jill_market_fee_percent);
+
+         const uint16_t SMARTBIT_PRECISION = 10000;
+         const uint16_t smartbit_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
+         const asset_object &smartbit = create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
+                                                        charge_market_fee, 4);
+         const auto &core = asset_id_type()(db);
+
+         update_feed_producers(smartbit, {feedproducer.id});
+
+         price_feed current_feed;
+         current_feed.settlement_price = smartbit.amount(100) / core.amount(100);
+         current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
+         publish_feed(smartbit, feedproducer, current_feed);
+
+         FC_ASSERT(smartbit.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price);
+
+
+         //////
+         // Advance to activate hardfork
+         //////
+         generate_blocks(HARDFORK_BSIP_81_TIME);
+         generate_block();
+         trx.clear();
+         set_expiration(db, trx);
+
+
+         //////
+         // After HF, test that new values can be set
+         //////
+         // Define the new taker fees
+         uint16_t jill_maker_fee_percent = jill_market_fee_percent;
+         uint16_t jill_taker_fee_percent = jill_maker_fee_percent / 2;
+
+         uint16_t smartbit_maker_fee_percent = 1 * GRAPHENE_1_PERCENT;
+         uint16_t smartbit_taker_fee_percent = 3 * GRAPHENE_1_PERCENT;
+
+         // Set the new taker fee for JILLCOIN
+         asset_update_operation uop;
+         uop.issuer = jill.id;
+         uop.asset_to_update = jillcoin.get_id();
+         uop.new_options = jillcoin.options;
+         uop.new_options.taker_fee_percent = jill_taker_fee_percent;
+
+         trx.clear();
+         trx.operations.push_back(uop);
+         db.current_fee_schedule().set_fee(trx.operations.back());
+         sign(trx, jill_private_key);
+         PUSH_TX(db, trx); // No exception should be thrown
+
+         // Check the taker fee for JILLCOIN
+         asset_object updated_asset = jillcoin.get_id()(db);
+         uint16_t expected_taker_fee_percent = jill_taker_fee_percent;
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+
+
+         // Set the new taker fee for SMARTBIT
+         uop = asset_update_operation();
+         uop.issuer = smartissuer.id;
+         uop.asset_to_update = smartbit.get_id();
+         uop.new_options = smartbit.options;
+         uop.new_options.market_fee_percent = smartbit_maker_fee_percent;
+         uop.new_options.taker_fee_percent = smartbit_taker_fee_percent;
+
+         trx.clear();
+         trx.operations.push_back(uop);
+         db.current_fee_schedule().set_fee(trx.operations.back());
+         sign(trx, smartissuer_private_key);
+         PUSH_TX(db, trx); // No exception should be thrown
+
+         // Check the taker fee for SMARTBIT
+         updated_asset = smartbit.get_id()(db);
+         expected_taker_fee_percent = smartbit_taker_fee_percent;
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+
+         // Check the maker fee for SMARTBIT
+         updated_asset = smartbit.get_id()(db);
+         expected_taker_fee_percent = smartbit_maker_fee_percent;
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.market_fee_percent);
+
+
+         //////
+         // After HF, create limit orders that will perfectly match
+         //////
+         BOOST_TEST_MESSAGE("Issuing 10 jillcoin to alice");
+         issue_uia(alice, jillcoin.amount(10 * JILL_PRECISION));
+         BOOST_TEST_MESSAGE("Checking alice's balance");
+         BOOST_REQUIRE_EQUAL(get_balance(alice, jillcoin), 10 * JILL_PRECISION);
+
+         BOOST_TEST_MESSAGE("Issuing 300 SMARTBIT to bob");
+         transfer(committee_account, bob.id, asset(10000000));
+         publish_feed(smartbit, feedproducer, current_feed); // Publish a recent feed
+         borrow(bob, smartbit.amount(300 * SMARTBIT_PRECISION), asset(2 * 300 * SMARTBIT_PRECISION));
+         BOOST_TEST_MESSAGE("Checking bob's balance");
+         BOOST_REQUIRE_EQUAL(get_balance(bob, smartbit), 300 * SMARTBIT_PRECISION);
+
+         // Alice and Bob place orders which match, and are completely filled by each other
+         // Alice is willing to sell 10 JILLCOIN for at least 300 SMARTBIT
+         limit_order_create_operation alice_sell_op = create_sell_operation(alice.id,
+                                                                            jillcoin.amount(10 * JILL_PRECISION),
+                                                                            smartbit.amount(300 * SMARTBIT_PRECISION));
+         trx.clear();
+         trx.operations.push_back(alice_sell_op);
+         asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
+         sign(trx, alice_private_key);
+         processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
+         limit_order_id_type alice_order_id = ptx.operation_results[0].get<object_id_type>();
+
+         const limit_order_object *alice_order_before = db.find<limit_order_object>(alice_order_id);
+         BOOST_CHECK(alice_order_before != nullptr);
+
+
+         // Bob is willing to sell 300 SMARTBIT for at least 10 JILLCOIN
+         limit_order_create_operation bob_sell_op
+                 = create_sell_operation(bob.id, smartbit.amount(300 * SMARTBIT_PRECISION),
+                                         jillcoin.amount(10 * JILL_PRECISION));
+         trx.clear();
+         trx.operations.push_back(bob_sell_op);
+         asset bob_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
+         sign(trx, bob_private_key);
+         ptx = PUSH_TX(db, trx); // No exception should be thrown
+         limit_order_id_type bob_order_id = ptx.operation_results[0].get<object_id_type>();
+
+         // Check that the orders were filled by ensuring that they are no longer on the order books
+         const limit_order_object *alice_order = db.find<limit_order_object>(alice_order_id);
+         BOOST_CHECK(alice_order == nullptr);
+         const limit_order_object *bob_order = db.find<limit_order_object>(bob_order_id);
+         BOOST_CHECK(bob_order == nullptr);
+
+
+         // Check the new balances of the maker
+         // Alice was the maker; she is receiving SMARTBIT
+         asset expected_smartbit_fee = smartbit.amount(
+                 300 * SMARTBIT_PRECISION * smartbit_maker_fee_percent / GRAPHENE_100_PERCENT);
+         BOOST_REQUIRE_EQUAL(get_balance(alice, smartbit),
+                             (300 * SMARTBIT_PRECISION) - alice_sell_fee.amount.value -
+                             expected_smartbit_fee.amount.value);
+         BOOST_REQUIRE_EQUAL(get_balance(alice, jillcoin), 0);
+
+         // Check the new balance of the taker
+         // Bob was the taker; he is receiving JILLCOIN
+         asset expected_jill_fee = jillcoin.amount(
+                 10 * JILL_PRECISION * jill_taker_fee_percent / GRAPHENE_100_PERCENT);
+         BOOST_REQUIRE_EQUAL(get_balance(bob, jillcoin),
+                             (10 * JILL_PRECISION) - bob_sell_fee.amount.value - expected_jill_fee.amount.value);
+         BOOST_REQUIRE_EQUAL(get_balance(bob, smartbit), 0);
+
+         // Check the asset issuer's accumulated fees
+         BOOST_CHECK(smartbit.dynamic_asset_data_id(db).accumulated_fees == expected_smartbit_fee.amount);
+         BOOST_CHECK(jillcoin.dynamic_asset_data_id(db).accumulated_fees == expected_jill_fee.amount);
+
+      } FC_LOG_AND_RETHROW()
+   }
+
 BOOST_AUTO_TEST_SUITE_END()
