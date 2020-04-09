@@ -766,7 +766,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          // Check the new balances of the maker
          // Alice was the maker; she is receiving IZZYCOIN
-         asset expected_izzy_fee = jillcoin.amount(
+         asset expected_izzy_fee = izzycoin.amount(
                  300 * IZZY_PRECISION * izzy_maker_fee_percent / GRAPHENE_100_PERCENT);
          BOOST_REQUIRE_EQUAL(get_balance(alice, izzycoin),
                              (300 * IZZY_PRECISION) - alice_sell_fee.amount.value - expected_izzy_fee.amount.value);
