@@ -708,10 +708,10 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
    if( bitasset.is_prediction_market )
       FC_ASSERT( bitasset.has_settlement(), "global settlement must occur before force settling a prediction market"  );
    else if( bitasset.current_feed.settlement_price.is_null()
-            && ( d.head_block_time() <= HARDFORK_CORE_216_TIME
+            && ( d.head_block_time() <= HARDFORK_CORE_216_TIME // TODO check whether the HF check can be removed
                  || !bitasset.has_settlement() ) )
       FC_THROW_EXCEPTION(insufficient_feeds, "Cannot force settle with no price feed.");
-   FC_ASSERT(d.get_balance(d.get(op.account), *asset_to_settle) >= op.amount);
+   FC_ASSERT( d.get_balance( op.account, op.amount.asset_id ) >= op.amount, "Insufficient balance" );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -735,8 +735,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
       {
          if( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
             FC_THROW( "Settle amount is too small to receive anything due to rounding" );
-         else // TODO remove this warning after hard fork core-184
-            wlog( "Something for nothing issue (#184, variant F) occurred at block #${block}", ("block",d.head_block_num()) );
+         // else do nothing. Before the hf, something for nothing issue (#184, variant F) could occur
       }
 
       asset pays = op.amount;
@@ -755,7 +754,14 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
             obj.settlement_fund -= settled_amount.amount;
          });
 
-         d.adjust_balance( op.account, settled_amount );
+         if( d.head_block_time() >= HARDFORK_CORE_1780_TIME )
+         {
+            auto issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d), settled_amount );
+            settled_amount -= issuer_fees;
+         }
+
+         if( settled_amount.amount > 0 )
+            d.adjust_balance( op.account, settled_amount );
       }
 
       d.modify( mia_dyn, [&]( asset_dynamic_data_object& obj ){
