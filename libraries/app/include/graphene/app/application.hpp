@@ -55,6 +55,18 @@ namespace graphene { namespace app {
          uint64_t api_limit_get_assets = 101;
          uint64_t api_limit_get_limit_orders = 300;
          uint64_t api_limit_get_order_book = 50;
+         uint64_t api_limit_list_htlcs = 100;
+         uint64_t api_limit_lookup_accounts = 1000;
+         uint64_t api_limit_lookup_witness_accounts = 1000;
+         uint64_t api_limit_lookup_committee_member_accounts = 1000;
+         uint64_t api_limit_lookup_vote_ids = 1000;
+         uint64_t api_limit_get_account_limit_orders = 101;
+         uint64_t api_limit_get_collateral_bids = 100;
+         uint64_t api_limit_get_top_markets = 100;
+         uint64_t api_limit_get_trade_history = 100;
+         uint64_t api_limit_get_trade_history_by_sequence = 100;
+         uint64_t api_limit_get_withdraw_permissions_by_giver = 101;
+         uint64_t api_limit_get_withdraw_permissions_by_recipient = 101;
    };
 
    class application
@@ -125,7 +137,11 @@ namespace graphene { namespace app {
 
          void enable_plugin( const string& name );
 
-      private:
+         bool is_plugin_enabled(const string& name) const;
+
+         std::shared_ptr<fc::thread> elasticsearch_thread;
+
+   private:
          void add_available_plugin( std::shared_ptr<abstract_plugin> p );
          std::shared_ptr<detail::application_impl> my;
 

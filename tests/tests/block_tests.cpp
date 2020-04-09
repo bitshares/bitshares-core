@@ -52,6 +52,9 @@ genesis_state_type make_genesis() {
 
    auto init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
    genesis_state.initial_active_witnesses = 10;
+   genesis_state.immutable_parameters.min_committee_member_count = INITIAL_COMMITTEE_MEMBER_COUNT;
+   genesis_state.immutable_parameters.min_witness_count = INITIAL_WITNESS_COUNT;
+
    for( unsigned int i = 0; i < genesis_state.initial_active_witnesses; ++i )
    {
       auto name = "init"+fc::to_string(i);
@@ -367,7 +370,14 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
 
       auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
 
-      BOOST_TEST_MESSAGE( "Adding blocks 1 through 10" );
+      {
+         const auto first_slot = db1.get_slot_at_time( fc::time_point::now() );
+         auto b = db1.generate_block( db1.get_slot_time(first_slot), db1.get_scheduled_witness(first_slot),
+                                      init_account_priv_key, database::skip_nothing);
+         PUSH_BLOCK( db2, b );
+      }
+
+      BOOST_TEST_MESSAGE( "Adding blocks 2 through 11" );
       for( uint32_t i = 1; i <= 10; ++i )
       {
          auto b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
@@ -378,19 +388,19 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
 
       for( uint32_t j = 0; j <= 4; j += 4 )
       {
-         // add blocks 11 through 13 to db1 only
+         // add blocks 12 through 14 to db1 only
          BOOST_TEST_MESSAGE( "Adding 3 blocks to db1 only" );
-         for( uint32_t i = 11 + j; i <= 13 + j; ++i )
+         for( uint32_t i = 12 + j; i <= 14 + j; ++i )
          {
             BOOST_TEST_MESSAGE( i );
             auto b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
          }
          string db1_tip = db1.head_block_id().str();
 
-         // add different blocks 11 through 13 to db2 only
+         // add different blocks 12 through 14 to db2 only
          BOOST_TEST_MESSAGE( "Add 3 different blocks to db2 only" );
          uint32_t next_slot = 3;
-         for( uint32_t i = 11 + j; i <= 13 + j; ++i )
+         for( uint32_t i = 12 + j; i <= 14 + j; ++i )
          {
             BOOST_TEST_MESSAGE( i );
             auto b =  db2.generate_block(db2.get_slot_time(next_slot), db2.get_scheduled_witness(next_slot), init_account_priv_key, database::skip_nothing);
@@ -403,8 +413,8 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
          }
 
          //The two databases are on distinct forks now, but at the same height.
-         BOOST_CHECK_EQUAL(db1.head_block_num(), 13u + j);
-         BOOST_CHECK_EQUAL(db2.head_block_num(), 13u + j);
+         BOOST_CHECK_EQUAL(db1.head_block_num(), 14u + j);
+         BOOST_CHECK_EQUAL(db2.head_block_num(), 14u + j);
          BOOST_CHECK( db1.head_block_id() != db2.head_block_id() );
 
          //Make a block on db2, make it invalid, then
@@ -416,7 +426,7 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
             b.transactions.emplace_back(signed_transaction());
             b.transactions.back().operations.emplace_back(transfer_operation());
             b.sign( init_account_priv_key );
-            BOOST_CHECK_EQUAL(b.block_num(), 14u + j);
+            BOOST_CHECK_EQUAL(b.block_num(), 15u + j);
             GRAPHENE_CHECK_THROW(PUSH_BLOCK( db1, b ), fc::exception);
 
             // At this point, `fetch_block_by_number` will fetch block from fork_db,
@@ -433,13 +443,13 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
                previous_block = curr_block;
             }
          }
-         BOOST_CHECK_EQUAL(db1.head_block_num(), 13u + j);
+         BOOST_CHECK_EQUAL(db1.head_block_num(), 14u + j);
          BOOST_CHECK_EQUAL(db1.head_block_id().str(), db1_tip);
 
          if( j == 0 )
          {
             // assert that db1 switches to new fork with good block
-            BOOST_CHECK_EQUAL(db2.head_block_num(), 14u + j);
+            BOOST_CHECK_EQUAL(db2.head_block_num(), 15u + j);
             PUSH_BLOCK( db1, good_block );
             BOOST_CHECK_EQUAL(db1.head_block_id().str(), db2.head_block_id().str());
          }
@@ -1100,14 +1110,14 @@ BOOST_FIXTURE_TEST_CASE( rsf_missed_blocks, database_fixture )
    {
       generate_block();
 
-      auto rsf = [&]() -> string
+      auto rsf = [this]() -> string
       {
-         fc::uint128 rsf = db.get_dynamic_global_properties().recent_slots_filled;
+	 fc::uint128_t rsf = db.get_dynamic_global_properties().recent_slots_filled;
          string result = "";
          result.reserve(128);
          for( int i=0; i<128; i++ )
          {
-            result += ((rsf.lo & 1) == 0) ? '0' : '1';
+            result += rsf & 1 ? '1' : '0';
             rsf >>= 1;
          }
          return result;
@@ -1418,25 +1428,33 @@ BOOST_AUTO_TEST_CASE( genesis_reserve_ids )
 
 BOOST_FIXTURE_TEST_CASE( miss_some_blocks, database_fixture )
 { try {
+   // Witnesses scheduled incorrectly in genesis block - reschedule
+   generate_blocks( witness_schedule_id_type()(db).current_shuffled_witnesses.size() );
+   generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+
    std::vector<witness_id_type> witnesses = witness_schedule_id_type()(db).current_shuffled_witnesses;
-   BOOST_CHECK_EQUAL( 10u, witnesses.size() );
+   BOOST_CHECK_EQUAL( INITIAL_WITNESS_COUNT, witnesses.size() );
    // database_fixture constructor calls generate_block once, signed by witnesses[0]
    generate_block(); // witnesses[1]
    generate_block(); // witnesses[2]
    for( const auto& id : witnesses )
       BOOST_CHECK_EQUAL( 0, id(db).total_missed );
    // generate_blocks generates another block *now* (witnesses[3])
-   // and one at now+10 blocks (witnesses[12%10])
-   generate_blocks( db.head_block_time() + db.get_global_properties().parameters.block_interval * 10, true );
-   // i. e. 8 blocks are missed in between by witness[4..11%10]
+   // and one at now+9 blocks (witnesses[12%9])
+   generate_blocks( db.head_block_time() + db.get_global_properties().parameters.block_interval * 9, true );
+   // i. e. 7 blocks are missed in between by witness[4..11%9]
    for( uint32_t i = 0; i < witnesses.size(); i++ )
-      BOOST_CHECK_EQUAL( (i+7) % 10 < 2 ? 0 : 1, witnesses[i](db).total_missed );
+      BOOST_CHECK_EQUAL( (i+6) % 9 < 2 ? 0 : 1, witnesses[i](db).total_missed );
 } FC_LOG_AND_RETHROW() }
 
 BOOST_FIXTURE_TEST_CASE( miss_many_blocks, database_fixture )
 {
    try
    {
+      // Witnesses scheduled incorrectly in genesis block - reschedule
+      generate_blocks( witness_schedule_id_type()(db).current_shuffled_witnesses.size() );
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+
       auto get_misses = []( database& db ) {
          std::map< witness_id_type, uint32_t > misses;
          for( const auto& witness_id : witness_schedule_id_type()(db).current_shuffled_witnesses )
@@ -1447,8 +1465,9 @@ BOOST_FIXTURE_TEST_CASE( miss_many_blocks, database_fixture )
       generate_block();
       generate_block();
       auto missed_before = get_misses( db );
-      // miss 10 maintenance intervals
-      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time + db.get_global_properties().parameters.maintenance_interval * 10, true );
+      // miss 9 maintenance intervals
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time + 
+                       db.get_global_properties().parameters.maintenance_interval * 9, true );
       generate_block();
       generate_block();
       generate_block();

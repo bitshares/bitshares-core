@@ -27,12 +27,7 @@
 #include <graphene/chain/htlc_object.hpp>
 #include <graphene/app/api.hpp>
 #include <graphene/utilities/key_conversion.hpp>
-
-using namespace graphene::app;
-using namespace graphene::chain;
-using namespace graphene::utilities;
-using std::string;
-using std::vector;
+#include "wallet_structs.hpp"
 
 namespace fc
 {
@@ -42,270 +37,11 @@ namespace fc
 
 namespace graphene { namespace wallet {
 
-typedef uint16_t transaction_handle_type;
-
 /**
  * This class takes a variant and turns it into an object
  * of the given type, with the new operator.
  */
-
 object* create_object( const variant& v );
-
-struct plain_keys
-{
-   map<public_key_type, string>  keys;
-   fc::sha512                    checksum;
-};
-
-struct brain_key_info
-{
-   string brain_priv_key;
-   string wif_priv_key;
-   public_key_type pub_key;
-};
-
-
-/**
- *  Contains the confirmation receipt the sender must give the receiver and
- *  the meta data about the receipt that helps the sender identify which receipt is
- *  for the receiver and which is for the change address.
- */
-struct blind_confirmation 
-{
-   struct output
-   {
-      string                          label;
-      public_key_type                 pub_key;
-      stealth_confirmation::memo_data decrypted_memo;
-      stealth_confirmation            confirmation;
-      authority                       auth;
-      string                          confirmation_receipt;
-   };
-
-   signed_transaction     trx;
-   vector<output>         outputs;
-};
-
-struct blind_balance
-{
-   asset                     amount;
-   public_key_type           from; ///< the account this balance came from
-   public_key_type           to; ///< the account this balance is logically associated with
-   public_key_type           one_time_key; ///< used to derive the authority key and blinding factor
-   fc::sha256                blinding_factor;
-   fc::ecc::commitment_type  commitment;
-   bool                      used = false;
-};
-
-struct blind_receipt
-{
-   std::pair<public_key_type,fc::time_point>        from_date()const { return std::make_pair(from_key,date); }
-   std::pair<public_key_type,fc::time_point>        to_date()const   { return std::make_pair(to_key,date);   }
-   std::tuple<public_key_type,asset_id_type,bool>   to_asset_used()const   { return std::make_tuple(to_key,amount.asset_id,used);   }
-   const commitment_type& commitment()const        { return data.commitment; }
-
-   fc::time_point                  date;
-   public_key_type                 from_key;
-   string                          from_label;
-   public_key_type                 to_key;
-   string                          to_label;
-   asset                           amount;
-   string                          memo;
-   authority                       control_authority;
-   stealth_confirmation::memo_data data;
-   bool                            used = false;
-   stealth_confirmation            conf;
-};
-
-struct by_from;
-struct by_to;
-struct by_to_asset_used;
-struct by_commitment;
-
-typedef multi_index_container< blind_receipt,
-   indexed_by<
-      ordered_unique< tag<by_commitment>, const_mem_fun< blind_receipt, const commitment_type&, &blind_receipt::commitment > >,
-      ordered_unique< tag<by_to>, const_mem_fun< blind_receipt, std::pair<public_key_type,fc::time_point>, &blind_receipt::to_date > >,
-      ordered_non_unique< tag<by_to_asset_used>, const_mem_fun< blind_receipt, std::tuple<public_key_type,asset_id_type,bool>, &blind_receipt::to_asset_used > >,
-      ordered_unique< tag<by_from>, const_mem_fun< blind_receipt, std::pair<public_key_type,fc::time_point>, &blind_receipt::from_date > >
-   >
-> blind_receipt_index_type;
-
-
-struct key_label
-{
-   string          label;
-   public_key_type key;
-};
-
-
-struct by_label;
-struct by_key;
-typedef multi_index_container<
-   key_label,
-   indexed_by<
-      ordered_unique< tag<by_label>, member< key_label, string, &key_label::label > >,
-      ordered_unique< tag<by_key>, member< key_label, public_key_type, &key_label::key > >
-   >
-> key_label_index_type;
-
-
-struct wallet_data
-{
-   /** Chain ID this wallet is used with */
-   chain_id_type chain_id;
-   account_multi_index_type my_accounts;
-   /// @return IDs of all accounts in @ref my_accounts
-   vector<object_id_type> my_account_ids()const
-   {
-      vector<object_id_type> ids;
-      ids.reserve(my_accounts.size());
-      std::transform(my_accounts.begin(), my_accounts.end(), std::back_inserter(ids),
-                     [](const account_object& ao) { return ao.id; });
-      return ids;
-   }
-   /// Add acct to @ref my_accounts, or update it if it is already in @ref my_accounts
-   /// @return true if the account was newly inserted; false if it was only updated
-   bool update_account(const account_object& acct)
-   {
-      auto& idx = my_accounts.get<by_id>();
-      auto itr = idx.find(acct.get_id());
-      if( itr != idx.end() )
-      {
-         idx.replace(itr, acct);
-         return false;
-      } else {
-         idx.insert(acct);
-         return true;
-      }
-   }
-
-   /** encrypted keys */
-   vector<char>              cipher_keys;
-
-   /** map an account to a set of extra keys that have been imported for that account */
-   map<account_id_type, set<public_key_type> >  extra_keys;
-
-   // map of account_name -> base58_private_key for
-   //    incomplete account regs
-   map<string, vector<string> > pending_account_registrations;
-   map<string, string> pending_witness_registrations;
-
-   key_label_index_type                                              labeled_keys;
-   blind_receipt_index_type                                          blind_receipts;
-
-   string                    ws_server = "ws://localhost:8090";
-   string                    ws_user;
-   string                    ws_password;
-};
-
-struct exported_account_keys
-{
-    string account_name;
-    vector<vector<char>> encrypted_private_keys;
-    vector<public_key_type> public_keys;
-};
-
-struct exported_keys
-{
-    fc::sha512 password_checksum;
-    vector<exported_account_keys> account_keys;
-};
-
-struct approval_delta
-{
-   vector<string> active_approvals_to_add;
-   vector<string> active_approvals_to_remove;
-   vector<string> owner_approvals_to_add;
-   vector<string> owner_approvals_to_remove;
-   vector<string> key_approvals_to_add;
-   vector<string> key_approvals_to_remove;
-};
-
-struct worker_vote_delta
-{
-   flat_set<worker_id_type> vote_for;
-   flat_set<worker_id_type> vote_against;
-   flat_set<worker_id_type> vote_abstain;
-};
-
-struct signed_block_with_info : public signed_block
-{
-   signed_block_with_info( const signed_block& block );
-   signed_block_with_info( const signed_block_with_info& block ) = default;
-
-   block_id_type block_id;
-   public_key_type signing_key;
-   vector< transaction_id_type > transaction_ids;
-};
-
-struct vesting_balance_object_with_info : public vesting_balance_object
-{
-   vesting_balance_object_with_info( const vesting_balance_object& vbo, fc::time_point_sec now );
-   vesting_balance_object_with_info( const vesting_balance_object_with_info& vbo ) = default;
-
-   /**
-    * How much is allowed to be withdrawn.
-    */
-   asset allowed_withdraw;
-
-   /**
-    * The time at which allowed_withdrawal was calculated.
-    */
-   fc::time_point_sec allowed_withdraw_time;
-};
-
-namespace detail {
-class wallet_api_impl;
-}
-
-/***
- * A utility class for performing various state-less actions that are related to wallets
- */
-class utility {
-   public:
-      /**
-       * Derive any number of *possible* owner keys from a given brain key.
-       *
-       * NOTE: These keys may or may not match with the owner keys of any account.
-       * This function is merely intended to assist with account or key recovery.
-       *
-       * @see suggest_brain_key()
-       *
-       * @param brain_key    Brain key
-       * @param number_of_desired_keys  Number of desired keys
-       * @return A list of keys that are deterministically derived from the brainkey
-       */
-      static vector<brain_key_info> derive_owner_keys_from_brain_key(string brain_key, int number_of_desired_keys = 1);
-
-      /** Suggests a safe brain key to use for creating your account.
-       * \c create_account_with_brain_key() requires you to specify a 'brain key',
-       * a long passphrase that provides enough entropy to generate cyrptographic
-       * keys.  This function will suggest a suitably random string that should
-       * be easy to write down (and, with effort, memorize).
-       * @returns a suggested brain_key
-       */
-      static brain_key_info suggest_brain_key();
-};
-
-struct operation_detail {
-   string                   memo;
-   string                   description;
-   operation_history_object op;
-};
-
-struct operation_detail_ex {
-    string                   memo;
-    string                   description;
-    operation_history_object op;
-    transaction_id_type      transaction_id;
-};
-
-struct account_history_operation_detail {
-   uint32_t                     total_count = 0;
-   uint32_t                     result_count = 0;
-   vector<operation_detail_ex>  details;
-};
 
 /**
  * This wallet assumes it is connected to the database server with a high-bandwidth, low-latency connection and
@@ -321,18 +57,26 @@ class wallet_api
 
       fc::ecc::private_key derive_private_key(const std::string& prefix_string, int sequence_number) const;
 
+      /** Returns info about head block, chain_id, maintenance, participation, current active witnesses and
+       * committee members.
+       * @returns runtime info about the blockchain
+       */
       variant                           info();
       /** Returns info such as client version, git version of graphene/fc, version of boost, openssl.
        * @returns compile time info and client and dependencies versions
        */
       variant_object                    about() const;
+      /** Returns info about a specified block.
+       * @param num height of the block to retrieve
+       * @returns info about the block, or null if not found
+       */
       optional<signed_block_with_info>    get_block( uint32_t num );
       /** Returns the number of accounts registered on the blockchain
        * @returns the number of registered accounts
        */
       uint64_t                          get_account_count()const;
       /** Lists all accounts controlled by this wallet.
-       * This returns a list of the full account objects for all accounts whose private keys 
+       * This returns a list of the full account objects for all accounts whose private keys
        * we possess.
        * @returns a list of account objects
        */
@@ -344,14 +88,14 @@ class wallet_api
        * start by setting \c lowerbound to the empty string \c "", and then each iteration, pass
        * the last account name returned as the \c lowerbound for the next \c list_accounts() call.
        *
-       * @param lowerbound the name of the first account to return.  If the named account does not exist, 
+       * @param lowerbound the name of the first account to return.  If the named account does not exist,
        *                   the list will start at the account that comes after \c lowerbound
        * @param limit the maximum number of accounts to return (max: 1000)
        * @returns a list of accounts mapping account names to account ids
        */
       map<string,account_id_type>       list_accounts(const string& lowerbound, uint32_t limit);
       /** List the balances of an account.
-       * Each account can have multiple balances, one for each type of asset owned by that 
+       * Each account can have multiple balances, one for each type of asset owned by that
        * account.  The returned list will only contain assets for which the account has a
        * nonzero balance
        * @param id the name or id of the account whose balances you want
@@ -359,7 +103,7 @@ class wallet_api
        */
       vector<asset>                     list_account_balances(const string& id);
       /** Lists all assets registered on the blockchain.
-       * 
+       *
        * To list all assets, pass the empty string \c "" for the lowerbound to start
        * at the beginning of the list, and iterate as necessary.
        *
@@ -367,9 +111,9 @@ class wallet_api
        * @param limit the maximum number of assets to return (max: 100)
        * @returns the list of asset objects, ordered by symbol
        */
-      vector<asset_object>              list_assets(const string& lowerbound, uint32_t limit)const;
+      vector<extended_asset_object>     list_assets(const string& lowerbound, uint32_t limit)const;
       /** Returns assets count registered on the blockchain.
-       * 
+       *
        * @returns assets count
        */
       uint64_t get_asset_count()const;
@@ -392,7 +136,8 @@ class wallet_api
        * @param start  the sequence number where to start looping back throw the history
        * @returns a list of \c operation_history_objects
        */
-     vector<operation_detail>  get_relative_account_history(string name, uint32_t stop, int limit, uint32_t start)const;
+     vector<operation_detail>  get_relative_account_history( string name, uint32_t stop,
+                                                             int limit, uint32_t start )const;
 
       /**
        * @brief Fetch all objects relevant to the specified account
@@ -403,8 +148,19 @@ class wallet_api
        * of \c name_or_id cannot be tied to an account, that input will be ignored.
        *
        */
-      full_account                      get_full_account( const string& name_or_id);
-      vector<bucket_object>             get_market_history(string symbol, string symbol2, uint32_t bucket, fc::time_point_sec start, fc::time_point_sec end)const;
+      full_account                      get_full_account( const string& name_or_id );
+
+      /**
+       * @brief Get OHLCV data of a trading pair in a time range
+       * @param symbol name or ID of the base asset
+       * @param symbol2 name or ID of the quote asset
+       * @param bucket length of each time bucket in seconds.
+       * @param start the start of a time range, E.G. "2018-01-01T00:00:00"
+       * @param end the end of the time range
+       * @return A list of OHLCV data, in "least recent first" order.
+       */
+      vector<bucket_object>             get_market_history( string symbol, string symbol2, uint32_t bucket,
+                                                            fc::time_point_sec start, fc::time_point_sec end )const;
 
       /**
        * @brief Fetch all orders relevant to the specified account sorted descendingly by price
@@ -422,7 +178,7 @@ class wallet_api
        * 1. if \c name_or_id cannot be tied to an account, empty result will be returned
        * 2. \c ostart_id and \c ostart_price can be \c null, if so the api will return the "first page" of orders;
        *    if \c ostart_id is specified and valid, its price will be used to do page query preferentially,
-       *    otherwise the \c ostart_price will be used 
+       *    otherwise the \c ostart_price will be used
        */
       vector<limit_order_object>        get_account_limit_orders( const string& name_or_id,
                                             const string &base,
@@ -431,8 +187,29 @@ class wallet_api
                                             optional<limit_order_id_type> ostart_id = optional<limit_order_id_type>(),
                                             optional<price> ostart_price = optional<price>());
 
+      /**
+       * @brief Get limit orders in a given market
+       * @param a symbol or ID of asset being sold
+       * @param b symbol or ID of asset being purchased
+       * @param limit Maximum number of orders to retrieve
+       * @return The limit orders, ordered from least price to greatest
+       */
       vector<limit_order_object>        get_limit_orders(string a, string b, uint32_t limit)const;
+
+      /**
+       * @brief Get call orders (aka margin positions) for a given asset
+       * @param a symbol name or ID of the debt asset
+       * @param limit Maximum number of orders to retrieve
+       * @return The call orders, ordered from earliest to be called to latest
+       */
       vector<call_order_object>         get_call_orders(string a, uint32_t limit)const;
+
+      /**
+       * @brief Get forced settlement orders in a given asset
+       * @param a Symbol or ID of asset being settled
+       * @param limit Maximum number of orders to retrieve
+       * @return The settle orders, ordered from earliest settlement date to latest
+       */
       vector<force_settlement_object>   get_settle_orders(string a, uint32_t limit)const;
 
       /** Returns the collateral_bid object for the given MPA
@@ -443,7 +220,7 @@ class wallet_api
        * @returns a list of \c collateral_bid_objects
        */
       vector<collateral_bid_object> get_collateral_bids(string asset, uint32_t limit = 100, uint32_t start = 0)const;
-      
+
       /** Returns the block chain's slowly-changing settings.
        * This object contains all of the properties of the blockchain that are fixed
        * or that change only once per maintenance interval (daily) such as the
@@ -457,12 +234,15 @@ class wallet_api
        * Get operations relevant to the specified account filtering by operation type, with transaction id
        *
        * @param name the name or id of the account, whose history shoulde be queried
-       * @param operation_types The IDs of the operation we want to get operations in the account( 0 = transfer , 1 = limit order create, ...)
+       * @param operation_types The IDs of the operation we want to get operations in the account
+       *                        ( 0 = transfer , 1 = limit order create, ...)
        * @param start the sequence number where to start looping back throw the history
        * @param limit the max number of entries to return (from start number)
        * @returns account_history_operation_detail
        */
-      account_history_operation_detail get_account_history_by_operations(string name, vector<uint16_t> operation_types, uint32_t start, int limit);
+      account_history_operation_detail get_account_history_by_operations( string name,
+                                                                          vector<uint16_t> operation_types,
+                                                                          uint32_t start, int limit);
 
       /** Returns the block chain's rapidly-changing properties.
        * The returned object contains information that changes every block interval
@@ -474,7 +254,7 @@ class wallet_api
 
       /** Returns information about the given account.
        *
-       * @param account_name_or_id the name or id of the account to provide information about
+       * @param account_name_or_id the name or ID of the account to provide information about
        * @returns the public account data stored in the blockchain
        */
       account_object                    get_account(string account_name_or_id) const;
@@ -483,7 +263,7 @@ class wallet_api
        * @param asset_name_or_id the symbol or id of the asset in question
        * @returns the information about the asset stored in the block chain
        */
-      asset_object                      get_asset(string asset_name_or_id) const;
+      extended_asset_object             get_asset(string asset_name_or_id) const;
 
       /** Returns the BitAsset-specific data for a given asset.
        * Market-issued assets's behavior are determined both by their "BitAsset Data" and
@@ -501,14 +281,14 @@ class wallet_api
       fc::optional<fc::variant>             get_htlc(string htlc_id) const;
 
       /** Lookup the id of a named account.
-       * @param account_name_or_id the name of the account to look up
+       * @param account_name_or_id the name or ID of the account to look up
        * @returns the id of the named account
        */
       account_id_type                   get_account_id(string account_name_or_id) const;
 
       /**
        * Lookup the id of a named asset.
-       * @param asset_name_or_id the symbol of an asset to look up
+       * @param asset_name_or_id the symbol or ID of an asset to look up
        * @returns the id of the given asset
        */
       asset_id_type                     get_asset_id(string asset_name_or_id) const;
@@ -517,8 +297,8 @@ class wallet_api
        * Returns the blockchain object corresponding to the given id.
        *
        * This generic function can be used to retrieve any object from the blockchain
-       * that is assigned an ID.  Certain types of objects have specialized convenience 
-       * functions to return their objects -- e.g., assets have \c get_asset(), accounts 
+       * that is assigned an ID.  Certain types of objects have specialized convenience
+       * functions to return their objects -- e.g., assets have \c get_asset(), accounts
        * have \c get_account(), but this function will work for any object.
        *
        * @param id the id of the object to return
@@ -526,7 +306,7 @@ class wallet_api
        */
       variant                           get_object(object_id_type id) const;
 
-      /** Returns the current wallet filename.  
+      /** Returns the current wallet filename.
        *
        * This is the filename that will be used when automatically saving the wallet.
        *
@@ -538,35 +318,76 @@ class wallet_api
       /**
        * Get the WIF private key corresponding to a public key.  The
        * private key must already be in the wallet.
+       * @param pubkey a public key in Base58 format
+       * @return the WIF private key
        */
       string                            get_private_key( public_key_type pubkey )const;
 
       /**
        * @ingroup Transaction Builder API
+       *
+       * Create a new transaction builder.
+       * @return handle of the new transaction builder
        */
       transaction_handle_type begin_builder_transaction();
       /**
        * @ingroup Transaction Builder API
+       *
+       * Append a new operation to a transaction builder.
+       * @param transaction_handle handle of the transaction builder
+       * @param op the operation in JSON format
        */
       void add_operation_to_builder_transaction(transaction_handle_type transaction_handle, const operation& op);
       /**
        * @ingroup Transaction Builder API
+       *
+       * Replace an operation in a transaction builder with a new operation.
+       * @param handle handle of the transaction builder
+       * @param operation_index the index of the old operation in the builder to be replaced
+       * @param new_op the new operation in JSON format
        */
       void replace_operation_in_builder_transaction(transaction_handle_type handle,
                                                     unsigned operation_index,
                                                     const operation& new_op);
       /**
        * @ingroup Transaction Builder API
+       *
+       * Calculate and update fees for the operations in a transaction builder.
+       * @param handle handle of the transaction builder
+       * @param fee_asset name or ID of an asset that to be used to pay fees
+       * @return total fees
        */
       asset set_fees_on_builder_transaction(transaction_handle_type handle, string fee_asset = GRAPHENE_SYMBOL);
       /**
        * @ingroup Transaction Builder API
+       *
+       * Show content of a transaction builder.
+       * @param handle handle of the transaction builder
+       * @return a transaction
        */
       transaction preview_builder_transaction(transaction_handle_type handle);
       /**
        * @ingroup Transaction Builder API
+       *
+       * Sign the transaction in a transaction builder and optionally broadcast to the network.
+       * @param transaction_handle handle of the transaction builder
+       * @param broadcast whether to broadcast the signed transaction to the network
+       * @return a signed transaction
        */
       signed_transaction sign_builder_transaction(transaction_handle_type transaction_handle, bool broadcast = true);
+
+      /**
+       * @ingroup Transaction Builder API
+       *
+       * Sign the transaction in a transaction builder and optionally broadcast to the network.
+       * @param transaction_handle handle of the transaction builder
+       * @param signing_keys Keys that must be used when signing the transaction
+       * @param broadcast whether to broadcast the signed transaction to the network
+       * @return a signed transaction
+       */
+      signed_transaction sign_builder_transaction2(transaction_handle_type transaction_handle,
+                                                  const vector<public_key_type>& signing_keys = vector<public_key_type>(),
+                                                  bool broadcast = true);
 
       /** Broadcast signed transaction
        * @param tx signed transaction
@@ -576,6 +397,19 @@ class wallet_api
 
       /**
        * @ingroup Transaction Builder API
+       *
+       * Create a proposal containing the operations in a transaction builder (create a new proposal_create
+       * operation, then replace the transaction builder with the new operation), then sign the transaction
+       * and optionally broadcast to the network.
+       *
+       * Note: this command is buggy because unable to specify proposer. It will be deprecated in a future release.
+       *       Please use \c propose_builder_transaction2() instead.
+       *
+       * @param handle handle of the transaction builder
+       * @param expiration when the proposal will expire
+       * @param review_period_seconds review period of the proposal in seconds
+       * @param broadcast whether to broadcast the signed transaction to the network
+       * @return a signed transaction
        */
       signed_transaction propose_builder_transaction(
           transaction_handle_type handle,
@@ -584,6 +418,20 @@ class wallet_api
           bool broadcast = true
          );
 
+      /**
+       * @ingroup Transaction Builder API
+       *
+       * Create a proposal containing the operations in a transaction builder (create a new proposal_create
+       * operation, then replace the transaction builder with the new operation), then sign the transaction
+       * and optionally broadcast to the network.
+       *
+       * @param handle handle of the transaction builder
+       * @param account_name_or_id name or ID of the account who would pay fees for creating the proposal
+       * @param expiration when the proposal will expire
+       * @param review_period_seconds review period of the proposal in seconds
+       * @param broadcast whether to broadcast the signed transaction to the network
+       * @return a signed transaction
+       */
       signed_transaction propose_builder_transaction2(
          transaction_handle_type handle,
          string account_name_or_id,
@@ -594,6 +442,9 @@ class wallet_api
 
       /**
        * @ingroup Transaction Builder API
+       *
+       * Destroy a transaction builder.
+       * @param handle handle of the transaction builder
        */
       void remove_builder_transaction(transaction_handle_type handle);
 
@@ -604,33 +455,42 @@ class wallet_api
        * @ingroup Wallet Management
        */
       bool    is_new()const;
-      
-      /** Checks whether the wallet is locked (is unable to use its private keys).  
+
+      /** Checks whether the wallet is locked (is unable to use its private keys).
        *
        * This state can be changed by calling \c lock() or \c unlock().
        * @return true if the wallet is locked
        * @ingroup Wallet Management
        */
       bool    is_locked()const;
-      
+
       /** Locks the wallet immediately.
        * @ingroup Wallet Management
        */
       void    lock();
-      
-      /** Unlocks the wallet.  
+
+      /** Unlocks the wallet.
        *
        * The wallet remain unlocked until the \c lock is called
        * or the program exits.
+       *
+       * When used in command line, if typed "unlock" without a password followed, the user will be prompted
+       * to input a password without echo.
+       *
        * @param password the password previously set with \c set_password()
        * @ingroup Wallet Management
        */
       void    unlock(string password);
-      
+
       /** Sets a new password on the wallet.
        *
        * The wallet must be either 'new' or 'unlocked' to
        * execute this command.
+       *
+       * When used in command line, if typed "set_password" without a password followed, the user will be prompted
+       * to input a password without echo.
+       *
+       * @param password a new password
        * @ingroup Wallet Management
        */
       void    set_password(string password);
@@ -639,14 +499,14 @@ class wallet_api
        *
        * The keys are printed in WIF format.  You can import these keys into another wallet
        * using \c import_key()
-       * @returns a map containing the private keys, indexed by their public key 
+       * @returns a map containing the private keys, indexed by their public key
        */
       map<public_key_type, string> dump_private_keys();
 
       /** Returns a list of all commands supported by the wallet API.
        *
        * This lists each command, along with its arguments and return types.
-       * For more detailed help on a single command, use \c get_help()
+       * For more detailed help on a single command, use \c gethelp()
        *
        * @returns a multi-line string suitable for displaying on a terminal
        */
@@ -658,7 +518,7 @@ class wallet_api
        */
       string  gethelp(const string& method)const;
 
-      /** Loads a specified Graphene wallet.
+      /** Loads a specified BitShares wallet.
        *
        * The current wallet is closed before the new wallet is loaded.
        *
@@ -673,14 +533,14 @@ class wallet_api
        */
       bool    load_wallet_file(string wallet_filename = "");
 
-      /** Quitting from BitShares wallet.
-       * 
-       * The current wallet will be closed.
+      /** Quit from the wallet.
+       *
+       * The current wallet will be closed and saved.
        */
       void    quit();
 
       /** Saves the current wallet to the given filename.
-       * 
+       *
        * @warning This does not change the wallet filename that will be used for future
        * writes, so think of this function as 'Save a Copy As...' instead of
        * 'Save As...'.  Use \c set_wallet_filename() to make the filename
@@ -735,8 +595,8 @@ class wallet_api
       /** Converts a signed_transaction in JSON form to its binary representation.
        *
        * @param tx the transaction to serialize
-       * @returns the binary form of the transaction.  It will not be hex encoded, 
-       *          this returns a raw string that may have null characters embedded 
+       * @returns the binary form of the transaction.  It will not be hex encoded,
+       *          this returns a raw string that may have null characters embedded
        *          in it
        */
       string serialize_transaction(signed_transaction tx) const;
@@ -744,7 +604,7 @@ class wallet_api
       /** Imports the private key for an existing account.
        *
        * The private key must match either an owner key or an active key for the
-       * named account.  
+       * named account.
        *
        * @see dump_private_keys()
        *
@@ -754,15 +614,38 @@ class wallet_api
        */
       bool import_key(string account_name_or_id, string wif_key);
 
+      /** Imports accounts from a BitShares 0.x wallet file.
+       * Current wallet file must be unlocked to perform the import.
+       *
+       * @param filename the BitShares 0.x wallet file to import
+       * @param password the password to encrypt the BitShares 0.x wallet file
+       * @returns a map containing the accounts found and whether imported
+       */
       map<string, bool> import_accounts( string filename, string password );
 
+      /** Imports from a BitShares 0.x wallet file, find keys that were bound to a given account name on the
+       * BitShares 0.x chain, rebind them to an account name on the 2.0 chain.
+       * Current wallet file must be unlocked to perform the import.
+       *
+       * @param filename the BitShares 0.x wallet file to import
+       * @param password the password to encrypt the BitShares 0.x wallet file
+       * @param src_account_name name of the account on BitShares 0.x chain
+       * @param dest_account_name name of the account on BitShares 2.0 chain,
+       *                          can be same or different to \c src_account_name
+       * @returns whether the import has succeeded
+       */
       bool import_account_keys( string filename, string password, string src_account_name, string dest_account_name );
 
       /**
        * This call will construct transaction(s) that will claim all balances controled
        * by wif_keys and deposit them into the given account.
+       *
+       * @param account_name_or_id name or ID of an account that to claim balances to
+       * @param wif_keys private WIF keys of balance objects to claim balances from
+       * @param broadcast true to broadcast the transaction on the network
        */
-      vector< signed_transaction > import_balance( string account_name_or_id, const vector<string>& wif_keys, bool broadcast );
+      vector< signed_transaction > import_balance( string account_name_or_id, const vector<string>& wif_keys,
+                                                   bool broadcast );
 
       /** Transforms a brain key to reduce the chance of errors when re-entering the key from memory.
        *
@@ -811,8 +694,7 @@ class wallet_api
        *  Upgrades an account to prime status.
        *  This makes the account holder a 'lifetime member'.
        *
-       *  @todo there is no option for annual membership
-       *  @param name the name or id of the account to upgrade
+       * @param name the name or id of the account to upgrade
        * @param broadcast true to broadcast the transaction on the network
        * @returns the signed transaction upgrading the account
        */
@@ -847,7 +729,7 @@ class wallet_api
        * @param to the name or id of the account receiving the funds
        * @param amount the amount to send (in nominal units -- to send half of a BTS, specify 0.5)
        * @param asset_symbol the symbol or id of the asset to send
-       * @param memo a memo to attach to the transaction.  The memo will be encrypted in the 
+       * @param memo a memo to attach to the transaction.  The memo will be encrypted in the
        *             transaction and readable for the receiver.  There is no length limit
        *             other than the limit imposed by maximum transaction size, but transaction
        *             increase with transaction size
@@ -863,7 +745,16 @@ class wallet_api
 
       /**
        *  This method works just like transfer, except it always broadcasts and
-       *  returns the transaction ID along with the signed transaction.
+       *  returns the transaction ID (hash) along with the signed transaction.
+       * @param from the name or id of the account sending the funds
+       * @param to the name or id of the account receiving the funds
+       * @param amount the amount to send (in nominal units -- to send half of a BTS, specify 0.5)
+       * @param asset_symbol the symbol or id of the asset to send
+       * @param memo a memo to attach to the transaction.  The memo will be encrypted in the
+       *             transaction and readable for the receiver.  There is no length limit
+       *             other than the limit imposed by maximum transaction size, but transaction
+       *             increase with transaction size
+       * @returns the transaction ID (hash) along with the signed transaction transferring funds
        */
       pair<transaction_id_type,signed_transaction> transfer2(string from,
                                                              string to,
@@ -877,95 +768,174 @@ class wallet_api
 
       /**
        *  This method is used to convert a JSON transaction to its transactin ID.
+       * @param trx a JSON transaction
+       * @return the ID (hash) of the transaction
        */
       transaction_id_type get_transaction_id( const signed_transaction& trx )const { return trx.id(); }
 
 
       /** Sign a memo message.
        *
-       * @param from the name or id of signing account; or a public key.
-       * @param to the name or id of receiving account; or a public key.
-       * @param memo text to sign.
+       * @param from the name or id of signing account; or a public key
+       * @param to the name or id of receiving account; or a public key
+       * @param memo text to sign
+       * @return the signed memo data
        */
       memo_data sign_memo(string from, string to, string memo);
 
       /** Read a memo.
        *
        * @param memo JSON-enconded memo.
-       * @returns string with decrypted message..
+       * @returns string with decrypted message.
        */
       string read_memo(const memo_data& memo);
 
 
+      /** Sign a message using an account's memo key. The signature is generated as in
+       *   in https://github.com/xeroc/python-graphenelib/blob/d9634d74273ebacc92555499eca7c444217ecba0/graphenecommon/message.py#L64 .
+       *
+       * @param signer the name or id of signing account
+       * @param message text to sign
+       * @return the signed message in an abstract format
+       */
+      signed_message sign_message(string signer, string message);
+
+      /** Verify a message signed with sign_message using the given account's memo key.
+       *
+       * @param message the message text
+       * @param account the account name of the message
+       * @param block the block number of the message
+       * @param time the timestamp of the message
+       * @param sig the message signature
+       * @return true if signature matches
+       */
+      bool verify_message( string message, string account, int block, const string& time, compact_signature sig );
+
+      /** Verify a message signed with sign_message
+       *
+       * @param message the signed_message structure containing message, meta data and signature
+       * @return true if signature matches
+       */
+      bool verify_signed_message( signed_message message );
+
+      /** Verify a message signed with sign_message, in its encapsulated form.
+       *
+       * @param message the complete encapsulated message string including separators and line feeds
+       * @return true if signature matches
+       */
+      bool verify_encapsulated_message( string message );
+
       /** These methods are used for stealth transfers */
       ///@{
       /**
-       *  This method can be used to set the label for a public key
+       * This method can be used to set a label for a public key
        *
-       *  @note No two keys can have the same label.
-       *
-       *  @return true if the label was set, otherwise false
+       * @note No two keys can have the same label.
+       * @param key a public key
+       * @param label a user-defined string as label
+       * @return true if the label was set, otherwise false
        */
-      bool                        set_key_label( public_key_type, string label );
-      string                      get_key_label( public_key_type )const;
+      bool                        set_key_label( public_key_type key, string label );
 
       /**
-       *  Generates a new blind account for the given brain key and assigns it the given label.
+       * Get label of a public key.
+       * @param key a public key
+       * @return the label if already set by \c set_key_label(), or an empty string if not set
+       */
+      string                      get_key_label( public_key_type key )const;
+
+      /**
+       * Generates a new blind account for the given brain key and assigns it the given label.
+       * @param label a label
+       * @param brain_key the brain key to be used to generate a new blind account
+       * @return the public key of the new account
        */
       public_key_type             create_blind_account( string label, string brain_key  );
 
       /**
-       * @return the total balance of all blinded commitments that can be claimed by the
+       * Return the total balances of all blinded commitments that can be claimed by the
+       * given account key or label.
+       * @param key_or_label a public key in Base58 format or a label
+       * @return the total balances of all blinded commitments that can be claimed by the
        * given account key or label
        */
       vector<asset>                get_blind_balances( string key_or_label );
-      /** @return all blind accounts */
+      /**
+       * Get all blind accounts.
+       * @return all blind accounts
+       */
       map<string,public_key_type> get_blind_accounts()const;
-      /** @return all blind accounts for which this wallet has the private key */
+      /**
+       * Get all blind accounts for which this wallet has the private key.
+       * @return all blind accounts for which this wallet has the private key
+       */
       map<string,public_key_type> get_my_blind_accounts()const;
-      /** @return the public key associated with the given label */
+      /**
+       * Get the public key associated with a given label.
+       * @param label a label
+       * @return the public key associated with the given label
+       */
       public_key_type             get_public_key( string label )const;
       ///@}
 
       /**
-       * @return all blind receipts to/form a particular account
+       * Get all blind receipts to/form a particular account
+       * @param key_or_account a public key in Base58 format or an account
+       * @return all blind receipts to/form the account
        */
       vector<blind_receipt> blind_history( string key_or_account );
 
       /**
-       *  Given a confirmation receipt, this method will parse it for a blinded balance and confirm
-       *  that it exists in the blockchain.  If it exists then it will report the amount received and
-       *  who sent it.
+       * Given a confirmation receipt, this method will parse it for a blinded balance and confirm
+       * that it exists in the blockchain.  If it exists then it will report the amount received and
+       * who sent it.
        *
-       *  @param opt_from if not empty and the sender is a unknown public key,
-       *                  then the unknown public key will be given the label \c opt_from
-       *  @param confirmation_receipt a base58 encoded stealth confirmation
-       *  @param opt_memo a self-defined label for this transfer to be saved in local wallet file
+       * @param confirmation_receipt a base58 encoded stealth confirmation
+       * @param opt_from if not empty and the sender is a unknown public key,
+       *                 then the unknown public key will be given the label \c opt_from
+       * @param opt_memo a self-defined label for this transfer to be saved in local wallet file
+       * @return a blind receipt
        */
       blind_receipt receive_blind_transfer( string confirmation_receipt, string opt_from, string opt_memo );
 
       /**
-       *  Transfers a public balance from \c from_account_id_or_name to one or more blinded balances using a
-       *  stealth transfer.
+       * Transfers a public balance from \c from_account_id_or_name to one or more blinded balances using a
+       * stealth transfer.
+       * @param from_account_id_or_name ID or name of an account to transfer from
+       * @param asset_symbol symbol or ID of the asset to be transferred
+       * @param to_amounts map from key or label to amount
+       * @param broadcast true to broadcast the transaction on the network
+       * @return a blind confirmation
        */
-      blind_confirmation transfer_to_blind( string from_account_id_or_name, 
+      blind_confirmation transfer_to_blind( string from_account_id_or_name,
                                             string asset_symbol,
-                                            /** map from key or label to amount */
-                                            vector<pair<string, string>> to_amounts, 
+                                            vector<pair<string, string>> to_amounts,
                                             bool broadcast = false );
 
       /**
        * Transfers funds from a set of blinded balances to a public account balance.
+       * @param from_blind_account_key_or_label a public key in Base58 format or a label to transfer from
+       * @param to_account_id_or_name ID or name of an account to transfer to
+       * @param amount the amount to be transferred
+       * @param asset_symbol symbol or ID of the asset to be transferred
+       * @param broadcast true to broadcast the transaction on the network
+       * @return a blind confirmation
        */
-      blind_confirmation transfer_from_blind( 
+      blind_confirmation transfer_from_blind(
                                             string from_blind_account_key_or_label,
-                                            string to_account_id_or_name, 
+                                            string to_account_id_or_name,
                                             string amount,
                                             string asset_symbol,
                                             bool broadcast = false );
 
       /**
-       *  Used to transfer from one set of blinded balances to another
+       * Transfer from one set of blinded balances to another.
+       * @param from_key_or_label a public key in Base58 format or a label to transfer from
+       * @param to_key_or_label a public key in Base58 format or a label to transfer to
+       * @param amount the amount to be transferred
+       * @param symbol symbol or ID of the asset to be transferred
+       * @param broadcast true to broadcast the transaction on the network
+       * @return a blind confirmation
        */
       blind_confirmation blind_transfer( string from_key_or_label,
                                          string to_key_or_label,
@@ -975,14 +945,14 @@ class wallet_api
 
       /** Place a limit order attempting to sell one asset for another.
        *
-       * Buying and selling are the same operation on Graphene; if you want to buy BTS 
+       * Buying and selling are the same operation on BitShares; if you want to buy BTS
        * with USD, you should sell USD for BTS.
        *
        * The blockchain will attempt to sell the \c symbol_to_sell for as
-       * much \c symbol_to_receive as possible, as long as the price is at 
-       * least \c min_to_receive / \c amount_to_sell.   
+       * much \c symbol_to_receive as possible, as long as the price is at
+       * least \c min_to_receive / \c amount_to_sell.
        *
-       * In addition to the transaction fees, market fees will apply as specified 
+       * In addition to the transaction fees, market fees will apply as specified
        * by the issuer of both the selling asset and the receiving asset as
        * a percentage of the amount exchanged.
        *
@@ -993,18 +963,18 @@ class wallet_api
        * Market orders are matched in the order they are included
        * in the block chain.
        *
-       * @todo Allow order expiration to be set here.  Document default/max expiration time
+       * @todo Document default/max expiration time
        *
-       * @param seller_account the account providing the asset being sold, and which will 
+       * @param seller_account the account providing the asset being sold, and which will
        *                       receive the proceeds of the sale.
        * @param amount_to_sell the amount of the asset being sold to sell (in nominal units)
        * @param symbol_to_sell the name or id of the asset to sell
        * @param min_to_receive the minimum amount you are willing to receive in return for
        *                       selling the entire amount_to_sell
        * @param symbol_to_receive the name or id of the asset you wish to receive
-       * @param timeout_sec if the order does not fill immediately, this is the length of 
-       *                    time the order will remain on the order books before it is 
-       *                    cancelled and the un-spent funds are returned to the seller's 
+       * @param timeout_sec if the order does not fill immediately, this is the length of
+       *                    time the order will remain on the order books before it is
+       *                    cancelled and the un-spent funds are returned to the seller's
        *                    account
        * @param fill_or_kill if true, the order will only be included in the blockchain
        *                     if it is filled immediately; if false, an open order will be
@@ -1074,14 +1044,14 @@ class wallet_api
        * Right now this function is difficult to use because you must provide raw JSON data
        * structures for the options objects, and those include prices and asset ids.
        *
-       * @param issuer the name or id of the account who will pay the fee and become the 
+       * @param issuer the name or id of the account who will pay the fee and become the
        *               issuer of the new asset.  This can be updated later
        * @param symbol the ticker symbol of the new asset
        * @param precision the number of digits of precision to the right of the decimal point,
        *                  must be less than or equal to 12
        * @param common asset options required for all new assets.
-       *               Note that core_exchange_rate technically needs to store the asset ID of 
-       *               this new asset. Since this ID is not known at the time this operation is 
+       *               Note that core_exchange_rate technically needs to store the asset ID of
+       *               this new asset. Since this ID is not known at the time this operation is
        *               created, create this price as though the new asset has instance ID 1, and
        *               the chain will overwrite it with the new asset's ID.
        * @param bitasset_opts options specific to BitAssets.  This may be null unless the
@@ -1111,8 +1081,8 @@ class wallet_api
                                      bool broadcast = false);
 
       /** Update the core options on an asset.
-       * There are a number of options which all assets in the network use. These options are 
-       * enumerated in the asset_object::asset_options struct. This command is used to update 
+       * There are a number of options which all assets in the network use. These options are
+       * enumerated in the asset_object::asset_options struct. This command is used to update
        * these options for an existing asset.
        *
        * @note This operation cannot be used to update BitAsset-specific options. For these options,
@@ -1176,7 +1146,7 @@ class wallet_api
       signed_transaction update_asset_feed_producers(string symbol,
                                                      flat_set<string> new_feed_producers,
                                                      bool broadcast = false);
-      
+
       /** Publishes a price feed for the named asset.
        *
        * Price feed providers use this command to publish their price feeds for market-issued assets. A price feed is
@@ -1204,7 +1174,7 @@ class wallet_api
 
       /** Pay into the fee pool for the given asset.
        *
-       * User-issued assets can optionally have a pool of the core asset which is 
+       * User-issued assets can optionally have a pool of the core asset which is
        * automatically used to pay transaction fees for any transaction using that
        * asset (using the asset's core exchange rate).
        *
@@ -1223,7 +1193,7 @@ class wallet_api
 
       /** Claim funds from the fee pool for the given asset.
        *
-       * User-issued assets can optionally have a pool of the core asset which is 
+       * User-issued assets can optionally have a pool of the core asset which is
        * automatically used to pay transaction fees for any transaction using that
        * asset (using the asset's core exchange rate).
        *
@@ -1238,9 +1208,9 @@ class wallet_api
                                               string amount,
                                               bool broadcast = false);
 
-      /** Burns the given user-issued asset.
+      /** Burns an amount of given asset.
        *
-       * This command burns the user-issued asset to reduce the amount in circulation.
+       * This command burns an amount of given asset to reduce the amount in circulation.
        * @note you cannot burn market-issued assets.
        * @param from the account containing the asset you wish to burn
        * @param amount the amount to burn, in nominal units
@@ -1257,15 +1227,15 @@ class wallet_api
        *
        * In order to use this operation, asset_to_settle must have the global_settle flag set
        *
-       * When this operation is executed all balances are converted into the backing asset at the
-       * settle_price and all open margin positions are called at the settle price.  If this asset is
-       * used as backing for other bitassets, those bitassets will be force settled at their current
-       * feed price.
+       * When this operation is executed all open margin positions are called at the settle price.
+       * A pool will be formed containing the collateral got from the margin positions.
+       * Users owning an amount of the asset may use \c settle_asset() to claim collateral instantly
+       * at the settle price from the pool.
+       * If this asset is used as backing for other bitassets, those bitassets will not be affected.
        *
-       * @note this operation is used only by the asset issuer, \c settle_asset() may be used by 
-       *       any user owning the asset
+       * @note this operation is used only by the asset issuer.
        *
-       * @param symbol the name or id of the asset to force settlement on
+       * @param symbol the name or id of the asset to globally settle
        * @param settle_price the price at which to settle
        * @param broadcast true to broadcast the transaction on the network
        * @returns the signed transaction settling the named asset
@@ -1276,16 +1246,19 @@ class wallet_api
 
       /** Schedules a market-issued asset for automatic settlement.
        *
-       * Holders of market-issued assests may request a forced settlement for some amount of their asset. This means that
-       * the specified sum will be locked by the chain and held for the settlement period, after which time the chain will
-       * choose a margin posision holder and buy the settled asset using the margin's collateral. The price of this sale
-       * will be based on the feed price for the market-issued asset being settled. The exact settlement price will be the
+       * Holders of market-issued assests may request a forced settlement for some amount of their asset.
+       * This means that the specified sum will be locked by the chain and held for the settlement period,
+       * after which time the chain will
+       * choose a margin posision holder and buy the settled asset using the margin's collateral.
+       * The price of this sale
+       * will be based on the feed price for the market-issued asset being settled.
+       * The exact settlement price will be the
        * feed price at the time of settlement with an offset in favor of the margin position, where the offset is a
        * blockchain parameter set in the global_property_object.
        *
        * @param account_to_settle the name or id of the account owning the asset
        * @param amount_to_settle the amount of the named asset to schedule for settlement
-       * @param symbol the name or id of the asset to settlement on
+       * @param symbol the name or id of the asset to settle
        * @param broadcast true to broadcast the transaction on the network
        * @returns the signed transaction settling the named asset
        */
@@ -1316,16 +1289,16 @@ class wallet_api
       /** Whitelist and blacklist accounts, primarily for transacting in whitelisted assets.
        *
        * Accounts can freely specify opinions about other accounts, in the form of either whitelisting or blacklisting
-       * them. This information is used in chain validation only to determine whether an account is authorized to transact
-       * in an asset type which enforces a whitelist, but third parties can use this information for other uses as well,
-       * as long as it does not conflict with the use of whitelisted assets.
+       * them. This information is used in chain validation only to determine whether an account is authorized to
+       * transact in an asset type which enforces a whitelist, but third parties can use this information for other
+       * uses as well, as long as it does not conflict with the use of whitelisted assets.
        *
        * An asset which enforces a whitelist specifies a list of accounts to maintain its whitelist, and a list of
-       * accounts to maintain its blacklist. In order for a given account A to hold and transact in a whitelisted asset S,
-       * A must be whitelisted by at least one of S's whitelist_authorities and blacklisted by none of S's
-       * blacklist_authorities. If A receives a balance of S, and is later removed from the whitelist(s) which allowed it
-       * to hold S, or added to any blacklist S specifies as authoritative, A's balance of S will be frozen until A's
-       * authorization is reinstated.
+       * accounts to maintain its blacklist. In order for a given account A to hold and transact in a whitelisted
+       * asset S, A must be whitelisted by at least one of S's whitelist_authorities and blacklisted by none of S's
+       * blacklist_authorities. If A receives a balance of S, and is later removed from the whitelist(s) which allowed
+       * it to hold S, or added to any blacklist S specifies as authoritative, A's balance of S will be frozen until
+       * A's authorization is reinstated.
        *
        * @param authorizing_account the account who is doing the whitelisting
        * @param account_to_list the account being whitelisted
@@ -1349,7 +1322,7 @@ class wallet_api
        * @returns the signed transaction registering a committee_member
        */
       signed_transaction create_committee_member(string owner_account,
-                                         string url, 
+                                         string url,
                                          bool broadcast = false);
 
       /** Lists all witnesses registered in the blockchain.
@@ -1360,7 +1333,7 @@ class wallet_api
        * start by setting \c lowerbound to the empty string \c "", and then each iteration, pass
        * the last witness name returned as the \c lowerbound for the next \c list_witnesss() call.
        *
-       * @param lowerbound the name of the first witness to return.  If the named witness does not exist, 
+       * @param lowerbound the name of the first witness to return.  If the named witness does not exist,
        *                   the list will start at the witness that comes after \c lowerbound
        * @param limit the maximum number of witnesss to return (max: 1000)
        * @returns a list of witnesss mapping witness names to witness ids
@@ -1375,8 +1348,8 @@ class wallet_api
        * start by setting \c lowerbound to the empty string \c "", and then each iteration, pass
        * the last committee_member name returned as the \c lowerbound for the next \c list_committee_members() call.
        *
-       * @param lowerbound the name of the first committee_member to return.  If the named committee_member does not exist, 
-       *                   the list will start at the committee_member that comes after \c lowerbound
+       * @param lowerbound the name of the first committee_member to return.  If the named committee_member does not
+       *                   exist, the list will start at the committee_member that comes after \c lowerbound
        * @param limit the maximum number of committee_members to return (max: 1000)
        * @returns a list of committee_members mapping committee_member names to committee_member ids
        */
@@ -1411,10 +1384,12 @@ class wallet_api
       /**
        * Update a witness object owned by the given account.
        *
-       * @param witness_name The name of the witness's owner account.  Also accepts the ID of the owner account or the ID of the witness.
+       * @param witness_name The name of the witness's owner account.
+       *                     Also accepts the ID of the owner account or the ID of the witness.
        * @param url Same as for create_witness.  The empty string makes it remain the same.
        * @param block_signing_key The new block signing public key.  The empty string makes it remain the same.
        * @param broadcast true if you wish to broadcast the transaction.
+       * @return the signed transaction
        */
       signed_transaction update_witness(string witness_name,
                                         string url,
@@ -1433,6 +1408,7 @@ class wallet_api
        * @param url Any text
        * @param worker_settings {"type" : "burn"|"refund"|"vesting", "pay_vesting_period_days" : x}
        * @param broadcast true if you wish to broadcast the transaction.
+       * @return the signed transaction
        */
       signed_transaction create_worker(
          string owner_account,
@@ -1446,11 +1422,12 @@ class wallet_api
          );
 
       /**
-       * Update your votes for a worker
+       * Update your votes for workers
        *
        * @param account The account which will pay the fee and update votes.
        * @param delta {"vote_for" : [...], "vote_against" : [...], "vote_abstain" : [...]}
        * @param broadcast true if you wish to broadcast the transaction.
+       * @return the signed transaction
        */
       signed_transaction update_worker_votes(
          string account,
@@ -1460,7 +1437,7 @@ class wallet_api
 
       /**
        * Create a hashed time lock contract
-       * 
+       *
        * @param source The account that will reserve the funds (and pay the fee)
        * @param destination The account that will receive the funds if the preimage is presented
        * @param amount the amount of the asset that is to be traded
@@ -1470,36 +1447,40 @@ class wallet_api
        * @param preimage_size the size of the preimage in bytes
        * @param claim_period_seconds how long after creation until the lock expires
        * @param broadcast true if you wish to broadcast the transaction
+       * @return the signed transaction
        */
       signed_transaction htlc_create( string source, string destination, string amount, string asset_symbol,
-            string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size, 
+            string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
             const uint32_t claim_period_seconds, bool broadcast = false );
 
       /****
        * Update a hashed time lock contract
-       * 
+       *
        * @param htlc_id The object identifier of the HTLC on the blockchain
        * @param issuer Who is performing this operation (and paying the fee)
        * @param preimage the preimage that should evaluate to the preimage_hash
+       * @return the signed transaction
        */
-      signed_transaction htlc_redeem( string htlc_id, string issuer, const std::string& preimage, 
+      signed_transaction htlc_redeem( string htlc_id, string issuer, const std::string& preimage,
             bool broadcast = false );
 
       /*****
        * Increase the timelock on an existing HTLC
-       * 
+       *
        * @param htlc_id The object identifier of the HTLC on the blockchain
        * @param issuer Who is performing this operation (and paying the fee)
        * @param seconds_to_add how many seconds to add to the existing timelock
        * @param broadcast true to broadcast to the network
+       * @return the signed transaction
        */
       signed_transaction htlc_extend(string htlc_id, string issuer, const uint32_t seconds_to_add,
             bool broadcast = false);
 
       /**
-       * Get information about a vesting balance object.
+       * Get information about a vesting balance object or vesting balance objects owned by an account.
        *
        * @param account_name An account name, account ID, or vesting balance object ID.
+       * @return a list of vesting balance objects with additional info
        */
       vector< vesting_balance_object_with_info > get_vesting_balances( string account_name );
 
@@ -1510,6 +1491,7 @@ class wallet_api
        * @param amount The amount to withdraw.
        * @param asset_symbol The symbol of the asset to withdraw.
        * @param broadcast true if you wish to broadcast the transaction
+       * @return the signed transaction
        */
       signed_transaction withdraw_vesting(
          string witness_name,
@@ -1519,8 +1501,8 @@ class wallet_api
 
       /** Vote for a given committee_member.
        *
-       * An account can publish a list of all committee_memberes they approve of.  This 
-       * command allows you to add or remove committee_memberes from this list.
+       * An account can publish a list of all committee_members they approve of.  This
+       * command allows you to add or remove committee_members from this list.
        * Each account's vote is weighted according to the number of shares of the
        * core asset owned by that account at the time the votes are tallied.
        *
@@ -1529,7 +1511,7 @@ class wallet_api
        *
        * @param voting_account the name or id of the account who is voting with their shares
        * @param committee_member the name or id of the committee_member' owner account
-       * @param approve true if you wish to vote in favor of that committee_member, false to 
+       * @param approve true if you wish to vote in favor of that committee_member, false to
        *                remove your vote in favor of that committee_member
        * @param broadcast true if you wish to broadcast the transaction
        * @return the signed transaction changing your vote for the given committee_member
@@ -1541,7 +1523,7 @@ class wallet_api
 
       /** Vote for a given witness.
        *
-       * An account can publish a list of all witnesses they approve of.  This 
+       * An account can publish a list of all witnesses they approve of.  This
        * command allows you to add or remove witnesses from this list.
        * Each account's vote is weighted according to the number of shares of the
        * core asset owned by that account at the time the votes are tallied.
@@ -1551,7 +1533,7 @@ class wallet_api
        *
        * @param voting_account the name or id of the account who is voting with their shares
        * @param witness the name or id of the witness' owner account
-       * @param approve true if you wish to vote in favor of that witness, false to 
+       * @param approve true if you wish to vote in favor of that witness, false to
        *                remove your vote in favor of that witness
        * @param broadcast true if you wish to broadcast the transaction
        * @return the signed transaction changing your vote for the given witness
@@ -1582,16 +1564,16 @@ class wallet_api
       signed_transaction set_voting_proxy(string account_to_modify,
                                           optional<string> voting_account,
                                           bool broadcast = false);
-      
+
       /** Set your vote for the number of witnesses and committee_members in the system.
        *
-       * Each account can voice their opinion on how many committee_members and how many 
+       * Each account can voice their opinion on how many committee_members and how many
        * witnesses there should be in the active committee_member/active witness list.  These
        * are independent of each other.  You must vote your approval of at least as many
        * committee_members or witnesses as you claim there should be (you can't say that there should
-       * be 20 committee_members but only vote for 10). 
+       * be 20 committee_members but only vote for 10).
        *
-       * There are maximum values for each set in the blockchain parameters (currently 
+       * There are maximum values for each set in the blockchain parameters (currently
        * defaulting to 1001).
        *
        * This setting can be changed at any time.  If your account has a voting proxy
@@ -1619,6 +1601,21 @@ class wallet_api
        */
       signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false);
 
+      /** Signs a transaction.
+       *
+       * Given a fully-formed transaction that is only lacking signatures, this signs
+       * the transaction with the inferred necessary keys and the explicitly provided keys,
+       * and optionally broadcasts the transaction
+       * @param tx the unsigned transaction
+       * @param signing_keys Keys that must be used when signing the transaction
+       * @param broadcast true if you wish to broadcast the transaction
+       * @return the signed version of the transaction
+       */
+      signed_transaction sign_transaction2(signed_transaction tx,
+                                           const vector<public_key_type>& signing_keys = vector<public_key_type>(),
+                                           bool broadcast = true);
+
+
       /** Get transaction signers.
        *
        * Returns information about who signed the transaction, specifically,
@@ -1638,17 +1635,17 @@ class wallet_api
 
       /** Returns an uninitialized object representing a given blockchain operation.
        *
-       * This returns a default-initialized object of the given type; it can be used 
+       * This returns a default-initialized object of the given type; it can be used
        * during early development of the wallet when we don't yet have custom commands for
-       * creating all of the operations the blockchain supports.  
+       * creating all of the operations the blockchain supports.
        *
        * Any operation the blockchain supports can be created using the transaction builder's
-       * \c add_operation_to_builder_transaction() , but to do that from the CLI you need to 
+       * \c add_operation_to_builder_transaction() , but to do that from the CLI you need to
        * know what the JSON form of the operation looks like.  This will give you a template
        * you can fill in.  It's better than nothing.
-       * 
-       * @param operation_type the type of operation to return, must be one of the 
-       *                       operations defined in `graphene/chain/operations.hpp`
+       *
+       * @param operation_type the type of operation to return, must be one of the
+       *                       operations defined in `graphene/protocol/operations.hpp`
        *                       (e.g., "global_parameters_update_operation")
        * @return a default-constructed operation of the given type
        */
@@ -1672,7 +1669,7 @@ class wallet_api
          bool broadcast = false);
 
       /** Propose a fee change.
-       * 
+       *
        * @param proposing_account The account paying the fee to propose the tx
        * @param expiration_time Timestamp specifying when the proposal will either take effect or expire.
        * @param changed_values Map of operation type to new fee.  Operations may be specified by name or ID.
@@ -1700,7 +1697,14 @@ class wallet_api
          const approval_delta& delta,
          bool broadcast /* = false */
          );
-         
+
+      /**
+       * Returns the order book for the market base:quote.
+       * @param base symbol name or ID of the base asset
+       * @param quote symbol name or ID of the quote asset
+       * @param limit depth of the order book to retrieve, for bids and asks each, capped at 50
+       * @return Order book of the market
+       */
       order_book get_order_book( const string& base, const string& quote, unsigned limit = 50);
 
       /** Signs a transaction.
@@ -1745,74 +1749,41 @@ class wallet_api
       fc::signal<void(bool)> lock_changed;
       std::shared_ptr<detail::wallet_api_impl> my;
       void encrypt_keys();
+
+      /**
+       * Manage account storage map(key->value) by using the custom operations plugin.
+       *
+       * Each account can optionally add random information in the form of a key-value map
+       * to be retrieved by any interested party.
+       *
+       * @param account The account ID or name that we are adding additional information to.
+       * @param catalog The name of the catalog the operation will insert data to.
+       * @param remove true if you want to remove stuff from a catalog.
+       * @param key_values The map to be inserted/removed to/from the catalog
+       * @param broadcast true if you wish to broadcast the transaction
+       *
+       * @return The signed transaction
+       */
+      signed_transaction account_store_map(string account, string catalog, bool remove,
+            flat_map<string, optional<string>> key_values, bool broadcast);
+
+      /**
+       * Get \c account_storage_object of an account by using the custom operations plugin.
+       *
+       * Storage data added to the map with @ref account_store_map will be returned.
+       *
+       * @param account Account ID or name to get contact data from.
+       * @param catalog The catalog to retrieve.
+       *
+       * @return An \c account_storage_object or empty.
+       */
+      vector<account_storage_object> get_account_storage(string account, string catalog);
+
 };
 
 } }
 
 extern template class fc::api<graphene::wallet::wallet_api>;
-
-FC_REFLECT( graphene::wallet::key_label, (label)(key) )
-FC_REFLECT( graphene::wallet::blind_balance, (amount)(from)(to)(one_time_key)(blinding_factor)(commitment)(used) )
-FC_REFLECT( graphene::wallet::blind_confirmation::output, (label)(pub_key)(decrypted_memo)(confirmation)(auth)(confirmation_receipt) )
-FC_REFLECT( graphene::wallet::blind_confirmation, (trx)(outputs) )
-
-FC_REFLECT( graphene::wallet::plain_keys, (keys)(checksum) )
-
-FC_REFLECT( graphene::wallet::wallet_data,
-            (chain_id)
-            (my_accounts)
-            (cipher_keys)
-            (extra_keys)
-            (pending_account_registrations)(pending_witness_registrations)
-            (labeled_keys)
-            (blind_receipts)
-            (ws_server)
-            (ws_user)
-            (ws_password)
-          )
-
-FC_REFLECT( graphene::wallet::brain_key_info,
-            (brain_priv_key)
-            (wif_priv_key)
-            (pub_key)
-          )
-
-FC_REFLECT( graphene::wallet::exported_account_keys, (account_name)(encrypted_private_keys)(public_keys) )
-
-FC_REFLECT( graphene::wallet::exported_keys, (password_checksum)(account_keys) )
-
-FC_REFLECT( graphene::wallet::blind_receipt,
-            (date)(from_key)(from_label)(to_key)(to_label)(amount)(memo)(control_authority)(data)(used)(conf) )
-
-FC_REFLECT( graphene::wallet::approval_delta,
-   (active_approvals_to_add)
-   (active_approvals_to_remove)
-   (owner_approvals_to_add)
-   (owner_approvals_to_remove)
-   (key_approvals_to_add)
-   (key_approvals_to_remove)
-)
-
-FC_REFLECT( graphene::wallet::worker_vote_delta,
-   (vote_for)
-   (vote_against)
-   (vote_abstain)
-)
-
-FC_REFLECT_DERIVED( graphene::wallet::signed_block_with_info, (graphene::chain::signed_block),
-   (block_id)(signing_key)(transaction_ids) )
-
-FC_REFLECT_DERIVED( graphene::wallet::vesting_balance_object_with_info, (graphene::chain::vesting_balance_object),
-   (allowed_withdraw)(allowed_withdraw_time) )
-
-FC_REFLECT( graphene::wallet::operation_detail, 
-            (memo)(description)(op) )
-
-FC_REFLECT(graphene::wallet::operation_detail_ex,
-            (memo)(description)(op)(transaction_id))
-
-FC_REFLECT( graphene::wallet::account_history_operation_detail,
-        (total_count)(result_count)(details))
 
 FC_API( graphene::wallet::wallet_api,
         (help)
@@ -1825,6 +1796,7 @@ FC_API( graphene::wallet::wallet_api,
         (set_fees_on_builder_transaction)
         (preview_builder_transaction)
         (sign_builder_transaction)
+        (sign_builder_transaction2)
         (broadcast_transaction)
         (propose_builder_transaction)
         (propose_builder_transaction2)
@@ -1913,6 +1885,7 @@ FC_API( graphene::wallet::wallet_api,
         (save_wallet_file)
         (serialize_transaction)
         (sign_transaction)
+        (sign_transaction2)
         (add_transaction_signature)
         (get_transaction_signers)
         (get_key_references)
@@ -1931,6 +1904,10 @@ FC_API( graphene::wallet::wallet_api,
         (network_get_connected_peers)
         (sign_memo)
         (read_memo)
+        (sign_message)
+        (verify_message)
+        (verify_signed_message)
+        (verify_encapsulated_message)
         (set_key_label)
         (get_key_label)
         (get_public_key)
@@ -1944,5 +1921,7 @@ FC_API( graphene::wallet::wallet_api,
         (blind_history)
         (receive_blind_transfer)
         (get_order_book)
+        (account_store_map)
+        (get_account_storage)
         (quit)
       )

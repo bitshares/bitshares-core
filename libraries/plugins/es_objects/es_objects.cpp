@@ -59,7 +59,7 @@ class es_objects_plugin_impl
       bool _es_objects_accounts = true;
       bool _es_objects_assets = true;
       bool _es_objects_balances = true;
-      bool _es_objects_limit_orders = true;
+      bool _es_objects_limit_orders = false;
       bool _es_objects_asset_bitasset = true;
       std::string _es_objects_index_prefix = "objects-";
       uint32_t _es_objects_start_es_after_block = 0;
@@ -79,7 +79,6 @@ class es_objects_plugin_impl
 
 bool es_objects_plugin_impl::genesis()
 {
-
    ilog("elasticsearch OBJECTS: inserting data from genesis");
 
    graphene::chain::database &db = _self.database();
@@ -296,52 +295,31 @@ void es_objects_plugin::plugin_set_program_options(
    )
 {
    cli.add_options()
-         ("es-objects-elasticsearch-url", boost::program_options::value<std::string>(), "Elasticsearch node url(http://localhost:9200/)")
+         ("es-objects-elasticsearch-url", boost::program_options::value<std::string>(),
+               "Elasticsearch node url(http://localhost:9200/)")
          ("es-objects-auth", boost::program_options::value<std::string>(), "Basic auth username:password('')")
-         ("es-objects-bulk-replay", boost::program_options::value<uint32_t>(), "Number of bulk documents to index on replay(10000)")
-         ("es-objects-bulk-sync", boost::program_options::value<uint32_t>(), "Number of bulk documents to index on a synchronized chain(100)")
+         ("es-objects-bulk-replay", boost::program_options::value<uint32_t>(),
+               "Number of bulk documents to index on replay(10000)")
+         ("es-objects-bulk-sync", boost::program_options::value<uint32_t>(),
+               "Number of bulk documents to index on a synchronized chain(100)")
          ("es-objects-proposals", boost::program_options::value<bool>(), "Store proposal objects(true)")
          ("es-objects-accounts", boost::program_options::value<bool>(), "Store account objects(true)")
          ("es-objects-assets", boost::program_options::value<bool>(), "Store asset objects(true)")
          ("es-objects-balances", boost::program_options::value<bool>(), "Store balances objects(true)")
-         ("es-objects-limit-orders", boost::program_options::value<bool>(), "Store limit order objects(true)")
+         ("es-objects-limit-orders", boost::program_options::value<bool>(), "Store limit order objects(false)")
          ("es-objects-asset-bitasset", boost::program_options::value<bool>(), "Store feed data(true)")
-         ("es-objects-index-prefix", boost::program_options::value<std::string>(), "Add a prefix to the index(objects-)")
-         ("es-objects-keep-only-current", boost::program_options::value<bool>(), "Keep only current state of the objects(true)")
-         ("es-objects-start-es-after-block", boost::program_options::value<uint32_t>(), "Start doing ES job after block(0)")
+         ("es-objects-index-prefix", boost::program_options::value<std::string>(),
+               "Add a prefix to the index(objects-)")
+         ("es-objects-keep-only-current", boost::program_options::value<bool>(),
+               "Keep only current state of the objects(true)")
+         ("es-objects-start-es-after-block", boost::program_options::value<uint32_t>(),
+               "Start doing ES job after block(0)")
          ;
    cfg.add(cli);
 }
 
 void es_objects_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
-   database().applied_block.connect([this](const signed_block &b) {
-      if(b.block_num() == 1) {
-         if (!my->genesis())
-            FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error populating genesis data.");
-      }
-   });
-
-   database().new_objects.connect([this]( const vector<object_id_type>& ids, const flat_set<account_id_type>& impacted_accounts ) {
-      if(!my->index_database(ids, "create"))
-      {
-         FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error creating object from ES database, we are going to keep trying.");
-      }
-   });
-   database().changed_objects.connect([this]( const vector<object_id_type>& ids, const flat_set<account_id_type>& impacted_accounts ) {
-      if(!my->index_database(ids, "update"))
-      {
-         FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error updating object from ES database, we are going to keep trying.");
-      }
-   });
-   database().removed_objects.connect([this](const vector<object_id_type>& ids, const vector<const object*>& objs, const flat_set<account_id_type>& impacted_accounts) {
-       if(!my->index_database(ids, "delete"))
-       {
-          FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error deleting object from ES database, we are going to keep trying.");
-       }
-   });
-
-
    if (options.count("es-objects-elasticsearch-url")) {
       my->_es_objects_elasticsearch_url = options["es-objects-elasticsearch-url"].as<std::string>();
    }
@@ -381,6 +359,37 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
    if (options.count("es-objects-start-es-after-block")) {
       my->_es_objects_start_es_after_block = options["es-objects-start-es-after-block"].as<uint32_t>();
    }
+
+   database().applied_block.connect([this](const signed_block &b) {
+      if(b.block_num() == 1 && my->_es_objects_start_es_after_block == 0) {
+         if (!my->genesis())
+            FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error populating genesis data.");
+      }
+   });
+   database().new_objects.connect([this]( const vector<object_id_type>& ids,
+         const flat_set<account_id_type>& impacted_accounts ) {
+      if(!my->index_database(ids, "create"))
+      {
+         FC_THROW_EXCEPTION(graphene::chain::plugin_exception,
+               "Error creating object from ES database, we are going to keep trying.");
+      }
+   });
+   database().changed_objects.connect([this]( const vector<object_id_type>& ids,
+         const flat_set<account_id_type>& impacted_accounts ) {
+      if(!my->index_database(ids, "update"))
+      {
+         FC_THROW_EXCEPTION(graphene::chain::plugin_exception,
+               "Error updating object from ES database, we are going to keep trying.");
+      }
+   });
+   database().removed_objects.connect([this](const vector<object_id_type>& ids,
+         const vector<const object*>& objs, const flat_set<account_id_type>& impacted_accounts) {
+      if(!my->index_database(ids, "delete"))
+      {
+         FC_THROW_EXCEPTION(graphene::chain::plugin_exception,
+               "Error deleting object from ES database, we are going to keep trying.");
+      }
+   });
 }
 
 void es_objects_plugin::plugin_startup()

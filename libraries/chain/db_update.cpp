@@ -37,8 +37,6 @@
 
 #include <graphene/protocol/fee_schedule.hpp>
 
-#include <fc/uint128.hpp>
-
 namespace graphene { namespace chain {
 
 void database::update_global_dynamic_data( const signed_block& b, const uint32_t missed_blocks )
@@ -381,6 +379,13 @@ void database::clear_expired_orders()
             cancel_settle_order(order);
             continue;
          }
+         if( GRAPHENE_100_PERCENT == mia.options.force_settlement_offset_percent ) // settle something for nothing
+         {
+            ilog( "Canceling a force settlement in ${asset} because settlement offset is 100%",
+                  ("asset", mia_object.symbol));
+            cancel_settle_order(order);
+            continue;
+         }
          if( max_settlement_volume.asset_id != current_asset )
             max_settlement_volume = mia_object.amount(mia.max_force_settlement_volume(mia_object.dynamic_data(*this).current_supply));
          // When current_asset_finished is true, this would be the 2nd time processing the same order.
@@ -412,9 +417,9 @@ void database::clear_expired_orders()
          {
             auto& pays = order.balance;
             auto receives = (order.balance * mia.current_feed.settlement_price);
-            receives.amount = ( fc::uint128_t(receives.amount.value) *
+            receives.amount = static_cast<uint64_t>( fc::uint128_t(receives.amount.value) *
                                 (GRAPHENE_100_PERCENT - mia.options.force_settlement_offset_percent) /
-                                GRAPHENE_100_PERCENT ).to_uint64();
+                                GRAPHENE_100_PERCENT );
             assert(receives <= order.balance * mia.current_feed.settlement_price);
             settlement_price = pays / receives;
          }
@@ -585,14 +590,13 @@ void database::clear_expired_htlcs()
          && htlc_idx.begin()->conditions.time_lock.expiration <= head_block_time() )
    {
       const htlc_object& obj = *htlc_idx.begin();
-      adjust_balance( obj.transfer.from, asset(obj.transfer.amount, obj.transfer.asset_id) );
-      // virtual op
-      htlc_refund_operation vop( obj.id, obj.transfer.from );
-      vop.htlc_id = htlc_idx.begin()->id;
+      const auto amount = asset(obj.transfer.amount, obj.transfer.asset_id);
+      adjust_balance( obj.transfer.from, amount );
+      // notify related parties
+      htlc_refund_operation vop( obj.id, obj.transfer.from, obj.transfer.to, amount,
+         obj.conditions.hash_lock.preimage_hash, obj.conditions.hash_lock.preimage_size );
       push_applied_operation( vop );
-
-      // remove the db object
-      remove( *htlc_idx.begin() );
+      remove( obj );
    }
 }
 

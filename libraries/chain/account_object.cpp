@@ -36,10 +36,10 @@ share_type cut_fee(share_type a, uint16_t p)
    if( p == GRAPHENE_100_PERCENT )
       return a;
 
-   fc::uint128 r(a.value);
+   fc::uint128_t r = a.value;
    r *= p;
    r /= GRAPHENE_100_PERCENT;
-   return r.to_uint64();
+   return static_cast<uint64_t>(r);
 }
 
 void account_balance_object::adjust_balance(const asset& delta)
@@ -254,19 +254,6 @@ void account_member_index::object_modified(const object& after)
           account_to_address_memberships[*itr].insert(after.id);
     }
 
-}
-
-void account_referrer_index::object_inserted( const object& obj )
-{
-}
-void account_referrer_index::object_removed( const object& obj )
-{
-}
-void account_referrer_index::about_to_modify( const object& before )
-{
-}
-void account_referrer_index::object_modified( const object& after  )
-{
 }
 
 const uint8_t  balances_by_account_index::bits = 20;

@@ -168,8 +168,11 @@ template<uint8_t SpaceID, uint8_t TypeID>
 struct reflector<graphene::db::object_id<SpaceID,TypeID> >
 {
     typedef graphene::db::object_id<SpaceID,TypeID> type;
-    typedef fc::true_type  is_defined;
-    typedef fc::false_type is_enum;
+    typedef std::true_type is_defined;
+    using native_members = typelist::list<fc::field_reflection<0, type, unsigned_int, &type::instance>>;
+    using inherited_members = typelist::list<>;
+    using members = native_members;
+    using base_classes = typelist::list<>;
     enum  member_count_enum {
       local_member_count = 1,
       total_member_count = 1
@@ -181,6 +184,10 @@ struct reflector<graphene::db::object_id<SpaceID,TypeID> >
        visitor.TEMPLATE operator()<member_type,type,&type::instance>( "instance" );
     }
 };
+namespace member_names {
+template<uint8_t S, uint8_t T>
+struct member_name<graphene::db::object_id<S,T>, 0> { static constexpr const char* value = "instance"; };
+}
 
 
  inline void to_variant( const graphene::db::object_id_type& var,  fc::variant& vo, uint32_t max_depth = 1 )

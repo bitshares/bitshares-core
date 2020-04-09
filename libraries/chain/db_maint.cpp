@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include <boost/multiprecision/integer.hpp>
-
 #include <fc/uint128.hpp>
 
 #include <graphene/protocol/market.hpp>
@@ -34,6 +32,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/buyback_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
@@ -46,6 +45,7 @@
 #include <graphene/chain/vote_count.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/custom_authority_object.hpp>
 
 namespace graphene { namespace chain {
 
@@ -184,10 +184,10 @@ void database::pay_workers( share_type& budget )
       // Note: if there is a good chance that passed_time_count == day_count,
       //       for better performance, can avoid the 128 bit calculation by adding a check.
       //       Since it's not the case on BitShares mainnet, we're not using a check here.
-      fc::uint128 pay(requested_pay.value);
+      fc::uint128_t pay = requested_pay.value;
       pay *= passed_time_count;
       pay /= day_count;
-      requested_pay = pay.to_uint64();
+      requested_pay = static_cast<uint64_t>(pay);
 
       share_type actual_pay = std::min(budget, requested_pay);
       //ilog(" ==> Paying ${a} to worker ${w}", ("w", active_worker.id)("a", actual_pay));
@@ -441,8 +441,8 @@ void database::initialize_budget_record( fc::time_point_sec now, budget_record& 
    //   be able to use the entire reserve
    budget_u128 += ((uint64_t(1) << GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS) - 1);
    budget_u128 >>= GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS;
-   if( budget_u128 < reserve.value )
-      rec.total_budget = share_type(budget_u128.to_uint64());
+   if( budget_u128 < static_cast<fc::uint128_t>(reserve.value) )
+      rec.total_budget = share_type(static_cast<uint64_t>(budget_u128));
    else
       rec.total_budget = reserve;
 
@@ -494,10 +494,10 @@ void database::process_budget()
       worker_budget_u128 /= 60*60*24;
 
       share_type worker_budget;
-      if( worker_budget_u128 >= available_funds.value )
+      if( worker_budget_u128 >= static_cast<fc::uint128_t>(available_funds.value) )
          worker_budget = available_funds;
       else
-         worker_budget = worker_budget_u128.to_uint64();
+         worker_budget = static_cast<uint64_t>(worker_budget_u128);
       rec.worker_budget = worker_budget;
       available_funds -= worker_budget;
 
@@ -637,12 +637,12 @@ void split_fba_balance(
    fc::uint128_t buyback_amount_128 = fba.accumulated_fba_fees.value;
    buyback_amount_128 *= designated_asset_buyback_pct;
    buyback_amount_128 /= GRAPHENE_100_PERCENT;
-   share_type buyback_amount = buyback_amount_128.to_uint64();
+   share_type buyback_amount = static_cast<uint64_t>(buyback_amount_128);
 
    fc::uint128_t issuer_amount_128 = fba.accumulated_fba_fees.value;
    issuer_amount_128 *= designated_asset_issuer_pct;
    issuer_amount_128 /= GRAPHENE_100_PERCENT;
-   share_type issuer_amount = issuer_amount_128.to_uint64();
+   share_type issuer_amount = static_cast<uint64_t>(issuer_amount_128);
 
    // this assert should never fail
    FC_ASSERT( buyback_amount + issuer_amount <= fba.accumulated_fba_fees );
@@ -879,7 +879,6 @@ void update_call_orders_hf_343( database& db )
 void update_call_orders_hf_1270( database& db )
 {
    // Update call_price
-   wlog( "Updating all call orders for hardfork core-1270 at block ${n}", ("n",db.head_block_num()) );
    for( const auto& call_obj : db.get_index_type<call_order_index>().indices().get<by_id>() )
    {
       db.modify( call_obj, []( call_order_object& call ) {
@@ -887,7 +886,6 @@ void update_call_orders_hf_1270( database& db )
          call.call_price.quote.amount = 1;
       });
    }
-   wlog( "Done updating all call orders for hardfork core-1270 at block ${n}", ("n",db.head_block_num()) );
 }
 
 /// Match call orders for all bitAssets, including PMs.
@@ -947,11 +945,12 @@ void database::process_bitassets()
 
 /****
  * @brief a one-time data process to correct max_supply
+ * 
+ * NOTE: while exceeding max_supply happened in mainnet, it seemed to have corrected
+ * itself before HF 1465. But this method must remain to correct some assets in testnet
  */
 void process_hf_1465( database& db )
 {
-   const auto head_num = db.head_block_num();
-   wlog( "Processing hard fork core-1465 at block ${n}", ("n",head_num) );
    // for each market issued asset
    const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
    for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
@@ -969,6 +968,22 @@ void process_hf_1465( database& db )
             obj.options.max_supply = graphene::chain::share_type(std::min(current_supply.value, GRAPHENE_MAX_SHARE_SUPPLY));
          });
       }
+   }
+}
+
+/****
+ * @brief a one-time data process to correct current_supply of BTS token in the BitShares mainnet
+ */
+void process_hf_2103( database& db )
+{
+   const balance_object* bal = db.find( balance_id_type( HARDFORK_CORE_2103_BALANCE_ID ) );
+   if( bal != nullptr && bal->balance.amount < 0 )
+   {
+      const asset_dynamic_data_object& ddo = bal->balance.asset_id(db).dynamic_data(db);
+      db.modify<asset_dynamic_data_object>( ddo, [bal](asset_dynamic_data_object& obj) {
+         obj.current_supply -= bal->balance.amount;
+      });
+      db.remove( *bal );
    }
 }
 
@@ -1004,15 +1019,12 @@ void update_median_feeds(database& db)
  * @param db the database
  * @param skip_check_call_orders true if check_call_orders() should not be called
  */
-// TODO: for better performance, this function can be removed if it actually updated nothing at hf time.
-//       * Also need to update related test cases
-//       * NOTE: the removal can't be applied to testnet
+// NOTE: Unable to remove this function for testnet nor mainnet. Unfortunately, bad
+//       feeds were found.
 void process_hf_868_890( database& db, bool skip_check_call_orders )
 {
    const auto next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
    const auto head_time = db.head_block_time();
-   const auto head_num = db.head_block_num();
-   wlog( "Processing hard fork core-868-890 at block ${n}", ("n",head_num) );
    // for each market issued asset
    const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
    for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
@@ -1028,9 +1040,6 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
 
       // for each feed
       const asset_bitasset_data_object& bitasset_data = current_asset.bitasset_data(db);
-      // NOTE: We'll only need old_feed if HF343 hasn't rolled out yet
-      auto old_feed = bitasset_data.current_feed;
-      bool feeds_changed = false; // did any feed change
       auto itr = bitasset_data.feeds.begin();
       while( itr != bitasset_data.feeds.end() )
       {
@@ -1038,7 +1047,6 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
          if ( itr->second.second.settlement_price.quote.asset_id != bitasset_data.options.short_backing_asset
                && ( is_witness_or_committee_fed || itr->second.second.settlement_price != price() ) )
          {
-            feeds_changed = true;
             db.modify( bitasset_data, [&itr, is_witness_or_committee_fed]( asset_bitasset_data_object& obj )
             {
                if( is_witness_or_committee_fed )
@@ -1061,88 +1069,25 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
          }
       } // end loop of each feed
 
-      // if any feed was modified, print a warning message
-      if( feeds_changed )
-      {
-         wlog( "Found invalid feed for asset ${asset_sym} (${asset_id}) during hardfork core-868-890",
-               ("asset_sym", current_asset.symbol)("asset_id", current_asset.id) );
-      }
-
       // always update the median feed due to https://github.com/bitshares/bitshares-core/issues/890
       db.modify( bitasset_data, [head_time,next_maint_time]( asset_bitasset_data_object &obj ) {
          obj.update_median_feeds( head_time, next_maint_time );
+         // NOTE: Normally we should call check_call_orders() after called update_median_feeds(), but for
+         // mainnet actually check_call_orders() would do nothing, so we skipped it for better performance.
       });
 
-      bool median_changed = ( old_feed.settlement_price != bitasset_data.current_feed.settlement_price );
-      bool median_feed_changed = ( !( old_feed == bitasset_data.current_feed ) );
-      if( median_feed_changed )
-      {
-         wlog( "Median feed for asset ${asset_sym} (${asset_id}) changed during hardfork core-868-890",
-               ("asset_sym", current_asset.symbol)("asset_id", current_asset.id) );
-      }
-
-      // Note: due to bitshares-core issue #935, the check below (using median_changed) is incorrect.
-      //       However, `skip_check_call_orders` will likely be true in both testnet and mainnet,
-      //         so effectively the incorrect code won't make a difference.
-      //       Additionally, we have code to update all call orders again during hardfork core-935
-      // TODO cleanup after hard fork
-      if( !skip_check_call_orders && median_changed ) // check_call_orders should be called
-      {
-         db.check_call_orders( current_asset );
-      }
-      else if( !skip_check_call_orders && median_feed_changed )
-      {
-         wlog( "Incorrectly skipped check_call_orders for asset ${asset_sym} (${asset_id}) during hardfork core-868-890",
-               ("asset_sym", current_asset.symbol)("asset_id", current_asset.id) );
-      }
    } // for each market issued asset
-   wlog( "Done processing hard fork core-868-890 at block ${n}", ("n",head_num) );
 }
 
-/******
- * @brief one-time data process for hard fork core-935
- *
- * Prior to hardfork 935, `check_call_orders` may be unintendedly skipped when
- * median price feed has changed. This method will run at the hardfork time, and
- * call `check_call_orders` for all markets.
- * https://github.com/bitshares/bitshares-core/issues/935
- *
- * @param db the database
+/**
+ * @brief Remove any custom active authorities whose expiration dates are in the past
+ * @param db A mutable database reference
  */
-// TODO: for better performance, this function can be removed if it actually updated nothing at hf time.
-//       * Also need to update related test cases
-//       * NOTE: perhaps the removal can't be applied to testnet
-void process_hf_935( database& db )
+void delete_expired_custom_authorities( database& db )
 {
-   bool changed_something = false;
-   const asset_bitasset_data_object* bitasset = nullptr;
-   bool settled_before_check_call;
-   bool settled_after_check_call;
-   // for each market issued asset
-   const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
-   for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
-   {
-      const auto& current_asset = *asset_itr;
-
-      if( !changed_something )
-      {
-         bitasset = &current_asset.bitasset_data( db );
-         settled_before_check_call = bitasset->has_settlement(); // whether already force settled
-      }
-
-      bool called_some = db.check_call_orders( current_asset );
-
-      if( !changed_something )
-      {
-         settled_after_check_call = bitasset->has_settlement(); // whether already force settled
-
-         if( settled_before_check_call != settled_after_check_call || called_some )
-         {
-            changed_something = true;
-            wlog( "process_hf_935 changed something" );
-         }
-      }
-   }
+   const auto& index = db.get_index_type<custom_authority_index>().indices().get<by_expiration>();
+   while (!index.empty() && index.begin()->valid_to < db.head_block_time())
+      db.remove(*index.begin());
 }
 
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
@@ -1290,11 +1235,6 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_868_890_TIME) && (next_maintenance_time > HARDFORK_CORE_868_890_TIME) )
       process_hf_868_890( *this, to_update_and_match_call_orders_for_hf_343 );
 
-   // Explicitly call check_call_orders of all markets
-   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_935_TIME) && (next_maintenance_time > HARDFORK_CORE_935_TIME)
-         && !to_update_and_match_call_orders_for_hf_343 )
-      process_hf_935( *this );
-
    // To reset call_price of all call orders, then match by new rule, for hard fork core-1270
    bool to_update_and_match_call_orders_for_hf_1270 = false;
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_1270_TIME) && (next_maintenance_time > HARDFORK_CORE_1270_TIME) )
@@ -1303,6 +1243,10 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    // make sure current_supply is less than or equal to max_supply
    if ( dgpo.next_maintenance_time <= HARDFORK_CORE_1465_TIME && next_maintenance_time > HARDFORK_CORE_1465_TIME )
       process_hf_1465(*this);
+
+   // Fix supply issue
+   if ( dgpo.next_maintenance_time <= HARDFORK_CORE_2103_TIME && next_maintenance_time > HARDFORK_CORE_2103_TIME )
+      process_hf_2103(*this);
 
    modify(dgpo, [next_maintenance_time](dynamic_global_property_object& d) {
       d.next_maintenance_time = next_maintenance_time;
@@ -1325,6 +1269,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    }
 
    process_bitassets();
+   delete_expired_custom_authorities(*this);
 
    // process_budget needs to run at the bottom because
    //   it needs to know the next_maintenance_time

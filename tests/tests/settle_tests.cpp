@@ -1504,9 +1504,6 @@ BOOST_AUTO_TEST_CASE( global_settle_rounding_test_after_hf_184 )
 BOOST_AUTO_TEST_CASE( create_bitassets )
 {
    try {
-      generate_blocks( HARDFORK_1268_TIME );
-      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
-      set_expiration( db, trx );
 
       ACTORS((paul)(rachelregistrar)(rachelreferrer));
 
@@ -1542,6 +1539,7 @@ BOOST_AUTO_TEST_CASE( create_bitassets )
       PUSH_TX(db, trx);
       generate_block();
       trx.clear();
+      set_expiration( db, trx );
    } FC_LOG_AND_RETHROW()
 }
 
@@ -1551,6 +1549,7 @@ BOOST_AUTO_TEST_CASE( market_fee_of_settle_order_before_hardfork_1780 )
       INVOKE(create_bitassets);
 
       GET_ACTOR(paul);
+      GET_ACTOR(rachel);
       GET_ACTOR(rachelregistrar);
       GET_ACTOR(rachelreferrer);
 
@@ -1560,8 +1559,6 @@ BOOST_AUTO_TEST_CASE( market_fee_of_settle_order_before_hardfork_1780 )
       asset_id_type bitusd_id = bitusd.id;
 
       const auto& core = asset_id_type()(db);
-
-      const account_object& rachel = get_account( "rachel" );
 
       {// add a feed to asset bitusd
          update_feed_producers( bitusd, {paul_id} );
@@ -1590,11 +1587,12 @@ BOOST_AUTO_TEST_CASE( market_fee_of_settle_order_before_hardfork_1780 )
 
       // and transfer some bitusd to rachel
       constexpr auto rachel_bitusd_count = 1000;
-      transfer( paul_id, rachel.get_id(), asset(rachel_bitusd_count, bitusd_id) );
+      transfer( paul_id, rachel_id, asset(rachel_bitusd_count, bitusd_id) );
 
       force_settle( rachel, bitusd.amount(rachel_bitusd_count) );
       generate_block();
       generate_blocks( db.head_block_time() + fc::hours(24) );
+      set_expiration( db, trx );
 
       // 1 biteur = 20 bitusd see publish_feed
       const auto biteur_expected_result = rachel_bitusd_count/20;
@@ -1615,7 +1613,11 @@ BOOST_AUTO_TEST_CASE( market_fee_of_settle_order_after_hardfork_1780 )
    try {
       INVOKE(create_bitassets);
 
+      generate_blocks( HARDFORK_CORE_1780_TIME );
+      set_expiration( db, trx );
+
       GET_ACTOR(paul);
+      GET_ACTOR(rachel);
       GET_ACTOR(rachelregistrar);
       GET_ACTOR(rachelreferrer);
 
@@ -1625,10 +1627,6 @@ BOOST_AUTO_TEST_CASE( market_fee_of_settle_order_after_hardfork_1780 )
       asset_id_type bitusd_id = bitusd.id;
 
       const auto& core = asset_id_type()(db);
-
-      const account_object& rachel = get_account( "rachel" );
-
-      generate_blocks( HARDFORK_CORE_1780_TIME );
 
       {// add a feed to asset bitusd
          update_feed_producers( bitusd, {paul_id} );
@@ -1657,19 +1655,20 @@ BOOST_AUTO_TEST_CASE( market_fee_of_settle_order_after_hardfork_1780 )
 
       // and transfer some bitusd to rachel
       constexpr auto rachel_bitusd_count = 1000;
-      transfer( paul_id, rachel.get_id(), asset(rachel_bitusd_count, bitusd_id) );
+      transfer( paul_id, rachel_id, asset(rachel_bitusd_count, bitusd_id) );
 
       force_settle( rachel, bitusd.amount(rachel_bitusd_count) );
       generate_block();
       generate_blocks( db.head_block_time() + fc::hours(24) );
+      set_expiration( db, trx );
 
       // 1 biteur = 20 bitusd see publish_feed
       const auto biteur_expected_result = rachel_bitusd_count/20;
-      BOOST_CHECK_EQUAL( get_balance(rachel, biteur), biteur_expected_result/2/*market fee percent = 50%*/ );
-      BOOST_CHECK_EQUAL( get_balance(rachel, bitusd), 0 );
+      BOOST_CHECK_EQUAL( get_balance(rachel_id, biteur_id), biteur_expected_result/2/*market fee percent = 50%*/ );
+      BOOST_CHECK_EQUAL( get_balance(rachel_id, bitusd_id), 0 );
 
-      const auto rachelregistrar_reward = get_market_fee_reward( rachelregistrar, biteur );
-      const auto rachelreferrer_reward = get_market_fee_reward( rachelreferrer, biteur );
+      const auto rachelregistrar_reward = get_market_fee_reward( rachelregistrar_id(db), biteur_id(db) );
+      const auto rachelreferrer_reward = get_market_fee_reward( rachelreferrer_id(db), biteur_id(db) );
 
       BOOST_CHECK_GT( rachelregistrar_reward, 0 );
       BOOST_CHECK_GT( rachelreferrer_reward, 0 );
@@ -1689,5 +1688,122 @@ BOOST_AUTO_TEST_CASE( market_fee_of_settle_order_after_hardfork_1780 )
    } FC_LOG_AND_RETHROW()
 }
 
+/**
+ * Test case to reproduce https://github.com/bitshares/bitshares-core/issues/1883.
+ * When there is only one fill_order object in the ticker rolling buffer, it should only be rolled out once.
+ */
+BOOST_AUTO_TEST_CASE( global_settle_ticker_test )
+{
+   try {
+      generate_block();
+
+      const auto& meta_idx = db.get_index_type<simple_index<graphene::market_history::market_ticker_meta_object>>();
+      const auto& ticker_idx = db.get_index_type<graphene::market_history::market_ticker_index>().indices();
+      const auto& history_idx = db.get_index_type<graphene::market_history::history_index>().indices();
+
+      BOOST_CHECK_EQUAL( meta_idx.size(), 0 );
+      BOOST_CHECK_EQUAL( ticker_idx.size(), 0 );
+      BOOST_CHECK_EQUAL( history_idx.size(), 0 );
+
+      ACTORS((judge)(alice));
+
+      const auto& pmark = create_prediction_market("PMARK", judge_id);
+      const auto& core  = asset_id_type()(db);
+
+      int64_t init_balance(1000000);
+      transfer(committee_account, judge_id, asset(init_balance));
+      transfer(committee_account, alice_id, asset(init_balance));
+
+      BOOST_TEST_MESSAGE( "Open position with equal collateral" );
+      borrow( alice, pmark.amount(1000), asset(1000) );
+
+      BOOST_TEST_MESSAGE( "Globally settling" );
+      force_global_settle( pmark, pmark.amount(1) / core.amount(1) );
+
+      generate_block();
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      {
+         BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( history_idx.size(), 1 );
+
+         const auto& meta = *meta_idx.begin();
+         const auto& tick = *ticker_idx.begin();
+         const auto& hist = *history_idx.begin();
+
+         BOOST_CHECK( meta.rolling_min_order_his_id == hist.id );
+         BOOST_CHECK( meta.skip_min_order_his_id == false );
+
+         BOOST_CHECK( tick.base_volume == 1000 );
+         BOOST_CHECK( tick.quote_volume == 1000 );
+      }
+
+      generate_blocks( db.head_block_time() + 86000 ); // less than a day
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      // nothing changes
+      {
+         BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( history_idx.size(), 1 );
+
+         const auto& meta = *meta_idx.begin();
+         const auto& tick = *ticker_idx.begin();
+         const auto& hist = *history_idx.begin();
+
+         BOOST_CHECK( meta.rolling_min_order_his_id == hist.id );
+         BOOST_CHECK( meta.skip_min_order_his_id == false );
+
+         BOOST_CHECK( tick.base_volume == 1000 );
+         BOOST_CHECK( tick.quote_volume == 1000 );
+      }
+
+      generate_blocks( db.head_block_time() + 4000 ); // now more than 24 hours
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      // the history is rolled out, new 24h volume should be 0
+      {
+         BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( history_idx.size(), 1 );
+
+         const auto& meta = *meta_idx.begin();
+         const auto& tick = *ticker_idx.begin();
+         const auto& hist = *history_idx.begin();
+
+         BOOST_CHECK( meta.rolling_min_order_his_id == hist.id );
+         BOOST_CHECK( meta.skip_min_order_his_id == true ); // the order should be skipped on next roll
+
+         BOOST_CHECK( tick.base_volume == 0 );
+         BOOST_CHECK( tick.quote_volume == 0 );
+      }
+
+      generate_block();
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      // nothing changes
+      {
+         BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( history_idx.size(), 1 );
+
+         const auto& meta = *meta_idx.begin();
+         const auto& tick = *ticker_idx.begin();
+         const auto& hist = *history_idx.begin();
+
+         BOOST_CHECK( meta.rolling_min_order_his_id == hist.id );
+         BOOST_CHECK( meta.skip_min_order_his_id == true );
+
+         BOOST_CHECK( tick.base_volume == 0 );
+         BOOST_CHECK( tick.quote_volume == 0 );
+      }
+
+
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
 
 BOOST_AUTO_TEST_SUITE_END()

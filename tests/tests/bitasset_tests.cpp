@@ -192,7 +192,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
    std::vector<account_id_type> active_witnesses;
    for(const witness_id_type& wit_id : global_props.active_witnesses)
       active_witnesses.push_back(wit_id(db).witness_account);
-   BOOST_REQUIRE_EQUAL(active_witnesses.size(), 10lu);
+   BOOST_REQUIRE_EQUAL(active_witnesses.size(), INITIAL_WITNESS_COUNT);
 
    {
       BOOST_TEST_MESSAGE("Adding price feed 1");
@@ -648,7 +648,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
 
    // this should pass
    BOOST_TEST_MESSAGE( "Evaluating a good operation" );
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
 
    // test with a market issued asset
    BOOST_TEST_MESSAGE( "Sending a non-bitasset." );
@@ -677,25 +677,25 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    // back by self
    BOOST_TEST_MESSAGE( "Message should contain: op.new_options.short_backing_asset == asset_obj.get_id()" );
    op.new_options.short_backing_asset = bit_usd_id;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    op.new_options.short_backing_asset = correct_asset_id;
 
    // prediction market with different precision
    BOOST_TEST_MESSAGE( "Message should contain: for a PM, asset_obj.precision != new_backing_asset.precision" );
    op.asset_to_update = asset_objs.prediction;
    op.issuer = asset_objs.prediction(db).issuer;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    op.asset_to_update = bit_usd_id;
    op.issuer = asset_objs.bit_usd(db).issuer;
 
    // checking old backing asset instead of new backing asset
    BOOST_TEST_MESSAGE( "Message should contain: to be backed by an asset which is not market issued asset nor CORE" );
    op.new_options.short_backing_asset = asset_objs.six_precision;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    BOOST_TEST_MESSAGE( "Message should contain: modified a blockchain-controlled market asset to be backed by an asset "
          "which is not backed by CORE" );
    op.new_options.short_backing_asset = asset_objs.prediction;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    op.new_options.short_backing_asset = correct_asset_id;
 
    // CHILDUSER is a non-committee asset backed by PARENT which is backed by CORE
@@ -707,15 +707,15 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    op.issuer = asset_objs.bit_parent(db).issuer;
    op.new_options.short_backing_asset = asset_objs.bit_usdbacked;
    // this should generate a warning in the log, but not fail.
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    // changing the backing asset to a UIA should work
    BOOST_TEST_MESSAGE( "Switching to a backing asset that is a UIA should work. No warning should be produced." );
    op.new_options.short_backing_asset = asset_objs.user_issued;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    // A -> B -> C, change B to be backed by A (circular backing)
    BOOST_TEST_MESSAGE( "Message should contain: A cannot be backed by B which is backed by A." );
    op.new_options.short_backing_asset = asset_objs.bit_child_bitasset;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    op.new_options.short_backing_asset = asset_objs.user_issued;
    BOOST_TEST_MESSAGE( "Message should contain: but this asset is a backing asset for a committee-issued asset." );
    // CHILDCOMMITTEE is a committee asset backed by PARENT which is backed by CORE
@@ -724,7 +724,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    create_bitasset( "CHILDCOMMITTEE", GRAPHENE_COMMITTEE_ACCOUNT, 100, charge_market_fee, 2,
          asset_objs.bit_parent );
    // it should again work, generating 2 warnings in the log. 1 for the above, and 1 new one.
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    op.asset_to_update = asset_objs.bit_usd;
    op.issuer = asset_objs.bit_usd(db).issuer;
    op.new_options.short_backing_asset = correct_asset_id;
@@ -738,7 +738,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    op.asset_to_update = asset_objs.bit_usdbacked2;
    op.issuer = asset_objs.bit_usdbacked2(db).issuer;
    op.new_options.short_backing_asset = asset_objs.bit_usdbacked;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    // set everything to a more normal state
    op.asset_to_update = asset_objs.bit_usdbacked;
    op.issuer = asset_objs.bit_usd(db).issuer;
@@ -748,25 +748,25 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    BOOST_TEST_MESSAGE( "Message should contain: op.new_options.feed_lifetime_sec <= chain_parameters.block_interval" );
    const auto good_feed_lifetime = op.new_options.feed_lifetime_sec;
    op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    BOOST_TEST_MESSAGE( "Message should contain: op.new_options.feed_lifetime_sec <= chain_parameters.block_interval" );
    op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    op.new_options.feed_lifetime_sec = good_feed_lifetime;
 
    // Force settlement delay must exceed block interval.
    BOOST_TEST_MESSAGE( "Message should contain: op.new_options.force_settlement_delay_sec <= chain_parameters.block_interval" );
    const auto good_force_settlement_delay_sec = op.new_options.force_settlement_delay_sec;
    op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    BOOST_TEST_MESSAGE( "Message should contain: op.new_options.force_settlement_delay_sec <= chain_parameters.block_interval" );
    op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    op.new_options.force_settlement_delay_sec = good_force_settlement_delay_sec;
 
    // this should pass
    BOOST_TEST_MESSAGE( "We should be all good again." );
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
 }
 
 /******
@@ -794,7 +794,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
 
    // this should pass
    BOOST_TEST_MESSAGE( "Evaluating a good operation" );
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
 
    // test with a market issued asset
    BOOST_TEST_MESSAGE( "Sending a non-bitasset." );
@@ -853,13 +853,13 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
    // changing the backing asset to a UIA should work
    BOOST_TEST_MESSAGE( "Switching to a backing asset that is a UIA should work." );
    op.new_options.short_backing_asset = asset_objs.user_issued;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    // A -> B -> C, change B to be backed by A (circular backing)
    BOOST_TEST_MESSAGE( "Check for circular backing. This should generate an exception" );
    op.new_options.short_backing_asset = asset_objs.bit_child_bitasset;
    REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "'A' backed by 'B' backed by 'A'" );
    op.new_options.short_backing_asset = asset_objs.user_issued;
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
    BOOST_TEST_MESSAGE( "Creating CHILDCOMMITTEE" );
    // CHILDCOMMITTEE is a committee asset backed by PARENT which is backed by CORE
    // Cannot change PARENT's backing asset from CORE to something else because that will make CHILDCOMMITTEE
@@ -907,14 +907,14 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
 
    // this should pass
    BOOST_TEST_MESSAGE( "We should be all good again." );
-   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_CHECK( evaluator.evaluate(op).is_type<void_result>() );
 
 }
 
 /*********
- * @brief Call check_call_orders after current_feed changed but not only settlement_price changed.
+ * @brief Call price inconsistent when MCR changed
  */
-BOOST_AUTO_TEST_CASE( hf_935_test )
+BOOST_AUTO_TEST_CASE( hf_1270_test )
 { try {
    uint32_t skip = database::skip_witness_signature
                  | database::skip_transaction_signatures
@@ -933,14 +933,9 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
       int blocks = 0;
       auto mi = db.get_global_properties().parameters.maintenance_interval;
 
-      if( i == 2 ) // go beyond hard fork 890
+      if( i == 2) // go beyond hard fork 890 (which is the same as 935 BTW)
       {
          generate_blocks( HARDFORK_CORE_868_890_TIME - mi, true, skip );
-         generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
-      }
-      else if( i == 4 ) // go beyond hard fork 935
-      {
-         generate_blocks( HARDFORK_CORE_935_TIME - mi, true, skip );
          generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
       }
       else if( i == 6 ) // go beyond hard fork 1270

@@ -37,52 +37,13 @@ namespace graphene { namespace protocol {
    fee_schedule fee_schedule::get_default()
    {
       fee_schedule result;
-      for( int i = 0; i < fee_parameters().count(); ++i )
+      for( size_t i = 0; i < fee_parameters().count(); ++i )
       {
          fee_parameters x; x.set_which(i);
          result.parameters.insert(x);
       }
       return result;
    }
-
-   struct fee_schedule_validate_visitor
-   {
-      typedef void result_type;
-
-      template<typename T>
-      void operator()( const T& p )const
-      {
-         //p.validate();
-      }
-   };
-
-   void fee_schedule::validate()const
-   {
-      for( const auto& f : parameters )
-         f.visit( fee_schedule_validate_visitor() );
-   }
-
-   struct calc_fee_visitor
-   {
-      typedef uint64_t result_type;
-
-      const fee_schedule& param;
-      const int current_op;
-      calc_fee_visitor( const fee_schedule& p, const operation& op ):param(p),current_op(op.which()){}
-
-      template<typename OpType>
-      result_type operator()( const OpType& op )const
-      {
-         try {
-            return op.calculate_fee( param.get<OpType>() ).value;
-         } catch (fc::assert_exception& e) {
-             fee_parameters params; params.set_which(current_op);
-             auto itr = param.parameters.find(params);
-             if( itr != param.parameters.end() ) params = *itr;
-             return op.calculate_fee( params.get<typename OpType::fee_parameters_type>() ).value;
-         }
-      }
-   };
 
    struct set_fee_visitor
    {
@@ -117,30 +78,11 @@ namespace graphene { namespace protocol {
       this->scale = 0;
    }
 
-   asset fee_schedule::calculate_fee( const operation& op )const
-   {
-      uint64_t required_fee = op.visit( calc_fee_visitor( *this, op ) );
-      if( scale != GRAPHENE_100_PERCENT )
-      {
-         auto scaled = fc::uint128(required_fee) * scale;
-         scaled /= GRAPHENE_100_PERCENT;
-         FC_ASSERT( scaled <= GRAPHENE_MAX_SHARE_SUPPLY,
-                    "Required fee after scaling would exceed maximum possible supply" );
-         required_fee = scaled.to_uint64();
-      }
-      return asset( required_fee );
-   }
-
-   asset fee_schedule::calculate_fee( const operation& op, const price& core_exchange_rate )const
-   {
-      return calculate_fee( op ).multiply_and_round_up( core_exchange_rate );
-   }
-
    asset fee_schedule::set_fee( operation& op, const price& core_exchange_rate )const
    {
       auto f = calculate_fee( op, core_exchange_rate );
       auto f_max = f;
-      for( int i=0; i<MAX_FEE_STABILIZATION_ITERATION; i++ )
+      for( size_t i=0; i<MAX_FEE_STABILIZATION_ITERATION; i++ )
       {
          op.visit( set_fee_visitor( f_max ) );
          auto f2 = calculate_fee( op, core_exchange_rate );
@@ -184,5 +126,3 @@ namespace graphene { namespace protocol {
    }
 
 } } // graphene::protocol
-
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::fee_schedule )

@@ -25,6 +25,12 @@
 #include <graphene/protocol/operations.hpp>
 
 namespace graphene { namespace protocol {
+   struct predicate_result;
+
+   using rejected_predicate = static_variant<predicate_result, fc::exception>;
+   using rejected_predicate_map = map<custom_authority_id_type, rejected_predicate>;
+   using custom_authority_lookup = std::function<vector<authority>(account_id_type, const operation&,
+                                                                   rejected_predicate_map*)>;
 
    /**
     * @defgroup transactions Transactions
@@ -111,7 +117,8 @@ namespace graphene { namespace protocol {
 
       void get_required_authorities( flat_set<account_id_type>& active,
                                      flat_set<account_id_type>& owner,
-                                     vector<authority>& other )const;
+                                     vector<authority>& other,
+                                     bool ignore_custom_operation_required_auths )const;
 
       virtual uint64_t get_packed_size()const;
 
@@ -145,13 +152,13 @@ namespace graphene { namespace protocol {
        *  validation.
        */
       set<public_key_type> get_required_signatures(
-         const chain_id_type& chain_id,
-         const flat_set<public_key_type>& available_keys,
-         const std::function<const authority*(account_id_type)>& get_active,
-         const std::function<const authority*(account_id_type)>& get_owner,
-         bool allow_non_immediate_owner,
-         uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH
-         )const;
+              const chain_id_type& chain_id,
+              const flat_set<public_key_type>& available_keys,
+              const std::function<const authority*(account_id_type)>& get_active,
+              const std::function<const authority*(account_id_type)>& get_owner,
+              bool allow_non_immediate_owner,
+              bool ignore_custom_operation_required_authorities,
+              uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH )const;
 
       /**
        * Checks whether signatures in this signed transaction are sufficient to authorize the transaction.
@@ -160,17 +167,22 @@ namespace graphene { namespace protocol {
        * @param chain_id the ID of a block chain
        * @param get_active callback function to retrieve active authorities of a given account
        * @param get_owner  callback function to retrieve owner authorities of a given account
+       * @param get_custom callback function to retrieve viable custom authorities for a given account and operation
        * @param allow_non_immediate_owner whether to allow owner authority of non-immediately
        *            required accounts to authorize operations in the transaction
+       * @param ignore_custom_operation_required_auths See issue #210; whether to ignore the
+       *            required_auths field of custom_operation or not
        * @param max_recursion maximum level of recursion when verifying, since an account
        *            can have another account in active authorities and/or owner authorities
        */
       void verify_authority(
-         const chain_id_type& chain_id,
-         const std::function<const authority*(account_id_type)>& get_active,
-         const std::function<const authority*(account_id_type)>& get_owner,
-         bool allow_non_immediate_owner,
-         uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH )const;
+              const chain_id_type& chain_id,
+              const std::function<const authority*(account_id_type)>& get_active,
+              const std::function<const authority*(account_id_type)>& get_owner,
+              const custom_authority_lookup& get_custom,
+              bool allow_non_immediate_owner,
+              bool ignore_custom_operation_required_auths,
+              uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH )const;
 
       /**
        * This is a slower replacement for get_required_signatures()
@@ -179,13 +191,14 @@ namespace graphene { namespace protocol {
        * non-minimal set.
        */
       set<public_key_type> minimize_required_signatures(
-         const chain_id_type& chain_id,
-         const flat_set<public_key_type>& available_keys,
-         const std::function<const authority*(account_id_type)>& get_active,
-         const std::function<const authority*(account_id_type)>& get_owner,
-         bool allow_non_immediate_owner,
-         uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH
-         ) const;
+              const chain_id_type& chain_id,
+              const flat_set<public_key_type>& available_keys,
+              const std::function<const authority*(account_id_type)>& get_active,
+              const std::function<const authority*(account_id_type)>& get_owner,
+              const custom_authority_lookup& get_custom,
+              bool allow_non_immediate_owner,
+              bool ignore_custom_operation_required_auths,
+              uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH) const;
 
       /**
        * @brief Extract public keys from signatures with given chain ID.
@@ -241,8 +254,11 @@ namespace graphene { namespace protocol {
     * @param sigs a set of public keys
     * @param get_active callback function to retrieve active authorities of a given account
     * @param get_owner  callback function to retrieve owner authorities of a given account
+    * @param get_custom callback function to retrieve viable custom authorities for a given account and operation
     * @param allow_non_immediate_owner whether to allow owner authority of non-immediately
     *            required accounts to authorize operations
+    * @param ignore_custom_operation_required_auths See issue #210; whether to ignore the
+    *            required_auths field of custom_operation or not
     * @param max_recursion maximum level of recursion when verifying, since an account
     *            can have another account in active authorities and/or owner authorities
     * @param allow_committee whether to allow the special "committee account" to authorize the operations
@@ -252,11 +268,13 @@ namespace graphene { namespace protocol {
    void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs,
                           const std::function<const authority*(account_id_type)>& get_active,
                           const std::function<const authority*(account_id_type)>& get_owner,
+                          const custom_authority_lookup& get_custom,
                           bool allow_non_immediate_owner,
+                          bool ignore_custom_operation_required_auths,
                           uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH,
-                          bool allow_committe = false,
+                          bool allow_committee = false,
                           const flat_set<account_id_type>& active_aprovals = flat_set<account_id_type>(),
-                          const flat_set<account_id_type>& owner_approvals = flat_set<account_id_type>());
+                          const flat_set<account_id_type>& owner_approvals = flat_set<account_id_type>() );
 
    /**
     *  @brief captures the result of evaluating the operations contained in the transaction

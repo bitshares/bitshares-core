@@ -1,4 +1,4 @@
-FROM phusion/baseimage:0.10.1
+FROM phusion/baseimage:0.11
 MAINTAINER The bitshares decentralized organisation
 
 ENV LANG=en_US.UTF-8
@@ -74,6 +74,7 @@ EXPOSE 1776
 
 # default exec/config files
 ADD docker/default_config.ini /etc/bitshares/config.ini
+ADD docker/default_logging.ini /etc/bitshares/logging.ini
 ADD docker/bitsharesentry.sh /usr/local/bin/bitsharesentry.sh
 RUN chmod a+x /usr/local/bin/bitsharesentry.sh
 
