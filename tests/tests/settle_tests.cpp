@@ -1523,7 +1523,8 @@ BOOST_AUTO_TEST_CASE( create_bitassets )
 
       const auto& bitusd = create_bitasset( "USDBIT", paul_id, market_fee_percent, charge_market_fee, 2, biteur_id );
 
-      const account_object rachel  = create_account( "rachel", rachelregistrar, rachelreferrer, referrer_reward_percent );
+      const account_object rachel  = create_account( "rachel", rachelregistrar, rachelreferrer,
+                                                     referrer_reward_percent );
 
       transfer( committee_account, rachelregistrar_id, asset( 10000000 ) );
       transfer( committee_account, rachelreferrer_id, asset( 10000000 ) );
