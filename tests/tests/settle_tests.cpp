@@ -1505,6 +1505,10 @@ BOOST_AUTO_TEST_CASE( create_bitassets )
 {
    try {
 
+      generate_blocks( HARDFORK_480_TIME ); // avoid being affected by the price feed bug
+      generate_block();
+      set_expiration( db, trx );
+
       ACTORS((paul)(rachelregistrar)(rachelreferrer));
 
       upgrade_to_lifetime_member(rachelregistrar);
