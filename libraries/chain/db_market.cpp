@@ -873,7 +873,8 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
    {
       margin_fee = calculate_margin_fee( mia, pays );
       FC_ASSERT( margin_fee.asset_id == pays.asset_id ); // margin fee should be paid in the debt asset
-      FC_ASSERT( margin_fee.amount < pays.amount ); // margin fee should never be more than what the call order is receiving
+      // margin fee should never be more than what the call order is receiving (but both could be zero)    
+      FC_ASSERT( margin_fee.amount == 0 || margin_fee.amount < pays.amount ); 
    }
 
    optional<asset> collateral_freed;
