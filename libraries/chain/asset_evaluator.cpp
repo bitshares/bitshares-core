@@ -32,9 +32,20 @@
 
 #include <functional>
 
-#include <locale>
-
 namespace graphene { namespace chain {
+namespace detail {
+
+   // TODO review and remove code below and links to it after hf_1774
+   void check_asset_options_hf_1774(const fc::time_point_sec& block_time, const asset_options& options)
+   {
+      if( block_time < HARDFORK_1774_TIME )
+      {
+         FC_ASSERT( !options.extensions.value.reward_percent.valid() ||
+                    *options.extensions.value.reward_percent < GRAPHENE_100_PERCENT,
+            "Asset extension reward percent must be less than 100% till HARDFORK_1774_TIME!");
+      }
+   }
+}
 
 void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
 { try {
@@ -44,6 +55,8 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    const auto& chain_parameters = d.get_global_properties().parameters;
    FC_ASSERT( op.common_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    FC_ASSERT( op.common_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
+
+   detail::check_asset_options_hf_1774(d.head_block_time(), op.common_options);
 
    // Check that all authorities do exist
    for( auto id : op.common_options.whitelist_authorities )
@@ -63,7 +76,8 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
       {
          auto prefix = op.symbol.substr( 0, dotpos );
          auto asset_symbol_itr = asset_indx.find( prefix );
-         FC_ASSERT( asset_symbol_itr != asset_indx.end(), "Asset ${s} may only be created by issuer of ${p}, but ${p} has not been registered",
+         FC_ASSERT( asset_symbol_itr != asset_indx.end(),
+                    "Asset ${s} may only be created by issuer of asset ${p}, but asset ${p} has not been created",
                     ("s",op.symbol)("p",prefix) );
          FC_ASSERT( asset_symbol_itr->issuer == op.issuer, "Asset ${s} may only be created by issuer of ${p}, ${i}",
                     ("s",op.symbol)("p",prefix)("i", op.issuer(d).name) );
@@ -271,6 +285,8 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
                  "Since Hardfork #199, updating issuer requires the use of asset_update_issuer_operation.");
       validate_new_issuer( d, a, *o.new_issuer );
    }
+
+   detail::check_asset_options_hf_1774(d.head_block_time(), o.new_options);
 
    if( a.dynamic_asset_data_id(d).current_supply != 0 )
    {
@@ -701,10 +717,10 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
    if( bitasset.is_prediction_market )
       FC_ASSERT( bitasset.has_settlement(), "global settlement must occur before force settling a prediction market"  );
    else if( bitasset.current_feed.settlement_price.is_null()
-            && ( d.head_block_time() <= HARDFORK_CORE_216_TIME
+            && ( d.head_block_time() <= HARDFORK_CORE_216_TIME // TODO check whether the HF check can be removed
                  || !bitasset.has_settlement() ) )
       FC_THROW_EXCEPTION(insufficient_feeds, "Cannot force settle with no price feed.");
-   FC_ASSERT(d.get_balance(d.get(op.account), *asset_to_settle) >= op.amount);
+   FC_ASSERT( d.get_balance( op.account, op.amount.asset_id ) >= op.amount, "Insufficient balance" );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -728,8 +744,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
       {
          if( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
             FC_THROW( "Settle amount is too small to receive anything due to rounding" );
-         else // TODO remove this warning after hard fork core-184
-            wlog( "Something for nothing issue (#184, variant F) occurred at block #${block}", ("block",d.head_block_num()) );
+         // else do nothing. Before the hf, something for nothing issue (#184, variant F) could occur
       }
 
       asset pays = op.amount;
@@ -748,7 +763,19 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
             obj.settlement_fund -= settled_amount.amount;
          });
 
-         d.adjust_balance( op.account, settled_amount );
+         // The account who settles pays market fees to the issuer of the collateral asset after HF core-1780
+         //
+         // TODO Check whether the HF check can be removed after the HF.
+         //      Note: even if logically it can be removed, perhaps the removal will lead to a small
+         //            performance loss. Needs testing.
+         if( d.head_block_time() >= HARDFORK_CORE_1780_TIME )
+         {
+            auto issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d), settled_amount );
+            settled_amount -= issuer_fees;
+         }
+
+         if( settled_amount.amount > 0 )
+            d.adjust_balance( op.account, settled_amount );
       }
 
       d.modify( mia_dyn, [&]( asset_dynamic_data_object& obj ){

@@ -312,7 +312,18 @@ namespace graphene { namespace wallet { namespace detail {
 
    signed_transaction wallet_api_impl::sign_transaction( signed_transaction tx, bool broadcast )
    {
+      return sign_transaction2(tx, {}, broadcast);
+   }
+
+   signed_transaction wallet_api_impl::sign_transaction2( signed_transaction tx,
+                                                         const vector<public_key_type>& signing_keys, bool broadcast)
+   {
       set<public_key_type> approving_key_set = get_owned_required_keys(tx);
+
+      // Add any explicit keys to the approving_key_set
+      for (const public_key_type& explicit_key : signing_keys) {
+         approving_key_set.insert(explicit_key);
+      }
 
       auto dyn_props = get_dynamic_global_properties();
       tx.set_reference_block( dyn_props.head_block_id );

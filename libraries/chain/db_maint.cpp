@@ -32,6 +32,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/buyback_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
@@ -970,6 +971,22 @@ void process_hf_1465( database& db )
    }
 }
 
+/****
+ * @brief a one-time data process to correct current_supply of BTS token in the BitShares mainnet
+ */
+void process_hf_2103( database& db )
+{
+   const balance_object* bal = db.find( balance_id_type( HARDFORK_CORE_2103_BALANCE_ID ) );
+   if( bal != nullptr && bal->balance.amount < 0 )
+   {
+      const asset_dynamic_data_object& ddo = bal->balance.asset_id(db).dynamic_data(db);
+      db.modify<asset_dynamic_data_object>( ddo, [bal](asset_dynamic_data_object& obj) {
+         obj.current_supply -= bal->balance.amount;
+      });
+      db.remove( *bal );
+   }
+}
+
 void update_median_feeds(database& db)
 {
    time_point_sec head_time = db.head_block_time();
@@ -1226,6 +1243,10 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    // make sure current_supply is less than or equal to max_supply
    if ( dgpo.next_maintenance_time <= HARDFORK_CORE_1465_TIME && next_maintenance_time > HARDFORK_CORE_1465_TIME )
       process_hf_1465(*this);
+
+   // Fix supply issue
+   if ( dgpo.next_maintenance_time <= HARDFORK_CORE_2103_TIME && next_maintenance_time > HARDFORK_CORE_2103_TIME )
+      process_hf_2103(*this);
 
    modify(dgpo, [next_maintenance_time](dynamic_global_property_object& d) {
       d.next_maintenance_time = next_maintenance_time;

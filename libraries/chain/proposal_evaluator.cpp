@@ -28,6 +28,10 @@
 
 namespace graphene { namespace chain {
 
+namespace detail {
+   void check_asset_options_hf_1774(const fc::time_point_sec& block_time, const asset_options& options);   
+}
+
 struct proposal_operation_hardfork_visitor
 {
    typedef void result_type;
@@ -40,6 +44,15 @@ struct proposal_operation_hardfork_visitor
 
    template<typename T>
    void operator()(const T &v) const {}
+
+   // hf_1774
+   void operator()(const graphene::chain::asset_create_operation &v) const {
+      detail::check_asset_options_hf_1774(block_time, v.common_options);
+   }
+   // hf_1774
+   void operator()(const graphene::chain::asset_update_operation &v) const {
+      detail::check_asset_options_hf_1774(block_time, v.new_options);
+   }
 
    void operator()(const graphene::chain::committee_member_update_global_parameters_operation &op) const {
       if (block_time < HARDFORK_CORE_1468_TIME) {
@@ -57,6 +70,10 @@ struct proposal_operation_hardfork_visitor
                    "Unable to define fees for custom authority operations prior to hardfork BSIP 40");
          FC_ASSERT(!op.new_parameters.current_fees->exists<custom_authority_delete_operation>(),
                    "Unable to define fees for custom authority operations prior to hardfork BSIP 40");
+      }
+      if (!HARDFORK_BSIP_86_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.extensions.value.market_fee_network_percent.valid(),
+                   "Unable to set market_fee_network_percent before hardfork BSIP 86");
       }
    }
    void operator()(const graphene::chain::htlc_create_operation &op) const {

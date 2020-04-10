@@ -526,6 +526,13 @@ signed_transaction wallet_api::sign_builder_transaction(transaction_handle_type 
    return my->sign_builder_transaction(transaction_handle, broadcast);
 }
 
+signed_transaction wallet_api::sign_builder_transaction2(transaction_handle_type transaction_handle,
+                                                        const vector<public_key_type>& explicit_keys,
+                                                        bool broadcast)
+{
+   return my->sign_builder_transaction2(transaction_handle, explicit_keys, broadcast);
+}
+
 pair<transaction_id_type,signed_transaction> wallet_api::broadcast_transaction(signed_transaction tx)
 {
     return my->broadcast_transaction(tx);
@@ -997,6 +1004,12 @@ void wallet_api::set_wallet_filename(string wallet_filename)
 signed_transaction wallet_api::sign_transaction(signed_transaction tx, bool broadcast /* = false */)
 { try {
    return my->sign_transaction( tx, broadcast);
+} FC_CAPTURE_AND_RETHROW( (tx) ) }
+
+signed_transaction wallet_api::sign_transaction2(signed_transaction tx, const vector<public_key_type>& signing_keys,
+                                                 bool broadcast /* = false */)
+{ try {
+   return my->sign_transaction2( tx, signing_keys, broadcast);
 } FC_CAPTURE_AND_RETHROW( (tx) ) }
 
 flat_set<public_key_type> wallet_api::get_transaction_signers(const signed_transaction &tx) const
@@ -1905,9 +1918,9 @@ signed_transaction wallet_api::account_store_map(string account, string catalog,
 }
 
 vector<account_storage_object> wallet_api::get_account_storage(string account, string catalog)
-{
+{ try {
    return my->_custom_operations->get_storage_info(account, catalog);
-}
+} FC_CAPTURE_AND_RETHROW( (account)(catalog) ) }
 
 signed_block_with_info::signed_block_with_info( const signed_block& block )
    : signed_block( block )
