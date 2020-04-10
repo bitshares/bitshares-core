@@ -919,8 +919,9 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
    const account_object* settle_owner_ptr = nullptr;
    // The owner of the settle order pays market fees to the issuer of the collateral asset after HF core-1780
    //
-   // TODO It's possible that the HF check can be removed after the HF for cleaner code and a potential small
-   //      performance gain, however the cleanup could also lead to a small performance loss. Needs testing.
+   // TODO Check whether the HF check can be removed after the HF.
+   //      Note: even if logically it can be removed, perhaps the removal will lead to a small performance
+   //            loss. Needs testing.
    if( head_block_time() >= HARDFORK_CORE_1780_TIME )
       settle_owner_ptr = &settle.owner(*this);
 

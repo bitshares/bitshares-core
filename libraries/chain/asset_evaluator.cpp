@@ -754,6 +754,11 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
             obj.settlement_fund -= settled_amount.amount;
          });
 
+         // The account who settles pays market fees to the issuer of the collateral asset after HF core-1780
+         //
+         // TODO Check whether the HF check can be removed after the HF.
+         //      Note: even if logically it can be removed, perhaps the removal will lead to a small
+         //            performance loss. Needs testing.
          if( d.head_block_time() >= HARDFORK_CORE_1780_TIME )
          {
             auto issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d), settled_amount );
