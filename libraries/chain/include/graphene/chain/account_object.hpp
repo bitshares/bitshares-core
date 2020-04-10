@@ -325,22 +325,6 @@ namespace graphene { namespace chain {
 
 
    /**
-    *  @brief This secondary index will allow a reverse lookup of all accounts that have been referred by
-    *  a particular account.
-    */
-   class account_referrer_index : public secondary_index
-   {
-      public:
-         virtual void object_inserted( const object& obj ) override;
-         virtual void object_removed( const object& obj ) override;
-         virtual void about_to_modify( const object& before ) override;
-         virtual void object_modified( const object& after  ) override;
-
-         /** maps the referrer to the set of accounts that they have referred */
-         map< account_id_type, set<account_id_type> > referred_by;
-   };
-
-   /**
     *  @brief This secondary index will allow fast access to the balance objects
     *         that belonging to an account.
     */

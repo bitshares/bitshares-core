@@ -50,7 +50,8 @@ asset linear_vesting_policy::get_allowed_withdraw( const vesting_policy_context&
             share_type total_vested = 0;
             if( elapsed_seconds < vesting_duration_seconds )
             {
-                total_vested = (fc::uint128_t( begin_balance.value ) * elapsed_seconds / vesting_duration_seconds).to_uint64();
+                total_vested = static_cast<uint64_t>(fc::uint128_t( begin_balance.value ) * elapsed_seconds
+                                                     / vesting_duration_seconds);
             }
             else
             {
@@ -116,8 +117,8 @@ asset cdd_vesting_policy::get_allowed_withdraw(const vesting_policy_context& ctx
       return asset(0, ctx.balance.asset_id);
    fc::uint128_t cs_earned = compute_coin_seconds_earned(ctx);
    fc::uint128_t withdraw_available = cs_earned / std::max(vesting_seconds, 1u);
-   assert(withdraw_available <= ctx.balance.amount.value);
-   return asset(withdraw_available.to_uint64(), ctx.balance.asset_id);
+   assert(withdraw_available <= static_cast<fc::uint128_t>(ctx.balance.amount.value));
+   return asset(static_cast<uint64_t>(withdraw_available), ctx.balance.asset_id);
 }
 
 void cdd_vesting_policy::on_deposit(const vesting_policy_context& ctx)

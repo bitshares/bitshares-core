@@ -72,17 +72,16 @@ void_result committee_member_update_evaluator::do_apply( const committee_member_
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
-void_result committee_member_update_global_parameters_evaluator::do_evaluate(const committee_member_update_global_parameters_operation& o)
+void_result committee_member_update_global_parameters_evaluator::do_evaluate(
+        const committee_member_update_global_parameters_operation& o)
 { try {
    FC_ASSERT(trx_state->_is_proposed_trx);
-
-   FC_ASSERT( db().head_block_time() > HARDFORK_CORE_1468_TIME || !o.new_parameters.extensions.value.updatable_htlc_options.valid(), 
-         "Unable to set HTLC parameters until hardfork." );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-void_result committee_member_update_global_parameters_evaluator::do_apply(const committee_member_update_global_parameters_operation& o)
+void_result committee_member_update_global_parameters_evaluator::do_apply(
+        const committee_member_update_global_parameters_operation& o)
 { try {
    db().modify(db().get_global_properties(), [&o](global_property_object& p) {
       p.pending_parameters = o.new_parameters;

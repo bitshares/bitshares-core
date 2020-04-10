@@ -1501,4 +1501,470 @@ BOOST_AUTO_TEST_CASE( global_settle_rounding_test_after_hf_184 )
    } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( create_bitassets )
+{
+   try {
+
+      generate_blocks( HARDFORK_480_TIME ); // avoid being affected by the price feed bug
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((paul)(rachelregistrar)(rachelreferrer));
+
+      upgrade_to_lifetime_member(rachelregistrar);
+      upgrade_to_lifetime_member(rachelreferrer);
+
+      constexpr auto market_fee_percent      = 50 * GRAPHENE_1_PERCENT;
+      constexpr auto biteur_reward_percent   = 90 * GRAPHENE_1_PERCENT;
+      constexpr auto referrer_reward_percent = 10 * GRAPHENE_1_PERCENT;
+
+      const auto& biteur = create_bitasset( "EURBIT", paul_id, market_fee_percent, charge_market_fee, 2 );
+      asset_id_type biteur_id = biteur.id;
+
+      const auto& bitusd = create_bitasset( "USDBIT", paul_id, market_fee_percent, charge_market_fee, 2, biteur_id );
+
+      const account_object rachel  = create_account( "rachel", rachelregistrar, rachelreferrer,
+                                                     referrer_reward_percent );
+
+      transfer( committee_account, rachelregistrar_id, asset( 10000000 ) );
+      transfer( committee_account, rachelreferrer_id, asset( 10000000 ) );
+      transfer( committee_account, rachel.get_id(), asset( 10000000) );
+      transfer( committee_account, paul_id, asset( 10000000000 ) );
+
+      asset_update_operation op;
+      op.issuer = biteur.issuer;
+      op.asset_to_update = biteur_id;
+      op.new_options.issuer_permissions = charge_market_fee;
+      op.new_options.extensions.value.reward_percent = biteur_reward_percent;
+      op.new_options.flags = bitusd.options.flags | charge_market_fee;
+      op.new_options.core_exchange_rate = price( asset(20,biteur_id), asset(1,asset_id_type()) );
+      op.new_options.market_fee_percent = market_fee_percent;
+      trx.operations.push_back(op);
+      sign(trx, paul_private_key);
+      PUSH_TX(db, trx);
+      generate_block();
+      trx.clear();
+      set_expiration( db, trx );
+   } FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE( market_fee_of_settle_order_before_hardfork_1780 )
+{
+   try {
+      INVOKE(create_bitassets);
+
+      GET_ACTOR(paul);
+      GET_ACTOR(rachel);
+      GET_ACTOR(rachelregistrar);
+      GET_ACTOR(rachelreferrer);
+
+      const asset_object &biteur = get_asset( "EURBIT" );
+      asset_id_type biteur_id = biteur.id;
+      const asset_object &bitusd = get_asset( "USDBIT" );
+      asset_id_type bitusd_id = bitusd.id;
+
+      const auto& core = asset_id_type()(db);
+
+      {// add a feed to asset bitusd
+         update_feed_producers( bitusd, {paul_id} );
+         price_feed feed;
+         feed.settlement_price = price( bitusd.amount(100), biteur.amount(5) );
+         feed.core_exchange_rate = price( bitusd.amount(100), asset(1) );
+         feed.maintenance_collateral_ratio = 175 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         feed.maximum_short_squeeze_ratio = 110 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         publish_feed( bitusd_id, paul_id, feed );
+      }
+
+      {// add a feed to asset biteur
+         update_feed_producers( biteur, {paul_id} );
+         price_feed feed;
+         feed.settlement_price = price( biteur.amount(100), core.amount(5) );
+         feed.maintenance_collateral_ratio = 175 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         feed.maximum_short_squeeze_ratio = 110 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         publish_feed( biteur_id, paul_id, feed );
+      }
+
+      enable_fees();
+
+      // paul gets some bitusd and biteur
+      borrow( paul_id, biteur.amount(20000), core.amount(2000) );
+      borrow( paul_id, bitusd.amount(10000), biteur.amount(1000) );
+
+      // and transfer some bitusd to rachel
+      constexpr auto rachel_bitusd_count = 1000;
+      transfer( paul_id, rachel_id, asset(rachel_bitusd_count, bitusd_id) );
+
+      force_settle( rachel, bitusd.amount(rachel_bitusd_count) );
+      generate_block();
+      generate_blocks( db.head_block_time() + fc::hours(24) );
+      set_expiration( db, trx );
+
+      // Check results
+      int64_t biteur_balance = 0;
+      int64_t biteur_accumulated_fee = 0;
+      int64_t bitusd_accumulated_fee = 0;
+      {
+         // 1 biteur = 20 bitusd see publish_feed
+         const auto biteur_expected_result = rachel_bitusd_count/20;
+         const auto biteur_market_fee = biteur_expected_result / 2; // market fee percent = 50%
+         biteur_balance += biteur_expected_result - biteur_market_fee;
+
+         BOOST_CHECK_EQUAL( get_balance(rachel, biteur), biteur_balance );
+         BOOST_CHECK_EQUAL( get_balance(rachel, bitusd), 0 );
+
+         const auto rachelregistrar_reward = get_market_fee_reward( rachelregistrar, biteur );
+         const auto rachelreferrer_reward = get_market_fee_reward( rachelreferrer, biteur );
+
+         BOOST_CHECK_EQUAL( rachelregistrar_reward, 0 );
+         BOOST_CHECK_EQUAL( rachelreferrer_reward, 0 );
+
+         // market fee
+         biteur_accumulated_fee += biteur_market_fee;
+         bitusd_accumulated_fee += 0; // usd market fee percent 50%, but call orders don't pay
+         BOOST_CHECK_EQUAL( biteur.dynamic_data(db).accumulated_fees.value, biteur_accumulated_fee);
+         BOOST_CHECK_EQUAL( bitusd.dynamic_data(db).accumulated_fees.value, bitusd_accumulated_fee );
+      }
+
+      // Update the feed to asset bitusd to trigger a global settlement
+      {
+         price_feed feed;
+         feed.settlement_price = price( bitusd.amount(10), biteur.amount(5) );
+         feed.core_exchange_rate = price( bitusd.amount(100), asset(1) );
+         feed.maintenance_collateral_ratio = 175 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         feed.maximum_short_squeeze_ratio = 110 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         publish_feed( bitusd_id, paul_id, feed );
+      }
+
+      // Transfer more bitusd to rachel
+      transfer( paul_id, rachel_id, asset(rachel_bitusd_count, bitusd_id) );
+      // Instant settlement
+      force_settle( rachel, bitusd.amount(rachel_bitusd_count) );
+
+      // Check results
+      {
+         // 950 biteur = 9000 bitusd in settlement fund
+         const auto biteur_expected_result = rachel_bitusd_count * 950 / 9000;
+         const auto biteur_market_fee = 0; // market fee percent = 50%, but doesn't pay before hf
+         biteur_balance += biteur_expected_result - biteur_market_fee;
+
+         BOOST_CHECK_EQUAL( get_balance(rachel, biteur), biteur_balance );
+         BOOST_CHECK_EQUAL( get_balance(rachel, bitusd), 0 );
+
+         const auto rachelregistrar_reward = get_market_fee_reward( rachelregistrar, biteur );
+         const auto rachelreferrer_reward = get_market_fee_reward( rachelreferrer, biteur );
+
+         BOOST_CHECK_EQUAL( rachelregistrar_reward, 0 );
+         BOOST_CHECK_EQUAL( rachelreferrer_reward, 0 );
+
+         // No market fee for instant settlement before hf
+         biteur_accumulated_fee += 0;
+         bitusd_accumulated_fee += 0;
+         BOOST_CHECK_EQUAL( biteur.dynamic_data(db).accumulated_fees.value, biteur_accumulated_fee);
+         BOOST_CHECK_EQUAL( bitusd.dynamic_data(db).accumulated_fees.value, bitusd_accumulated_fee );
+      }
+
+   } FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE( market_fee_of_settle_order_after_hardfork_1780 )
+{
+   try {
+      INVOKE(create_bitassets);
+
+      generate_blocks( HARDFORK_CORE_1780_TIME );
+      set_expiration( db, trx );
+
+      GET_ACTOR(paul);
+      GET_ACTOR(rachel);
+      GET_ACTOR(rachelregistrar);
+      GET_ACTOR(rachelreferrer);
+
+      const asset_object &biteur = get_asset( "EURBIT" );
+      asset_id_type biteur_id = biteur.id;
+      const asset_object &bitusd = get_asset( "USDBIT" );
+      asset_id_type bitusd_id = bitusd.id;
+
+      const auto& core = asset_id_type()(db);
+
+      {// add a feed to asset bitusd
+         update_feed_producers( bitusd, {paul_id} );
+         price_feed feed;
+         feed.settlement_price = price( bitusd.amount(100), biteur.amount(5) );
+         feed.core_exchange_rate = price( bitusd.amount(100), asset(1) );
+         feed.maintenance_collateral_ratio = 175 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         feed.maximum_short_squeeze_ratio = 110 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         publish_feed( bitusd_id, paul_id, feed );
+      }
+
+      {// add a feed to asset biteur
+         update_feed_producers( biteur, {paul_id} );
+         price_feed feed;
+         feed.settlement_price = price( biteur.amount(100), core.amount(5) );
+         feed.maintenance_collateral_ratio = 175 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         feed.maximum_short_squeeze_ratio = 110 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         publish_feed( biteur_id, paul_id, feed );
+      }
+
+      enable_fees();
+
+      // paul gets some bitusd and biteur
+      borrow( paul_id, biteur.amount(20000), core.amount(2000) );
+      borrow( paul_id, bitusd.amount(10000), biteur.amount(1000) );
+
+      // and transfer some bitusd to rachel
+      constexpr auto rachel_bitusd_count = 1000;
+      transfer( paul_id, rachel_id, asset(rachel_bitusd_count, bitusd_id) );
+
+      force_settle( rachel, bitusd.amount(rachel_bitusd_count) );
+      generate_block();
+      generate_blocks( db.head_block_time() + fc::hours(24) );
+      set_expiration( db, trx );
+
+      // Check results
+      int64_t biteur_balance = 0;
+      int64_t biteur_accumulated_fee = 0;
+      int64_t bitusd_accumulated_fee = 0;
+      {
+         // 1 biteur = 20 bitusd see publish_feed
+         const auto biteur_expected_result = rachel_bitusd_count/20;
+         const auto biteur_market_fee = biteur_expected_result / 2; // market fee percent = 50%
+         biteur_balance += biteur_expected_result - biteur_market_fee;
+
+         BOOST_CHECK_EQUAL( get_balance(rachel, biteur), biteur_balance );
+         BOOST_CHECK_EQUAL( get_balance(rachel, bitusd), 0 );
+
+         const auto rachelregistrar_reward = get_market_fee_reward( rachelregistrar, biteur );
+         const auto rachelreferrer_reward = get_market_fee_reward( rachelreferrer, biteur );
+
+         const auto biteur_reward = biteur_market_fee * 9 / 10; // 90%
+         const auto referrer_reward = biteur_reward / 10; // 10%
+         const auto registrar_reward = biteur_reward - referrer_reward;
+
+         BOOST_CHECK_EQUAL( rachelregistrar_reward, registrar_reward  );
+         BOOST_CHECK_EQUAL( rachelreferrer_reward, referrer_reward );
+
+         // market fee
+         biteur_accumulated_fee += biteur_market_fee - biteur_reward;
+         bitusd_accumulated_fee += 0; // usd market fee percent 50%, but call orders don't pay
+         BOOST_CHECK_EQUAL( biteur.dynamic_data(db).accumulated_fees.value, biteur_accumulated_fee);
+         BOOST_CHECK_EQUAL( bitusd.dynamic_data(db).accumulated_fees.value, bitusd_accumulated_fee );
+
+      }
+
+   } FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE( market_fee_of_instant_settle_order_after_hardfork_1780 )
+{
+   try {
+      INVOKE(create_bitassets);
+
+      generate_blocks( HARDFORK_CORE_1780_TIME );
+      set_expiration( db, trx );
+
+      GET_ACTOR(paul);
+      GET_ACTOR(rachel);
+      GET_ACTOR(rachelregistrar);
+      GET_ACTOR(rachelreferrer);
+
+      const asset_object &biteur = get_asset( "EURBIT" );
+      asset_id_type biteur_id = biteur.id;
+      const asset_object &bitusd = get_asset( "USDBIT" );
+      asset_id_type bitusd_id = bitusd.id;
+
+      const auto& core = asset_id_type()(db);
+
+      {// add a feed to asset bitusd
+         update_feed_producers( bitusd, {paul_id} );
+         price_feed feed;
+         feed.settlement_price = price( bitusd.amount(100), biteur.amount(5) );
+         feed.core_exchange_rate = price( bitusd.amount(100), asset(1) );
+         feed.maintenance_collateral_ratio = 175 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         feed.maximum_short_squeeze_ratio = 110 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         publish_feed( bitusd_id, paul_id, feed );
+      }
+
+      {// add a feed to asset biteur
+         update_feed_producers( biteur, {paul_id} );
+         price_feed feed;
+         feed.settlement_price = price( biteur.amount(100), core.amount(5) );
+         feed.maintenance_collateral_ratio = 175 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         feed.maximum_short_squeeze_ratio = 110 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         publish_feed( biteur_id, paul_id, feed );
+      }
+
+      enable_fees();
+
+      // paul gets some bitusd and biteur
+      borrow( paul_id, biteur.amount(20000), core.amount(2000) );
+      borrow( paul_id, bitusd.amount(10000), biteur.amount(1000) );
+
+      // Update the feed to asset bitusd to trigger a global settlement
+      {
+         price_feed feed;
+         feed.settlement_price = price( bitusd.amount(10), biteur.amount(5) );
+         feed.core_exchange_rate = price( bitusd.amount(100), asset(1) );
+         feed.maintenance_collateral_ratio = 175 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         feed.maximum_short_squeeze_ratio = 110 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+         publish_feed( bitusd_id, paul_id, feed );
+      }
+
+      // Transfer some bitusd to rachel
+      constexpr auto rachel_bitusd_count = 1000;
+      transfer( paul_id, rachel_id, asset(rachel_bitusd_count, bitusd_id) );
+      // Instant settlement
+      force_settle( rachel, bitusd.amount(rachel_bitusd_count) ); // instant settlement
+
+      // Check results
+      int64_t biteur_balance = 0;
+      int64_t biteur_accumulated_fee = 0;
+      int64_t bitusd_accumulated_fee = 0;
+      {
+         // 1000 biteur = 10000 bitusd in settlement fund
+         const auto biteur_expected_result = rachel_bitusd_count/10;
+         const auto biteur_market_fee = biteur_expected_result / 2; // market fee percent = 50%
+         biteur_balance += biteur_expected_result - biteur_market_fee;
+
+         BOOST_CHECK_EQUAL( get_balance(rachel, biteur), biteur_balance );
+         BOOST_CHECK_EQUAL( get_balance(rachel, bitusd), 0 );
+
+         const auto rachelregistrar_reward = get_market_fee_reward( rachelregistrar, biteur );
+         const auto rachelreferrer_reward = get_market_fee_reward( rachelreferrer, biteur );
+
+         const auto biteur_reward = biteur_market_fee * 9 / 10; // 90%
+         const auto referrer_reward = biteur_reward / 10; // 10%
+         const auto registrar_reward = biteur_reward - referrer_reward;
+
+         BOOST_CHECK_EQUAL( rachelregistrar_reward, registrar_reward  );
+         BOOST_CHECK_EQUAL( rachelreferrer_reward, referrer_reward );
+
+         // market fee
+         biteur_accumulated_fee += biteur_market_fee - biteur_reward;
+         bitusd_accumulated_fee += 0; // usd market fee percent 50%, but call orders don't pay
+         BOOST_CHECK_EQUAL( biteur.dynamic_data(db).accumulated_fees.value, biteur_accumulated_fee);
+         BOOST_CHECK_EQUAL( bitusd.dynamic_data(db).accumulated_fees.value, bitusd_accumulated_fee );
+
+      }
+
+   } FC_LOG_AND_RETHROW()
+}
+
+/**
+ * Test case to reproduce https://github.com/bitshares/bitshares-core/issues/1883.
+ * When there is only one fill_order object in the ticker rolling buffer, it should only be rolled out once.
+ */
+BOOST_AUTO_TEST_CASE( global_settle_ticker_test )
+{
+   try {
+      generate_block();
+
+      const auto& meta_idx = db.get_index_type<simple_index<graphene::market_history::market_ticker_meta_object>>();
+      const auto& ticker_idx = db.get_index_type<graphene::market_history::market_ticker_index>().indices();
+      const auto& history_idx = db.get_index_type<graphene::market_history::history_index>().indices();
+
+      BOOST_CHECK_EQUAL( meta_idx.size(), 0 );
+      BOOST_CHECK_EQUAL( ticker_idx.size(), 0 );
+      BOOST_CHECK_EQUAL( history_idx.size(), 0 );
+
+      ACTORS((judge)(alice));
+
+      const auto& pmark = create_prediction_market("PMARK", judge_id);
+      const auto& core  = asset_id_type()(db);
+
+      int64_t init_balance(1000000);
+      transfer(committee_account, judge_id, asset(init_balance));
+      transfer(committee_account, alice_id, asset(init_balance));
+
+      BOOST_TEST_MESSAGE( "Open position with equal collateral" );
+      borrow( alice, pmark.amount(1000), asset(1000) );
+
+      BOOST_TEST_MESSAGE( "Globally settling" );
+      force_global_settle( pmark, pmark.amount(1) / core.amount(1) );
+
+      generate_block();
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      {
+         BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( history_idx.size(), 1 );
+
+         const auto& meta = *meta_idx.begin();
+         const auto& tick = *ticker_idx.begin();
+         const auto& hist = *history_idx.begin();
+
+         BOOST_CHECK( meta.rolling_min_order_his_id == hist.id );
+         BOOST_CHECK( meta.skip_min_order_his_id == false );
+
+         BOOST_CHECK( tick.base_volume == 1000 );
+         BOOST_CHECK( tick.quote_volume == 1000 );
+      }
+
+      generate_blocks( db.head_block_time() + 86000 ); // less than a day
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      // nothing changes
+      {
+         BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( history_idx.size(), 1 );
+
+         const auto& meta = *meta_idx.begin();
+         const auto& tick = *ticker_idx.begin();
+         const auto& hist = *history_idx.begin();
+
+         BOOST_CHECK( meta.rolling_min_order_his_id == hist.id );
+         BOOST_CHECK( meta.skip_min_order_his_id == false );
+
+         BOOST_CHECK( tick.base_volume == 1000 );
+         BOOST_CHECK( tick.quote_volume == 1000 );
+      }
+
+      generate_blocks( db.head_block_time() + 4000 ); // now more than 24 hours
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      // the history is rolled out, new 24h volume should be 0
+      {
+         BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( history_idx.size(), 1 );
+
+         const auto& meta = *meta_idx.begin();
+         const auto& tick = *ticker_idx.begin();
+         const auto& hist = *history_idx.begin();
+
+         BOOST_CHECK( meta.rolling_min_order_his_id == hist.id );
+         BOOST_CHECK( meta.skip_min_order_his_id == true ); // the order should be skipped on next roll
+
+         BOOST_CHECK( tick.base_volume == 0 );
+         BOOST_CHECK( tick.quote_volume == 0 );
+      }
+
+      generate_block();
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      // nothing changes
+      {
+         BOOST_CHECK_EQUAL( meta_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( ticker_idx.size(), 1 );
+         BOOST_CHECK_EQUAL( history_idx.size(), 1 );
+
+         const auto& meta = *meta_idx.begin();
+         const auto& tick = *ticker_idx.begin();
+         const auto& hist = *history_idx.begin();
+
+         BOOST_CHECK( meta.rolling_min_order_his_id == hist.id );
+         BOOST_CHECK( meta.skip_min_order_his_id == true );
+
+         BOOST_CHECK( tick.base_volume == 0 );
+         BOOST_CHECK( tick.quote_volume == 0 );
+      }
+
+
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

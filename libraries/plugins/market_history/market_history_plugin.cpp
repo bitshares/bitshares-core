@@ -371,7 +371,8 @@ void market_history_plugin_impl::update_market_histories( const signed_block& b 
       }
       else // if all data are rolled out
       {
-         if( last_min_his_id != _meta->rolling_min_order_his_id ) // if rolled out some
+         if( !_meta->skip_min_order_his_id
+             || last_min_his_id != _meta->rolling_min_order_his_id ) // if rolled out some
          {
             db.modify( *_meta, [&]( market_ticker_meta_object& mtm ) {
                mtm.rolling_min_order_his_id = last_min_his_id;

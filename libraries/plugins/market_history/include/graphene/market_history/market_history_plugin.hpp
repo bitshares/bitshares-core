@@ -146,8 +146,8 @@ struct market_ticker_object : public abstract_object<market_ticker_object>
    share_type          last_day_quote;
    share_type          latest_base;
    share_type          latest_quote;
-   fc::uint128         base_volume;
-   fc::uint128         quote_volume;
+   fc::uint128_t       base_volume;
+   fc::uint128_t       quote_volume;
 };
 
 struct market_ticker_meta_object : public abstract_object<market_ticker_meta_object>
@@ -199,7 +199,8 @@ typedef multi_index_container<
    market_ticker_object,
    indexed_by<
       ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-      ordered_non_unique< tag<by_volume>, member< market_ticker_object, fc::uint128, &market_ticker_object::base_volume > >,
+      ordered_non_unique< tag<by_volume>,
+                          member< market_ticker_object, fc::uint128_t, &market_ticker_object::base_volume > >,
       ordered_unique<
          tag<by_market>,
          composite_key<
