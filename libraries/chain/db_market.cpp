@@ -1229,22 +1229,30 @@ asset database::pay_market_fees(const account_object* seller, const asset_object
                // cut referrer percent from reward
                auto registrar_reward = reward;
 
-               auto registrar = ( seller->registrar == GRAPHENE_TEMP_ACCOUNT && head_block_time() >= HARDFORK_CORE_1800_TIME )
-                                 ? GRAPHENE_COMMITTEE_ACCOUNT
-                                 : seller->registrar;
+               auto registrar = seller->registrar;
+               auto referrer = seller->referrer;
 
-               if( seller->referrer != seller->registrar )
+               // After HF core-1800, for funds going to temp-account, redirect to committee-account
+               if( head_block_time() >= HARDFORK_CORE_1800_TIME )
+               {
+                  if( registrar == GRAPHENE_TEMP_ACCOUNT )
+                     registrar = GRAPHENE_COMMITTEE_ACCOUNT;
+                  if( referrer == GRAPHENE_TEMP_ACCOUNT )
+                     referrer = GRAPHENE_COMMITTEE_ACCOUNT;
+               }
+
+               if( referrer != registrar )
                {
                   const auto referrer_rewards_value = detail::calculate_percent( reward.amount,
                                                                                  seller->referrer_rewards_percentage );
 
-                  if ( referrer_rewards_value > 0 && is_authorized_asset(*this, seller->referrer(*this), recv_asset) )
+                  if ( referrer_rewards_value > 0 && is_authorized_asset(*this, referrer(*this), recv_asset) )
                   {
                      FC_ASSERT ( referrer_rewards_value <= reward.amount.value,
                                  "Referrer reward shouldn't be greater than total reward" );
                      const asset referrer_reward = recv_asset.amount(referrer_rewards_value);
                      registrar_reward -= referrer_reward;
-                     deposit_market_fee_vesting_balance(seller->referrer, referrer_reward);
+                     deposit_market_fee_vesting_balance(referrer, referrer_reward);
                   }
                }
                if( registrar_reward.amount > 0 )
