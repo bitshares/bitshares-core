@@ -123,10 +123,11 @@ namespace graphene {
 
       void_result htlc_redeem_evaluator::do_apply(const htlc_redeem_operation& o)
       {
-         db().adjust_balance(htlc_obj->transfer.to, asset(htlc_obj->transfer.amount, htlc_obj->transfer.asset_id) );
+         const auto amount = asset(htlc_obj->transfer.amount, htlc_obj->transfer.asset_id);
+         db().adjust_balance(htlc_obj->transfer.to, amount);
          // notify related parties
-         htlc_redeemed_operation virt_op( htlc_obj->id, htlc_obj->transfer.from, htlc_obj->transfer.to,
-               o.redeemer, asset(htlc_obj->transfer.amount, htlc_obj->transfer.asset_id ), o.preimage );
+         htlc_redeemed_operation virt_op( htlc_obj->id, htlc_obj->transfer.from, htlc_obj->transfer.to, o.redeemer,
+               amount, htlc_obj->conditions.hash_lock.preimage_hash, htlc_obj->conditions.hash_lock.preimage_size );
          db().push_applied_operation( virt_op );
          db().remove(*htlc_obj);
          return void_result();

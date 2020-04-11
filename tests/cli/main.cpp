@@ -28,9 +28,12 @@
 #include <graphene/utilities/tempdir.hpp>
 
 #include <graphene/account_history/account_history_plugin.hpp>
+#include <graphene/api_helper_indexes/api_helper_indexes.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
+#include <graphene/custom_operations/custom_operations_plugin.hpp>
 #include <graphene/egenesis/egenesis.hpp>
 #include <graphene/wallet/wallet.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <fc/thread/thread.hpp>
 #include <fc/network/http/websocket.hpp>
@@ -46,7 +49,7 @@
       #define _WIN32_WINNT 0x0501
    #endif
    #include <winsock2.h>
-   #include <WS2tcpip.h>
+   #include <ws2tcpip.h>
 #else
    #include <sys/types.h>
    #include <sys/socket.h>
@@ -125,6 +128,9 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    app1->register_plugin<graphene::account_history::account_history_plugin>(true);
    app1->register_plugin< graphene::market_history::market_history_plugin >(true);
    app1->register_plugin< graphene::grouped_orders::grouped_orders_plugin>(true);
+   app1->register_plugin< graphene::api_helper_indexes::api_helper_indexes>(true);
+   app1->register_plugin<graphene::custom_operations::custom_operations_plugin>(true);
+
    app1->startup_plugins();
    boost::program_options::variables_map cfg;
 #ifdef _WIN32
@@ -137,6 +143,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    );
    cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
    cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
+   cfg.emplace("custom-operations-start-block", boost::program_options::variable_value(uint32_t(1), false));
    app1->initialize(app_dir.path(), cfg);
 
    app1->initialize_plugins(cfg);
@@ -144,6 +151,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 
    app1->startup();
    fc::usleep(fc::milliseconds(500));
+
    return app1;
 }
 
@@ -168,11 +176,45 @@ bool generate_block(std::shared_ptr<graphene::app::application> app, graphene::c
    }
 }
 
-bool generate_block(std::shared_ptr<graphene::app::application> app) 
+bool generate_block(std::shared_ptr<graphene::app::application> app)
 {
    graphene::chain::signed_block returned_block;
    return generate_block(app, returned_block);
 }
+
+
+signed_block generate_block(std::shared_ptr<graphene::app::application> app, uint32_t skip, const fc::ecc::private_key& key, int miss_blocks)
+{
+   // skip == ~0 will skip checks specified in database::validation_steps
+   skip |= database::skip_undo_history_check;
+
+   auto db = app->chain_database();
+   auto block = db->generate_block(db->get_slot_time(miss_blocks + 1),
+                                   db->get_scheduled_witness(miss_blocks + 1),
+                                   key, skip);
+   db->clear_pending();
+   return block;
+}
+
+
+//////
+// Generate blocks until the timestamp
+//////
+uint32_t generate_blocks(std::shared_ptr<graphene::app::application> app, fc::time_point_sec timestamp)
+{
+   fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
+   uint32_t skip = ~0;
+   auto db = app->chain_database();
+
+   generate_block(app);
+   auto slots_to_miss = db->get_slot_at_time(timestamp);
+   if( slots_to_miss <= 1 )
+      return 1;
+   --slots_to_miss;
+   generate_block(app, skip, committee_key, slots_to_miss);
+   return 2;
+}
+
 
 ///////////
 /// @brief Skip intermediate blocks, and generate a maintenance block
@@ -209,7 +251,8 @@ public:
    client_connection(
       std::shared_ptr<graphene::app::application> app,
       const fc::temp_directory& data_dir,
-      const int server_port_number
+      const int server_port_number,
+      const std::string custom_wallet_filename = "wallet.json"
    )
    {
       wallet_data.chain_id = app->chain_database()->get_chain_id();
@@ -225,7 +268,7 @@ public:
       BOOST_CHECK(remote_login_api->login( wallet_data.ws_user, wallet_data.ws_password ) );
 
       wallet_api_ptr = std::make_shared<graphene::wallet::wallet_api>(wallet_data, remote_login_api);
-      wallet_filename = data_dir.path().generic_string() + "/wallet.json";
+      wallet_filename = data_dir.path().generic_string() + "/" + custom_wallet_filename;
       wallet_api_ptr->set_wallet_filename(wallet_filename);
 
       wallet_api = fc::api<graphene::wallet::wallet_api>(wallet_api_ptr);
@@ -233,17 +276,10 @@ public:
       wallet_cli = std::make_shared<fc::rpc::cli>(GRAPHENE_MAX_NESTED_OBJECTS);
       for( auto& name_formatter : wallet_api_ptr->get_result_formatters() )
          wallet_cli->format_result( name_formatter.first, name_formatter.second );
-
-      boost::signals2::scoped_connection closed_connection(websocket_connection->closed.connect([=]{
-         cerr << "Server has disconnected us.\n";
-         wallet_cli->stop();
-      }));
-      (void)(closed_connection);
    }
    ~client_connection()
    {
-      // wait for everything to finish up
-      fc::usleep(fc::milliseconds(500));
+      wallet_cli->stop();
    }
 public:
    fc::http::websocket_client websocket_client;
@@ -310,10 +346,6 @@ struct cli_fixture
    ~cli_fixture()
    {
       BOOST_TEST_MESSAGE("Cleanup cli_wallet::boost_fixture_test_case");
-
-      // wait for everything to finish up
-      fc::usleep(fc::seconds(1));
-
       app1->shutdown();
 #ifdef _WIN32
       sockQuit();
@@ -488,6 +520,122 @@ BOOST_FIXTURE_TEST_CASE( cli_get_signed_transaction_signers, cli_fixture )
       throw;
    }
 }
+
+
+///////////////////////
+// Wallet RPC
+// Test adding an unnecessary signature to a transaction
+///////////////////////
+BOOST_FIXTURE_TEST_CASE(cli_sign_tx_with_unnecessary_signature, cli_fixture) {
+   try {
+      auto db = app1->chain_database();
+
+      account_object nathan_acct = con.wallet_api_ptr->get_account("nathan");
+      INVOKE(upgrade_nathan_account);
+
+      // Register Bob account
+      const auto bob_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+              "bob", bob_bki.pub_key, bob_bki.pub_key, "nathan", "nathan", 0, true
+      );
+
+      // Register Charlie account
+      const graphene::wallet::brain_key_info charlie_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+              "charlie", charlie_bki.pub_key, charlie_bki.pub_key, "nathan", "nathan", 0, true
+      );
+      const account_object &charlie_acc = con.wallet_api_ptr->get_account("charlie");
+
+      // Import Bob's key
+      BOOST_CHECK(con.wallet_api_ptr->import_key("bob", bob_bki.wif_priv_key));
+
+      // Create transaction with a transfer operation from Nathan to Charlie
+      transfer_operation top;
+      top.from = nathan_acct.id;
+      top.to = charlie_acc.id;
+      top.amount = asset(5000);
+      top.fee = db->current_fee_schedule().calculate_fee(top);
+
+      signed_transaction test_tx;
+      test_tx.operations.push_back(top);
+
+      // Sign the transaction with the implied nathan's key and the explicitly yet unnecessary Bob's key
+      auto signed_trx = con.wallet_api_ptr->sign_transaction2(test_tx, {bob_bki.pub_key}, false);
+
+      // Check for two signatures on the transaction
+      BOOST_CHECK_EQUAL(signed_trx.signatures.size(), 2);
+      flat_set<public_key_type> signers = con.wallet_api_ptr->get_transaction_signers(signed_trx);
+
+      // Check that the signed transaction contains both Nathan's required signature and Bob's unnecessary signature
+      BOOST_CHECK_EQUAL(nathan_acct.active.get_keys().size(), 1);
+      flat_set<public_key_type> expected_signers = {bob_bki.pub_key, nathan_acct.active.get_keys().front()};
+      flat_set<public_key_type> actual_signers = con.wallet_api_ptr->get_transaction_signers(signed_trx);
+      BOOST_CHECK(signers == expected_signers);
+
+   } catch (fc::exception &e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+
+///////////////////////
+// Wallet RPC
+// Test adding an unnecessary signature to a transaction builder
+///////////////////////
+BOOST_FIXTURE_TEST_CASE(cli_sign_tx_builder_with_unnecessary_signature, cli_fixture) {
+   try {
+      auto db = app1->chain_database();
+
+      account_object nathan_acct = con.wallet_api_ptr->get_account("nathan");
+      INVOKE(upgrade_nathan_account);
+
+      // Register Bob account
+      const auto bob_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+              "bob", bob_bki.pub_key, bob_bki.pub_key, "nathan", "nathan", 0, true
+      );
+
+      // Register Charlie account
+      const graphene::wallet::brain_key_info charlie_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+              "charlie", charlie_bki.pub_key, charlie_bki.pub_key, "nathan", "nathan", 0, true
+      );
+      const account_object &charlie_acc = con.wallet_api_ptr->get_account("charlie");
+
+      // Import Bob's key
+      BOOST_CHECK(con.wallet_api_ptr->import_key("bob", bob_bki.wif_priv_key));
+
+      // Use transaction builder to build a transaction with a transfer operation from Nathan to Charlie
+      graphene::wallet::transaction_handle_type tx_handle = con.wallet_api_ptr->begin_builder_transaction();
+
+      transfer_operation top;
+      top.from = nathan_acct.id;
+      top.to = charlie_acc.id;
+      top.amount = asset(5000);
+
+      con.wallet_api_ptr->add_operation_to_builder_transaction(tx_handle, top);
+      con.wallet_api_ptr->set_fees_on_builder_transaction(tx_handle, GRAPHENE_SYMBOL);
+
+      // Sign the transaction with the implied nathan's key and the explicitly yet unnecessary Bob's key
+      auto signed_trx = con.wallet_api_ptr->sign_builder_transaction2(tx_handle, {bob_bki.pub_key}, false);
+
+      // Check for two signatures on the transaction
+      BOOST_CHECK_EQUAL(signed_trx.signatures.size(), 2);
+      flat_set<public_key_type> signers = con.wallet_api_ptr->get_transaction_signers(signed_trx);
+
+      // Check that the signed transaction contains both Nathan's required signature and Bob's unnecessary signature
+      BOOST_CHECK_EQUAL(nathan_acct.active.get_keys().size(), 1);
+      flat_set<public_key_type> expected_signers = {bob_bki.pub_key, nathan_acct.active.get_keys().front()};
+      flat_set<public_key_type> actual_signers = con.wallet_api_ptr->get_transaction_signers(signed_trx);
+      BOOST_CHECK(signers == expected_signers);
+
+   } catch (fc::exception &e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 
 BOOST_FIXTURE_TEST_CASE( cli_get_available_transaction_signers, cli_fixture )
 {
@@ -860,6 +1008,10 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
       throw;
    }
    app1->shutdown();
+   app1.reset();
+   // Intentional delay after app1->shutdown
+   std::cout << "cli_multisig_transaction conclusion: Intentional delay" << std::endl;
+   fc::usleep(fc::seconds(1));
 }
 
 graphene::wallet::plain_keys decrypt_keys( const std::string& password, const vector<char>& cipher_keys )
@@ -1084,6 +1236,10 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       throw;
    }
    app1->shutdown();
+   app1.reset();
+   // Intentional delay after app1->shutdown
+   std::cout << "cli_create_htlc conclusion: Intentional delay" << std::endl;
+   fc::usleep(fc::seconds(1));
 }
 
 static string encapsulate( const graphene::wallet::signed_message& msg )
@@ -1188,3 +1344,252 @@ BOOST_FIXTURE_TEST_CASE( cli_sign_message, cli_fixture )
    BOOST_CHECK( con.wallet_api_ptr->verify_encapsulated_message( encapsulate( msg ) ) );
 
 } FC_LOG_AND_RETHROW() }
+
+///////////////////
+// Test the general storage by custom operations plugin
+///////////////////
+BOOST_FIXTURE_TEST_CASE( general_storage, cli_fixture )
+{
+   try {
+      // create the taker account
+      INVOKE(create_new_account);
+
+      auto db = app1->chain_database();
+
+      BOOST_TEST_MESSAGE("Storing in a map.");
+
+      flat_map<string, optional<string>> pairs;
+      pairs["key1"] = fc::json::to_string("value1");
+      pairs["key2"] = fc::json::to_string("value2");
+
+      con.wallet_api_ptr->account_store_map("nathan", "any", false, pairs, true);
+
+      BOOST_TEST_MESSAGE("The system is generating a block.");
+      BOOST_CHECK(generate_block(app1));
+
+      BOOST_TEST_MESSAGE("Get current map for nathan.");
+      auto nathan_map = con.wallet_api_ptr->get_account_storage("nathan", "any");
+
+      BOOST_CHECK_EQUAL(nathan_map[0].id.instance(), 0);
+      BOOST_CHECK_EQUAL(nathan_map[0].account.instance.value, 17);
+      BOOST_CHECK_EQUAL(nathan_map[0].catalog, "any");
+      BOOST_CHECK_EQUAL(nathan_map[0].key, "key1");
+      BOOST_CHECK_EQUAL(nathan_map[0].value->as_string(), "value1");
+      BOOST_CHECK_EQUAL(nathan_map[1].id.instance(), 1);
+      BOOST_CHECK_EQUAL(nathan_map[1].account.instance.value, 17);
+      BOOST_CHECK_EQUAL(nathan_map[1].catalog, "any");
+      BOOST_CHECK_EQUAL(nathan_map[1].key, "key2");
+      BOOST_CHECK_EQUAL(nathan_map[1].value->as_string(), "value2");
+
+      BOOST_TEST_MESSAGE("Storing in a list.");
+
+      flat_map<string, optional<string>> favs;
+      favs["chocolate"];
+      favs["milk"];
+      favs["banana"];
+
+      con.wallet_api_ptr->account_store_map("nathan", "favourites", false, favs, true);
+
+      BOOST_TEST_MESSAGE("The system is generating a block.");
+      BOOST_CHECK(generate_block(app1));
+
+      BOOST_TEST_MESSAGE("Get current list for nathan.");
+      auto nathan_list = con.wallet_api_ptr->get_account_storage("nathan", "favourites");
+
+      BOOST_CHECK_EQUAL(nathan_list[0].id.instance(), 2);
+      BOOST_CHECK_EQUAL(nathan_list[0].account.instance.value, 17);
+      BOOST_CHECK_EQUAL(nathan_list[0].catalog, "favourites");
+      BOOST_CHECK_EQUAL(nathan_list[0].key, "banana");
+      BOOST_CHECK_EQUAL(nathan_list[1].id.instance(), 3);
+      BOOST_CHECK_EQUAL(nathan_list[1].account.instance.value, 17);
+      BOOST_CHECK_EQUAL(nathan_list[1].catalog, "favourites");
+      BOOST_CHECK_EQUAL(nathan_list[1].key, "chocolate");
+      BOOST_CHECK_EQUAL(nathan_list[2].id.instance(), 4);
+      BOOST_CHECK_EQUAL(nathan_list[2].account.instance.value, 17);
+      BOOST_CHECK_EQUAL(nathan_list[2].catalog, "favourites");
+      BOOST_CHECK_EQUAL(nathan_list[2].key, "milk");
+
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+//////
+// Template copied
+//////
+template<typename Object>
+unsigned_int member_index(string name) {
+   unsigned_int index;
+   fc::typelist::runtime::for_each(typename fc::reflector<Object>::native_members(), [&name, &index](auto t) mutable {
+      if (name == decltype(t)::type::get_name())
+      index = decltype(t)::type::index;
+   });
+   return index;
+}
+
+///////////////////////
+// Wallet RPC
+// Test sign_builder_transaction2 with an account (bob) that has received a custom authorization
+// to transfer funds from another account (alice)
+///////////////////////
+BOOST_FIXTURE_TEST_CASE(cli_use_authorized_transfer, cli_fixture) {
+   try {
+      //////
+      // Initialize the blockchain
+      //////
+      auto db = app1->chain_database();
+
+      account_object nathan_acct = con.wallet_api_ptr->get_account("nathan");
+      INVOKE(upgrade_nathan_account);
+
+      // Register Alice account
+      const auto alice_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+              "alice", alice_bki.pub_key, alice_bki.pub_key, "nathan", "nathan", 0, true
+      );
+      const account_object &alice_acc = con.wallet_api_ptr->get_account("alice");
+
+      // Register Bob account
+      const auto bob_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+              "bob", bob_bki.pub_key, bob_bki.pub_key, "nathan", "nathan", 0, true
+      );
+      const account_object &bob_acc = con.wallet_api_ptr->get_account("bob");
+
+      // Register Charlie account
+      const graphene::wallet::brain_key_info charlie_bki = con.wallet_api_ptr->suggest_brain_key();
+      con.wallet_api_ptr->register_account(
+              "charlie", charlie_bki.pub_key, charlie_bki.pub_key, "nathan", "nathan", 0, true
+      );
+      const account_object &charlie_acc = con.wallet_api_ptr->get_account("charlie");
+
+      // Fund Alice's account
+      con.wallet_api_ptr->transfer("nathan", "alice", "450000", "1.3.0", "", true);
+
+      // Initialize common variables
+      signed_transaction signed_trx;
+
+
+      //////
+      // Initialize Alice's CLI wallet
+      //////
+      client_connection con_alice(app1, app_dir, server_port_number, "wallet_alice.json");
+      con_alice.wallet_api_ptr->set_password("supersecret");
+      con_alice.wallet_api_ptr->unlock("supersecret");
+
+      // Import Alice's key
+      BOOST_CHECK(con_alice.wallet_api_ptr->import_key("alice", alice_bki.wif_priv_key));
+
+
+      //////
+      // Initialize the blockchain for BSIP 40
+      //////
+      generate_blocks(app1, HARDFORK_BSIP_40_TIME);
+      // Set committee parameters
+      app1->chain_database()->modify(app1->chain_database()->get_global_properties(), [](global_property_object& p) {
+         p.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+      });
+
+
+      //////
+      // Alice authorizes Bob to transfer funds from her account to Charlie's account
+      //////
+      graphene::wallet::transaction_handle_type tx_alice_handle = con_alice.wallet_api_ptr->begin_builder_transaction();
+
+      custom_authority_create_operation caop;
+      caop.account = alice_acc.get_id();
+      caop.auth.add_authority(bob_acc.get_id(), 1);
+      caop.auth.weight_threshold = 1;
+      caop.enabled = true;
+      caop.valid_to = db->head_block_time() + 1000;
+      caop.operation_type = operation::tag<transfer_operation>::value;
+
+      // Restriction should have "to" equal Charlie
+      vector<restriction> restrictions;
+      auto to_index = member_index<transfer_operation>("to");
+      restrictions.emplace_back(to_index, restriction::func_eq, charlie_acc.get_id());
+
+      con_alice.wallet_api_ptr->add_operation_to_builder_transaction(tx_alice_handle, caop);
+      asset ca_fee = con_alice.wallet_api_ptr->set_fees_on_builder_transaction(tx_alice_handle, GRAPHENE_SYMBOL);
+
+      // Sign the transaction with the inferred Alice key
+      signed_trx = con_alice.wallet_api_ptr->sign_builder_transaction2(tx_alice_handle, {}, true);
+
+      // Check for one signatures on the transaction
+      BOOST_CHECK_EQUAL(signed_trx.signatures.size(), 1);
+
+      // Check that the signed transaction contains Alice's signature
+      flat_set<public_key_type> expected_signers = {alice_bki.pub_key};
+      flat_set<public_key_type> actual_signers = con_alice.wallet_api_ptr->get_transaction_signers(signed_trx);
+      BOOST_CHECK(actual_signers == expected_signers);
+
+
+      //////
+      // Initialize Bob's CLI wallet
+      //////
+      client_connection con_bob(app1, app_dir, server_port_number, "wallet_bob.json");
+      con_bob.wallet_api_ptr->set_password("supersecret");
+      con_bob.wallet_api_ptr->unlock("supersecret");
+
+      // Import Bob's key
+      BOOST_CHECK(con_bob.wallet_api_ptr->import_key("bob", bob_bki.wif_priv_key));
+
+
+      //////
+      // Bob attempt to transfer funds from Alice to Charlie while using Bob's wallet
+      // This should succeed because Bob is authorized to transfer by Alice
+      //////
+      graphene::wallet::transaction_handle_type tx_bob_handle = con_bob.wallet_api_ptr->begin_builder_transaction();
+
+      const asset transfer_amount = asset(123 * GRAPHENE_BLOCKCHAIN_PRECISION);
+      transfer_operation top;
+      top.from = alice_acc.id;
+      top.to = charlie_acc.id;
+      top.amount = transfer_amount;
+
+      con_bob.wallet_api_ptr->add_operation_to_builder_transaction(tx_bob_handle, top);
+      asset transfer_fee = con_bob.wallet_api_ptr->set_fees_on_builder_transaction(tx_bob_handle, GRAPHENE_SYMBOL);
+
+      // Sign the transaction with the explicit Bob key
+      signed_trx = con_bob.wallet_api_ptr->sign_builder_transaction2(tx_bob_handle, {bob_bki.pub_key}, true);
+
+      // Check for one signatures on the transaction
+      BOOST_CHECK_EQUAL(signed_trx.signatures.size(), 1);
+
+      // Check that the signed transaction contains Bob's signature
+      BOOST_CHECK_EQUAL(nathan_acct.active.get_keys().size(), 1);
+      expected_signers = {bob_bki.pub_key};
+      actual_signers = con_bob.wallet_api_ptr->get_transaction_signers(signed_trx);
+      BOOST_CHECK(actual_signers == expected_signers);
+
+
+      //////
+      // Check account balances
+      //////
+      // Check Charlie's balances
+      vector<asset> charlie_balances = con.wallet_api_ptr->list_account_balances("charlie");
+      BOOST_CHECK_EQUAL(charlie_balances.size(), 1);
+      asset charlie_core_balance = charlie_balances.front();
+      asset expected_charlie_core_balance = transfer_amount;
+      BOOST_ASSERT(charlie_core_balance == expected_charlie_core_balance);
+
+      // Check Bob's balances
+      vector<asset> bob_balances = con.wallet_api_ptr->list_account_balances("bob");
+      BOOST_CHECK_EQUAL(bob_balances.size(), 0);
+
+      // Check Alice's balance
+      vector<asset> alice_balances = con.wallet_api_ptr->list_account_balances("alice");
+      BOOST_CHECK_EQUAL(alice_balances.size(), 1);
+      asset alice_core_balance = alice_balances.front();
+      asset expected_alice_balance =  asset(450000 * GRAPHENE_BLOCKCHAIN_PRECISION)
+                                      - expected_charlie_core_balance
+                                      - ca_fee - transfer_fee;
+      BOOST_CHECK(alice_core_balance.asset_id == expected_alice_balance.asset_id);
+      BOOST_CHECK_EQUAL(alice_core_balance.amount.value, expected_alice_balance.amount.value);
+
+   } catch (fc::exception &e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}

@@ -32,6 +32,7 @@
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/cli.hpp>
 #include <fc/rpc/websocket_api.hpp>
+#include <fc/stacktrace.hpp>
 
 #include <graphene/app/api.hpp>
 #include <graphene/chain/config.hpp>
@@ -124,6 +125,7 @@ void setup_logging(string console_level, bool file_logger, string file_level, st
 
 int main( int argc, char** argv )
 {
+   fc::print_stacktrace_on_segfault();
    try {
 
       boost::program_options::options_description opts;
