@@ -98,6 +98,7 @@ public:
    std::string operator()(const graphene::protocol::asset_create_operation& op)const;
    std::string operator()(const graphene::protocol::htlc_create_operation& op)const;
    std::string operator()(const graphene::protocol::htlc_redeem_operation& op)const;
+   std::string operator()(const graphene::protocol::htlc_redeemed_operation& op)const;
 };
 
 }}} // namespace graphene::wallet::detail

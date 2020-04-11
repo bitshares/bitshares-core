@@ -47,6 +47,10 @@ public:
    {
       return "SHA256 " + hash.str();
    }
+   result_type operator()( const fc::hash160& hash )const
+   {
+      return "HASH160 " + hash.str();
+   }
 };
 
 std::string operation_printer::fee(const graphene::protocol::asset& a)const {
@@ -134,6 +138,19 @@ std::string operation_printer::operator()(const asset_create_operation& op) cons
 }
 
 std::string operation_printer::operator()(const htlc_redeem_operation& op) const
+{
+   out << "Redeem HTLC with database id "
+         << std::to_string(op.htlc_id.space_id)
+         << "." << std::to_string(op.htlc_id.type_id)
+         << "." << std::to_string((uint64_t)op.htlc_id.instance)
+         << " with preimage \"";
+   for (unsigned char c : op.preimage)
+      out << c;
+   out << "\"";
+   return fee(op.fee);
+}
+
+std::string operation_printer::operator()(const htlc_redeemed_operation& op) const
 {
    out << "Redeem HTLC with database id "
          << std::to_string(op.htlc_id.space_id)
