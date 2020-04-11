@@ -412,8 +412,8 @@ namespace graphene { namespace chain {
          int match( const limit_order_object& taker, const limit_order_object& maker, const price& trade_price );
          /***
           * @brief Match the two orders
-          * @param taker the taker
-          * @param maker the maker
+          * @param taker the account that is removing liquidity from the book
+          * @param maker the account that put liquidity on the book
           * @param trade_price the price the trade should execute at
           * @param feed_price the price of the current feed
           * @param maintenance_collateral_ratio the maintenance collateral ratio

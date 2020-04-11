@@ -1264,7 +1264,7 @@ void database::distribute_market_fees( const account_object* seller, const asset
       }
    }
 
-   // procss the remaining fees
+   // process the remaining fees
    if (issuer_fees.amount >  0)
    {  
       // calculate and pay referral rewards

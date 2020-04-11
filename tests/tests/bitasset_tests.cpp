@@ -1440,9 +1440,13 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
    ACTORS( (alice)  (bob) (charlie) (feeder1) (feeder2) (feeder3) );
    auto& core = asset_id_type()(db);
    const auto& core_id = core.id;
+   // alice will eventually overdo it on margin
    transfer( committee_account(db), alice, asset(100000 * prec) );
+   // bob will take advantage of alice's situation
    transfer( committee_account(db), bob,   asset(100000 * prec) );
+   // charlie will create an asset and trade it
    transfer( committee_account(db), charlie, asset(100000 * prec) );
+   // price feeders
    transfer( committee_account(db), feeder1, asset(100 * prec) );
    transfer( committee_account(db), feeder2, asset(100 * prec) );
    transfer( committee_account(db), feeder3, asset(100 * prec) );
