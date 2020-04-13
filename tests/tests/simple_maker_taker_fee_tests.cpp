@@ -789,6 +789,322 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
 
    /**
+    * Test of different maker and taker fees charged when filling limit orders after HF for a UIA
+    *
+    * Test the filling of a taker fee when the **maker** fee percent is set to 0.  This tests some optimizations
+    * in database::calculate_market_fee().
+    */
+   BOOST_AUTO_TEST_CASE(simple_match_and_fill_with_different_fees_uia_2) {
+      try {
+         // Initialize for the current time
+         trx.clear();
+         set_expiration(db, trx);
+
+         // Initialize actors
+         ACTORS((jill)(izzy)(alice)(bob));
+
+         // Initialize tokens
+         price price(asset(1, asset_id_type(1)), asset(1));
+
+         const uint16_t JILL_PRECISION = 100;
+         const uint16_t jill_market_fee_percent = 0 * GRAPHENE_1_PERCENT;
+         const asset_object jillcoin = create_user_issued_asset("JCOIN", jill, charge_market_fee, price, 2,
+                                                                jill_market_fee_percent);
+
+         const uint16_t IZZY_PRECISION = 1000;
+         const uint16_t izzy_market_fee_percent = 0 * GRAPHENE_1_PERCENT;
+         const asset_object izzycoin = create_user_issued_asset("ICOIN", izzy, charge_market_fee, price, 3,
+                                                                izzy_market_fee_percent);
+
+
+         //////
+         // Advance to activate hardfork
+         //////
+         generate_blocks(HARDFORK_BSIP_81_TIME);
+         generate_block();
+         trx.clear();
+         set_expiration(db, trx);
+
+
+         //////
+         // After HF, test that new values can be set
+         //////
+         // Define the new taker fees
+         uint16_t jill_maker_fee_percent = jill_market_fee_percent;
+         uint16_t jill_taker_fee_percent = 1 * GRAPHENE_1_PERCENT;
+
+         uint16_t izzy_maker_fee_percent = izzy_market_fee_percent;
+         uint16_t izzy_taker_fee_percent = 3 * GRAPHENE_1_PERCENT;
+
+         // Set the new taker fee for JILLCOIN
+         asset_update_operation uop;
+         uop.issuer = jill.id;
+         uop.asset_to_update = jillcoin.get_id();
+         uop.new_options.market_fee_percent = jill_maker_fee_percent;
+         uop.new_options = jillcoin.options;
+         uop.new_options.taker_fee_percent = jill_taker_fee_percent;
+
+         trx.clear();
+         trx.operations.push_back(uop);
+         db.current_fee_schedule().set_fee(trx.operations.back());
+         sign(trx, jill_private_key);
+         PUSH_TX(db, trx); // No exception should be thrown
+
+         // Check the taker fee for JILLCOIN
+         asset_object updated_asset = jillcoin.get_id()(db);
+         uint16_t expected_taker_fee_percent = jill_taker_fee_percent;
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+
+         // Set the new taker fee for IZZYCOIN
+         uop.issuer = izzy.id;
+         uop.asset_to_update = izzycoin.get_id();
+         uop.new_options.market_fee_percent = izzy_maker_fee_percent;
+         uop.new_options = izzycoin.options;
+         uop.new_options.taker_fee_percent = izzy_taker_fee_percent;
+
+         trx.clear();
+         trx.operations.push_back(uop);
+         db.current_fee_schedule().set_fee(trx.operations.back());
+         sign(trx, izzy_private_key);
+         PUSH_TX(db, trx); // No exception should be thrown
+
+         // Check the taker fee for IZZYCOIN
+         updated_asset = izzycoin.get_id()(db);
+         expected_taker_fee_percent = izzy_taker_fee_percent;
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+
+
+         //////
+         // After HF, create limit orders that will perfectly match
+         //////
+         BOOST_TEST_MESSAGE("Issuing 10 jillcoin to alice");
+         issue_uia(alice, jillcoin.amount(10 * JILL_PRECISION));
+         BOOST_TEST_MESSAGE("Checking alice's balance");
+         BOOST_REQUIRE_EQUAL(get_balance(alice, jillcoin), 10 * JILL_PRECISION);
+
+         BOOST_TEST_MESSAGE("Issuing 300 izzycoin to bob");
+         issue_uia(bob, izzycoin.amount(300 * IZZY_PRECISION));
+         BOOST_TEST_MESSAGE("Checking bob's balance");
+         BOOST_REQUIRE_EQUAL(get_balance(bob, izzycoin), 300 * IZZY_PRECISION);
+
+         // Alice and Bob place orders which match, and are completely filled by each other
+         // Alice is willing to sell 10 JILLCOIN for at least 300 IZZYCOIN
+         limit_order_create_operation alice_sell_op = create_sell_operation(alice.id,
+                                                                            jillcoin.amount(10 * JILL_PRECISION),
+                                                                            izzycoin.amount(300 *
+                                                                                            IZZY_PRECISION));
+         trx.clear();
+         trx.operations.push_back(alice_sell_op);
+         asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
+         sign(trx, alice_private_key);
+         processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
+         limit_order_id_type alice_order_id = ptx.operation_results[0].get<object_id_type>();
+
+         const limit_order_object* alice_order_before = db.find<limit_order_object>(alice_order_id);
+         BOOST_CHECK(alice_order_before != nullptr);
+
+         // Bob is willing to sell 300 IZZYCOIN for at least 10 JILLCOIN
+         limit_order_create_operation bob_sell_op = create_sell_operation(bob.id, izzycoin.amount(300 * IZZY_PRECISION),
+                                                                          jillcoin.amount(
+                                                                                  10 *
+                                                                                  JILL_PRECISION));
+         trx.clear();
+         trx.operations.push_back(bob_sell_op);
+         asset bob_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
+         sign(trx, bob_private_key);
+         ptx = PUSH_TX(db, trx); // No exception should be thrown
+         limit_order_id_type bob_order_id = ptx.operation_results[0].get<object_id_type>();
+
+         // Check that the orders were filled by ensuring that they are no longer on the order books
+         const limit_order_object* alice_order = db.find<limit_order_object>(alice_order_id);
+         BOOST_CHECK(alice_order == nullptr);
+         const limit_order_object* bob_order = db.find<limit_order_object>(bob_order_id);
+         BOOST_CHECK(bob_order == nullptr);
+
+
+         // Check the new balances of the maker
+         // Alice was the maker; she is receiving IZZYCOIN
+         asset expected_izzy_fee = izzycoin.amount(
+                 300 * IZZY_PRECISION * izzy_maker_fee_percent / GRAPHENE_100_PERCENT);
+         BOOST_REQUIRE_EQUAL(get_balance(alice, izzycoin),
+                             (300 * IZZY_PRECISION) - alice_sell_fee.amount.value - expected_izzy_fee.amount.value);
+         BOOST_REQUIRE_EQUAL(get_balance(alice, jillcoin), 0);
+
+         // Check the new balance of the taker
+         // Bob was the taker; he is receiving JILLCOIN
+         asset expected_jill_fee = jillcoin.amount(
+                 10 * JILL_PRECISION * jill_taker_fee_percent / GRAPHENE_100_PERCENT);
+         BOOST_REQUIRE_EQUAL(get_balance(bob, jillcoin),
+                             (10 * JILL_PRECISION) - bob_sell_fee.amount.value - expected_jill_fee.amount.value);
+         BOOST_REQUIRE_EQUAL(get_balance(bob, izzycoin), 0);
+
+         // Check the asset issuer's accumulated fees
+         BOOST_CHECK(izzycoin.dynamic_asset_data_id(db).accumulated_fees == expected_izzy_fee.amount);
+         BOOST_CHECK(jillcoin.dynamic_asset_data_id(db).accumulated_fees == expected_jill_fee.amount);
+
+      } FC_LOG_AND_RETHROW()
+   }
+
+
+   /**
+    * Test of different maker and taker fees charged when filling limit orders after HF for a UIA
+    *
+    * Test the filling of a taker fee when the **taker** fee percent is set to 0.  This tests some optimizations
+    * in database::calculate_market_fee().
+    */
+   BOOST_AUTO_TEST_CASE(simple_match_and_fill_with_different_fees_uia_3) {
+      try {
+         // Initialize for the current time
+         trx.clear();
+         set_expiration(db, trx);
+
+         // Initialize actors
+         ACTORS((jill)(izzy)(alice)(bob));
+
+         // Initialize tokens
+         price price(asset(1, asset_id_type(1)), asset(1));
+
+         const uint16_t JILL_PRECISION = 100;
+         const uint16_t jill_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
+         const asset_object jillcoin = create_user_issued_asset("JCOIN", jill, charge_market_fee, price, 2,
+                                                                jill_market_fee_percent);
+
+         const uint16_t IZZY_PRECISION = 1000;
+         const uint16_t izzy_market_fee_percent = 5 * GRAPHENE_1_PERCENT;
+         const asset_object izzycoin = create_user_issued_asset("ICOIN", izzy, charge_market_fee, price, 3,
+                                                                izzy_market_fee_percent);
+
+
+         //////
+         // Advance to activate hardfork
+         //////
+         generate_blocks(HARDFORK_BSIP_81_TIME);
+         generate_block();
+         trx.clear();
+         set_expiration(db, trx);
+
+
+         //////
+         // After HF, test that new values can be set
+         //////
+         // Define the new taker fees
+         uint16_t jill_maker_fee_percent = jill_market_fee_percent;
+         uint16_t jill_taker_fee_percent = 0 * GRAPHENE_1_PERCENT;
+
+         uint16_t izzy_maker_fee_percent = izzy_market_fee_percent;
+         uint16_t izzy_taker_fee_percent = 0 * GRAPHENE_1_PERCENT;
+
+         // Set the new taker fee for JILLCOIN
+         asset_update_operation uop;
+         uop.issuer = jill.id;
+         uop.asset_to_update = jillcoin.get_id();
+         uop.new_options.market_fee_percent = jill_maker_fee_percent;
+         uop.new_options = jillcoin.options;
+         uop.new_options.taker_fee_percent = jill_taker_fee_percent;
+
+         trx.clear();
+         trx.operations.push_back(uop);
+         db.current_fee_schedule().set_fee(trx.operations.back());
+         sign(trx, jill_private_key);
+         PUSH_TX(db, trx); // No exception should be thrown
+
+         // Check the taker fee for JILLCOIN
+         asset_object updated_asset = jillcoin.get_id()(db);
+         uint16_t expected_taker_fee_percent = jill_taker_fee_percent;
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+
+         // Set the new taker fee for IZZYCOIN
+         uop.issuer = izzy.id;
+         uop.asset_to_update = izzycoin.get_id();
+         uop.new_options.market_fee_percent = izzy_maker_fee_percent;
+         uop.new_options = izzycoin.options;
+         uop.new_options.taker_fee_percent = izzy_taker_fee_percent;
+
+         trx.clear();
+         trx.operations.push_back(uop);
+         db.current_fee_schedule().set_fee(trx.operations.back());
+         sign(trx, izzy_private_key);
+         PUSH_TX(db, trx); // No exception should be thrown
+
+         // Check the taker fee for IZZYCOIN
+         updated_asset = izzycoin.get_id()(db);
+         expected_taker_fee_percent = izzy_taker_fee_percent;
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+
+
+         //////
+         // After HF, create limit orders that will perfectly match
+         //////
+         BOOST_TEST_MESSAGE("Issuing 10 jillcoin to alice");
+         issue_uia(alice, jillcoin.amount(10 * JILL_PRECISION));
+         BOOST_TEST_MESSAGE("Checking alice's balance");
+         BOOST_REQUIRE_EQUAL(get_balance(alice, jillcoin), 10 * JILL_PRECISION);
+
+         BOOST_TEST_MESSAGE("Issuing 300 izzycoin to bob");
+         issue_uia(bob, izzycoin.amount(300 * IZZY_PRECISION));
+         BOOST_TEST_MESSAGE("Checking bob's balance");
+         BOOST_REQUIRE_EQUAL(get_balance(bob, izzycoin), 300 * IZZY_PRECISION);
+
+         // Alice and Bob place orders which match, and are completely filled by each other
+         // Alice is willing to sell 10 JILLCOIN for at least 300 IZZYCOIN
+         limit_order_create_operation alice_sell_op = create_sell_operation(alice.id,
+                                                                            jillcoin.amount(10 * JILL_PRECISION),
+                                                                            izzycoin.amount(300 *
+                                                                                            IZZY_PRECISION));
+         trx.clear();
+         trx.operations.push_back(alice_sell_op);
+         asset alice_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
+         sign(trx, alice_private_key);
+         processed_transaction ptx = PUSH_TX(db, trx); // No exception should be thrown
+         limit_order_id_type alice_order_id = ptx.operation_results[0].get<object_id_type>();
+
+         const limit_order_object* alice_order_before = db.find<limit_order_object>(alice_order_id);
+         BOOST_CHECK(alice_order_before != nullptr);
+
+         // Bob is willing to sell 300 IZZYCOIN for at least 10 JILLCOIN
+         limit_order_create_operation bob_sell_op = create_sell_operation(bob.id, izzycoin.amount(300 * IZZY_PRECISION),
+                                                                          jillcoin.amount(
+                                                                                  10 *
+                                                                                  JILL_PRECISION));
+         trx.clear();
+         trx.operations.push_back(bob_sell_op);
+         asset bob_sell_fee = db.current_fee_schedule().set_fee(trx.operations.back());
+         sign(trx, bob_private_key);
+         ptx = PUSH_TX(db, trx); // No exception should be thrown
+         limit_order_id_type bob_order_id = ptx.operation_results[0].get<object_id_type>();
+
+         // Check that the orders were filled by ensuring that they are no longer on the order books
+         const limit_order_object* alice_order = db.find<limit_order_object>(alice_order_id);
+         BOOST_CHECK(alice_order == nullptr);
+         const limit_order_object* bob_order = db.find<limit_order_object>(bob_order_id);
+         BOOST_CHECK(bob_order == nullptr);
+
+
+         // Check the new balances of the maker
+         // Alice was the maker; she is receiving IZZYCOIN
+         asset expected_izzy_fee = izzycoin.amount(
+                 300 * IZZY_PRECISION * izzy_maker_fee_percent / GRAPHENE_100_PERCENT);
+         BOOST_REQUIRE_EQUAL(get_balance(alice, izzycoin),
+                             (300 * IZZY_PRECISION) - alice_sell_fee.amount.value - expected_izzy_fee.amount.value);
+         BOOST_REQUIRE_EQUAL(get_balance(alice, jillcoin), 0);
+
+         // Check the new balance of the taker
+         // Bob was the taker; he is receiving JILLCOIN
+         asset expected_jill_fee = jillcoin.amount(
+                 10 * JILL_PRECISION * jill_taker_fee_percent / GRAPHENE_100_PERCENT);
+         BOOST_REQUIRE_EQUAL(get_balance(bob, jillcoin),
+                             (10 * JILL_PRECISION) - bob_sell_fee.amount.value - expected_jill_fee.amount.value);
+         BOOST_REQUIRE_EQUAL(get_balance(bob, izzycoin), 0);
+
+         // Check the asset issuer's accumulated fees
+         BOOST_CHECK(izzycoin.dynamic_asset_data_id(db).accumulated_fees == expected_izzy_fee.amount);
+         BOOST_CHECK(jillcoin.dynamic_asset_data_id(db).accumulated_fees == expected_jill_fee.amount);
+
+      } FC_LOG_AND_RETHROW()
+   }
+
+
+   /**
     * Test of different maker and taker fees charged when filling limit orders after HF for a smart asset
     */
    BOOST_AUTO_TEST_CASE(simple_match_and_fill_with_different_fees_smart_asset) {
