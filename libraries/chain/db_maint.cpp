@@ -1080,10 +1080,12 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
 }
 
 /****
- * @brief a one-time data process to assign default taker fees for BSIP81
+ * @brief A one-time data process to assign the initial taker fee percentage for BSIP81
+ * Every asset issuer may subsequently change the taker fee
  */
 void process_hf_bsip81(database &db) {
-   // for each asset
+   // Iterate through every each to set the default taker fee to equal the maker fee
+   // Without this processing code the taker fee will default to zero
    const auto &asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
    for (auto asset_itr = asset_idx.cbegin(); asset_itr != asset_idx.cend(); ++asset_itr) {
       const asset_object &asset = *asset_itr;

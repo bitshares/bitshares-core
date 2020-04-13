@@ -77,8 +77,9 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    auto asset_symbol_itr = asset_indx.find( op.symbol );
    FC_ASSERT( asset_symbol_itr == asset_indx.end() );
 
-   // This must remain due to "BOND.CNY" being allowed before this HF
+   // Define now from the current block time
    const time_point_sec now = d.head_block_time();
+   // This must remain due to "BOND.CNY" being allowed before this HF
    if( now > HARDFORK_385_TIME )
    {
       auto dotpos = op.symbol.rfind( '.' );
@@ -117,8 +118,8 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
       FC_ASSERT( op.precision == op.bitasset_opts->short_backing_asset(d).precision );
    }
 
+   // Taker fees should be zero until activation of BSIP81
    if(now <= HARDFORK_BSIP_81_TIME) {
-      // Taker fees should be zero until activation of BSIP81
       FC_ASSERT(op.common_options.taker_fee_percent == 0, "Simple maker-taker fees are not yet activated");
    }
 

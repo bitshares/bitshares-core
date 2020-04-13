@@ -216,7 +216,9 @@ void asset_options::validate()const
 {
    FC_ASSERT( max_supply > 0 );
    FC_ASSERT( max_supply <= GRAPHENE_MAX_SHARE_SUPPLY );
+   // The non-negative maker fee must be less than 100%
    FC_ASSERT( market_fee_percent <= GRAPHENE_100_PERCENT );
+   // The non-negative taker fee must be less than 100%
    FC_ASSERT( taker_fee_percent <= GRAPHENE_100_PERCENT );
    FC_ASSERT( max_market_fee >= 0 && max_market_fee <= GRAPHENE_MAX_SHARE_SUPPLY );
    // There must be no high bits in permissions whose meaning is not known.
