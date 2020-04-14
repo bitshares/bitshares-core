@@ -350,12 +350,14 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          ACTORS((smartissuer)(feedproducer));
 
          // Initialize tokens
-//         const asset_object &bitsmart = create_bitasset("SMARTBIT", smartissuer.id);
-         const asset_object bitsmart = create_bitasset("SMARTBIT", smartissuer.id);
-
+         create_bitasset("SMARTBIT", smartissuer.id);
+         // Obtain asset object after a block is generated to obtain the final object that is commited to the database
+         generate_block();
+         const asset_object &bitsmart = get_asset("SMARTBIT");
 
          generate_blocks(HARDFORK_615_TIME); // get around Graphene issue #615 feed expiration bug
          generate_block();
+
 
          //////
          // Before HF, test inability to set taker fees
@@ -446,40 +448,46 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          price price(asset(1, asset_id_type(1)), asset(1));
 
          const uint16_t alice1coin_market_fee_percent = 1 * GRAPHENE_1_PERCENT;
-         const asset_object alice1coin = create_user_issued_asset("ALICE1COIN", alice, charge_market_fee, price, 2,
+         create_user_issued_asset("ALICE1COIN", alice, charge_market_fee, price, 2,
                                                                   alice1coin_market_fee_percent);
 
          const uint16_t alice2coin_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
-         const asset_object alice2coin = create_user_issued_asset("ALICE2COIN", alice, charge_market_fee, price, 2,
+         create_user_issued_asset("ALICE2COIN", alice, charge_market_fee, price, 2,
                                                                   alice2coin_market_fee_percent);
 
          const uint16_t bob1coin_market_fee_percent = 3 * GRAPHENE_1_PERCENT;
-         const asset_object bob1coin = create_user_issued_asset("BOB1COIN", alice, charge_market_fee, price, 2,
+         create_user_issued_asset("BOB1COIN", alice, charge_market_fee, price, 2,
                                                                 bob1coin_market_fee_percent);
 
          const uint16_t bob2coin_market_fee_percent = 4 * GRAPHENE_1_PERCENT;
-         const asset_object bob2coin = create_user_issued_asset("BOB2COIN", alice, charge_market_fee, price, 2,
+         create_user_issued_asset("BOB2COIN", alice, charge_market_fee, price, 2,
                                                                 bob2coin_market_fee_percent);
 
          const uint16_t charlie1coin_market_fee_percent = 4 * GRAPHENE_1_PERCENT;
-         const asset_object charlie1coin = create_user_issued_asset("CHARLIE1COIN", alice, charge_market_fee, price, 2,
+         create_user_issued_asset("CHARLIE1COIN", alice, charge_market_fee, price, 2,
                                                                     charlie1coin_market_fee_percent);
 
          const uint16_t charlie2coin_market_fee_percent = 5 * GRAPHENE_1_PERCENT;
-         const asset_object charlie2coin = create_user_issued_asset("CHARLIE2COIN", alice, charge_market_fee, price, 2,
+         create_user_issued_asset("CHARLIE2COIN", alice, charge_market_fee, price, 2,
                                                                     charlie2coin_market_fee_percent);
 
          const uint16_t bitsmart1coin_market_fee_percent = 7 * GRAPHENE_1_PERCENT;
          create_bitasset("SMARTBIT1", smartissuer.id, bitsmart1coin_market_fee_percent);
-         generate_blocks(1); // The smart asset's ID will be updated after a block is generated
-//         const asset_object &bitsmart1 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SMARTBIT1");
-         const asset_object bitsmart1 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SMARTBIT1");
+
 
          const uint16_t bitsmart2coin_market_fee_percent = 8 * GRAPHENE_1_PERCENT;
          create_bitasset("SMARTBIT2", smartissuer.id, bitsmart2coin_market_fee_percent);
-         generate_blocks(1); // The smart asset's ID will be updated after a block is generated
-//         const asset_object &bitsmart2 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SMARTBIT2");
-         const asset_object bitsmart2 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SMARTBIT2");
+
+         // Obtain asset object after a block is generated to obtain the final object that is commited to the database
+         generate_block();
+         const asset_object& alice1coin = get_asset("ALICE1COIN");
+         const asset_object& alice2coin = get_asset("ALICE2COIN");
+         const asset_object& bob1coin = get_asset("BOB1COIN");
+         const asset_object& bob2coin = get_asset("BOB2COIN");
+         const asset_object& charlie1coin = get_asset("CHARLIE1COIN");
+         const asset_object& charlie2coin = get_asset("CHARLIE2COIN");
+         const asset_object& bitsmart1 = get_asset("SMARTBIT1");
+         const asset_object& bitsmart2 = get_asset("SMARTBIT2");
 
 
          //////
@@ -658,13 +666,18 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          const uint16_t JILL_PRECISION = 100;
          const uint16_t jill_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
-         const asset_object jillcoin = create_user_issued_asset("JCOIN", jill, charge_market_fee, price, 2,
+         create_user_issued_asset("JCOIN", jill, charge_market_fee, price, 2,
                                                                 jill_market_fee_percent);
 
          const uint16_t IZZY_PRECISION = 1000;
          const uint16_t izzy_market_fee_percent = 5 * GRAPHENE_1_PERCENT;
-         const asset_object izzycoin = create_user_issued_asset("ICOIN", izzy, charge_market_fee, price, 3,
+         create_user_issued_asset("ICOIN", izzy, charge_market_fee, price, 3,
                                                                 izzy_market_fee_percent);
+
+         // Obtain asset object after a block is generated to obtain the final object that is commited to the database
+         generate_block();
+         const asset_object& jillcoin = get_asset("JCOIN");
+         const asset_object& izzycoin = get_asset("ICOIN");
 
 
          //////
@@ -816,13 +829,18 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          const uint16_t JILL_PRECISION = 100;
          const uint16_t jill_market_fee_percent = 0 * GRAPHENE_1_PERCENT;
-         const asset_object jillcoin = create_user_issued_asset("JCOIN", jill, charge_market_fee, price, 2,
+         create_user_issued_asset("JCOIN", jill, charge_market_fee, price, 2,
                                                                 jill_market_fee_percent);
 
          const uint16_t IZZY_PRECISION = 1000;
          const uint16_t izzy_market_fee_percent = 0 * GRAPHENE_1_PERCENT;
-         const asset_object izzycoin = create_user_issued_asset("ICOIN", izzy, charge_market_fee, price, 3,
+         create_user_issued_asset("ICOIN", izzy, charge_market_fee, price, 3,
                                                                 izzy_market_fee_percent);
+
+         // Obtain asset object after a block is generated to obtain the final object that is commited to the database
+         generate_block();
+         const asset_object& jillcoin = get_asset("JCOIN");
+         const asset_object& izzycoin = get_asset("ICOIN");
 
 
          //////
@@ -976,13 +994,18 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          const uint16_t JILL_PRECISION = 100;
          const uint16_t jill_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
-         const asset_object jillcoin = create_user_issued_asset("JCOIN", jill, charge_market_fee, price, 2,
+         create_user_issued_asset("JCOIN", jill, charge_market_fee, price, 2,
                                                                 jill_market_fee_percent);
 
          const uint16_t IZZY_PRECISION = 1000;
          const uint16_t izzy_market_fee_percent = 5 * GRAPHENE_1_PERCENT;
-         const asset_object izzycoin = create_user_issued_asset("ICOIN", izzy, charge_market_fee, price, 3,
+         create_user_issued_asset("ICOIN", izzy, charge_market_fee, price, 3,
                                                                 izzy_market_fee_percent);
+
+         // Obtain asset object after a block is generated to obtain the final object that is commited to the database
+         generate_block();
+         const asset_object& jillcoin = get_asset("JCOIN");
+         const asset_object& izzycoin = get_asset("ICOIN");
 
 
          //////
@@ -1138,10 +1161,13 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          const uint16_t SMARTBIT_PRECISION = 10000;
          const uint16_t smartbit_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
-//         const asset_object &smartbit = create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
-//                                                        charge_market_fee, 4);
-         const asset_object smartbit = create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
+         create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
                                                         charge_market_fee, 4);
+
+         // Obtain asset object after a block is generated to obtain the final object that is commited to the database
+         generate_block();
+         const asset_object &smartbit = get_asset("SMARTBIT");
+
          const auto &core = asset_id_type()(db);
 
          update_feed_producers(smartbit, {feedproducer.id});
@@ -1327,10 +1353,12 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          const uint16_t SMARTBIT_PRECISION = 10000;
          const uint16_t smartbit_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
-//         const asset_object &smartbit = create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
-//                                                        charge_market_fee, 4);
-         const asset_object smartbit = create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
+         create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
                                                         charge_market_fee, 4);
+         // Obtain asset object after a block is generated to obtain the final object that is commited to the database
+         generate_block();
+         const asset_object &smartbit = get_asset("SMARTBIT");
+
          const auto &core = asset_id_type()(db);
 
          update_feed_producers(smartbit, {feedproducer.id});
