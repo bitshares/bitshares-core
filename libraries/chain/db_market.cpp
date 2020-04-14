@@ -1190,7 +1190,9 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
 
    // Optimization: The fee is zero if the order is a taker, and the taker fee percent is 0%
    // This optimization should only be used after BSIP81 activation
-   if(!before_core_hardfork_bsip81 && !is_maker && trade_asset.options.taker_fee_percent == 0)
+   if(!before_core_hardfork_bsip81 && !is_maker
+      && trade_asset.options.extensions.value.taker_fee_percent.valid()
+      && *trade_asset.options.extensions.value.taker_fee_percent == 0)
       return trade_asset.amount(0);
 
    uint16_t fee_percent;
@@ -1199,7 +1201,12 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
       fee_percent = trade_asset.options.market_fee_percent;
    } else {
       // After BSIP81, the fee depends on if maker or taker
-      fee_percent = is_maker ? trade_asset.options.market_fee_percent : trade_asset.options.taker_fee_percent;
+      if (is_maker) {
+         fee_percent = trade_asset.options.market_fee_percent;
+      } else {
+         fee_percent = trade_asset.options.extensions.value.taker_fee_percent.valid()
+                       ? *trade_asset.options.extensions.value.taker_fee_percent : 0;
+      }
    }
 
    auto value = detail::calculate_percent(trade_amount.amount, fee_percent);

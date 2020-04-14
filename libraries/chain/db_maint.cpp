@@ -1093,7 +1093,7 @@ void process_hf_bsip81(database &db) {
       wlog("Setting default taker fee of ${asset} to ${raw_market_fee_percent}.",
               ("asset", asset.symbol) ("raw_market_fee_percent", raw_market_fee_percent));
       db.modify<asset_object>(asset, [raw_market_fee_percent](asset_object &obj) {
-         obj.options.taker_fee_percent = raw_market_fee_percent;
+         obj.options.extensions.value.taker_fee_percent = raw_market_fee_percent;
       });
    }
 }

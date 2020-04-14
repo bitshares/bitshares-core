@@ -32,6 +32,8 @@ namespace graphene { namespace protocol {
    {
       fc::optional<uint16_t>                  reward_percent;
       fc::optional<flat_set<account_id_type>> whitelist_market_fee_sharing;
+      // After BSIP81 activation, taker_fee_percent is the taker fee
+      fc::optional<uint16_t>                  taker_fee_percent;
    };
    typedef extension<additional_asset_options> additional_asset_options_t;
 
@@ -52,8 +54,6 @@ namespace graphene { namespace protocol {
       // BSIP81: Asset owners may specify different market fee rate for maker orders and taker orders
       // After BSIP81 activation, market_fee_percent is the maker fee
       uint16_t market_fee_percent = 0;
-      // After BSIP81 activation, taker_fee_percent is the taker fee
-      uint16_t taker_fee_percent = 0;
       /// Market fees calculated as @ref market_fee_percent of the traded volume are capped to this value
       share_type max_market_fee = GRAPHENE_MAX_SHARE_SUPPLY;
 
@@ -527,7 +527,6 @@ FC_REFLECT( graphene::protocol::asset_claim_pool_operation::fee_parameters_type,
 FC_REFLECT( graphene::protocol::asset_options,
             (max_supply)
             (market_fee_percent)
-            (taker_fee_percent)
             (max_market_fee)
             (issuer_permissions)
             (flags)
@@ -549,7 +548,7 @@ FC_REFLECT( graphene::protocol::bitasset_options,
             (extensions)
           )
 
-FC_REFLECT( graphene::protocol::additional_asset_options, (reward_percent)(whitelist_market_fee_sharing) )
+FC_REFLECT( graphene::protocol::additional_asset_options, (reward_percent)(whitelist_market_fee_sharing)(taker_fee_percent) )
 FC_REFLECT( graphene::protocol::asset_create_operation::fee_parameters_type, (symbol3)(symbol4)(long_symbol)(price_per_kbyte) )
 FC_REFLECT( graphene::protocol::asset_global_settle_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::protocol::asset_settle_operation::fee_parameters_type, (fee) )

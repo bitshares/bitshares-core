@@ -63,7 +63,7 @@ struct simple_maker_taker_database_fixture : database_fixture {
       creator.common_options.flags = flags;
       creator.common_options.issuer_permissions = flags;
       creator.common_options.market_fee_percent = maker_fee_percent;
-      creator.common_options.taker_fee_percent = taker_fee_percent;
+      creator.common_options.extensions.value.taker_fee_percent = taker_fee_percent;
 
       return creator;
 
@@ -104,7 +104,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          uop.asset_to_update = jillcoin.get_id();
          uop.new_options = jillcoin.options;
          uint16_t new_taker_fee_percent = uop.new_options.market_fee_percent / 2;
-         uop.new_options.taker_fee_percent = new_taker_fee_percent;
+         uop.new_options.extensions.value.taker_fee_percent = new_taker_fee_percent;
 
          trx.operations.push_back(uop);
          db.current_fee_schedule().set_fee(trx.operations.back());
@@ -114,8 +114,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          // Check the taker fee
          asset_object updated_asset = jillcoin.get_id()(db);
-         uint16_t expected_taker_fee_percent = 0; // Before the HF it should be set to 0
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
 
          //////
@@ -126,7 +125,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
             set_expiration(db, trx);
 
             uint64_t alternate_taker_fee_percent = new_taker_fee_percent * 2;
-            uop.new_options.taker_fee_percent = alternate_taker_fee_percent;
+            uop.new_options.extensions.value.taker_fee_percent = alternate_taker_fee_percent;
 
             proposal_create_operation cop;
             cop.review_period_seconds = 86400;
@@ -141,8 +140,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
             // Check the taker fee is not changed because the proposal has not been approved
             updated_asset = jillcoin.get_id()(db);
-            expected_taker_fee_percent = 0; // Before the HF it should be set to 0
-            BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+            BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
          }
 
 
@@ -189,14 +187,15 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          // which is effectively the new maker fee percent
          //////
          updated_asset = jillcoin.get_id()(db);
-         expected_taker_fee_percent = updated_asset.options.market_fee_percent;
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         uint16_t expected_taker_fee_percent = updated_asset.options.market_fee_percent;
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
 
          //////
          // After HF, test invalid taker fees
          //////
-         uop.new_options.taker_fee_percent = GRAPHENE_100_PERCENT + 1;
+         uop.new_options.extensions.value.taker_fee_percent = GRAPHENE_100_PERCENT + 1;
          trx.clear();
          trx.operations.push_back(uop);
          db.current_fee_schedule().set_fee(trx.operations.back());
@@ -208,7 +207,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          //////
          // After HF, test that new values can be set
          //////
-         uop.new_options.taker_fee_percent = new_taker_fee_percent;
+         uop.new_options.extensions.value.taker_fee_percent = new_taker_fee_percent;
          trx.clear();
          trx.operations.push_back(uop);
          db.current_fee_schedule().set_fee(trx.operations.back());
@@ -218,7 +217,8 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          // Check the taker fee
          updated_asset = jillcoin.get_id()(db);
          expected_taker_fee_percent = new_taker_fee_percent;
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
 
          //////
@@ -229,7 +229,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
             set_expiration(db, trx);
 
             uint64_t alternate_taker_fee_percent = new_taker_fee_percent * 2;
-            uop.new_options.taker_fee_percent = alternate_taker_fee_percent;
+            uop.new_options.extensions.value.taker_fee_percent = alternate_taker_fee_percent;
 
             proposal_create_operation cop;
             cop.review_period_seconds = 86400;
@@ -245,7 +245,8 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
             // Check the taker fee is not changed because the proposal has not been approved
             updated_asset = jillcoin.get_id()(db);
             expected_taker_fee_percent = new_taker_fee_percent;
-            BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+            BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+            BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
 
             // Approve the proposal
@@ -268,7 +269,8 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
             // Check the taker fee is not changed because the proposal has not been approved
             updated_asset = jillcoin.get_id()(db);
             expected_taker_fee_percent = alternate_taker_fee_percent;
-            BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+            BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+            BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
          }
 
@@ -324,7 +326,8 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
             BOOST_CHECK(asset_idx.find("JCOIN2") != asset_idx.end());
             updated_asset = *asset_idx.find("JCOIN2");
             expected_taker_fee_percent = taker_fee_percent;
-            BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+            BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+            BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
             uint16_t expected_maker_fee_percent = maker_fee_percent;
             BOOST_CHECK_EQUAL(expected_maker_fee_percent, updated_asset.options.market_fee_percent);
 
@@ -347,7 +350,8 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          ACTORS((smartissuer)(feedproducer));
 
          // Initialize tokens
-         const asset_object &bitsmart = create_bitasset("SMARTBIT", smartissuer.id);
+//         const asset_object &bitsmart = create_bitasset("SMARTBIT", smartissuer.id);
+         const asset_object bitsmart = create_bitasset("SMARTBIT", smartissuer.id);
 
 
          generate_blocks(HARDFORK_615_TIME); // get around Graphene issue #615 feed expiration bug
@@ -361,7 +365,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          uop.asset_to_update = bitsmart.get_id();
          uop.new_options = bitsmart.options;
          uint16_t new_taker_fee_percent = uop.new_options.market_fee_percent / 2;
-         uop.new_options.taker_fee_percent = new_taker_fee_percent;
+         uop.new_options.extensions.value.taker_fee_percent = new_taker_fee_percent;
 
          trx.operations.push_back(uop);
          db.current_fee_schedule().set_fee(trx.operations.back());
@@ -371,8 +375,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          // Check the taker fee
          asset_object updated_asset = bitsmart.get_id()(db);
-         uint16_t expected_taker_fee_percent = 0; // Before the HF it should be set to 0
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
 
          //////
@@ -390,14 +393,15 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          // which is effectively the new maker fee percent
          //////
          updated_asset = bitsmart.get_id()(db);
-         expected_taker_fee_percent = updated_asset.options.market_fee_percent;
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         uint16_t expected_taker_fee_percent = updated_asset.options.market_fee_percent;
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
 
          //////
          // After HF, test invalid taker fees
          //////
-         uop.new_options.taker_fee_percent = GRAPHENE_100_PERCENT + 1;
+         uop.new_options.extensions.value.taker_fee_percent = GRAPHENE_100_PERCENT + 1;
          trx.clear();
          trx.operations.push_back(uop);
          db.current_fee_schedule().set_fee(trx.operations.back());
@@ -409,7 +413,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          //////
          // After HF, test that new values can be set
          //////
-         uop.new_options.taker_fee_percent = new_taker_fee_percent;
+         uop.new_options.extensions.value.taker_fee_percent = new_taker_fee_percent;
          trx.clear();
          trx.operations.push_back(uop);
          db.current_fee_schedule().set_fee(trx.operations.back());
@@ -419,7 +423,8 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          // Check the taker fee
          updated_asset = bitsmart.get_id()(db);
          expected_taker_fee_percent = new_taker_fee_percent;
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
       } FC_LOG_AND_RETHROW()
    }
@@ -467,12 +472,14 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          const uint16_t bitsmart1coin_market_fee_percent = 7 * GRAPHENE_1_PERCENT;
          create_bitasset("SMARTBIT1", smartissuer.id, bitsmart1coin_market_fee_percent);
          generate_blocks(1); // The smart asset's ID will be updated after a block is generated
-         const asset_object &bitsmart1 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SMARTBIT1");
+//         const asset_object &bitsmart1 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SMARTBIT1");
+         const asset_object bitsmart1 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SMARTBIT1");
 
          const uint16_t bitsmart2coin_market_fee_percent = 8 * GRAPHENE_1_PERCENT;
          create_bitasset("SMARTBIT2", smartissuer.id, bitsmart2coin_market_fee_percent);
          generate_blocks(1); // The smart asset's ID will be updated after a block is generated
-         const asset_object &bitsmart2 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SMARTBIT2");
+//         const asset_object &bitsmart2 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SMARTBIT2");
+         const asset_object bitsmart2 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SMARTBIT2");
 
 
          //////
@@ -515,40 +522,32 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
 
          //////
-         // Before HF, test that taker fees are set to zero
+         // Before HF, test that taker fees are not set
          //////
          // Check the taker fee
          updated_asset = alice1coin.get_id()(db);
-         expected_fee_percent = 0; // Before the HF it should be set to 0
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
          updated_asset = alice2coin.get_id()(db);
-         expected_fee_percent = 0; // Before the HF it should be set to 0
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
          updated_asset = bob1coin.get_id()(db);
-         expected_fee_percent = 0; // Before the HF it should be set to 0
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
          updated_asset = bob2coin.get_id()(db);
-         expected_fee_percent = 0; // Before the HF it should be set to 0
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
          updated_asset = charlie1coin.get_id()(db);
-         expected_fee_percent = 0; // Before the HF it should be set to 0
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
          updated_asset = charlie2coin.get_id()(db);
-         expected_fee_percent = 0; // Before the HF it should be set to 0
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
          updated_asset = bitsmart1.get_id()(db);
-         expected_fee_percent = 0; // Before the HF it should be set to 0
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
          updated_asset = bitsmart2.get_id()(db);
-         expected_fee_percent = 0; // Before the HF it should be set to 0
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
 
          //////
@@ -601,35 +600,42 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          //////
          updated_asset = alice1coin.get_id()(db);
          expected_fee_percent = alice1coin_market_fee_percent;
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
          updated_asset = alice2coin.get_id()(db);
          expected_fee_percent = alice2coin_market_fee_percent;
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
          updated_asset = bob1coin.get_id()(db);
          expected_fee_percent = bob1coin_market_fee_percent;
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
          updated_asset = bob2coin.get_id()(db);
          expected_fee_percent = bob2coin_market_fee_percent;
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
          updated_asset = charlie1coin.get_id()(db);
          expected_fee_percent = charlie1coin_market_fee_percent;
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
          updated_asset = charlie2coin.get_id()(db);
          expected_fee_percent = charlie2coin_market_fee_percent;
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
          updated_asset = bitsmart1.get_id()(db);
          expected_fee_percent = bitsmart1coin_market_fee_percent;
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
          updated_asset = bitsmart2.get_id()(db);
          expected_fee_percent = bitsmart2coin_market_fee_percent;
-         BOOST_CHECK_EQUAL(expected_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
       } FC_LOG_AND_RETHROW()
    }
@@ -685,7 +691,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          uop.issuer = jill.id;
          uop.asset_to_update = jillcoin.get_id();
          uop.new_options = jillcoin.options;
-         uop.new_options.taker_fee_percent = jill_taker_fee_percent;
+         uop.new_options.extensions.value.taker_fee_percent = jill_taker_fee_percent;
 
          trx.clear();
          trx.operations.push_back(uop);
@@ -696,13 +702,14 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          // Check the taker fee for JILLCOIN
          asset_object updated_asset = jillcoin.get_id()(db);
          uint16_t expected_taker_fee_percent = jill_taker_fee_percent;
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
          // Set the new taker fee for IZZYCOIN
          uop.issuer = izzy.id;
          uop.asset_to_update = izzycoin.get_id();
          uop.new_options = izzycoin.options;
-         uop.new_options.taker_fee_percent = izzy_taker_fee_percent;
+         uop.new_options.extensions.value.taker_fee_percent = izzy_taker_fee_percent;
 
          trx.clear();
          trx.operations.push_back(uop);
@@ -713,7 +720,8 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          // Check the taker fee for IZZYCOIN
          updated_asset = izzycoin.get_id()(db);
          expected_taker_fee_percent = izzy_taker_fee_percent;
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
 
          //////
@@ -842,7 +850,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          uop.asset_to_update = jillcoin.get_id();
          uop.new_options.market_fee_percent = jill_maker_fee_percent;
          uop.new_options = jillcoin.options;
-         uop.new_options.taker_fee_percent = jill_taker_fee_percent;
+         uop.new_options.extensions.value.taker_fee_percent = jill_taker_fee_percent;
 
          trx.clear();
          trx.operations.push_back(uop);
@@ -853,14 +861,15 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          // Check the taker fee for JILLCOIN
          asset_object updated_asset = jillcoin.get_id()(db);
          uint16_t expected_taker_fee_percent = jill_taker_fee_percent;
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
          // Set the new taker fee for IZZYCOIN
          uop.issuer = izzy.id;
          uop.asset_to_update = izzycoin.get_id();
          uop.new_options.market_fee_percent = izzy_maker_fee_percent;
          uop.new_options = izzycoin.options;
-         uop.new_options.taker_fee_percent = izzy_taker_fee_percent;
+         uop.new_options.extensions.value.taker_fee_percent = izzy_taker_fee_percent;
 
          trx.clear();
          trx.operations.push_back(uop);
@@ -871,7 +880,8 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          // Check the taker fee for IZZYCOIN
          updated_asset = izzycoin.get_id()(db);
          expected_taker_fee_percent = izzy_taker_fee_percent;
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
 
          //////
@@ -1000,7 +1010,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          uop.asset_to_update = jillcoin.get_id();
          uop.new_options.market_fee_percent = jill_maker_fee_percent;
          uop.new_options = jillcoin.options;
-         uop.new_options.taker_fee_percent = jill_taker_fee_percent;
+         uop.new_options.extensions.value.taker_fee_percent = jill_taker_fee_percent;
 
          trx.clear();
          trx.operations.push_back(uop);
@@ -1011,14 +1021,15 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          // Check the taker fee for JILLCOIN
          asset_object updated_asset = jillcoin.get_id()(db);
          uint16_t expected_taker_fee_percent = jill_taker_fee_percent;
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
          // Set the new taker fee for IZZYCOIN
          uop.issuer = izzy.id;
          uop.asset_to_update = izzycoin.get_id();
          uop.new_options.market_fee_percent = izzy_maker_fee_percent;
          uop.new_options = izzycoin.options;
-         uop.new_options.taker_fee_percent = izzy_taker_fee_percent;
+         uop.new_options.extensions.value.taker_fee_percent = izzy_taker_fee_percent;
 
          trx.clear();
          trx.operations.push_back(uop);
@@ -1029,7 +1040,8 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          // Check the taker fee for IZZYCOIN
          updated_asset = izzycoin.get_id()(db);
          expected_taker_fee_percent = izzy_taker_fee_percent;
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
 
          //////
@@ -1126,7 +1138,9 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          const uint16_t SMARTBIT_PRECISION = 10000;
          const uint16_t smartbit_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
-         const asset_object &smartbit = create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
+//         const asset_object &smartbit = create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
+//                                                        charge_market_fee, 4);
+         const asset_object smartbit = create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
                                                         charge_market_fee, 4);
          const auto &core = asset_id_type()(db);
 
@@ -1164,7 +1178,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          uop.issuer = jill.id;
          uop.asset_to_update = jillcoin.get_id();
          uop.new_options = jillcoin.options;
-         uop.new_options.taker_fee_percent = jill_taker_fee_percent;
+         uop.new_options.extensions.value.taker_fee_percent = jill_taker_fee_percent;
 
          trx.clear();
          trx.operations.push_back(uop);
@@ -1175,7 +1189,8 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          // Check the taker fee for JILLCOIN
          asset_object updated_asset = jillcoin.get_id()(db);
          uint16_t expected_taker_fee_percent = jill_taker_fee_percent;
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
 
          // Set the new taker fee for SMARTBIT
@@ -1184,7 +1199,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          uop.asset_to_update = smartbit.get_id();
          uop.new_options = smartbit.options;
          uop.new_options.market_fee_percent = smartbit_maker_fee_percent;
-         uop.new_options.taker_fee_percent = smartbit_taker_fee_percent;
+         uop.new_options.extensions.value.taker_fee_percent = smartbit_taker_fee_percent;
 
          trx.clear();
          trx.operations.push_back(uop);
@@ -1195,7 +1210,8 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          // Check the taker fee for SMARTBIT
          updated_asset = smartbit.get_id()(db);
          expected_taker_fee_percent = smartbit_taker_fee_percent;
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
          // Check the maker fee for SMARTBIT
          updated_asset = smartbit.get_id()(db);
@@ -1311,7 +1327,9 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          const uint16_t SMARTBIT_PRECISION = 10000;
          const uint16_t smartbit_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
-         const asset_object &smartbit = create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
+//         const asset_object &smartbit = create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
+//                                                        charge_market_fee, 4);
+         const asset_object smartbit = create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
                                                         charge_market_fee, 4);
          const auto &core = asset_id_type()(db);
 
@@ -1349,7 +1367,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          uop.issuer = jill.id;
          uop.asset_to_update = jillcoin.get_id();
          uop.new_options = jillcoin.options;
-         uop.new_options.taker_fee_percent = jill_taker_fee_percent;
+         uop.new_options.extensions.value.taker_fee_percent = jill_taker_fee_percent;
 
          trx.clear();
          trx.operations.push_back(uop);
@@ -1360,7 +1378,8 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          // Check the taker fee for JILLCOIN
          asset_object updated_asset = jillcoin.get_id()(db);
          uint16_t expected_taker_fee_percent = jill_taker_fee_percent;
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
 
          // Set the new taker fee for SMARTBIT
@@ -1369,7 +1388,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          uop.asset_to_update = smartbit.get_id();
          uop.new_options = smartbit.options;
          uop.new_options.market_fee_percent = smartbit_maker_fee_percent;
-         uop.new_options.taker_fee_percent = smartbit_taker_fee_percent;
+         uop.new_options.extensions.value.taker_fee_percent = smartbit_taker_fee_percent;
 
          trx.clear();
          trx.operations.push_back(uop);
@@ -1380,7 +1399,8 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          // Check the taker fee for SMARTBIT
          updated_asset = smartbit.get_id()(db);
          expected_taker_fee_percent = smartbit_taker_fee_percent;
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, updated_asset.options.taker_fee_percent);
+         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
+         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
          // Check the maker fee for SMARTBIT
          updated_asset = smartbit.get_id()(db);
