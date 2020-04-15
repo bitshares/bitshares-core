@@ -545,6 +545,9 @@ try {
 BOOST_AUTO_TEST_CASE( htlc_hardfork_test )
 { 
    try {
+      ACTORS( (alice) );
+      int64_t init_balance(10000 * GRAPHENE_BLOCKCHAIN_PRECISION);
+      transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
       {
          // try to set committee parameters before hardfork
          proposal_create_operation cop = proposal_create_operation::committee_proposal(
@@ -682,8 +685,92 @@ BOOST_AUTO_TEST_CASE( htlc_hardfork_test )
       const htlc_create_operation::fee_parameters_type& htlc_fee 
             = current_fee_schedule.get<htlc_create_operation>();
       BOOST_CHECK_EQUAL(htlc_fee.fee, 2 * GRAPHENE_BLOCKCHAIN_PRECISION);
+
+      // verify that the per_kb fee can't be set until after BSIP 64
+     {
+         BOOST_TEST_MESSAGE("Attempting to set HTLC per_kb fees before hard fork.");
+
+         // get existing fee_schedule
+         const chain_parameters& existing_params = db.get_global_properties().parameters;
+         const fee_schedule_type& existing_fee_schedule = *(existing_params.current_fees);
+         // create a new fee_shedule
+         std::shared_ptr<fee_schedule_type> new_fee_schedule = std::make_shared<fee_schedule_type>();
+         new_fee_schedule->scale = existing_fee_schedule.scale;
+         // replace the old with the new
+         flat_map<uint64_t, graphene::chain::fee_parameters> params_map = get_htlc_fee_parameters();
+         htlc_create_operation::fee_parameters_type create_param;
+         create_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         create_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         create_param.fee_per_kb = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         params_map[((operation)htlc_create_operation()).which()] = create_param;
+         for(auto param : existing_fee_schedule.parameters)
+         {
+            auto itr = params_map.find(param.which());
+            if (itr == params_map.end())
+               new_fee_schedule->parameters.insert(param);
+            else
+            {
+               new_fee_schedule->parameters.insert( (*itr).second);
+            }
+         }
+         proposal_create_operation cop = proposal_create_operation::committee_proposal(
+               db.get_global_properties().parameters, db.head_block_time());
+         cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+         cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
+         committee_member_update_global_parameters_operation uop;
+         uop.new_parameters.current_fees = new_fee_schedule;
+         cop.proposed_ops.emplace_back(uop);
+         cop.fee = asset( 100000 );
+         trx.operations.push_back( cop );
+         GRAPHENE_CHECK_THROW(db.push_transaction( trx ), fc::exception);
+         trx.clear();
+      }
+      // verify that the per_kb fee can be set after BSIP 64
+      generate_blocks( HARDFORK_CORE_BSIP64_TIME + 10);
+      set_expiration(db, trx);
+      {
+         BOOST_TEST_MESSAGE("Attempting to set HTLC per_kb fees after hard fork.");
+
+         // get existing fee_schedule
+         const chain_parameters& existing_params = db.get_global_properties().parameters;
+         const fee_schedule_type& existing_fee_schedule = *(existing_params.current_fees);
+         // create a new fee_shedule
+         std::shared_ptr<fee_schedule_type> new_fee_schedule = std::make_shared<fee_schedule_type>();
+         new_fee_schedule->scale = existing_fee_schedule.scale;
+         // replace the old with the new
+         flat_map<uint64_t, graphene::chain::fee_parameters> params_map = get_htlc_fee_parameters();
+         htlc_create_operation::fee_parameters_type create_param;
+         create_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         create_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         create_param.fee_per_kb = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         params_map[((operation)htlc_create_operation()).which()] = create_param;
+         for(auto param : existing_fee_schedule.parameters)
+         {
+            auto itr = params_map.find(param.which());
+            if (itr == params_map.end())
+               new_fee_schedule->parameters.insert(param);
+            else
+            {
+               new_fee_schedule->parameters.insert( (*itr).second);
+            }
+         }
+         proposal_create_operation cop = proposal_create_operation::committee_proposal(
+               db.get_global_properties().parameters, db.head_block_time());
+         cop.fee_paying_account = alice_id;
+         cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
+         committee_member_update_global_parameters_operation uop;
+         uop.new_parameters.current_fees = new_fee_schedule;
+         cop.proposed_ops.emplace_back(uop);
+         cop.fee = db.current_fee_schedule().calculate_fee(cop);
+         trx.operations.push_back( cop );
+         sign(trx, alice_private_key);
+         db.push_transaction( trx );
+         trx.clear();
+      }
       
-} FC_LOG_AND_RETHROW() }
+   } 
+   FC_LOG_AND_RETHROW() 
+}
 
 BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
 { try {

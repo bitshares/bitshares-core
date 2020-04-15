@@ -61,6 +61,11 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_redeem_operation>());
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_extend_operation>());
       }
+      if (block_time < HARDFORK_CORE_BSIP64_TIME) 
+      {
+         FC_ASSERT( op.new_parameters.current_fees->get<htlc_create_operation>().fee_per_kb == 0,
+               "Unable to set htlc_create_operation per_kb_fee until after BSIP 64 hardfork");
+      }
       if (!HARDFORK_BSIP_40_PASSED(block_time)) {
          FC_ASSERT(!op.new_parameters.extensions.value.custom_authority_options.valid(),
                    "Unable to set Custom Authority Options before hardfork BSIP 40");

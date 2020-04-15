@@ -47,6 +47,7 @@ namespace graphene { namespace protocol {
          struct fee_parameters_type {
             uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
             uint64_t fee_per_day = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
+            uint64_t fee_per_kb = 0;
          };
 
          // paid to network
@@ -215,7 +216,7 @@ namespace graphene { namespace protocol {
 
 FC_REFLECT_TYPENAME( graphene::protocol::htlc_hash )
 
-FC_REFLECT( graphene::protocol::htlc_create_operation::fee_parameters_type, (fee) (fee_per_day) )
+FC_REFLECT( graphene::protocol::htlc_create_operation::fee_parameters_type, (fee) (fee_per_day) (fee_per_kb) )
 FC_REFLECT( graphene::protocol::htlc_create_operation::additional_options_type, (memo))
 FC_REFLECT( graphene::protocol::htlc_redeem_operation::fee_parameters_type, (fee) (fee_per_kb) )
 FC_REFLECT( graphene::protocol::htlc_redeemed_operation::fee_parameters_type, ) // VIRTUAL
