@@ -1735,6 +1735,20 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          htlc_id_type htlc_id = result_block.transactions[result_block.transactions.size()-1].operation_results[0].get<object_id_type>();
          bob_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
          BOOST_TEST_MESSAGE("Bob shares the HTLC ID with Alice. The HTLC ID is: " + bob_htlc_id_as_string);
+         // test operation_printer
+         auto hist = con.wallet_api_ptr->get_account_history("alice", 10);
+         for(size_t i = 0; i < hist.size(); ++i)
+         {
+            if (i < 2)
+            {
+               auto obj = hist[i];
+               std::stringstream ss;
+               ss << "Description: " << obj.description << " Memo: " << obj.memo << "\n";
+               auto str = ss.str();
+               BOOST_TEST_MESSAGE( str );
+               BOOST_CHECK( str.find("HASH160 008e") != std::string::npos );
+            }
+         }
       }
 
       // Alice can now look over Bob's HTLC, to see if it is what was agreed to:
