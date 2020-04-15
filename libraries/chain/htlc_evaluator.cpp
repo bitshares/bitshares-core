@@ -54,7 +54,7 @@ namespace graphene {
                "Memo unavailable until after HARDFORK BSIP64");
          // HASH160 added at hardfork BSIP64
          FC_ASSERT( d.head_block_time() > HARDFORK_CORE_BSIP64_TIME || o.preimage_hash.which() != 
-               htlc_hash(fc::hash160()).which(), "HASH160 unavailable until after HARDFORK BSIP64" );
+               htlc_hash(fc::hash160()).which(), "HASH160 unavailable until after HARDFORK BSIP64" );            
          const auto& asset_to_transfer = o.amount.asset_id( d );
          const auto& from_account = o.from( d );
          const auto& to_account = o.to( d );
@@ -64,6 +64,8 @@ namespace graphene {
          FC_ASSERT( is_authorized_asset( d, to_account, asset_to_transfer ), 
                "Asset ${asset} is not authorized for account ${acct}.", 
                ( "asset", asset_to_transfer.id )( "acct", to_account.id ) );
+         FC_ASSERT( d.head_block_time() < HARDFORK_CORE_BSIP64_TIME || !asset_to_transfer.is_transfer_restricted(), 
+               "Asset ${asset} cannot be transfered.", ("asset", asset_to_transfer.id) );   
          return void_result();
       }
 
@@ -80,9 +82,9 @@ namespace graphene {
                esc.transfer.asset_id              = o.amount.asset_id;
                esc.conditions.hash_lock.preimage_hash = o.preimage_hash;
                esc.conditions.hash_lock.preimage_size = o.preimage_size;
-               esc.conditions.time_lock.expiration    = dbase.head_block_time() + o.claim_period_seconds;
                if ( o.extensions.value.memo.valid() )
                   esc.memo = o.extensions.value.memo;
+               esc.conditions.time_lock.expiration    = dbase.head_block_time() + o.claim_period_seconds;
             });
             return  esc.id;
 

@@ -202,10 +202,10 @@ uint64_t wallet_api::get_asset_count()const
 
 signed_transaction wallet_api::htlc_create( string source, string destination, string amount, string asset_symbol,
          string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
-         const uint32_t claim_period_seconds, bool broadcast)
+         const uint32_t claim_period_seconds, const std::string& memo, bool broadcast)
 {
    return my->htlc_create(source, destination, amount, asset_symbol, hash_algorithm, preimage_hash, preimage_size,
-         claim_period_seconds, broadcast);
+         claim_period_seconds, memo, broadcast);
 }
 
 fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
@@ -223,6 +223,8 @@ fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
       const auto& asset = my->get_asset( obj.transfer.asset_id );
       transfer["asset"] = asset.symbol;
       transfer["amount"] = graphene::app::uint128_amount_to_string( obj.transfer.amount.value, asset.precision );
+      if (obj.memo.valid())
+         transfer["memo"] = my->read_memo( *obj.memo );
       class htlc_hash_to_variant_visitor
       {
          public:

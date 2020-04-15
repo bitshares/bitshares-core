@@ -290,7 +290,7 @@ try {
       create_operation.amount = graphene::chain::asset( 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 60;
-      create_operation.preimage_hash = hash_it<fc::sha256>( pre_image );
+      create_operation.preimage_hash = hash_it<fc::hash160>( pre_image );
       create_operation.preimage_size = preimage_size;
       create_operation.from = alice_id;
       create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
@@ -322,7 +322,7 @@ try {
       create_operation.amount = graphene::chain::asset( 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 60;
-      create_operation.preimage_hash = hash_it<fc::sha256>( pre_image );
+      create_operation.preimage_hash = hash_it<fc::hash160>( pre_image );
       create_operation.preimage_size = 0;
       create_operation.from = alice_id;
       create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
@@ -348,11 +348,26 @@ try {
    graphene::app::database_api db_api(db);
    auto obj = db_api.get_objects( {alice_htlc_id }).front();
    graphene::chain::htlc_object htlc = obj.template as<graphene::chain::htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS);
-
+   BOOST_CHECK( htlc.memo.valid() );
+   
    // grab number of history objects to make sure everyone gets notified
    size_t alice_num_history = get_operation_history(alice_id).size();
    size_t bob_num_history = get_operation_history(bob_id).size();
    size_t joker_num_history = get_operation_history(joker_id).size();
+
+   // joker sends a redeem operation with a bad hash
+   {
+      std::vector<char> bad_pre_image{ 0x00, 0x01, 0x02 };
+      graphene::chain::htlc_redeem_operation update_operation;
+      update_operation.redeemer = joker_id;
+      update_operation.htlc_id = alice_htlc_id;
+      update_operation.preimage = bad_pre_image;
+      update_operation.fee = db.current_fee_schedule().calculate_fee( update_operation );
+      trx.operations.push_back( update_operation );
+      sign(trx, joker_private_key);
+      GRAPHENE_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+      trx.clear();      
+   }
 
    // joker sends a redeem operation to claim the funds for bob
    {

@@ -300,7 +300,7 @@ public:
 
    signed_transaction htlc_create( string source, string destination, string amount, string asset_symbol,
          string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
-         const uint32_t claim_period_seconds, bool broadcast = false );
+         const uint32_t claim_period_seconds, const std::string& memo, bool broadcast = false );
 
    signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<char>& preimage, bool broadcast );
 

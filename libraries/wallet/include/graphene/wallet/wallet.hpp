@@ -1446,12 +1446,13 @@ class wallet_api
        * @param preimage_hash the hash of the preimage
        * @param preimage_size the size of the preimage in bytes
        * @param claim_period_seconds how long after creation until the lock expires
+       * @param memo the memo
        * @param broadcast true if you wish to broadcast the transaction
        * @return the signed transaction
        */
       signed_transaction htlc_create( string source, string destination, string amount, string asset_symbol,
             string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
-            const uint32_t claim_period_seconds, bool broadcast = false );
+            const uint32_t claim_period_seconds, const std::string& memo, bool broadcast = false );
 
       /****
        * Update a hashed time lock contract
