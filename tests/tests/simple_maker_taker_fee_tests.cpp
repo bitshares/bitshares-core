@@ -183,13 +183,11 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          //////
          // After HF, test default values of taker fee after HF
-         // After the HF its default value should be the market fee percent
-         // which is effectively the new maker fee percent
+         // After the HF its default value should still not be set
          //////
          updated_asset = jillcoin.get_id()(db);
          uint16_t expected_taker_fee_percent = updated_asset.options.market_fee_percent;
-         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
 
          //////
@@ -391,13 +389,11 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
          //////
          // After HF, test default values of taker fee after HF
-         // After the HF its default value should be the market fee percent
-         // which is effectively the new maker fee percent
+         // After the HF its default value should still not be set
          //////
          updated_asset = bitsmart.get_id()(db);
          uint16_t expected_taker_fee_percent = updated_asset.options.market_fee_percent;
-         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
-         BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
 
          //////
@@ -604,46 +600,39 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
 
          //////
-         // After HF, test the taker fees for each asset are set, by default, to the maker fees
+         // After HF, test the taker fees for each asset are not set
          //////
          updated_asset = alice1coin.get_id()(db);
          expected_fee_percent = alice1coin_market_fee_percent;
-         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
-         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
          updated_asset = alice2coin.get_id()(db);
          expected_fee_percent = alice2coin_market_fee_percent;
-         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
-         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
          updated_asset = bob1coin.get_id()(db);
          expected_fee_percent = bob1coin_market_fee_percent;
-         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
-         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
          updated_asset = bob2coin.get_id()(db);
          expected_fee_percent = bob2coin_market_fee_percent;
-         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
-         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
          updated_asset = charlie1coin.get_id()(db);
          expected_fee_percent = charlie1coin_market_fee_percent;
-         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
-         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
          updated_asset = charlie2coin.get_id()(db);
          expected_fee_percent = charlie2coin_market_fee_percent;
-         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
          updated_asset = bitsmart1.get_id()(db);
          expected_fee_percent = bitsmart1coin_market_fee_percent;
-         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
-         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
          updated_asset = bitsmart2.get_id()(db);
          expected_fee_percent = bitsmart2coin_market_fee_percent;
-         BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
-         BOOST_CHECK_EQUAL(expected_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
+         BOOST_CHECK(!updated_asset.options.extensions.value.taker_fee_percent.valid());
 
       } FC_LOG_AND_RETHROW()
    }

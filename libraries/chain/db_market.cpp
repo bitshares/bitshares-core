@@ -1184,29 +1184,18 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
    if( is_maker && trade_asset.options.market_fee_percent == 0 )
       return trade_asset.amount(0);
 
-   // BSIP81: Asset owners may specify different market fee rate for maker orders and taker orders
-   auto maint_time = get_dynamic_global_properties().next_maintenance_time;
-   bool before_core_hardfork_bsip81 = ( maint_time <= HARDFORK_BSIP_81_TIME ); // before simple maker-taker fee
-
    // Optimization: The fee is zero if the order is a taker, and the taker fee percent is 0%
-   // This optimization should only be used after BSIP81 activation
-   if(!before_core_hardfork_bsip81 && !is_maker
-      && trade_asset.options.extensions.value.taker_fee_percent.valid()
-      && *trade_asset.options.extensions.value.taker_fee_percent == 0)
+   const optional<uint16_t>& taker_fee_percent = trade_asset.options.extensions.value.taker_fee_percent;
+   if(!is_maker && taker_fee_percent.valid() && *taker_fee_percent == 0)
       return trade_asset.amount(0);
 
    uint16_t fee_percent;
-   if( before_core_hardfork_bsip81 ) {
-      // Before BSIP81, the fee is the market fee
+   if (is_maker) {
+      // Maker orders are charged the maker fee percent
       fee_percent = trade_asset.options.market_fee_percent;
    } else {
-      // After BSIP81, the fee depends on if maker or taker
-      if (is_maker) {
-         fee_percent = trade_asset.options.market_fee_percent;
-      } else {
-         fee_percent = trade_asset.options.extensions.value.taker_fee_percent.valid()
-                       ? *trade_asset.options.extensions.value.taker_fee_percent : 0;
-      }
+      // Taker orders are charged the taker fee percent if they are valid.  Otherwise, the maker fee percent.
+      fee_percent = taker_fee_percent.valid() ? *taker_fee_percent : trade_asset.options.market_fee_percent;
    }
 
    auto value = detail::calculate_percent(trade_amount.amount, fee_percent);
