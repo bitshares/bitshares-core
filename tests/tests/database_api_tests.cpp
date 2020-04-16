@@ -66,7 +66,12 @@ BOOST_AUTO_TEST_CASE(is_registered)
       /***
        * Assert
        */
-      graphene::app::database_api db_api(db);
+      graphene::app::database_api db_api1(db);
+      BOOST_CHECK_THROW( db_api1.is_public_key_registered((string) nathan_public), fc::exception );
+
+      graphene::app::application_options opt = app.get_options();
+      opt.has_api_helper_indexes_plugin = true;
+      graphene::app::database_api db_api( db, &opt );
 
       BOOST_CHECK(db_api.is_public_key_registered((string) nathan_public));
       BOOST_CHECK(db_api.is_public_key_registered((string) dan_public));
@@ -1365,7 +1370,14 @@ BOOST_AUTO_TEST_CASE( api_limit_get_key_references ){
    vector< private_key_type > numbered_private_keys;
    vector< public_key_type >  numbered_key_id;
    numbered_private_keys.reserve( num_keys );
-   graphene::app::database_api db_api( db, &( app.get_options() ));
+
+   graphene::app::database_api db_api1( db, &( app.get_options() ));
+   BOOST_CHECK_THROW( db_api1.get_key_references(numbered_key_id), fc::exception );
+
+   graphene::app::application_options opt = app.get_options();
+   opt.has_api_helper_indexes_plugin = true;
+   graphene::app::database_api db_api( db, &opt );
+
    for( int i=0; i<num_keys1; i++ )
    {
       private_key_type privkey = generate_private_key(std::string("key_") + std::to_string(i));
