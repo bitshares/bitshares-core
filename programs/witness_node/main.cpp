@@ -67,13 +67,14 @@ int main(int argc, char** argv) {
    try {
       bpo::options_description app_options("BitShares Witness Node");
       bpo::options_description cfg_options("BitShares Witness Node");
+      std::string default_plugins = "witness account_history market_history grouped_orders "
+                                    "api_helper_indexes custom_operations";
       app_options.add_options()
             ("help,h", "Print this help message and exit.")
             ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("witness_node_data_dir"),
                     "Directory containing databases, configuration file, etc.")
             ("version,v", "Display version information")
-            ("plugins", bpo::value<std::string>()
-                            ->default_value("witness account_history market_history grouped_orders api_helper_indexes"),
+            ("plugins", bpo::value<std::string>()->default_value(default_plugins),
                     "Space-separated list of plugins to activate")
             ("ignore-api-helper-indexes-warning", "Do not exit if api_helper_indexes plugin is not enabled.");
 
@@ -84,9 +85,8 @@ int main(int argc, char** argv) {
       cfg_options.add(cfg);
 
       cfg_options.add_options()
-              ("plugins", bpo::value<std::string>()
-	                      ->default_value("witness account_history market_history grouped_orders api_helper_indexes"),
-               "Space-separated list of plugins to activate")
+            ("plugins", bpo::value<std::string>()->default_value(default_plugins),
+                    "Space-separated list of plugins to activate")
             ("ignore-api-helper-indexes-warning", "Do not exit if api_helper_indexes plugin is not enabled.");
 
       auto witness_plug = node->register_plugin<witness_plugin::witness_plugin>();
