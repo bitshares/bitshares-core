@@ -833,6 +833,9 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
       if( is_maker && maker_discount_percent > 0 )
       {
          share_type refund = detail::calculate_percent( deferred_paid_fee, maker_discount_percent );
+         // Note: it's possible that the deferred_paid_fee is very small,
+         //       which can result in a zero refund due to rounding issue,
+         //       in this case, no refund to the fee pool
          if( refund > 0 )
          {
             FC_ASSERT( refund <= deferred_paid_fee, "Internal error" );
