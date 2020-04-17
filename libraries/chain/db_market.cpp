@@ -872,7 +872,7 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
    if (is_margin_call)
    {
       margin_fee = calculate_margin_fee( pays );
-      // margin fee should never be more than what the call order is receiving (but both could be zero)    
+      // margin fee should never be more than what the call order is paying    
       FC_ASSERT( margin_fee.amount == 0 || margin_fee.amount < pays.amount ); 
    }
 
