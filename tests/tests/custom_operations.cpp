@@ -329,4 +329,181 @@ catch (fc::exception &e) {
    throw;
 } }
 
+BOOST_AUTO_TEST_CASE(custom_operations_account_storage_no_catalog_api_test)
+{
+try {
+   ACTORS((alice)(bob));
+
+   app.enable_plugin("custom_operations");
+   custom_operations_api custom_operations_api(app);
+
+   generate_block();
+   enable_fees();
+
+   int64_t init_balance(10000 * GRAPHENE_BLOCKCHAIN_PRECISION);
+
+   transfer(committee_account, alice_id, asset(init_balance));
+   transfer(committee_account, bob_id, asset(init_balance));
+
+   // add some stuff to different catalogs of bob and alice
+   string catalog1 = "catalog1";
+   string catalog2 = "catalog1";
+   string catalog3 = "catalog3";
+   flat_map<string, optional<string>> pairs;
+
+   pairs["key1"] = fc::json::to_string("value1");
+   pairs["key2"] = fc::json::to_string("value2");
+   map_operation(pairs, false, catalog1, alice_id, alice_private_key, db);
+   generate_block();
+
+   pairs.clear();
+   pairs["key3"] = fc::json::to_string("value3");
+   pairs["key4"] = fc::json::to_string("value4");
+   map_operation(pairs, false, catalog2, alice_id, alice_private_key, db);
+   generate_block();
+
+   pairs.clear();
+   pairs["key1"] = fc::json::to_string("value1");
+   pairs["key2"] = fc::json::to_string("value2");
+   map_operation(pairs, false, catalog3, bob_id, bob_private_key, db);
+   generate_block();
+
+   // check the record amounts for each user
+   auto storage_results_alice = custom_operations_api.get_storage_info("alice");
+   BOOST_CHECK_EQUAL(storage_results_alice.size(), 4 );
+   auto storage_results_bob = custom_operations_api.get_storage_info("bob");
+   BOOST_CHECK_EQUAL(storage_results_bob.size(), 2 );
+}
+catch (fc::exception &e) {
+   edump((e.to_detail_string()));
+   throw;
+} }
+
+BOOST_AUTO_TEST_CASE(custom_operations_get_catalogs_api_test)
+{
+try {
+   ACTORS((alice));
+
+   app.enable_plugin("custom_operations");
+   custom_operations_api custom_operations_api(app);
+
+   generate_block();
+   enable_fees();
+
+   int64_t init_balance(10000 * GRAPHENE_BLOCKCHAIN_PRECISION);
+
+   transfer(committee_account, alice_id, asset(init_balance));
+
+   // add some catalogs
+   string catalog1 = "catalog1";
+   string catalog2 = "catalog2";
+   string catalog3 = "catalog3";
+   flat_map<string, optional<string>> pairs;
+
+   pairs["key"] = fc::json::to_string("value");
+   map_operation(pairs, false, catalog1, alice_id, alice_private_key, db);
+   generate_block();
+
+   pairs["key"] = fc::json::to_string("value");
+   map_operation(pairs, false, catalog2, alice_id, alice_private_key, db);
+   generate_block();
+
+   pairs["key"] = fc::json::to_string("value");
+   map_operation(pairs, false, catalog3, alice_id, alice_private_key, db);
+   generate_block();
+
+   // add a few new keys to catalog3
+   pairs["key2"] = fc::json::to_string("value2");
+   pairs["key3"] = fc::json::to_string("value3");
+   map_operation(pairs, false, catalog3, alice_id, alice_private_key, db);
+   generate_block();
+
+   auto system_catalogs = custom_operations_api.get_catalogs();
+   BOOST_CHECK_EQUAL(system_catalogs.size(), 3 );
+
+   system_catalogs = custom_operations_api.get_catalogs(catalog2);
+   BOOST_CHECK_EQUAL(system_catalogs.size(), 2 );
+
+   system_catalogs = custom_operations_api.get_catalogs(catalog3);
+   BOOST_CHECK_EQUAL(system_catalogs.size(), 1 );
+
+   system_catalogs = custom_operations_api.get_catalogs("whatever");
+   BOOST_CHECK_EQUAL(system_catalogs.size(), 0 );
+
+}
+catch (fc::exception &e) {
+   edump((e.to_detail_string()));
+   throw;
+} }
+
+BOOST_AUTO_TEST_CASE(custom_operations_api_pagination_limits)
+{
+try {
+   ACTORS((alice));
+
+   app.enable_plugin("custom_operations");
+   custom_operations_api custom_operations_api(app);
+
+   generate_block();
+   enable_fees();
+
+   int64_t init_balance(10000 * GRAPHENE_BLOCKCHAIN_PRECISION);
+
+   transfer(committee_account, alice_id, asset(init_balance));
+
+   // add some catalogs
+   string catalog = "catalog";
+   flat_map<string, optional<string>> pairs;
+
+   for(int i = 0; i<200; i++)
+   {
+      pairs[to_string(i)] = fc::json::to_string("value" + to_string(i));
+   }
+
+   map_operation(pairs, false, catalog, alice_id, alice_private_key, db);
+   generate_block();
+
+   auto storage_results_alice = custom_operations_api.get_storage_info("alice");
+   BOOST_CHECK_EQUAL(storage_results_alice.size(), 100 );
+
+   storage_results_alice = custom_operations_api.get_storage_info("alice", optional<std::string>(), optional<account_storage_id_type>(), 10);
+   BOOST_CHECK_EQUAL(storage_results_alice.size(), 10 );
+
+   storage_results_alice = custom_operations_api.get_storage_info("alice", optional<std::string>(), account_storage_id_type(0), 1);
+   BOOST_CHECK_EQUAL(storage_results_alice.size(), 1 );
+   BOOST_CHECK_EQUAL(storage_results_alice[0].id.instance(), 0 );
+
+   storage_results_alice = custom_operations_api.get_storage_info("alice", optional<std::string>(), account_storage_id_type(1), 1);
+   BOOST_CHECK_EQUAL(storage_results_alice.size(), 1 );
+   BOOST_CHECK_EQUAL(storage_results_alice[0].id.instance(), 1 );
+
+   storage_results_alice = custom_operations_api.get_storage_info("alice", optional<std::string>(), account_storage_id_type(2), 3);
+   BOOST_CHECK_EQUAL(storage_results_alice.size(), 3 );
+   BOOST_CHECK_EQUAL(storage_results_alice[0].id.instance(), 2 );
+   BOOST_CHECK_EQUAL(storage_results_alice[1].id.instance(), 3 );
+   BOOST_CHECK_EQUAL(storage_results_alice[2].id.instance(), 4 );
+
+   // add some more catalogs
+   string catalog2 = "catalog2";
+   string catalog3 = "catalog3";
+   string catalog4 = "catalog4";
+   map_operation(pairs, false, catalog2, alice_id, alice_private_key, db);
+   map_operation(pairs, false, catalog3, alice_id, alice_private_key, db);
+   map_operation(pairs, false, catalog4, alice_id, alice_private_key, db);
+   generate_block();
+
+   auto system_catalogs = custom_operations_api.get_catalogs("", 1);
+   BOOST_CHECK_EQUAL(system_catalogs.size(), 1 );
+
+   system_catalogs = custom_operations_api.get_catalogs("", 2);
+   BOOST_CHECK_EQUAL(system_catalogs.size(), 2 );
+
+   system_catalogs = custom_operations_api.get_catalogs();
+   BOOST_CHECK_EQUAL(system_catalogs.size(), 4 );
+}
+catch (fc::exception &e) {
+   edump((e.to_detail_string()));
+   throw;
+} }
+
 BOOST_AUTO_TEST_SUITE_END()

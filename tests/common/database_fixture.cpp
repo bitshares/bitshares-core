@@ -340,7 +340,10 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    }
 
    if(current_test_name == "custom_operations_account_storage_map_test" ||
-      current_test_name == "custom_operations_account_storage_list_test") {
+      current_test_name == "custom_operations_account_storage_list_test" ||
+      current_test_name == "custom_operations_account_storage_no_catalog_api_test" ||
+      current_test_name == "custom_operations_get_catalogs_api_test" ||
+      current_test_name == "custom_operations_api_pagination_limits") {
       auto custom_operations_plugin = app.register_plugin<graphene::custom_operations::custom_operations_plugin>();
       custom_operations_plugin->plugin_set_app(&app);
       custom_operations_plugin->plugin_initialize(options);

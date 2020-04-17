@@ -55,17 +55,23 @@ struct by_custom_id;
 struct by_custom_account;
 struct by_account_catalog;
 struct by_account_catalog_key;
+struct by_catalog;
 
 typedef multi_index_container<
       account_storage_object,
       indexed_by<
             ordered_non_unique< tag<by_custom_id>, member< object, object_id_type, &object::id > >,
             ordered_non_unique< tag<by_custom_account>,
-                  member< account_storage_object, account_id_type, &account_storage_object::account > >,
+                  composite_key< account_storage_object,
+                        member< account_storage_object, account_id_type, &account_storage_object::account >,
+                        member< object, object_id_type, &account_storage_object::id >
+                  >
+            >,
             ordered_non_unique< tag<by_account_catalog>,
                   composite_key< account_storage_object,
                         member< account_storage_object, account_id_type, &account_storage_object::account >,
-                        member< account_storage_object, string, &account_storage_object::catalog >
+                        member< account_storage_object, string, &account_storage_object::catalog >,
+                        member< object, object_id_type, &account_storage_object::id >
                   >
             >,
             ordered_non_unique< tag<by_account_catalog_key>,
@@ -74,6 +80,9 @@ typedef multi_index_container<
                         member< account_storage_object, string, &account_storage_object::catalog >,
                         member< account_storage_object, string, &account_storage_object::key >
                   >
+            >,
+            ordered_non_unique< tag<by_catalog>,
+                  member< account_storage_object, std::string, &account_storage_object::catalog>
             >
       >
 > account_storage_multi_index_type;

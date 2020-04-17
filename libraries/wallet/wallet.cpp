@@ -1904,9 +1904,10 @@ signed_transaction wallet_api::account_store_map(string account, string catalog,
    return my->account_store_map(account, catalog, remove, key_values, broadcast);
 }
 
-vector<account_storage_object> wallet_api::get_account_storage(string account, string catalog)
+vector<account_storage_object> wallet_api::get_account_storage(string account, optional<string> catalog, 
+      optional<account_storage_id_type> start, optional<uint32_t> limit)
 {
-   return my->_custom_operations->get_storage_info(account, catalog);
+   return my->_custom_operations->get_storage_info(account, catalog, start, limit);
 }
 
 signed_block_with_info::signed_block_with_info( const signed_block& block )

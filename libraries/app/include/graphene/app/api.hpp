@@ -535,11 +535,24 @@ namespace graphene { namespace app {
           * @brief Get all stored objects of an account in a particular catalog
           *
           * @param account Account name to get info from
-          * @param catalog Category classification. Each account can store multiple catalogs.
+          * @param catalog Optional category classification. Each account can store multiple catalogs.
+          * @param start The storage ID to start pulling data from, used for pagination purposes
+          * @param limit The number of records to retrieve
           *
           * @return The vector of objects of the account or empty
           */
-         vector<account_storage_object> get_storage_info(std::string account, std::string catalog)const;
+         vector<account_storage_object> get_storage_info(std::string account, optional<std::string> catalog = optional<std::string>(),
+               optional<account_storage_id_type> start = optional<account_storage_id_type>(account_storage_id_type(0)), optional<uint32_t> limit = 100)const;
+
+         /**
+          * @brief Get all available catalogs in the blockchain
+          *
+          * @param start A partial string to start looking
+          * @param limit The number of records to retrieve
+          *
+          * @return The vector of objects of the account or empty
+          */
+         vector<std::string> get_catalogs(std::string start = "", uint32_t limit = 100)const;
 
    private:
          application& _app;
