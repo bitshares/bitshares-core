@@ -849,8 +849,8 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
 /***
  * @brief fill a call order in the specified amounts
  * @param order the call order
- * @param pays What the call order will give to the other party
- * @param receives what the call order will receive from the other party
+ * @param pays What the call order will give to the other party (collateral)
+ * @param receives what the call order will receive from the other party (debt)
  * @param fill_price the price at which the call order will execute
  * @param is_maker TRUE if the call order is the maker, FALSE if it is the taker
  * @param is_margin_call TRUE if this method was called due to a margin call
@@ -871,8 +871,7 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
    asset margin_fee(0, pays.asset_id);
    if (is_margin_call)
    {
-      margin_fee = calculate_margin_fee( mia, pays );
-      FC_ASSERT( margin_fee.asset_id == pays.asset_id ); // margin fee should be paid in the debt asset
+      margin_fee = calculate_margin_fee( pays );
       // margin fee should never be more than what the call order is receiving (but both could be zero)    
       FC_ASSERT( margin_fee.amount == 0 || margin_fee.amount < pays.amount ); 
    }
@@ -912,7 +911,7 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
 
    // If the whole debt is paid, adjust borrower's collateral balance
    if( collateral_freed.valid() )
-      adjust_balance( order.borrower, *collateral_freed - margin_fee );
+      adjust_balance( order.borrower, *collateral_freed );
 
    // Update account statistics. We know that order.collateral_type() == pays.asset_id
    if( pays.asset_id == asset_id_type() )
@@ -926,7 +925,7 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
 
    // virtual operation for account history
    push_applied_operation( fill_order_operation( order.id, order.borrower, pays, receives,
-         asset(0, pays.asset_id), fill_price, is_maker ) );
+         margin_fee, fill_price, is_maker ) );
 
    // Call order completely filled, remove it
    if( collateral_freed.valid() )
@@ -1201,7 +1200,7 @@ void database::pay_order( const account_object& receiver, const asset& receives,
 
 asset database::calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount )
 {
-   assert( trade_asset.id == trade_amount.asset_id );
+   FC_ASSERT( trade_asset.id == trade_amount.asset_id );
 
    if( !trade_asset.charges_market_fees() )
       return trade_asset.amount(0);
@@ -1220,14 +1219,12 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
 /***
  * @brief calculate the margin fee
  * 
- * Note that the trade_asset controls the fee percentage, but trade_amount controls the asset the fee is paid in
- * @param trade_asset the asset that controls the fee
- * @param trade_amount the asset that the fee should be paid in
+ * @param trade_amount the asset and amount that the fee should be based upon
  * @returns the amount to be paid
  */
-asset database::calculate_margin_fee( const asset_object& trade_asset, const asset& trade_amount)
+asset database::calculate_margin_fee( const asset& trade_amount )
 {
-   assert( trade_asset.id != trade_amount.asset_id );
+   const asset_object& trade_asset = trade_amount.asset_id(*this);
 
    if( !trade_asset.charges_market_fees() )
       return asset(0, trade_amount.asset_id);
@@ -1238,11 +1235,6 @@ asset database::calculate_margin_fee( const asset_object& trade_asset, const ass
    auto value = detail::calculate_percent(trade_amount.amount, *trade_asset.options.extensions.value.margin_call_fee_ratio);
    asset percent_fee(value, trade_amount.asset_id);
 
-   // TODO: This check should be based on exchange rate
-   /*
-   if( percent_fee.amount > trade_asset.options.max_market_fee )
-      percent_fee.amount = trade_asset.options.max_market_fee;
-   */
    return percent_fee;
 }
 

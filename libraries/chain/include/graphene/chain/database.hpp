@@ -459,13 +459,18 @@ namespace graphene { namespace chain {
          void pay_order( const account_object& receiver, const asset& receives, const asset& pays );
 
          /**
-          * Calculate the market fee that is to be taken
-          * @param recv_asset the asset that is to be given
-          * @param trade_amount the quantity
+          * @brief Calculate the market fee that is to be taken
+          * @param recv_asset the asset (passed in to avoid a lookup)
+          * @param trade_amount the quantity that the fee calculation is based upon
           * @param is_margin_trading TRUE if this is a limit order going against a call order
           */
          asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
-         asset calculate_margin_fee(const asset_object& pays_asset, const asset& trade_amount);
+          /**
+          * @brief Calculate the margin fee that is to be taken
+          * @param trade_amount the asset and quantity that the fee calculation is based upon
+          * @param is_margin_trading TRUE if this is a limit order going against a call order
+          */        
+         asset calculate_margin_fee( const asset& trade_amount );
          asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives );
          void distribute_market_fees( const account_object* seller, const asset_object& recv_asset, const asset& issuer_fees);
 

@@ -1629,8 +1629,8 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
    BOOST_CHECK_EQUAL( 0, num_limit_orders_on_books( db ) );
 
    // the order should have executed, giving Alice some CORE
-   // 200 original collateral - what Bob took (86) - the margin call fee (0.086)
-   expected_core_balance_alice += 114 * prec - 8600; // return of what's left of collateral
+   // 200 original collateral - what Bob took (86)
+   expected_core_balance_alice += (200 - 86) * prec; // return of what's left of collateral
    BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance(alice, core) );
    BOOST_CHECK_EQUAL( 0, get_balance(alice, my_asset_id(db) ) );
    // and here are Bob's holdings
@@ -1639,8 +1639,8 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
    BOOST_CHECK_EQUAL( expected_jmj_balance_bob, get_balance(bob, my_asset_id(db) ) ); 
    // chalie should have collected the margin call fee
    BOOST_CHECK_EQUAL( expected_core_balance_charlie, get_balance( charlie, core) );
-   // 0.086 core should have been added to the accumulated fees
-   BOOST_CHECK_EQUAL(8600, asset_id_type()(db).dynamic_data(db).accumulated_fees.value );
+   // 15.19 JMJ should have been added to the accumulated fees
+   BOOST_CHECK_EQUAL( 15.19 * prec, my_asset_id(db).dynamic_data(db).accumulated_fees.value );
 
 } FC_LOG_AND_RETHROW() }
 

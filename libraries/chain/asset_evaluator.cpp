@@ -45,6 +45,13 @@ namespace detail {
             "Asset extension reward percent must be less than 100% till HARDFORK_1774_TIME!");
       }
    }
+
+   void check_asset_options_bsip74( const fc::time_point_sec& block_time, const asset_options& options)
+   {
+      FC_ASSERT( block_time >= HARDFORK_CORE_BSIP74_TIME 
+            || !options.extensions.value.margin_call_fee_ratio.valid(),
+            "A BitAsset's MCFR cannot be set before Hardfork BSIP74" );      
+   }
 }
 
 void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
@@ -102,9 +109,7 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
                  op.bitasset_opts->force_settlement_delay_sec > chain_parameters.block_interval );
    }
 
-   FC_ASSERT( d.head_block_time() >= HARDFORK_CORE_BSIP74_TIME 
-         || !op.common_options.extensions.value.margin_call_fee_ratio.valid(),
-         "A BitAsset's MCFR cannot be set before Hardfork BSIP74" );   
+   detail::check_asset_options_bsip74(d.head_block_time(), op.common_options);
 
    if( op.is_prediction_market )
    {
@@ -304,9 +309,7 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
               "Incorrect issuer for asset! (${o.issuer} != ${a.issuer})",
               ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
-   FC_ASSERT( d.head_block_time() >= HARDFORK_CORE_BSIP74_TIME 
-         || !o.new_options.extensions.value.margin_call_fee_ratio.valid(),
-         "A BitAsset's MCFR cannot be set before Hardfork BSIP74" );
+   detail::check_asset_options_bsip74(d.head_block_time(), o.new_options);
 
    const auto& chain_parameters = d.get_global_properties().parameters;
 
