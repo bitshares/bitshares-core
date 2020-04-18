@@ -226,7 +226,7 @@ FC_REFLECT( graphene::protocol::htlc_create_operation,
       (fee)(from)(to)(amount)(preimage_hash)(preimage_size)(claim_period_seconds)(extensions))
 FC_REFLECT( graphene::protocol::htlc_redeem_operation, (fee)(htlc_id)(redeemer)(preimage)(extensions))
 FC_REFLECT( graphene::protocol::htlc_redeemed_operation,
-      (fee)(htlc_id)(from)(to)(redeemer)(amount)(htlc_preimage_hash)(htlc_preimage_size))
+      (fee)(htlc_id)(from)(to)(redeemer)(amount)(htlc_preimage_hash)(htlc_preimage_size)(preimage))
 FC_REFLECT( graphene::protocol::htlc_extend_operation, (fee)(htlc_id)(update_issuer)(seconds_to_add)(extensions))
 FC_REFLECT( graphene::protocol::htlc_refund_operation,
       (fee)(htlc_id)(to)(original_htlc_recipient)(htlc_amount)(htlc_preimage_hash)(htlc_preimage_size))

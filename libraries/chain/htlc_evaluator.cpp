@@ -41,8 +41,8 @@ namespace graphene {
                FC_ASSERT( !op.extensions.value.memo.valid(), 
                      "Memo unavailable until after HARDFORK BSIP64");
                // HASH160 added at hardfork BSIP64
-               FC_ASSERT( op.preimage_hash.which() != 
-                     htlc_hash(fc::hash160()).which(), "HASH160 unavailable until after HARDFORK BSIP64" );   
+               FC_ASSERT( !op.preimage_hash.is_type<fc::hash160>(),
+                     "HASH160 unavailable until after HARDFORK BSIP64" );   
             }
             else
             {
