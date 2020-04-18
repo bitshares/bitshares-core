@@ -1165,7 +1165,7 @@ BOOST_AUTO_TEST_CASE(get_limit_orders_by_account)
    // Get the first 101 orders
    results = db_api.get_limit_orders_by_account( seller.name );
    BOOST_CHECK_EQUAL( results.size(), 101 );
-   for (size_t i = 0 ; i < results.size() - 2 ; ++i)
+   for (size_t i = 0 ; i < results.size() - 1 ; ++i)
    {
       BOOST_CHECK(results[i].id < results[i+1].id);
    }
@@ -1176,7 +1176,7 @@ BOOST_AUTO_TEST_CASE(get_limit_orders_by_account)
    // Get the No. 101-201 orders
    results = db_api.get_limit_orders_by_account( seller.name, {}, o.id );
    BOOST_CHECK_EQUAL( results.size(), 101 );
-   for (size_t i = 0 ; i < results.size() - 2 ; ++i)
+   for (size_t i = 0 ; i < results.size() - 1 ; ++i)
    {
       BOOST_CHECK(results[i].id < results[i+1].id);
    }
@@ -1187,7 +1187,7 @@ BOOST_AUTO_TEST_CASE(get_limit_orders_by_account)
    // Get the No. 201- orders
    results = db_api.get_limit_orders_by_account( seller.name, {}, o.id );
    BOOST_CHECK_EQUAL( results.size(), 50 );
-   for (size_t i = 0 ; i < results.size() - 2 ; ++i)
+   for (size_t i = 0 ; i < results.size() - 1 ; ++i)
    {
       BOOST_CHECK(results[i].id < results[i+1].id);
    }
@@ -1197,7 +1197,7 @@ BOOST_AUTO_TEST_CASE(get_limit_orders_by_account)
    // Get the No. 201-210 orders
    results2 = db_api.get_limit_orders_by_account( seller.name, 10, o.id );
    BOOST_CHECK_EQUAL( results2.size(), 10 );
-   for (size_t i = 0 ; i < results2.size() - 2 ; ++i)
+   for (size_t i = 0 ; i < results2.size() - 1 ; ++i)
    {
       BOOST_CHECK(results2[i].id < results2[i+1].id);
       BOOST_CHECK(results[i].id == results2[i].id);
