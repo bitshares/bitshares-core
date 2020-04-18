@@ -293,12 +293,12 @@ try {
       create_operation.preimage_hash = hash_it<fc::hash160>( pre_image );
       create_operation.preimage_size = preimage_size;
       create_operation.from = alice_id;
-      create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
       create_operation.extensions.value.memo = memo_data();
       create_operation.extensions.value.memo->from = alice_public_key;
       create_operation.extensions.value.memo->to = bob_public_key;
       create_operation.extensions.value.memo->set_message(
             alice_private_key, bob_public_key, "Dear Bob,\n\nMoney!\n\nLove, Alice");
+      create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
       try {
@@ -306,7 +306,11 @@ try {
          BOOST_TEST_FAIL("crate_operation should have failed due to the memo field");
       } catch(fc::exception& ex) {
          if (ex.to_string().find("Memo unavailable") == std::string::npos )
-            BOOST_TEST_FAIL("create_operation failed but not due to the memo field.");
+         {
+            std::stringstream ss;
+            ss << "create_operation failed but not due to the memo field. Message was: " << ex.to_detail_string();
+            BOOST_FAIL(ss.str());
+         }
       }
       trx.clear();
    }
@@ -325,12 +329,12 @@ try {
       create_operation.preimage_hash = hash_it<fc::hash160>( pre_image );
       create_operation.preimage_size = 0;
       create_operation.from = alice_id;
-      create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
       create_operation.extensions.value.memo = memo_data();
       create_operation.extensions.value.memo->from = alice_public_key;
       create_operation.extensions.value.memo->to = bob_public_key;
       create_operation.extensions.value.memo->set_message(
             alice_private_key, bob_public_key, "Dear Bob,\n\nMoney!\n\nLove, Alice");
+      create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
       PUSH_TX(db, trx, ~0);
@@ -341,8 +345,8 @@ try {
       generate_block();
    }
 
-   // verify funds on hold... 100 - 3 = 97, minus the 4 coin fee = 93
-   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 93 * GRAPHENE_BLOCKCHAIN_PRECISION );
+   // verify funds on hold... 100 - 3 = 97, minus the transaction fee = 91.78907
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 91.78907 * GRAPHENE_BLOCKCHAIN_PRECISION );
 
    // make sure Bob (or anyone) can see the details of the transaction
    graphene::app::database_api db_api(db);
@@ -384,8 +388,8 @@ try {
    }
    // verify funds end up in Bob's account (3)
    BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
-   // verify funds remain out of Alice's acount ( 100 - 3 - 4 )
-   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 93 * GRAPHENE_BLOCKCHAIN_PRECISION );
+   // verify funds remain out of Alice's acount ( 100 - 3 - transaction fee )
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 91.78907 * GRAPHENE_BLOCKCHAIN_PRECISION );
    // verify all three get notified
    std::vector<operation_history_object> history = get_operation_history(alice_id);
    BOOST_CHECK_EQUAL( history.size(), alice_num_history + 1);
@@ -686,88 +690,6 @@ BOOST_AUTO_TEST_CASE( htlc_hardfork_test )
             = current_fee_schedule.get<htlc_create_operation>();
       BOOST_CHECK_EQUAL(htlc_fee.fee, 2 * GRAPHENE_BLOCKCHAIN_PRECISION);
 
-      // verify that the per_kb fee can't be set until after BSIP 64
-     {
-         BOOST_TEST_MESSAGE("Attempting to set HTLC per_kb fees before hard fork.");
-
-         // get existing fee_schedule
-         const chain_parameters& existing_params = db.get_global_properties().parameters;
-         const fee_schedule_type& existing_fee_schedule = *(existing_params.current_fees);
-         // create a new fee_shedule
-         std::shared_ptr<fee_schedule_type> new_fee_schedule = std::make_shared<fee_schedule_type>();
-         new_fee_schedule->scale = existing_fee_schedule.scale;
-         // replace the old with the new
-         flat_map<uint64_t, graphene::chain::fee_parameters> params_map = get_htlc_fee_parameters();
-         htlc_create_operation::fee_parameters_type create_param;
-         create_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
-         create_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
-         create_param.fee_per_kb = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
-         params_map[((operation)htlc_create_operation()).which()] = create_param;
-         for(auto param : existing_fee_schedule.parameters)
-         {
-            auto itr = params_map.find(param.which());
-            if (itr == params_map.end())
-               new_fee_schedule->parameters.insert(param);
-            else
-            {
-               new_fee_schedule->parameters.insert( (*itr).second);
-            }
-         }
-         proposal_create_operation cop = proposal_create_operation::committee_proposal(
-               db.get_global_properties().parameters, db.head_block_time());
-         cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
-         cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
-         committee_member_update_global_parameters_operation uop;
-         uop.new_parameters.current_fees = new_fee_schedule;
-         cop.proposed_ops.emplace_back(uop);
-         cop.fee = asset( 100000 );
-         trx.operations.push_back( cop );
-         GRAPHENE_CHECK_THROW(db.push_transaction( trx ), fc::exception);
-         trx.clear();
-      }
-      // verify that the per_kb fee can be set after BSIP 64
-      generate_blocks( HARDFORK_CORE_BSIP64_TIME + 10);
-      set_expiration(db, trx);
-      {
-         BOOST_TEST_MESSAGE("Attempting to set HTLC per_kb fees after hard fork.");
-
-         // get existing fee_schedule
-         const chain_parameters& existing_params = db.get_global_properties().parameters;
-         const fee_schedule_type& existing_fee_schedule = *(existing_params.current_fees);
-         // create a new fee_shedule
-         std::shared_ptr<fee_schedule_type> new_fee_schedule = std::make_shared<fee_schedule_type>();
-         new_fee_schedule->scale = existing_fee_schedule.scale;
-         // replace the old with the new
-         flat_map<uint64_t, graphene::chain::fee_parameters> params_map = get_htlc_fee_parameters();
-         htlc_create_operation::fee_parameters_type create_param;
-         create_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
-         create_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
-         create_param.fee_per_kb = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
-         params_map[((operation)htlc_create_operation()).which()] = create_param;
-         for(auto param : existing_fee_schedule.parameters)
-         {
-            auto itr = params_map.find(param.which());
-            if (itr == params_map.end())
-               new_fee_schedule->parameters.insert(param);
-            else
-            {
-               new_fee_schedule->parameters.insert( (*itr).second);
-            }
-         }
-         proposal_create_operation cop = proposal_create_operation::committee_proposal(
-               db.get_global_properties().parameters, db.head_block_time());
-         cop.fee_paying_account = alice_id;
-         cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
-         committee_member_update_global_parameters_operation uop;
-         uop.new_parameters.current_fees = new_fee_schedule;
-         cop.proposed_ops.emplace_back(uop);
-         cop.fee = db.current_fee_schedule().calculate_fee(cop);
-         trx.operations.push_back( cop );
-         sign(trx, alice_private_key);
-         db.push_transaction( trx );
-         trx.clear();
-      }
-      
    } 
    FC_LOG_AND_RETHROW() 
 }
@@ -871,13 +793,13 @@ BOOST_AUTO_TEST_CASE( fee_calculations )
       htlc_create_operation create;
       // no days
       create.claim_period_seconds = 0;
-      BOOST_CHECK_EQUAL( create.calculate_fee(create_fee).value, 2 );
+      BOOST_CHECK_EQUAL( create.calculate_fee(create_fee, 2).value, 2 );
       // exactly 1 day
       create.claim_period_seconds = 60 * 60 * 24;
-      BOOST_CHECK_EQUAL( create.calculate_fee(create_fee).value, 4 );
+      BOOST_CHECK_EQUAL( create.calculate_fee(create_fee, 2).value, 4 );
       // tad over a day
       create.claim_period_seconds++;
-      BOOST_CHECK_EQUAL( create.calculate_fee(create_fee).value, 6 );
+      BOOST_CHECK_EQUAL( create.calculate_fee(create_fee, 2).value, 6 );
    }
    // redeem
    {
