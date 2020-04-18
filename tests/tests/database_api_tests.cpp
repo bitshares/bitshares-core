@@ -1115,6 +1115,115 @@ BOOST_AUTO_TEST_CASE( lookup_vote_ids )
 
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE(get_limit_orders_by_account)
+{ try {
+   graphene::app::database_api db_api( db, &( app.get_options() ));
+   ACTORS((seller)(buyer)(watcher));
+
+   const auto& bitcny = create_user_issued_asset("CNY");
+   const auto& core   = asset_id_type()(db);
+
+   int64_t init_balance(10000000);
+   transfer( committee_account, seller_id, asset(init_balance) );
+   issue_uia( buyer_id, bitcny.amount(init_balance) );
+   BOOST_CHECK_EQUAL( 10000000, get_balance(seller, core) );
+   BOOST_CHECK_EQUAL( 10000000, get_balance(buyer, bitcny) );
+
+   std::vector<limit_order_object> results, results2;
+   limit_order_object o;
+
+   // limit too large
+   BOOST_CHECK_THROW( db_api.get_limit_orders_by_account( seller.name, 102 ), fc::exception );
+
+   // The order book is empty
+   results = db_api.get_limit_orders_by_account( seller.name );
+   BOOST_CHECK_EQUAL( results.size(), 0 );
+
+   // Seller create 50 orders
+   for (size_t i = 0 ; i < 50 ; ++i)
+   {
+      BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250)));
+   }
+
+   // Get all orders
+   results = db_api.get_limit_orders_by_account( seller.name );
+   BOOST_CHECK_EQUAL( results.size(), 50 );
+
+   // Seller create 200 orders
+   for (size_t i = 1 ; i < 101 ; ++i)
+   {
+      BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250 + i)));
+      BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250 - i)));
+   }
+
+   // Buyer create 20 orders
+   for (size_t i = 0 ; i < 70 ; ++i)
+   {
+      BOOST_CHECK(create_sell_order(buyer, bitcny.amount(100), core.amount(5000 + i)));
+   }
+
+   // Get the first 101 orders
+   results = db_api.get_limit_orders_by_account( seller.name );
+   BOOST_CHECK_EQUAL( results.size(), 101 );
+   for (size_t i = 0 ; i < results.size() - 2 ; ++i)
+   {
+      BOOST_CHECK(results[i].id < results[i+1].id);
+   }
+   BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(250)));
+   BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(276)));
+   o = results.back();
+
+   // Get the No. 101-201 orders
+   results = db_api.get_limit_orders_by_account( seller.name, {}, o.id );
+   BOOST_CHECK_EQUAL( results.size(), 101 );
+   for (size_t i = 0 ; i < results.size() - 2 ; ++i)
+   {
+      BOOST_CHECK(results[i].id < results[i+1].id);
+   }
+   BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(276)));
+   BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(326)));
+   o = results.back();
+
+   // Get the No. 201- orders
+   results = db_api.get_limit_orders_by_account( seller.name, {}, o.id );
+   BOOST_CHECK_EQUAL( results.size(), 50 );
+   for (size_t i = 0 ; i < results.size() - 2 ; ++i)
+   {
+      BOOST_CHECK(results[i].id < results[i+1].id);
+   }
+   BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(326)));
+   BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(150)));
+
+   // Get the No. 201-210 orders
+   results2 = db_api.get_limit_orders_by_account( seller.name, 10, o.id );
+   BOOST_CHECK_EQUAL( results2.size(), 10 );
+   for (size_t i = 0 ; i < results2.size() - 2 ; ++i)
+   {
+      BOOST_CHECK(results2[i].id < results2[i+1].id);
+      BOOST_CHECK(results[i].id == results2[i].id);
+   }
+   BOOST_CHECK(results2.front().sell_price == price(core.amount(100), bitcny.amount(326)));
+   BOOST_CHECK(results2.back().sell_price == price(core.amount(100), bitcny.amount(170)));
+
+   // Buyer has 70 orders, all IDs are greater than sellers
+   results = db_api.get_limit_orders_by_account( buyer.name, 90, o.id );
+   BOOST_CHECK_EQUAL( results.size(), 70 );
+   o = results.back();
+
+   // All seller's order IDs are smaller, so querying with a buyer's ID will get nothing
+   results = db_api.get_limit_orders_by_account( seller.name, 90, o.id );
+   BOOST_CHECK_EQUAL( results.size(), 0 );
+
+   // Watcher has no order
+   results = db_api.get_limit_orders_by_account( watcher.name );
+   BOOST_CHECK_EQUAL( results.size(), 0 );
+
+   // unregistered account, throws exception
+   BOOST_CHECK_THROW( db_api.get_limit_orders_by_account( "not-a-user", 10, limit_order_id_type() ),
+                      fc::exception );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE(get_account_limit_orders)
 { try {
    graphene::app::database_api db_api( db, &( app.get_options() ));

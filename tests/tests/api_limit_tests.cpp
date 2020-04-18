@@ -145,6 +145,24 @@ BOOST_AUTO_TEST_CASE( api_limit_get_limit_orders ){
    throw;
    }
 }
+
+BOOST_AUTO_TEST_CASE( api_limit_get_limit_orders_by_account ){
+   try{
+   graphene::app::database_api db_api( db, &( app.get_options() ));
+   const auto& test = create_user_issued_asset("TESTASSET");
+   create_sell_order( account_id_type(), asset(1,asset_id_type()), test.amount(1) );
+   GRAPHENE_CHECK_THROW(db_api.get_limit_orders_by_account(
+      std::string(static_cast<object_id_type>(account_id_type())), 160), fc::exception);
+   vector<limit_order_object>  limit_orders =db_api.get_limit_orders_by_account(
+      std::string(static_cast<object_id_type>(account_id_type())), 145);
+   BOOST_REQUIRE_EQUAL( limit_orders.size(), 1u);
+
+   }catch (fc::exception& e) {
+   edump((e.to_detail_string()));
+   throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( api_limit_get_call_orders ){
    try{
    graphene::app::database_api db_api( db, &( app.get_options() ));
