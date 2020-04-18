@@ -36,6 +36,9 @@
 
 namespace graphene { namespace wallet { namespace detail {
 
+std::string print_memo( const graphene::wallet::detail::wallet_api_impl& wallet, 
+      const fc::optional<graphene::protocol::memo_data>& memo, ostream& out);
+
 struct operation_result_printer
 {
 public:

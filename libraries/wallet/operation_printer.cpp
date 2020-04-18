@@ -79,37 +79,45 @@ std::string operation_printer::operator()(const transfer_to_blind_operation& op)
        << " fee: " << fa.amount_to_pretty_string( op.fee );
    return "";
 }
-string operation_printer::operator()(const transfer_operation& op) const
+
+string print_memo( const graphene::wallet::detail::wallet_api_impl& wallet, 
+      const fc::optional<graphene::protocol::memo_data>& memo, ostream& out)
 {
-   out << "Transfer " << wallet.get_asset(op.amount.asset_id).amount_to_pretty_string(op.amount)
-       << " from " << wallet.get_account(op.from).name << " to " << wallet.get_account(op.to).name;
-   std::string memo;
-   if( op.memo )
+   std::string outstr;
+   if( memo )
    {
       if( wallet.is_locked() )
       {
          out << " -- Unlock wallet to see memo.";
       } else {
          try {
-            FC_ASSERT( wallet._keys.count(op.memo->to) || wallet._keys.count(op.memo->from),
+            FC_ASSERT( wallet._keys.count(memo->to) || wallet._keys.count(memo->from),
                        "Memo is encrypted to a key ${to} or ${from} not in this wallet.",
-                       ("to", op.memo->to)("from",op.memo->from) );
-            if( wallet._keys.count(op.memo->to) ) {
-               auto my_key = wif_to_key(wallet._keys.at(op.memo->to));
+                       ("to", memo->to)("from",memo->from) );
+            if( wallet._keys.count(memo->to) ) {
+               auto my_key = wif_to_key(wallet._keys.at(memo->to));
                FC_ASSERT(my_key, "Unable to recover private key to decrypt memo. Wallet may be corrupted.");
-               memo = op.memo->get_message(*my_key, op.memo->from);
-               out << " -- Memo: " << memo;
+               outstr = memo->get_message(*my_key, memo->from);
+               out << " -- Memo: " << outstr;
             } else {
-               auto my_key = wif_to_key(wallet._keys.at(op.memo->from));
+               auto my_key = wif_to_key(wallet._keys.at(memo->from));
                FC_ASSERT(my_key, "Unable to recover private key to decrypt memo. Wallet may be corrupted.");
-               memo = op.memo->get_message(*my_key, op.memo->to);
-               out << " -- Memo: " << memo;
+               outstr = memo->get_message(*my_key, memo->to);
+               out << " -- Memo: " << outstr;
             }
          } catch (const fc::exception& e) {
             out << " -- could not decrypt memo";
          }
       }
-   }
+   } 
+   return outstr;  
+}
+
+string operation_printer::operator()(const transfer_operation& op) const
+{
+   out << "Transfer " << wallet.get_asset(op.amount.asset_id).amount_to_pretty_string(op.amount)
+       << " from " << wallet.get_account(op.from).name << " to " << wallet.get_account(op.to).name;
+   std::string memo = print_memo( wallet, op.memo, out );
    fee(op.fee);
    return memo;
 }
@@ -178,17 +186,14 @@ std::string operation_printer::operator()(const htlc_create_operation& op) const
    operation_result_printer rprinter(wallet);
    std::string database_id = result.visit(rprinter);
 
-   out << "Create HTLC to " << to.name
-         << " with id " << database_id
-         << " preimage hash: ["
-         << op.preimage_hash.visit( vtor )
-         << "] (Fee: " << fee_asset.amount_to_pretty_string( op.fee ) << ")";
+   out << "Create HTLC to " << to.name << " with id " << database_id
+         << " preimage hash: [" << op.preimage_hash.visit( vtor ) << "] ";
+   print_memo(wallet, op.extensions.value.memo, out);
    // determine if the block that the HTLC is in is before or after LIB
    int32_t pending_blocks = hist.block_num - wallet.get_dynamic_global_properties().last_irreversible_block_num;
    if (pending_blocks > 0)
       out << " (pending " << std::to_string(pending_blocks) << " blocks)";
-
-   return "";
+   return fee(op.fee);
 }
 
 std::string operation_result_printer::operator()(const void_result& x) const

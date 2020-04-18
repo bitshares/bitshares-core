@@ -1739,16 +1739,31 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          auto hist = con.wallet_api_ptr->get_account_history("alice", 10);
          for(size_t i = 0; i < hist.size(); ++i)
          {
+            auto obj = hist[i];
+            std::stringstream ss;
+            ss << "Description: " << obj.description << "\n";
+            auto str = ss.str();
+            BOOST_TEST_MESSAGE( str );
             if (i < 2)
             {
-               auto obj = hist[i];
-               std::stringstream ss;
-               ss << "Description: " << obj.description << " Memo: " << obj.memo << "\n";
-               auto str = ss.str();
-               BOOST_TEST_MESSAGE( str );
                BOOST_CHECK( str.find("HASH160 008e") != std::string::npos );
             }
          }
+         con.wallet_api_ptr->lock();
+         hist = con.wallet_api_ptr->get_account_history("alice", 10);
+         for(size_t i = 0; i < hist.size(); ++i)
+         {
+            auto obj = hist[i];
+            std::stringstream ss;
+            ss << "Description: " << obj.description << "\n";
+            auto str = ss.str();
+            BOOST_TEST_MESSAGE( str );
+            if (i < 2)
+            {
+               BOOST_CHECK( str.find("HASH160 008e") != std::string::npos );
+            }
+         } 
+         con.wallet_api_ptr->unlock("supersecret");        
       }
 
       // Alice can now look over Bob's HTLC, to see if it is what was agreed to:
