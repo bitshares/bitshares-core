@@ -58,30 +58,7 @@ std::string operation_printer::fee(const graphene::protocol::asset& a)const {
    return "";
 }
 
-std::string operation_printer::operator()(const transfer_from_blind_operation& op)const
-{
-   auto a = wallet.get_asset( op.fee.asset_id );
-   auto receiver = wallet.get_account( op.to );
-
-   out <<  receiver.name
-       << " received " << a.amount_to_pretty_string( op.amount ) << " from blinded balance";
-   return "";
-}
-std::string operation_printer::operator()(const transfer_to_blind_operation& op)const
-{
-   auto fa = wallet.get_asset( op.fee.asset_id );
-   auto a = wallet.get_asset( op.amount.asset_id );
-   auto sender = wallet.get_account( op.from );
-
-   out <<  sender.name
-       << " sent " << a.amount_to_pretty_string( op.amount ) << " to " << op.outputs.size()
-       << " blinded balance" << (op.outputs.size()>1?"s":"")
-       << " fee: " << fa.amount_to_pretty_string( op.fee );
-   return "";
-}
-
-string print_memo( const graphene::wallet::detail::wallet_api_impl& wallet, 
-      const fc::optional<graphene::protocol::memo_data>& memo, ostream& out)
+string operation_printer::print_memo( const fc::optional<graphene::protocol::memo_data>& memo )const
 {
    std::string outstr;
    if( memo )
@@ -113,11 +90,33 @@ string print_memo( const graphene::wallet::detail::wallet_api_impl& wallet,
    return outstr;  
 }
 
+std::string operation_printer::operator()(const transfer_from_blind_operation& op)const
+{
+   auto a = wallet.get_asset( op.fee.asset_id );
+   auto receiver = wallet.get_account( op.to );
+
+   out <<  receiver.name
+       << " received " << a.amount_to_pretty_string( op.amount ) << " from blinded balance";
+   return "";
+}
+std::string operation_printer::operator()(const transfer_to_blind_operation& op)const
+{
+   auto fa = wallet.get_asset( op.fee.asset_id );
+   auto a = wallet.get_asset( op.amount.asset_id );
+   auto sender = wallet.get_account( op.from );
+
+   out <<  sender.name
+       << " sent " << a.amount_to_pretty_string( op.amount ) << " to " << op.outputs.size()
+       << " blinded balance" << (op.outputs.size()>1?"s":"")
+       << " fee: " << fa.amount_to_pretty_string( op.fee );
+   return "";
+}
+
 string operation_printer::operator()(const transfer_operation& op) const
 {
    out << "Transfer " << wallet.get_asset(op.amount.asset_id).amount_to_pretty_string(op.amount)
        << " from " << wallet.get_account(op.from).name << " to " << wallet.get_account(op.to).name;
-   std::string memo = print_memo( wallet, op.memo, out );
+   std::string memo = print_memo( op.memo );
    fee(op.fee);
    return memo;
 }
@@ -188,7 +187,7 @@ std::string operation_printer::operator()(const htlc_create_operation& op) const
 
    out << "Create HTLC to " << to.name << " with id " << database_id
          << " preimage hash: [" << op.preimage_hash.visit( vtor ) << "] ";
-   print_memo(wallet, op.extensions.value.memo, out);
+   print_memo( op.extensions.value.memo );
    // determine if the block that the HTLC is in is before or after LIB
    int32_t pending_blocks = hist.block_num - wallet.get_dynamic_global_properties().last_irreversible_block_num;
    if (pending_blocks > 0)

@@ -36,9 +36,6 @@
 
 namespace graphene { namespace wallet { namespace detail {
 
-std::string print_memo( const graphene::wallet::detail::wallet_api_impl& wallet, 
-      const fc::optional<graphene::protocol::memo_data>& memo, ostream& out);
-
 struct operation_result_printer
 {
 public:
@@ -102,6 +99,8 @@ public:
    std::string operator()(const graphene::protocol::htlc_create_operation& op)const;
    std::string operator()(const graphene::protocol::htlc_redeem_operation& op)const;
    std::string operator()(const graphene::protocol::htlc_redeemed_operation& op)const;
+   protected:
+   std::string print_memo( const fc::optional<graphene::protocol::memo_data>& memo)const;
 };
 
 }}} // namespace graphene::wallet::detail
