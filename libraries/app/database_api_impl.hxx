@@ -101,6 +101,9 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       // Markets / feeds
       vector<limit_order_object>         get_limit_orders( const std::string& a, const std::string& b,
                                                            uint32_t limit)const;
+      vector<limit_order_object>         get_limit_orders_by_account( const string& account_name_or_id,
+                                                                      optional<uint32_t> limit,
+                                                                      optional<limit_order_id_type> start_id );
       vector<limit_order_object>         get_account_limit_orders( const string& account_name_or_id,
                                                                    const string &base,
                                                                    const string &quote, uint32_t limit,
