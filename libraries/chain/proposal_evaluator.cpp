@@ -25,11 +25,17 @@
 #include <graphene/chain/proposal_evaluator.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/htlc_object.hpp>
 
 namespace graphene { namespace chain {
 
 namespace detail {
-   void check_asset_options_hf_1774(const fc::time_point_sec& block_time, const asset_options& options);   
+   void check_asset_options_hf_1774(const fc::time_point_sec& block_time, const asset_options& options); 
+   void check_htlc_create_hf_bsip64(const fc::time_point_sec& block_time, const htlc_create_operation& op, 
+         const asset_object& asset);
+   void check_htlc_redeem_hf_bsip64(const fc::time_point_sec& block_time, 
+         const htlc_redeem_operation& op, const htlc_object* htlc_obj);
+  
 }
 
 struct proposal_operation_hardfork_visitor
@@ -78,9 +84,12 @@ struct proposal_operation_hardfork_visitor
    }
    void operator()(const graphene::chain::htlc_create_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
+      detail::check_htlc_create_hf_bsip64(block_time, op, op.amount.asset_id(db));
    }
    void operator()(const graphene::chain::htlc_redeem_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
+      const auto* htlc_obj = &op.htlc_id(db);
+      detail::check_htlc_redeem_hf_bsip64(block_time, op, htlc_obj);
    }
    void operator()(const graphene::chain::htlc_extend_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
