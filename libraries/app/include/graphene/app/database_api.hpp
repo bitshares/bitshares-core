@@ -441,7 +441,7 @@ class database_api
        * @return List of limit orders of the specified account
        *
        * @note
-       * 1. if @p account_name_or_id cannot be tied to an account, empty result will be returned
+       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
        * 2. @p limit can be omitted or be null, if so the default value 101 will be used
        * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of orders
        * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
@@ -465,7 +465,7 @@ class database_api
        * @return List of orders from @p account_name_or_id to the corresponding account
        *
        * @note
-       * 1. if @p account_name_or_id cannot be tied to an account, empty result will be returned
+       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
        * 2. @p ostart_id and @p ostart_price can be empty, if so the api will return the "first page" of orders;
        *    if @p ostart_id is specified, its price will be used to do page query preferentially,
        *    otherwise the @p ostart_price will be used;
