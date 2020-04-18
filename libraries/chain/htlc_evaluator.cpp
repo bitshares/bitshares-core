@@ -48,10 +48,10 @@ namespace graphene {
             {
                // this can be moved to the normal non-hf checks after HF_BSIP64
                //  IF there were no restricted transfers before HF_BSIP64
-               FC_ASSERT( !asset_to_transfer.is_transfer_restricted(), 
+               FC_ASSERT( !asset_to_transfer.is_transfer_restricted()
+                     || op.from == asset_to_transfer.issuer || op.to == asset_to_transfer.issuer,
                      "Asset ${asset} cannot be transfered.", ("asset", asset_to_transfer.id) );   
             }
-
          }
 
          void check_htlc_redeem_hf_bsip64(const fc::time_point_sec& block_time, 
