@@ -925,7 +925,13 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
    if( head_block_time() >= HARDFORK_CORE_1780_TIME )
       settle_owner_ptr = &settle.owner(*this);
 
-   auto issuer_fees = pay_market_fees( settle_owner_ptr, get(receives.asset_id), receives );
+   // Issuer lays claim to both market fees and force-settlement fees (BSIP87) when a settle
+   // order is filled.  Note that when computing force-settle fees, we reduce the 'receives'
+   // amount by the previous market fee so that the combined effect of the two fees will be
+   // multiplicative rather than additive.  This prevents the net fee exceeding 100%.
+   const asset_object & recv_asset_obj = get(receives.asset_id);
+   asset issuer_fees = pay_market_fees( settle_owner_ptr, recv_asset_obj, receives );
+   issuer_fees += calculate_force_settle_fees( recv_asset_obj, receives - issuer_fees );
 
    if( pays < settle.balance )
    {
@@ -1291,6 +1297,22 @@ asset database::pay_market_fees(const account_object* seller, const asset_object
    }
 
    return market_fees;
+}
+
+/***
+ * @brief Calculate force-settlement fee as per BSIP87
+ * @param recv_asset the collateral asset (passed in to avoid a lookup)
+ * @param receives the amount of collateral settler would expect to receive prior to this fee
+ *     (fee is computed as a percentage of this amount)
+ * @return asset representing the fee amount
+ */
+asset database::calculate_force_settle_fees(const asset_object& recv_asset, const asset& receives) const
+{
+   if( !recv_asset.options.extensions.value.force_settle_fee_percent.valid()
+         || *recv_asset.options.extensions.value.force_settle_fee_percent == 0 )
+      return recv_asset.amount(0);
+   auto value = detail::calculate_percent(receives.amount, *recv_asset.options.extensions.value.force_settle_fee_percent);
+   return recv_asset.amount(value);
 }
 
 } }

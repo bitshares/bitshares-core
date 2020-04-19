@@ -32,6 +32,8 @@ namespace graphene { namespace protocol {
    {
       fc::optional<uint16_t>                  reward_percent;
       fc::optional<flat_set<account_id_type>> whitelist_market_fee_sharing;
+      // MERGE NOTE: BSIP-74 and/or BSIP-81 additions here
+      fc::optional<uint16_t> force_settle_fee_percent;  // BSIP-87
    };
    typedef extension<additional_asset_options> additional_asset_options_t;
 
@@ -544,7 +546,7 @@ FC_REFLECT( graphene::protocol::bitasset_options,
             (extensions)
           )
 
-FC_REFLECT( graphene::protocol::additional_asset_options, (reward_percent)(whitelist_market_fee_sharing) )
+FC_REFLECT( graphene::protocol::additional_asset_options, (reward_percent)(whitelist_market_fee_sharing)(force_settle_fee_percent) )
 FC_REFLECT( graphene::protocol::asset_create_operation::fee_parameters_type, (symbol3)(symbol4)(long_symbol)(price_per_kbyte) )
 FC_REFLECT( graphene::protocol::asset_global_settle_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::protocol::asset_settle_operation::fee_parameters_type, (fee) )

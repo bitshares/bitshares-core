@@ -101,6 +101,11 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
       FC_ASSERT( op.bitasset_opts->feed_lifetime_sec > chain_parameters.block_interval &&
                  op.bitasset_opts->force_settlement_delay_sec > chain_parameters.block_interval );
    }
+
+   FC_ASSERT( d.head_block_time() >= HARDFORK_CORE_BSIP87_TIME
+              || !op.common_options.extensions.value.force_settle_fee_percent.valid(),
+              "A BitAsset's FSFP cannot be set before Hardfork BSIP87" );
+
    if( op.is_prediction_market )
    {
       FC_ASSERT( op.bitasset_opts );
@@ -298,6 +303,10 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    FC_ASSERT( o.issuer == a.issuer,
               "Incorrect issuer for asset! (${o.issuer} != ${a.issuer})",
               ("o.issuer", o.issuer)("a.issuer", a.issuer) );
+
+   FC_ASSERT( d.head_block_time() >= HARDFORK_CORE_BSIP87_TIME
+              || !o.new_options.extensions.value.force_settle_fee_percent.valid(),
+              "A BitAsset's FSFP cannot be set before Hardfork BSIP87" );
 
    const auto& chain_parameters = d.get_global_properties().parameters;
 
