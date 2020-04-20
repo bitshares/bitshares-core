@@ -61,7 +61,7 @@ namespace graphene { namespace protocol {
    template<>
    uint64_t calc_fee_visitor::operator()(const htlc_create_operation& op)const
    {
-      transfer_operation::fee_parameters_type t;
+      transfer_operation::fee_parameters_type t = param.get<transfer_operation>();
       return op.calculate_fee( param.get<htlc_create_operation>(), t.price_per_kbyte).value;
    }
 
