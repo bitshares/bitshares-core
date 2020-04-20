@@ -101,6 +101,10 @@ public:
    std::string operator()(const graphene::protocol::htlc_redeemed_operation& op)const;
    protected:
    std::string print_memo( const fc::optional<graphene::protocol::memo_data>& memo)const;
+   void print_preimage( const std::vector<char>& preimage)const;
+   std::string print_redeem(const graphene::protocol::htlc_id_type& id, 
+         const std::string& redeemer, const std::vector<char>& preimage, 
+         const graphene::protocol::asset& op_fee)const;
 };
 
 }}} // namespace graphene::wallet::detail

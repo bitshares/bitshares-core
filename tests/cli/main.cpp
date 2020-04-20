@@ -1686,7 +1686,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
 
       BOOST_TEST_MESSAGE("Alice has agreed to buy 3 BOBCOIN from Bob for 3 BTS. Alice creates an HTLC");
       // create an HTLC
-      std::string preimage_string = "My Secret";
+      std::string preimage_string = "My Super Long Secret that is larger than 50 charaters. How do I look?\n";
       fc::hash160 preimage_md = fc::hash160::hash(preimage_string);
       std::stringstream ss;
       for(size_t i = 0; i < preimage_md.data_size(); i++)
@@ -1735,35 +1735,6 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          htlc_id_type htlc_id = result_block.transactions[result_block.transactions.size()-1].operation_results[0].get<object_id_type>();
          bob_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
          BOOST_TEST_MESSAGE("Bob shares the HTLC ID with Alice. The HTLC ID is: " + bob_htlc_id_as_string);
-         // test operation_printer
-         auto hist = con.wallet_api_ptr->get_account_history("alice", 10);
-         for(size_t i = 0; i < hist.size(); ++i)
-         {
-            auto obj = hist[i];
-            std::stringstream ss;
-            ss << "Description: " << obj.description << "\n";
-            auto str = ss.str();
-            BOOST_TEST_MESSAGE( str );
-            if (i < 2)
-            {
-               BOOST_CHECK( str.find("HASH160 008e") != std::string::npos );
-            }
-         }
-         con.wallet_api_ptr->lock();
-         hist = con.wallet_api_ptr->get_account_history("alice", 10);
-         for(size_t i = 0; i < hist.size(); ++i)
-         {
-            auto obj = hist[i];
-            std::stringstream ss;
-            ss << "Description: " << obj.description << "\n";
-            auto str = ss.str();
-            BOOST_TEST_MESSAGE( str );
-            if (i < 2)
-            {
-               BOOST_CHECK( str.find("HASH160 008e") != std::string::npos );
-            }
-         } 
-         con.wallet_api_ptr->unlock("supersecret");        
       }
 
       // Alice can now look over Bob's HTLC, to see if it is what was agreed to:
@@ -1774,8 +1745,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
       // Alice likes what she sees, so uses her preimage to get her BOBCOIN
       {
          BOOST_TEST_MESSAGE("Alice uses her preimage to retrieve the BOBCOIN");
-         std::string secret = "My Secret";
-         con.wallet_api_ptr->htlc_redeem(bob_htlc_id_as_string, "alice", secret, true);
+         con.wallet_api_ptr->htlc_redeem(bob_htlc_id_as_string, "alice", preimage_string, true);
          BOOST_TEST_MESSAGE("The system is generating a block");
          BOOST_CHECK(generate_block(app1));
       }
@@ -1784,11 +1754,40 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
       // Bob can use the preimage to retrieve his BTS
       {
          BOOST_TEST_MESSAGE("Bob uses Alice's preimage to retrieve the BOBCOIN");
-         std::string secret = "My Secret";
-         con.wallet_api_ptr->htlc_redeem(alice_htlc_id_as_string, "bob", secret, true);
+         con.wallet_api_ptr->htlc_redeem(alice_htlc_id_as_string, "bob", preimage_string, true);
          BOOST_TEST_MESSAGE("The system is generating a block");
          BOOST_CHECK(generate_block(app1));
       }
+
+      // test operation_printer
+      auto hist = con.wallet_api_ptr->get_account_history("alice", 10);
+      for(size_t i = 0; i < hist.size(); ++i)
+      {
+         auto obj = hist[i];
+         std::stringstream ss;
+         ss << "Description: " << obj.description << "\n";
+         auto str = ss.str();
+         BOOST_TEST_MESSAGE( str );
+         if (i == 3 || i == 4)
+         {
+            BOOST_CHECK( str.find("HASH160 620e4d5ba") != std::string::npos );
+         }
+      }
+      con.wallet_api_ptr->lock();
+      hist = con.wallet_api_ptr->get_account_history("alice", 10);
+      for(size_t i = 0; i < hist.size(); ++i)
+      {
+         auto obj = hist[i];
+         std::stringstream ss;
+         ss << "Description: " << obj.description << "\n";
+         auto str = ss.str();
+         BOOST_TEST_MESSAGE( str );
+         if (i == 3 || i == 4)
+         {
+            BOOST_CHECK( str.find("HASH160 620e4d5ba") != std::string::npos );
+         }
+      } 
+      con.wallet_api_ptr->unlock("supersecret");        
 
       // wait for everything to finish up
       fc::usleep(fc::seconds(1));

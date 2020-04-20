@@ -90,6 +90,32 @@ string operation_printer::print_memo( const fc::optional<graphene::protocol::mem
    return outstr;  
 }
 
+void operation_printer::print_preimage(const std::vector<char>& preimage)const
+{
+   if (preimage.size() == 0)
+      return;
+   out << " with preimage \"";
+   // cut it at 50 bytes max
+   auto flags = out.flags();
+   out << std::hex << setw(2) << setfill('0');
+   for (size_t i = 0; i < std::min<size_t>(50, preimage.size()); i++)
+      out << +preimage[i];
+   out.flags(flags);
+   if (preimage.size() > 50)
+      out << "...(truncated due to size)";
+   out << "\"";
+}
+
+string operation_printer::print_redeem(const graphene::protocol::htlc_id_type& id,
+      const std::string& redeemer, const std::vector<char>& preimage, 
+      const graphene::protocol::asset& op_fee)const
+{
+   out << redeemer << " redeemed HTLC with id "
+         << std::string( static_cast<object_id_type>(id));
+   print_preimage( preimage );
+   return fee(op_fee);
+}
+
 std::string operation_printer::operator()(const transfer_from_blind_operation& op)const
 {
    auto a = wallet.get_asset( op.fee.asset_id );
@@ -146,34 +172,12 @@ std::string operation_printer::operator()(const asset_create_operation& op) cons
 
 std::string operation_printer::operator()(const htlc_redeem_operation& op) const
 {
-   auto flags = out.flags();
-   out << "Redeem HTLC with database id "
-         << std::to_string(op.htlc_id.space_id)
-         << "." << std::to_string(op.htlc_id.type_id)
-         << "." << std::to_string((uint64_t)op.htlc_id.instance)
-         << " with preimage \"";
-   out << std::hex;
-   for (unsigned char c : op.preimage)
-      out << c;
-   out.flags(flags);
-   out << "\"";
-   return fee(op.fee);
+   return print_redeem(op.htlc_id, wallet.get_account(op.redeemer).name, op.preimage, op.fee);
 }
 
 std::string operation_printer::operator()(const htlc_redeemed_operation& op) const
 {
-   auto flags = out.flags();
-   out << "Redeem HTLC with database id "
-         << std::to_string(op.htlc_id.space_id)
-         << "." << std::to_string(op.htlc_id.type_id)
-         << "." << std::to_string((uint64_t)op.htlc_id.instance)
-         << " with preimage \"";
-   out << std::hex;
-   for (unsigned char c : op.preimage)
-      out << c;
-   out.flags(flags);
-   out << "\"";
-   return fee(op.fee);
+   return print_redeem(op.htlc_id, wallet.get_account(op.redeemer).name, op.preimage, op.fee);
 }
 
 std::string operation_printer::operator()(const htlc_create_operation& op) const
@@ -182,10 +186,12 @@ std::string operation_printer::operator()(const htlc_create_operation& op) const
 
    auto fee_asset = wallet.get_asset( op.fee.asset_id );
    auto to = wallet.get_account( op.to );
+   auto from = wallet.get_account( op.from );
    operation_result_printer rprinter(wallet);
    std::string database_id = result.visit(rprinter);
 
-   out << "Create HTLC to " << to.name << " with id " << database_id
+   out << "Create HTLC from " << from.name << " to " << to.name 
+         << " with id " << database_id
          << " preimage hash: [" << op.preimage_hash.visit( vtor ) << "] ";
    print_memo( op.extensions.value.memo );
    // determine if the block that the HTLC is in is before or after LIB
