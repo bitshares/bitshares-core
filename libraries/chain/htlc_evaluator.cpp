@@ -60,7 +60,7 @@ namespace graphene {
             // TODO: The hardfork portion of this check can be removed if no HTLC redemptions are 
             // attempted on an HTLC with a 0 preimage size before the hardfork date.
             if ( htlc_obj->conditions.hash_lock.preimage_size > 0U || 
-                  block_time <= HARDFORK_CORE_BSIP64_TIME )
+                  block_time < HARDFORK_CORE_BSIP64_TIME )
                FC_ASSERT(op.preimage.size() == htlc_obj->conditions.hash_lock.preimage_size, "Preimage size mismatch.");
          }
       } // end of graphene::chain::details
