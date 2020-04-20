@@ -1765,39 +1765,56 @@ uint64_t database_api_impl::get_committee_count()const
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<worker_object> database_api::get_all_workers()const
+vector<worker_object> database_api::get_all_workers( const optional<bool> is_expired )const
 {
-    return my->get_all_workers();
+   return my->get_all_workers( is_expired );
 }
 
-vector<worker_object> database_api_impl::get_all_workers()const
+vector<worker_object> database_api_impl::get_all_workers( const optional<bool> is_expired )const
 {
-    vector<worker_object> result;
-    const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_id>();
-    for( const auto& w : workers_idx )
-    {
-       result.push_back( w );
-    }
-    return result;
+   vector<worker_object> result;
+
+   if( !is_expired.valid() ) // query for all workers
+   {
+      const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_id>();
+      result.reserve( workers_idx.size() );
+      for( const auto& w : workers_idx )
+      {
+         result.push_back( w );
+      }
+   }
+   else // query for workers that are expired only or not expired only
+   {
+      const time_point_sec now = _db.head_block_time();
+      const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_end_date>();
+      auto itr = *is_expired ? workers_idx.begin() : workers_idx.lower_bound( now );
+      auto end = *is_expired ? workers_idx.upper_bound( now ) : workers_idx.end();
+      for( ; itr != end; ++itr )
+      {
+         result.push_back( *itr );
+      }
+   }
+
+   return result;
 }
 
-vector<optional<worker_object>> database_api::get_workers_by_account(const std::string account_id_or_name)const
+vector<worker_object> database_api::get_workers_by_account(const std::string account_id_or_name)const
 {
-    return my->get_workers_by_account( account_id_or_name );
+   return my->get_workers_by_account( account_id_or_name );
 }
 
-vector<optional<worker_object>> database_api_impl::get_workers_by_account(const std::string account_id_or_name)const
+vector<worker_object> database_api_impl::get_workers_by_account(const std::string account_id_or_name)const
 {
-   vector<optional<worker_object>> result;
+   vector<worker_object> result;
    const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_account>();
 
    const account_id_type account = get_account_from_string(account_id_or_name)->id;
-   for( const auto& w : workers_idx )
-    {
-        if( w.worker_account == account )
-            result.push_back( w );
-    }
-    return result;
+   auto range = workers_idx.equal_range(account);
+   for(auto itr = range.first; itr != range.second; ++itr)
+   {
+      result.push_back( *itr );
+   }
+   return result;
 }
 
 uint64_t database_api::get_worker_count()const
