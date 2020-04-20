@@ -38,12 +38,11 @@ namespace graphene { namespace protocol {
    {
       uint64_t days = ( claim_period_seconds + SECONDS_PER_DAY - 1 ) / SECONDS_PER_DAY;
       // multiply with overflow check
-      share_type per_day_fee = fee_params.fee_per_day * days;
-      share_type per_kb_fee = 0;
+      share_type total_fee = fee_params.fee; 
+      total_fee += share_type(fee_params.fee_per_day) * days;
       if (extensions.value.memo.valid())
-         per_kb_fee = calculate_data_fee( fc::raw::pack_size(extensions.value.memo), fee_per_kb);
-      FC_ASSERT( days == 0 || per_day_fee / days == fee_params.fee_per_day, "Fee calculation overflow" );
-      return fee_params.fee + per_day_fee + per_kb_fee;
+         total_fee += calculate_data_fee( fc::raw::pack_size(extensions.value.memo), fee_per_kb);
+      return total_fee;
    }
 
    void htlc_redeem_operation::validate()const {

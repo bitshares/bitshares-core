@@ -92,7 +92,7 @@ namespace graphene {
                ( "asset", asset_to_transfer.id )( "acct", from_account.id ) );
          FC_ASSERT( is_authorized_asset( d, to_account, asset_to_transfer ), 
                "Asset ${asset} is not authorized for account ${acct}.", 
-               ( "asset", asset_to_transfer.id )( "acct", to_account.id ) );  
+               ( "asset", asset_to_transfer.id )( "acct", to_account.id ) );
          return void_result();
       }
 
