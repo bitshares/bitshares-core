@@ -1170,6 +1170,42 @@ BOOST_AUTO_TEST_CASE( get_all_workers )
 
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE( get_workers_by_account )
+{ try {
+   graphene::app::database_api db_api( db, &( app.get_options() ));
+   ACTORS( (connie)(whitney)(wolverine) );
+
+   fund(connie);
+   upgrade_to_lifetime_member(connie);
+   fund(whitney);
+   upgrade_to_lifetime_member(whitney);
+   fund(wolverine);
+   upgrade_to_lifetime_member(wolverine);
+
+   vector<worker_object> results;
+
+   const auto& worker1 = create_worker( connie_id );
+   worker_id_type worker1_id = worker1.id;
+
+   const auto& worker2 = create_worker( whitney_id, 1000, fc::days(50) );
+   worker_id_type worker2_id = worker2.id;
+
+   const auto& worker3 = create_worker( whitney_id, 1000, fc::days(100) );
+   worker_id_type worker3_id = worker3.id;
+
+   BOOST_REQUIRE_EQUAL( db_api.get_workers_by_account("connie").size(), 1 );
+   BOOST_CHECK( db_api.get_workers_by_account("connie").front().id == worker1_id );
+
+   BOOST_REQUIRE_EQUAL( db_api.get_workers_by_account(string(whitney.id)).size(), 2 );
+   BOOST_CHECK( db_api.get_workers_by_account(string(whitney.id)).front().id == worker2_id );
+   BOOST_CHECK( db_api.get_workers_by_account(string(whitney.id)).back().id == worker3_id );
+
+   BOOST_REQUIRE_EQUAL( db_api.get_workers_by_account("wolverine").size(), 0 );
+
+   BOOST_REQUIRE_THROW( db_api.get_workers_by_account("not-a-user"), fc::exception );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE( lookup_vote_ids )
 { try {
    graphene::app::database_api db_api( db, &( app.get_options() ));
