@@ -31,6 +31,13 @@
 #include <graphene/protocol/vote.hpp>
 
 namespace graphene { namespace protocol {
+   struct additional_account_options
+   {
+      optional<account_id_type> committee_voting_account = GRAPHENE_PROXY_TO_SELF_ACCOUNT;
+      optional<account_id_type> witness_voting_account = GRAPHENE_PROXY_TO_SELF_ACCOUNT;
+      optional<account_id_type> worker_voting_account = GRAPHENE_PROXY_TO_SELF_ACCOUNT;
+   };
+   typedef extension<additional_account_options> additional_account_options_t;
 
    bool is_valid_name( const string& s );
    bool is_cheap_name( const string& n );
@@ -56,7 +63,7 @@ namespace graphene { namespace protocol {
       /// This is the list of vote IDs this account votes for. The weight of these votes is determined by this
       /// account's balance of core asset.
       flat_set<vote_id_type> votes;
-      extensions_type        extensions;
+      additional_account_options_t extensions;
 
       /// Whether this account is voting
       inline bool is_voting() const
@@ -268,8 +275,53 @@ namespace graphene { namespace protocol {
       void        validate()const;
    };
 
+   /*
+    * @brief explicit operation for voting
+    * @ingroup operations
+    *
+    * Vote for the 3 referendum categories(committee, witness, worker), the number of witnesses
+    * and committee members the blockchain can have, update your proxy.
+    *
+    * Additionally the operation will allow the user to select specific proxies for each of the 3 referendum categories.
+    */
+   struct account_update_votes_operation : public base_operation
+   {
+      struct fee_parameters_type { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
+      asset fee;
+
+      /// The account to update
+      account_id_type account;
+
+      /// Votes to add or remove
+      optional<flat_set<vote_id_type>> votes_to_add;
+      optional<flat_set<vote_id_type>> votes_to_remove;
+
+      // A new voting account
+      optional<account_id_type> voting_account;
+
+      // Voting accounts by referendum category
+      optional<account_id_type> committee_voting_account;
+      optional<account_id_type> witness_voting_account;
+      optional<account_id_type> worker_voting_account;
+
+      // A new number of witness
+      optional<uint16_t> num_witness;
+
+      // A new number of committee member
+      optional<uint16_t> num_committee;
+
+      // For future extensions
+      extensions_type extensions;
+
+      account_id_type fee_payer()const { return account; }
+      void        validate()const;
+   };
+
 } } // graphene::protocol
 
+FC_REFLECT( graphene::protocol::additional_account_options,
+            (committee_voting_account)(witness_voting_account)(worker_voting_account))
 FC_REFLECT(graphene::protocol::account_options, (memo_key)(voting_account)(num_witness)(num_committee)(votes)(extensions))
 FC_REFLECT_ENUM( graphene::protocol::account_whitelist_operation::account_listing,
                 (no_listing)(white_listed)(black_listed)(white_and_black_listed))
@@ -298,17 +350,26 @@ FC_REFLECT( graphene::protocol::account_whitelist_operation::fee_parameters_type
 FC_REFLECT( graphene::protocol::account_update_operation::fee_parameters_type, (fee)(price_per_kbyte) )
 FC_REFLECT( graphene::protocol::account_upgrade_operation::fee_parameters_type, (membership_annual_fee)(membership_lifetime_fee) )
 FC_REFLECT( graphene::protocol::account_transfer_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::account_update_votes_operation::fee_parameters_type, (fee) )
 
 FC_REFLECT( graphene::protocol::account_transfer_operation, (fee)(account_id)(new_owner)(extensions) )
+FC_REFLECT( graphene::protocol::account_update_votes_operation, (fee)(account)(votes_to_add)
+                                                                (votes_to_remove)(voting_account)
+                                                                (committee_voting_account)(witness_voting_account)
+                                                                (worker_voting_account)(num_witness)(num_committee)
+                                                                (extensions))
 
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::additional_account_options )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_options )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_whitelist_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_upgrade_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_transfer_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_votes_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_whitelist_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_upgrade_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_transfer_operation )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::account_update_votes_operation )

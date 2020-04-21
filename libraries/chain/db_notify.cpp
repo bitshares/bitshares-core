@@ -305,6 +305,10 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // account
    }
+   void operator()( const account_update_votes_operation& op )
+   {
+      _impacted.insert( op.fee_payer() );
+   }
 };
 
 } // namespace detail

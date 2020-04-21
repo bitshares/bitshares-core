@@ -98,6 +98,9 @@ struct proposal_operation_hardfork_visitor
    void operator()(const graphene::chain::custom_authority_delete_operation&) const {
       FC_ASSERT( HARDFORK_BSIP_40_PASSED(block_time), "Not allowed until hardfork BSIP 40" );
    }
+   void operator()(const graphene::chain::account_update_votes_operation &op) const {
+      FC_ASSERT( block_time >= HARDFORK_BSIP_47_TIME, "Not allowed until hardfork BSIP 47" );
+   }
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {
       bool already_contains_proposal_update = false;
