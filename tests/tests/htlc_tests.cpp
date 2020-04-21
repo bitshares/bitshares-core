@@ -346,7 +346,7 @@ try {
    }
 
    // verify funds on hold... 100 - 3 = 97, minus the transaction fee = 90.57813
-   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90.57813 * GRAPHENE_BLOCKCHAIN_PRECISION );
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 9057813 );
 
    // make sure Bob (or anyone) can see the details of the transaction
    graphene::app::database_api db_api(db);
@@ -389,7 +389,7 @@ try {
    // verify funds end up in Bob's account (3)
    BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
    // verify funds remain out of Alice's acount ( 100 - 3 - transaction fee )
-   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90.57813 * GRAPHENE_BLOCKCHAIN_PRECISION );
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 9057813 );
    // verify all three get notified
    std::vector<operation_history_object> history = get_operation_history(alice_id);
    BOOST_CHECK_EQUAL( history.size(), alice_num_history + 1);
