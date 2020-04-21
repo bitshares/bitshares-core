@@ -106,12 +106,23 @@ namespace graphene { namespace protocol {
          FC_ASSERT( *extensions.value.market_fee_network_percent <= GRAPHENE_100_PERCENT,
                     "The market_fee_network_percent parameter can not exceed 100%" );
       }
+      if( extensions.value.maker_fee_discount_percent.valid() )
+      {
+         FC_ASSERT( *extensions.value.maker_fee_discount_percent <= GRAPHENE_100_PERCENT,
+                    "The maker_fee_discount_percent parameter can not exceed 100%" );
+      }
    }
 
    uint16_t chain_parameters::get_market_fee_network_percent() const
    {
       return extensions.value.market_fee_network_percent.valid() ?
                 *extensions.value.market_fee_network_percent : 0;
+   }
+
+   uint16_t chain_parameters::get_maker_fee_discount_percent() const
+   {
+      return extensions.value.maker_fee_discount_percent.valid() ?
+                *extensions.value.maker_fee_discount_percent : 0;
    }
 
 }}
