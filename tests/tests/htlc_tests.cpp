@@ -275,10 +275,10 @@ try {
       // this try/catch is just to get some console output to verify the exception
       try {
          PUSH_TX(db, trx, ~0);
-         BOOST_TEST_FAIL("crate_operation should have failed due to the HASH160 hash");
+         BOOST_FAIL("crate_operation should have failed due to the HASH160 hash");
       } catch(fc::exception& ex) {
          if ( ex.to_string().find("HASH160 unavailable") == std::string::npos )
-            BOOST_TEST_FAIL("create_operation failed but not due to the hash160 function");
+            BOOST_FAIL("create_operation failed but not due to the hash160 function");
        }
       trx.clear();
    }
@@ -303,7 +303,7 @@ try {
       sign(trx, alice_private_key);
       try {
          PUSH_TX(db, trx, ~0);
-         BOOST_TEST_FAIL("crate_operation should have failed due to the memo field");
+         BOOST_FAIL("crate_operation should have failed due to the memo field");
       } catch(fc::exception& ex) {
          if (ex.to_string().find("Memo unavailable") == std::string::npos )
          {
