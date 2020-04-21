@@ -441,7 +441,7 @@ namespace graphene { namespace chain {
 
          asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
          asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives );
-         asset calculate_force_settle_fees(const asset_object& recv_asset, const asset& receives) const;
+         asset pay_force_settle_fees(const asset_object& collecting_asset, const asset& collat_receives);
          ///@}
 
 
