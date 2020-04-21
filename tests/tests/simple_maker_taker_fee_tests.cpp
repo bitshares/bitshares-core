@@ -1,3 +1,27 @@
+/*
+ * Copyright (c) 2020 Michel Santos, and contributors.
+ *
+ * The MIT License
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
 #include <string>
 #include <boost/test/unit_test.hpp>
 #include <fc/exception/exception.hpp>
@@ -641,7 +665,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
    /**
     * Test of different maker and taker fees charged when filling limit orders after HF for a UIA
     */
-   BOOST_AUTO_TEST_CASE(simple_match_and_fill_with_different_fees_uia) {
+   BOOST_AUTO_TEST_CASE(simple_match_and_fill_with_different_fees_uia_1) {
       try {
          // Initialize for the current time
          trx.clear();
@@ -1310,6 +1334,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
    /**
     * Test of different maker and taker fees charged when filling limit orders after HF for a smart asset
+    * and a user-issued asset
     *
     * 1. (Order 1) An order will be placed to offer JCOIN
     *
@@ -1321,9 +1346,10 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
     * 3. (Order 3) A matching order will be placed to offer JCOIN.
     *     Order 3 should be charged a taker fee, and Order 2 should be charged a maker fee.
     *
-    * Summary: Order 2 should be charged a taker fee when matching Order 1, and Order 2 should be charged a maker fee when matching Order 3.
+    * Summary: Order 2 should be charged a taker fee when matching Order 1,
+    * and Order 2 should be charged a maker fee when matching Order 3.
     */
-   BOOST_AUTO_TEST_CASE(partial_maker_partial_taker_fills) {
+   BOOST_AUTO_TEST_CASE(partial_maker_partial_taker_fills_1) {
       try {
          // Initialize for the current time
          trx.clear();
@@ -1398,6 +1424,10 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          BOOST_CHECK(updated_asset.options.extensions.value.taker_fee_percent.valid());
          BOOST_CHECK_EQUAL(expected_taker_fee_percent, *updated_asset.options.extensions.value.taker_fee_percent);
 
+         // Check the maker fee for JILLCOIN
+         uint16_t expected_maker_fee_percent = jill_maker_fee_percent;
+         BOOST_CHECK_EQUAL(expected_maker_fee_percent, updated_asset.options.market_fee_percent);
+
 
          // Set the new taker fee for SMARTBIT
          uop = asset_update_operation();
@@ -1426,7 +1456,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
 
          //////
-         // Create Orders 1 and 2 that will match.
+         // Create Orders 1 and 2 to match.
          // Order 1 will be completely filled, and Order 2 will be partially filled.
          //////
          // Initialize token balance of actors
@@ -1503,7 +1533,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
 
 
          //////
-         // Create Order 3 that will the remainder of match Order 2
+         // Create Order 3 to match the remainder of match Order 2
          //////
          // Initialize token balance of actors
          BOOST_TEST_MESSAGE("Issuing 5 JCOIN to charlie");
@@ -1553,7 +1583,7 @@ BOOST_FIXTURE_TEST_SUITE(simple_maker_taker_fee_tests, simple_maker_taker_databa
          // Check the asset issuer's accumulated fees
          share_type expected_smartbit_fee_after_order_3 =
                  expected_smartbit_fee_after_order_2 + expected_smartbit_fee.amount;
-         share_type expected_jill_fee_after_order_3 = expected_jill_fee_after_order_2 + expected_jill_fee.amount;
+         share_type expected_jill_fee_after_order_3 = expected_jill_fee_after_order_2 + expected_jill_order_3_fee.amount;
          BOOST_CHECK(smartbit.dynamic_asset_data_id(db).accumulated_fees == expected_smartbit_fee_after_order_3);
          BOOST_CHECK(jillcoin.dynamic_asset_data_id(db).accumulated_fees == expected_jill_fee_after_order_3);
 
