@@ -369,7 +369,7 @@ vector<operation_detail> wallet_api::get_relative_account_history(
 
 account_history_operation_detail wallet_api::get_account_history_by_operations(
       string name,
-      vector<uint16_t> operation_types,
+      flat_set<uint16_t> operation_types,
       uint32_t start,
       int limit)
 {
