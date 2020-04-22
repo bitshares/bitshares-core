@@ -805,7 +805,7 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
    const account_object& seller = order.seller(*this);
    const asset_object& recv_asset = receives.asset_id(*this);
 
-   auto issuer_fees = pay_market_fees(&seller, recv_asset, receives);
+   auto issuer_fees = pay_market_fees(&seller, recv_asset, receives, is_maker);
 
    pay_order( seller, receives - issuer_fees, pays );
 
@@ -977,7 +977,7 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
    if( head_block_time() >= HARDFORK_CORE_1780_TIME )
       settle_owner_ptr = &settle.owner(*this);
 
-   auto issuer_fees = pay_market_fees( settle_owner_ptr, get(receives.asset_id), receives );
+   auto issuer_fees = pay_market_fees( settle_owner_ptr, get(receives.asset_id), receives, is_maker );
 
    if( pays < settle.balance )
    {
@@ -1226,16 +1226,31 @@ void database::pay_order( const account_object& receiver, const asset& receives,
    adjust_balance(receiver.get_id(), receives);
 }
 
-asset database::calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount )
+asset database::calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount, const bool& is_maker)
 {
    assert( trade_asset.id == trade_amount.asset_id );
 
    if( !trade_asset.charges_market_fees() )
       return trade_asset.amount(0);
-   if( trade_asset.options.market_fee_percent == 0 )
+   // Optimization: The fee is zero if the order is a maker, and the maker fee percent is 0%
+   if( is_maker && trade_asset.options.market_fee_percent == 0 )
       return trade_asset.amount(0);
 
-   auto value = detail::calculate_percent(trade_amount.amount, trade_asset.options.market_fee_percent);
+   // Optimization: The fee is zero if the order is a taker, and the taker fee percent is 0%
+   const optional<uint16_t>& taker_fee_percent = trade_asset.options.extensions.value.taker_fee_percent;
+   if(!is_maker && taker_fee_percent.valid() && *taker_fee_percent == 0)
+      return trade_asset.amount(0);
+
+   uint16_t fee_percent;
+   if (is_maker) {
+      // Maker orders are charged the maker fee percent
+      fee_percent = trade_asset.options.market_fee_percent;
+   } else {
+      // Taker orders are charged the taker fee percent if they are valid.  Otherwise, the maker fee percent.
+      fee_percent = taker_fee_percent.valid() ? *taker_fee_percent : trade_asset.options.market_fee_percent;
+   }
+
+   auto value = detail::calculate_percent(trade_amount.amount, fee_percent);
    asset percent_fee = trade_asset.amount(value);
 
    if( percent_fee.amount > trade_asset.options.max_market_fee )
@@ -1244,9 +1259,10 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
    return percent_fee;
 }
 
-asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives )
+asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,
+                                const bool& is_maker)
 {
-   const auto market_fees = calculate_market_fee( recv_asset, receives );
+   const auto market_fees = calculate_market_fee( recv_asset, receives, is_maker );
    auto issuer_fees = market_fees;
    FC_ASSERT( issuer_fees <= receives, "Market fee shouldn't be greater than receives");
    //Don't dirty undo state if not actually collecting any fees
