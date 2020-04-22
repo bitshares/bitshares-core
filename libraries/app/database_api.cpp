@@ -989,6 +989,43 @@ vector<limit_order_object> database_api_impl::get_limit_orders( const std::strin
    return get_limit_orders(asset_a_id, asset_b_id, limit);
 }
 
+vector<limit_order_object> database_api::get_limit_orders_by_account( const string& account_name_or_id,
+                              optional<uint32_t> limit, optional<limit_order_id_type> start_id )
+{
+   return my->get_limit_orders_by_account( account_name_or_id, limit, start_id );
+}
+
+vector<limit_order_object> database_api_impl::get_limit_orders_by_account( const string& account_name_or_id,
+                              optional<uint32_t> olimit, optional<limit_order_id_type> ostart_id )
+{
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+   FC_ASSERT( limit <= _app_options->api_limit_get_limit_orders_by_account,
+              "limit can not be greater than ${limit}",
+              ("limit", _app_options->api_limit_get_limit_orders_by_account) );
+
+   vector<limit_order_object> results;
+
+   const account_object* account = get_account_from_string(account_name_or_id);
+   if (account == nullptr)
+      return results;
+
+   limit_order_id_type start_id = ostart_id.valid() ? *ostart_id : limit_order_id_type();
+
+   const auto& index_by_account = _db.get_index_type<limit_order_index>().indices().get<by_account>();
+   auto lower_itr = index_by_account.lower_bound( std::make_tuple( account->id, start_id ) );
+   auto upper_itr = index_by_account.upper_bound( account->id );
+
+   results.reserve( limit );
+   uint32_t count = 0;
+   for ( ; lower_itr != upper_itr && count < limit; ++lower_itr, ++count)
+   {
+      const limit_order_object &order = *lower_itr;
+      results.emplace_back(order);
+   }
+
+   return results;
+}
+
 vector<limit_order_object> database_api::get_account_limit_orders(
                               const string& account_name_or_id, const string &base, const string &quote,
                               uint32_t limit, optional<limit_order_id_type> ostart_id, optional<price> ostart_price )
@@ -1021,9 +1058,9 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders(
       FC_ASSERT(ostart_price->quote.asset_id == quote_id, "Quote asset inconsistent with start price");
    }
 
-   const auto& index_by_account = _db.get_index_type<limit_order_index>().indices().get<by_account>();
-   limit_order_multi_index_type::index<by_account>::type::const_iterator lower_itr;
-   limit_order_multi_index_type::index<by_account>::type::const_iterator upper_itr;
+   const auto& index_by_account = _db.get_index_type<limit_order_index>().indices().get<by_account_price>();
+   limit_order_multi_index_type::index<by_account_price>::type::const_iterator lower_itr;
+   limit_order_multi_index_type::index<by_account_price>::type::const_iterator upper_itr;
 
    // if both order_id and price are invalid, query the first page
    if ( !ostart_id.valid() && !ostart_price.valid() )

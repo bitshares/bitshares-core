@@ -343,6 +343,9 @@ void application_impl::set_api_limit() {
    if(_options->count("api-limit-get-limit-orders")){
       _app_options.api_limit_get_limit_orders = _options->at("api-limit-get-limit-orders").as<uint64_t>();
    }
+   if(_options->count("api-limit-get-limit-orders-by-account")){
+      _app_options.api_limit_get_limit_orders_by_account = _options->at("api-limit-get-limit-orders-by-account").as<uint64_t>();
+   }
    if(_options->count("api-limit-get-order-book")){
       _app_options.api_limit_get_order_book = _options->at("api-limit-get-order-book").as<uint64_t>();
    }
@@ -1079,6 +1082,8 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::list_assets and get_assets_by_issuer to set max limit value")
          ("api-limit-get-limit-orders",boost::program_options::value<uint64_t>()->default_value(300),
           "For database_api_impl::get_limit_orders to set max limit value")
+         ("api-limit-get-limit-orders-by-account",boost::program_options::value<uint64_t>()->default_value(101),
+          "For database_api_impl::get_limit_orders_by_account to set max limit value")
          ("api-limit-get-order-book",boost::program_options::value<uint64_t>()->default_value(50),
           "For database_api_impl::get_order_book to set max limit value")
          ("api-limit-lookup-accounts",boost::program_options::value<uint64_t>()->default_value(1000),
