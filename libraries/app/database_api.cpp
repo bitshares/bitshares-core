@@ -339,8 +339,11 @@ vector<flat_set<account_id_type>> database_api_impl::get_key_references( vector<
    FC_ASSERT( _app_options && _app_options->has_api_helper_indexes_plugin,
               "api_helper_indexes plugin is not enabled on this server." );
 
-   uint64_t api_limit_get_key_references=_app_options->api_limit_get_key_references;
-   FC_ASSERT(keys.size() <= api_limit_get_key_references);
+   const auto configured_limit = _app_options->api_limit_get_key_references;
+   FC_ASSERT( keys.size() <= configured_limit,
+              "Number of querying keys can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    const auto& idx = _db.get_index_type<account_index>();
    const auto& aidx = dynamic_cast<const base_primary_index&>(idx);
    const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
@@ -461,7 +464,11 @@ std::map<string,full_account> database_api::get_full_accounts( const vector<stri
 std::map<std::string, full_account> database_api_impl::get_full_accounts( const vector<std::string>& names_or_ids,
                                                                           optional<bool> subscribe )
 {
-   FC_ASSERT( names_or_ids.size() <= _app_options->api_limit_get_full_accounts );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_full_accounts;
+   FC_ASSERT( names_or_ids.size() <= configured_limit,
+              "Number of querying accounts can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    bool to_subscribe = get_whether_to_subscribe( subscribe );
 
@@ -702,7 +709,12 @@ map<string,account_id_type> database_api_impl::lookup_accounts( const string& lo
                                                                 uint32_t limit,
                                                                 optional<bool> subscribe )const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_lookup_accounts );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_lookup_accounts;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    const auto& accounts_by_name = _db.get_index_type<account_index>().indices().get<by_name>();
    map<string,account_id_type> result;
 
@@ -888,8 +900,11 @@ vector<extended_asset_object> database_api::list_assets(const string& lower_boun
 
 vector<extended_asset_object> database_api_impl::list_assets(const string& lower_bound_symbol, uint32_t limit)const
 {
-   uint64_t api_limit_get_assets = _app_options->api_limit_get_assets;
-   FC_ASSERT( limit <= api_limit_get_assets );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_assets;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    const auto& assets_by_symbol = _db.get_index_type<asset_index>().indices().get<by_symbol>();
    vector<extended_asset_object> result;
@@ -925,8 +940,11 @@ vector<extended_asset_object> database_api::get_assets_by_issuer(const std::stri
 vector<extended_asset_object> database_api_impl::get_assets_by_issuer(const std::string& issuer_name_or_id,
                                                                       asset_id_type start, uint32_t limit)const
 {
-   uint64_t api_limit_get_assets = _app_options->api_limit_get_assets;
-   FC_ASSERT( limit <= api_limit_get_assets );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_assets;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    vector<extended_asset_object> result;
    const account_id_type account = get_account_from_string(issuer_name_or_id)->id;
@@ -980,8 +998,11 @@ vector<limit_order_object> database_api::get_limit_orders(std::string a, std::st
 vector<limit_order_object> database_api_impl::get_limit_orders( const std::string& a, const std::string& b,
                                                                 uint32_t limit )const
 {
-   uint64_t api_limit_get_limit_orders=_app_options->api_limit_get_limit_orders;
-   FC_ASSERT( limit <= api_limit_get_limit_orders );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_limit_orders;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    const asset_id_type asset_a_id = get_asset_from_string(a)->id;
    const asset_id_type asset_b_id = get_asset_from_string(b)->id;
@@ -999,9 +1020,12 @@ vector<limit_order_object> database_api_impl::get_limit_orders_by_account( const
                               optional<uint32_t> olimit, optional<limit_order_id_type> ostart_id )
 {
    uint32_t limit = olimit.valid() ? *olimit : 101;
-   FC_ASSERT( limit <= _app_options->api_limit_get_limit_orders_by_account,
-              "limit can not be greater than ${limit}",
-              ("limit", _app_options->api_limit_get_limit_orders_by_account) );
+
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_limit_orders_by_account;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    vector<limit_order_object> results;
 
@@ -1037,7 +1061,11 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders(
                               const string& account_name_or_id, const string &base, const string &quote,
                               uint32_t limit, optional<limit_order_id_type> ostart_id, optional<price> ostart_price )
 {
-   FC_ASSERT( limit <= _app_options->api_limit_get_account_limit_orders );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_account_limit_orders;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    vector<limit_order_object>   results;
    uint32_t                     count = 0;
@@ -1121,8 +1149,11 @@ vector<call_order_object> database_api::get_call_orders(const std::string& a, ui
 
 vector<call_order_object> database_api_impl::get_call_orders(const std::string& a, uint32_t limit)const
 {
-   uint64_t api_limit_get_call_orders = _app_options->api_limit_get_call_orders;
-   FC_ASSERT( limit <= api_limit_get_call_orders );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_call_orders;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    const asset_object* mia = get_asset_from_string(a);
    const auto& call_index = _db.get_index_type<call_order_index>().indices().get<by_collateral>();
@@ -1148,8 +1179,11 @@ vector<call_order_object> database_api::get_call_orders_by_account(const std::st
 vector<call_order_object> database_api_impl::get_call_orders_by_account(const std::string& account_name_or_id,
                                                                         asset_id_type start, uint32_t limit)const
 {
-   uint64_t api_limit_get_call_orders = _app_options->api_limit_get_call_orders;
-   FC_ASSERT( limit <= api_limit_get_call_orders );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_call_orders;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    vector<call_order_object> result;
    const account_id_type account = get_account_from_string(account_name_or_id)->id;
@@ -1171,8 +1205,11 @@ vector<force_settlement_object> database_api::get_settle_orders(const std::strin
 
 vector<force_settlement_object> database_api_impl::get_settle_orders(const std::string& a, uint32_t limit)const
 {
-   uint64_t api_limit_get_settle_orders = _app_options->api_limit_get_settle_orders;
-   FC_ASSERT( limit <= api_limit_get_settle_orders );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_settle_orders;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    const asset_id_type asset_a_id = get_asset_from_string(a)->id;
    const auto& settle_index = _db.get_index_type<force_settlement_index>().indices().get<by_expiration>();
@@ -1202,8 +1239,11 @@ vector<force_settlement_object> database_api_impl::get_settle_orders_by_account(
       force_settlement_id_type start,
       uint32_t limit )const
 {
-   uint64_t api_limit_get_settle_orders = _app_options->api_limit_get_settle_orders;
-   FC_ASSERT( limit <= api_limit_get_settle_orders );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_settle_orders;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    vector<force_settlement_object> result;
    const account_id_type account = get_account_from_string(account_name_or_id)->id;
@@ -1252,7 +1292,12 @@ vector<collateral_bid_object> database_api::get_collateral_bids( const std::stri
 vector<collateral_bid_object> database_api_impl::get_collateral_bids( const std::string& asset,
                                                                       uint32_t limit, uint32_t skip )const
 { try {
-   FC_ASSERT( limit <= _app_options->api_limit_get_collateral_bids );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_collateral_bids;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    const asset_id_type asset_id = get_asset_from_string(asset)->id;
    const asset_object& swan = asset_id(_db);
    FC_ASSERT( swan.is_market_issued() );
@@ -1368,8 +1413,12 @@ order_book database_api::get_order_book( const string& base, const string& quote
 
 order_book database_api_impl::get_order_book( const string& base, const string& quote, unsigned limit )const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_get_order_book );
-  
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_order_book;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    order_book result;
    result.base = base;
    result.quote = quote;
@@ -1418,7 +1467,10 @@ vector<market_ticker> database_api_impl::get_top_markets(uint32_t limit)const
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-   FC_ASSERT( limit <= _app_options->api_limit_get_top_markets );
+   const auto configured_limit = _app_options->api_limit_get_top_markets;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    const auto& volume_idx = _db.get_index_type<market_ticker_index>().indices().get<by_volume>();
    auto itr = volume_idx.rbegin();
@@ -1456,7 +1508,10 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-   FC_ASSERT( limit <= _app_options->api_limit_get_trade_history );
+   const auto configured_limit = _app_options->api_limit_get_trade_history;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    auto assets = lookup_asset_symbols( {base, quote} );
    FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
@@ -1548,7 +1603,11 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-   FC_ASSERT( limit <= _app_options->api_limit_get_trade_history_by_sequence );
+   const auto configured_limit = _app_options->api_limit_get_trade_history_by_sequence;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    FC_ASSERT( start >= 0 );
    int64_t start_seq = -start;
 
@@ -1682,7 +1741,12 @@ map<string, witness_id_type> database_api::lookup_witness_accounts( const string
 map<string, witness_id_type> database_api_impl::lookup_witness_accounts( const string& lower_bound_name,
                                                                          uint32_t limit )const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_lookup_witness_accounts );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_lookup_witness_accounts;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    const auto& witnesses_by_id = _db.get_index_type<witness_index>().indices().get<by_id>();
 
    // we want to order witnesses by account name, but that name is in the account object
@@ -1764,7 +1828,12 @@ map<string, committee_member_id_type> database_api::lookup_committee_member_acco
 map<string, committee_member_id_type> database_api_impl::lookup_committee_member_accounts(
                                          const string& lower_bound_name, uint32_t limit )const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_lookup_committee_member_accounts );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_lookup_committee_member_accounts;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    const auto& committee_members_by_id = _db.get_index_type<committee_member_index>().indices().get<by_id>();
 
    // we want to order committee_members by account name, but that name is in the account object
@@ -1879,7 +1948,11 @@ vector<variant> database_api::lookup_vote_ids( const vector<vote_id_type>& votes
 
 vector<variant> database_api_impl::lookup_vote_ids( const vector<vote_id_type>& votes )const
 {
-   FC_ASSERT( votes.size() < _app_options->api_limit_lookup_vote_ids );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_lookup_vote_ids;
+   FC_ASSERT( votes.size() <= configured_limit,
+              "Number of querying votes can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    const auto& witness_idx = _db.get_index_type<witness_index>().indices().get<by_vote_id>();
    const auto& committee_idx = _db.get_index_type<committee_member_index>().indices().get<by_vote_id>();
@@ -2107,7 +2180,7 @@ bool database_api_impl::verify_account_authority( const string& account_name_or_
             // Use a no-op lookup for custom authorities; we don't want it even if one does apply for our dummy op
             [](auto, auto, auto*) { return vector<authority>(); },
             true, MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(_db.head_block_time()) );
-   } 
+   }
    catch (fc::exception& ex)
    {
       return false;
@@ -2292,7 +2365,12 @@ vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_b
                                       withdraw_permission_id_type start,
                                       uint32_t limit)const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_get_withdraw_permissions_by_giver );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_withdraw_permissions_by_giver;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    vector<withdraw_permission_object> result;
 
    const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_from>();
@@ -2321,7 +2399,12 @@ vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_b
                                       withdraw_permission_id_type start,
                                       uint32_t limit)const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_get_withdraw_permissions_by_recipient );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_withdraw_permissions_by_recipient;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    vector<withdraw_permission_object> result;
 
    const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_authorized>();
@@ -2366,7 +2449,12 @@ vector<htlc_object> database_api::get_htlc_by_from( const std::string account_id
 vector<htlc_object> database_api_impl::get_htlc_by_from( const std::string account_id_or_name,
                                                          htlc_id_type start, uint32_t limit ) const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_get_htlc_by );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_htlc_by;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    vector<htlc_object> result;
 
    const auto& htlc_idx = _db.get_index_type< htlc_index >().indices().get< by_from_id >();
@@ -2391,8 +2479,12 @@ vector<htlc_object> database_api::get_htlc_by_to( const std::string account_id_o
 vector<htlc_object> database_api_impl::get_htlc_by_to( const std::string account_id_or_name,
                                                        htlc_id_type start, uint32_t limit ) const
 {
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_htlc_by;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
-   FC_ASSERT( limit <= _app_options->api_limit_get_htlc_by );
    vector<htlc_object> result;
 
    const auto& htlc_idx = _db.get_index_type< htlc_index >().indices().get< by_to_id >();
@@ -2415,7 +2507,11 @@ vector<htlc_object> database_api::list_htlcs(const htlc_id_type start, uint32_t 
 
 vector<htlc_object> database_api_impl::list_htlcs(const htlc_id_type start, uint32_t limit) const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_list_htlcs );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_list_htlcs;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    vector<htlc_object> result;
    const auto& htlc_idx = _db.get_index_type<htlc_index>().indices().get<by_id>();
@@ -2497,8 +2593,11 @@ vector<optional<extended_asset_object>> database_api_impl::get_assets( const vec
 vector<limit_order_object> database_api_impl::get_limit_orders( const asset_id_type a, const asset_id_type b,
                                                                 const uint32_t limit )const
 {
-   uint64_t api_limit_get_limit_orders=_app_options->api_limit_get_limit_orders;
-   FC_ASSERT( limit <= api_limit_get_limit_orders );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_limit_orders;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    const auto& limit_order_idx = _db.get_index_type<limit_order_index>();
    const auto& limit_price_idx = limit_order_idx.indices().get<by_price>();
