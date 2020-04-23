@@ -572,6 +572,16 @@ namespace graphene { namespace chain {
          void update_withdraw_permissions();
          bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
                                    const asset_bitasset_data_object* bitasset_ptr = nullptr );
+         /***
+          * Get the correct max_short_squeeze_price from the price_feed based on chain time
+          * (due to hardfork changes in the calculation)
+          * @param block_time the chain's current block time
+          * @param mia the debt asset
+          * @param feed the debt asset's price feed
+          * @returns the max short squeeze price
+          */
+         price get_max_short_squeeze_price( const fc::time_point_sec& block_time, 
+               const asset_object& mia, const price_feed& feed)const;
          void clear_expired_htlcs();
 
          ///Steps performed only at maintenance intervals

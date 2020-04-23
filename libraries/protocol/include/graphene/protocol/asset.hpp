@@ -192,14 +192,17 @@ namespace graphene { namespace protocol {
       /** Fixed point between 1.000 and 10.000, implied fixed point denominator is GRAPHENE_COLLATERAL_RATIO_DENOM */
       uint16_t maximum_short_squeeze_ratio = GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO;
 
-      /** When selling collateral to pay off debt, the least amount of debt to receive should be
+      /** 
+       * When selling collateral to pay off debt, the least amount of debt to receive should be
        *  min_usd = max_short_squeeze_price() * collateral
        *
        *  This is provided to ensure that a black swan cannot be trigged due to poor liquidity alone, it
        *  must be confirmed by having the max_short_squeeze_price() move below the black swan price.
+       * @param mcfr the margin call fee ratio for the debt asset
        */
-      price max_short_squeeze_price()const;
-      /// Another implementation of max_short_squeeze_price() before the core-1270 hard fork
+      price max_short_squeeze_price( const fc::optional<uint16_t>& mcfr )const;
+      /// Other implementations of max_short_squeeze_price() due to hardfork changes
+      price max_short_squeeze_price_before_hf_bsip74()const;
       price max_short_squeeze_price_before_hf_1270()const;
 
       /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call territory.

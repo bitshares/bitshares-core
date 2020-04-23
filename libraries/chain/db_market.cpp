@@ -474,10 +474,7 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
           && !sell_abd->has_settlement()
           && !sell_abd->current_feed.settlement_price.is_null() )
       {
-         if( before_core_hardfork_1270 )
-            call_match_price = ~sell_abd->current_feed.max_short_squeeze_price_before_hf_1270();
-         else
-            call_match_price = ~sell_abd->current_feed.max_short_squeeze_price();
+         call_match_price = ~get_max_short_squeeze_price( maint_time, sell_asset, sell_abd->current_feed );
          if( ~new_order_object.sell_price <= call_match_price ) // new limit order price is good enough to match a call
             to_check_call_orders = true;
       }
@@ -970,6 +967,24 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
    return filled;
 } FC_CAPTURE_AND_RETHROW( (settle)(pays)(receives) ) }
 
+/***
+ * Get the correct max_short_squeeze_price from the price_feed based on chain time
+ * (due to hardfork changes in the calculation)
+ * @param block_time the chain's current block time
+ * @param mia the debt asset
+ * @param feed the debt asset's price feed
+ * @returns the max short squeeze price
+ */
+price database::get_max_short_squeeze_price( const fc::time_point_sec& block_time, const asset_object& mia, 
+      const price_feed& feed)const
+{
+   if ( block_time >= HARDFORK_CORE_BSIP74_TIME )
+      return feed.max_short_squeeze_price(mia.options.extensions.value.margin_call_fee_ratio);
+   if ( block_time <= HARDFORK_CORE_1270_TIME )
+      return feed.max_short_squeeze_price_before_hf_1270();
+   return feed.max_short_squeeze_price_before_hf_bsip74();
+}
+
 /**
  *  Starting with the least collateralized orders, fill them if their
  *  call price is above the max(lowest bid,call_limit).
@@ -1018,8 +1033,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     // looking for limit orders selling the most USD for the least CORE
     auto max_price = price::max( mia.id, bitasset.options.short_backing_asset );
     // stop when limit orders are selling too little USD for too much CORE
-    auto min_price = ( before_core_hardfork_1270 ? bitasset.current_feed.max_short_squeeze_price_before_hf_1270()
-                                                 : bitasset.current_feed.max_short_squeeze_price() );
+    auto min_price = get_max_short_squeeze_price( maint_time, mia, bitasset.current_feed);
 
     // NOTE limit_price_index is sorted from greatest to least
     auto limit_itr = limit_price_index.lower_bound( max_price );
