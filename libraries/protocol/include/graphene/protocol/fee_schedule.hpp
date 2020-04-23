@@ -37,42 +37,38 @@ namespace graphene { namespace protocol {
    template<typename Operation>
    class fee_helper {
      public:
-      const typename Operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      const typename Operation::fee_parameters_type& get(const fee_parameters::flat_set_type& parameters)const
       {
          auto itr = parameters.find( typename Operation::fee_parameters_type() );
-         FC_ASSERT( itr != parameters.end() );
-         return itr->template get<typename Operation::fee_parameters_type>();
-      }
-   };
+         if( itr != parameters.end() )
+            return itr->template get<typename Operation::fee_parameters_type>();
 
-   template<>
-   class fee_helper<account_create_operation> {
-     public:
-      const account_create_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
-      {
-         auto itr = parameters.find( account_create_operation::fee_parameters_type() );
-         FC_ASSERT( itr != parameters.end() );
-         return itr->get<account_create_operation::fee_parameters_type>();
+         static typename Operation::fee_parameters_type dummy;
+         return dummy;
       }
-      typename account_create_operation::fee_parameters_type& get(fee_parameters::flat_set_type& parameters)const
+      typename Operation::fee_parameters_type& mutable_get(fee_parameters::flat_set_type& parameters)const
       {
-         auto itr = parameters.find( account_create_operation::fee_parameters_type() );
-         FC_ASSERT( itr != parameters.end() );
-         return itr->get<account_create_operation::fee_parameters_type>();
+         auto itr = parameters.find( typename Operation::fee_parameters_type() );
+         if( itr != parameters.end() )
+            return itr->template get<typename Operation::fee_parameters_type >();
+         
+         static typename Operation::fee_parameters_type dummy = get(parameters);
+         parameters.insert(dummy);
+         return dummy;
       }
    };
 
    template<>
    class fee_helper<bid_collateral_operation> {
      public:
-      const bid_collateral_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      const bid_collateral_operation::fee_parameters_type& get(const fee_parameters::flat_set_type& parameters)const
       {
          auto itr = parameters.find( bid_collateral_operation::fee_parameters_type() );
          if ( itr != parameters.end() )
             return itr->get<bid_collateral_operation::fee_parameters_type>();
 
          static bid_collateral_operation::fee_parameters_type bid_collateral_dummy;
-         bid_collateral_dummy.fee = fee_helper<call_order_update_operation>().cget(parameters).fee;
+         bid_collateral_dummy.fee = fee_helper<call_order_update_operation>().get(parameters).fee;
          return bid_collateral_dummy;
       }
    };
@@ -80,14 +76,14 @@ namespace graphene { namespace protocol {
    template<>
    class fee_helper<asset_update_issuer_operation> {
      public:
-      const asset_update_issuer_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      const asset_update_issuer_operation::fee_parameters_type& get(const fee_parameters::flat_set_type& parameters)const
       {
          auto itr = parameters.find( asset_update_issuer_operation::fee_parameters_type() );
          if ( itr != parameters.end() )
             return itr->get<asset_update_issuer_operation::fee_parameters_type>();
 
          static asset_update_issuer_operation::fee_parameters_type dummy;
-         dummy.fee = fee_helper<asset_update_operation>().cget(parameters).fee;
+         dummy.fee = fee_helper<asset_update_operation>().get(parameters).fee;
          return dummy;
       }
    };
@@ -95,58 +91,20 @@ namespace graphene { namespace protocol {
    template<>
    class fee_helper<asset_claim_pool_operation> {
      public:
-      const asset_claim_pool_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      const asset_claim_pool_operation::fee_parameters_type& get(const fee_parameters::flat_set_type& parameters)const
       {
          auto itr = parameters.find( asset_claim_pool_operation::fee_parameters_type() );
          if ( itr != parameters.end() )
             return itr->get<asset_claim_pool_operation::fee_parameters_type>();
 
          static asset_claim_pool_operation::fee_parameters_type asset_claim_pool_dummy;
-         asset_claim_pool_dummy.fee = fee_helper<asset_fund_fee_pool_operation>().cget(parameters).fee;
+         asset_claim_pool_dummy.fee = fee_helper<asset_fund_fee_pool_operation>().get(parameters).fee;
          return asset_claim_pool_dummy;
       }
    };
 
-   template<>
-   class fee_helper<htlc_create_operation> {
-     public:
-      const htlc_create_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
-      {
-         auto itr = parameters.find( htlc_create_operation::fee_parameters_type() );
-         if ( itr != parameters.end() )
-            return itr->get<htlc_create_operation::fee_parameters_type>();
 
-         static htlc_create_operation::fee_parameters_type htlc_create_operation_fee_dummy;
-         return htlc_create_operation_fee_dummy;
-      }
-   };
 
-   template<>
-   class fee_helper<htlc_redeem_operation> {
-     public:
-      const htlc_redeem_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
-      {
-         auto itr = parameters.find( htlc_redeem_operation::fee_parameters_type() );
-         if ( itr != parameters.end() )
-            return itr->get<htlc_redeem_operation::fee_parameters_type>();
-
-         static htlc_redeem_operation::fee_parameters_type htlc_redeem_operation_fee_dummy;
-         return htlc_redeem_operation_fee_dummy;
-      }
-   };
-   template<>
-   class fee_helper<htlc_extend_operation> {
-     public:
-      const htlc_extend_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
-      {
-         auto itr = parameters.find( htlc_extend_operation::fee_parameters_type() );
-         if ( itr != parameters.end() )
-            return itr->get<htlc_extend_operation::fee_parameters_type>();
-
-         static htlc_extend_operation::fee_parameters_type htlc_extend_operation_fee_dummy;
-         return htlc_extend_operation_fee_dummy;
-      }
-   };
    /**
     *  @brief contains all of the parameters necessary to calculate the fee for any operation
     */
@@ -182,12 +140,12 @@ namespace graphene { namespace protocol {
       template<typename Operation>
       const typename Operation::fee_parameters_type& get()const
       {
-         return fee_helper<Operation>().cget(parameters);
+         return fee_helper<Operation>().get(parameters);
       }
       template<typename Operation>
-      typename Operation::fee_parameters_type& get()
+      typename Operation::fee_parameters_type& mutable_get()
       {
-         return fee_helper<Operation>().get(parameters);
+         return fee_helper<Operation>().mutable_get(parameters);
       }
       template<typename Operation>
       bool exists()const
