@@ -42,8 +42,6 @@ namespace graphene { namespace chain {
          void_result do_evaluate( const limit_order_create_operation& o );
          object_id_type do_apply( const limit_order_create_operation& o );
 
-         asset calculate_market_fee( const asset_object* aobj, const asset& trade_amount );
-
          /** override the default behavior defined by generic_evalautor
           */
          virtual void convert_fee() override;

@@ -51,13 +51,12 @@ struct account_storage_object : public abstract_object<account_storage_object>
    optional<variant> value;
 };
 
-struct by_custom_id;
 struct by_account_catalog_key;
 
 typedef multi_index_container<
       account_storage_object,
       indexed_by<
-            ordered_unique< tag<by_custom_id>, member< object, object_id_type, &object::id > >,
+            ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
             ordered_unique< tag<by_account_catalog_key>,
                   composite_key< account_storage_object,
                         member< account_storage_object, account_id_type, &account_storage_object::account >,

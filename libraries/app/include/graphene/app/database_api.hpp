@@ -432,6 +432,25 @@ class database_api
       vector<limit_order_object> get_limit_orders(std::string a, std::string b, uint32_t limit)const;
 
       /**
+       * @brief Fetch open limit orders in all markets relevant to the specified account, ordered by ID
+       *
+       * @param account_name_or_id  The name or ID of an account to retrieve
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start order id, fetch orders whose IDs are greater than or equal to this order
+       *
+       * @return List of limit orders of the specified account
+       *
+       * @note
+       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of orders
+       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<limit_order_object> get_limit_orders_by_account( const string& account_name_or_id,
+            optional<uint32_t> limit = 101,
+            optional<limit_order_id_type> start_id = optional<limit_order_id_type>() );
+
+      /**
        * @brief Fetch all orders relevant to the specified account and specified market, result orders
        *        are sorted descendingly by price
        *
@@ -446,7 +465,7 @@ class database_api
        * @return List of orders from @p account_name_or_id to the corresponding account
        *
        * @note
-       * 1. if @p account_name_or_id cannot be tied to an account, empty result will be returned
+       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
        * 2. @p ostart_id and @p ostart_price can be empty, if so the api will return the "first page" of orders;
        *    if @p ostart_id is specified, its price will be used to do page query preferentially,
        *    otherwise the @p ostart_price will be used;
@@ -674,18 +693,19 @@ class database_api
       ///////////////////////
 
       /**
-       * @brief Get all workers
-       * @return All the workers
+       * @brief Get workers
+       * @param is_expired null for all workers, true for expired workers only, false for non-expired workers only
+       * @return A list of worker objects
        *
       */
-      vector<worker_object> get_all_workers()const;
+      vector<worker_object> get_all_workers( const optional<bool> is_expired = optional<bool>() )const;
 
       /**
        * @brief Get the workers owned by a given account
        * @param account_name_or_id The name or ID of the account whose worker should be retrieved
        * @return A list of worker objects owned by the account
        */
-      vector<optional<worker_object>> get_workers_by_account(const std::string account_name_or_id)const;
+      vector<worker_object> get_workers_by_account(const std::string account_name_or_id)const;
 
       /**
        * @brief Get the total number of workers registered with the blockchain
@@ -952,6 +972,7 @@ FC_API(graphene::app::database_api,
    // Markets / feeds
    (get_order_book)
    (get_limit_orders)
+   (get_limit_orders_by_account)
    (get_account_limit_orders)
    (get_call_orders)
    (get_call_orders_by_account)

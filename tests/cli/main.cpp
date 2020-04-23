@@ -997,7 +997,7 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
       auto balances = con.wallet_api_ptr->list_account_balances( "cifer.test" );
       for (auto b : balances) {
          if (b.asset_id == asset_id_type()) {
-            BOOST_ASSERT(b == asset(900000000 - 3000000));
+            BOOST_CHECK(b == asset(900000000 - 3000000));
          }
       }
 
@@ -1568,7 +1568,7 @@ BOOST_FIXTURE_TEST_CASE(cli_use_authorized_transfer, cli_fixture) {
       BOOST_CHECK_EQUAL(charlie_balances.size(), 1);
       asset charlie_core_balance = charlie_balances.front();
       asset expected_charlie_core_balance = transfer_amount;
-      BOOST_ASSERT(charlie_core_balance == expected_charlie_core_balance);
+      BOOST_CHECK(charlie_core_balance == expected_charlie_core_balance);
 
       // Check Bob's balances
       vector<asset> bob_balances = con.wallet_api_ptr->list_account_balances("bob");

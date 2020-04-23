@@ -744,7 +744,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_relative_account_history) {
 BOOST_AUTO_TEST_CASE(api_limit_get_account_history_by_operations) {
    try {
    graphene::app::history_api hist_api(app);
-   vector<uint16_t> operation_types;
+   flat_set<uint16_t> operation_types;
    //account_id_type() do 3 ops
    create_bitasset("USD", account_id_type());
    create_account("dan");
