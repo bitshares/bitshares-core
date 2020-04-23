@@ -223,7 +223,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    if(current_test_name =="api_limit_lookup_vote_ids")
    {
       options.insert(std::make_pair("api-limit-lookup-vote-ids", boost::program_options::variable_value
-         ((uint64_t)3, false)));
+         ((uint64_t)2, false)));
    }
    if(current_test_name =="api_limit_get_account_limit_orders")
    {
