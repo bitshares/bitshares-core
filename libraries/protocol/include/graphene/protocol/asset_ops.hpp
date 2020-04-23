@@ -32,6 +32,8 @@ namespace graphene { namespace protocol {
    {
       fc::optional<uint16_t>                  reward_percent;
       fc::optional<flat_set<account_id_type>> whitelist_market_fee_sharing;
+      // After BSIP81 activation, taker_fee_percent is the taker fee
+      fc::optional<uint16_t> taker_fee_percent;
       fc::optional<uint16_t> margin_call_fee_ratio; // fee to asset issuer for margin call trading
    };
 

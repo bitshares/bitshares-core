@@ -773,7 +773,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
          //            performance loss. Needs testing.
          if( d.head_block_time() >= HARDFORK_CORE_1780_TIME )
          {
-            auto issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d), settled_amount );
+            auto issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d), settled_amount, false );
             settled_amount -= issuer_fees;
          }
 

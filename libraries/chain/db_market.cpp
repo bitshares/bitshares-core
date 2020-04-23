@@ -801,7 +801,7 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
 
    const account_object& seller = order.seller(*this);
 
-   auto issuer_fees = pay_market_fees(&seller, receives.asset_id(*this), receives);
+   auto issuer_fees = pay_market_fees(&seller, receives.asset_id(*this), receives, is_maker);
 
    pay_order( seller, receives - issuer_fees, pays );
 
@@ -897,8 +897,8 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
       });
 
    // distribute the margin fee
-   if (margin_fee.amount > 0)
-      distribute_market_fees( &order.borrower(*this), margin_fee.asset_id(*this), margin_fee );
+   //if (margin_fee.amount > 0)
+   //   distribute_market_fees( &order.borrower(*this), margin_fee.asset_id(*this), margin_fee );
 
    // update current supply
    const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
@@ -945,7 +945,7 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
    if( head_block_time() >= HARDFORK_CORE_1780_TIME )
       settle_owner_ptr = &settle.owner(*this);
 
-   auto issuer_fees = pay_market_fees( settle_owner_ptr, get(receives.asset_id), receives );
+   auto issuer_fees = pay_market_fees( settle_owner_ptr, get(receives.asset_id), receives, is_maker );
 
    if( pays < settle.balance )
    {
@@ -1212,16 +1212,31 @@ void database::pay_order( const account_object& receiver, const asset& receives,
    adjust_balance(receiver.get_id(), receives);
 }
 
-asset database::calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount )
+asset database::calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount, const bool& is_maker)
 {
-   FC_ASSERT( trade_asset.id == trade_amount.asset_id );
+   assert( trade_asset.id == trade_amount.asset_id );
 
    if( !trade_asset.charges_market_fees() )
       return trade_asset.amount(0);
-   if( trade_asset.options.market_fee_percent == 0 )
+   // Optimization: The fee is zero if the order is a maker, and the maker fee percent is 0%
+   if( is_maker && trade_asset.options.market_fee_percent == 0 )
       return trade_asset.amount(0);
 
-   auto value = detail::calculate_percent(trade_amount.amount, trade_asset.options.market_fee_percent);
+   // Optimization: The fee is zero if the order is a taker, and the taker fee percent is 0%
+   const optional<uint16_t>& taker_fee_percent = trade_asset.options.extensions.value.taker_fee_percent;
+   if(!is_maker && taker_fee_percent.valid() && *taker_fee_percent == 0)
+      return trade_asset.amount(0);
+
+   uint16_t fee_percent;
+   if (is_maker) {
+      // Maker orders are charged the maker fee percent
+      fee_percent = trade_asset.options.market_fee_percent;
+   } else {
+      // Taker orders are charged the taker fee percent if they are valid.  Otherwise, the maker fee percent.
+      fee_percent = taker_fee_percent.valid() ? *taker_fee_percent : trade_asset.options.market_fee_percent;
+   }
+
+   auto value = detail::calculate_percent(trade_amount.amount, fee_percent);
    asset percent_fee = trade_asset.amount(value);
 
    if( percent_fee.amount > trade_asset.options.max_market_fee )
@@ -1230,50 +1245,35 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
    return percent_fee;
 }
 
-/***
- * @brief calculate the margin fee
- * 
- * @param trade_amount the asset and amount that the fee should be based upon
- * @returns the amount to be paid
- */
-asset database::calculate_margin_fee( const asset& trade_amount )
+asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,
+                                const bool& is_maker)
 {
-   const asset_object& trade_asset = trade_amount.asset_id(*this);
-
-   if( !trade_asset.charges_market_fees() )
-      return asset(0, trade_amount.asset_id);
-   if( !trade_asset.options.extensions.value.margin_call_fee_ratio.valid() 
-         || *trade_asset.options.extensions.value.margin_call_fee_ratio == 0 )
-      return asset(0, trade_amount.asset_id);
-
-   auto value = detail::calculate_percent(trade_amount.amount, *trade_asset.options.extensions.value.margin_call_fee_ratio);
-   asset percent_fee(value, trade_amount.asset_id);
-
-   return percent_fee;
-}
-
-void database::distribute_market_fees( const account_object* seller, const asset_object& recv_asset, const asset& market_fees)
-{
+   const auto market_fees = calculate_market_fee( recv_asset, receives, is_maker );
    auto issuer_fees = market_fees;
-   // Share market fees to the network
-   const uint16_t network_percent = get_global_properties().parameters.get_market_fee_network_percent();
-   if( network_percent > 0 )
+   FC_ASSERT( issuer_fees <= receives, "Market fee shouldn't be greater than receives");
+   //Don't dirty undo state if not actually collecting any fees
+   if ( issuer_fees.amount > 0 )
    {
-      const auto network_fees_amt = detail::calculate_percent( issuer_fees.amount, network_percent );
-      FC_ASSERT( network_fees_amt <= issuer_fees.amount,
-                  "Fee shared to the network shouldn't be greater than total market fee" );
-      if( network_fees_amt > 0 )
+      // Share market fees to the network
+      const uint16_t network_percent = get_global_properties().parameters.get_market_fee_network_percent();
+      if( network_percent > 0 )
       {
-         const asset network_fees = recv_asset.amount( network_fees_amt );
-         deposit_market_fee_vesting_balance( GRAPHENE_COMMITTEE_ACCOUNT, network_fees );
-         issuer_fees -= network_fees;
+         const auto network_fees_amt = detail::calculate_percent( issuer_fees.amount, network_percent );
+         FC_ASSERT( network_fees_amt <= issuer_fees.amount,
+                    "Fee shared to the network shouldn't be greater than total market fee" );
+         if( network_fees_amt > 0 )
+         {
+            const asset network_fees = recv_asset.amount( network_fees_amt );
+            deposit_market_fee_vesting_balance( GRAPHENE_COMMITTEE_ACCOUNT, network_fees );
+            issuer_fees -= network_fees;
+         }
       }
    }
 
-   // process the remaining fees
-   if (issuer_fees.amount >  0)
-   {  
-      // calculate and pay referral rewards
+   // Process the remaining fees
+   if ( issuer_fees.amount > 0 )
+   {
+      // calculate and pay rewards
       asset reward = recv_asset.amount(0);
 
       auto is_rewards_allowed = [&recv_asset, seller]() {
@@ -1335,25 +1335,16 @@ void database::distribute_market_fees( const account_object* seller, const asset
          }
       }
 
-      const auto& recv_dyn_data = recv_asset.dynamic_asset_data_id(*this);
-      modify( recv_dyn_data, [&issuer_fees, &reward]( asset_dynamic_data_object& obj ){
-         obj.accumulated_fees += issuer_fees.amount - reward.amount;
-      });
-   }
-}
-
-asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives )
-{
-   // market fee calculation
-   const auto issuer_fees = calculate_market_fee( recv_asset, receives );
-   FC_ASSERT( issuer_fees <= receives, "Market fee shouldn't be greater than receives");
-   //Don't dirty undo state if not actually collecting any fees
-   if ( issuer_fees.amount > 0 )
-   {
-      distribute_market_fees(seller, recv_asset, issuer_fees);
+      if( issuer_fees.amount > reward.amount )
+      {
+         const auto& recv_dyn_data = recv_asset.dynamic_asset_data_id(*this);
+         modify( recv_dyn_data, [&issuer_fees, &reward]( asset_dynamic_data_object& obj ){
+            obj.accumulated_fees += issuer_fees.amount - reward.amount;
+         });
+      }
    }
 
-   return issuer_fees;
+   return market_fees;
 }
 
 } }
