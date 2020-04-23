@@ -1079,6 +1079,7 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
    } // for each market issued asset
 }
 
+
 /**
  * @brief Remove any custom active authorities whose expiration dates are in the past
  * @param db A mutable database reference

@@ -808,21 +808,73 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
    assert( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation( order.id, order.seller, pays, receives, issuer_fees, fill_price, is_maker ) );
 
-   // conditional because cheap integer comparison may allow us to avoid two expensive modify() and object lookups
-   if( order.deferred_fee > 0 )
-   {
-      modify( seller.statistics(*this), [&]( account_statistics_object& statistics )
-      {
-         statistics.pay_fee( order.deferred_fee, get_global_properties().parameters.cashback_vesting_threshold );
-      } );
-   }
+   // BSIP85: Maker order creation fee discount, https://github.com/bitshares/bsips/blob/master/bsip-0085.md
+   //   if the order creation fee was paid in BTS,
+   //     return round_down(deferred_fee * maker_fee_discount_percent) to the owner,
+   //     then process the remaining deferred fee as before;
+   //   if the order creation fee was paid in another asset,
+   //     return round_down(deferred_paid_fee * maker_fee_discount_percent) to the owner,
+   //     return round_down(deferred_fee * maker_fee_discount_percent) to the fee pool of the asset,
+   //     then process the remaining deferred fee and deferred paid fee as before.
+   const uint16_t maker_discount_percent = get_global_properties().parameters.get_maker_fee_discount_percent();
 
+   // Save local copies for calculation
+   share_type deferred_fee = order.deferred_fee;
+   share_type deferred_paid_fee = order.deferred_paid_fee.amount;
+
+   // conditional because cheap integer comparison may allow us to avoid two expensive modify() and object lookups
    if( order.deferred_paid_fee.amount > 0 ) // implies head_block_time() > HARDFORK_CORE_604_TIME
    {
+      share_type fee_pool_refund = 0;
+      if( is_maker && maker_discount_percent > 0 )
+      {
+         share_type refund = detail::calculate_percent( deferred_paid_fee, maker_discount_percent );
+         // Note: it's possible that the deferred_paid_fee is very small,
+         //       which can result in a zero refund due to rounding issue,
+         //       in this case, no refund to the fee pool
+         if( refund > 0 )
+         {
+            FC_ASSERT( refund <= deferred_paid_fee, "Internal error" );
+            adjust_balance( order.seller, asset(refund, order.deferred_paid_fee.asset_id) );
+            deferred_paid_fee -= refund;
+
+            // deferred_fee might be positive too
+            FC_ASSERT( deferred_fee > 0, "Internal error" );
+            fee_pool_refund = detail::calculate_percent( deferred_fee, maker_discount_percent );
+            FC_ASSERT( fee_pool_refund <= deferred_fee, "Internal error" );
+            deferred_fee -= fee_pool_refund;
+         }
+      }
+
       const auto& fee_asset_dyn_data = order.deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
-      modify( fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {
-         addo.accumulated_fees += order.deferred_paid_fee.amount;
+      modify( fee_asset_dyn_data, [deferred_paid_fee,fee_pool_refund](asset_dynamic_data_object& addo) {
+         addo.accumulated_fees += deferred_paid_fee;
+         addo.fee_pool += fee_pool_refund;
       });
+   }
+
+   if( order.deferred_fee > 0 )
+   {
+      if( order.deferred_paid_fee.amount <= 0 // paid in CORE, or before HF 604
+            && is_maker && maker_discount_percent > 0 )
+      {
+         share_type refund = detail::calculate_percent( deferred_fee, maker_discount_percent );
+         if( refund > 0 )
+         {
+            FC_ASSERT( refund <= deferred_fee, "Internal error" );
+            adjust_balance( order.seller, asset(refund, asset_id_type()) );
+            deferred_fee -= refund;
+         }
+      }
+      // else do nothing here, because we have already processed it above, or no need to process
+
+      if( deferred_fee > 0 )
+      {
+         modify( seller.statistics(*this), [deferred_fee,this]( account_statistics_object& statistics )
+         {
+            statistics.pay_fee( deferred_fee, get_global_properties().parameters.cashback_vesting_threshold );
+         } );
+      }
    }
 
    if( pays == order.amount_for_sale() )
@@ -832,7 +884,7 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
    }
    else
    {
-      modify( order, [&]( limit_order_object& b ) {
+      modify( order, [&pays]( limit_order_object& b ) {
                              b.for_sale -= pays.amount;
                              b.deferred_fee = 0;
                              b.deferred_paid_fee.amount = 0;
