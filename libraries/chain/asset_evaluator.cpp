@@ -50,7 +50,7 @@ namespace detail {
    void check_asset_options_hf_bsip81(const fc::time_point_sec& block_time, const asset_options& options)
    {
       if (block_time < HARDFORK_BSIP_81_TIME) {
-         // Taker fees should be zero until activation of BSIP81
+         // Taker fees should not be set until activation of BSIP81
          FC_ASSERT(!options.extensions.value.taker_fee_percent.valid(),
                    "Taker fee percent should not be defined before HARDFORK_BSIP_81_TIME");
       }
