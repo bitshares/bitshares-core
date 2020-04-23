@@ -55,18 +55,30 @@ namespace detail {
                    "Taker fee percent should not be defined before HARDFORK_BSIP_81_TIME");
       }
    }
+
+   // TODO review and remove code below and links to it after HARDFORK_BSIP_77_TIME
+   void check_bitasset_options_hf_bsip77(const fc::time_point_sec& block_time, const bitasset_options& options)
+   {
+      if ( !HARDFORK_BSIP_77_PASSED( block_time ) ) {
+         // ICR should not be set until activation of BSIP77
+         FC_ASSERT(!options.extensions.value.initial_collateral_ratio.valid(),
+                   "Initial collateral ratio should not be defined before HARDFORK_BSIP_77_TIME");
+      }
+   }
 }
 
 void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
 { try {
 
    const database& d = db();
+   // Define now from the current block time
+   const time_point_sec now = d.head_block_time();
 
    const auto& chain_parameters = d.get_global_properties().parameters;
    FC_ASSERT( op.common_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    FC_ASSERT( op.common_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
 
-   detail::check_asset_options_hf_1774(d.head_block_time(), op.common_options);
+   detail::check_asset_options_hf_1774( now, op.common_options );
 
    // Check that all authorities do exist
    for( auto id : op.common_options.whitelist_authorities )
@@ -78,8 +90,6 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    auto asset_symbol_itr = asset_indx.find( op.symbol );
    FC_ASSERT( asset_symbol_itr == asset_indx.end() );
 
-   // Define now from the current block time
-   const time_point_sec now = d.head_block_time();
    // This must remain due to "BOND.CNY" being allowed before this HF
    if( now > HARDFORK_385_TIME )
    {
@@ -98,6 +108,7 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    if( op.bitasset_opts )
    {
+      detail::check_bitasset_options_hf_bsip77( now, *op.bitasset_opts );
       const asset_object& backing = op.bitasset_opts->short_backing_asset(d);
       if( backing.is_market_issued() )
       {
@@ -297,7 +308,7 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       validate_new_issuer( d, a, *o.new_issuer );
    }
 
-   detail::check_asset_options_hf_1774(d.head_block_time(), o.new_options);
+   detail::check_asset_options_hf_1774( now, o.new_options );
 
    if( a.dynamic_asset_data_id(d).current_supply != 0 )
    {
@@ -435,6 +446,8 @@ void check_children_of_bitasset(database& d, const asset_update_bitasset_operati
 void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bitasset_operation& op)
 { try {
    database& d = db();
+
+   detail::check_bitasset_options_hf_bsip77( d.head_block_time(), op.new_options );
 
    const asset_object& asset_obj = op.asset_to_update(d);
 

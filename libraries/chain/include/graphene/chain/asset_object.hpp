@@ -196,6 +196,11 @@ namespace graphene { namespace chain {
          /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call territory.
          /// This value is derived from @ref current_feed for better performance and should be kept consistent.
          price current_maintenance_collateralization;
+         /// After BSIP77, when creating a new debt position or updating an existing position, the position
+         /// will be checked against the `initial_collateral_ratio` (ICR) parameter in the bitasset options.
+         /// This value is derived from @ref current_feed and `ICR` for better performance and should be kept
+         /// consistent.
+         price current_initial_collateralization;
 
          /// True if this asset implements a @ref prediction_market
          bool is_prediction_market = false;

@@ -29,8 +29,9 @@
 namespace graphene { namespace chain {
 
 namespace detail {
-   void check_asset_options_hf_1774(const fc::time_point_sec& block_time, const asset_options& options);   
+   void check_asset_options_hf_1774(const fc::time_point_sec& block_time, const asset_options& options);
    void check_asset_options_hf_bsip81(const fc::time_point_sec& block_time, const asset_options& options);
+   void check_bitasset_options_hf_bsip77(const fc::time_point_sec& block_time, const bitasset_options& options);
 }
 
 struct proposal_operation_hardfork_visitor
@@ -50,6 +51,10 @@ struct proposal_operation_hardfork_visitor
       // hf_1774
       detail::check_asset_options_hf_1774(block_time, v.common_options);
 
+      // HARDFORK_BSIP_77
+      if( v.bitasset_opts.valid() )
+         detail::check_bitasset_options_hf_bsip77( block_time, *v.bitasset_opts );
+
       // HARDFORK_BSIP_81
       detail::check_asset_options_hf_bsip81(block_time, v.common_options);
    }
@@ -59,6 +64,10 @@ struct proposal_operation_hardfork_visitor
 
       // HARDFORK_BSIP_81
       detail::check_asset_options_hf_bsip81(block_time, v.new_options);
+   }
+   void operator()(const graphene::chain::asset_update_bitasset_operation &v) const {
+      // HARDFORK_BSIP_77
+      detail::check_bitasset_options_hf_bsip77( block_time, v.new_options );
    }
 
    void operator()(const graphene::chain::committee_member_update_global_parameters_operation &op) const {

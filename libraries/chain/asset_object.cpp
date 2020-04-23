@@ -69,7 +69,12 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
       current_feed_publication_time = current_time;
       current_feed = price_feed();
       if( after_core_hardfork_1270 )
+      {
+         // update data derived from MCR
          current_maintenance_collateralization = price();
+         // update data derived from ICR
+         current_initial_collateralization = price();
+      }
       return;
    }
    if( current_feeds.size() == 1 )
@@ -79,7 +84,16 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
       current_feed = current_feeds.front();
       // Note: perhaps can defer updating current_maintenance_collateralization for better performance
       if( after_core_hardfork_1270 )
+      {
+         // update data derived from MCR
          current_maintenance_collateralization = current_feed.maintenance_collateralization();
+         // update data derived from ICR
+         const auto& icr = options.extensions.value.initial_collateral_ratio;
+         if( icr.valid() && *icr > current_feed.maintenance_collateral_ratio ) // if ICR is set and is above MCR
+            current_initial_collateralization = current_feed.calculate_initial_collateralization( *icr );
+         else // if ICR is not set, or not above MCR
+            current_initial_collateralization = current_maintenance_collateralization;
+      }
       return;
    }
 
@@ -102,7 +116,16 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
    current_feed = median_feed;
    // Note: perhaps can defer updating current_maintenance_collateralization for better performance
    if( after_core_hardfork_1270 )
+   {
+      // update data derived from MCR
       current_maintenance_collateralization = current_feed.maintenance_collateralization();
+      // update data derived from ICR
+      const auto& icr = options.extensions.value.initial_collateral_ratio;
+      if( icr.valid() && *icr > current_feed.maintenance_collateral_ratio ) // if ICR is set and is above MCR
+         current_initial_collateralization = current_feed.calculate_initial_collateralization( *icr );
+      else // if ICR is not set, or not above MCR
+         current_initial_collateralization = current_maintenance_collateralization;
+   }
 }
 
 
@@ -186,6 +209,7 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_bitasset_data_object, (gr
                     (current_feed)
                     (current_feed_publication_time)
                     (current_maintenance_collateralization)
+                    (current_initial_collateralization)
                     (options)
                     (force_settled_volume)
                     (is_prediction_market)
