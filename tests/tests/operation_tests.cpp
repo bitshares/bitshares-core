@@ -343,6 +343,196 @@ BOOST_AUTO_TEST_CASE( asset_settle_cancel_operation_test_after_hf588 )
    }
 }
 
+/// Tests the "initial_collateral_ratio" parameter can only be set after the BSIP77 hard fork
+// TODO remove this test case after the hard fork
+BOOST_AUTO_TEST_CASE( bsip77_hardfork_time_test )
+{
+   try {
+
+      // Proceeds to a recent hard fork
+      generate_blocks( HARDFORK_CORE_583_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((sam));
+
+      // Before bsip77 hard fork, unable to create a bitasset with ICR
+      BOOST_CHECK_THROW( create_bitasset( "USDBIT", sam_id, 100, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBIT", sam_id, 100, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 1 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBIT", sam_id, 100, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 1000 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBIT", sam_id, 100, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 1001 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBIT", sam_id, 100, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 1750 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBIT", sam_id, 100, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 32000 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBIT", sam_id, 100, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 32001 ), fc::exception );
+
+      // Can create a bitasset without ICR
+      const auto& bitusd = create_bitasset( "USDBIT", sam.id, 100, charge_market_fee, 2, {},
+                                            GRAPHENE_MAX_SHARE_SUPPLY );
+      asset_id_type usd_id = bitusd.id;
+
+      // helper function for setting ICR for an asset
+      auto set_icr_for_asset = [&](asset_id_type aid, optional<uint16_t> icr) {
+         const asset_object& ao = aid(db);
+         const asset_bitasset_data_object& abo = ao.bitasset_data(db);
+         asset_update_bitasset_operation uop;
+         uop.issuer = ao.issuer;
+         uop.asset_to_update = aid;
+         uop.new_options = abo.options;
+         uop.new_options.extensions.value.initial_collateral_ratio = icr;
+         trx.operations.clear();
+         trx.operations.push_back( uop );
+         trx.validate();
+         set_expiration( db, trx );
+         PUSH_TX(db, trx, ~0);
+      };
+
+      // Before bsip77 hard fork, unable to update a bitasset with ICR
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 0 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 1 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 1000 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 1001 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 1750 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 32000 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 32001 ), fc::exception );
+
+      // helper function for creating a proposal which contains an asset_create_operation with ICR
+      auto propose_create_bitasset = [&]( string name, optional<uint16_t> icr ) {
+         asset_create_operation acop = make_bitasset( name, sam_id, 100, charge_market_fee, 2, {},
+                                                      GRAPHENE_MAX_SHARE_SUPPLY, icr );
+         proposal_create_operation cop;
+         cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+         cop.expiration_time = db.head_block_time() + 100;
+         cop.proposed_ops.emplace_back( acop );
+         trx.operations.clear();
+         trx.operations.push_back( cop );
+         trx.validate();
+         set_expiration( db, trx );
+         processed_transaction ptx = PUSH_TX(db, trx, ~0);
+         trx.operations.clear();
+      };
+
+      // Before bsip77 hard fork, unable to create a proposal with an asset_create_operation with ICR
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITA", 0 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITA", 1 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITA", 1000 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITA", 1001 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITA", 1750 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITA", 32000 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITA", 32001 ), fc::exception );
+
+      // helper function for creating a proposal which contains an asset_update_bitasset_operation with ICR
+      auto propose_set_icr_for_asset = [&](asset_id_type aid, optional<uint16_t> icr) {
+         const asset_object& ao = aid(db);
+         const asset_bitasset_data_object& abo = ao.bitasset_data(db);
+         asset_update_bitasset_operation uop;
+         uop.issuer = ao.issuer;
+         uop.asset_to_update = aid;
+         uop.new_options = abo.options;
+         uop.new_options.extensions.value.initial_collateral_ratio = icr;
+
+         proposal_create_operation cop;
+         cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+         cop.expiration_time = db.head_block_time() + 100;
+         cop.proposed_ops.emplace_back( uop );
+         trx.operations.clear();
+         trx.operations.push_back( cop );
+         trx.validate();
+         set_expiration( db, trx );
+         PUSH_TX(db, trx, ~0);
+         trx.operations.clear();
+      };
+
+      // Before bsip77 hard fork, unable to create a proposal with an asset_update_bitasset_op with ICR
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 0 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 1 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 1000 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 1001 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 1750 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 32000 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 32001 ), fc::exception );
+
+      // Pass the hard fork time
+      generate_blocks( HARDFORK_BSIP_77_TIME );
+      set_expiration( db, trx );
+
+      // Unable to create a bitasset with an invalid ICR
+      BOOST_CHECK_THROW( create_bitasset( "USDBITB", sam_id, 0, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBITB", sam_id, 1, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBITB", sam_id, 1000, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBITB", sam_id, 32001, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 0 ), fc::exception );
+      // Able to create a bitasset with a valid ICR
+      asset_id_type usdc_id = create_bitasset( "USDBITC", sam.id, 100, charge_market_fee, 2, {},
+                                               GRAPHENE_MAX_SHARE_SUPPLY, 1001 ).id;
+      asset_id_type usdd_id = create_bitasset( "USDBITD", sam.id, 100, charge_market_fee, 2, {},
+                                               GRAPHENE_MAX_SHARE_SUPPLY, 1750 ).id;
+      asset_id_type usde_id = create_bitasset( "USDBITE", sam.id, 100, charge_market_fee, 2, {},
+                                               GRAPHENE_MAX_SHARE_SUPPLY, 32000 ).id;
+      // Able to create a bitasset without ICR
+      asset_id_type usdf_id = create_bitasset( "USDBITF", sam.id, 100, charge_market_fee, 2, {},
+                                               GRAPHENE_MAX_SHARE_SUPPLY, {} ).id;
+
+      BOOST_CHECK( usdc_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio == 1001 );
+      BOOST_CHECK( usdd_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio == 1750 );
+      BOOST_CHECK( usde_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio == 32000 );
+      BOOST_CHECK( !usdf_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio.valid() );
+
+      // Unable to update a bitasset with an invalid ICR
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 0 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 1 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 1000 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 32001 ), fc::exception );
+      // Able to update a bitasset with a valid ICR
+      set_icr_for_asset( usd_id, 1001 );
+      BOOST_CHECK( usd_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio == 1001 );
+      set_icr_for_asset( usd_id, 1750 );
+      BOOST_CHECK( usd_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio == 1750 );
+      set_icr_for_asset( usd_id, 32000 );
+      BOOST_CHECK( usd_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio == 32000 );
+      // Able to update a bitasset, unset its ICR
+      set_icr_for_asset( usd_id, {} );
+      BOOST_CHECK( !usd_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio.valid() );
+
+      // Unable to create a proposal with an asset_create_operation with an invalid ICR
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITG", 0 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITG", 1 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITG", 1000 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITG", 32001 ), fc::exception );
+      // able to create a proposal with a valid ICR or no ICR
+      propose_create_bitasset( "USDBITG", 1001 );
+      propose_create_bitasset( "USDBITG", 1750 );
+      propose_create_bitasset( "USDBITG", 32000 );
+      propose_create_bitasset( "USDBITG", {} );
+
+      // Unable to create a proposal with an asset_update_bitasset_op with an invalid ICR
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 0 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 1 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 1000 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 32001 ), fc::exception );
+      // Able to create a proposal with a valid ICR or no ICR
+      propose_set_icr_for_asset( usd_id, 1001 );
+      propose_set_icr_for_asset( usd_id, 1750 );
+      propose_set_icr_for_asset( usd_id, 32000 );
+      propose_set_icr_for_asset( usd_id, {} );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( old_call_order_update_test_after_hardfork_bsip77_when_icr_not_set )
 {
    bsip77 = true;
