@@ -53,15 +53,12 @@ namespace graphene { namespace protocol {
       }
    };
 
-   /**
-    * Specialization for htlc_create_operation
-    * 
-    * For HTLCs, after HF_BSIP64, we need to add in the fee per kb
-    */
    template<>
    uint64_t calc_fee_visitor::operator()(const htlc_create_operation& op)const
    {
-      transfer_operation::fee_parameters_type t = param.get<transfer_operation>();
+      transfer_operation::fee_parameters_type t;
+      if (param.exists<transfer_operation>())
+         t = param.get<transfer_operation>();
       return op.calculate_fee( param.get<htlc_create_operation>(), t.price_per_kbyte).value;
    }
 
