@@ -88,11 +88,7 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
          // update data derived from MCR
          current_maintenance_collateralization = current_feed.maintenance_collateralization();
          // update data derived from ICR
-         const auto& icr = options.extensions.value.initial_collateral_ratio;
-         if( icr.valid() && *icr > current_feed.maintenance_collateral_ratio ) // if ICR is set and is above MCR
-            current_initial_collateralization = current_feed.calculate_initial_collateralization( *icr );
-         else // if ICR is not set, or not above MCR
-            current_initial_collateralization = current_maintenance_collateralization;
+         refresh_current_initial_collateralization();
       }
       return;
    }
@@ -120,6 +116,16 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
       // update data derived from MCR
       current_maintenance_collateralization = current_feed.maintenance_collateralization();
       // update data derived from ICR
+      refresh_current_initial_collateralization();
+   }
+}
+
+void asset_bitasset_data_object::refresh_current_initial_collateralization()
+{
+   if( current_feed.settlement_price.is_null() )
+      current_initial_collateralization = price();
+   else
+   {
       const auto& icr = options.extensions.value.initial_collateral_ratio;
       if( icr.valid() && *icr > current_feed.maintenance_collateral_ratio ) // if ICR is set and is above MCR
          current_initial_collateralization = current_feed.calculate_initial_collateralization( *icr );
@@ -127,8 +133,6 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
          current_initial_collateralization = current_maintenance_collateralization;
    }
 }
-
-
 
 asset asset_object::amount_from_string(string amount_string) const
 { try {

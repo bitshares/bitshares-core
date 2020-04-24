@@ -581,6 +581,12 @@ static bool update_bitasset_object_options(
          is_witness_or_committee_fed = true;
    }
 
+   // check if ICR will change
+   const auto& old_icr = bdo.options.extensions.value.initial_collateral_ratio;
+   const auto& new_icr = op.new_options.extensions.value.initial_collateral_ratio;
+   bool icr_changed = ( ( old_icr.valid() != new_icr.valid() )
+                        || ( old_icr.valid() && *old_icr != *new_icr ) );
+
    bdo.options = op.new_options;
 
    // are we modifying the underlying? If so, reset the feeds
@@ -609,6 +615,11 @@ static bool update_bitasset_object_options(
 
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
       return ( after_hf_core_868_890 && ! (old_feed == bdo.current_feed) );
+   }
+   else if( icr_changed ) // feeds not updated, but ICR changed
+   {
+      // update data derived from ICR
+      bdo.refresh_current_initial_collateralization();
    }
 
    return false;

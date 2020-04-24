@@ -202,6 +202,10 @@ namespace graphene { namespace chain {
          /// consistent.
          price current_initial_collateralization;
 
+         /// Derive @ref current_initial_collateralization from other member variables.
+         /// Note: this assumes @ref current_maintenance_collateralization is fresh.
+         void refresh_current_initial_collateralization();
+
          /// True if this asset implements a @ref prediction_market
          bool is_prediction_market = false;
 
