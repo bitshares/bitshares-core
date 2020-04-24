@@ -84,6 +84,7 @@ namespace graphene { namespace protocol {
          optional< htlc_options > updatable_htlc_options;
          optional< custom_authority_options_type > custom_authority_options;
          optional< uint16_t > market_fee_network_percent;
+         optional< uint16_t > maker_fee_discount_percent;
       };
 
       extension<ext> extensions;
@@ -98,6 +99,9 @@ namespace graphene { namespace protocol {
 
       /// If @ref market_fee_network_percent is valid, return the value it contains, otherwise return 0
       uint16_t get_market_fee_network_percent() const;
+
+      /// If @ref maker_fee_discount_percent is valid, return the value it contains, otherwise return 0
+      uint16_t get_maker_fee_discount_percent() const;
 
       private:
       static void safe_copy(chain_parameters& to, const chain_parameters& from);
@@ -121,6 +125,7 @@ FC_REFLECT( graphene::protocol::chain_parameters::ext,
       (updatable_htlc_options)
       (custom_authority_options)
       (market_fee_network_percent)
+      (maker_fee_discount_percent)
 )
 
 FC_REFLECT( graphene::protocol::chain_parameters,
