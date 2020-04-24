@@ -343,9 +343,11 @@ BOOST_AUTO_TEST_CASE( asset_settle_cancel_operation_test_after_hf588 )
    }
 }
 
-/// Tests the "initial_collateral_ratio" parameter can only be set after the BSIP77 hard fork
-// TODO remove this test case after the hard fork
-BOOST_AUTO_TEST_CASE( bsip77_hardfork_time_test )
+/// Test case for bsip77:
+/// * the "initial_collateral_ratio" parameter can only be set after the BSIP77 hard fork
+/// * the parameter should be within a range
+// TODO removed the hard fork part after the hard fork, keep the valid range part
+BOOST_AUTO_TEST_CASE( bsip77_hardfork_time_and_param_valid_range_test )
 {
    try {
 
