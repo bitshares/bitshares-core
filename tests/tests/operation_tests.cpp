@@ -184,7 +184,10 @@ BOOST_AUTO_TEST_CASE( old_call_order_update_test_after_hardfork_583 )
 {
    try {
 
-      generate_blocks( HARDFORK_CORE_583_TIME );
+      auto hf_time = HARDFORK_CORE_583_TIME;
+      if( bsip77 )
+         hf_time = HARDFORK_BSIP_77_TIME;
+      generate_blocks( hf_time );
       generate_block();
       set_expiration( db, trx );
 
@@ -340,6 +343,12 @@ BOOST_AUTO_TEST_CASE( asset_settle_cancel_operation_test_after_hf588 )
    }
 }
 
+BOOST_AUTO_TEST_CASE( old_call_order_update_test_after_hardfork_bsip77_when_icr_not_set )
+{
+   bsip77 = true;
+   INVOKE( old_call_order_update_test_after_hardfork_583 );
+}
+
 BOOST_AUTO_TEST_CASE( more_call_order_update_test )
 {
    try {
@@ -447,7 +456,10 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
 {
    try {
 
-      generate_blocks( HARDFORK_CORE_583_TIME );
+      auto hf_time = HARDFORK_CORE_583_TIME;
+      if( bsip77 )
+         hf_time = HARDFORK_BSIP_77_TIME;
+      generate_blocks( hf_time );
       generate_block();
       set_expiration( db, trx );
 
@@ -554,6 +566,12 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
       edump((e.to_detail_string()));
       throw;
    }
+}
+
+BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr_not_set )
+{
+   bsip77 = true;
+   INVOKE( more_call_order_update_test_after_hardfork_583 );
 }
 
 BOOST_AUTO_TEST_CASE( call_order_update_validation_test )
