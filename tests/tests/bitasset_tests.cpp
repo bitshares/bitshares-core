@@ -1439,7 +1439,7 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
    BOOST_CHECK_EQUAL( 5 * prec, fees->calculate_fee( limit_order_create_operation() ).amount.value);
    ACTORS( (alice)  (bob) (charlie) (feeder1) (feeder2) (feeder3) );
    auto& core = asset_id_type()(db);
-   const auto& core_id = core.id;
+   const asset_id_type& core_id = core.id;
    // alice will eventually overdo it on margin
    transfer( committee_account(db), alice, asset(100000 * prec) );
    // bob will take advantage of alice's situation
@@ -1547,6 +1547,14 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
    BOOST_CHECK( my_asset_id(db).options.extensions.value.margin_call_fee_ratio.valid() );
    BOOST_CHECK_EQUAL( *my_asset_id(db).options.extensions.value.margin_call_fee_ratio, 10 );
 
+   {
+      BOOST_TEST_MESSAGE("Verify margin fee is zero");
+      asset trade_amount(100000, my_asset_id );
+      asset fee = db.calculate_margin_fee( trade_amount );
+      BOOST_CHECK_EQUAL( fee.amount.value, 0 );
+      BOOST_CHECK_EQUAL( fee.asset_id.instance.value, core_id.instance.value);
+   }
+
    // must create some price feeds before we can borrow
    {
       price_feed feed1;
@@ -1596,6 +1604,15 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
    BOOST_CHECK_EQUAL( 0, num_limit_orders_on_books( db ) );
    BOOST_CHECK_EQUAL( 2, num_call_orders_on_books( db ) );
 
+
+   {
+      BOOST_TEST_MESSAGE("Verify margin fee is now non-zero");
+      asset trade_amount(100000, my_asset_id );
+      asset fee = db.calculate_margin_fee( trade_amount );
+      BOOST_CHECK_EQUAL( fee.amount.value, 100 );
+      BOOST_CHECK_EQUAL( fee.asset_id.instance.value, core_id.instance.value);
+   }
+   
    // Bob places an order that will eventually executed against Alice's call order
    // NOTE: This must be done first to prevent a global settlement event
    {
@@ -1638,6 +1655,7 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
    BOOST_CHECK_EQUAL( expected_core_balance_bob, get_balance( bob, core) );
    BOOST_CHECK_EQUAL( expected_jmj_balance_bob, get_balance(bob, my_asset_id(db) ) ); 
    // chalie should have collected the margin call fee
+   expected_core_balance_charlie += 116000);
    BOOST_CHECK_EQUAL( expected_core_balance_charlie, get_balance( charlie, core) );
    // 15.19 JMJ should have been added to the accumulated fees
    BOOST_CHECK_EQUAL( 15.19 * prec, my_asset_id(db).dynamic_data(db).accumulated_fees.value );

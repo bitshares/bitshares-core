@@ -896,6 +896,34 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
 } FC_CAPTURE_AND_RETHROW( (order)(pays)(receives) ) }
 
 /***
+ * @brief calculate the margin fee
+ * @param trade_amount the asset and amount that the fee should be based upon
+ * @returns the amount to be paid, in the collateral asset
+ */
+asset database::calculate_margin_fee( const asset& trade_amount )
+{
+   const asset_object& trade_asset = trade_amount.asset_id(*this);
+   const asset_bitasset_data_object& bit_data = trade_asset.bitasset_data(*this);
+   const asset_id_type& collateral_asset_id = bit_data.options.short_backing_asset;
+   //const asset_object& collateral_asset = collateral_asset_id(*this);
+
+   if( !trade_asset.charges_market_fees() )
+      return asset(0, collateral_asset_id);
+   if( !trade_asset.options.extensions.value.margin_call_fee_ratio.valid() 
+         || *trade_asset.options.extensions.value.margin_call_fee_ratio == 0 )
+      return asset(0, collateral_asset_id);
+   // verify settlement price is valid
+   if ( bit_data.current_feed.settlement_price.is_null() )
+      return asset(0, collateral_asset_id);
+
+   asset fee_in_debt_asset = asset(
+      detail::calculate_percent(trade_amount.amount, *trade_asset.options.extensions.value.margin_call_fee_ratio),
+      trade_amount.asset_id);
+   // convert the fee to collateral asset, based on settlement price
+   return fee_in_debt_asset.multiply_and_round_up(bit_data.current_feed.settlement_price);
+}   
+
+/***
  * @brief fill a call order in the specified amounts
  * @param order the call order
  * @param pays What the call order will give to the other party (collateral)
@@ -920,9 +948,9 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
    asset margin_fee(0, pays.asset_id);
    if (is_margin_call)
    {
-      margin_fee = calculate_margin_fee( pays );
+      margin_fee = calculate_margin_fee( receives );
       // margin fee should never be more than what the call order is paying    
-      FC_ASSERT( margin_fee.amount == 0 || margin_fee.amount < pays.amount ); 
+      FC_ASSERT( margin_fee.amount == 0 || margin_fee.amount < receives.amount ); 
    }
 
    optional<asset> collateral_freed;
@@ -949,8 +977,8 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
       });
 
    // distribute the margin fee
-   //if (margin_fee.amount > 0)
-   //   distribute_market_fees( &order.borrower(*this), margin_fee.asset_id(*this), margin_fee );
+   if (margin_fee.amount > 0)
+      distribute_market_fees( &order.borrower(*this), margin_fee.asset_id(*this), margin_fee );
 
    // update current supply
    const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
@@ -1295,6 +1323,11 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
       percent_fee.amount = trade_asset.options.max_market_fee;
 
    return percent_fee;
+}
+
+asset database::pay_margin_fees(const asset& fee)
+{
+   // put it in accumulated fees for now.
 }
 
 asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,
