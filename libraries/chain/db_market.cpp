@@ -1351,7 +1351,7 @@ asset database::pay_force_settle_fees(const asset_object& collecting_asset, cons
 
    // Deposit fee in asset's dynamic data object:
    if( value > 0) {
-      collecting_asset.bitasset_data(*this).receive_collateral_fee(*this, settle_fee);
+      collecting_asset.accumulate_fee(*this, settle_fee);
    }
    return settle_fee;
 }
