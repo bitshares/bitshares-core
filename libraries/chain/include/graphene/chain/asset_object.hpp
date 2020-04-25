@@ -65,6 +65,7 @@ namespace graphene { namespace chain {
          share_type current_supply;
          share_type confidential_supply; ///< total asset held in confidential balances
          share_type accumulated_fees; ///< fees accumulate to be paid out over time
+         share_type accumulated_collateral_fees; ///< accumulated collateral-denominated fees (for bitassets)
          share_type fee_pool;         ///< in core asset
    };
 
@@ -183,6 +184,27 @@ namespace graphene { namespace chain {
 
          /// The tunable options for BitAssets are stored in this field.
          bitasset_options options;
+
+         /// Get reference to collateral asset object
+         template<class DB>
+         const asset_object& collateral_asset(const DB& db) const
+         { return options.short_backing_asset(db); }
+
+         /// Check collateral-denominated fees:
+         template<class DB>
+         bool collateral_fees_are_zero(const DB& db) const
+         { return asset_id(db).dynamic_asset_data_id(db).accumulated_collateral_fees > 0; }
+
+         /// Add to asset's collateral-denominated fees, validating that fee is compatible asset
+         template<class DB>
+         void receive_collateral_fee(DB& db, const asset& fee) const
+         {
+            FC_ASSERT( fee.asset_id == options.short_backing_asset );
+            const auto& asset_dyn_data = asset_id(db).dynamic_asset_data_id(db);
+            db.modify( asset_dyn_data, [&fee]( asset_dynamic_data_object& obj ){
+               obj.accumulated_collateral_fees += fee.amount;
+            });
+         }
 
          /// Feeds published for this asset. If issuer is not committee, the keys in this map are the feed publishing
          /// accounts; otherwise, the feed publishers are the currently active committee_members and witnesses and this map
