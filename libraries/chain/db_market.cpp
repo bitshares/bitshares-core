@@ -1340,20 +1340,18 @@ asset database::pay_market_fees(const account_object* seller, const asset_object
  */
 asset database::pay_force_settle_fees(const asset_object& collecting_asset, const asset& collat_receives)
 {
-   const asset_object& recv_asset = get(collat_receives.asset_id);
    FC_ASSERT( collecting_asset.get_id() != collat_receives.asset_id );
+
+   const asset_object& collat_asset = get(collat_receives.asset_id);
    if( !collecting_asset.options.extensions.value.force_settle_fee_percent.valid()
          || *collecting_asset.options.extensions.value.force_settle_fee_percent == 0 )
-      return recv_asset.amount(0);
+      return collat_asset.amount(0);
    auto value = detail::calculate_percent(collat_receives.amount, *collecting_asset.options.extensions.value.force_settle_fee_percent);
-   asset settle_fee = recv_asset.amount(value);
+   asset settle_fee = collat_asset.amount(value);
+
    // Deposit fee in asset's dynamic data object:
-   if( value > 0)
-   {
-      const auto& asset_dyn_data = collecting_asset.dynamic_asset_data_id(*this);
-      modify( asset_dyn_data, [&settle_fee]( asset_dynamic_data_object& obj ){
-         obj.accumulated_fees += settle_fee.amount;  // TODO: Wrong place to put fee
-      });
+   if( value > 0) {
+      collecting_asset.bitasset_data(*this).receive_collateral_fee(*this, settle_fee);
    }
    return settle_fee;
 }
