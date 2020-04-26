@@ -920,25 +920,51 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
 } FC_CAPTURE_AND_RETHROW((o)) }
 
 
-
+/***
+ * @brief evaluator for asset_claim_fees operation
+ *
+ * Checks that we are able to claim fees denominated in asset Y (the amount_to_claim asset),
+ * from some container asset X which is presumed to have accumulated the fees we wish to claim.
+ * The container asset is either explicitly named in the extensions, or else assumed as the same
+ * asset as the amount_to_claim asset. Evaluation fails if either (a) operation issuer is not
+ * the same as the container_asset issuer, or (b) container_asset has no fee bucket for
+ * amount_to_claim asset.
+ */
 void_result asset_claim_fees_evaluator::do_evaluate( const asset_claim_fees_operation& o )
 { try {
-   FC_ASSERT( o.amount_to_claim.asset_id(db()).issuer == o.issuer, "Asset fees may only be claimed by the issuer" );
+   const asset_object & container_asset = o.extensions.claim_from_asset_id.valid() ?
+      (*o.extensions.claim_from_asset_id)(db()) : o.amount_to_claim.asset_id(db());
+   FC_ASSERT( container_asset.issuer == o.issuer, "Asset fees may only be claimed by the issuer" );
+   FC_ASSERT( container_asset.can_accumulate_fee(db(),o.amount_to_claim),
+              "Asset ${a} (${id}) is not backed by asset (${fid}) and does not hold it as fees.",
+              ("a",container_asset.symbol)("id",container_asset.id)("fid",o.amount_to_claim.asset_id) );
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 
+/***
+ * @brief apply asset_claim_fees operation
+ */
 void_result asset_claim_fees_evaluator::do_apply( const asset_claim_fees_operation& o )
 { try {
    database& d = db();
 
-   const asset_object& a = o.amount_to_claim.asset_id(d);
-   const asset_dynamic_data_object& addo = a.dynamic_asset_data_id(d);
-   FC_ASSERT( o.amount_to_claim.amount <= addo.accumulated_fees, "Attempt to claim more fees than have accumulated", ("addo",addo) );
+   const asset_object & c = o.extensions.claim_from_asset_id.valid() ?
+      (*o.extensions.claim_from_asset_id)(d) : o.amount_to_claim.asset_id(d);
+   const asset_dynamic_data_object& ddo = c.dynamic_asset_data_id(d);
+   const asset_object & a = o.amount_to_claim.asset_id(d);
 
-   d.modify( addo, [&]( asset_dynamic_data_object& _addo  ) {
-     _addo.accumulated_fees -= o.amount_to_claim.amount;
-   });
+   if ( c.get_id() == a.get_id() ) {
+      FC_ASSERT( o.amount_to_claim.amount <= ddo.accumulated_fees, "Attempt to claim more fees than have accumulated", ("ddo",ddo) );
+      d.modify( ddo, [&]( asset_dynamic_data_object& _addo  ) {
+         _addo.accumulated_fees -= o.amount_to_claim.amount;
+      });
+   } else {
+      FC_ASSERT( o.amount_to_claim.amount <= ddo.accumulated_collateral_fees, "Attempt to claim more fees than have accumulated", ("ddo",ddo) );
+      d.modify( ddo, [&]( asset_dynamic_data_object& _addo  ) {
+         _addo.accumulated_collateral_fees -= o.amount_to_claim.amount;
+      });
+   }
 
    d.adjust_balance( o.issuer, o.amount_to_claim );
 

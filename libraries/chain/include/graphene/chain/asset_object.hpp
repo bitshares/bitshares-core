@@ -166,11 +166,18 @@ namespace graphene { namespace chain {
          share_type reserved( const DB& db )const
          { return options.max_supply - dynamic_data(db).current_supply; }
 
+         /// @return true if asset can accumulate fees in the given denomination
+         template<class DB>
+         bool can_accumulate_fee(const DB& db, const asset& fee) const {
+            return (( fee.asset_id == get_id() ) ||
+                    ( is_market_issued() && fee.asset_id == bitasset_data(db).options.short_backing_asset ));
+         }
+
          /***
           * @brief receive a fee asset to accrue in dynamic_data object
           *
-          * @details Asset owners define various fees (market fees, force-settle fees, etc.) to
-          * be collected for the asset owners. These fees are typically denominated in the asset
+          * Asset owners define various fees (market fees, force-settle fees, etc.) to be
+          * collected for the asset owners. These fees are typically denominated in the asset
           * itself, but for bitassets some of the fees are denominated in the collateral
           * asset. This will place the fee in the right container.
           */
