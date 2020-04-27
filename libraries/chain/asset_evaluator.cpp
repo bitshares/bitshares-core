@@ -935,10 +935,17 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
  */
 void_result asset_claim_fees_evaluator::do_evaluate( const asset_claim_fees_operation& o )
 { try {
+   database& d = db();
+
+   // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
+   FC_ASSERT( !o.extensions.claim_from_asset_id.valid() ||
+              d.head_block_time() >= HARDFORK_CORE_BSIP_87_74_COLLATFEE_TIME,
+              "Collateral-denominated fees are not yet active and therefore cannot be claimed." );
+
    const asset_object & container_asset = o.extensions.claim_from_asset_id.valid() ?
-      (*o.extensions.claim_from_asset_id)(db()) : o.amount_to_claim.asset_id(db());
+      (*o.extensions.claim_from_asset_id)(d) : o.amount_to_claim.asset_id(d);
    FC_ASSERT( container_asset.issuer == o.issuer, "Asset fees may only be claimed by the issuer" );
-   FC_ASSERT( container_asset.can_accumulate_fee(db(),o.amount_to_claim),
+   FC_ASSERT( container_asset.can_accumulate_fee(d,o.amount_to_claim),
               "Asset ${a} (${id}) is not backed by asset (${fid}) and does not hold it as fees.",
               ("a",container_asset.symbol)("id",container_asset.id)("fid",o.amount_to_claim.asset_id) );
    return void_result();
