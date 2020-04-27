@@ -103,8 +103,8 @@ namespace graphene { namespace protocol {
                  "Committee proposal review period must be less than the maximum proposal lifetime" );
       if( extensions.value.market_fee_network_percent.valid() )
       {
-         FC_ASSERT( *extensions.value.market_fee_network_percent <= GRAPHENE_100_PERCENT,
-                    "The market_fee_network_percent parameter can not exceed 100%" );
+         FC_ASSERT( *extensions.value.market_fee_network_percent <= 3000, // GRAPHENE_100_PERCENT is 10000
+                    "The market_fee_network_percent parameter can not exceed 30%" );
       }
       if( extensions.value.maker_fee_discount_percent.valid() )
       {
