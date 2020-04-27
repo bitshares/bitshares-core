@@ -25,14 +25,11 @@
 #include <graphene/chain/proposal_evaluator.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/hardfork.hpp>
-#include <graphene/chain/htlc_object.hpp>
 
 namespace graphene { namespace chain {
 
 namespace detail {
    void check_asset_options_hf_1774(const fc::time_point_sec& block_time, const asset_options& options); 
-   void check_htlc_create_hf_bsip64(const fc::time_point_sec& block_time, const htlc_create_operation& op, 
-         const asset_object& asset);
    void check_asset_options_hf_bsip81(const fc::time_point_sec& block_time, const asset_options& options);
 }
 

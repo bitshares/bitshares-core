@@ -423,7 +423,7 @@ BOOST_FIXTURE_TEST_CASE( create_new_account, cli_fixture )
       BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
       con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
 
-      // attempt to give jmjatlanta some bitsahres
+      // attempt to give jmjatlanta some bitshares
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
       signed_transaction transfer_tx = con.wallet_api_ptr->transfer(
          "nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true
@@ -848,7 +848,7 @@ BOOST_FIXTURE_TEST_CASE( account_history_pagination, cli_fixture )
    {
       INVOKE(create_new_account);
 
-      // attempt to give jmjatlanta some bitsahres
+      // attempt to give jmjatlanta some bitshares
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
       for(int i = 1; i <= 199; i++)
       {
@@ -945,7 +945,7 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
       create_multisig_acct_tx.operations.push_back(account_create_op);
       con.wallet_api_ptr->sign_transaction(create_multisig_acct_tx, true);
 
-      // attempt to give cifer.test some bitsahres
+      // attempt to give cifer.test some bitshares
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to cifer.test");
       signed_transaction transfer_tx1 = con.wallet_api_ptr->transfer("nathan", "cifer.test", "10000", "1.3.0", "Here are some BTS for your new account", true);
 
@@ -1127,7 +1127,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
          signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "alice", 
                "nathan", "nathan", true);
          con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
-         // attempt to give alice some bitsahres
+         // attempt to give alice some bitshares
          BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to alice");
          signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "alice", "10000", "1.3.0", 
                "Here are some CORE token for your new account", true);
@@ -1141,7 +1141,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
                "nathan", "nathan", true);
          // this should cause resync which will import the keys of alice and bob
          generate_block(app1);
-         // attempt to give bob some bitsahres
+         // attempt to give bob some bitshares
          BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to Bob");
          signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "bob", "10000", "1.3.0", 
                "Here are some CORE token for your new account", true);
@@ -1663,7 +1663,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "alice", 
                "nathan", "nathan", true);
          con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
-         // attempt to give alice some bitsahres
+         // attempt to give alice some bitshares
          BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to alice");
          signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "alice", "10000", "1.3.0", 
                "Here are some CORE token for your new account", true);
@@ -1677,7 +1677,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
                "nathan", "nathan", true);
          // this should cause resync which will import the keys of alice and bob
          generate_block(app1);
-         // attempt to give bob some bitsahres
+         // attempt to give bob some bitshares
          BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to Bob");
          signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "bob", "10000", "1.3.0", 
                "Here are some CORE token for your new account", true);
@@ -1722,7 +1722,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
 
       // Bob likes what he sees, so he creates an HTLC, using the info he retrieved from Alice's HTLC
       con.wallet_api_ptr->htlc_create("bob", "alice",
-            "3", "BOBCOIN", "HASH160", hash_str, preimage_string.size(), timelock, "Bob to Alice", true);
+            "3", "BOBCOIN", "HASH160", hash_str, preimage_string.size(), fc::hours(12).to_seconds(), "Bob to Alice", true);
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
       std::string bob_htlc_id_as_string;
