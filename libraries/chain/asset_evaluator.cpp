@@ -455,6 +455,9 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
       FC_ASSERT( asset_obj.dynamic_asset_data_id(d).current_supply == 0,
                  "Cannot update a bitasset if there is already a current supply." );
 
+      FC_ASSERT( asset_obj.dynamic_asset_data_id(d).accumulated_collateral_fees == 0,
+                 "Must claim collateral-denominated fees before changing backing asset." );
+
       const asset_object& new_backing_asset = op.new_options.short_backing_asset(d); // check if the asset exists
 
       if( after_hf_core_922_931 )
