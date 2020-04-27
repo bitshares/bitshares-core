@@ -465,12 +465,20 @@ namespace graphene { namespace chain {
           * @param is_maker TRUE if this is the fee for a maker, FALSE if taker
           */
          asset calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount, const bool& is_maker);
-          /**
-          * @brief Calculate the margin fee that is to be taken
-          * @param trade_amount the asset and quantity that the fee calculation is based upon
-          * @param is_margin_trading TRUE if this is a limit order going against a call order
-          */        
-         asset calculate_margin_fee( const asset& trade_amount );
+         /**
+          * @brief Calculate the market fee that is to be taken
+          * @param debt the indebted asset
+          * @param collateral_receives the amount of collateral received (before fees)
+          * @returns the amount of fee that should be collected
+          */
+         asset calculate_margin_fees( const asset_object& debt, const asset& collateral_receives);
+         /****
+          * @brief distribute the margin fee
+          * @param debt_asset the indebted asset
+          * @param collarteral_receives the fee
+          * @returns the amount of the fee that was collected
+          */       
+         asset pay_margin_fees(const asset_object& debt, const asset& fee );
          asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,
                                 const bool& is_maker);
 
