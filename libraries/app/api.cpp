@@ -310,6 +310,8 @@ namespace graphene { namespace app {
 
     vector<order_history_object> history_api::get_fill_order_history( std::string asset_a, std::string asset_b, uint32_t limit  )const
     {
+       auto hist = _app.get_plugin<market_history_plugin>( "market_history" );
+       FC_ASSERT( hist );
        FC_ASSERT(_app.chain_database());
        const auto& db = *_app.chain_database();
        asset_id_type a = database_api.get_asset_id_from_string( asset_a );
@@ -488,7 +490,11 @@ namespace graphene { namespace app {
     vector<bucket_object> history_api::get_market_history( std::string asset_a, std::string asset_b,
                                                            uint32_t bucket_seconds, fc::time_point_sec start, fc::time_point_sec end )const
     { try {
+
+       auto hist = _app.get_plugin<market_history_plugin>( "market_history" );
+       FC_ASSERT( hist );
        FC_ASSERT(_app.chain_database());
+
        const auto& db = *_app.chain_database();
        asset_id_type a = database_api.get_asset_id_from_string( asset_a );
        asset_id_type b = database_api.get_asset_id_from_string( asset_b );
