@@ -1601,7 +1601,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
       int server_port_number = 0;
       app1 = start_application(app_dir, server_port_number);
       // set committee parameters
-      app1->chain_database()->modify(app1->chain_database()->get_global_properties(), [](global_property_object& p) {
+      app1->chain_database()->modify(app1->chain_database()->get_global_properties(), [](global_property_object& p)
+      {
          graphene::chain::htlc_options params;
          params.max_preimage_size = 1024;
          params.max_timeout_secs = 60 * 60 * 24 * 28;
@@ -1634,7 +1635,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
       account_object nathan_acct_after_upgrade = con.wallet_api_ptr->get_account("nathan");
 
       // verify that the upgrade was successful
-      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())
+      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), 
+            (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())
             (nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
       BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
 
@@ -1660,8 +1662,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
       {
          graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
          BOOST_CHECK(!bki.brain_priv_key.empty());
-         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "alice", 
-               "nathan", "nathan", true);
+         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key,
+               "alice", "nathan", "nathan", true);
          con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
          // attempt to give alice some bitshares
          BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to alice");
@@ -1673,8 +1675,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
       {
          graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
          BOOST_CHECK(!bki.brain_priv_key.empty());
-         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "bob", 
-               "nathan", "nathan", true);
+         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key,
+               "bob", "nathan", "nathan", true);
          // this should cause resync which will import the keys of alice and bob
          generate_block(app1);
          // attempt to give bob some bitshares
@@ -1710,7 +1712,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          BOOST_CHECK(generate_block(app1, result_block));
 
          // get the ID:
-         htlc_id_type htlc_id = result_block.transactions[result_block.transactions.size()-1].operation_results[0].get<object_id_type>();
+         htlc_id_type htlc_id = result_block.transactions[result_block.transactions.size()-1]
+               .operation_results[0].get<object_id_type>();
          alice_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
          BOOST_TEST_MESSAGE("Alice shares the HTLC ID with Bob. The HTLC ID is: " + alice_htlc_id_as_string);
       }
@@ -1722,7 +1725,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
 
       // Bob likes what he sees, so he creates an HTLC, using the info he retrieved from Alice's HTLC
       con.wallet_api_ptr->htlc_create("bob", "alice",
-            "3", "BOBCOIN", "HASH160", hash_str, preimage_string.size(), fc::hours(12).to_seconds(), "Bob to Alice", true);
+            "3", "BOBCOIN", "HASH160", hash_str, preimage_string.size(), fc::hours(12).to_seconds(),
+            "Bob to Alice", true);
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
       std::string bob_htlc_id_as_string;
@@ -1732,7 +1736,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          BOOST_CHECK(generate_block(app1, result_block));
 
          // get the ID:
-         htlc_id_type htlc_id = result_block.transactions[result_block.transactions.size()-1].operation_results[0].get<object_id_type>();
+         htlc_id_type htlc_id = result_block.transactions[result_block.transactions.size()-1]
+               .operation_results[0].get<object_id_type>();
          bob_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
          BOOST_TEST_MESSAGE("Bob shares the HTLC ID with Alice. The HTLC ID is: " + bob_htlc_id_as_string);
       }
@@ -1750,7 +1755,20 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          BOOST_CHECK(generate_block(app1));
       }
 
-      // TODO: Bob can look at Alice's history to see her preimage
+      // Bob can look at Alice's history to see her preimage
+      {
+         BOOST_TEST_MESSAGE("Bob can look at the history of Alice to see the preimage");
+         std::vector<graphene::wallet::operation_detail> hist = con.wallet_api_ptr->get_account_history("alice", 1);
+         BOOST_TEST( hist[0].description.find("with preimage \"4d792") != hist[0].description.npos);
+      }
+      
+      // Bob can also look at his own history to see Alice's preimage
+      {
+         BOOST_TEST_MESSAGE("Bob can look at his own history to see the preimage");
+         std::vector<graphene::wallet::operation_detail> hist = con.wallet_api_ptr->get_account_history("bob", 1);
+         BOOST_TEST( hist[0].description.find("with preimage \"4d792") != hist[0].description.npos);
+      }
+
       // Bob can use the preimage to retrieve his BTS
       {
          BOOST_TEST_MESSAGE("Bob uses Alice's preimage to retrieve the BOBCOIN");

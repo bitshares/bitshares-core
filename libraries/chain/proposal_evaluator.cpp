@@ -63,7 +63,8 @@ struct proposal_operation_hardfork_visitor
 
    void operator()(const graphene::chain::committee_member_update_global_parameters_operation &op) const {
       if (block_time < HARDFORK_CORE_1468_TIME) {
-         FC_ASSERT(!op.new_parameters.extensions.value.updatable_htlc_options.valid(), "Unable to set HTLC options before hardfork 1468");
+         FC_ASSERT(!op.new_parameters.extensions.value.updatable_htlc_options.valid(), 
+               "Unable to set HTLC options before hardfork 1468");
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_create_operation>());
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_redeem_operation>());
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_extend_operation>());
@@ -126,7 +127,8 @@ struct proposal_operation_hardfork_visitor
          // Do not allow more than 1 proposal_update in a proposal
          if ( op.op.is_type<proposal_update_operation>() )
          {
-            FC_ASSERT( !already_contains_proposal_update, "At most one proposal update can be nested in a proposal!" );
+            FC_ASSERT( !already_contains_proposal_update, 
+                  "At most one proposal update can be nested in a proposal!" );
             already_contains_proposal_update = true;
          }
       }
@@ -188,8 +190,9 @@ void_result proposal_create_evaluator::do_evaluate( const proposal_create_operat
    FC_ASSERT( o.expiration_time > block_time, "Proposal has already expired on creation." );
    FC_ASSERT( o.expiration_time <= block_time + global_parameters.maximum_proposal_lifetime,
               "Proposal expiration time is too far in the future." );
-   FC_ASSERT( !o.review_period_seconds || fc::seconds( *o.review_period_seconds ) < ( o.expiration_time - block_time ),
-              "Proposal review period must be less than its overall lifetime." );
+   FC_ASSERT( !o.review_period_seconds || 
+         fc::seconds( *o.review_period_seconds ) < ( o.expiration_time - block_time ),
+         "Proposal review period must be less than its overall lifetime." );
 
    // Find all authorities required by the proposed operations
    flat_set<account_id_type> tmp_required_active_auths;
@@ -199,8 +202,8 @@ void_result proposal_create_evaluator::do_evaluate( const proposal_create_operat
       operation_get_required_authorities( op.op, tmp_required_active_auths, _required_owner_auths, other,
                                           MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( block_time ) );
    }
-   // All accounts which must provide both owner and active authority should be omitted from the active authority set;
-   // owner authority approval implies active authority approval.
+   // All accounts which must provide both owner and active authority should be omitted from the 
+   // active authority set; owner authority approval implies active authority approval.
    std::set_difference( tmp_required_active_auths.begin(), tmp_required_active_auths.end(),
                         _required_owner_auths.begin(), _required_owner_auths.end(),
                         std::inserter( _required_active_auths, _required_active_auths.begin() ) );
@@ -295,9 +298,9 @@ void_result proposal_update_evaluator::do_apply(const proposal_update_operation&
 { try {
    database& d = db();
 
-   // Potential optimization: if _executed_proposal is true, we can skip the modify step and make push_proposal skip
-   // signature checks. This isn't done now because I just wrote all the proposals code, and I'm not yet 100% sure the
-   // required approvals are sufficient to authorize the transaction.
+   // Potential optimization: if _executed_proposal is true, we can skip the modify step and make push_proposal 
+   // skip signature checks. This isn't done now because I just wrote all the proposals code, and I'm not yet 
+   // 100% sure the required approvals are sufficient to authorize the transaction.
    d.modify(*_proposal, [&o](proposal_object& p) {
       p.available_active_approvals.insert(o.active_approvals_to_add.begin(), o.active_approvals_to_add.end());
       p.available_owner_approvals.insert(o.owner_approvals_to_add.begin(), o.owner_approvals_to_add.end());

@@ -83,8 +83,8 @@ namespace graphene { namespace wallet { namespace detail {
       return sign_transaction(tx, broadcast);
    } FC_CAPTURE_AND_RETHROW( (from)(to)(amount)(asset_symbol)(memo)(broadcast) ) }
 
-   signed_transaction wallet_api_impl::htlc_create( string source, string destination, string amount, string asset_symbol,
-         string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
+   signed_transaction wallet_api_impl::htlc_create( string source, string destination, string amount,
+         string asset_symbol, string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
          const uint32_t claim_period_seconds, const std::string& memo, bool broadcast )
    {
       try
@@ -122,8 +122,8 @@ namespace graphene { namespace wallet { namespace detail {
             (preimage_hash)(preimage_size)(claim_period_seconds)(broadcast) )
    }
 
-   signed_transaction wallet_api_impl::htlc_redeem( string htlc_id, string issuer, const std::vector<char>& preimage, 
-         bool broadcast )
+   signed_transaction wallet_api_impl::htlc_redeem( string htlc_id, string issuer,
+         const std::vector<char>& preimage, bool broadcast )
    {
       try
       {
@@ -147,7 +147,7 @@ namespace graphene { namespace wallet { namespace detail {
       } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(preimage)(broadcast) )
    }
 
-   signed_transaction wallet_api_impl::htlc_extend ( string htlc_id, string issuer, const uint32_t seconds_to_add, 
+   signed_transaction wallet_api_impl::htlc_extend ( string htlc_id, string issuer, const uint32_t seconds_to_add,
          bool broadcast)
    {
       try

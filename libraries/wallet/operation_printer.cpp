@@ -95,13 +95,13 @@ void operation_printer::print_preimage(const std::vector<char>& preimage)const
    if (preimage.size() == 0)
       return;
    out << " with preimage \"";
-   // cut it at 50 bytes max
+   // cut it at 300 bytes max
    auto flags = out.flags();
    out << std::hex << setw(2) << setfill('0');
-   for (size_t i = 0; i < std::min<size_t>(50, preimage.size()); i++)
+   for (size_t i = 0; i < std::min<size_t>(300, preimage.size()); i++)
       out << +preimage[i];
    out.flags(flags);
-   if (preimage.size() > 50)
+   if (preimage.size() > 300)
       out << "...(truncated due to size)";
    out << "\"";
 }

@@ -34,7 +34,8 @@ namespace graphene { namespace protocol {
       FC_ASSERT( amount.amount > 0, "HTLC amount should be greater than zero" );
    }
 
-   share_type htlc_create_operation::calculate_fee( const fee_parameters_type& fee_params, uint32_t fee_per_kb )const
+   share_type htlc_create_operation::calculate_fee( const fee_parameters_type& fee_params, 
+         uint32_t fee_per_kb )const
    {
       uint64_t days = ( claim_period_seconds + SECONDS_PER_DAY - 1 ) / SECONDS_PER_DAY;
       // multiply with overflow check
