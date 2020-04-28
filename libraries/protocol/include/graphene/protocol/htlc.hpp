@@ -130,9 +130,10 @@ namespace graphene { namespace protocol {
 
          htlc_redeemed_operation() {}
          htlc_redeemed_operation( htlc_id_type htlc_id, account_id_type from, account_id_type to,
-               account_id_type redeemer, asset amount, const htlc_hash& preimage_hash, uint16_t preimage_size ) :
+               account_id_type redeemer, asset amount, const htlc_hash& preimage_hash, uint16_t preimage_size,
+               const std::vector<char>& preimage ) :
                htlc_id(htlc_id), from(from), to(to), redeemer(redeemer), amount(amount),
-               htlc_preimage_hash(preimage_hash), htlc_preimage_size(preimage_size) {}
+               htlc_preimage_hash(preimage_hash), htlc_preimage_size(preimage_size), preimage(preimage) {}
 
          account_id_type fee_payer()const { return to; }
          void validate()const { FC_ASSERT( !"virtual operation" ); }

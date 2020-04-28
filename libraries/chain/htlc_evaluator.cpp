@@ -61,7 +61,8 @@ namespace graphene {
             // attempted on an HTLC with a 0 preimage size before the hardfork date.
             if ( htlc_obj->conditions.hash_lock.preimage_size > 0U || 
                   block_time < HARDFORK_CORE_BSIP64_TIME )
-               FC_ASSERT(op.preimage.size() == htlc_obj->conditions.hash_lock.preimage_size, "Preimage size mismatch.");
+               FC_ASSERT(op.preimage.size() == htlc_obj->conditions.hash_lock.preimage_size, 
+                     "Preimage size mismatch.");
          }
       } // end of graphene::chain::details
 
@@ -78,9 +79,11 @@ namespace graphene {
          FC_ASSERT(htlc_options, "HTLC Committee options are not set.");
 
          // make sure the expiration is reasonable
-         FC_ASSERT( o.claim_period_seconds <= htlc_options->max_timeout_secs, "HTLC Timeout exceeds allowed length" );
+         FC_ASSERT( o.claim_period_seconds <= htlc_options->max_timeout_secs, 
+               "HTLC Timeout exceeds allowed length" );
          // make sure the preimage length is reasonable
-         FC_ASSERT( o.preimage_size <= htlc_options->max_preimage_size, "HTLC preimage length exceeds allowed length" );
+         FC_ASSERT( o.preimage_size <= htlc_options->max_preimage_size, 
+               "HTLC preimage length exceeds allowed length" );
          // make sure the sender has the funds for the HTLC
          FC_ASSERT( d.get_balance( o.from, o.amount.asset_id) >= (o.amount), "Insufficient funds") ;
          const auto& asset_to_transfer = o.amount.asset_id( d );
@@ -154,7 +157,8 @@ namespace graphene {
          db().adjust_balance(htlc_obj->transfer.to, amount);
          // notify related parties
          htlc_redeemed_operation virt_op( htlc_obj->id, htlc_obj->transfer.from, htlc_obj->transfer.to, o.redeemer,
-               amount, htlc_obj->conditions.hash_lock.preimage_hash, htlc_obj->conditions.hash_lock.preimage_size );
+               amount, htlc_obj->conditions.hash_lock.preimage_hash, htlc_obj->conditions.hash_lock.preimage_size,
+               o.preimage );
          db().push_applied_operation( virt_op );
          db().remove(*htlc_obj);
          return void_result();

@@ -147,7 +147,8 @@ try {
    {
       graphene::chain::htlc_extend_operation big_extend;
       big_extend.htlc_id = alice_htlc_id;
-      big_extend.seconds_to_add = db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_timeout_secs + 10;
+      big_extend.seconds_to_add = db.get_global_properties().parameters.extensions.value
+            .updatable_htlc_options->max_timeout_secs + 10;
       big_extend.fee = db.get_global_properties().parameters.current_fees->calculate_fee(big_extend);
       big_extend.update_issuer = alice_id;
       trx.operations.push_back(big_extend);
@@ -180,9 +181,9 @@ try {
 /****
  * @brief helper to create htlc_create_operation
  */
-htlc_create_operation create_htlc(const database& db, const account_id_type& from, const account_id_type& to, const asset& amount,
-      const graphene::protocol::htlc_hash& preimage_hash, uint16_t preimage_size, uint64_t seconds,
-      const fc::optional<memo_data>& memo = fc::optional<memo_data>())
+htlc_create_operation create_htlc(const database& db, const account_id_type& from, const account_id_type& to,
+      const asset& amount, const graphene::protocol::htlc_hash& preimage_hash, uint16_t preimage_size,
+      uint64_t seconds, const fc::optional<memo_data>& memo = fc::optional<memo_data>())
 {
    htlc_create_operation ret_val;
    ret_val.from = from;
@@ -236,7 +237,8 @@ try {
     * Proposals before the hardfork
     */
    {
-      BOOST_TEST_MESSAGE("Alice is creating a proposal with an HTLC that contains a memo before the hardfork (should fail)");
+      BOOST_TEST_MESSAGE(
+            "Alice is creating a proposal with an HTLC that contains a memo before the hardfork (should fail)");
       memo_data data;
       data.from = alice_public_key;
       data.to = bob_public_key;
@@ -335,10 +337,12 @@ try {
       trx.clear();
    }
    {
-      BOOST_TEST_MESSAGE("Bob wants to transfer ALICECOIN within a proposal, always allowed, although will fail later");
+      BOOST_TEST_MESSAGE(
+            "Bob wants to transfer ALICECOIN within a proposal, always allowed, although will fail later");
       graphene::chain::htlc_create_operation create_operation = create_htlc(db, bob_id, joker_id, asset(3,uia_id),
             hash_it<fc::sha256>(pre_image), preimage_size, 60);
-      graphene::chain::proposal_create_operation prop_create = create_proposal(db, bob_id, create_operation, db.head_block_time() + 100);
+      graphene::chain::proposal_create_operation prop_create = create_proposal(
+            db, bob_id, create_operation, db.head_block_time() + 100);
       trx.operations.push_back(prop_create);
       sign(trx, bob_private_key);
       PUSH_TX(db, trx, ~0);
@@ -424,10 +428,12 @@ try {
       trx.clear();
    }
    {
-      BOOST_TEST_MESSAGE("Bob wants to transfer ALICECOIN within a proposal, always allowed, although will fail later");
+      BOOST_TEST_MESSAGE(
+            "Bob wants to transfer ALICECOIN within a proposal, always allowed, although will fail later");
       graphene::chain::htlc_create_operation create_operation = create_htlc(db, bob_id, joker_id, asset(3,uia_id),
             hash_it<fc::sha256>(pre_image), preimage_size, 60);
-      graphene::chain::proposal_create_operation prop_create = create_proposal(db, bob_id, create_operation, db.head_block_time() + 100);
+      graphene::chain::proposal_create_operation prop_create = create_proposal(
+            db, bob_id, create_operation, db.head_block_time() + 100);
       trx.operations.push_back(prop_create);
       sign(trx, bob_private_key);
       PUSH_TX(db, trx, ~0);
@@ -435,7 +441,8 @@ try {
    }
    {
       BOOST_TEST_MESSAGE("A memo field should include a charge per kb (uses fee from transfer_operation)");
-      htlc_create_operation op = create_htlc(db, alice_id, bob_id, asset(3), hash_it<fc::sha256>(pre_image), preimage_size, 60);
+      htlc_create_operation op = create_htlc(db, alice_id, bob_id, asset(3), hash_it<fc::sha256>(pre_image),
+            preimage_size, 60);
       asset no_memo_fee = op.fee;
       memo_data data;
       data.from = alice_public_key;
@@ -445,8 +452,8 @@ try {
       asset with_memo_fee = db.current_fee_schedule().calculate_fee(op);
       BOOST_CHECK_GT( with_memo_fee.amount.value, no_memo_fee.amount.value );
    }
-   // After HF 64, a zero in the preimage_size means 2 things, no preimage (can happen, but who would do such a thing),
-   // or simply skip the size validation. To test, we must attempt to redeem both cases
+   // After HF 64, a zero in the preimage_size means 2 things, no preimage (can happen, but who would do such a
+   // thing), or simply skip the size validation. To test, we must attempt to redeem both cases
    {
       // case 1: 0 preimage with 0 preimage_size
       BOOST_TEST_MESSAGE("Attempt to create an HTLC with no preimage (should pass)");
@@ -749,7 +756,8 @@ BOOST_AUTO_TEST_CASE( htlc_hardfork_test )
                new_fee_schedule->parameters.insert( (*itr).second);
             }
          }
-         proposal_create_operation cop = proposal_create_operation::committee_proposal(db.get_global_properties().parameters, db.head_block_time());
+         proposal_create_operation cop = proposal_create_operation::committee_proposal(db.get_global_properties()
+               .parameters, db.head_block_time());
          cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
          cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
          committee_member_update_global_parameters_operation uop;
@@ -780,12 +788,14 @@ BOOST_AUTO_TEST_CASE( htlc_hardfork_test )
       }
       BOOST_TEST_MESSAGE( "Verifying that the parameters didn't change immediately" );
 
-      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 19200u);
+      BOOST_CHECK_EQUAL(
+            db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 19200u);
 
       BOOST_TEST_MESSAGE( "Generating blocks until proposal expires" );
       generate_blocks(good_proposal_id(db).expiration_time + 5);
       BOOST_TEST_MESSAGE( "Verify that the parameters still have not changed" );
-      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 19200u);
+      BOOST_CHECK_EQUAL(db.get_global_properties()
+            .parameters.extensions.value.updatable_htlc_options->max_preimage_size, 19200u);
 
       BOOST_TEST_MESSAGE( "Generating blocks until next maintenance interval" );
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
@@ -793,8 +803,10 @@ BOOST_AUTO_TEST_CASE( htlc_hardfork_test )
 
       BOOST_TEST_MESSAGE( "Verify that the change has been implemented" );
       
-      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 2048u);
-      const graphene::chain::fee_schedule& current_fee_schedule = *(db.get_global_properties().parameters.current_fees);
+      BOOST_CHECK_EQUAL(db.get_global_properties()
+            .parameters.extensions.value.updatable_htlc_options->max_preimage_size, 2048u);
+      const graphene::chain::fee_schedule& current_fee_schedule =
+            *(db.get_global_properties().parameters.current_fees);
       const htlc_create_operation::fee_parameters_type& htlc_fee 
             = current_fee_schedule.get<htlc_create_operation>();
       BOOST_CHECK_EQUAL(htlc_fee.fee, 2 * GRAPHENE_BLOCKCHAIN_PRECISION);
