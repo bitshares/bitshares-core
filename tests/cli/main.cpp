@@ -1759,14 +1759,14 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
       {
          BOOST_TEST_MESSAGE("Bob can look at the history of Alice to see the preimage");
          std::vector<graphene::wallet::operation_detail> hist = con.wallet_api_ptr->get_account_history("alice", 1);
-         BOOST_TEST( hist[0].description.find("with preimage \"4d792") != hist[0].description.npos);
+         BOOST_CHECK( hist[0].description.find("with preimage \"4d792") != hist[0].description.npos);
       }
       
       // Bob can also look at his own history to see Alice's preimage
       {
          BOOST_TEST_MESSAGE("Bob can look at his own history to see the preimage");
          std::vector<graphene::wallet::operation_detail> hist = con.wallet_api_ptr->get_account_history("bob", 1);
-         BOOST_TEST( hist[0].description.find("with preimage \"4d792") != hist[0].description.npos);
+         BOOST_CHECK( hist[0].description.find("with preimage \"4d792") != hist[0].description.npos);
       }
 
       // Bob can use the preimage to retrieve his BTS
