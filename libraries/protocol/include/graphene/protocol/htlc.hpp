@@ -26,17 +26,20 @@
 #include <fc/time.hpp>
 #include <graphene/protocol/base.hpp>
 #include <graphene/protocol/asset.hpp>
+#include <graphene/protocol/memo.hpp>
 #include <algorithm> // std::max
 
 namespace graphene { namespace protocol {
       typedef fc::ripemd160    htlc_algo_ripemd160;
       typedef fc::sha1         htlc_algo_sha1;
       typedef fc::sha256       htlc_algo_sha256;
+      typedef fc::hash160      htlc_algo_hash160;
 
       typedef fc::static_variant<
          htlc_algo_ripemd160,
          htlc_algo_sha1,
-         htlc_algo_sha256
+         htlc_algo_sha256,
+         htlc_algo_hash160
       > htlc_hash;
 
       struct htlc_create_operation : public base_operation 
@@ -45,6 +48,7 @@ namespace graphene { namespace protocol {
             uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
             uint64_t fee_per_day = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
+
          // paid to network
          asset fee;
          // where the held monies are to come from
@@ -59,8 +63,13 @@ namespace graphene { namespace protocol {
          uint16_t preimage_size;
          // The time the funds will be returned to the source if not claimed
          uint32_t claim_period_seconds;
-         // for future expansion
-         extensions_type extensions;
+         
+         // additional extensions
+         struct additional_options_type
+         {
+            fc::optional<memo_data> memo;
+         };
+         extension<additional_options_type> extensions;
 
          /***
           * @brief Does simple validation of this object
@@ -75,7 +84,7 @@ namespace graphene { namespace protocol {
          /****
           * @brief calculates the fee to be paid for this operation
           */
-         share_type calculate_fee(const fee_parameters_type& fee_params)const;
+         share_type calculate_fee(const fee_parameters_type& fee_params, uint32_t fee_per_kb)const;
       };
 
       struct htlc_redeem_operation : public base_operation
@@ -137,6 +146,7 @@ namespace graphene { namespace protocol {
          uint16_t htlc_preimage_size;
 
          asset fee;
+         std::vector<char> preimage;
       };
 
       struct htlc_extend_operation : public base_operation
@@ -206,6 +216,7 @@ namespace graphene { namespace protocol {
 FC_REFLECT_TYPENAME( graphene::protocol::htlc_hash )
 
 FC_REFLECT( graphene::protocol::htlc_create_operation::fee_parameters_type, (fee) (fee_per_day) )
+FC_REFLECT( graphene::protocol::htlc_create_operation::additional_options_type, (memo))
 FC_REFLECT( graphene::protocol::htlc_redeem_operation::fee_parameters_type, (fee) (fee_per_kb) )
 FC_REFLECT( graphene::protocol::htlc_redeemed_operation::fee_parameters_type, ) // VIRTUAL
 FC_REFLECT( graphene::protocol::htlc_extend_operation::fee_parameters_type, (fee) (fee_per_day))
@@ -215,12 +226,13 @@ FC_REFLECT( graphene::protocol::htlc_create_operation,
       (fee)(from)(to)(amount)(preimage_hash)(preimage_size)(claim_period_seconds)(extensions))
 FC_REFLECT( graphene::protocol::htlc_redeem_operation, (fee)(htlc_id)(redeemer)(preimage)(extensions))
 FC_REFLECT( graphene::protocol::htlc_redeemed_operation,
-      (fee)(htlc_id)(from)(to)(redeemer)(amount)(htlc_preimage_hash)(htlc_preimage_size))
+      (fee)(htlc_id)(from)(to)(redeemer)(amount)(htlc_preimage_hash)(htlc_preimage_size)(preimage))
 FC_REFLECT( graphene::protocol::htlc_extend_operation, (fee)(htlc_id)(update_issuer)(seconds_to_add)(extensions))
 FC_REFLECT( graphene::protocol::htlc_refund_operation,
       (fee)(htlc_id)(to)(original_htlc_recipient)(htlc_amount)(htlc_preimage_hash)(htlc_preimage_size))
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_create_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_create_operation::additional_options_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_redeem_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_extend_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::htlc_create_operation )

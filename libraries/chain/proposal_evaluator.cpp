@@ -29,7 +29,7 @@
 namespace graphene { namespace chain {
 
 namespace detail {
-   void check_asset_options_hf_1774(const fc::time_point_sec& block_time, const asset_options& options);   
+   void check_asset_options_hf_1774(const fc::time_point_sec& block_time, const asset_options& options); 
    void check_asset_options_hf_bsip81(const fc::time_point_sec& block_time, const asset_options& options);
 }
 
@@ -89,6 +89,16 @@ struct proposal_operation_hardfork_visitor
    }
    void operator()(const graphene::chain::htlc_create_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
+      if (block_time < HARDFORK_CORE_BSIP64_TIME)
+      {
+         // memo field added at harfork BSIP64
+         // NOTE: both of these checks can be removed after hardfork time
+         FC_ASSERT( !op.extensions.value.memo.valid(), 
+               "Memo unavailable until after HARDFORK BSIP64");
+         // HASH160 added at hardfork BSIP64
+         FC_ASSERT( !op.preimage_hash.is_type<fc::hash160>(),
+               "HASH160 unavailable until after HARDFORK BSIP64" );   
+      }
    }
    void operator()(const graphene::chain::htlc_redeem_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
