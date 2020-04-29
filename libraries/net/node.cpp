@@ -30,6 +30,7 @@
 #include <iostream>
 #include <algorithm>
 #include <tuple>
+#include <string>
 #include <boost/tuple/tuple.hpp>
 #include <boost/circular_buffer.hpp>
 
@@ -70,6 +71,7 @@
 #include <fc/crypto/rand.hpp>
 #include <fc/network/rate_limiting.hpp>
 #include <fc/network/ip.hpp>
+#include <fc/network/resolve.hpp>
 
 #include <graphene/net/node.hpp>
 #include <graphene/net/peer_database.hpp>
@@ -4198,6 +4200,25 @@ namespace graphene { namespace net { namespace detail {
       trigger_p2p_network_connect_loop();
     }
 
+   void node_impl::add_seed_node(const std::string& endpoint_string)
+   {
+      VERIFY_CORRECT_THREAD();
+      std::vector<fc::ip::endpoint> endpoints;
+      try
+      {
+         endpoints = graphene::net::node::resolve_string_to_ip_endpoints(endpoint_string);
+      }
+      catch(...)
+      {
+         wlog( "Unable to resolve endpoint during attempt to add seed node ${ep}", ("ep", endpoint_string) );
+      }
+      for (const fc::ip::endpoint& endpoint : endpoints)
+      {
+         ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
+         add_node(endpoint);
+      }
+   }
+
     void node_impl::initiate_connect_to(const peer_connection_ptr& new_peer)
     {
       new_peer->get_socket().open();
@@ -5103,5 +5124,52 @@ namespace graphene { namespace net { namespace detail {
 #undef INVOKE_AND_COLLECT_STATISTICS
 
   } // end namespace detail
+
+   std::vector<fc::ip::endpoint> node::resolve_string_to_ip_endpoints(const std::string& in)
+   {
+      try
+      {
+         std::string::size_type colon_pos = in.find(':');
+         if (colon_pos == std::string::npos)
+            FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
+                  ("endpoint_string", in));
+         std::string port_string = in.substr(colon_pos + 1);
+         try
+         {
+            uint16_t port = boost::lexical_cast<uint16_t>(port_string);
+
+            std::string hostname = in.substr(0, colon_pos);
+            std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
+            if (endpoints.empty())
+               FC_THROW_EXCEPTION( fc::unknown_host_exception,
+                     "The host name can not be resolved: ${hostname}",
+                     ("hostname", hostname) );
+            return endpoints;
+         }
+         catch (const boost::bad_lexical_cast&)
+         {
+            FC_THROW("Bad port: ${port}", ("port", port_string));
+         }
+      }
+      FC_CAPTURE_AND_RETHROW((in))
+   }
+
+   void node::add_seed_nodes(std::vector<std::string> seeds)
+   {
+      for(const std::string& endpoint_string : seeds )
+      {
+         try {
+            add_seed_node(endpoint_string);
+         } catch( const fc::exception& e ) {
+            wlog( "caught exception ${e} while adding seed node ${endpoint}",
+                  ("e", e.to_detail_string())("endpoint", endpoint_string) );
+         }
+      }
+   }
+
+   void node::add_seed_node(const std::string& in)
+   {
+      INVOKE_IN_IMPL(add_seed_node, in);
+   }
 
 } } // end namespace graphene::net
