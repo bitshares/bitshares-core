@@ -71,13 +71,19 @@ market_ticker::market_ticker(const market_ticker_object& mto,
    quote_volume = uint128_amount_to_string( qv, asset_quote.precision );
 
    if(!orders.asks.empty())
-      lowest_ask = orders.asks[0].price;
-      lowest_ask_base_size =orders.asks[0].base;
-      lowest_ask_quote_size =orders.asks[0].quote;
+   {
+       lowest_ask = orders.asks[0].price;
+       lowest_ask_base_size = orders.asks[0].base;
+       lowest_ask_quote_size = orders.asks[0].quote;
+   }
+
    if(!orders.bids.empty())
-      highest_bid = orders.bids[0].price;
-      highest_bid_base_size =orders.bids[0].base;
-      highest_bid_quote_size =orders.bids[0].quote;
+   {
+       highest_bid = orders.bids[0].price;
+       highest_bid_base_size = orders.bids[0].base;
+       highest_bid_quote_size = orders.bids[0].quote;
+   }
+
 }
 
 market_ticker::market_ticker(const fc::time_point_sec& now,
