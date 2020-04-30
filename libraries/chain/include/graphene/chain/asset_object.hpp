@@ -65,6 +65,7 @@ namespace graphene { namespace chain {
          share_type current_supply;
          share_type confidential_supply; ///< total asset held in confidential balances
          share_type accumulated_fees; ///< fees accumulate to be paid out over time
+         share_type accumulated_collateral_fees; ///< accumulated collateral-denominated fees (for bitassets)
          share_type fee_pool;         ///< in core asset
    };
 
@@ -164,6 +165,44 @@ namespace graphene { namespace chain {
          template<class DB>
          share_type reserved( const DB& db )const
          { return options.max_supply - dynamic_data(db).current_supply; }
+
+         /// @return true if asset can accumulate fees in the given denomination
+         template<class DB>
+         bool can_accumulate_fee(const DB& db, const asset& fee) const {
+            return (( fee.asset_id == get_id() ) ||
+                    ( is_market_issued() && fee.asset_id == bitasset_data(db).options.short_backing_asset ));
+         }
+
+         /***
+          * @brief receive a fee asset to accrue in dynamic_data object
+          *
+          * Asset owners define various fees (market fees, force-settle fees, etc.) to be
+          * collected for the asset owners. These fees are typically denominated in the asset
+          * itself, but for bitassets some of the fees are denominated in the collateral
+          * asset. This will place the fee in the right container.
+          */
+         template<class DB>
+         void accumulate_fee(DB& db, const asset& fee) const
+         {
+            const auto& dyn_data = dynamic_asset_data_id(db);
+            if (fee.asset_id == get_id()) { // fee same as asset
+               db.modify( dyn_data, [&fee]( asset_dynamic_data_object& obj ){
+                  obj.accumulated_fees += fee.amount;
+               });
+            } else { // fee different asset; perhaps collateral-denominated fee
+               FC_ASSERT( is_market_issued(),
+                          "Asset ${a} (${id}) cannot accept fee of asset (${fid}).",
+                          ("a",this->symbol)("id",this->id)("fid",fee.asset_id) );
+               const auto & bad = bitasset_data(db);
+               FC_ASSERT( fee.asset_id == bad.options.short_backing_asset,
+                          "Asset ${a} (${id}) cannot accept fee of asset (${fid}).",
+                          ("a",this->symbol)("id",this->id)("fid",fee.asset_id) );
+               db.modify( dyn_data, [&fee]( asset_dynamic_data_object& obj ){
+                  obj.accumulated_collateral_fees += fee.amount;
+               });
+            }
+         }
+
    };
 
    /**
@@ -183,6 +222,11 @@ namespace graphene { namespace chain {
 
          /// The tunable options for BitAssets are stored in this field.
          bitasset_options options;
+
+         /// Check collateral-denominated fees:
+         template<class DB>
+         bool collateral_fees_are_zero(const DB& db) const
+         { return asset_id(db).dynamic_asset_data_id(db).accumulated_collateral_fees > 0; }
 
          /// Feeds published for this asset. If issuer is not committee, the keys in this map are the feed publishing
          /// accounts; otherwise, the feed publishers are the currently active committee_members and witnesses and this map

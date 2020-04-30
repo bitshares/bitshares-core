@@ -449,10 +449,20 @@ namespace graphene { namespace protocol {
          uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
       };
 
+      struct additional_options_type
+      {
+         /// Which asset to claim fees from. This is needed, e.g., to claim collateral-
+         /// denominated fees from a collateral-backed smart asset. If unset, assumed to be same
+         /// asset as amount_to_claim is denominated in, such as would be the case when claiming
+         /// market fees.
+         fc::optional<asset_id_type> claim_from_asset_id;
+      };
+
       asset           fee;
-      account_id_type issuer;
-      asset           amount_to_claim; /// amount_to_claim.asset_id->issuer must == issuer
-      extensions_type extensions;
+      account_id_type issuer; /// must match issuer of asset from which we claim fees
+      asset           amount_to_claim;
+
+      additional_options_type extensions;
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
@@ -524,6 +534,8 @@ namespace graphene { namespace protocol {
 
 FC_REFLECT( graphene::protocol::asset_claim_fees_operation, (fee)(issuer)(amount_to_claim)(extensions) )
 FC_REFLECT( graphene::protocol::asset_claim_fees_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::asset_claim_fees_operation::additional_options_type, (claim_from_asset_id) )
+
 FC_REFLECT( graphene::protocol::asset_claim_pool_operation, (fee)(issuer)(asset_id)(amount_to_claim)(extensions) )
 FC_REFLECT( graphene::protocol::asset_claim_pool_operation::fee_parameters_type, (fee) )
 
@@ -622,6 +634,7 @@ GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_settle_operat
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_fund_fee_pool_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_pool_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_fees_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_fees_operation::additional_options_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_issuer_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_bitasset_operation::fee_parameters_type )
