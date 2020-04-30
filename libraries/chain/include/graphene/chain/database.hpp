@@ -468,17 +468,17 @@ namespace graphene { namespace chain {
          /**
           * @brief Calculate the market fee that is to be taken
           * @param debt the indebted asset
-          * @param collateral_receives the amount of collateral received (before fees)
+          * @param receives the amount of collateral received (before fees)
           * @returns the amount of fee that should be collected
           */
-         asset calculate_margin_fees( const asset_object& debt, const asset& collateral_receives);
+         asset calculate_margin_fee( const asset_object& debt, const asset& receives)const;
          /****
           * @brief distribute the margin fee
           * @param debt_asset the indebted asset
-          * @param collarteral_receives the fee
+          * @param receives the collateral received (before fees)
           * @returns the amount of the fee that was collected
           */       
-         asset pay_margin_fees(const asset_object& debt, const asset& fee );
+         asset pay_margin_fees(const asset_object& debt, const asset& receives );
          asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,
                                 const bool& is_maker);
 
@@ -580,16 +580,6 @@ namespace graphene { namespace chain {
          void update_withdraw_permissions();
          bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
                                    const asset_bitasset_data_object* bitasset_ptr = nullptr );
-         /***
-          * Get the correct max_short_squeeze_price from the price_feed based on chain time
-          * (due to hardfork changes in the calculation)
-          * @param block_time the chain's current block time
-          * @param mia the debt asset
-          * @param feed the debt asset's price feed
-          * @returns the max short squeeze price
-          */
-         price get_max_short_squeeze_price( const fc::time_point_sec& block_time, 
-               const asset_object& mia, const price_feed& feed)const;
          void clear_expired_htlcs();
 
          ///Steps performed only at maintenance intervals
@@ -676,7 +666,17 @@ namespace graphene { namespace chain {
          const chain_property_object*           _p_chain_property_obj      = nullptr;
          const witness_schedule_object*         _p_witness_schedule_obj    = nullptr;
          ///@}
-   };
+         protected:
+         /***
+          * Get the correct max_short_squeeze_price from the price_feed based on chain time
+          * (due to hardfork changes in the calculation)
+          * @param block_time the chain's current block time
+          * @param mia the debt asset
+          * @param feed the debt asset's price feed
+          * @returns the max short squeeze price
+          */
+         price get_max_short_squeeze_price( const fc::time_point_sec& block_time, 
+               const asset_object& mia, const price_feed& feed)const;   };
 
    namespace detail
    {

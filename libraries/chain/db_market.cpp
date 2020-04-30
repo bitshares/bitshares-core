@@ -916,14 +916,10 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
    const asset_object& mia = receives.asset_id(*this);
    FC_ASSERT( mia.is_market_issued() );
 
-   // calculate any margin call fees
-   asset margin_fee(0, pays.asset_id);
+   // calculate any margin call fees NOTE: Paid in collateral asset
+   asset margin_fee = asset(0);
    if (is_margin_call)
-   {
-      margin_fee = calculate_margin_fees( mia, receives);;
-      // margin fee should never be more than what the call order is paying    
-      FC_ASSERT( margin_fee.amount == 0 || margin_fee.amount < receives.amount ); 
-   }
+      margin_fee = pay_margin_fees(mia, pays);
 
    optional<asset> collateral_freed;
    // adjust the order
@@ -1026,11 +1022,9 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
 price database::get_max_short_squeeze_price( const fc::time_point_sec& block_time, const asset_object& mia, 
       const price_feed& feed)const
 {
-   if ( block_time >= HARDFORK_CORE_BSIP74_TIME )
-      return feed.max_short_squeeze_price(mia.options.extensions.value.margin_call_fee_ratio);
    if ( block_time <= HARDFORK_CORE_1270_TIME )
       return feed.max_short_squeeze_price_before_hf_1270();
-   return feed.max_short_squeeze_price_before_hf_bsip74();
+   return feed.max_short_squeeze_price(mia.options.extensions.value.margin_call_fee_ratio);
 }
 
 /**
@@ -1299,21 +1293,27 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
  * @param collateral_receives the amount of collateral received (before fees)
  * @returns the amount of fee that should be collected
  */
-asset database::calculate_margin_fees(const asset_object& debt, const asset& collateral_receiving)
+asset database::calculate_margin_fee(const asset_object& debt, const asset& receives)const
 {
-   return asset(0, collateral_receiving.asset_id);
+   auto ba = debt.bitasset_data(*this);
+   auto price_feed = ba.current_feed;
+   auto amount = receives.amount 
+         * (price_feed.maximum_short_squeeze_ratio / GRAPHENE_COLLATERAL_RATIO_DENOM) 
+         / price_feed.settlement_price.base.amount;
+   return asset(amount, ba.options.short_backing_asset) ;
 }
 
 /****
- * @brief distribute the margin fee
+ * @brief calculate the margin fee and distribute it
  * @param debt_asset the indebted asset
  * @param collarteral_receives the fee
  * @returns the amount of the fee that was collected
  */ 
-asset database::pay_margin_fees(const asset_object& debt_asset, const asset& fee)
+asset database::pay_margin_fees(const asset_object& debt_asset, const asset& receives)
 {
-   // put it in accumulated fees for now.
-   return fee;
+   const auto margin_fees = calculate_margin_fee( debt_asset, receives );
+   debt_asset.accumulate_fee(*this, margin_fees);
+   return margin_fees;
 }
 
 asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,

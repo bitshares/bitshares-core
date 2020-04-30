@@ -1430,6 +1430,137 @@ int num_call_orders_on_books( graphene::chain::database& db )
    return count;  
 }
 
+void publish_feed_jmjcoin( database_fixture& fixture,  const price& price, 
+      const account_object& feeder1, const account_object& feeder2, const account_object& feeder3)
+{
+      const asset_object& my_asset = price.base.asset_id(fixture.db);
+      BOOST_TEST_MESSAGE("Create valid feeds");
+      price_feed feed1;
+      feed1.core_exchange_rate = price;
+      feed1.settlement_price = price;
+      feed1.maintenance_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
+      feed1.maximum_short_squeeze_ratio = GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO;
+      fixture.publish_feed( my_asset, feeder1, feed1 );
+      fixture.publish_feed( my_asset, feeder2, feed1 );
+      fixture.publish_feed( my_asset, feeder3, feed1 );   
+}
+
+asset_id_type create_jmjcoin( database_fixture& fixture, 
+      const account_id_type& owner, const private_key_type& pk, const account_object& feeder1,
+      const account_object& feeder2, const account_object& feeder3 )
+{
+   asset_id_type core_id;
+   asset_id_type my_asset_id;
+   // create an asset
+   {
+      BOOST_TEST_MESSAGE("Create JMJCOIN");
+      asset_create_operation create;
+      create.issuer = owner;
+      create.fee = fixture.db.get_global_properties().parameters.current_fees->calculate_fee(create);
+      create.symbol = "JMJCOIN";
+      create.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
+      create.common_options.market_fee_percent = 10; // 100=1%, 10=0.1%
+      create.common_options.flags |= charge_market_fee;
+      create.is_prediction_market = false;
+      create.bitasset_opts = bitasset_options();
+      create.common_options.core_exchange_rate = 
+            graphene::protocol::price( asset(1,asset_id_type(1)), asset(1, core_id));
+      fixture.trx.operations.push_back( std::move(create) );
+      fixture.sign(fixture.trx, pk);
+      my_asset_id = PUSH_TX(fixture.db, fixture.trx).operation_results[0].get<object_id_type>();
+      fixture.trx.clear();
+
+      BOOST_TEST_MESSAGE("Add 3 feeders");
+      flat_set<account_id_type> feeders = { feeder1.id, feeder2.id, feeder3.id };
+      fixture.update_feed_producers( my_asset_id(fixture.db), feeders );
+   }
+   return my_asset_id;
+}
+
+void adjust_mcfr( database_fixture& fixture, const account_object& owner, const fc::ecc::private_key& pk,
+      const asset_object& asset, fc::optional<uint16_t> ratio)
+{
+      additional_asset_options extras;
+      extras.margin_call_fee_ratio = ratio;   
+
+      asset_update_operation update;
+      update.issuer = owner.id;
+      update.asset_to_update = asset.id;
+      update.new_options = asset.options;
+      update.new_options.extensions.value = extras;
+      fixture.trx.operations.push_back( std::move(update) );
+      fixture.sign(fixture.trx, pk);
+      PUSH_TX(fixture.db, fixture.trx);
+      fixture.trx.clear();   
+}
+
+BOOST_AUTO_TEST_CASE( mcfr_match_price_test )
+{
+   ACTORS( (charlie) (feeder1) (feeder2) (feeder3) )
+   const asset_id_type core_id;
+
+   // fast forward to a reasonable chain time
+   generate_blocks( HARDFORK_CORE_1270_TIME + 10 );
+   set_expiration( db, trx );
+
+   // first create the asset
+   asset_id_type my_asset_id = create_jmjcoin( *this, charlie_id, charlie_private_key, feeder1, feeder2, feeder3 );
+   publish_feed_jmjcoin( *this, price( asset(1, my_asset_id), asset(1, core_id) ), feeder1, feeder2, feeder3);
+   const asset_object& my_asset = my_asset_id(db);
+   const auto& bitasset_data = my_asset.bitasset_data(db);
+   const auto& price_feed = bitasset_data.current_feed;
+
+   price match_price( asset(100, my_asset_id), asset(100, core_id) );
+
+   // check the max_short_squeeze_price
+   price ssp = db.get_max_short_squeeze_price( db.head_block_time(), my_asset, price_feed );
+   BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
+   BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
+
+   BOOST_TEST_MESSAGE("Advancing past Hardfork BSIP74"); 
+   generate_blocks( HARDFORK_CORE_BSIP74_TIME + 10);
+   set_expiration( db, trx );
+   publish_feed_jmjcoin( *this, price( asset(1, my_asset_id), asset(1, core_id) ), feeder1, feeder2, feeder3);
+
+   // after hf74, a limit order can match a call order if the price is "feed_price / (mssr-mcfr)"
+   // the value should not change if mcfr is unset
+   ssp = db.get_max_short_squeeze_price( db.head_block_time(), my_asset, price_feed );
+   BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
+   BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
+
+   // adjusting the MCFR to be equal to MSSR should make the price the same as before
+   adjust_mcfr( *this, charlie, charlie_private_key, my_asset, GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO );
+   ssp = db.get_max_short_squeeze_price( db.head_block_time(), my_asset, price_feed );
+   BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
+   BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
+
+   // adjusting the MCFR to be greater than MSSR should make the price the same as before
+   adjust_mcfr( *this, charlie, charlie_private_key, my_asset, GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO + 1000 );
+   ssp = db.get_max_short_squeeze_price( db.head_block_time(), my_asset, price_feed );
+   BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
+   BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
+   
+   // adjusting the MCFR should adjust the max short squeeze price down
+   adjust_mcfr( *this, charlie, charlie_private_key, my_asset, 750);
+   ssp = db.get_max_short_squeeze_price( db.head_block_time(), my_asset, price_feed );
+   BOOST_CHECK_EQUAL( ssp.base.amount.value, 4 );
+   BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
+}
+
+BOOST_AUTO_TEST_CASE( calculate_margin_fee_test )
+{
+   ACTORS( (charlie) (feeder1) (feeder2) (feeder3) )
+   const asset_id_type core_id;
+
+    // first create the asset
+   asset_id_type my_asset_id = create_jmjcoin( *this, charlie_id, charlie_private_key, feeder1, feeder2, feeder3 );
+   const asset_object& my_asset = my_asset_id(db);
+
+   // now test some fee scenarios
+   BOOST_CHECK_EQUAL( db.calculate_margin_fee(my_asset, asset(100, core_id)).amount.value, 1 );
+   BOOST_CHECK_EQUAL( db.calculate_margin_fee(my_asset, asset(200, core_id)).amount.value, 2 ); 
+}
+
 BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
 { try {
    const auto& prec = GRAPHENE_BLOCKCHAIN_PRECISION;
@@ -1479,29 +1610,7 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
       REQUIRE_EXCEPTION_WITH_TEXT( PUSH_TX(db, trx), "BSIP74" );
       trx.clear();
 
-      BOOST_TEST_MESSAGE("Create JMJCOIN");
-      create = asset_create_operation();
-      create.issuer = charlie_id;
-      create.fee = fees->calculate_fee(create);
-      expected_core_balance_charlie -= create.fee.amount.value;
-      create.symbol = "JMJCOIN";
-      create.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
-      create.common_options.market_fee_percent = 10; // 100=1%, 10=0.1%
-      create.common_options.flags |= charge_market_fee;
-      create.is_prediction_market = false;
-      create.bitasset_opts = bitasset_options();
-      create.common_options.core_exchange_rate = graphene::protocol::price( asset(1,asset_id_type(1)), asset(1, core_id));
-      trx.operations.push_back( std::move(create) );
-      sign(trx, charlie_private_key);
-      my_asset_id = PUSH_TX(db, trx).operation_results[0].get<object_id_type>();
-      trx.clear();
-
-      BOOST_TEST_MESSAGE("Add 3 feeders");
-      my_asset = my_asset_id(db);
-      flat_set<account_id_type> feeders = { feeder1_id, feeder2_id, feeder3_id };
-      update_feed_producers( my_asset, feeders );
-      expected_core_balance_charlie -= fees->calculate_fee( asset_update_feed_producers_operation() ).amount.value;
-      BOOST_CHECK_EQUAL( expected_core_balance_charlie, get_balance( charlie, core) );      
+      my_asset_id = create_jmjcoin( *this, charlie_id, charlie_private_key, feeder1, feeder2, feeder3);     
 
       BOOST_TEST_MESSAGE("Attempt to add margin fee before hardfork (should fail)");
       asset_update_operation update;
@@ -1553,7 +1662,7 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
    {
       BOOST_TEST_MESSAGE("Verify margin fee is zero, as feeds are invalid");
       asset trade_amount(100000, core_id );
-      asset fee = db.calculate_margin_fees(my_asset_id(db), trade_amount );
+      asset fee = db.calculate_margin_fee(my_asset_id(db), trade_amount );
       BOOST_CHECK_EQUAL( fee.amount.value, 0 );
       BOOST_CHECK_EQUAL( fee.asset_id.instance.value, core_id.instance.value);
    }
@@ -1607,7 +1716,7 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
    {
       BOOST_TEST_MESSAGE("Verify margin fee is now non-zero");
       asset trade_amount(100000, core_id );
-      asset fee = db.calculate_margin_fees(my_asset_id(db), trade_amount );
+      asset fee = db.calculate_margin_fee(my_asset_id(db), trade_amount );
       BOOST_CHECK_EQUAL( fee.amount.value, 100 );
       BOOST_CHECK_EQUAL( fee.asset_id.instance.value, core_id.instance.value);
    }
@@ -1632,7 +1741,7 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
       feed1.settlement_price = price( asset( 100, my_asset_id ), asset( 115, core_id ) );
       feed1.maintenance_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
       publish_feed( my_asset_id(db), feeder1, feed1 );
-      publish_feed( my_asset_id(db), feeder2, feed1 );
+      publish_feed( my_asset_id(db), feeder2, feed1 ); // <- This one triggers the margin call
       publish_feed( my_asset_id(db), feeder3, feed1 );
    }
 

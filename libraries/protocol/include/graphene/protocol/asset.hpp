@@ -201,8 +201,7 @@ namespace graphene { namespace protocol {
        * @param mcfr the margin call fee ratio for the debt asset
        */
       price max_short_squeeze_price( const fc::optional<uint16_t>& mcfr )const;
-      /// Other implementations of max_short_squeeze_price() due to hardfork changes
-      price max_short_squeeze_price_before_hf_bsip74()const;
+      /// Other implementation of max_short_squeeze_price() due to hardfork changes
       price max_short_squeeze_price_before_hf_1270()const;
 
       /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call territory.

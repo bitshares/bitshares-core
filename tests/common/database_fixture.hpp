@@ -183,11 +183,19 @@ public:
 };
 
 struct database_fixture {
+   class unsafe_db : public chain::database
+   {
+      public:
+      price get_max_short_squeeze_price( const fc::time_point_sec& block_time, 
+            const asset_object& mia, const price_feed& feed)const 
+            { return chain::database::get_max_short_squeeze_price( block_time, mia, feed); }
+   };
    // the reason we use an app is to exercise the indexes of built-in
    //   plugins
    graphene::app::application app;
    genesis_state_type genesis_state;
-   chain::database &db;
+   // this will give us access to some protected functions for testing
+   unsafe_db &db;
    signed_transaction trx;
    public_key_type committee_key;
    account_id_type committee_account;
