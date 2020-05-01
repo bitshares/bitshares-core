@@ -918,7 +918,7 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
 
    // calculate any margin call fees NOTE: Paid in collateral asset
    asset margin_fee = asset(0);
-   if (is_margin_call)
+   if (!is_maker && is_margin_call)
       margin_fee = pay_margin_fees(mia, pays);
 
    optional<asset> collateral_freed;
@@ -1173,10 +1173,10 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        }
 
        asset usd_for_sale = limit_order.amount_for_sale();
-       asset call_pays, call_receives, order_pays, order_receives;
+       asset call_pays, call_receives, limit_pays, limit_receives;
        if( usd_to_buy > usd_for_sale )
        {  // fill order
-          order_receives  = usd_for_sale * match_price; // round down, in favor of call order
+          limit_receives  = usd_for_sale * match_price; // round down, in favor of call order
 
           // Be here, the limit order won't be paying something for nothing, since if it would, it would have
           //   been cancelled elsewhere already (a maker limit order won't be paying something for nothing):
@@ -1193,7 +1193,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
              //   so we should cull the order in fill_limit_order() below.
              // The order would receive 0 even at `match_price`, so it would receive 0 at its own price,
              //   so calling maybe_cull_small() will always cull it.
-             call_receives = order_receives.multiply_and_round_up( match_price );
+             call_receives = limit_receives.multiply_and_round_up( match_price );
 
           filled_limit = true;
 
@@ -1202,10 +1202,10 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
           if( before_core_hardfork_342 )
           {
-             order_receives = usd_to_buy * match_price; // round down, in favor of call order
+             limit_receives = usd_to_buy * match_price; // round down, in favor of call order
           }
           else
-             order_receives = usd_to_buy.multiply_and_round_up( match_price ); // round up, in favor of limit order
+             limit_receives = usd_to_buy.multiply_and_round_up( match_price ); // round up, in favor of limit order
 
           filled_call    = true; // this is safe, since BSIP38 (hard fork core-834) depends on BSIP31 (hard fork core-343)
 
@@ -1219,8 +1219,8 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
           }
        }
 
-       call_pays  = order_receives;
-       order_pays = call_receives;
+       call_pays  = limit_receives;
+       limit_pays = call_receives;
 
        if( filled_call && before_core_hardfork_343 )
           ++call_price_itr;
@@ -1233,7 +1233,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
        auto next_limit_itr = std::next( limit_itr );
        // when for_new_limit_order is true, the limit order is taker, otherwise the limit order is maker
-       bool really_filled = fill_limit_order( limit_order, order_pays, order_receives, true, match_price, !for_new_limit_order );
+       bool really_filled = fill_limit_order( limit_order, limit_pays, limit_receives, true, match_price, !for_new_limit_order );
        if( really_filled || ( filled_limit && before_core_hardfork_453 ) )
           limit_itr = next_limit_itr;
 
@@ -1297,6 +1297,9 @@ asset database::calculate_margin_fee(const asset_object& debt, const asset& rece
 {
    auto ba = debt.bitasset_data(*this);
    auto price_feed = ba.current_feed;
+   if ( price_feed.settlement_price.is_null() 
+         || price_feed.settlement_price.base.amount == 0)
+      return asset(0);
    auto amount = receives.amount 
          * (price_feed.maximum_short_squeeze_ratio / GRAPHENE_COLLATERAL_RATIO_DENOM) 
          / price_feed.settlement_price.base.amount;

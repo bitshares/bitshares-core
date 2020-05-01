@@ -1561,7 +1561,7 @@ BOOST_AUTO_TEST_CASE( calculate_margin_fee_test )
    BOOST_CHECK_EQUAL( db.calculate_margin_fee(my_asset, asset(200, core_id)).amount.value, 2 ); 
 }
 
-BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
+BOOST_AUTO_TEST_CASE( bsip74_hardfork_feed_price_test )
 { try {
    const auto& prec = GRAPHENE_BLOCKCHAIN_PRECISION;
    enable_fees();
@@ -1768,5 +1768,138 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_test )
    BOOST_CHECK_EQUAL( 1519000, my_asset_id(db).dynamic_data(db).accumulated_fees.value );
 
 } FC_LOG_AND_RETHROW() }
+
+
+BOOST_AUTO_TEST_CASE( bsip74_limit_price_test )
+{ try {
+   const auto& prec = GRAPHENE_BLOCKCHAIN_PRECISION;
+   enable_fees();
+
+   generate_blocks( HARDFORK_CORE_BSIP74_TIME + 10);
+   set_expiration( db, trx );
+
+   const auto fees = db.get_global_properties().parameters.current_fees;
+
+   ACTORS( (alice)  (bob) (charlie) (feeder1) (feeder2) (feeder3) );
+   auto& core = asset_id_type()(db);
+   const asset_id_type& core_id = core.id;
+   // alice will eventually overdo it on margin
+   transfer( committee_account(db), alice, asset(100000 * prec) );
+   // bob will take advantage of alice's situation
+   transfer( committee_account(db), bob,   asset(100000 * prec) );
+   // charlie will create an asset and trade it
+   transfer( committee_account(db), charlie, asset(100000 * prec) );
+   // price feeders
+   transfer( committee_account(db), feeder1, asset(100 * prec) );
+   transfer( committee_account(db), feeder2, asset(100 * prec) );
+   transfer( committee_account(db), feeder3, asset(100 * prec) );
+
+   int64_t expected_core_balance_alice = 100000 * prec;
+   int64_t expected_core_balance_bob = 100000 * prec;
+   int64_t expected_core_balance_charlie = 100000 * prec;
+
+   asset_id_type my_asset_id;
+   asset_object my_asset;
+   {
+      my_asset_id = create_jmjcoin( *this, charlie_id, charlie_private_key, feeder1, feeder2, feeder3);
+      my_asset = my_asset_id(db);
+
+      BOOST_TEST_MESSAGE("BSIP 74 has passed, update the fee");
+      additional_asset_options extras;
+      extras.margin_call_fee_ratio = 10;   
+
+      asset_update_operation update;
+      update.issuer = charlie_id;
+      update.fee = fees->calculate_fee(update);
+      expected_core_balance_charlie -= update.fee.amount.value;
+      update.asset_to_update = my_asset_id;
+      update.new_options = my_asset.options;
+      update.new_options.extensions.value = extras;
+      trx.operations.push_back( std::move(update) );
+      sign(trx, charlie_private_key);
+      PUSH_TX(db, trx);
+      trx.clear();   
+
+      my_asset = my_asset_id(db);
+      BOOST_CHECK( my_asset.options.extensions.value.margin_call_fee_ratio.valid() );
+      BOOST_CHECK_EQUAL( *my_asset.options.extensions.value.margin_call_fee_ratio, 10 );
+   }
+   {
+      BOOST_TEST_MESSAGE("Verify margin fee is zero, as feeds are invalid");
+      asset trade_amount(100000, core_id );
+      asset fee = db.calculate_margin_fee(my_asset_id(db), trade_amount );
+      BOOST_CHECK_EQUAL( fee.amount.value, 0 );
+      BOOST_CHECK_EQUAL( fee.asset_id.instance.value, core_id.instance.value);
+   }
+   {
+      BOOST_TEST_MESSAGE("Create valid feeds");
+      price_feed feed1;
+      feed1.core_exchange_rate = price( asset( 100, my_asset_id ), asset( 100, core_id ) );
+      feed1.settlement_price = price( asset( 100, my_asset_id ), asset( 100, core_id ) );
+      feed1.maintenance_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
+      publish_feed( my_asset_id(db), feeder1, feed1 );
+      publish_feed( my_asset_id(db), feeder2, feed1 );
+      publish_feed( my_asset_id(db), feeder3, feed1 );
+   }
+   {
+      BOOST_TEST_MESSAGE("Borrow some JMJCOIN into existence");
+      borrow( alice, asset(100 * prec, my_asset_id), asset(200 * prec) );
+      borrow( charlie, asset( 100 * prec, my_asset_id), asset(300 * prec) );
+   }
+   {
+      BOOST_TEST_MESSAGE("Sell JMJCOIN to Bob (100-5=95 satoshis");
+      create_sell_order( alice_id, asset(95 * prec, my_asset_id), asset(95 * prec, core_id), 
+            fc::time_point_sec::maximum(), 
+            price( asset(100, my_asset_id), asset(100, core_id ) ) );
+      expected_core_balance_alice += 95 * prec; // 95 sold + 5 JMJCoin fee.
+      create_sell_order( charlie_id, asset(95 * prec, my_asset_id), asset(95 * prec, core_id), 
+            fc::time_point_sec::maximum(), 
+            price( asset(100, my_asset_id), asset(100, core_id ) ) );
+      expected_core_balance_charlie += 95 * prec; // 95 sold gives charlie 95 core
+      BOOST_TEST_MESSAGE("Bob buys all JMJCOIN on the book");
+      create_sell_order( bob_id, asset(190 * prec, core_id), asset(190 * prec, my_asset_id), fc::time_point_sec::maximum(),
+            price( asset(100, my_asset_id), asset(100, core_id ) ) );     
+      expected_core_balance_bob -= 190 * prec; // 190 JMJCoin bought for 190 CORE
+   }
+   BOOST_CHECK_EQUAL( 0, num_limit_orders_on_books( db ) );
+   BOOST_CHECK_EQUAL( 2, num_call_orders_on_books( db ) );   
+   {
+      BOOST_TEST_MESSAGE("Adjust feed price close to (but not beyond) where Alice will get margin called");
+      price new_price( asset( 100, my_asset_id), asset(116, core_id) );
+      publish_feed_jmjcoin( *this, new_price, feeder1, feeder2, feeder3 );
+      my_asset = my_asset_id(db);
+      BOOST_TEST_MESSAGE( "New MSSR is: " + fc::json::to_pretty_string( my_asset.bitasset_data(db)
+            .current_feed.max_short_squeeze_price(my_asset.options.extensions.value.margin_call_fee_ratio)));
+   }
+   // gather balances to watch fees
+   auto bob_jmjcoin_balance = db.get_balance(bob_id, my_asset_id).amount.value;
+   auto bob_core_balance = db.get_balance(bob_id, core_id).amount.value;
+   auto alice_core_balance = db.get_balance(alice_id, core_id).amount.value;
+   {
+      BOOST_TEST_MESSAGE("Bob places order to sell JMJCOIN for CORE just below MSSR");
+      create_sell_order( bob_id, asset( 100 * prec, my_asset_id ), asset(172 * prec, core_id) );
+      // Bob's order should have executed
+      BOOST_CHECK_EQUAL( 0, num_limit_orders_on_books( db ) );
+      // only Charlie's call order is left
+      BOOST_CHECK_EQUAL( 1, num_call_orders_on_books( db ) );
+      // Bob should have sold 100 jmjcoin
+      BOOST_CHECK_EQUAL( db.get_balance(bob_id, my_asset_id).amount.value, bob_jmjcoin_balance - (100*prec));
+      // Bob should have 172 more core minus cost of limit order plus 84,000 due to the call needing to
+      // buy so much JMJCOIN. (see db_market::match(limit,call)::match_price and ask.get_max_debt_to_cover)
+      BOOST_CHECK_EQUAL( db.get_balance(bob_id, core_id).amount.value, bob_core_balance 
+            + (172*prec)
+            - fees->calculate_fee(limit_order_create_operation()).amount.value
+            + 84000);
+      // Alice should have no JMJCOIN
+      BOOST_CHECK_EQUAL( db.get_balance(alice_id, my_asset_id).amount.value, 0);
+      // Alice should have gained what is left of her collateral back.
+      BOOST_CHECK_EQUAL( db.get_balance(alice_id, core_id).amount.value, alice_core_balance 
+            + 172000000
+            -     84000
+            - 169200000);
+   }
+
+} FC_LOG_AND_RETHROW() }
+
 
 BOOST_AUTO_TEST_SUITE_END()
