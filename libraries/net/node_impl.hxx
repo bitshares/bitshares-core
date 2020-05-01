@@ -337,6 +337,14 @@ class node_impl : public peer_connection_delegate
 
       std::list<fc::future<void> > _handle_message_calls_in_progress;
 
+      /// used by the task that checks whether addresses of seed nodes have been updated
+      // @{
+      boost::container::flat_set<std::string> _seed_nodes;
+      fc::future<void> _update_seed_nodes_loop_done;
+      void update_seed_nodes_task();
+      void schedule_next_update_seed_nodes_task();
+      // @}
+
       node_impl(const std::string& user_agent);
       virtual ~node_impl();
 
@@ -483,6 +491,7 @@ class node_impl : public peer_connection_delegate
       void connect_to_p2p_network();
       void add_node( const fc::ip::endpoint& ep );
       void add_seed_node( const std::string& seed_string );
+      void resolve_seed_node_and_add( const std::string& seed_string );
       void initiate_connect_to(const peer_connection_ptr& peer);
       void connect_to_endpoint(const fc::ip::endpoint& ep);
       void listen_on_endpoint(const fc::ip::endpoint& ep , bool wait_if_not_available);

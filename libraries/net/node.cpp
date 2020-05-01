@@ -483,6 +483,43 @@ namespace graphene { namespace net { namespace detail {
       //  _retrigger_connect_loop_promise->set_value();
     }
 
+   void node_impl::update_seed_nodes_task()
+   {
+      VERIFY_CORRECT_THREAD();
+
+      try
+      {
+         dlog("Starting an iteration of update_seed_nodes loop.");
+         for( const std::string& endpoint_string : _seed_nodes )
+         {
+            resolve_seed_node_and_add( endpoint_string );
+         }
+         dlog("Done an iteration of update_seed_nodes loop.");
+      }
+      catch (const fc::canceled_exception&)
+      {
+        throw;
+      }
+      FC_CAPTURE_AND_LOG( (_seed_nodes) )
+
+      schedule_next_update_seed_nodes_task();
+   }
+
+   void node_impl::schedule_next_update_seed_nodes_task()
+   {
+      VERIFY_CORRECT_THREAD();
+
+      if( _node_is_shutting_down )
+         return;
+
+      if( _update_seed_nodes_loop_done.valid() && _update_seed_nodes_loop_done.canceled() )
+         return;
+
+      _update_seed_nodes_loop_done = fc::schedule( [this]() { update_seed_nodes_task(); },
+                                                   fc::time_point::now() + fc::hours(3),
+                                                   "update_seed_nodes_loop" );
+   }
+
     bool node_impl::have_already_received_sync_item( const item_hash_t& item_hash )
     {
       VERIFY_CORRECT_THREAD();
@@ -3764,6 +3801,20 @@ namespace graphene { namespace net { namespace detail {
 
       try
       {
+        _update_seed_nodes_loop_done.cancel_and_wait("node_impl::close()");
+        dlog("Update seed nodes loop terminated");
+      }
+      catch ( const fc::exception& e )
+      {
+        wlog( "Exception thrown while terminating Update seed nodes loop, ignoring: ${e}", ("e", e) );
+      }
+      catch (...)
+      {
+        wlog( "Exception thrown while terminating Update seed nodes loop, ignoring" );
+      }
+
+      try
+      {
         _bandwidth_monitor_loop_done.cancel_and_wait("node_impl::close()");
         dlog("Bandwidth monitor loop terminated");
       }
@@ -4166,6 +4217,7 @@ namespace graphene { namespace net { namespace detail {
 
       assert(!_accept_loop_complete.valid() &&
              !_p2p_network_connect_loop_done.valid() &&
+             !_update_seed_nodes_loop_done.valid() &&
              !_fetch_sync_items_loop_done.valid() &&
              !_fetch_item_loop_done.valid() &&
              !_advertise_inventory_loop_done.valid() &&
@@ -4183,6 +4235,7 @@ namespace graphene { namespace net { namespace detail {
       _fetch_updated_peer_lists_loop_done = fc::async([=](){ fetch_updated_peer_lists_loop(); }, "fetch_updated_peer_lists_loop");
       _bandwidth_monitor_loop_done = fc::async([=](){ bandwidth_monitor_loop(); }, "bandwidth_monitor_loop");
       _dump_node_status_task_done = fc::async([=](){ dump_node_status_task(); }, "dump_node_status_task");
+      schedule_next_update_seed_nodes_task();
     }
 
     void node_impl::add_node(const fc::ip::endpoint& ep)
@@ -4203,7 +4256,15 @@ namespace graphene { namespace net { namespace detail {
    void node_impl::add_seed_node(const std::string& endpoint_string)
    {
       VERIFY_CORRECT_THREAD();
+      _seed_nodes.insert( endpoint_string );
+      resolve_seed_node_and_add( endpoint_string );
+   }
+
+   void node_impl::resolve_seed_node_and_add(const std::string& endpoint_string)
+   {
+      VERIFY_CORRECT_THREAD();
       std::vector<fc::ip::endpoint> endpoints;
+      ilog("Resolving seed node ${endpoint}", ("endpoint", endpoint_string));
       try
       {
          endpoints = graphene::net::node::resolve_string_to_ip_endpoints(endpoint_string);
@@ -5125,6 +5186,7 @@ namespace graphene { namespace net { namespace detail {
 
   } // end namespace detail
 
+   // TODO move this function to impl class
    std::vector<fc::ip::endpoint> node::resolve_string_to_ip_endpoints(const std::string& in)
    {
       try
