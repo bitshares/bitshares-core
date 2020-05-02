@@ -251,6 +251,8 @@ void asset_options::validate()const
 void asset_claim_fees_operation::validate()const {
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( amount_to_claim.amount > 0 );
+   if( extensions.value.claim_from_asset_id.valid() )
+     FC_ASSERT( *extensions.value.claim_from_asset_id != amount_to_claim.asset_id );
 }
 
 void asset_claim_pool_operation::validate()const {

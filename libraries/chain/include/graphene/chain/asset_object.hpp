@@ -184,6 +184,8 @@ namespace graphene { namespace chain {
          template<class DB>
          void accumulate_fee(DB& db, const asset& fee) const
          {
+            if (fee.amount == 0) return;
+            FC_ASSERT( fee.amount >= 0, "Fee amount must be non-negative." );
             const auto& dyn_data = dynamic_asset_data_id(db);
             if (fee.asset_id == get_id()) { // fee same as asset
                db.modify( dyn_data, [&fee]( asset_dynamic_data_object& obj ){
@@ -222,11 +224,6 @@ namespace graphene { namespace chain {
 
          /// The tunable options for BitAssets are stored in this field.
          bitasset_options options;
-
-         /// Check collateral-denominated fees:
-         template<class DB>
-         bool collateral_fees_are_zero(const DB& db) const
-         { return asset_id(db).dynamic_asset_data_id(db).accumulated_collateral_fees > 0; }
 
          /// Feeds published for this asset. If issuer is not committee, the keys in this map are the feed publishing
          /// accounts; otherwise, the feed publishers are the currently active committee_members and witnesses and this map
