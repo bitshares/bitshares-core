@@ -293,7 +293,7 @@ struct serializer< fc::static_variant<T...>, false >
       {
          init = true;
          fc::static_variant<T...> var;
-         for( int i = 0; i < (int)var.count(); ++i )
+         for( size_t i = 0; i < var.count(); ++i )
          {
             var.set_which(i);
             var.visit( register_type_visitor() );
@@ -372,7 +372,7 @@ int main( int argc, char** argv )
     operation op;
 
     std::cout << "ChainTypes.operations=\n";
-    for( int i = 0; i < (int)op.count(); ++i )
+    for( size_t i = 0; i < op.count(); ++i )
     {
        op.set_which(i);
        op.visit( detail_ns::serialize_type_visitor(i) );

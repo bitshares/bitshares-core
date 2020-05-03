@@ -43,6 +43,8 @@ namespace graphene { namespace wallet { namespace detail {
          return fc::sha256( hash );
       if( name_upper == "SHA1" )
          return fc::sha1( hash );
+      if( name_upper == "HASH160" )
+         return fc::hash160( hash );
       FC_THROW_EXCEPTION( fc::invalid_arg_exception, "Unknown algorithm '${a}'", ("a",algorithm) );
    }
 
@@ -81,9 +83,9 @@ namespace graphene { namespace wallet { namespace detail {
       return sign_transaction(tx, broadcast);
    } FC_CAPTURE_AND_RETHROW( (from)(to)(amount)(asset_symbol)(memo)(broadcast) ) }
 
-   signed_transaction wallet_api_impl::htlc_create( string source, string destination, string amount, string asset_symbol,
-         string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
-         const uint32_t claim_period_seconds, bool broadcast )
+   signed_transaction wallet_api_impl::htlc_create( string source, string destination, string amount,
+         string asset_symbol, string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
+         const uint32_t claim_period_seconds, const std::string& memo, bool broadcast )
    {
       try
       {
@@ -91,6 +93,8 @@ namespace graphene { namespace wallet { namespace detail {
          fc::optional<asset_object> asset_obj = get_asset(asset_symbol);
          FC_ASSERT(asset_obj, "Could not find asset matching ${asset}", ("asset", asset_symbol));
 
+         const account_object& from_acct = get_account(source);
+         const account_object& to_acct = get_account(destination);
          htlc_create_operation create_op;
          create_op.from = get_account(source).id;
          create_op.to = get_account(destination).id;
@@ -98,6 +102,15 @@ namespace graphene { namespace wallet { namespace detail {
          create_op.claim_period_seconds = claim_period_seconds;
          create_op.preimage_hash = do_hash( hash_algorithm, preimage_hash );
          create_op.preimage_size = preimage_size;
+         if (!memo.empty())
+         {
+            memo_data data;
+            data.from = from_acct.options.memo_key;
+            data.to = to_acct.options.memo_key;
+            data.set_message( 
+                  get_private_key(from_acct.options.memo_key), to_acct.options.memo_key, memo);
+            create_op.extensions.value.memo = data;
+         }
 
          signed_transaction tx;
          tx.operations.push_back(create_op);
@@ -109,8 +122,8 @@ namespace graphene { namespace wallet { namespace detail {
             (preimage_hash)(preimage_size)(claim_period_seconds)(broadcast) )
    }
 
-   signed_transaction wallet_api_impl::htlc_redeem( string htlc_id, string issuer, const std::vector<char>& preimage, 
-         bool broadcast )
+   signed_transaction wallet_api_impl::htlc_redeem( string htlc_id, string issuer,
+         const std::vector<char>& preimage, bool broadcast )
    {
       try
       {
@@ -134,7 +147,7 @@ namespace graphene { namespace wallet { namespace detail {
       } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(preimage)(broadcast) )
    }
 
-   signed_transaction wallet_api_impl::htlc_extend ( string htlc_id, string issuer, const uint32_t seconds_to_add, 
+   signed_transaction wallet_api_impl::htlc_extend ( string htlc_id, string issuer, const uint32_t seconds_to_add,
          bool broadcast)
    {
       try

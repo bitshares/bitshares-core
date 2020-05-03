@@ -53,6 +53,16 @@ namespace graphene { namespace protocol {
       }
    };
 
+   template<>
+   uint64_t calc_fee_visitor::operator()(const htlc_create_operation& op)const
+   {
+      //TODO: refactor for performance (see https://github.com/bitshares/bitshares-core/issues/2150)
+      transfer_operation::fee_parameters_type t;
+      if (param.exists<transfer_operation>())
+         t = param.get<transfer_operation>();
+      return op.calculate_fee( param.get<htlc_create_operation>(), t.price_per_kbyte).value;
+   }
+
    asset fee_schedule::calculate_fee( const operation& op )const
    {
       uint64_t required_fee = op.visit( calc_fee_visitor( *this, op ) );
