@@ -31,6 +31,7 @@ namespace graphene { namespace chain {
 namespace detail {
    void check_asset_options_hf_1774(const fc::time_point_sec& block_time, const asset_options& options); 
    void check_asset_options_hf_bsip81(const fc::time_point_sec& block_time, const asset_options& options);
+   void check_asset_claim_fees_hardfork_87_74_collatfee(const fc::time_point_sec& block_time, const asset_claim_fees_operation& op);
 }
 
 struct proposal_operation_hardfork_visitor
@@ -59,6 +60,10 @@ struct proposal_operation_hardfork_visitor
 
       // HARDFORK_BSIP_81
       detail::check_asset_options_hf_bsip81(block_time, v.new_options);
+   }
+
+   void operator()(const graphene::chain::asset_claim_fees_operation &v) const {
+      detail::check_asset_claim_fees_hardfork_87_74_collatfee(block_time, v); // HF_REMOVABLE
    }
 
    void operator()(const graphene::chain::committee_member_update_global_parameters_operation &op) const {

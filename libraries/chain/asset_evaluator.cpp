@@ -55,7 +55,16 @@ namespace detail {
                    "Taker fee percent should not be defined before HARDFORK_BSIP_81_TIME");
       }
    }
-}
+
+   void check_asset_claim_fees_hardfork_87_74_collatfee(const fc::time_point_sec& block_time, const asset_claim_fees_operation& op)
+   {
+      // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
+      FC_ASSERT( !op.extensions.value.claim_from_asset_id.valid() ||
+                 block_time >= HARDFORK_CORE_BSIP_87_74_COLLATFEE_TIME,
+                 "Collateral-denominated fees are not yet active and therefore cannot be claimed." );
+   }
+
+} // graphene::chain::detail
 
 void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
 { try {
@@ -454,6 +463,9 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    {
       FC_ASSERT( asset_obj.dynamic_asset_data_id(d).current_supply == 0,
                  "Cannot update a bitasset if there is already a current supply." );
+
+      FC_ASSERT( asset_obj.dynamic_asset_data_id(d).accumulated_collateral_fees == 0,
+                 "Must claim collateral-denominated fees before changing backing asset." );
 
       const asset_object& new_backing_asset = op.new_options.short_backing_asset(d); // check if the asset exists
 
@@ -920,25 +932,58 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
 } FC_CAPTURE_AND_RETHROW((o)) }
 
 
-
+/***
+ * @brief evaluator for asset_claim_fees operation
+ *
+ * Checks that we are able to claim fees denominated in asset Y (the amount_to_claim asset),
+ * from some container asset X which is presumed to have accumulated the fees we wish to claim.
+ * The container asset is either explicitly named in the extensions, or else assumed as the same
+ * asset as the amount_to_claim asset. Evaluation fails if either (a) operation issuer is not
+ * the same as the container_asset issuer, or (b) container_asset has no fee bucket for
+ * amount_to_claim asset, or (c) accumulated fees are insufficient to cover amount claimed.
+ */
 void_result asset_claim_fees_evaluator::do_evaluate( const asset_claim_fees_operation& o )
 { try {
-   FC_ASSERT( o.amount_to_claim.asset_id(db()).issuer == o.issuer, "Asset fees may only be claimed by the issuer" );
+   const database& d = db();
+
+   detail::check_asset_claim_fees_hardfork_87_74_collatfee(d.head_block_time(), o); // HF_REMOVABLE
+
+   container_asset = o.extensions.value.claim_from_asset_id.valid() ?
+      &(*o.extensions.value.claim_from_asset_id)(d) : &o.amount_to_claim.asset_id(d);
+
+   FC_ASSERT( container_asset->issuer == o.issuer, "Asset fees may only be claimed by the issuer" );
+   FC_ASSERT( container_asset->can_accumulate_fee(d,o.amount_to_claim),
+              "Asset ${a} (${id}) is not backed by asset (${fid}) and does not hold it as fees.",
+              ("a",container_asset->symbol)("id",container_asset->id)("fid",o.amount_to_claim.asset_id) );
+
+   container_ddo = &container_asset->dynamic_asset_data_id(d);
+
+   FC_ASSERT( o.amount_to_claim.amount <= ((container_asset->get_id() == o.amount_to_claim.asset_id) ?
+                                           container_ddo->accumulated_fees :
+                                           container_ddo->accumulated_collateral_fees),
+              "Attempt to claim more fees than have accumulated within asset ${a} (${id})",
+              ("a",container_asset->symbol)("id",container_asset->id)("ddo",*container_ddo) );
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 
+/***
+ * @brief apply asset_claim_fees operation
+ */
 void_result asset_claim_fees_evaluator::do_apply( const asset_claim_fees_operation& o )
 { try {
    database& d = db();
 
-   const asset_object& a = o.amount_to_claim.asset_id(d);
-   const asset_dynamic_data_object& addo = a.dynamic_asset_data_id(d);
-   FC_ASSERT( o.amount_to_claim.amount <= addo.accumulated_fees, "Attempt to claim more fees than have accumulated", ("addo",addo) );
-
-   d.modify( addo, [&]( asset_dynamic_data_object& _addo  ) {
-     _addo.accumulated_fees -= o.amount_to_claim.amount;
-   });
+   if ( container_asset->get_id() == o.amount_to_claim.asset_id ) {
+      d.modify( *container_ddo, [&o]( asset_dynamic_data_object& _addo  ) {
+         _addo.accumulated_fees -= o.amount_to_claim.amount;
+      });
+   } else {
+      d.modify( *container_ddo, [&o]( asset_dynamic_data_object& _addo  ) {
+         _addo.accumulated_collateral_fees -= o.amount_to_claim.amount;
+      });
+   }
 
    d.adjust_balance( o.issuer, o.amount_to_claim );
 

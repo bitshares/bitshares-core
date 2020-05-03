@@ -529,6 +529,7 @@ void database_fixture::verify_asset_supplies( const database& db )
       {
          const auto& bad = asset_obj.bitasset_data(db);
          total_balances[bad.options.short_backing_asset] += bad.settlement_fund;
+         total_balances[bad.options.short_backing_asset] += dasset_obj.accumulated_collateral_fees;
       }
       total_balances[asset_obj.id] += dasset_obj.confidential_supply.value;
    }
