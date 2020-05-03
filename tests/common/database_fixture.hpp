@@ -187,8 +187,8 @@ struct database_fixture {
    {
       public:
       price get_max_short_squeeze_price( const fc::time_point_sec& block_time, 
-            const asset_object& mia, const price_feed& feed)const 
-            { return chain::database::get_max_short_squeeze_price( block_time, mia, feed); }
+            const price_feed& feed, fc::optional<uint64_t> mcfr = fc::optional<uint64_t>() )const 
+         { return chain::database::get_max_short_squeeze_price( block_time, feed, mcfr); }
    };
    // the reason we use an app is to exercise the indexes of built-in
    //   plugins

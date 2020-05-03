@@ -45,6 +45,14 @@ namespace detail {
       return static_cast<int64_t>(a);
    }
 
+   share_type calculate_ratio( const share_type& value, uint16_t ratio)
+   {
+      fc::uint128_t a(value.value);
+      a *= (ratio-GRAPHENE_COLLATERAL_RATIO_DENOM);
+      a /= GRAPHENE_COLLATERAL_RATIO_DENOM;
+      return static_cast<int64_t>(a);
+   }
+
 } //detail
 
 /**
@@ -474,7 +482,7 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
           && !sell_abd->has_settlement()
           && !sell_abd->current_feed.settlement_price.is_null() )
       {
-         call_match_price = ~get_max_short_squeeze_price( maint_time, sell_asset, sell_abd->current_feed );
+         call_match_price = ~get_max_short_squeeze_price( maint_time, sell_abd->current_feed );
          if( ~new_order_object.sell_price <= call_match_price ) // new limit order price is good enough to match a call
             to_check_call_orders = true;
       }
@@ -682,7 +690,7 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    order_pays = call_receives;
 
    int result = 0;
-   result |= fill_limit_order( bid, order_pays, order_receives, cull_taker, match_price, false ); // the limit order is taker
+   result |= fill_limit_order( bid, order_pays, order_receives, cull_taker, match_price, false, true );
    result |= fill_call_order( ask, call_pays, call_receives, match_price, true ) << 1;      // the call order is maker
    // result can be 0 when call order has target_collateral_ratio option set.
 
@@ -792,7 +800,7 @@ asset database::match( const call_order_object& call,
 } FC_CAPTURE_AND_RETHROW( (call)(settle)(match_price)(max_settlement) ) }
 
 bool database::fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small,
-                           const price& fill_price, const bool is_maker )
+                           const price& fill_price, const bool is_maker, bool is_margin_call )
 { try {
    cull_if_small |= (head_block_time() < HARDFORK_555_TIME);
 
@@ -801,7 +809,11 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
 
    const account_object& seller = order.seller(*this);
 
-   auto issuer_fees = pay_market_fees(&seller, receives.asset_id(*this), receives, is_maker);
+   asset issuer_fees;
+   if (!is_maker && is_margin_call)
+      issuer_fees = pay_margin_fees(pays.asset_id(*this), receives );
+   else
+      issuer_fees = pay_market_fees(&seller, receives.asset_id(*this), receives, is_maker);
 
    pay_order( seller, receives - issuer_fees, pays );
 
@@ -1015,16 +1027,16 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
  * Get the correct max_short_squeeze_price from the price_feed based on chain time
  * (due to hardfork changes in the calculation)
  * @param block_time the chain's current block time
- * @param mia the debt asset
  * @param feed the debt asset's price feed
+ * @param mcfr the margin call fee ratio (include if the call order is the taker)
  * @returns the max short squeeze price
  */
-price database::get_max_short_squeeze_price( const fc::time_point_sec& block_time, const asset_object& mia, 
-      const price_feed& feed)const
+price database::get_max_short_squeeze_price( const fc::time_point_sec& block_time, const price_feed& feed,
+      fc::optional<uint64_t> mcfr)const
 {
    if ( block_time <= HARDFORK_CORE_1270_TIME )
       return feed.max_short_squeeze_price_before_hf_1270();
-   return feed.max_short_squeeze_price(mia.options.extensions.value.margin_call_fee_ratio);
+   return feed.max_short_squeeze_price(mcfr);
 }
 
 /**
@@ -1075,7 +1087,8 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     // looking for limit orders selling the most USD for the least CORE
     auto max_price = price::max( mia.id, bitasset.options.short_backing_asset );
     // stop when limit orders are selling too little USD for too much CORE
-    auto min_price = get_max_short_squeeze_price( maint_time, mia, bitasset.current_feed);
+    auto min_price = get_max_short_squeeze_price( maint_time, bitasset.current_feed, 
+         mia.options.extensions.value.margin_call_fee_ratio);
 
     // NOTE limit_price_index is sorted from greatest to least
     auto limit_itr = limit_price_index.lower_bound( max_price );
@@ -1225,7 +1238,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        if( filled_call && before_core_hardfork_343 )
           ++call_price_itr;
        // when for_new_limit_order is true, the call order is maker, otherwise the call order is taker
-       fill_call_order( call_order, call_pays, call_receives, match_price, for_new_limit_order, true );
+       fill_call_order( call_order, call_pays, call_receives, match_price, for_new_limit_order, true);
        if( !before_core_hardfork_1270 )
           call_collateral_itr = call_collateral_index.lower_bound( call_min );
        else if( !before_core_hardfork_343 )
@@ -1288,34 +1301,35 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
 }
 
 /**
- * @brief Calculate the market fee that is to be taken
+ * @brief Calculate the margin fee that is to be taken
  * @param debt the indebted asset
- * @param collateral_receives the amount of collateral received (before fees)
+ * @param collateral the amount of collateral received (before fees)
  * @returns the amount of fee that should be collected
  */
-asset database::calculate_margin_fee(const asset_object& debt, const asset& receives)const
+asset database::calculate_margin_fee(const asset_object& debt, const asset& collateral)const
 {
    auto ba = debt.bitasset_data(*this);
    auto price_feed = ba.current_feed;
    if ( price_feed.settlement_price.is_null() 
-         || price_feed.settlement_price.base.amount == 0)
+         || price_feed.settlement_price.base.amount == 0
+         || !debt.options.extensions.value.margin_call_fee_ratio.valid())
       return asset(0);
-   auto amount = receives.amount 
-         * (price_feed.maximum_short_squeeze_ratio / GRAPHENE_COLLATERAL_RATIO_DENOM) 
-         / price_feed.settlement_price.base.amount;
+   auto ratio = std::min(price_feed.maximum_short_squeeze_ratio, *debt.options.extensions.value.margin_call_fee_ratio);
+   auto amount = detail::calculate_ratio( collateral.amount, ratio );
    return asset(amount, ba.options.short_backing_asset) ;
 }
 
 /****
  * @brief calculate the margin fee and distribute it
  * @param debt_asset the indebted asset
- * @param collarteral_receives the fee
+ * @param collarteral the amount of the collateral
  * @returns the amount of the fee that was collected
  */ 
-asset database::pay_margin_fees(const asset_object& debt_asset, const asset& receives)
+asset database::pay_margin_fees(const asset_object& debt_asset, const asset& collateral)
 {
-   const auto margin_fees = calculate_margin_fee( debt_asset, receives );
-   debt_asset.accumulate_fee(*this, margin_fees);
+   const auto margin_fees = calculate_margin_fee( debt_asset, collateral );
+   if (margin_fees.amount.value != 0)
+      debt_asset.accumulate_fee(*this, margin_fees);
    return margin_fees;
 }
 

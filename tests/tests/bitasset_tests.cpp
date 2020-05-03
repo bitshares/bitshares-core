@@ -1488,6 +1488,7 @@ void adjust_mcfr( database_fixture& fixture, const account_object& owner, const 
       update.asset_to_update = asset.id;
       update.new_options = asset.options;
       update.new_options.extensions.value = extras;
+      update.fee = fixture.db.get_global_properties().parameters.current_fees->calculate_fee(update);
       fixture.trx.operations.push_back( std::move(update) );
       fixture.sign(fixture.trx, pk);
       PUSH_TX(fixture.db, fixture.trx);
@@ -1513,7 +1514,7 @@ BOOST_AUTO_TEST_CASE( mcfr_match_price_test )
    price match_price( asset(100, my_asset_id), asset(100, core_id) );
 
    // check the max_short_squeeze_price
-   price ssp = db.get_max_short_squeeze_price( db.head_block_time(), my_asset, price_feed );
+   price ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed );
    BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
    BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
 
@@ -1524,44 +1525,68 @@ BOOST_AUTO_TEST_CASE( mcfr_match_price_test )
 
    // after hf74, a limit order can match a call order if the price is "feed_price / (mssr-mcfr)"
    // the value should not change if mcfr is unset
-   ssp = db.get_max_short_squeeze_price( db.head_block_time(), my_asset, price_feed );
+   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed );
    BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
    BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
 
    // adjusting the MCFR to be equal to MSSR should make the price the same as before
    adjust_mcfr( *this, charlie, charlie_private_key, my_asset, GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO );
-   ssp = db.get_max_short_squeeze_price( db.head_block_time(), my_asset, price_feed );
+   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed );
    BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
    BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
 
    // adjusting the MCFR to be greater than MSSR should make the price the same as before
    adjust_mcfr( *this, charlie, charlie_private_key, my_asset, GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO + 1000 );
-   ssp = db.get_max_short_squeeze_price( db.head_block_time(), my_asset, price_feed );
+   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed );
    BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
    BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
    
    // adjusting the MCFR should adjust the max short squeeze price down
    adjust_mcfr( *this, charlie, charlie_private_key, my_asset, 750);
-   ssp = db.get_max_short_squeeze_price( db.head_block_time(), my_asset, price_feed );
+   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed );
    BOOST_CHECK_EQUAL( ssp.base.amount.value, 4 );
    BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
 }
 
 BOOST_AUTO_TEST_CASE( calculate_margin_fee_test )
 {
-   ACTORS( (charlie) (feeder1) (feeder2) (feeder3) )
-   const asset_id_type core_id;
+   try
+   {
+      ACTORS( (charlie) (feeder1) (feeder2) (feeder3) )
+      const asset_id_type core_id;
 
-    // first create the asset
-   asset_id_type my_asset_id = create_jmjcoin( *this, charlie_id, charlie_private_key, feeder1, feeder2, feeder3 );
-   const asset_object& my_asset = my_asset_id(db);
+      BOOST_TEST_MESSAGE("Advancing past Hardfork BSIP74"); 
+      generate_blocks( HARDFORK_CORE_BSIP74_TIME + 10);
+      set_expiration( db, trx );      
+      
+      // first create the asset
+      asset_id_type my_asset_id = create_jmjcoin( *this, charlie_id, charlie_private_key, feeder1, feeder2, feeder3 );
+      const asset_object& my_asset = my_asset_id(db);
 
-   // now test some fee scenarios
-   BOOST_CHECK_EQUAL( db.calculate_margin_fee(my_asset, asset(100, core_id)).amount.value, 1 );
-   BOOST_CHECK_EQUAL( db.calculate_margin_fee(my_asset, asset(200, core_id)).amount.value, 2 ); 
+      // no feeds, no mcfr
+      BOOST_CHECK_EQUAL( db.calculate_margin_fee(my_asset, asset(100, core_id)).amount.value, 0 );
+      // 5% mcfr, but no feed
+      adjust_mcfr( *this, charlie, charlie_private_key, my_asset, 1050 );
+      BOOST_CHECK_EQUAL( db.calculate_margin_fee(my_asset, asset(100, core_id)).amount.value, 0 );
+      // add feed (fee still at 5%)
+      publish_feed_jmjcoin( *this, price( asset(1, my_asset_id), asset(1, core_id) ), feeder1, feeder2, feeder3);
+      BOOST_CHECK_EQUAL( db.calculate_margin_fee(my_asset, asset(100, core_id)).amount.value, 5 );
+      // adjust MCFR to be equal to MSSR
+      adjust_mcfr( *this, charlie, charlie_private_key, my_asset, 1500 );
+      BOOST_CHECK_EQUAL( db.calculate_margin_fee(my_asset, asset(100, core_id)).amount.value, 50 );
+      // adjust MCFR to be greater than MSSR (should not change fee)
+      adjust_mcfr( *this, charlie, charlie_private_key, my_asset, 1600 );
+      BOOST_CHECK_EQUAL( db.calculate_margin_fee(my_asset, asset(100, core_id)).amount.value, 50 );
+   }
+   FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE( bsip74_hardfork_feed_price_test )
+/**
+ * In this test, the limit order is the maker, and the call is the taker.
+ * Short squeeze price should be based on MSSR and MCFR
+ * MCFR should be taken from the collateral that the call order receives
+ */
+BOOST_AUTO_TEST_CASE( bsip74_feed_price_test )
 { try {
    const auto& prec = GRAPHENE_BLOCKCHAIN_PRECISION;
    enable_fees();
@@ -1581,11 +1606,6 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_feed_price_test )
    transfer( committee_account(db), feeder1, asset(100 * prec) );
    transfer( committee_account(db), feeder2, asset(100 * prec) );
    transfer( committee_account(db), feeder3, asset(100 * prec) );
-
-   int64_t expected_core_balance_alice = 100000 * prec;
-   int64_t expected_core_balance_bob = 100000 * prec;
-   int64_t expected_core_balance_charlie = 100000 * prec;
-   int64_t expected_jmj_balance_bob = 0;
 
    asset_id_type my_asset_id;
    asset_object my_asset;
@@ -1610,22 +1630,13 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_feed_price_test )
       REQUIRE_EXCEPTION_WITH_TEXT( PUSH_TX(db, trx), "BSIP74" );
       trx.clear();
 
+      // create the coin without the fee will succeed
       my_asset_id = create_jmjcoin( *this, charlie_id, charlie_private_key, feeder1, feeder2, feeder3);     
 
       BOOST_TEST_MESSAGE("Attempt to add margin fee before hardfork (should fail)");
-      asset_update_operation update;
-      update.issuer = charlie_id;
-      update.fee = fees->calculate_fee(update);
-      update.asset_to_update = my_asset_id;
-      update.new_options = my_asset_id(db).options;
-      update.new_options.extensions.value = extras;
-      trx.operations.push_back( std::move(update) );
-      sign(trx, charlie_private_key);
-      REQUIRE_EXCEPTION_WITH_TEXT( PUSH_TX(db, trx), "BSIP74" );
+      REQUIRE_EXCEPTION_WITH_TEXT( adjust_mcfr( *this, charlie, charlie_private_key, my_asset_id(db), 1050), 
+            "BSIP74" );
       trx.clear();
-
-      BOOST_TEST_MESSAGE("Verify the status is as it should be");
-      BOOST_CHECK_EQUAL( expected_core_balance_charlie, get_balance( charlie, core) );
    }
 
    BOOST_TEST_MESSAGE("Advancing past Hardfork BSIP74"); 
@@ -1638,26 +1649,11 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_feed_price_test )
 
    {
       BOOST_TEST_MESSAGE("BSIP 74 has passed, now update the fee");
-      additional_asset_options extras;
-      extras.margin_call_fee_ratio = 10;   
-
-      asset_update_operation update;
-      update.issuer = charlie_id;
-      update.fee = fees->calculate_fee(update);
-      expected_core_balance_charlie -= update.fee.amount.value;
-      update.asset_to_update = my_asset_id;
-      update.new_options = my_asset.options;
-      update.new_options.extensions.value = extras;
-      trx.operations.push_back( std::move(update) );
-      sign(trx, charlie_private_key);
-      PUSH_TX(db, trx);
-      trx.clear();   
+      adjust_mcfr( *this, charlie, charlie_private_key, my_asset, 1050 );
 
       my_asset = my_asset_id(db);
       BOOST_CHECK( my_asset.options.extensions.value.margin_call_fee_ratio.valid() );
-      BOOST_CHECK_EQUAL( *my_asset.options.extensions.value.margin_call_fee_ratio, 10 );
-      BOOST_TEST_MESSAGE( "Charlie should have paid to update the asset's ratio" );
-      BOOST_CHECK_EQUAL( expected_core_balance_charlie, get_balance( charlie, core) );
+      BOOST_CHECK_EQUAL( *my_asset.options.extensions.value.margin_call_fee_ratio, 1050 );
    }
    {
       BOOST_TEST_MESSAGE("Verify margin fee is zero, as feeds are invalid");
@@ -1668,108 +1664,88 @@ BOOST_AUTO_TEST_CASE( bsip74_hardfork_feed_price_test )
    }
    {
       BOOST_TEST_MESSAGE("Create valid feeds");
-      price_feed feed1;
-      feed1.core_exchange_rate = price( asset( 100, my_asset_id ), asset( 100, core_id ) );
-      feed1.settlement_price = price( asset( 100, my_asset_id ), asset( 100, core_id ) );
-      feed1.maintenance_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
-      publish_feed( my_asset_id(db), feeder1, feed1 );
-      publish_feed( my_asset_id(db), feeder2, feed1 );
-      publish_feed( my_asset_id(db), feeder3, feed1 );
+      publish_feed_jmjcoin( *this, price( asset(100, my_asset_id), asset( 100, core_id) ), feeder1, feeder2, feeder3);
+   }
+   {
+      BOOST_TEST_MESSAGE("Verify margin fee is now non-zero");
+      asset trade_amount(100000, core_id );
+      asset fee = db.calculate_margin_fee(my_asset_id(db), trade_amount );
+      BOOST_CHECK_EQUAL( fee.amount.value, 5000 );
+      BOOST_CHECK_EQUAL( fee.asset_id.instance.value, core_id.instance.value);
    }
    {
       BOOST_TEST_MESSAGE("Borrow some JMJCOIN into existence");
       borrow( alice, asset(100 * prec, my_asset_id), asset(200 * prec) );
       borrow( charlie, asset( 100 * prec, my_asset_id), asset(300 * prec) );
-      // calculate the fees to keep up with the balances
-      call_order_update_operation op;
-      expected_core_balance_alice -= fees->calculate_fee(op).amount.value;
-      expected_core_balance_alice -= 200 * prec;
-      expected_core_balance_charlie -= fees->calculate_fee(op).amount.value + (300 * prec);
-      BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance( alice, core) );
-      BOOST_CHECK_EQUAL( expected_core_balance_charlie, get_balance( charlie, core) );
-      BOOST_CHECK_EQUAL( 100 * prec, get_balance( alice, my_asset_id(db) ) );
    }
    {
       BOOST_TEST_MESSAGE("Sell JMJCOIN to Bob (100-5=95 satoshis");
       create_sell_order( alice_id, asset(95 * prec, my_asset_id), asset(95 * prec, core_id), 
             fc::time_point_sec::maximum(), 
             price( asset(100, my_asset_id), asset(100, core_id ) ) );
-      expected_core_balance_alice += 95 * prec; // 95 sold + 5 JMJCoin fee.
       create_sell_order( charlie_id, asset(95 * prec, my_asset_id), asset(95 * prec, core_id), 
             fc::time_point_sec::maximum(), 
             price( asset(100, my_asset_id), asset(100, core_id ) ) );
-      expected_core_balance_charlie += 95 * prec; // 95 sold gives charlie 95 core
       BOOST_TEST_MESSAGE("Bob buys all JMJCOIN on the book");
       create_sell_order( bob_id, asset(190 * prec, core_id), asset(190 * prec, my_asset_id), fc::time_point_sec::maximum(),
             price( asset(100, my_asset_id), asset(100, core_id ) ) );     
-      expected_core_balance_bob -= 190 * prec; // 190 JMJCoin bought for 190 CORE
-      expected_jmj_balance_bob = 18481000; // don't forget the 5 JMJ network fee + 0.1% market fee (190*0.001=0.19);
       // now alice holds only core, but has debt in JMJCOIN
-      BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance(alice, core) );
-      BOOST_CHECK_EQUAL( 0, get_balance(alice, my_asset_id(db) ) );
-      // and bob hold core and JMJCOIN
-      BOOST_CHECK_EQUAL( expected_core_balance_bob, get_balance( bob, core) );
-      BOOST_CHECK_EQUAL( expected_jmj_balance_bob, get_balance(bob, my_asset_id(db) ) ); // received 185 due to JMJCoin fee. Ouch!
+      BOOST_CHECK_EQUAL( get_balance(alice, my_asset_id(db) ), 0 );
+      // and bob holds core and JMJCOIN 19000 market fee
+      // 19,000,000 received from order, minus 19,000 market fee - 500,000 tx fee =
+      BOOST_CHECK_EQUAL( get_balance(bob, my_asset_id(db) ), 18481000 );
    }
-   BOOST_CHECK_EQUAL( 0, num_limit_orders_on_books( db ) );
-   BOOST_CHECK_EQUAL( 2, num_call_orders_on_books( db ) );
+   BOOST_CHECK_EQUAL( 0, num_limit_orders_on_books( db ) ); // bob's order was completely filled
+   BOOST_CHECK_EQUAL( 2, num_call_orders_on_books( db ) ); // Alice and Charlie's calls still exist
    {
-      BOOST_TEST_MESSAGE("Verify margin fee is now non-zero");
-      asset trade_amount(100000, core_id );
-      asset fee = db.calculate_margin_fee(my_asset_id(db), trade_amount );
-      BOOST_CHECK_EQUAL( fee.amount.value, 100 );
-      BOOST_CHECK_EQUAL( fee.asset_id.instance.value, core_id.instance.value);
-   }
-   {
-      BOOST_TEST_MESSAGE("Bob places order to sell JMJCOIN for CORE (prevents GS)");
-      create_sell_order( bob_id, asset( 100 * prec, my_asset_id ), asset(86 * prec, core_id) );
-      expected_core_balance_bob -= fees->calculate_fee( limit_order_create_operation() ).amount.value;
-      expected_jmj_balance_bob -= 100 * prec;
-      BOOST_CHECK_EQUAL( expected_core_balance_bob, get_balance( bob, core) ); // the fee should be taken out
-      BOOST_CHECK_EQUAL( expected_jmj_balance_bob, get_balance(bob, my_asset_id(db) ) ); // Order is executed 
+      BOOST_TEST_MESSAGE("Bob places order to sell JMJCOIN for CORE");
+      create_sell_order( bob_id, asset( 100 * prec, my_asset_id ), asset(170 * prec, core_id) );
       BOOST_CHECK_EQUAL( 1, num_limit_orders_on_books( db ) );
+      BOOST_CHECK_EQUAL( 2, num_call_orders_on_books( db ) ); // Alice and Charlie's calls still exist
    }   
-
+   auto previous_core_balance_alice = get_balance(alice, core);
+   auto previous_core_balance_bob = get_balance(bob, core);
+   auto previous_core_balance_charlie = get_balance(charlie, core);
    // now the price of CORE drops, pushing Alice's loan into margin call territory
    // at a price of 100:100 (1:1), alice was collateralized at 200% (1:2). 
-   // A drop in price to 100:115 puts her at 174%, below 175% threshold.
+   // A drop in price to 100:135 puts her at 148%, below 175% threshold.
    {
       BOOST_TEST_MESSAGE("Value of CORE drops, pushing Alice's loan into margin call territory");
       price_feed feed1;
-      feed1.core_exchange_rate = price( asset( 100, my_asset_id ), asset( 116, core_id ) );
+      feed1.core_exchange_rate = price( asset( 100, my_asset_id ), asset( 118, core_id ) );
       //NOTE: settlement_price is what margin calls are based on.
-      feed1.settlement_price = price( asset( 100, my_asset_id ), asset( 115, core_id ) );
+      feed1.settlement_price = price( asset( 100, my_asset_id ), asset( 118, core_id ) );
       feed1.maintenance_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
       publish_feed( my_asset_id(db), feeder1, feed1 );
       publish_feed( my_asset_id(db), feeder2, feed1 ); // <- This one triggers the margin call
       publish_feed( my_asset_id(db), feeder3, feed1 );
+      BOOST_TEST_MESSAGE( "New Short Squeeze Price is: " + fc::json::to_pretty_string( my_asset.bitasset_data(db)
+            .current_feed.max_short_squeeze_price()));
    }
 
    // GS should not have happened
    BOOST_CHECK( !my_asset_id(db).bitasset_data(db).has_settlement() );
 
    // Alice's call should be gone, so should Bob's limit order
-   BOOST_CHECK_EQUAL( 1, num_call_orders_on_books( db ) );
-   BOOST_CHECK_EQUAL( 0, num_limit_orders_on_books( db ) );
+   BOOST_CHECK_EQUAL(num_call_orders_on_books( db ), 1 );
+   BOOST_CHECK_EQUAL(num_limit_orders_on_books( db ), 0 );
 
-   // the order should have executed, giving Alice some CORE
+   // the order should have executed, giving Alice more CORE
    // 200 original collateral - what Bob took (86)
-   expected_core_balance_alice += (200 - 86) * prec; // return of what's left of collateral
-   BOOST_CHECK_EQUAL( expected_core_balance_alice, get_balance(alice, core) );
-   BOOST_CHECK_EQUAL( 0, get_balance(alice, my_asset_id(db) ) );
+   BOOST_CHECK_EQUAL( get_balance(alice, core), previous_core_balance_alice );
+   BOOST_CHECK_EQUAL( get_balance(alice, my_asset_id(db) ), 0 );
    // and here are Bob's holdings
-   expected_core_balance_bob += 86 * prec; // received from limit order for sale of JMJCoin
-   BOOST_CHECK_EQUAL( expected_core_balance_bob, get_balance( bob, core) );
-   BOOST_CHECK_EQUAL( expected_jmj_balance_bob, get_balance(bob, my_asset_id(db) ) ); 
+   BOOST_CHECK_EQUAL( get_balance( bob, core), previous_core_balance_bob );
    // chalie should have collected the margin call fee
-   expected_core_balance_charlie += 116000;
-   BOOST_CHECK_EQUAL( expected_core_balance_charlie, get_balance( charlie, core) );
-   // 15.19 JMJ should have been added to the accumulated fees
-   BOOST_CHECK_EQUAL( 1519000, my_asset_id(db).dynamic_data(db).accumulated_fees.value );
+   BOOST_CHECK_EQUAL( get_balance( charlie, core), previous_core_balance_charlie );
 
 } FC_LOG_AND_RETHROW() }
 
-
+/**
+ * In this test, the limit order is the taker, and the call is the maker.
+ * Short squeeze price should only be based on MSSR, and not MCFR
+ * MCFR should be taken from the collateral that the limit order receives
+ */
 BOOST_AUTO_TEST_CASE( bsip74_limit_price_test )
 { try {
    const auto& prec = GRAPHENE_BLOCKCHAIN_PRECISION;
@@ -1804,25 +1780,11 @@ BOOST_AUTO_TEST_CASE( bsip74_limit_price_test )
       my_asset_id = create_jmjcoin( *this, charlie_id, charlie_private_key, feeder1, feeder2, feeder3);
       my_asset = my_asset_id(db);
 
-      BOOST_TEST_MESSAGE("BSIP 74 has passed, update the fee");
-      additional_asset_options extras;
-      extras.margin_call_fee_ratio = 10;   
-
-      asset_update_operation update;
-      update.issuer = charlie_id;
-      update.fee = fees->calculate_fee(update);
-      expected_core_balance_charlie -= update.fee.amount.value;
-      update.asset_to_update = my_asset_id;
-      update.new_options = my_asset.options;
-      update.new_options.extensions.value = extras;
-      trx.operations.push_back( std::move(update) );
-      sign(trx, charlie_private_key);
-      PUSH_TX(db, trx);
-      trx.clear();   
-
+      BOOST_TEST_MESSAGE("BSIP 74 has passed, update the fee to 5%");
+      adjust_mcfr( *this, charlie, charlie_private_key, my_asset, 1050);
       my_asset = my_asset_id(db);
       BOOST_CHECK( my_asset.options.extensions.value.margin_call_fee_ratio.valid() );
-      BOOST_CHECK_EQUAL( *my_asset.options.extensions.value.margin_call_fee_ratio, 10 );
+      BOOST_CHECK_EQUAL( *my_asset.options.extensions.value.margin_call_fee_ratio, 1050 );
    }
    {
       BOOST_TEST_MESSAGE("Verify margin fee is zero, as feeds are invalid");
@@ -1833,13 +1795,9 @@ BOOST_AUTO_TEST_CASE( bsip74_limit_price_test )
    }
    {
       BOOST_TEST_MESSAGE("Create valid feeds");
-      price_feed feed1;
-      feed1.core_exchange_rate = price( asset( 100, my_asset_id ), asset( 100, core_id ) );
-      feed1.settlement_price = price( asset( 100, my_asset_id ), asset( 100, core_id ) );
-      feed1.maintenance_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
-      publish_feed( my_asset_id(db), feeder1, feed1 );
-      publish_feed( my_asset_id(db), feeder2, feed1 );
-      publish_feed( my_asset_id(db), feeder3, feed1 );
+      publish_feed_jmjcoin( *this, price( asset( 100, my_asset_id ), asset( 100, core_id ) ), feeder1, feeder2, feeder3);
+      BOOST_TEST_MESSAGE( "Starting MSSR is: " + fc::json::to_pretty_string( my_asset.bitasset_data(db)
+            .current_feed.max_short_squeeze_price()));
    }
    {
       BOOST_TEST_MESSAGE("Borrow some JMJCOIN into existence");
@@ -1868,8 +1826,8 @@ BOOST_AUTO_TEST_CASE( bsip74_limit_price_test )
       price new_price( asset( 100, my_asset_id), asset(116, core_id) );
       publish_feed_jmjcoin( *this, new_price, feeder1, feeder2, feeder3 );
       my_asset = my_asset_id(db);
-      BOOST_TEST_MESSAGE( "New MSSR is: " + fc::json::to_pretty_string( my_asset.bitasset_data(db)
-            .current_feed.max_short_squeeze_price(my_asset.options.extensions.value.margin_call_fee_ratio)));
+      BOOST_TEST_MESSAGE( "New Short Squeeze Price is: " + fc::json::to_pretty_string( my_asset.bitasset_data(db)
+            .current_feed.max_short_squeeze_price()));
    }
    // gather balances to watch fees
    auto bob_jmjcoin_balance = db.get_balance(bob_id, my_asset_id).amount.value;
@@ -1877,26 +1835,24 @@ BOOST_AUTO_TEST_CASE( bsip74_limit_price_test )
    auto alice_core_balance = db.get_balance(alice_id, core_id).amount.value;
    {
       BOOST_TEST_MESSAGE("Bob places order to sell JMJCOIN for CORE just below MSSR");
-      create_sell_order( bob_id, asset( 100 * prec, my_asset_id ), asset(172 * prec, core_id) );
+      create_sell_order( bob_id, asset( 100 * prec, my_asset_id ), asset(174 * prec, core_id) );
       // Bob's order should have executed
       BOOST_CHECK_EQUAL( 0, num_limit_orders_on_books( db ) );
       // only Charlie's call order is left
       BOOST_CHECK_EQUAL( 1, num_call_orders_on_books( db ) );
       // Bob should have sold 100 jmjcoin
       BOOST_CHECK_EQUAL( db.get_balance(bob_id, my_asset_id).amount.value, bob_jmjcoin_balance - (100*prec));
-      // Bob should have 172 more core minus cost of limit order plus 84,000 due to the call needing to
-      // buy so much JMJCOIN. (see db_market::match(limit,call)::match_price and ask.get_max_debt_to_cover)
-      BOOST_CHECK_EQUAL( db.get_balance(bob_id, core_id).amount.value, bob_core_balance 
-            + (172*prec)
-            - fees->calculate_fee(limit_order_create_operation()).amount.value
-            + 84000);
+      // the match price was based on MSSR price which was [50/87], so (100*prec) JMJCOIN receives 17,400,000 core 
+      // minus transaction fee (500,000) and margin call fee (5%=870,000)
+      auto limit_order_fee = fees->calculate_fee(limit_order_create_operation()).amount.value;
+      BOOST_CHECK_EQUAL( db.get_balance(bob_id, core_id).amount.value, 
+            bob_core_balance + 17400000 - limit_order_fee - 870000 );
       // Alice should have no JMJCOIN
       BOOST_CHECK_EQUAL( db.get_balance(alice_id, my_asset_id).amount.value, 0);
       // Alice should have gained what is left of her collateral back.
-      BOOST_CHECK_EQUAL( db.get_balance(alice_id, core_id).amount.value, alice_core_balance 
-            + 172000000
-            -     84000
-            - 169200000);
+      // she originally put up 20,000,000, but Bob gave 17,400,000, so she is freed from debt, but only gets
+      // 2,600,000 of her collateral back
+      BOOST_CHECK_EQUAL( db.get_balance(alice_id, core_id).amount.value, alice_core_balance + 2600000 );
    }
 
 } FC_LOG_AND_RETHROW() }

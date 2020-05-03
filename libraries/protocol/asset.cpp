@@ -286,7 +286,7 @@ namespace graphene { namespace protocol {
          // NOTE: settlement price is in debt/collateral
          if ( mcfr.valid() && *mcfr < maximum_short_squeeze_ratio )
             return settlement_price * ratio_type( GRAPHENE_COLLATERAL_RATIO_DENOM, 
-                  maximum_short_squeeze_ratio - *mcfr );
+                  maximum_short_squeeze_ratio - *mcfr + GRAPHENE_COLLATERAL_RATIO_DENOM );
          return settlement_price * ratio_type( GRAPHENE_COLLATERAL_RATIO_DENOM, maximum_short_squeeze_ratio );
       }
 
