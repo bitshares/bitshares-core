@@ -454,15 +454,16 @@ namespace graphene { namespace protocol {
          /// Which asset to claim fees from. This is needed, e.g., to claim collateral-
          /// denominated fees from a collateral-backed smart asset. If unset, assumed to be same
          /// asset as amount_to_claim is denominated in, such as would be the case when claiming
-         /// market fees.
+         /// market fees. If set, validation requires it to be a different asset_id than
+         /// amount_to_claim (else there would exist two ways to form the same request).
          fc::optional<asset_id_type> claim_from_asset_id;
       };
 
       asset           fee;
-      account_id_type issuer; /// must match issuer of asset from which we claim fees
+      account_id_type issuer; ///< must match issuer of asset from which we claim fees
       asset           amount_to_claim;
 
-      additional_options_type extensions;
+      extension<additional_options_type> extensions;
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
