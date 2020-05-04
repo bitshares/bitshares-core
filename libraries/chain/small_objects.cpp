@@ -128,7 +128,7 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::condition_info::ti
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::condition_info, BOOST_PP_SEQ_NIL,
    (hash_lock)(time_lock) )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object, (graphene::db::object),
-               (transfer) (conditions) )
+               (transfer) (conditions) (memo) )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::operation_history_object, (graphene::chain::object),
                     (op)(result)(block_num)(trx_in_block)(op_in_trx)(virtual_op) )

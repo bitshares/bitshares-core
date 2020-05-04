@@ -805,28 +805,80 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
    const account_object& seller = order.seller(*this);
    const asset_object& recv_asset = receives.asset_id(*this);
 
-   auto issuer_fees = pay_market_fees(&seller, recv_asset, receives);
+   auto issuer_fees = pay_market_fees(&seller, recv_asset, receives, is_maker);
 
    pay_order( seller, receives - issuer_fees, pays );
 
    assert( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation( order.id, order.seller, pays, receives, issuer_fees, fill_price, is_maker ) );
 
-   // conditional because cheap integer comparison may allow us to avoid two expensive modify() and object lookups
-   if( order.deferred_fee > 0 )
-   {
-      modify( seller.statistics(*this), [&]( account_statistics_object& statistics )
-      {
-         statistics.pay_fee( order.deferred_fee, get_global_properties().parameters.cashback_vesting_threshold );
-      } );
-   }
+   // BSIP85: Maker order creation fee discount, https://github.com/bitshares/bsips/blob/master/bsip-0085.md
+   //   if the order creation fee was paid in BTS,
+   //     return round_down(deferred_fee * maker_fee_discount_percent) to the owner,
+   //     then process the remaining deferred fee as before;
+   //   if the order creation fee was paid in another asset,
+   //     return round_down(deferred_paid_fee * maker_fee_discount_percent) to the owner,
+   //     return round_down(deferred_fee * maker_fee_discount_percent) to the fee pool of the asset,
+   //     then process the remaining deferred fee and deferred paid fee as before.
+   const uint16_t maker_discount_percent = get_global_properties().parameters.get_maker_fee_discount_percent();
 
+   // Save local copies for calculation
+   share_type deferred_fee = order.deferred_fee;
+   share_type deferred_paid_fee = order.deferred_paid_fee.amount;
+
+   // conditional because cheap integer comparison may allow us to avoid two expensive modify() and object lookups
    if( order.deferred_paid_fee.amount > 0 ) // implies head_block_time() > HARDFORK_CORE_604_TIME
    {
+      share_type fee_pool_refund = 0;
+      if( is_maker && maker_discount_percent > 0 )
+      {
+         share_type refund = detail::calculate_percent( deferred_paid_fee, maker_discount_percent );
+         // Note: it's possible that the deferred_paid_fee is very small,
+         //       which can result in a zero refund due to rounding issue,
+         //       in this case, no refund to the fee pool
+         if( refund > 0 )
+         {
+            FC_ASSERT( refund <= deferred_paid_fee, "Internal error" );
+            adjust_balance( order.seller, asset(refund, order.deferred_paid_fee.asset_id) );
+            deferred_paid_fee -= refund;
+
+            // deferred_fee might be positive too
+            FC_ASSERT( deferred_fee > 0, "Internal error" );
+            fee_pool_refund = detail::calculate_percent( deferred_fee, maker_discount_percent );
+            FC_ASSERT( fee_pool_refund <= deferred_fee, "Internal error" );
+            deferred_fee -= fee_pool_refund;
+         }
+      }
+
       const auto& fee_asset_dyn_data = order.deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
-      modify( fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {
-         addo.accumulated_fees += order.deferred_paid_fee.amount;
+      modify( fee_asset_dyn_data, [deferred_paid_fee,fee_pool_refund](asset_dynamic_data_object& addo) {
+         addo.accumulated_fees += deferred_paid_fee;
+         addo.fee_pool += fee_pool_refund;
       });
+   }
+
+   if( order.deferred_fee > 0 )
+   {
+      if( order.deferred_paid_fee.amount <= 0 // paid in CORE, or before HF 604
+            && is_maker && maker_discount_percent > 0 )
+      {
+         share_type refund = detail::calculate_percent( deferred_fee, maker_discount_percent );
+         if( refund > 0 )
+         {
+            FC_ASSERT( refund <= deferred_fee, "Internal error" );
+            adjust_balance( order.seller, asset(refund, asset_id_type()) );
+            deferred_fee -= refund;
+         }
+      }
+      // else do nothing here, because we have already processed it above, or no need to process
+
+      if( deferred_fee > 0 )
+      {
+         modify( seller.statistics(*this), [deferred_fee,this]( account_statistics_object& statistics )
+         {
+            statistics.pay_fee( deferred_fee, get_global_properties().parameters.cashback_vesting_threshold );
+         } );
+      }
    }
 
    if( pays == order.amount_for_sale() )
@@ -836,7 +888,7 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
    }
    else
    {
-      modify( order, [&]( limit_order_object& b ) {
+      modify( order, [&pays]( limit_order_object& b ) {
                              b.for_sale -= pays.amount;
                              b.deferred_fee = 0;
                              b.deferred_paid_fee.amount = 0;
@@ -948,7 +1000,7 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
    if( head_block_time() >= HARDFORK_CORE_1780_TIME )
       settle_owner_ptr = &settle.owner(*this);
    // Compute and pay the market fees:
-   asset market_fees = pay_market_fees( settle_owner_ptr, get(receives.asset_id), receives );
+   asset market_fees = pay_market_fees( settle_owner_ptr, get(receives.asset_id), receives, is_maker );
 
    // Issuer of the settled smartcoin asset lays claim to a force-settlement fee (BSIP87), but
    // note that fee is denominated in collateral asset, not the debt asset.  Asset object of
@@ -1212,16 +1264,31 @@ void database::pay_order( const account_object& receiver, const asset& receives,
    adjust_balance(receiver.get_id(), receives);
 }
 
-asset database::calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount )
+asset database::calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount, const bool& is_maker)
 {
    assert( trade_asset.id == trade_amount.asset_id );
 
    if( !trade_asset.charges_market_fees() )
       return trade_asset.amount(0);
-   if( trade_asset.options.market_fee_percent == 0 )
+   // Optimization: The fee is zero if the order is a maker, and the maker fee percent is 0%
+   if( is_maker && trade_asset.options.market_fee_percent == 0 )
       return trade_asset.amount(0);
 
-   auto value = detail::calculate_percent(trade_amount.amount, trade_asset.options.market_fee_percent);
+   // Optimization: The fee is zero if the order is a taker, and the taker fee percent is 0%
+   const optional<uint16_t>& taker_fee_percent = trade_asset.options.extensions.value.taker_fee_percent;
+   if(!is_maker && taker_fee_percent.valid() && *taker_fee_percent == 0)
+      return trade_asset.amount(0);
+
+   uint16_t fee_percent;
+   if (is_maker) {
+      // Maker orders are charged the maker fee percent
+      fee_percent = trade_asset.options.market_fee_percent;
+   } else {
+      // Taker orders are charged the taker fee percent if they are valid.  Otherwise, the maker fee percent.
+      fee_percent = taker_fee_percent.valid() ? *taker_fee_percent : trade_asset.options.market_fee_percent;
+   }
+
+   auto value = detail::calculate_percent(trade_amount.amount, fee_percent);
    asset percent_fee = trade_asset.amount(value);
 
    if( percent_fee.amount > trade_asset.options.max_market_fee )
@@ -1230,9 +1297,10 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
    return percent_fee;
 }
 
-asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives )
+asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,
+                                const bool& is_maker)
 {
-   const auto market_fees = calculate_market_fee( recv_asset, receives );
+   const auto market_fees = calculate_market_fee( recv_asset, receives, is_maker );
    auto issuer_fees = market_fees;
    FC_ASSERT( issuer_fees <= receives, "Market fee shouldn't be greater than receives");
    //Don't dirty undo state if not actually collecting any fees

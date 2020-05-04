@@ -151,10 +151,10 @@ namespace graphene { namespace app {
           */
          history_operation_detail get_account_history_by_operations(
             const std::string account_id_or_name,
-            vector<uint16_t> operation_types,
+            flat_set<uint16_t> operation_types,
             uint32_t start,
             unsigned limit
-         );
+         )const;
 
          /**
           * @brief Get only asked operations relevant to the specified account

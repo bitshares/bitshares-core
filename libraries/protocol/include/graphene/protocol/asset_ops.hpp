@@ -32,7 +32,9 @@ namespace graphene { namespace protocol {
    {
       fc::optional<uint16_t>                  reward_percent;
       fc::optional<flat_set<account_id_type>> whitelist_market_fee_sharing;
-      // MERGE NOTE: BSIP-74 and/or BSIP-81 additions here
+      // After BSIP81 activation, taker_fee_percent is the taker fee
+      fc::optional<uint16_t>                  taker_fee_percent;
+      // MERGE NOTE: BSIP-74 additions here
       fc::optional<uint16_t> force_settle_fee_percent;  // BSIP-87
    };
    typedef extension<additional_asset_options> additional_asset_options_t;
@@ -51,6 +53,8 @@ namespace graphene { namespace protocol {
       /// When this asset is traded on the markets, this percentage of the total traded will be exacted and paid
       /// to the issuer. This is a fixed point value, representing hundredths of a percent, i.e. a value of 100
       /// in this field means a 1% fee is charged on market trades of this asset.
+      // BSIP81: Asset owners may specify different market fee rate for maker orders and taker orders
+      // After BSIP81 activation, market_fee_percent is the maker fee
       uint16_t market_fee_percent = 0;
       /// Market fees calculated as @ref market_fee_percent of the traded volume are capped to this value
       share_type max_market_fee = GRAPHENE_MAX_SHARE_SUPPLY;
@@ -444,10 +448,21 @@ namespace graphene { namespace protocol {
          uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
       };
 
+      struct additional_options_type
+      {
+         /// Which asset to claim fees from. This is needed, e.g., to claim collateral-
+         /// denominated fees from a collateral-backed smart asset. If unset, assumed to be same
+         /// asset as amount_to_claim is denominated in, such as would be the case when claiming
+         /// market fees. If set, validation requires it to be a different asset_id than
+         /// amount_to_claim (else there would exist two ways to form the same request).
+         fc::optional<asset_id_type> claim_from_asset_id;
+      };
+
       asset           fee;
-      account_id_type issuer;
-      asset           amount_to_claim; /// amount_to_claim.asset_id->issuer must == issuer
-      extensions_type extensions;
+      account_id_type issuer; ///< must match issuer of asset from which we claim fees
+      asset           amount_to_claim;
+
+      extension<additional_options_type> extensions;
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
@@ -519,6 +534,8 @@ namespace graphene { namespace protocol {
 
 FC_REFLECT( graphene::protocol::asset_claim_fees_operation, (fee)(issuer)(amount_to_claim)(extensions) )
 FC_REFLECT( graphene::protocol::asset_claim_fees_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::asset_claim_fees_operation::additional_options_type, (claim_from_asset_id) )
+
 FC_REFLECT( graphene::protocol::asset_claim_pool_operation, (fee)(issuer)(asset_id)(amount_to_claim)(extensions) )
 FC_REFLECT( graphene::protocol::asset_claim_pool_operation::fee_parameters_type, (fee) )
 
@@ -546,7 +563,7 @@ FC_REFLECT( graphene::protocol::bitasset_options,
             (extensions)
           )
 
-FC_REFLECT( graphene::protocol::additional_asset_options, (reward_percent)(whitelist_market_fee_sharing)(force_settle_fee_percent) )
+FC_REFLECT( graphene::protocol::additional_asset_options, (reward_percent)(whitelist_market_fee_sharing)(taker_fee_percent)(force_settle_fee_percent) )
 FC_REFLECT( graphene::protocol::asset_create_operation::fee_parameters_type, (symbol3)(symbol4)(long_symbol)(price_per_kbyte) )
 FC_REFLECT( graphene::protocol::asset_global_settle_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::protocol::asset_settle_operation::fee_parameters_type, (fee) )
@@ -617,6 +634,7 @@ GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_settle_operat
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_fund_fee_pool_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_pool_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_fees_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_fees_operation::additional_options_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_issuer_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_bitasset_operation::fee_parameters_type )
