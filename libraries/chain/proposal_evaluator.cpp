@@ -51,7 +51,7 @@ struct proposal_operation_hardfork_visitor
    void operator()(const graphene::chain::asset_create_operation &v) const {
       // hf_1774
       detail::check_asset_options_hf_1774(block_time, v.common_options);
-
+      detail::check_asset_options_bsip74(block_time, v.common_options);
       // HARDFORK_BSIP_81
       detail::check_asset_options_hf_bsip81(block_time, v.common_options);
    }
