@@ -1525,26 +1525,36 @@ BOOST_AUTO_TEST_CASE( mcfr_match_price_test )
 
    // after hf74, a limit order can match a call order if the price is "feed_price / (mssr-mcfr)"
    // the value should not change if mcfr is unset
-   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed );
+   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed, 
+         my_asset_id(db).options.extensions.value.margin_call_fee_ratio );
    BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
    BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
 
    // adjusting the MCFR to be equal to MSSR should make the price the same as before
    adjust_mcfr( *this, charlie, charlie_private_key, my_asset, GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO );
-   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed );
+   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed,
+         my_asset_id(db).options.extensions.value.margin_call_fee_ratio  );
    BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
    BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
 
    // adjusting the MCFR to be greater than MSSR should make the price the same as before
    adjust_mcfr( *this, charlie, charlie_private_key, my_asset, GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO + 1000 );
-   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed );
+   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed,
+         my_asset_id(db).options.extensions.value.margin_call_fee_ratio  );
    BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
    BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
    
    // adjusting the MCFR should adjust the max short squeeze price down
    adjust_mcfr( *this, charlie, charlie_private_key, my_asset, 750);
-   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed );
+   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed,
+         my_asset_id(db).options.extensions.value.margin_call_fee_ratio  );
    BOOST_CHECK_EQUAL( ssp.base.amount.value, 4 );
+   BOOST_CHECK_EQUAL( ssp.quote.amount.value, 7 );
+
+   // calling get_max_short_squeeze_price should not include MCFR if the MCFR value is not passed
+   // (as is the case when limit order is the maker)
+   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed );
+   BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
    BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
 }
 
@@ -1730,14 +1740,17 @@ BOOST_AUTO_TEST_CASE( bsip74_feed_price_test )
    BOOST_CHECK_EQUAL(num_call_orders_on_books( db ), 1 );
    BOOST_CHECK_EQUAL(num_limit_orders_on_books( db ), 0 );
 
-   // the order should have executed, giving Alice more CORE
-   // 200 original collateral - what Bob took (86)
-   BOOST_CHECK_EQUAL( get_balance(alice, core), previous_core_balance_alice );
+   // the order should have executed, giving Alice what is left of her collateral
+   // She received 10,000,000 JMJCOIN at 100:170, giving Bob 17,000,000 CORE, plus she paid a 5% (850,000) margin fee
+   // frees up 2,150,000 CORE
+   // 20,000,000 original collateral - what Bob took (17,000,000) - fee (850,000) 
+   BOOST_CHECK_EQUAL( get_balance(alice, core), previous_core_balance_alice + 2150000 );
    BOOST_CHECK_EQUAL( get_balance(alice, my_asset_id(db) ), 0 );
    // and here are Bob's holdings
-   BOOST_CHECK_EQUAL( get_balance( bob, core), previous_core_balance_bob );
-   // chalie should have collected the margin call fee
+   BOOST_CHECK_EQUAL( get_balance( bob, core), previous_core_balance_bob + 17000000 );
+   // chalie should have collected the margin call fee in the asset's collateral fees
    BOOST_CHECK_EQUAL( get_balance( charlie, core), previous_core_balance_charlie );
+   BOOST_CHECK_EQUAL( my_asset_id(db).dynamic_data(db).accumulated_collateral_fees.value, 850000 );
 
 } FC_LOG_AND_RETHROW() }
 
@@ -1850,7 +1863,7 @@ BOOST_AUTO_TEST_CASE( bsip74_limit_price_test )
       // Alice should have no JMJCOIN
       BOOST_CHECK_EQUAL( db.get_balance(alice_id, my_asset_id).amount.value, 0);
       // Alice should have gained what is left of her collateral back.
-      // she originally put up 20,000,000, but Bob gave 17,400,000, so she is freed from debt, but only gets
+      // she originally put up 20,000,000, but Bob took 17,400,000, so she is freed from debt, but only gets
       // 2,600,000 of her collateral back
       BOOST_CHECK_EQUAL( db.get_balance(alice_id, core_id).amount.value, alice_core_balance + 2600000 );
    }

@@ -937,7 +937,7 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
    // adjust the order
    modify( order, [&]( call_order_object& o ) {
          o.debt       -= receives.amount;
-         o.collateral -= pays.amount;
+         o.collateral -= pays.amount + margin_fee.amount;
          if( o.debt == 0 ) // is the whole debt paid?
          {
             collateral_freed = o.get_collateral();
@@ -969,8 +969,9 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
    // Update account statistics. We know that order.collateral_type() == pays.asset_id
    if( pays.asset_id == asset_id_type() )
    {
-      modify( get_account_stats_by_owner(order.borrower), [&collateral_freed,&pays]( account_statistics_object& b ){
-         b.total_core_in_orders -= pays.amount;
+      modify( get_account_stats_by_owner(order.borrower), 
+            [&collateral_freed,&pays,&margin_fee]( account_statistics_object& b ){
+         b.total_core_in_orders -= pays.amount + margin_fee.amount;
          if( collateral_freed.valid() )
             b.total_core_in_orders -= collateral_freed->amount;
       });
