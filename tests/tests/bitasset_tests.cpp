@@ -1418,13 +1418,6 @@ int num_call_orders_on_books( graphene::chain::database& db )
    const auto& call_index = db.get_index_type<call_order_index>().indices().get<by_collateral>();
    int count = 0;
    std::for_each( call_index.begin(), call_index.end(), [&count](const call_order_object& obj) {
-      std::stringstream output;
-      output << "Call order: " << obj.id.number
-            << " is for " << obj.get_collateral().amount.value << " of asset id " << obj.get_collateral().asset_id.instance.value
-            << " which is collateralizing a debt of " << obj.get_debt().amount.value << " of asset id " << obj.get_debt().asset_id.instance.value
-            << "\n   Execution price is " << obj.call_price.base.amount.value << " of asset " << obj.call_price.base.asset_id.instance.value
-            << " versus " << obj.call_price.quote.amount.value << " of asset " << obj.call_price.quote.asset_id.instance.value;
-      BOOST_TEST_MESSAGE( output.str() );
       count++; 
    }); 
    return count;  
@@ -1697,8 +1690,8 @@ BOOST_AUTO_TEST_CASE( bsip74_feed_price_test )
             fc::time_point_sec::maximum(), 
             price( asset(100, my_asset_id), asset(100, core_id ) ) );
       BOOST_TEST_MESSAGE("Bob buys all JMJCOIN on the book");
-      create_sell_order( bob_id, asset(190 * prec, core_id), asset(190 * prec, my_asset_id), fc::time_point_sec::maximum(),
-            price( asset(100, my_asset_id), asset(100, core_id ) ) );     
+      create_sell_order( bob_id, asset(190 * prec, core_id), asset(190 * prec, my_asset_id), 
+            fc::time_point_sec::maximum(), price( asset(100, my_asset_id), asset(100, core_id ) ) );     
       // now alice holds only core, but has debt in JMJCOIN
       BOOST_CHECK_EQUAL( get_balance(alice, my_asset_id(db) ), 0 );
       // and bob holds core and JMJCOIN 19000 market fee
@@ -1807,7 +1800,7 @@ BOOST_AUTO_TEST_CASE( bsip74_limit_price_test )
    }
    {
       BOOST_TEST_MESSAGE("Create valid feeds");
-      publish_feed_jmjcoin( *this, price( asset( 100, my_asset_id ), asset( 100, core_id ) ), feeder1, feeder2, feeder3);
+      publish_feed_jmjcoin( *this, price( asset(100, my_asset_id), asset(100, core_id) ), feeder1, feeder2, feeder3);
       BOOST_TEST_MESSAGE( "Starting MSSR is: " + fc::json::to_pretty_string( my_asset.bitasset_data(db)
             .current_feed.max_short_squeeze_price()));
    }
@@ -1827,7 +1820,7 @@ BOOST_AUTO_TEST_CASE( bsip74_limit_price_test )
             price( asset(100, my_asset_id), asset(100, core_id ) ) );
       expected_core_balance_charlie += 95 * prec; // 95 sold gives charlie 95 core
       BOOST_TEST_MESSAGE("Bob buys all JMJCOIN on the book");
-      create_sell_order( bob_id, asset(190 * prec, core_id), asset(190 * prec, my_asset_id), fc::time_point_sec::maximum(),
+      create_sell_order( bob_id, asset(190*prec, core_id), asset(190*prec, my_asset_id), fc::time_point_sec::maximum(),
             price( asset(100, my_asset_id), asset(100, core_id ) ) );     
       expected_core_balance_bob -= 190 * prec; // 190 JMJCoin bought for 190 CORE
    }
@@ -1977,7 +1970,7 @@ BOOST_AUTO_TEST_CASE( bsip74_insufficient_collateral_test )
             fc::time_point_sec::maximum(), 
             price( asset(100, my_asset_id), asset(100, core_id ) ) );
       BOOST_TEST_MESSAGE("Bob buys all JMJCOIN on the book");
-      create_sell_order( bob_id, asset(190 * prec, core_id), asset(190 * prec, my_asset_id), fc::time_point_sec::maximum(),
+      create_sell_order( bob_id, asset(190*prec, core_id), asset(190*prec, my_asset_id), fc::time_point_sec::maximum(),
             price( asset(100, my_asset_id), asset(100, core_id ) ) );     
       // now alice holds only core, but has debt in JMJCOIN
       BOOST_CHECK_EQUAL( get_balance(alice, my_asset_id(db) ), 0 );
