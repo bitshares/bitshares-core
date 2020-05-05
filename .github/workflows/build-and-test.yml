@@ -42,6 +42,7 @@ jobs:
       run: |
         mkdir -p _build
         pushd _build
+        export -n BOOST_ROOT BOOST_INCLUDEDIR BOOST_LIBRARYDIR
         cmake -D CMAKE_BUILD_TYPE=Release \
               -D CMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON \
               -D CMAKE_C_COMPILER=gcc \
@@ -68,7 +69,7 @@ jobs:
         _build/tests/app_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/es_test
+        _build/tests/es_test
     - name: Node-Test
       run: |
         pushd _build
@@ -105,6 +106,7 @@ jobs:
       run: |
         mkdir -p _build
         pushd _build
+        export -n BOOST_ROOT BOOST_INCLUDEDIR BOOST_LIBRARYDIR
         cmake -D CMAKE_BUILD_TYPE=Debug \
               -D CMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON \
               -D CMAKE_C_COMPILER=gcc \
@@ -131,7 +133,7 @@ jobs:
         _build/tests/app_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/es_test
+        _build/tests/es_test
     - name: Node-Test
       run: |
         pushd _build
