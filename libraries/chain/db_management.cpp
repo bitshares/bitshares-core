@@ -30,8 +30,7 @@
 #include <graphene/chain/operation_history_object.hpp>
 
 #include <graphene/protocol/fee_schedule.hpp>
-
-#include <fc/io/fstream.hpp>
+#include <graphene/utilities/file_util.hpp>
 
 #include <fstream>
 #include <functional>
@@ -182,15 +181,16 @@ void database::open(
          wipe_object_db = true;
       else
       {
-         std::string version_string;
-         fc::read_file_contents( data_dir / "db_version", version_string );
+         std::string version_string = graphene::utilities::read_file_contents( (data_dir / "db_version").string() );
          wipe_object_db = ( version_string != db_version );
       }
       if( wipe_object_db ) {
           ilog("Wiping object_database due to missing or wrong version");
           object_database::wipe( data_dir );
-          std::ofstream version_file( (data_dir / "db_version").generic_string().c_str(),
-                                      std::ios::out | std::ios::binary | std::ios::trunc );
+          std::ofstream version_file( (data_dir / "db_version").generic_string(),
+                                      std::ios::binary | std::ios::trunc );
+          FC_ASSERT( !version_file.fail() && !version_file.bad(), "Failed to open file '${f}'",
+                     ("f",(data_dir / "db_version").string()) );
           version_file.write( db_version.c_str(), db_version.size() );
           version_file.close();
       }

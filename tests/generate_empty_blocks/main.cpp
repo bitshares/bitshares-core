@@ -27,12 +27,12 @@
 #include <iostream>
 #include <iterator>
 
-#include <fc/io/fstream.hpp>
 #include <fc/io/json.hpp>
 #include <fc/io/stdio.hpp>
 
 #include <graphene/app/api.hpp>
 #include <graphene/egenesis/egenesis.hpp>
+#include <graphene/utilities/file_util.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 
 #include <boost/filesystem.hpp>
@@ -61,7 +61,7 @@ int main( int argc, char** argv )
       cli_options.add_options()
             ("help,h", "Print this help message and exit.")
             ("data-dir", bpo::value<boost::filesystem::path>()->default_value("empty_blocks_data_dir"), "Directory containing generator database")
-            ("genesis-json,g", bpo::value<boost::filesystem::path>(), "File to read genesis state from")
+            ("genesis-json,g", bpo::value<std::string>(), "File to read genesis state from")
             ("genesis-time,t", bpo::value<uint32_t>()->default_value(0), "Timestamp for genesis state (0=use value from file/example)")
             ("num-blocks,n", bpo::value<uint32_t>()->default_value(1000000), "Number of blocks to generate")
             ("miss-rate,r", bpo::value<uint32_t>()->default_value(3), "Percentage of blocks to miss")
@@ -96,10 +96,9 @@ int main( int argc, char** argv )
       genesis_state_type genesis;
       if( options.count("genesis-json") )
       {
-         fc::path genesis_json_filename = options["genesis-json"].as<boost::filesystem::path>();
-         std::cerr << "embed_genesis:  Reading genesis from file " << genesis_json_filename.preferred_string() << "\n";
-         std::string genesis_json;
-         read_file_contents( genesis_json_filename, genesis_json );
+         std::string genesis_json_filename = options["genesis-json"].as<std::string>();
+         std::cerr << "generate_empty_blocks:  Reading genesis from file " << genesis_json_filename << "\n";
+         std::string genesis_json = graphene::utilities::read_file_contents( genesis_json_filename );
          genesis = fc::json::from_string( genesis_json ).as< genesis_state_type >(20);
       }
       else

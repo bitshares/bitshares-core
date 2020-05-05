@@ -36,11 +36,11 @@
 #include <graphene/net/core_messages.hpp>
 #include <graphene/net/exceptions.hpp>
 
+#include <graphene/utilities/file_util.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
 
 #include <fc/asio.hpp>
-#include <fc/io/fstream.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/network/resolve.hpp>
@@ -392,8 +392,8 @@ void application_impl::startup()
       ilog("Initializing database...");
       if( _options->count("genesis-json") )
       {
-         std::string genesis_str;
-         fc::read_file_contents( _options->at("genesis-json").as<boost::filesystem::path>(), genesis_str );
+         const std::string genesis_file = _options->at("genesis-json").as<std::string>();
+         std::string genesis_str = graphene::utilities::read_file_contents( genesis_file );
          graphene::chain::genesis_state_type genesis = fc::json::from_string( genesis_str ).as<graphene::chain::genesis_state_type>( 20 );
          bool modified_genesis = false;
          if( _options->count("genesis-timestamp") )
@@ -1039,7 +1039,7 @@ void application::set_program_options(boost::program_options::options_descriptio
           "Endpoint for TLS websocket RPC to listen on")
          ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"), "The TLS certificate file for this server")
          ("server-pem-password,P", bpo::value<string>()->implicit_value(""), "Password for this certificate")
-         ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
+         ("genesis-json", bpo::value<std::string>(), "File to read Genesis State from")
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads, default to 0 for auto-configuration")

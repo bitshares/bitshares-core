@@ -28,16 +28,20 @@
 #include <fc/popcount.hpp>
 #include <fc/git_revision.hpp>
 #include <fc/thread/scoped_lock.hpp>
-#include <fc/io/fstream.hpp>
 
 #include <graphene/wallet/wallet.hpp>
 #include "wallet_api_impl.hpp"
+
+#include <graphene/utilities/file_util.hpp>
 #include <graphene/utilities/git_revision.hpp>
 
 #ifndef WIN32
 # include <sys/types.h>
 # include <sys/stat.h>
 #endif
+
+#include <fstream>
+#include <ios>
 
 // explicit instantiation for later use
 namespace fc {
@@ -440,16 +444,16 @@ namespace graphene { namespace wallet { namespace detail {
          // http://en.wikipedia.org/wiki/Most_vexing_parse
          //
          std::string tmp_wallet_filename = wallet_filename + ".tmp";
-         fc::ofstream outfile{ fc::path( tmp_wallet_filename ) };
+         std::ofstream outfile( tmp_wallet_filename, std::ios_base::trunc );
+         FC_ASSERT( !outfile.fail() && !outfile.bad(), "Failed to open file '${f}'",
+                    ("f",tmp_wallet_filename) );
          outfile.write( data.c_str(), data.length() );
          outfile.flush();
          outfile.close();
 
          wlog( "saved successfully wallet to tmp file ${fn}", ("fn", tmp_wallet_filename) );
 
-         std::string wallet_file_content;
-         fc::read_file_contents(tmp_wallet_filename, wallet_file_content);
-
+         std::string wallet_file_content = graphene::utilities::read_file_contents( tmp_wallet_filename );
          if (wallet_file_content == data) {
             wlog( "validated successfully tmp wallet file ${fn}", ("fn", tmp_wallet_filename) );
 
