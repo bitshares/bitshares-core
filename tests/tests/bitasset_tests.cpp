@@ -927,7 +927,7 @@ BOOST_AUTO_TEST_CASE( hf_1270_test )
    generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
    generate_block( skip );
 
-   for( int i = 0; i < 8; ++i )
+   for( int i = 0; i < 10; ++i )
    {
       idump( (i) );
       int blocks = 0;
@@ -942,6 +942,10 @@ BOOST_AUTO_TEST_CASE( hf_1270_test )
       {
          generate_blocks( HARDFORK_CORE_1270_TIME - mi, true, skip );
          generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
+      }
+      else if( i == 8 ) // go beyond hard fork BSIP77
+      {
+         generate_blocks( HARDFORK_BSIP_77_TIME, true, skip );
       }
       set_expiration( db, trx );
 
