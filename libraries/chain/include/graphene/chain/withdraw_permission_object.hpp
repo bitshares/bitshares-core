@@ -44,8 +44,8 @@ namespace graphene { namespace chain {
   class withdraw_permission_object : public graphene::db::abstract_object<withdraw_permission_object>
   {
      public:
-        static const uint8_t space_id = protocol_ids;
-        static const uint8_t type_id  = withdraw_permission_object_type;
+        static constexpr uint8_t space_id = protocol_ids;
+        static constexpr uint8_t type_id  = withdraw_permission_object_type;
 
         /// The account authorizing @ref authorized_account to withdraw from it
         account_id_type    withdraw_from_account;

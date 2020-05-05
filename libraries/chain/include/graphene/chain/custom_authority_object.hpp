@@ -42,8 +42,8 @@ namespace graphene { namespace chain {
       mutable optional<restriction_predicate_function> predicate_cache;
 
    public:
-      static const uint8_t space_id = protocol_ids;
-      static const uint8_t type_id = custom_authority_object_type;
+      static constexpr uint8_t space_id = protocol_ids;
+      static constexpr uint8_t type_id = custom_authority_object_type;
 
       account_id_type account;
       bool enabled;

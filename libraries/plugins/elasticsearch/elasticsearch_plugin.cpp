@@ -588,7 +588,12 @@ vector<operation_history_object> elasticsearch_plugin::get_account_history(
    variant variant_response = fc::json::from_string(response);
    
    const auto hits = variant_response["hits"]["total"];
-   const auto size = std::min(static_cast<uint32_t>(hits.as_uint64()), limit);
+   uint32_t size;
+   if( hits.is_object() ) // ES-7 ?
+      size = static_cast<uint32_t>(hits["value"].as_uint64());
+   else // probably ES-6
+      size = static_cast<uint32_t>(hits.as_uint64());
+   size = std::min( size, limit );
 
    for(unsigned i=0; i<size; i++)
    {
