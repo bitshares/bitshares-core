@@ -56,7 +56,16 @@ namespace detail {
       }
    }
 
-   void check_asset_claim_fees_hardfork_87_74_collatfee(const fc::time_point_sec& block_time, const asset_claim_fees_operation& op)
+   void check_asset_options_hf_bsip87(const fc::time_point_sec& block_time, const asset_options& options)
+   {
+      // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
+      FC_ASSERT( !options.extensions.value.force_settle_fee_percent.valid()
+                 || block_time >= HARDFORK_CORE_BSIP87_TIME,
+                 "A BitAsset's FSFP cannot be set before Hardfork BSIP87" );
+   }
+
+   void check_asset_claim_fees_hardfork_87_74_collatfee(const fc::time_point_sec& block_time,
+                                                        const asset_claim_fees_operation& op)
    {
       // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
       FC_ASSERT( !op.extensions.value.claim_from_asset_id.valid() ||
@@ -70,12 +79,16 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 { try {
 
    const database& d = db();
+   const time_point_sec now = d.head_block_time();
+
+   // Hardfork Checks:
+   detail::check_asset_options_hf_1774(now, op.common_options);
+   detail::check_asset_options_hf_bsip81(now, op.common_options);
+   detail::check_asset_options_hf_bsip87(now, op.common_options); // HF_REMOVABLE
 
    const auto& chain_parameters = d.get_global_properties().parameters;
    FC_ASSERT( op.common_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    FC_ASSERT( op.common_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
-
-   detail::check_asset_options_hf_1774(d.head_block_time(), op.common_options);
 
    // Check that all authorities do exist
    for( auto id : op.common_options.whitelist_authorities )
@@ -87,8 +100,6 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    auto asset_symbol_itr = asset_indx.find( op.symbol );
    FC_ASSERT( asset_symbol_itr == asset_indx.end() );
 
-   // Define now from the current block time
-   const time_point_sec now = d.head_block_time();
    // This must remain due to "BOND.CNY" being allowed before this HF
    if( now > HARDFORK_385_TIME )
    {
@@ -123,18 +134,11 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
                  op.bitasset_opts->force_settlement_delay_sec > chain_parameters.block_interval );
    }
 
-   FC_ASSERT( d.head_block_time() >= HARDFORK_CORE_BSIP87_TIME
-              || !op.common_options.extensions.value.force_settle_fee_percent.valid(),
-              "A BitAsset's FSFP cannot be set before Hardfork BSIP87" );
-
    if( op.is_prediction_market )
    {
       FC_ASSERT( op.bitasset_opts );
       FC_ASSERT( op.precision == op.bitasset_opts->short_backing_asset(d).precision );
    }
-
-   // Check the taker fee percent
-   detail::check_asset_options_hf_bsip81(now, op.common_options);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -299,6 +303,11 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    const database& d = db();
    const time_point_sec now = d.head_block_time();
 
+   // Hardfork Checks:
+   detail::check_asset_options_hf_1774(now, o.new_options);
+   detail::check_asset_options_hf_bsip81(now, o.new_options);
+   detail::check_asset_options_hf_bsip87(now, o.new_options); // HF_REMOVABLE
+
    const asset_object& a = o.asset_to_update(d);
    auto a_copy = a;
    a_copy.options = o.new_options;
@@ -310,8 +319,6 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
                  "Since Hardfork #199, updating issuer requires the use of asset_update_issuer_operation.");
       validate_new_issuer( d, a, *o.new_issuer );
    }
-
-   detail::check_asset_options_hf_1774(d.head_block_time(), o.new_options);
 
    if( a.dynamic_asset_data_id(d).current_supply != 0 )
    {
@@ -329,10 +336,6 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
               "Incorrect issuer for asset! (${o.issuer} != ${a.issuer})",
               ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
-   FC_ASSERT( d.head_block_time() >= HARDFORK_CORE_BSIP87_TIME
-              || !o.new_options.extensions.value.force_settle_fee_percent.valid(),
-              "A BitAsset's FSFP cannot be set before Hardfork BSIP87" );
-
    const auto& chain_parameters = d.get_global_properties().parameters;
 
    FC_ASSERT( o.new_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
@@ -341,9 +344,6 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    FC_ASSERT( o.new_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    for( auto id : o.new_options.blacklist_authorities )
       d.get_object(id);
-
-   // Check the taker fee percent
-   detail::check_asset_options_hf_bsip81(now, o.new_options);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }

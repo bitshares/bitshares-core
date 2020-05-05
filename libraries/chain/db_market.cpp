@@ -1011,9 +1011,6 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
 
    auto total_collateral_denominated_fees = market_fees + force_settle_fees;
 
-   // TODO: Do we need a something-for-nothing check here? Or does rounding guarantee fees
-   // strictly less than receives?
-
    // If we don't consume entire settle order:
    if( pays < settle.balance )
    {
@@ -1027,7 +1024,8 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
    adjust_balance(settle.owner, receives - total_collateral_denominated_fees);
 
    assert( pays.asset_id != receives.asset_id );
-   push_applied_operation( fill_order_operation( settle.id, settle.owner, pays, receives, total_collateral_denominated_fees, fill_price, is_maker ) );
+   push_applied_operation( fill_order_operation( settle.id, settle.owner, pays, receives,
+                                                 total_collateral_denominated_fees, fill_price, is_maker ) );
 
    if (filled)
       remove(settle);
@@ -1401,7 +1399,7 @@ asset database::pay_market_fees(const account_object* seller, const asset_object
 
 /***
  * @brief Calculate force-settlement fee and give it to issuer of the settled asset
- * @param collecting_asset the smart asset object which should receive the the fee
+ * @param collecting_asset the smart asset object which should receive the fee
  * @param collat_receives the amount of collateral the settler would expect to receive absent this fee
  *     (fee is computed as a percentage of this amount)
  * @return asset denoting the amount of fee collected
@@ -1414,7 +1412,9 @@ asset database::pay_force_settle_fees(const asset_object& collecting_asset, cons
    if( !collecting_asset.options.extensions.value.force_settle_fee_percent.valid()
          || *collecting_asset.options.extensions.value.force_settle_fee_percent == 0 )
       return collat_asset.amount(0);
-   auto value = detail::calculate_percent(collat_receives.amount, *collecting_asset.options.extensions.value.force_settle_fee_percent);
+
+   auto value = detail::calculate_percent(collat_receives.amount,
+                                          *collecting_asset.options.extensions.value.force_settle_fee_percent);
    asset settle_fee = collat_asset.amount(value);
 
    // Deposit fee in asset's dynamic data object:
