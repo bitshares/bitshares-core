@@ -69,7 +69,7 @@ jobs:
         _build/tests/app_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/es_test
+        _build/tests/es_test
     - name: Node-Test
       run: |
         pushd _build
@@ -133,7 +133,7 @@ jobs:
         _build/tests/app_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/es_test
+        _build/tests/es_test
     - name: Node-Test
       run: |
         pushd _build
