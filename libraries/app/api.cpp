@@ -688,19 +688,61 @@ namespace graphene { namespace app {
 
    // custom operations api
    vector<account_storage_object> custom_operations_api::get_storage_info(std::string account_id_or_name,
-         std::string catalog)const
+         optional<std::string> catalog, optional<account_storage_id_type> start, optional<uint32_t> limit)const
    {
       auto plugin = _app.get_plugin<graphene::custom_operations::custom_operations_plugin>("custom_operations");
       FC_ASSERT( plugin );
+      uint64_t api_limit_get_storage_info = _app.get_options().api_limit_get_storage_info;
+
+      uint32_t limit_ = api_limit_get_storage_info;
+      if(limit.valid())
+         limit_ = *limit;
+      FC_ASSERT( limit_ <= api_limit_get_storage_info );
+
+      account_storage_id_type start_ = account_storage_id_type(0);
+      if(start.valid())
+         start_ = *start;
 
       const auto account_id = database_api.get_account_id_from_string(account_id_or_name);
       vector<account_storage_object> results;
+
       const auto& storage_index = _app.chain_database()->get_index_type<account_storage_index>();
-      const auto& by_account_catalog_idx = storage_index.indices().get<by_account_catalog>();
-      auto itr = by_account_catalog_idx.lower_bound(make_tuple(account_id, catalog));
-      while(itr != by_account_catalog_idx.end() && itr->account == account_id && itr->catalog == catalog) {
-         results.push_back(*itr);
-         ++itr;
+      if(catalog.valid()) {
+         const auto &by_account_catalog_idx = storage_index.indices().get<by_account_catalog>();
+         auto itr = by_account_catalog_idx.lower_bound(make_tuple(account_id, *catalog, start_));
+         while (itr != by_account_catalog_idx.end() && itr->account == account_id && itr->catalog == *catalog &&
+                results.size() < limit_) {
+            results.push_back(*itr);
+            ++itr;
+         }
+      }
+      else {
+         const auto &by_id_idx = storage_index.indices().get<by_custom_account>();
+         auto itr = by_id_idx.lower_bound(make_tuple(account_id, start_));
+         while (itr != by_id_idx.end() && itr->account == account_id && results.size() < limit_) {
+            results.push_back(*itr);
+            ++itr;
+         }
+      }
+      return results;
+   }
+
+   vector<std::string> custom_operations_api::get_catalogs(std::string start, uint32_t limit) const
+   {
+      auto plugin = _app.get_plugin<graphene::custom_operations::custom_operations_plugin>("custom_operations");
+      FC_ASSERT( plugin );
+      uint64_t api_limit_get_catalogs = _app.get_options().api_limit_get_catalogs;
+      FC_ASSERT( limit <= api_limit_get_catalogs );
+
+      vector<std::string> results;
+      const auto& storage_index = _app.chain_database()->get_index_type<account_storage_index>();
+      const auto &by_catalog_idx = storage_index.indices().get<by_catalog>();
+
+      auto itr_start = by_catalog_idx.lower_bound(start);
+      for (auto itr = itr_start; itr != by_catalog_idx.end();) {
+         results.push_back(itr->catalog);
+         if(results.size() >= limit) break;
+         itr = by_catalog_idx.upper_bound(itr->catalog);
       }
       return results;
    }

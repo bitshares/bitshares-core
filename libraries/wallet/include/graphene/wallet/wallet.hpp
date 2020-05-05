@@ -1746,11 +1746,15 @@ class wallet_api
        * @ref account_list_accounts will be returned.
        *
        * @param account Account ID or name to get contact data from.
-       * @param catalog The catalog to retrieve.
+       * @param catalog Optional catalog to retrieve or use all if not present.
+       * @param start Optional ID to get started for pagination purposes
+       * @param limit Optional number of results to get
        *
        * @return An \c account_storage_object or empty.
        */
-      vector<account_storage_object> get_account_storage(string account, string catalog);
+      vector<account_storage_object> get_account_storage(string account, optional<string> catalog = optional<std::string>(),
+            optional<account_storage_id_type> start = optional<account_storage_id_type>(account_storage_id_type(0)),
+	    optional<uint32_t> limit = 100);
 
 };
 
