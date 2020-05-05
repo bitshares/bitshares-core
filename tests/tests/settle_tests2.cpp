@@ -887,4 +887,79 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
       FC_LOG_AND_RETHROW()
    }
 
+
+   /**
+    * Attempt to claim invalid fees
+    */
+   BOOST_AUTO_TEST_CASE(force_settle_fee_invalid_claims_test) {
+      try {
+         INVOKE(force_settle_fee_1_test);
+
+         GET_ACTOR(assetowner);
+
+         // Check the asset owner's accumulated asset fees
+         const auto &core = asset_id_type()(db);
+         const asset_object& bitusd = get_asset("USDBIT");
+         BOOST_CHECK(bitusd.dynamic_asset_data_id(db).accumulated_fees == 0);
+         BOOST_CHECK(bitusd.dynamic_asset_data_id(db).accumulated_collateral_fees > 0);
+         share_type rachel_fsf_fee_core = bitusd.dynamic_asset_data_id(db).accumulated_collateral_fees;
+
+         // Attempt to claim negative fees
+         trx.clear();
+         asset_claim_fees_operation claim_op;
+         claim_op.issuer = assetowner.id;
+         claim_op.extensions.value.claim_from_asset_id = bitusd.id;
+         claim_op.amount_to_claim = core.amount(-5 * std::pow(10, core.precision));
+         trx.operations.push_back(claim_op);
+         set_expiration(db, trx);
+         sign(trx, assetowner_private_key);
+         REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "amount_to_claim.amount > 0");
+
+         // Attempt to claim excessive claim fee
+         trx.clear();
+         claim_op = asset_claim_fees_operation();
+         claim_op.issuer = assetowner.id;
+         claim_op.extensions.value.claim_from_asset_id = bitusd.id;
+         claim_op.amount_to_claim = rachel_fsf_fee_core + 1;
+         trx.operations.push_back(claim_op);
+         set_expiration(db, trx);
+         sign(trx, assetowner_private_key);
+         REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "Attempt to claim more collateral fees");
+
+         // Attempt to claim with an invalid asset asset type
+         trx.clear();
+         ACTOR(jill);
+         price price(asset(1, asset_id_type(1)), asset(1));
+         uint16_t market_fee_percent = 20 * GRAPHENE_1_PERCENT;
+         create_user_issued_asset("JCOIN", jill, charge_market_fee, price, 2, market_fee_percent);
+         generate_block(); trx.clear(); set_expiration(db, trx);
+         const asset_object& jillcoin = get_asset("JCOIN");
+
+         trx.clear();
+         claim_op = asset_claim_fees_operation();
+         claim_op.issuer = assetowner.id;
+         claim_op.extensions.value.claim_from_asset_id = bitusd.id;
+         claim_op.amount_to_claim = jillcoin.amount(rachel_fsf_fee_core.value);
+         trx.operations.push_back(claim_op);
+         set_expiration(db, trx);
+         sign(trx, assetowner_private_key);
+         REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "is not backed by asset");
+
+         // Attempt to claim all that can be claimed
+         trx.clear();
+         claim_op = asset_claim_fees_operation();
+         claim_op.issuer = assetowner.id;
+         claim_op.extensions.value.claim_from_asset_id = bitusd.id;
+         claim_op.amount_to_claim = rachel_fsf_fee_core;
+         trx.operations.push_back(claim_op);
+         set_expiration(db, trx);
+         sign(trx, assetowner_private_key);
+         PUSH_TX(db, trx);
+         BOOST_CHECK(bitusd.dynamic_asset_data_id(db).accumulated_collateral_fees == 0);
+
+      }
+      FC_LOG_AND_RETHROW()
+   }
+
+
 BOOST_AUTO_TEST_SUITE_END()
