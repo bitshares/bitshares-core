@@ -530,6 +530,7 @@ void database_fixture::verify_asset_supplies( const database& db )
       {
          const auto& bad = asset_obj.bitasset_data(db);
          total_balances[bad.options.short_backing_asset] += bad.settlement_fund;
+         total_balances[bad.options.short_backing_asset] += dasset_obj.accumulated_collateral_fees;
       }
       total_balances[asset_obj.id] += dasset_obj.confidential_supply.value;
    }
@@ -1493,6 +1494,12 @@ flat_map< uint64_t, graphene::chain::fee_parameters > database_fixture::get_htlc
    extend_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    extend_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    ret_val[((operation)htlc_extend_operation()).which()] = extend_param;
+
+   // set the transfer kb fee to something other than default, to verify we're looking
+   // at the correct fee
+   transfer_operation::fee_parameters_type transfer_param;
+   transfer_param.price_per_kbyte *= 2;
+   ret_val[ ((operation)transfer_operation()).which() ] = transfer_param;
 
    return ret_val;
 }

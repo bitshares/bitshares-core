@@ -74,7 +74,7 @@ BOOST_AUTO_TEST_CASE( hardfork_time_test )
       cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
       cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
       committee_member_update_global_parameters_operation cmuop;
-      cmuop.new_parameters.extensions.value.market_fee_network_percent = 10001; // 100.01%
+      cmuop.new_parameters.extensions.value.market_fee_network_percent = 3001; // 30.01%
       cop.proposed_ops.emplace_back(cmuop);
       trx.operations.push_back(cop);
 

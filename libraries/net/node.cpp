@@ -30,6 +30,7 @@
 #include <iostream>
 #include <algorithm>
 #include <tuple>
+#include <string>
 #include <boost/tuple/tuple.hpp>
 #include <boost/circular_buffer.hpp>
 
@@ -70,6 +71,7 @@
 #include <fc/crypto/rand.hpp>
 #include <fc/network/rate_limiting.hpp>
 #include <fc/network/ip.hpp>
+#include <fc/network/resolve.hpp>
 
 #include <graphene/net/node.hpp>
 #include <graphene/net/peer_database.hpp>
@@ -480,6 +482,43 @@ namespace graphene { namespace net { namespace detail {
       //if( _retrigger_connect_loop_promise )
       //  _retrigger_connect_loop_promise->set_value();
     }
+
+   void node_impl::update_seed_nodes_task()
+   {
+      VERIFY_CORRECT_THREAD();
+
+      try
+      {
+         dlog("Starting an iteration of update_seed_nodes loop.");
+         for( const std::string& endpoint_string : _seed_nodes )
+         {
+            resolve_seed_node_and_add( endpoint_string );
+         }
+         dlog("Done an iteration of update_seed_nodes loop.");
+      }
+      catch (const fc::canceled_exception&)
+      {
+        throw;
+      }
+      FC_CAPTURE_AND_LOG( (_seed_nodes) )
+
+      schedule_next_update_seed_nodes_task();
+   }
+
+   void node_impl::schedule_next_update_seed_nodes_task()
+   {
+      VERIFY_CORRECT_THREAD();
+
+      if( _node_is_shutting_down )
+         return;
+
+      if( _update_seed_nodes_loop_done.valid() && _update_seed_nodes_loop_done.canceled() )
+         return;
+
+      _update_seed_nodes_loop_done = fc::schedule( [this]() { update_seed_nodes_task(); },
+                                                   fc::time_point::now() + fc::hours(3),
+                                                   "update_seed_nodes_loop" );
+   }
 
     bool node_impl::have_already_received_sync_item( const item_hash_t& item_hash )
     {
@@ -3762,6 +3801,20 @@ namespace graphene { namespace net { namespace detail {
 
       try
       {
+        _update_seed_nodes_loop_done.cancel_and_wait("node_impl::close()");
+        dlog("Update seed nodes loop terminated");
+      }
+      catch ( const fc::exception& e )
+      {
+        wlog( "Exception thrown while terminating Update seed nodes loop, ignoring: ${e}", ("e", e) );
+      }
+      catch (...)
+      {
+        wlog( "Exception thrown while terminating Update seed nodes loop, ignoring" );
+      }
+
+      try
+      {
         _bandwidth_monitor_loop_done.cancel_and_wait("node_impl::close()");
         dlog("Bandwidth monitor loop terminated");
       }
@@ -4164,6 +4217,7 @@ namespace graphene { namespace net { namespace detail {
 
       assert(!_accept_loop_complete.valid() &&
              !_p2p_network_connect_loop_done.valid() &&
+             !_update_seed_nodes_loop_done.valid() &&
              !_fetch_sync_items_loop_done.valid() &&
              !_fetch_item_loop_done.valid() &&
              !_advertise_inventory_loop_done.valid() &&
@@ -4181,6 +4235,7 @@ namespace graphene { namespace net { namespace detail {
       _fetch_updated_peer_lists_loop_done = fc::async([=](){ fetch_updated_peer_lists_loop(); }, "fetch_updated_peer_lists_loop");
       _bandwidth_monitor_loop_done = fc::async([=](){ bandwidth_monitor_loop(); }, "bandwidth_monitor_loop");
       _dump_node_status_task_done = fc::async([=](){ dump_node_status_task(); }, "dump_node_status_task");
+      schedule_next_update_seed_nodes_task();
     }
 
     void node_impl::add_node(const fc::ip::endpoint& ep)
@@ -4197,6 +4252,33 @@ namespace graphene { namespace net { namespace detail {
       _potential_peer_db.update_entry(updated_peer_record);
       trigger_p2p_network_connect_loop();
     }
+
+   void node_impl::add_seed_node(const std::string& endpoint_string)
+   {
+      VERIFY_CORRECT_THREAD();
+      _seed_nodes.insert( endpoint_string );
+      resolve_seed_node_and_add( endpoint_string );
+   }
+
+   void node_impl::resolve_seed_node_and_add(const std::string& endpoint_string)
+   {
+      VERIFY_CORRECT_THREAD();
+      std::vector<fc::ip::endpoint> endpoints;
+      ilog("Resolving seed node ${endpoint}", ("endpoint", endpoint_string));
+      try
+      {
+         endpoints = graphene::net::node::resolve_string_to_ip_endpoints(endpoint_string);
+      }
+      catch(...)
+      {
+         wlog( "Unable to resolve endpoint during attempt to add seed node ${ep}", ("ep", endpoint_string) );
+      }
+      for (const fc::ip::endpoint& endpoint : endpoints)
+      {
+         ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
+         add_node(endpoint);
+      }
+   }
 
     void node_impl::initiate_connect_to(const peer_connection_ptr& new_peer)
     {
@@ -5103,5 +5185,53 @@ namespace graphene { namespace net { namespace detail {
 #undef INVOKE_AND_COLLECT_STATISTICS
 
   } // end namespace detail
+
+   // TODO move this function to impl class
+   std::vector<fc::ip::endpoint> node::resolve_string_to_ip_endpoints(const std::string& in)
+   {
+      try
+      {
+         std::string::size_type colon_pos = in.find(':');
+         if (colon_pos == std::string::npos)
+            FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
+                  ("endpoint_string", in));
+         std::string port_string = in.substr(colon_pos + 1);
+         try
+         {
+            uint16_t port = boost::lexical_cast<uint16_t>(port_string);
+
+            std::string hostname = in.substr(0, colon_pos);
+            std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
+            if (endpoints.empty())
+               FC_THROW_EXCEPTION( fc::unknown_host_exception,
+                     "The host name can not be resolved: ${hostname}",
+                     ("hostname", hostname) );
+            return endpoints;
+         }
+         catch (const boost::bad_lexical_cast&)
+         {
+            FC_THROW("Bad port: ${port}", ("port", port_string));
+         }
+      }
+      FC_CAPTURE_AND_RETHROW((in))
+   }
+
+   void node::add_seed_nodes(std::vector<std::string> seeds)
+   {
+      for(const std::string& endpoint_string : seeds )
+      {
+         try {
+            add_seed_node(endpoint_string);
+         } catch( const fc::exception& e ) {
+            wlog( "caught exception ${e} while adding seed node ${endpoint}",
+                  ("e", e.to_detail_string())("endpoint", endpoint_string) );
+         }
+      }
+   }
+
+   void node::add_seed_node(const std::string& in)
+   {
+      INVOKE_IN_IMPL(add_seed_node, in);
+   }
 
 } } // end namespace graphene::net
