@@ -962,4 +962,143 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
    }
 
 
+   /**
+    * Test 100% force settlement fee.
+    *
+    * There are two primary actors: paul, rachel
+    *
+    * 1. Asset owner creates the smart coin called bitUSD
+    * 2. The feed price is 1 satoshi bitUSD for 20 satoshi Core = 0.01 bitUSD for 0.00020 Core = 50 bitUSD for 1 Core
+    * 3. Paul borrows 100 bitUSD (10000 satoshis of bitUSD) from the blockchain with a low amount of collateral
+    * 4. Paul gives Rachel 20 bitUSD
+    * 5. Rachel force-settles 2 bitUSD which should be collected from Paul's debt position
+    * because of its relatively lower collateral ratio
+    *
+    * The force-settlement by Rachel should account for both the force-settlement offset fee,
+    * and the new force settlement fee from BSIP87.
+    */
+   BOOST_AUTO_TEST_CASE(force_settle_fee_extreme_1_test) {
+      try {
+         ///////
+         // Initialize the scenario
+         ///////
+         // Advance to the when the force-settlement fee activates
+         generate_blocks(HARDFORK_CORE_BSIP87_TIME);
+         generate_block();
+         set_expiration(db, trx);
+         trx.clear();
+
+         // Create actors
+         ACTORS((assetowner)(feedproducer)(paul)(rachel));
+
+         // Fund actors
+         uint64_t initial_balance_core = 10000000;
+         transfer(committee_account, assetowner.id, asset(initial_balance_core));
+         transfer(committee_account, feedproducer.id, asset(initial_balance_core));
+         transfer(committee_account, paul.id, asset(initial_balance_core));
+
+         // 1. Create assets
+         const uint16_t usd_fso_percent = 5 * GRAPHENE_1_PERCENT; // 5% Force-settlement offset fee %
+         const uint16_t usd_fsf_percent = 100 * GRAPHENE_1_PERCENT; // 100% Force-settlement fee % (BSIP87)
+         create_smart_asset("USDBIT", assetowner.id, usd_fso_percent, usd_fsf_percent);
+
+         generate_block();
+         set_expiration(db, trx);
+         trx.clear();
+
+         const auto &bitusd = get_asset("USDBIT");
+         const auto &core = asset_id_type()(db);
+
+
+         ///////
+         // 2. Publish a feed for the smart asset
+         ///////
+         update_feed_producers(bitusd.id, {feedproducer_id});
+         price_feed current_feed;
+         current_feed.maintenance_collateral_ratio = 1750;
+         current_feed.maximum_short_squeeze_ratio = 1100;
+         // Requirement of 20x collateral in satoshis: 1 satoshi bitUSD for 20 satoshi Core
+         // -> 0.01 bitUSD for 0.00020 Core = 100 bitUSD for 2 Core = 50 bitUSD for 1 Core
+         current_feed.settlement_price = bitusd.amount(1) / core.amount(20);
+         publish_feed(bitusd, feedproducer, current_feed);
+
+
+         ///////
+         // 3. Paul borrows 100 bitUSD
+         ///////
+         // Paul will borrow bitUSD by providing 2x collateral required: 2 * 20 = 40
+         int64_t paul_initial_usd = 100 * std::pow(10, bitusd.precision); // 10000
+         int64_t paul_initial_core = paul_initial_usd * 2 * 20; // 400000
+         const call_order_object &call_paul = *borrow(paul, bitusd.amount(paul_initial_usd),
+                                                      core.amount(paul_initial_core));
+         call_order_id_type call_paul_id = call_paul.id;
+         BOOST_REQUIRE_EQUAL(get_balance(paul, bitusd), paul_initial_usd);
+
+         BOOST_CHECK_EQUAL(get_balance(paul, bitusd), paul_initial_usd);
+         BOOST_CHECK_EQUAL(get_balance(paul, core), initial_balance_core - paul_initial_core);
+
+
+         ///////
+         // 4. Paul gives Rachel 20 bitUSD and retains 80 bitUSD
+         ///////
+         int64_t rachel_initial_usd = 20 * std::pow(10, bitusd.precision);
+         transfer(paul.id, rachel.id, asset(rachel_initial_usd, bitusd.id));
+
+         BOOST_CHECK_EQUAL(get_balance(rachel, bitusd), rachel_initial_usd);
+         BOOST_CHECK_EQUAL(get_balance(rachel, core), 0);
+
+         BOOST_CHECK_EQUAL(get_balance(paul, bitusd), paul_initial_usd - rachel_initial_usd);
+         BOOST_CHECK_EQUAL(get_balance(paul, core), initial_balance_core - paul_initial_core);
+
+
+         ///////
+         // 5. Rachel force-settles 2 bitUSD which should be collected from Paul's debt position
+         ///////
+         const int64_t rachel_settle_amount = 2 * std::pow(10, bitusd.precision); // 200 satoshi bitusd
+         operation_result result = force_settle(rachel, bitusd.amount(rachel_settle_amount));
+
+         force_settlement_id_type rachel_settle_id = result.get<object_id_type>();
+         BOOST_CHECK_EQUAL(rachel_settle_id(db).balance.amount.value, rachel_settle_amount);
+
+         // Advance time to complete the force settlement and to update the price feed
+         generate_blocks(db.head_block_time() + fc::hours(26));
+         set_expiration(db, trx);
+         trx.clear();
+         publish_feed(bitusd, feedproducer_id(db), current_feed);
+         trx.clear();
+
+         // Rachel's settlement should have completed and should no longer be present
+         BOOST_CHECK(!db.find(rachel_settle_id));
+
+         // Check Rachel's balance
+         // Rachel redeemed some smart asset and should get the equivalent collateral amount (according to the feed price)
+         // minus the force_settlement_offset_fee - force_settlement_fee
+         // uint64_t rachel_settle_core = 4000; // rachel_settle_amount * 20
+         // uint64_t rachel_fso_fee_core = 200; // rachel_settle_core * usd_fso_percent / GRAPHENE_100_PERCENT
+         uint64_t rachel_fso_remainder_core = 3800; // rachel_settle_core - rachel_fso_fee_core
+         uint64_t rachel_fsf_fee_core = 3800; // (rachel_fso_remainder_core) * usd_fsf_percent / GRAPHENE_100_PERCENT
+         // Rachel redeemed 2 bitUSD and should get 4000 satoshi Core - 200 satoshi Core - 3800 satoshi  Core
+         uint64_t expected_rachel_core = 0; // rachel_settle_core - rachel_fso_fee_core - rachel_fsf_fee_core
+         BOOST_CHECK_EQUAL(get_balance(rachel, bitusd), rachel_initial_usd - rachel_settle_amount);
+         BOOST_CHECK_EQUAL(get_balance(rachel, core), expected_rachel_core);
+
+         // Check Paul's balance
+         BOOST_CHECK_EQUAL(get_balance(paul, bitusd), paul_initial_usd - rachel_initial_usd);
+         BOOST_CHECK_EQUAL(get_balance(paul, core), initial_balance_core - paul_initial_core);
+
+         // Check Paul's debt to the blockchain
+         // Rachel redeemed 2 bitUSD from the blockchain, and the blockchain closed this amount from Paul's debt to it
+         BOOST_CHECK_EQUAL(paul_initial_usd - rachel_settle_amount, call_paul_id(db).debt.value);
+         // The call order has the original amount of collateral less what was redeemed by Rachel
+         BOOST_CHECK_EQUAL(paul_initial_core - rachel_fso_remainder_core, call_paul_id(db).collateral.value);
+
+         // Check the asset owner's accumulated asset fees
+         BOOST_CHECK(bitusd.dynamic_asset_data_id(db).accumulated_fees == 0);
+         BOOST_CHECK(bitusd.dynamic_asset_data_id(db).accumulated_collateral_fees == rachel_fsf_fee_core);
+
+      }
+      FC_LOG_AND_RETHROW()
+   }
+
+
 BOOST_AUTO_TEST_SUITE_END()
