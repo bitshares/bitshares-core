@@ -434,6 +434,7 @@ void database_fixture::vote_for_committee_and_witnesses(uint16_t num_committee, 
 
    op.fee = db.current_fee_schedule().calculate_fee( op );
 
+   trx.operations.clear();
    trx.operations.push_back(op);
    trx.validate();
    PUSH_TX(db, trx, ~0);
@@ -697,16 +698,17 @@ const account_object& database_fixture::get_account( const string& name )const
    return *itr;
 }
 
-const asset_object& database_fixture::create_bitasset(
+asset_create_operation database_fixture::make_bitasset(
    const string& name,
    account_id_type issuer /* = GRAPHENE_WITNESS_ACCOUNT */,
    uint16_t market_fee_percent /* = 100 */ /* 1% */,
    uint16_t flags /* = charge_market_fee */,
    uint16_t precision /* = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS */,
    asset_id_type backing_asset /* = CORE */,
-   share_type max_supply  /* = GRAPHENE_MAX_SHARE_SUPPLY */
+   share_type max_supply,  /* = GRAPHENE_MAX_SHARE_SUPPLY */
+   optional<uint16_t> initial_cr /* = {} */
    )
-{ try {
+{
    asset_create_operation creator;
    creator.issuer = issuer;
    creator.fee = asset();
@@ -721,6 +723,24 @@ const asset_object& database_fixture::create_bitasset(
    creator.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
    creator.bitasset_opts = bitasset_options();
    creator.bitasset_opts->short_backing_asset = backing_asset;
+   creator.bitasset_opts->extensions.value.initial_collateral_ratio = initial_cr;
+   return creator;
+}
+
+const asset_object& database_fixture::create_bitasset(
+   const string& name,
+   account_id_type issuer /* = GRAPHENE_WITNESS_ACCOUNT */,
+   uint16_t market_fee_percent /* = 100 */ /* 1% */,
+   uint16_t flags /* = charge_market_fee */,
+   uint16_t precision /* = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS */,
+   asset_id_type backing_asset /* = CORE */,
+   share_type max_supply,  /* = GRAPHENE_MAX_SHARE_SUPPLY */
+   optional<uint16_t> initial_cr /* = {} */
+   )
+{ try {
+   asset_create_operation creator = make_bitasset( name, issuer, market_fee_percent, flags,
+                                                   precision, backing_asset, max_supply, initial_cr );
+   trx.operations.clear();
    trx.operations.push_back(std::move(creator));
    trx.validate();
    processed_transaction ptx = PUSH_TX(db, trx, ~0);
@@ -752,6 +772,7 @@ const asset_object& database_fixture::create_prediction_market(
    creator.bitasset_opts = bitasset_options();
    creator.bitasset_opts->short_backing_asset = backing_asset;
    creator.is_prediction_market = true;
+   trx.operations.clear();
    trx.operations.push_back(std::move(creator));
    trx.validate();
    processed_transaction ptx = PUSH_TX(db, trx, ~0);
@@ -772,6 +793,7 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    creator.common_options.flags = charge_market_fee;
    creator.common_options.issuer_permissions = charge_market_fee;
+   trx.operations.clear();
    trx.operations.push_back(std::move(creator));
    trx.validate();
    processed_transaction ptx = PUSH_TX(db, trx, ~0);
@@ -812,6 +834,7 @@ void database_fixture::issue_uia( const account_object& recipient, asset amount 
    op.issuer = amount.asset_id(db).issuer;
    op.asset_to_issue = amount;
    op.issue_to_account = recipient.id;
+   trx.operations.clear();
    trx.operations.push_back(op);
    PUSH_TX( db, trx, ~0 );
    trx.operations.clear();
@@ -857,6 +880,7 @@ const account_object& database_fixture::create_account(
    const public_key_type& key /* = public_key_type() */
    )
 {
+   trx.operations.clear();
    trx.operations.push_back(make_account(name, key));
    trx.validate();
    processed_transaction ptx = PUSH_TX(db, trx, ~0);
@@ -924,6 +948,7 @@ const committee_member_object& database_fixture::create_committee_member( const 
 {
    committee_member_create_operation op;
    op.committee_member_account = owner.id;
+   trx.operations.clear();
    trx.operations.push_back(op);
    trx.validate();
    processed_transaction ptx = PUSH_TX(db, trx, ~0);
@@ -945,6 +970,7 @@ const witness_object& database_fixture::create_witness( const account_object& ow
    witness_create_operation op;
    op.witness_account = owner.id;
    op.block_signing_key = signing_private_key.get_public_key();
+   trx.operations.clear();
    trx.operations.push_back(op);
    trx.validate();
    processed_transaction ptx = PUSH_TX(db, trx, skip_flags );
@@ -960,6 +986,7 @@ const worker_object& database_fixture::create_worker( const account_id_type owne
    op.initializer = burn_worker_initializer();
    op.work_begin_date = db.head_block_time();
    op.work_end_date = op.work_begin_date + duration;
+   trx.operations.clear();
    trx.operations.push_back(op);
    trx.validate();
    processed_transaction ptx = PUSH_TX(db, trx, ~0);
@@ -1021,6 +1048,7 @@ asset database_fixture::cancel_limit_order( const limit_order_object& order )
   limit_order_cancel_operation cancel_order;
   cancel_order.fee_paying_account = order.seller;
   cancel_order.order = order.id;
+  trx.operations.clear();
   trx.operations.push_back(cancel_order);
   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
   trx.validate();
@@ -1053,6 +1081,7 @@ void database_fixture::transfer(
       trans.from = from.id;
       trans.to   = to.id;
       trans.amount = amount;
+      trx.operations.clear();
       trx.operations.push_back(trans);
 
       if( fee == asset() )
@@ -1129,6 +1158,7 @@ void database_fixture::publish_feed(const account_id_type& publisher,
    op.asset_id = asset2;
    op.feed.settlement_price = ~price(a1.amount(amount1),a2.amount(amount2));
    op.feed.core_exchange_rate = ~price(core.amount(amount1), a2.amount(amount2));
+   trx.operations.clear();
    trx.operations.push_back(std::move(op));
    PUSH_TX( db, trx, ~0);
    generate_block();
@@ -1233,6 +1263,7 @@ void database_fixture::fund_fee_pool( const account_object& from, const asset_ob
    fund.from_account = from.id;
    fund.asset_id = asset_to_fund.id;
    fund.amount = amount;
+   trx.operations.clear();
    trx.operations.push_back( fund );
 
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
@@ -1508,6 +1539,7 @@ void database_fixture::set_htlc_committee_parameters()
    uop.new_parameters.current_fees = new_fee_schedule;
    cop.proposed_ops.emplace_back(uop);
 
+   trx.operations.clear();
    trx.operations.push_back(cop);
    graphene::chain::processed_transaction proc_trx = db.push_transaction(trx);
    trx.clear();

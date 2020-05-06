@@ -56,6 +56,16 @@ namespace detail {
       }
    }
 
+   // TODO review and remove code below and links to it after HARDFORK_BSIP_77_TIME
+   void check_bitasset_options_hf_bsip77(const fc::time_point_sec& block_time, const bitasset_options& options)
+   {
+      if ( !HARDFORK_BSIP_77_PASSED( block_time ) ) {
+         // ICR should not be set until activation of BSIP77
+         FC_ASSERT(!options.extensions.value.initial_collateral_ratio.valid(),
+                   "Initial collateral ratio should not be defined before HARDFORK_BSIP_77_TIME");
+      }
+   }
+
    void check_asset_options_hf_bsip87(const fc::time_point_sec& block_time, const asset_options& options)
    {
       // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
@@ -118,6 +128,7 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    if( op.bitasset_opts )
    {
+      detail::check_bitasset_options_hf_bsip77( now, *op.bitasset_opts );
       const asset_object& backing = op.bitasset_opts->short_backing_asset(d);
       if( backing.is_market_issued() )
       {
@@ -454,6 +465,8 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 { try {
    database& d = db();
 
+   detail::check_bitasset_options_hf_bsip77( d.head_block_time(), op.new_options );
+
    const asset_object& asset_obj = op.asset_to_update(d);
 
    FC_ASSERT( asset_obj.is_market_issued(), "Cannot update BitAsset-specific settings on a non-BitAsset." );
@@ -589,6 +602,12 @@ static bool update_bitasset_object_options(
          is_witness_or_committee_fed = true;
    }
 
+   // check if ICR will change
+   const auto& old_icr = bdo.options.extensions.value.initial_collateral_ratio;
+   const auto& new_icr = op.new_options.extensions.value.initial_collateral_ratio;
+   bool icr_changed = ( ( old_icr.valid() != new_icr.valid() )
+                        || ( old_icr.valid() && *old_icr != *new_icr ) );
+
    bdo.options = op.new_options;
 
    // are we modifying the underlying? If so, reset the feeds
@@ -617,6 +636,11 @@ static bool update_bitasset_object_options(
 
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
       return ( after_hf_core_868_890 && ! (old_feed == bdo.current_feed) );
+   }
+   else if( icr_changed ) // feeds not updated, but ICR changed
+   {
+      // update data derived from ICR
+      bdo.refresh_current_initial_collateralization();
    }
 
    return false;

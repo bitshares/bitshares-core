@@ -102,6 +102,15 @@ namespace graphene { namespace protocol {
     * @note Changes to this struct will break protocol compatibility
     */
    struct bitasset_options {
+
+      struct ext
+      {
+         /// After BSIP77, when creating a new debt position or updating an existing position,
+         /// the position will be checked against this parameter.
+         /// Unused for prediction markets, although we allow it to be set for simpler implementation
+         fc::optional<uint16_t> initial_collateral_ratio;
+      };
+
       /// Time before a price feed expires
       uint32_t feed_lifetime_sec = GRAPHENE_DEFAULT_PRICE_FEED_LIFETIME;
       /// Minimum number of unexpired feeds required to extract a median feed from
@@ -119,7 +128,8 @@ namespace graphene { namespace protocol {
       /// This speicifies which asset type is used to collateralize short sales
       /// This field may only be updated if the current supply of the asset is zero.
       asset_id_type short_backing_asset;
-      extensions_type extensions;
+
+      extension<ext> extensions;
 
       /// Perform internal consistency checks.
       /// @throws fc::exception if any check fails
@@ -553,6 +563,9 @@ FC_REFLECT( graphene::protocol::asset_options,
             (description)
             (extensions)
           )
+
+FC_REFLECT( graphene::protocol::bitasset_options::ext, (initial_collateral_ratio) )
+
 FC_REFLECT( graphene::protocol::bitasset_options,
             (feed_lifetime_sec)
             (minimum_feeds)
@@ -565,7 +578,10 @@ FC_REFLECT( graphene::protocol::bitasset_options,
 
 FC_REFLECT( graphene::protocol::additional_asset_options,
             (reward_percent)(whitelist_market_fee_sharing)(taker_fee_percent)(force_settle_fee_percent) )
-FC_REFLECT( graphene::protocol::asset_create_operation::fee_parameters_type, (symbol3)(symbol4)(long_symbol)(price_per_kbyte) )
+
+FC_REFLECT( graphene::protocol::asset_create_operation::fee_parameters_type,
+            (symbol3)(symbol4)(long_symbol)(price_per_kbyte) )
+
 FC_REFLECT( graphene::protocol::asset_global_settle_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::protocol::asset_settle_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::protocol::asset_settle_cancel_operation::fee_parameters_type, )
@@ -627,6 +643,7 @@ FC_REFLECT( graphene::protocol::asset_reserve_operation,
 FC_REFLECT( graphene::protocol::asset_fund_fee_pool_operation, (fee)(from_account)(asset_id)(amount)(extensions) );
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_options )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::bitasset_options::ext )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::bitasset_options )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::additional_asset_options )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_create_operation::fee_parameters_type )
