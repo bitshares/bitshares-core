@@ -970,7 +970,7 @@ void_result asset_claim_fees_evaluator::do_evaluate( const asset_claim_fees_oper
    FC_ASSERT( o.amount_to_claim.amount <= ((container_asset->get_id() == o.amount_to_claim.asset_id) ?
                                            container_ddo->accumulated_fees :
                                            container_ddo->accumulated_collateral_fees),
-              "Attempt to claim more fees than have accumulated within asset ${a} (${id})",
+              "Attempt to claim more collateral fees than have accumulated within asset ${a} (${id})",
               ("a",container_asset->symbol)("id",container_asset->id)("ddo",*container_ddo) );
 
    return void_result();
