@@ -216,7 +216,13 @@ void asset_options::validate()const
 {
    FC_ASSERT( max_supply > 0 );
    FC_ASSERT( max_supply <= GRAPHENE_MAX_SHARE_SUPPLY );
+   // The non-negative maker fee must be less than or equal to 100%
    FC_ASSERT( market_fee_percent <= GRAPHENE_100_PERCENT );
+
+   // The non-negative taker fee must be less than or equal to 100%
+   if( extensions.value.taker_fee_percent.valid() )
+      FC_ASSERT( *extensions.value.taker_fee_percent <= GRAPHENE_100_PERCENT );
+
    FC_ASSERT( max_market_fee >= 0 && max_market_fee <= GRAPHENE_MAX_SHARE_SUPPLY );
    // There must be no high bits in permissions whose meaning is not known.
    FC_ASSERT( !(issuer_permissions & ~ASSET_ISSUER_PERMISSION_MASK) );
@@ -239,12 +245,14 @@ void asset_options::validate()const
       FC_ASSERT( whitelist_markets.find(item) == whitelist_markets.end() );
    }
    if( extensions.value.reward_percent.valid() )
-      FC_ASSERT( *extensions.value.reward_percent < GRAPHENE_100_PERCENT );
+      FC_ASSERT( *extensions.value.reward_percent <= GRAPHENE_100_PERCENT );
 }
 
 void asset_claim_fees_operation::validate()const {
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( amount_to_claim.amount > 0 );
+   if( extensions.value.claim_from_asset_id.valid() )
+     FC_ASSERT( *extensions.value.claim_from_asset_id != amount_to_claim.asset_id );
 }
 
 void asset_claim_pool_operation::validate()const {
@@ -265,6 +273,7 @@ GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_settle_oper
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_fund_fee_pool_operation::fee_parameters_type )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_pool_operation::fee_parameters_type )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_fees_operation::fee_parameters_type )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_fees_operation::additional_options_type )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_operation::fee_parameters_type )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_issuer_operation::fee_parameters_type )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_bitasset_operation::fee_parameters_type )

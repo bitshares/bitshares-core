@@ -32,18 +32,50 @@
 
 #include <functional>
 
-#include <locale>
-
 namespace graphene { namespace chain {
+namespace detail {
+
+   // TODO review and remove code below and links to it after hf_1774
+   void check_asset_options_hf_1774(const fc::time_point_sec& block_time, const asset_options& options)
+   {
+      if( block_time < HARDFORK_1774_TIME )
+      {
+         FC_ASSERT( !options.extensions.value.reward_percent.valid() ||
+                    *options.extensions.value.reward_percent < GRAPHENE_100_PERCENT,
+            "Asset extension reward percent must be less than 100% till HARDFORK_1774_TIME!");
+      }
+   }
+
+   // TODO review and remove code below and links to it after HARDFORK_BSIP_81_TIME
+   void check_asset_options_hf_bsip81(const fc::time_point_sec& block_time, const asset_options& options)
+   {
+      if (block_time < HARDFORK_BSIP_81_TIME) {
+         // Taker fees should not be set until activation of BSIP81
+         FC_ASSERT(!options.extensions.value.taker_fee_percent.valid(),
+                   "Taker fee percent should not be defined before HARDFORK_BSIP_81_TIME");
+      }
+   }
+
+   void check_asset_claim_fees_hardfork_87_74_collatfee(const fc::time_point_sec& block_time, const asset_claim_fees_operation& op)
+   {
+      // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
+      FC_ASSERT( !op.extensions.value.claim_from_asset_id.valid() ||
+                 block_time >= HARDFORK_CORE_BSIP_87_74_COLLATFEE_TIME,
+                 "Collateral-denominated fees are not yet active and therefore cannot be claimed." );
+   }
+
+} // graphene::chain::detail
 
 void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
 { try {
 
-   database& d = db();
+   const database& d = db();
 
    const auto& chain_parameters = d.get_global_properties().parameters;
    FC_ASSERT( op.common_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    FC_ASSERT( op.common_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
+
+   detail::check_asset_options_hf_1774(d.head_block_time(), op.common_options);
 
    // Check that all authorities do exist
    for( auto id : op.common_options.whitelist_authorities )
@@ -55,15 +87,18 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    auto asset_symbol_itr = asset_indx.find( op.symbol );
    FC_ASSERT( asset_symbol_itr == asset_indx.end() );
 
+   // Define now from the current block time
+   const time_point_sec now = d.head_block_time();
    // This must remain due to "BOND.CNY" being allowed before this HF
-   if( d.head_block_time() > HARDFORK_385_TIME )
+   if( now > HARDFORK_385_TIME )
    {
       auto dotpos = op.symbol.rfind( '.' );
       if( dotpos != std::string::npos )
       {
          auto prefix = op.symbol.substr( 0, dotpos );
          auto asset_symbol_itr = asset_indx.find( prefix );
-         FC_ASSERT( asset_symbol_itr != asset_indx.end(), "Asset ${s} may only be created by issuer of ${p}, but ${p} has not been registered",
+         FC_ASSERT( asset_symbol_itr != asset_indx.end(),
+                    "Asset ${s} may only be created by issuer of asset ${p}, but asset ${p} has not been created",
                     ("s",op.symbol)("p",prefix) );
          FC_ASSERT( asset_symbol_itr->issuer == op.issuer, "Asset ${s} may only be created by issuer of ${p}, ${i}",
                     ("s",op.symbol)("p",prefix)("i", op.issuer(d).name) );
@@ -92,6 +127,9 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
       FC_ASSERT( op.bitasset_opts );
       FC_ASSERT( op.precision == op.bitasset_opts->short_backing_asset(d).precision );
    }
+
+   // Check the taker fee percent
+   detail::check_asset_options_hf_bsip81(now, op.common_options);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -253,7 +291,8 @@ static void validate_new_issuer( const database& d, const asset_object& a, accou
 
 void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 { try {
-   database& d = db();
+   const database& d = db();
+   const time_point_sec now = d.head_block_time();
 
    const asset_object& a = o.asset_to_update(d);
    auto a_copy = a;
@@ -262,10 +301,12 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 
    if( o.new_issuer )
    {
-      FC_ASSERT( d.head_block_time() < HARDFORK_CORE_199_TIME,
+      FC_ASSERT( now  < HARDFORK_CORE_199_TIME,
                  "Since Hardfork #199, updating issuer requires the use of asset_update_issuer_operation.");
       validate_new_issuer( d, a, *o.new_issuer );
    }
+
+   detail::check_asset_options_hf_1774(d.head_block_time(), o.new_options);
 
    if( a.dynamic_asset_data_id(d).current_supply != 0 )
    {
@@ -291,6 +332,9 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    FC_ASSERT( o.new_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    for( auto id : o.new_options.blacklist_authorities )
       d.get_object(id);
+
+   // Check the taker fee percent
+   detail::check_asset_options_hf_bsip81(now, o.new_options);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
@@ -419,6 +463,9 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    {
       FC_ASSERT( asset_obj.dynamic_asset_data_id(d).current_supply == 0,
                  "Cannot update a bitasset if there is already a current supply." );
+
+      FC_ASSERT( asset_obj.dynamic_asset_data_id(d).accumulated_collateral_fees == 0,
+                 "Must claim collateral-denominated fees before changing backing asset." );
 
       const asset_object& new_backing_asset = op.new_options.short_backing_asset(d); // check if the asset exists
 
@@ -692,10 +739,10 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
    if( bitasset.is_prediction_market )
       FC_ASSERT( bitasset.has_settlement(), "global settlement must occur before force settling a prediction market"  );
    else if( bitasset.current_feed.settlement_price.is_null()
-            && ( d.head_block_time() <= HARDFORK_CORE_216_TIME
+            && ( d.head_block_time() <= HARDFORK_CORE_216_TIME // TODO check whether the HF check can be removed
                  || !bitasset.has_settlement() ) )
       FC_THROW_EXCEPTION(insufficient_feeds, "Cannot force settle with no price feed.");
-   FC_ASSERT(d.get_balance(d.get(op.account), *asset_to_settle) >= op.amount);
+   FC_ASSERT( d.get_balance( op.account, op.amount.asset_id ) >= op.amount, "Insufficient balance" );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -719,8 +766,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
       {
          if( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
             FC_THROW( "Settle amount is too small to receive anything due to rounding" );
-         else // TODO remove this warning after hard fork core-184
-            wlog( "Something for nothing issue (#184, variant F) occurred at block #${block}", ("block",d.head_block_num()) );
+         // else do nothing. Before the hf, something for nothing issue (#184, variant F) could occur
       }
 
       asset pays = op.amount;
@@ -739,7 +785,20 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
             obj.settlement_fund -= settled_amount.amount;
          });
 
-         d.adjust_balance( op.account, settled_amount );
+         // The account who settles pays market fees to the issuer of the collateral asset after HF core-1780
+         //
+         // TODO Check whether the HF check can be removed after the HF.
+         //      Note: even if logically it can be removed, perhaps the removal will lead to a small
+         //            performance loss. Needs testing.
+         if( d.head_block_time() >= HARDFORK_CORE_1780_TIME )
+         {
+	    const bool is_maker = false; // Settlement orders are takers
+            auto issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d), settled_amount , is_maker );
+            settled_amount -= issuer_fees;
+         }
+
+         if( settled_amount.amount > 0 )
+            d.adjust_balance( op.account, settled_amount );
       }
 
       d.modify( mia_dyn, [&]( asset_dynamic_data_object& obj ){
@@ -873,25 +932,58 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
 } FC_CAPTURE_AND_RETHROW((o)) }
 
 
-
+/***
+ * @brief evaluator for asset_claim_fees operation
+ *
+ * Checks that we are able to claim fees denominated in asset Y (the amount_to_claim asset),
+ * from some container asset X which is presumed to have accumulated the fees we wish to claim.
+ * The container asset is either explicitly named in the extensions, or else assumed as the same
+ * asset as the amount_to_claim asset. Evaluation fails if either (a) operation issuer is not
+ * the same as the container_asset issuer, or (b) container_asset has no fee bucket for
+ * amount_to_claim asset, or (c) accumulated fees are insufficient to cover amount claimed.
+ */
 void_result asset_claim_fees_evaluator::do_evaluate( const asset_claim_fees_operation& o )
 { try {
-   FC_ASSERT( o.amount_to_claim.asset_id(db()).issuer == o.issuer, "Asset fees may only be claimed by the issuer" );
+   const database& d = db();
+
+   detail::check_asset_claim_fees_hardfork_87_74_collatfee(d.head_block_time(), o); // HF_REMOVABLE
+
+   container_asset = o.extensions.value.claim_from_asset_id.valid() ?
+      &(*o.extensions.value.claim_from_asset_id)(d) : &o.amount_to_claim.asset_id(d);
+
+   FC_ASSERT( container_asset->issuer == o.issuer, "Asset fees may only be claimed by the issuer" );
+   FC_ASSERT( container_asset->can_accumulate_fee(d,o.amount_to_claim),
+              "Asset ${a} (${id}) is not backed by asset (${fid}) and does not hold it as fees.",
+              ("a",container_asset->symbol)("id",container_asset->id)("fid",o.amount_to_claim.asset_id) );
+
+   container_ddo = &container_asset->dynamic_asset_data_id(d);
+
+   FC_ASSERT( o.amount_to_claim.amount <= ((container_asset->get_id() == o.amount_to_claim.asset_id) ?
+                                           container_ddo->accumulated_fees :
+                                           container_ddo->accumulated_collateral_fees),
+              "Attempt to claim more fees than have accumulated within asset ${a} (${id})",
+              ("a",container_asset->symbol)("id",container_asset->id)("ddo",*container_ddo) );
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 
+/***
+ * @brief apply asset_claim_fees operation
+ */
 void_result asset_claim_fees_evaluator::do_apply( const asset_claim_fees_operation& o )
 { try {
    database& d = db();
 
-   const asset_object& a = o.amount_to_claim.asset_id(d);
-   const asset_dynamic_data_object& addo = a.dynamic_asset_data_id(d);
-   FC_ASSERT( o.amount_to_claim.amount <= addo.accumulated_fees, "Attempt to claim more fees than have accumulated", ("addo",addo) );
-
-   d.modify( addo, [&]( asset_dynamic_data_object& _addo  ) {
-     _addo.accumulated_fees -= o.amount_to_claim.amount;
-   });
+   if ( container_asset->get_id() == o.amount_to_claim.asset_id ) {
+      d.modify( *container_ddo, [&o]( asset_dynamic_data_object& _addo  ) {
+         _addo.accumulated_fees -= o.amount_to_claim.amount;
+      });
+   } else {
+      d.modify( *container_ddo, [&o]( asset_dynamic_data_object& _addo  ) {
+         _addo.accumulated_collateral_fees -= o.amount_to_claim.amount;
+      });
+   }
 
    d.adjust_balance( o.issuer, o.amount_to_claim );
 

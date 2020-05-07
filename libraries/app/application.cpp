@@ -43,7 +43,6 @@
 #include <fc/io/fstream.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/rpc/websocket_api.hpp>
-#include <fc/network/resolve.hpp>
 #include <fc/crypto/base64.hpp>
 
 #include <boost/filesystem/path.hpp>
@@ -125,41 +124,14 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    if( _options->count("seed-node") )
    {
       auto seeds = _options->at("seed-node").as<vector<string>>();
-      for( const string& endpoint_string : seeds )
-      {
-         try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
-            for (const fc::ip::endpoint& endpoint : endpoints)
-            {
-               ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-               _p2p_network->add_node(endpoint);
-               _p2p_network->connect_to_endpoint(endpoint);
-            }
-         } catch( const fc::exception& e ) {
-            wlog( "caught exception ${e} while adding seed node ${endpoint}",
-                     ("e", e.to_detail_string())("endpoint", endpoint_string) );
-         }
-      }
+      _p2p_network->add_seed_nodes(seeds);
    }
 
    if( _options->count("seed-nodes") )
    {
       auto seeds_str = _options->at("seed-nodes").as<string>();
       auto seeds = fc::json::from_string(seeds_str).as<vector<string>>(2);
-      for( const string& endpoint_string : seeds )
-      {
-         try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
-            for (const fc::ip::endpoint& endpoint : endpoints)
-            {
-               ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-               _p2p_network->add_node(endpoint);
-            }
-         } catch( const fc::exception& e ) {
-            wlog( "caught exception ${e} while adding seed node ${endpoint}",
-                     ("e", e.to_detail_string())("endpoint", endpoint_string) );
-         }
-      }
+      _p2p_network->add_seed_nodes(seeds);
    }
    else
    {
@@ -167,20 +139,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       vector<string> seeds = {
          #include "../egenesis/seed-nodes.txt"
       };
-      for( const string& endpoint_string : seeds )
-      {
-         try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
-            for (const fc::ip::endpoint& endpoint : endpoints)
-            {
-               ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-               _p2p_network->add_node(endpoint);
-            }
-         } catch( const fc::exception& e ) {
-            wlog( "caught exception ${e} while adding seed node ${endpoint}",
-                     ("e", e.to_detail_string())("endpoint", endpoint_string) );
-         }
-      }
+      _p2p_network->add_seed_nodes(seeds);
    }
 
    if( _options->count("p2p-endpoint") )
@@ -195,36 +154,6 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
                                         _chain_db->head_block_id()),
                            std::vector<uint32_t>());
 } FC_CAPTURE_AND_RETHROW() }
-
-std::vector<fc::ip::endpoint> application_impl::resolve_string_to_ip_endpoints(const std::string& endpoint_string)
-{
-   try
-   {
-      string::size_type colon_pos = endpoint_string.find(':');
-      if (colon_pos == std::string::npos)
-         FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
-                  ("endpoint_string", endpoint_string));
-      std::string port_string = endpoint_string.substr(colon_pos + 1);
-      try
-      {
-         uint16_t port = boost::lexical_cast<uint16_t>(port_string);
-
-         std::string hostname = endpoint_string.substr(0, colon_pos);
-         std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
-         if (endpoints.empty())
-            FC_THROW_EXCEPTION( fc::unknown_host_exception,
-                                "The host name can not be resolved: ${hostname}",
-                                ("hostname", hostname) );
-         return endpoints;
-      }
-      catch (const boost::bad_lexical_cast&)
-      {
-         FC_THROW("Bad port: ${port}", ("port", port_string));
-      }
-   }
-   FC_CAPTURE_AND_RETHROW((endpoint_string))
-}
-
 
 void application_impl::new_connection( const fc::http::websocket_connection_ptr& c )
 {
@@ -263,7 +192,11 @@ void application_impl::reset_websocket_server()
    if( !_options->count("rpc-endpoint") )
       return;
 
-   _websocket_server = std::make_shared<fc::http::websocket_server>();
+   string proxy_forward_header;
+   if( _options->count("proxy-forwarded-for-header") )
+      proxy_forward_header = _options->at("proxy-forwarded-for-header").as<string>();
+
+   _websocket_server = std::make_shared<fc::http::websocket_server>( proxy_forward_header );
    _websocket_server->on_connection( std::bind(&application_impl::new_connection, this, std::placeholders::_1) );
 
    ilog("Configured websocket rpc to listen on ${ip}", ("ip",_options->at("rpc-endpoint").as<string>()));
@@ -281,8 +214,13 @@ void application_impl::reset_websocket_tls_server()
       return;
    }
 
+   string proxy_forward_header;
+   if( _options->count("proxy-forwarded-for-header") )
+      proxy_forward_header = _options->at("proxy-forwarded-for-header").as<string>();
+
    string password = _options->count("server-pem-password") ? _options->at("server-pem-password").as<string>() : "";
-   _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>( _options->at("server-pem").as<string>(), password );
+   _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>(
+                                 _options->at("server-pem").as<string>(), password, proxy_forward_header );
    _websocket_tls_server->on_connection( std::bind(&application_impl::new_connection, this, std::placeholders::_1) );
 
    ilog("Configured websocket TLS rpc to listen on ${ip}", ("ip",_options->at("rpc-tls-endpoint").as<string>()));
@@ -342,6 +280,9 @@ void application_impl::set_api_limit() {
    }
    if(_options->count("api-limit-get-limit-orders")){
       _app_options.api_limit_get_limit_orders = _options->at("api-limit-get-limit-orders").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-limit-orders-by-account")){
+      _app_options.api_limit_get_limit_orders_by_account = _options->at("api-limit-get-limit-orders-by-account").as<uint64_t>();
    }
    if(_options->count("api-limit-get-order-book")){
       _app_options.api_limit_get_order_book = _options->at("api-limit-get-order-book").as<uint64_t>();
@@ -509,6 +450,9 @@ void application_impl::startup()
 
    if( _active_plugins.find( "market_history" ) != _active_plugins.end() )
       _app_options.has_market_history_plugin = true;
+
+   if( _active_plugins.find( "api_helper_indexes" ) != _active_plugins.end() )
+      _app_options.has_api_helper_indexes_plugin = true;
 
    if( _options->count("api-access") ) {
 
@@ -1039,6 +983,9 @@ void application::set_program_options(boost::program_options::options_descriptio
           "Endpoint for TLS websocket RPC to listen on")
          ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"), "The TLS certificate file for this server")
          ("server-pem-password,P", bpo::value<string>()->implicit_value(""), "Password for this certificate")
+         ("proxy-forwarded-for-header", bpo::value<string>()->implicit_value("X-Forwarded-For-Client"),
+          "A HTTP header similar to X-Forwarded-For (XFF), used by the RPC server to extract clients' address info, "
+          "usually added by a trusted reverse proxy")
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
@@ -1076,6 +1023,8 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::list_assets and get_assets_by_issuer to set max limit value")
          ("api-limit-get-limit-orders",boost::program_options::value<uint64_t>()->default_value(300),
           "For database_api_impl::get_limit_orders to set max limit value")
+         ("api-limit-get-limit-orders-by-account",boost::program_options::value<uint64_t>()->default_value(101),
+          "For database_api_impl::get_limit_orders_by_account to set max limit value")
          ("api-limit-get-order-book",boost::program_options::value<uint64_t>()->default_value(50),
           "For database_api_impl::get_order_book to set max limit value")
          ("api-limit-lookup-accounts",boost::program_options::value<uint64_t>()->default_value(1000),

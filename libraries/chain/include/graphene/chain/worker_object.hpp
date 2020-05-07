@@ -145,13 +145,15 @@ class worker_object : public abstract_object<worker_object>
 struct by_account;
 struct by_vote_for;
 struct by_vote_against;
+struct by_end_date;
 typedef multi_index_container<
    worker_object,
    indexed_by<
       ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
       ordered_non_unique< tag<by_account>, member< worker_object, account_id_type, &worker_object::worker_account > >,
       ordered_unique< tag<by_vote_for>, member< worker_object, vote_id_type, &worker_object::vote_for > >,
-   ordered_unique< tag<by_vote_against>, member< worker_object, vote_id_type, &worker_object::vote_against > >
+      ordered_unique< tag<by_vote_against>, member< worker_object, vote_id_type, &worker_object::vote_against > >,
+      ordered_non_unique< tag<by_end_date>, member< worker_object, time_point_sec, &worker_object::work_end_date> >
    >
 > worker_object_multi_index_type;
 

@@ -37,6 +37,14 @@ bool _is_authorized_asset(
    const account_object& acct,
    const asset_object& asset_obj)
 {
+   // committee-account is always allowed to transact after BSIP 86
+   if( HARDFORK_BSIP_86_PASSED( d.head_block_time() ) )
+   {
+      static const object_id_type committee_account_id( GRAPHENE_COMMITTEE_ACCOUNT );
+      if( acct.id == committee_account_id )
+         return true;
+   }
+
    if( acct.allowed_assets.valid() )
    {
       if( acct.allowed_assets->find( asset_obj.id ) == acct.allowed_assets->end() )

@@ -245,7 +245,12 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app1.initialize(app_dir.path(), cfg);
       BOOST_TEST_MESSAGE( "Starting app1 and waiting 500 ms" );
       app1.startup();
-      fc::wait_for( fc::seconds(10), [&app1] () {
+      #ifdef NDEBUG
+        #define LISTEN_WAIT_TIME (fc::milliseconds(10000))
+      #else
+        #define LISTEN_WAIT_TIME (fc::milliseconds(30000))
+      #endif
+      fc::wait_for( LISTEN_WAIT_TIME, [&app1] () {
          const auto status = app1.p2p_node()->network_get_info();
          return status["listening_on"].as<fc::ip::endpoint>( 5 ).port() == 3939;
       });
@@ -268,7 +273,12 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Starting app2 and waiting for connection" );
       app2.startup();
 
-      fc::wait_for( fc::seconds(10), [&app1] () { return app1.p2p_node()->get_connection_count() > 0; } );
+      #ifdef NDEBUG
+        #define CONNECT_WAIT_TIME (fc::milliseconds(10000))
+      #else
+        #define CONNECT_WAIT_TIME (fc::milliseconds(30000))
+      #endif
+      fc::wait_for( CONNECT_WAIT_TIME, [&app1] () { return app1.p2p_node()->get_connection_count() > 0; } );
 
       BOOST_REQUIRE_EQUAL(app1.p2p_node()->get_connection_count(), 1u);
       BOOST_CHECK_EQUAL(std::string(app1.p2p_node()->get_connected_peers().front().host.get_address()), "127.0.0.1");
@@ -316,7 +326,12 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Broadcasting tx" );
       app1.p2p_node()->broadcast(graphene::net::trx_message(trx));
 
-      fc::usleep(fc::milliseconds(500));
+      #ifdef NDEBUG
+        #define BROADCAST_WAIT_TIME (fc::milliseconds(5000))
+      #else
+        #define BROADCAST_WAIT_TIME (fc::milliseconds(15000))
+      #endif
+      fc::usleep( BROADCAST_WAIT_TIME );
 
       BOOST_CHECK_EQUAL( db1->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
       BOOST_CHECK_EQUAL( db2->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
@@ -333,7 +348,8 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Broadcasting block" );
       app2.p2p_node()->broadcast(graphene::net::block_message( block_1 ));
 
-      fc::usleep(fc::milliseconds(500));
+      fc::usleep( BROADCAST_WAIT_TIME );
+
       BOOST_TEST_MESSAGE( "Verifying nodes are still connected" );
       BOOST_CHECK_EQUAL(app1.p2p_node()->get_connection_count(), 1u);
       BOOST_CHECK_EQUAL(app1.chain_database()->head_block_num(), 1u);

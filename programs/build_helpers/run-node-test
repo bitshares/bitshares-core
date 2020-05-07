@@ -22,12 +22,12 @@ NODE_PID=$!
 
 echo "Waiting for cli_wallet start..." 1>&2 &
 CLI_PID=$!
-sleep 1
+sleep 5
 _START="`date +%s`"
-while ! ps -p "$CLI_PID" >/dev/null && [ $((`date +%s` - _START)) -lt 120 ]; do
-    programs/cli_wallet/cli_wallet -s ws://127.0.0.1:8090 -d -H 127.0.0.1:8091 >cli.log 2>&1 &
+while ! ps -p "$CLI_PID" >/dev/null && [ $((`date +%s` - $_START)) -lt 120 ]; do
+    programs/cli_wallet/cli_wallet -sws://127.0.0.1:8090 -d -H127.0.0.1:8091 >cli.log 2>&1 &
     CLI_PID=$!
-    sleep 2
+    sleep 10
 done
 
 if ! ps -p "$CLI_PID" >/dev/null; then
@@ -38,7 +38,7 @@ fi
 echo "Waiting for head_block 131071..." 1>&2
 touch "$DATA_DIR"/info.json
 _START="`date +%s`"
-while [ $(( "`date +%s`" - $_START )) -lt 180 ]; do
+while [ $(( `date +%s` - $_START )) -lt 180 ]; do
     sleep 2
     curl --silent -o "$DATA_DIR"/info.json --data '{"id":0,"method":"info","params":[]}' \
 	 http://127.0.0.1:8091/rpc

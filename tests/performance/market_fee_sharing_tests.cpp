@@ -25,6 +25,7 @@
 
 #include <chrono>
 #include <graphene/chain/hardfork.hpp>
+#include <fc/time.hpp>
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;
