@@ -1,0 +1,4 @@
+// bitshares-core BSIP 87: add force-settlement fee percentage:
+#ifndef HARDFORK_CORE_BSIP87_TIME
+#define HARDFORK_CORE_BSIP87_TIME (fc::time_point_sec( 1679955066 ) ) // Temporary date until actual hardfork date is set
+#endif

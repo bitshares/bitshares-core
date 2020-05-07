@@ -963,22 +963,55 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
    return collateral_freed.valid();
 } FC_CAPTURE_AND_RETHROW( (order)(pays)(receives) ) }
 
+/***
+ * @brief fullfill a settle order in the specified amounts
+ *
+ * @details Called from database::match(), this coordinates exchange of debt asset X held in the
+ *    settle order for collateral asset Y held in a call order, and routes fees.  Note that we
+ *    don't touch the call order directly, as match() handles this via a separate call to
+ *    fill_call_order().  We are told exactly how much X and Y to exchange, based on details of
+ *    order matching determined higher up the call chain. Thus it is possible that the settle
+ *    order is not completely satisfied at the conclusion of this function.
+ *
+ * @param settle the force_settlement object
+ * @param pays the quantity of market-issued debt asset X which the settler will yield in this
+ *    round (may be less than the full amount indicated in settle object)
+ * @param receives the quantity of collateral asset Y which the settler will receive in
+ *    exchange for X
+ * @param fill_price the price at which the settle order will execute (not used - passed through
+ *    to virtual operation)
+ * @param is_maker TRUE if the settle order is the maker, FALSE if it is the taker (passed
+ *    through to virtual operation)
+ * @returns TRUE if the settle order was completely filled, FALSE if only partially filled
+ */
 bool database::fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
                                   const price& fill_price, const bool is_maker )
 { try {
    bool filled = false;
 
    const account_object* settle_owner_ptr = nullptr;
-   // The owner of the settle order pays market fees to the issuer of the collateral asset after HF core-1780
+   // The owner of the settle order pays market fees to the issuer of the collateral asset.
+   // After HF core-1780, these fees are shared to the referral program, which is flagged to
+   // pay_market_fees by setting settle_owner_ptr non-null.
    //
    // TODO Check whether the HF check can be removed after the HF.
    //      Note: even if logically it can be removed, perhaps the removal will lead to a small performance
    //            loss. Needs testing.
    if( head_block_time() >= HARDFORK_CORE_1780_TIME )
       settle_owner_ptr = &settle.owner(*this);
+   // Compute and pay the market fees:
+   asset market_fees = pay_market_fees( settle_owner_ptr, get(receives.asset_id), receives, is_maker );
 
-   auto issuer_fees = pay_market_fees( settle_owner_ptr, get(receives.asset_id), receives, is_maker );
+   // Issuer of the settled smartcoin asset lays claim to a force-settlement fee (BSIP87), but
+   // note that fee is denominated in collateral asset, not the debt asset.  Asset object of
+   // debt asset is passed to the pay function so it knows where to put the fee. Note that
+   // amount of collateral asset upon which fee is assessed is reduced by market_fees already
+   // paid to prevent the total fee exceeding total collateral.
+   asset force_settle_fees = pay_force_settle_fees( get(pays.asset_id), receives - market_fees );
 
+   auto total_collateral_denominated_fees = market_fees + force_settle_fees;
+
+   // If we don't consume entire settle order:
    if( pays < settle.balance )
    {
       modify(settle, [&pays](force_settlement_object& s) {
@@ -987,15 +1020,18 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
    } else {
       filled = true;
    }
-   adjust_balance(settle.owner, receives - issuer_fees);
+   // Give released collateral not already taken as fees to settle order owner:
+   adjust_balance(settle.owner, receives - total_collateral_denominated_fees);
 
    assert( pays.asset_id != receives.asset_id );
-   push_applied_operation( fill_order_operation( settle.id, settle.owner, pays, receives, issuer_fees, fill_price, is_maker ) );
+   push_applied_operation( fill_order_operation( settle.id, settle.owner, pays, receives,
+                                                 total_collateral_denominated_fees, fill_price, is_maker ) );
 
    if (filled)
       remove(settle);
 
    return filled;
+
 } FC_CAPTURE_AND_RETHROW( (settle)(pays)(receives) ) }
 
 /**
@@ -1359,6 +1395,34 @@ asset database::pay_market_fees(const account_object* seller, const asset_object
    }
 
    return market_fees;
+}
+
+/***
+ * @brief Calculate force-settlement fee and give it to issuer of the settled asset
+ * @param collecting_asset the smart asset object which should receive the fee
+ * @param collat_receives the amount of collateral the settler would expect to receive absent this fee
+ *     (fee is computed as a percentage of this amount)
+ * @return asset denoting the amount of fee collected
+ */
+asset database::pay_force_settle_fees(const asset_object& collecting_asset, const asset& collat_receives)
+{
+   FC_ASSERT( collecting_asset.get_id() != collat_receives.asset_id );
+
+   const bitasset_options& collecting_bitasset_opts = collecting_asset.bitasset_data(*this).options;
+
+   if( !collecting_bitasset_opts.extensions.value.force_settle_fee_percent.valid()
+         || *collecting_bitasset_opts.extensions.value.force_settle_fee_percent == 0 )
+      return asset{ 0, collat_receives.asset_id };
+
+   auto value = detail::calculate_percent(collat_receives.amount,
+                                          *collecting_bitasset_opts.extensions.value.force_settle_fee_percent);
+   asset settle_fee = asset{ value, collat_receives.asset_id };
+
+   // Deposit fee in asset's dynamic data object:
+   if( value > 0) {
+      collecting_asset.accumulate_fee(*this, settle_fee);
+   }
+   return settle_fee;
 }
 
 } }

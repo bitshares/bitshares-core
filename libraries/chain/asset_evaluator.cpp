@@ -66,7 +66,16 @@ namespace detail {
       }
    }
 
-   void check_asset_claim_fees_hardfork_87_74_collatfee(const fc::time_point_sec& block_time, const asset_claim_fees_operation& op)
+   void check_bitasset_options_hf_bsip87(const fc::time_point_sec& block_time, const bitasset_options& options)
+   {
+      // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
+      FC_ASSERT( !options.extensions.value.force_settle_fee_percent.valid()
+                 || block_time >= HARDFORK_CORE_BSIP87_TIME,
+                 "A BitAsset's FSFP cannot be set before Hardfork BSIP87" );
+   }
+
+   void check_asset_claim_fees_hardfork_87_74_collatfee(const fc::time_point_sec& block_time,
+                                                        const asset_claim_fees_operation& op)
    {
       // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
       FC_ASSERT( !op.extensions.value.claim_from_asset_id.valid() ||
@@ -80,14 +89,19 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 { try {
 
    const database& d = db();
-   // Define now from the current block time
    const time_point_sec now = d.head_block_time();
+
+   // Hardfork Checks:
+   detail::check_asset_options_hf_1774(now, op.common_options);
+   detail::check_asset_options_hf_bsip81(now, op.common_options);
+   if( op.bitasset_opts ) {
+      detail::check_bitasset_options_hf_bsip77( now, *op.bitasset_opts );
+      detail::check_bitasset_options_hf_bsip87( now, *op.bitasset_opts ); // HF_REMOVABLE
+   }
 
    const auto& chain_parameters = d.get_global_properties().parameters;
    FC_ASSERT( op.common_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    FC_ASSERT( op.common_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
-
-   detail::check_asset_options_hf_1774( now, op.common_options );
 
    // Check that all authorities do exist
    for( auto id : op.common_options.whitelist_authorities )
@@ -117,7 +131,6 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    if( op.bitasset_opts )
    {
-      detail::check_bitasset_options_hf_bsip77( now, *op.bitasset_opts );
       const asset_object& backing = op.bitasset_opts->short_backing_asset(d);
       if( backing.is_market_issued() )
       {
@@ -133,14 +146,12 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
       FC_ASSERT( op.bitasset_opts->feed_lifetime_sec > chain_parameters.block_interval &&
                  op.bitasset_opts->force_settlement_delay_sec > chain_parameters.block_interval );
    }
+
    if( op.is_prediction_market )
    {
       FC_ASSERT( op.bitasset_opts );
       FC_ASSERT( op.precision == op.bitasset_opts->short_backing_asset(d).precision );
    }
-
-   // Check the taker fee percent
-   detail::check_asset_options_hf_bsip81(now, op.common_options);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -305,6 +316,10 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    const database& d = db();
    const time_point_sec now = d.head_block_time();
 
+   // Hardfork Checks:
+   detail::check_asset_options_hf_1774(now, o.new_options);
+   detail::check_asset_options_hf_bsip81(now, o.new_options);
+
    const asset_object& a = o.asset_to_update(d);
    auto a_copy = a;
    a_copy.options = o.new_options;
@@ -316,8 +331,6 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
                  "Since Hardfork #199, updating issuer requires the use of asset_update_issuer_operation.");
       validate_new_issuer( d, a, *o.new_issuer );
    }
-
-   detail::check_asset_options_hf_1774( now, o.new_options );
 
    if( a.dynamic_asset_data_id(d).current_supply != 0 )
    {
@@ -343,9 +356,6 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    FC_ASSERT( o.new_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    for( auto id : o.new_options.blacklist_authorities )
       d.get_object(id);
-
-   // Check the taker fee percent
-   detail::check_asset_options_hf_bsip81(now, o.new_options);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
@@ -425,7 +435,7 @@ void_result asset_update_issuer_evaluator::do_apply(const asset_update_issuer_op
  * @param true if after hf 922/931 (if nothing triggers, this and the logic that depends on it
  *    should be removed).
  */
-void check_children_of_bitasset(database& d, const asset_update_bitasset_operation& op,
+void check_children_of_bitasset(const database& d, const asset_update_bitasset_operation& op,
       const asset_object& new_backing_asset)
 {
    // no need to do these checks if the new backing asset is CORE
@@ -454,9 +464,12 @@ void check_children_of_bitasset(database& d, const asset_update_bitasset_operati
 
 void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bitasset_operation& op)
 { try {
-   database& d = db();
+   const database& d = db();
+   const time_point_sec now = d.head_block_time();
 
-   detail::check_bitasset_options_hf_bsip77( d.head_block_time(), op.new_options );
+   // Hardfork Checks:
+   detail::check_bitasset_options_hf_bsip77( now, op.new_options );
+   detail::check_bitasset_options_hf_bsip87( now, op.new_options ); // HF_REMOVABLE
 
    const asset_object& asset_obj = op.asset_to_update(d);
 
