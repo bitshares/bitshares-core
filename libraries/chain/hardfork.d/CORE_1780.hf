@@ -1,0 +1,4 @@
+// Market fees of settle orders aren't shared to referral program
+#ifndef HARDFORK_CORE_1780_TIME
+#define HARDFORK_CORE_1780_TIME (fc::time_point_sec( 1600000000 ) ) // September 13, 2020 3:26:40 PM (GMT)
+#endif

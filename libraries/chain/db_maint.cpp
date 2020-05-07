@@ -32,6 +32,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/buyback_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
@@ -44,6 +45,7 @@
 #include <graphene/chain/vote_count.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/custom_authority_object.hpp>
 
 namespace graphene { namespace chain {
 
@@ -969,6 +971,22 @@ void process_hf_1465( database& db )
    }
 }
 
+/****
+ * @brief a one-time data process to correct current_supply of BTS token in the BitShares mainnet
+ */
+void process_hf_2103( database& db )
+{
+   const balance_object* bal = db.find( balance_id_type( HARDFORK_CORE_2103_BALANCE_ID ) );
+   if( bal != nullptr && bal->balance.amount < 0 )
+   {
+      const asset_dynamic_data_object& ddo = bal->balance.asset_id(db).dynamic_data(db);
+      db.modify<asset_dynamic_data_object>( ddo, [bal](asset_dynamic_data_object& obj) {
+         obj.current_supply -= bal->balance.amount;
+      });
+      db.remove( *bal );
+   }
+}
+
 void update_median_feeds(database& db)
 {
    time_point_sec head_time = db.head_block_time();
@@ -1059,6 +1077,18 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
       });
 
    } // for each market issued asset
+}
+
+
+/**
+ * @brief Remove any custom active authorities whose expiration dates are in the past
+ * @param db A mutable database reference
+ */
+void delete_expired_custom_authorities( database& db )
+{
+   const auto& index = db.get_index_type<custom_authority_index>().indices().get<by_expiration>();
+   while (!index.empty() && index.begin()->valid_to < db.head_block_time())
+      db.remove(*index.begin());
 }
 
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
@@ -1215,6 +1245,10 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    if ( dgpo.next_maintenance_time <= HARDFORK_CORE_1465_TIME && next_maintenance_time > HARDFORK_CORE_1465_TIME )
       process_hf_1465(*this);
 
+   // Fix supply issue
+   if ( dgpo.next_maintenance_time <= HARDFORK_CORE_2103_TIME && next_maintenance_time > HARDFORK_CORE_2103_TIME )
+      process_hf_2103(*this);
+
    modify(dgpo, [next_maintenance_time](dynamic_global_property_object& d) {
       d.next_maintenance_time = next_maintenance_time;
       d.accounts_registered_this_interval = 0;
@@ -1236,6 +1270,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    }
 
    process_bitassets();
+   delete_expired_custom_authorities(*this);
 
    // process_budget needs to run at the bottom because
    //   it needs to know the next_maintenance_time

@@ -219,6 +219,8 @@ public:
    asset set_fees_on_builder_transaction(transaction_handle_type handle, string fee_asset = GRAPHENE_SYMBOL);
    transaction preview_builder_transaction(transaction_handle_type handle);
    signed_transaction sign_builder_transaction(transaction_handle_type transaction_handle, bool broadcast = true);
+   signed_transaction sign_builder_transaction2(transaction_handle_type transaction_handle,
+         const vector<public_key_type>& signing_keys = vector<public_key_type>(), bool broadcast = true);
 
    pair<transaction_id_type,signed_transaction> broadcast_transaction(signed_transaction tx);
 
@@ -297,9 +299,10 @@ public:
 
    signed_transaction htlc_create( string source, string destination, string amount, string asset_symbol,
          string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
-         const uint32_t claim_period_seconds, bool broadcast = false );
+         const uint32_t claim_period_seconds, const std::string& memo, bool broadcast = false );
 
-   signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<char>& preimage, bool broadcast );
+   signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<char>& preimage, 
+         bool broadcast );
 
    signed_transaction htlc_extend ( string htlc_id, string issuer, const uint32_t seconds_to_add, bool broadcast);
 
@@ -325,6 +328,9 @@ public:
          bool broadcast );
 
    signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false);
+   signed_transaction sign_transaction2(signed_transaction tx,
+                                        const vector<public_key_type>& signing_keys = vector<public_key_type>(),
+                                        bool broadcast = false);
 
    flat_set<public_key_type> get_transaction_signers(const signed_transaction &tx) const;
 

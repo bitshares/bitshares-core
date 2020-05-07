@@ -59,6 +59,8 @@ namespace graphene { namespace chain {
             } time_lock;
          } conditions;
 
+         fc::optional<memo_data> memo;
+
       /****
        * Index helper for timelock
        */
