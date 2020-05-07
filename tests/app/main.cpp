@@ -327,9 +327,9 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app1.p2p_node()->broadcast(graphene::net::trx_message(trx));
 
       #ifdef NDEBUG
-        #define BROADCAST_WAIT_TIME (fc::milliseconds(3000))
+        #define BROADCAST_WAIT_TIME (fc::milliseconds(5000))
       #else
-        #define BROADCAST_WAIT_TIME (fc::milliseconds(10000))
+        #define BROADCAST_WAIT_TIME (fc::milliseconds(15000))
       #endif
       fc::usleep( BROADCAST_WAIT_TIME );
 
