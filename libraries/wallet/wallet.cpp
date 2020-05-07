@@ -202,10 +202,10 @@ uint64_t wallet_api::get_asset_count()const
 
 signed_transaction wallet_api::htlc_create( string source, string destination, string amount, string asset_symbol,
          string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
-         const uint32_t claim_period_seconds, bool broadcast)
+         const uint32_t claim_period_seconds, const std::string& memo, bool broadcast)
 {
    return my->htlc_create(source, destination, amount, asset_symbol, hash_algorithm, preimage_hash, preimage_size,
-         claim_period_seconds, broadcast);
+         claim_period_seconds, memo, broadcast);
 }
 
 fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
@@ -223,6 +223,8 @@ fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
       const auto& asset = my->get_asset( obj.transfer.asset_id );
       transfer["asset"] = asset.symbol;
       transfer["amount"] = graphene::app::uint128_amount_to_string( obj.transfer.amount.value, asset.precision );
+      if (obj.memo.valid())
+         transfer["memo"] = my->read_memo( *obj.memo );
       class htlc_hash_to_variant_visitor
       {
          public:
@@ -234,6 +236,8 @@ fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
          { return convert("SHA1", obj.str()); }
          result_type operator()(const fc::sha256& obj)const
          { return convert("SHA256", obj.str()); }
+         result_type operator()(const fc::hash160& obj)const
+         { return convert("HASH160", obj.str()); }
          private:
          result_type convert(const std::string& type, const std::string& hash)const
          {
@@ -369,7 +373,7 @@ vector<operation_detail> wallet_api::get_relative_account_history(
 
 account_history_operation_detail wallet_api::get_account_history_by_operations(
       string name,
-      vector<uint16_t> operation_types,
+      flat_set<uint16_t> operation_types,
       uint32_t start,
       int limit)
 {
@@ -524,6 +528,13 @@ transaction wallet_api::preview_builder_transaction(transaction_handle_type hand
 signed_transaction wallet_api::sign_builder_transaction(transaction_handle_type transaction_handle, bool broadcast)
 {
    return my->sign_builder_transaction(transaction_handle, broadcast);
+}
+
+signed_transaction wallet_api::sign_builder_transaction2(transaction_handle_type transaction_handle,
+                                                        const vector<public_key_type>& explicit_keys,
+                                                        bool broadcast)
+{
+   return my->sign_builder_transaction2(transaction_handle, explicit_keys, broadcast);
 }
 
 pair<transaction_id_type,signed_transaction> wallet_api::broadcast_transaction(signed_transaction tx)
@@ -997,6 +1008,12 @@ void wallet_api::set_wallet_filename(string wallet_filename)
 signed_transaction wallet_api::sign_transaction(signed_transaction tx, bool broadcast /* = false */)
 { try {
    return my->sign_transaction( tx, broadcast);
+} FC_CAPTURE_AND_RETHROW( (tx) ) }
+
+signed_transaction wallet_api::sign_transaction2(signed_transaction tx, const vector<public_key_type>& signing_keys,
+                                                 bool broadcast /* = false */)
+{ try {
+   return my->sign_transaction2( tx, signing_keys, broadcast);
 } FC_CAPTURE_AND_RETHROW( (tx) ) }
 
 flat_set<public_key_type> wallet_api::get_transaction_signers(const signed_transaction &tx) const
@@ -1905,9 +1922,9 @@ signed_transaction wallet_api::account_store_map(string account, string catalog,
 }
 
 vector<account_storage_object> wallet_api::get_account_storage(string account, string catalog)
-{
+{ try {
    return my->_custom_operations->get_storage_info(account, catalog);
-}
+} FC_CAPTURE_AND_RETHROW( (account)(catalog) ) }
 
 signed_block_with_info::signed_block_with_info( const signed_block& block )
    : signed_block( block )

@@ -166,6 +166,9 @@ namespace graphene { namespace chain {
 
          void_result do_evaluate( const asset_claim_fees_operation& o );
          void_result do_apply( const asset_claim_fees_operation& o );
+
+         const asset_object* container_asset = nullptr;
+         const asset_dynamic_data_object* container_ddo = nullptr;
    };
 
    class asset_claim_pool_evaluator : public evaluator<asset_claim_pool_evaluator>

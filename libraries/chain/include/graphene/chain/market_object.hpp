@@ -70,6 +70,7 @@ class limit_order_object : public abstract_object<limit_order_object>
 struct by_price;
 struct by_expiration;
 struct by_account;
+struct by_account_price;
 typedef multi_index_container<
    limit_order_object,
    indexed_by<
@@ -87,7 +88,15 @@ typedef multi_index_container<
          >,
          composite_key_compare< std::greater<price>, std::less<object_id_type> >
       >,
+      // index used by APIs
       ordered_unique< tag<by_account>,
+         composite_key< limit_order_object,
+            member<limit_order_object, account_id_type, &limit_order_object::seller>,
+            member<object, object_id_type, &object::id>
+         >
+      >,
+      // index used by APIs
+      ordered_unique< tag<by_account_price>,
          composite_key< limit_order_object,
             member<limit_order_object, account_id_type, &limit_order_object::seller>,
             member<limit_order_object, price, &limit_order_object::sell_price>,

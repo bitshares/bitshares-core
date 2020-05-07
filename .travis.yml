@@ -31,5 +31,7 @@ jobs:
   include:
     - stage: build for cache
       script: ./programs/build_helpers/build_protocol
-    - stage: build and test
+    - stage: build, test and scan partly with sonar
       script: ./programs/build_helpers/build_and_test
+    - stage: scan fully with sonar
+      script: ./programs/build_helpers/scan_with_sonar

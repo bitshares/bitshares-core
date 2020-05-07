@@ -41,6 +41,7 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/witness_schedule_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/custom_authority_object.hpp>
 
 #include <fc/io/raw.hpp>
 
@@ -127,7 +128,7 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::condition_info::ti
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::condition_info, BOOST_PP_SEQ_NIL,
    (hash_lock)(time_lock) )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object, (graphene::db::object),
-               (transfer) (conditions) )
+               (transfer) (conditions) (memo) )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::operation_history_object, (graphene::chain::object),
                     (op)(result)(block_num)(trx_in_block)(op_in_trx)(virtual_op) )
@@ -189,6 +190,10 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::worker_object, (graphene::db::o
                     (url)
                   )
 
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::custom_authority_object, (graphene::db::object),
+                               (account)(enabled)(valid_from)(valid_to)(operation_type)
+                               (auth)(restrictions)(restriction_counter) )
+
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::balance_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::block_summary_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::budget_record )
@@ -210,3 +215,4 @@ GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::withdraw_permission_
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::witness_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::witness_schedule_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::worker_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::custom_authority_object )

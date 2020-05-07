@@ -55,6 +55,26 @@ namespace detail {
  * No more asset updates may be issued.
 */
 void database::globally_settle_asset( const asset_object& mia, const price& settlement_price )
+{
+   auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+   bool before_core_hardfork_1669 = ( maint_time <= HARDFORK_CORE_1669_TIME ); // whether to use call_price
+
+   if( before_core_hardfork_1669 )
+   {
+      globally_settle_asset_impl( mia, settlement_price,
+                                  get_index_type<call_order_index>().indices().get<by_price>() );
+   }
+   else
+   {
+      globally_settle_asset_impl( mia, settlement_price,
+                                  get_index_type<call_order_index>().indices().get<by_collateral>() );
+   }
+}
+
+template<typename IndexType>
+void database::globally_settle_asset_impl( const asset_object& mia,
+                                           const price& settlement_price,
+                                           const IndexType& call_index )
 { try {
    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
    FC_ASSERT( !bitasset.has_settlement(), "black swan already occurred, it should not happen again" );
@@ -65,28 +85,29 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    const asset_dynamic_data_object& mia_dyn = mia.dynamic_asset_data_id(*this);
    auto original_mia_supply = mia_dyn.current_supply;
 
-   const auto& call_price_index = get_index_type<call_order_index>().indices().get<by_price>();
-
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
 
    // cancel all call orders and accumulate it into collateral_gathered
-   auto call_itr = call_price_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
-   auto call_end = call_price_index.upper_bound( price::max( bitasset.options.short_backing_asset, mia.id ) );
+   auto call_itr = call_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
+   auto call_end = call_index.upper_bound( price::max( bitasset.options.short_backing_asset, mia.id ) );
+
    asset pays;
    while( call_itr != call_end )
    {
-      if( before_core_hardfork_342 )
-         pays = call_itr->get_debt() * settlement_price; // round down, in favor of call order
-      else
-         pays = call_itr->get_debt().multiply_and_round_up( settlement_price ); // round up, in favor of global settlement fund
+      const call_order_object& order = *call_itr;
+      ++call_itr;
 
-      if( pays > call_itr->get_collateral() )
-         pays = call_itr->get_collateral();
+      if( before_core_hardfork_342 )
+         pays = order.get_debt() * settlement_price; // round down, in favor of call order
+      else
+         pays = order.get_debt().multiply_and_round_up( settlement_price ); // round up in favor of global-settle fund
+
+      if( pays > order.get_collateral() )
+         pays = order.get_collateral();
 
       collateral_gathered += pays;
-      const auto&  order = *call_itr;
-      ++call_itr;
+
       FC_ASSERT( fill_call_order( order, pays, order.get_debt(), settlement_price, true ) ); // call order is maker
    }
 
@@ -784,28 +805,80 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
    const account_object& seller = order.seller(*this);
    const asset_object& recv_asset = receives.asset_id(*this);
 
-   auto issuer_fees = pay_market_fees(&seller, recv_asset, receives);
+   auto issuer_fees = pay_market_fees(&seller, recv_asset, receives, is_maker);
 
    pay_order( seller, receives - issuer_fees, pays );
 
    assert( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation( order.id, order.seller, pays, receives, issuer_fees, fill_price, is_maker ) );
 
-   // conditional because cheap integer comparison may allow us to avoid two expensive modify() and object lookups
-   if( order.deferred_fee > 0 )
-   {
-      modify( seller.statistics(*this), [&]( account_statistics_object& statistics )
-      {
-         statistics.pay_fee( order.deferred_fee, get_global_properties().parameters.cashback_vesting_threshold );
-      } );
-   }
+   // BSIP85: Maker order creation fee discount, https://github.com/bitshares/bsips/blob/master/bsip-0085.md
+   //   if the order creation fee was paid in BTS,
+   //     return round_down(deferred_fee * maker_fee_discount_percent) to the owner,
+   //     then process the remaining deferred fee as before;
+   //   if the order creation fee was paid in another asset,
+   //     return round_down(deferred_paid_fee * maker_fee_discount_percent) to the owner,
+   //     return round_down(deferred_fee * maker_fee_discount_percent) to the fee pool of the asset,
+   //     then process the remaining deferred fee and deferred paid fee as before.
+   const uint16_t maker_discount_percent = get_global_properties().parameters.get_maker_fee_discount_percent();
 
+   // Save local copies for calculation
+   share_type deferred_fee = order.deferred_fee;
+   share_type deferred_paid_fee = order.deferred_paid_fee.amount;
+
+   // conditional because cheap integer comparison may allow us to avoid two expensive modify() and object lookups
    if( order.deferred_paid_fee.amount > 0 ) // implies head_block_time() > HARDFORK_CORE_604_TIME
    {
+      share_type fee_pool_refund = 0;
+      if( is_maker && maker_discount_percent > 0 )
+      {
+         share_type refund = detail::calculate_percent( deferred_paid_fee, maker_discount_percent );
+         // Note: it's possible that the deferred_paid_fee is very small,
+         //       which can result in a zero refund due to rounding issue,
+         //       in this case, no refund to the fee pool
+         if( refund > 0 )
+         {
+            FC_ASSERT( refund <= deferred_paid_fee, "Internal error" );
+            adjust_balance( order.seller, asset(refund, order.deferred_paid_fee.asset_id) );
+            deferred_paid_fee -= refund;
+
+            // deferred_fee might be positive too
+            FC_ASSERT( deferred_fee > 0, "Internal error" );
+            fee_pool_refund = detail::calculate_percent( deferred_fee, maker_discount_percent );
+            FC_ASSERT( fee_pool_refund <= deferred_fee, "Internal error" );
+            deferred_fee -= fee_pool_refund;
+         }
+      }
+
       const auto& fee_asset_dyn_data = order.deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
-      modify( fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {
-         addo.accumulated_fees += order.deferred_paid_fee.amount;
+      modify( fee_asset_dyn_data, [deferred_paid_fee,fee_pool_refund](asset_dynamic_data_object& addo) {
+         addo.accumulated_fees += deferred_paid_fee;
+         addo.fee_pool += fee_pool_refund;
       });
+   }
+
+   if( order.deferred_fee > 0 )
+   {
+      if( order.deferred_paid_fee.amount <= 0 // paid in CORE, or before HF 604
+            && is_maker && maker_discount_percent > 0 )
+      {
+         share_type refund = detail::calculate_percent( deferred_fee, maker_discount_percent );
+         if( refund > 0 )
+         {
+            FC_ASSERT( refund <= deferred_fee, "Internal error" );
+            adjust_balance( order.seller, asset(refund, asset_id_type()) );
+            deferred_fee -= refund;
+         }
+      }
+      // else do nothing here, because we have already processed it above, or no need to process
+
+      if( deferred_fee > 0 )
+      {
+         modify( seller.statistics(*this), [deferred_fee,this]( account_statistics_object& statistics )
+         {
+            statistics.pay_fee( deferred_fee, get_global_properties().parameters.cashback_vesting_threshold );
+         } );
+      }
    }
 
    if( pays == order.amount_for_sale() )
@@ -815,7 +888,7 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
    }
    else
    {
-      modify( order, [&]( limit_order_object& b ) {
+      modify( order, [&pays]( limit_order_object& b ) {
                              b.for_sale -= pays.amount;
                              b.deferred_fee = 0;
                              b.deferred_paid_fee.amount = 0;
@@ -895,14 +968,22 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
 { try {
    bool filled = false;
 
-   auto issuer_fees = pay_market_fees( nullptr, get(receives.asset_id), receives);
+   const account_object* settle_owner_ptr = nullptr;
+   // The owner of the settle order pays market fees to the issuer of the collateral asset after HF core-1780
+   //
+   // TODO Check whether the HF check can be removed after the HF.
+   //      Note: even if logically it can be removed, perhaps the removal will lead to a small performance
+   //            loss. Needs testing.
+   if( head_block_time() >= HARDFORK_CORE_1780_TIME )
+      settle_owner_ptr = &settle.owner(*this);
+
+   auto issuer_fees = pay_market_fees( settle_owner_ptr, get(receives.asset_id), receives, is_maker );
 
    if( pays < settle.balance )
    {
       modify(settle, [&pays](force_settlement_object& s) {
          s.balance -= pays;
       });
-      filled = false;
    } else {
       filled = true;
    }
@@ -942,6 +1023,14 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     if( !mia.is_market_issued() ) return false;
 
     const asset_bitasset_data_object& bitasset = ( bitasset_ptr ? *bitasset_ptr : mia.bitasset_data(*this) );
+    
+    // price feeds can cause black swans in prediction markets
+    // The hardfork check may be able to be removed after the hardfork date
+    // if check_for_blackswan never triggered a black swan on a prediction market.
+    // NOTE: check_for_blackswan returning true does not always mean a black
+    // swan was triggered.
+    if ( maint_time >= HARDFORK_CORE_460_TIME && bitasset.is_prediction_market )
+       return false;
 
     if( check_for_blackswan( mia, enable_black_swan, &bitasset ) )
        return false;
@@ -1137,16 +1226,31 @@ void database::pay_order( const account_object& receiver, const asset& receives,
    adjust_balance(receiver.get_id(), receives);
 }
 
-asset database::calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount )
+asset database::calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount, const bool& is_maker)
 {
    assert( trade_asset.id == trade_amount.asset_id );
 
    if( !trade_asset.charges_market_fees() )
       return trade_asset.amount(0);
-   if( trade_asset.options.market_fee_percent == 0 )
+   // Optimization: The fee is zero if the order is a maker, and the maker fee percent is 0%
+   if( is_maker && trade_asset.options.market_fee_percent == 0 )
       return trade_asset.amount(0);
 
-   auto value = detail::calculate_percent(trade_amount.amount, trade_asset.options.market_fee_percent);
+   // Optimization: The fee is zero if the order is a taker, and the taker fee percent is 0%
+   const optional<uint16_t>& taker_fee_percent = trade_asset.options.extensions.value.taker_fee_percent;
+   if(!is_maker && taker_fee_percent.valid() && *taker_fee_percent == 0)
+      return trade_asset.amount(0);
+
+   uint16_t fee_percent;
+   if (is_maker) {
+      // Maker orders are charged the maker fee percent
+      fee_percent = trade_asset.options.market_fee_percent;
+   } else {
+      // Taker orders are charged the taker fee percent if they are valid.  Otherwise, the maker fee percent.
+      fee_percent = taker_fee_percent.valid() ? *taker_fee_percent : trade_asset.options.market_fee_percent;
+   }
+
+   auto value = detail::calculate_percent(trade_amount.amount, fee_percent);
    asset percent_fee = trade_asset.amount(value);
 
    if( percent_fee.amount > trade_asset.options.max_market_fee )
@@ -1155,11 +1259,32 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
    return percent_fee;
 }
 
-asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives )
+asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,
+                                const bool& is_maker)
 {
-   const auto issuer_fees = calculate_market_fee( recv_asset, receives );
+   const auto market_fees = calculate_market_fee( recv_asset, receives, is_maker );
+   auto issuer_fees = market_fees;
    FC_ASSERT( issuer_fees <= receives, "Market fee shouldn't be greater than receives");
    //Don't dirty undo state if not actually collecting any fees
+   if ( issuer_fees.amount > 0 )
+   {
+      // Share market fees to the network
+      const uint16_t network_percent = get_global_properties().parameters.get_market_fee_network_percent();
+      if( network_percent > 0 )
+      {
+         const auto network_fees_amt = detail::calculate_percent( issuer_fees.amount, network_percent );
+         FC_ASSERT( network_fees_amt <= issuer_fees.amount,
+                    "Fee shared to the network shouldn't be greater than total market fee" );
+         if( network_fees_amt > 0 )
+         {
+            const asset network_fees = recv_asset.amount( network_fees_amt );
+            deposit_market_fee_vesting_balance( GRAPHENE_COMMITTEE_ACCOUNT, network_fees );
+            issuer_fees -= network_fees;
+         }
+      }
+   }
+
+   // Process the remaining fees
    if ( issuer_fees.amount > 0 )
    {
       // calculate and pay rewards
@@ -1182,35 +1307,58 @@ asset database::pay_market_fees(const account_object* seller, const asset_object
             if ( reward_value > 0 && is_authorized_asset(*this, seller->registrar(*this), recv_asset) )
             {
                reward = recv_asset.amount(reward_value);
-               FC_ASSERT( reward < issuer_fees, "Market reward should be less than issuer fees");
+               // TODO after hf_1774, remove the `if` check, keep the code in `else`
+               if( head_block_time() < HARDFORK_1774_TIME ){
+                  FC_ASSERT( reward < issuer_fees, "Market reward should be less than issuer fees");
+               }
+               else{
+                  FC_ASSERT( reward <= issuer_fees, "Market reward should not be greater than issuer fees");
+               }
                // cut referrer percent from reward
                auto registrar_reward = reward;
-               if( seller->referrer != seller->registrar )
+
+               auto registrar = seller->registrar;
+               auto referrer = seller->referrer;
+
+               // After HF core-1800, for funds going to temp-account, redirect to committee-account
+               if( head_block_time() >= HARDFORK_CORE_1800_TIME )
+               {
+                  if( registrar == GRAPHENE_TEMP_ACCOUNT )
+                     registrar = GRAPHENE_COMMITTEE_ACCOUNT;
+                  if( referrer == GRAPHENE_TEMP_ACCOUNT )
+                     referrer = GRAPHENE_COMMITTEE_ACCOUNT;
+               }
+
+               if( referrer != registrar )
                {
                   const auto referrer_rewards_value = detail::calculate_percent( reward.amount,
                                                                                  seller->referrer_rewards_percentage );
 
-                  if ( referrer_rewards_value > 0 && is_authorized_asset(*this, seller->referrer(*this), recv_asset) )
+                  if ( referrer_rewards_value > 0 && is_authorized_asset(*this, referrer(*this), recv_asset) )
                   {
                      FC_ASSERT ( referrer_rewards_value <= reward.amount.value,
                                  "Referrer reward shouldn't be greater than total reward" );
                      const asset referrer_reward = recv_asset.amount(referrer_rewards_value);
                      registrar_reward -= referrer_reward;
-                     deposit_market_fee_vesting_balance(seller->referrer, referrer_reward);
+                     deposit_market_fee_vesting_balance(referrer, referrer_reward);
                   }
                }
-               deposit_market_fee_vesting_balance(seller->registrar, registrar_reward);
+               if( registrar_reward.amount > 0 )
+                  deposit_market_fee_vesting_balance(registrar, registrar_reward);
             }
          }
       }
 
-      const auto& recv_dyn_data = recv_asset.dynamic_asset_data_id(*this);
-      modify( recv_dyn_data, [&issuer_fees, &reward]( asset_dynamic_data_object& obj ){
-         obj.accumulated_fees += issuer_fees.amount - reward.amount;
-      });
+      if( issuer_fees.amount > reward.amount )
+      {
+         const auto& recv_dyn_data = recv_asset.dynamic_asset_data_id(*this);
+         modify( recv_dyn_data, [&issuer_fees, &reward]( asset_dynamic_data_object& obj ){
+            obj.accumulated_fees += issuer_fees.amount - reward.amount;
+         });
+      }
    }
 
-   return issuer_fees;
+   return market_fees;
 }
 
 } }

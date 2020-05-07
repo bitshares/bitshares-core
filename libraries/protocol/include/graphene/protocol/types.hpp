@@ -44,6 +44,7 @@
 #include <fc/crypto/sha1.hpp>
 #include <fc/crypto/sha224.hpp>
 #include <fc/crypto/sha256.hpp>
+#include <fc/crypto/hash160.hpp>
 #include <fc/crypto/elliptic.hpp>
 #include <fc/reflect/reflect.hpp>
 #include <fc/reflect/variant.hpp>
@@ -239,7 +240,8 @@ GRAPHENE_DEFINE_IDS(protocol, protocol_ids, /*protocol objects are not prefixed*
                     (vesting_balance)
                     (worker)
                     (balance)
-                    (htlc))
+                    (htlc)
+                    (custom_authority))
 
 FC_REFLECT(graphene::protocol::public_key_type, (key_data))
 FC_REFLECT(graphene::protocol::public_key_type::binary_key, (data)(check))

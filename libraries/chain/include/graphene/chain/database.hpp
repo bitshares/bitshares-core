@@ -43,6 +43,8 @@
 
 #include <map>
 
+namespace graphene { namespace protocol { struct predicate_result; } }
+
 namespace graphene { namespace chain {
    using graphene::db::abstract_object;
    using graphene::db::object;
@@ -279,6 +281,17 @@ namespace graphene { namespace chain {
 
          node_property_object& node_properties();
 
+         /**
+          * @brief Get a list of custom authorities which can validate the provided operation for the provided account
+          * @param account The account whose authority is required
+          * @param op The operation requring the specified account's authority
+          * @param rejected_authorities [Optional] A pointer to a map that should be populated with the custom
+          * authorities which were valid, but rejected because the operation did not comply with the restrictions
+          * @return A vector of authorities which can be used to authorize op in place of account
+          */
+         vector<authority> get_viable_custom_authorities(
+                 account_id_type account, const operation& op,
+                 rejected_predicate_map* rejected_authorities = nullptr )const;
 
          uint32_t last_non_undoable_block_num() const;
          //////////////////// db_init.cpp ////////////////////
@@ -365,6 +378,13 @@ namespace graphene { namespace chain {
          void cancel_bid(const collateral_bid_object& bid, bool create_virtual_op = true);
          void execute_bid( const collateral_bid_object& bid, share_type debt_covered, share_type collateral_from_fund, const price_feed& current_feed );
 
+      private:
+         template<typename IndexType>
+         void globally_settle_asset_impl( const asset_object& bitasset,
+                                          const price& settle_price,
+                                          const IndexType& call_index );
+
+      public:
          /**
           * @brief Process a new limit order through the markets
           * @param order The new order to process
@@ -419,8 +439,9 @@ namespace graphene { namespace chain {
          // helpers to fill_order
          void pay_order( const account_object& receiver, const asset& receives, const asset& pays );
 
-         asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
-         asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives );
+         asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount, const bool& is_maker);
+         asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,
+                               const bool& is_maker);
          ///@}
 
 

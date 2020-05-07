@@ -177,7 +177,7 @@ namespace graphene { namespace protocol {
       /**
        *  Validates all of the parameters are present and accounted for.
        */
-      void validate()const;
+      void validate()const {}
 
       template<typename Operation>
       const typename Operation::fee_parameters_type& get()const

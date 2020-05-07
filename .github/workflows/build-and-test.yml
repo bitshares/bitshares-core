@@ -35,6 +35,9 @@ jobs:
                      libboost-regex-dev \
                      libboost-coroutine-dev \
                      libcurl4-openssl-dev
+        sudo apt-get auto-remove -y
+        sudo apt-get clean -y
+        df -h
     - uses: actions/checkout@v1
       with:
         submodules: recursive
@@ -42,6 +45,7 @@ jobs:
       run: |
         mkdir -p _build
         pushd _build
+        export -n BOOST_ROOT BOOST_INCLUDEDIR BOOST_LIBRARYDIR
         cmake -D CMAKE_BUILD_TYPE=Release \
               -D CMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON \
               -D CMAKE_C_COMPILER=gcc \
@@ -63,16 +67,20 @@ jobs:
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
         make -j 2 -C _build
+        df -h
     - name: Unit-Tests
       run: |
         _build/tests/app_test
+        _build/tests/es_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/es_test
+        df -h
     - name: Node-Test
       run: |
+        df -h
         pushd _build
         ../programs/build_helpers/run-node-test
+        df -h
   test-debug:
     name: Build and run tests in Debug mode
     runs-on: ubuntu-latest
@@ -98,13 +106,21 @@ jobs:
                      libboost-regex-dev \
                      libboost-coroutine-dev \
                      libcurl4-openssl-dev
+        sudo apt-get auto-remove -y
+        sudo apt-get clean -y
+        df -h
     - uses: actions/checkout@v1
       with:
         submodules: recursive
     - name: Configure
       run: |
         mkdir -p _build
+        sudo mkdir -p /mnt/libraries /mnt/tests
+        sudo chmod a+rwx /mnt/libraries /mnt/tests
+        ln -s /mnt/libraries _build/libraries
+        ln -s /mnt/tests _build/tests
         pushd _build
+        export -n BOOST_ROOT BOOST_INCLUDEDIR BOOST_LIBRARYDIR
         cmake -D CMAKE_BUILD_TYPE=Debug \
               -D CMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON \
               -D CMAKE_C_COMPILER=gcc \
@@ -125,17 +141,24 @@ jobs:
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
+        df -h
         make -j 2 -C _build
+        df -h
     - name: Unit-Tests
       run: |
         _build/tests/app_test
+        df -h
+        _build/tests/es_test
+        df -h
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/es_test
+        df -h
     - name: Node-Test
       run: |
+        df -h
         pushd _build
         ../programs/build_helpers/run-node-test
+        df -h
   prepare-mingw64-libs:
     name: Build 3rd-party libraries required for windows cross-build
     runs-on: ubuntu-latest
@@ -231,6 +254,9 @@ jobs:
                      ccache \
                      g++-mingw-w64-x86-64 \
                      mingw-w64-tools
+        sudo apt-get auto-remove -y
+        sudo apt-get clean -y
+        df -h
     - uses: actions/checkout@v1
       with:
         submodules: recursive
@@ -307,12 +333,15 @@ jobs:
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
         make -j 2 -C _build witness_node cli_wallet app_test cli_test chain_test
+        df -h
     - name: Unit-Tests
       run: |
         _build/tests/app_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
         libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
+        df -h
     - name: Node-Test
       run: |
+        df -h
         pushd _build
         ../programs/build_helpers/run-node-test
