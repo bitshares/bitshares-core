@@ -216,6 +216,10 @@ void bitasset_options::validate() const
       FC_ASSERT( *extensions.value.initial_collateral_ratio >= GRAPHENE_MIN_COLLATERAL_RATIO );
       FC_ASSERT( *extensions.value.initial_collateral_ratio <= GRAPHENE_MAX_COLLATERAL_RATIO );
    }
+
+   if( extensions.value.force_settle_fee_percent.valid() )
+      FC_ASSERT( *extensions.value.force_settle_fee_percent <= GRAPHENE_100_PERCENT );
+
 }
 
 void asset_options::validate()const
@@ -252,8 +256,6 @@ void asset_options::validate()const
    }
    if( extensions.value.reward_percent.valid() )
       FC_ASSERT( *extensions.value.reward_percent <= GRAPHENE_100_PERCENT );
-   if( extensions.value.force_settle_fee_percent.valid() )
-      FC_ASSERT( *extensions.value.force_settle_fee_percent <= GRAPHENE_100_PERCENT );
 }
 
 void asset_claim_fees_operation::validate()const {
