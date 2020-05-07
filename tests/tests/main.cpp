@@ -24,12 +24,14 @@
 #include <cstdlib>
 #include <iostream>
 #include <boost/test/included/unit_test.hpp>
+#include <chrono>
 
 extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;
 
 boost::unit_test::test_suite* init_unit_test_suite(int argc, char* argv[]) {
-   std::srand(time(NULL));
-   std::cout << "Random number generator seeded to " << time(NULL) << std::endl;
+   const auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+   std::srand( seed );
+   std::cout << "Random number generator seeded to " << seed << std::endl;
    const char* genesis_timestamp_str = getenv("GRAPHENE_TESTING_GENESIS_TIMESTAMP");
    if( genesis_timestamp_str != nullptr )
    {
