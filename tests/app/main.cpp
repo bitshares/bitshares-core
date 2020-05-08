@@ -246,9 +246,9 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Starting app1 and waiting 500 ms" );
       app1.startup();
       #ifdef NDEBUG
-        #define LISTEN_WAIT_TIME (fc::milliseconds(10000))
-      #else
         #define LISTEN_WAIT_TIME (fc::milliseconds(30000))
+      #else
+        #define LISTEN_WAIT_TIME (fc::milliseconds(120000))
       #endif
       fc::wait_for( LISTEN_WAIT_TIME, [&app1] () {
          const auto status = app1.p2p_node()->network_get_info();
@@ -327,11 +327,13 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app1.p2p_node()->broadcast(graphene::net::trx_message(trx));
 
       #ifdef NDEBUG
-        #define BROADCAST_WAIT_TIME (fc::milliseconds(5000))
-      #else
         #define BROADCAST_WAIT_TIME (fc::milliseconds(15000))
+      #else
+        #define BROADCAST_WAIT_TIME (fc::milliseconds(60000))
       #endif
-      fc::usleep( BROADCAST_WAIT_TIME );
+      fc::wait_for( BROADCAST_WAIT_TIME, [db2] () {
+         return db2->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value == 1000000;
+      });
 
       BOOST_CHECK_EQUAL( db1->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
       BOOST_CHECK_EQUAL( db2->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
@@ -345,16 +347,25 @@ BOOST_AUTO_TEST_CASE( two_node_network )
          committee_key,
          database::skip_nothing);
 
+      BOOST_CHECK_EQUAL( db1->head_block_num(), 0u );
+      BOOST_CHECK_EQUAL( db2->head_block_num(), 1u );
+      BOOST_CHECK_EQUAL( block_1.block_num(), 1u );
+
       BOOST_TEST_MESSAGE( "Broadcasting block" );
       app2.p2p_node()->broadcast(graphene::net::block_message( block_1 ));
 
-      fc::usleep( BROADCAST_WAIT_TIME );
+      fc::wait_for( BROADCAST_WAIT_TIME, [db1] () {
+         return db1->head_block_num() == 1;
+      });
 
       BOOST_TEST_MESSAGE( "Verifying nodes are still connected" );
       BOOST_CHECK_EQUAL(app1.p2p_node()->get_connection_count(), 1u);
       BOOST_CHECK_EQUAL(app1.chain_database()->head_block_num(), 1u);
 
       BOOST_TEST_MESSAGE( "Checking GRAPHENE_NULL_ACCOUNT has balance" );
+      BOOST_CHECK_EQUAL( db1->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
+      BOOST_CHECK_EQUAL( db2->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
+
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
