@@ -75,7 +75,7 @@ void change_backing_asset(database_fixture& fixture, const fc::ecc::private_key&
    }
    catch (fc::exception& ex)
    {
-      BOOST_FAIL( "Exception thrown in chainge_backing_asset. Exception was: " +
+      BOOST_FAIL( "Exception thrown in change_backing_asset. Exception was: " +
             ex.to_string(fc::log_level(fc::log_level::all)) );
    }
 }
@@ -1406,5 +1406,139 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
    INVOKE(hf_890_test);
 
 } FC_LOG_AND_RETHROW() }
+
+
+   /**
+    * Test the claiming of collateral asset fees before HARDFORK_CORE_BSIP_87_74_COLLATFEE_TIME.
+    *
+    * Test prohibitions against changing of the backing/collateral asset for a smart asset
+    * if any collateral asset fees are available to be claimed.
+    */
+   BOOST_AUTO_TEST_CASE(change_backing_asset_prohibitions) {
+      try {
+         /**
+          * Initialize
+          */
+         // Initialize for the current time
+         trx.clear();
+         set_expiration(db, trx);
+
+         // Initialize actors
+         ACTORS((smartissuer)(feedproducer)); // Actors for smart asset
+         ACTORS((jill)(izzy)); // Actors for user-issued assets
+         ACTORS((alice)); // Actors who hold balances
+
+         price price(asset(1, asset_id_type(1)), asset(1));
+         uint16_t market_fee_percent = 20 * GRAPHENE_1_PERCENT;
+         create_user_issued_asset("JCOIN", jill, charge_market_fee, price, 2, market_fee_percent);
+         generate_block(); trx.clear(); set_expiration(db, trx);
+         const asset_object jillcoin = get_asset("JCOIN");
+
+         create_user_issued_asset("ICOIN", izzy, charge_market_fee, price, 2, market_fee_percent);
+         generate_block();
+         const asset_object izzycoin = get_asset("ICOIN");
+
+         // Create the smart asset backed by JCOIN
+         const uint16_t smartbit_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
+         create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
+                         charge_market_fee, 2, jillcoin.id);
+
+         // Obtain asset object after a block is generated to obtain the final object that is commited to the database
+         generate_block(); trx.clear(); set_expiration(db, trx);
+         const asset_object &smartbit = get_asset("SMARTBIT");
+         const asset_bitasset_data_object& smartbit_bitasset_data = (*smartbit.bitasset_data_id)(db);
+         // Confirm that the asset is to be backed by JCOIN
+         BOOST_CHECK(smartbit_bitasset_data.options.short_backing_asset == jillcoin.id);
+
+         // Fund balances of the actors
+         issue_uia(alice, jillcoin.amount(5000 * std::pow(10, jillcoin.precision)));
+         BOOST_REQUIRE_EQUAL(get_balance(alice, jillcoin), 5000 * std::pow(10, jillcoin.precision));
+         BOOST_REQUIRE_EQUAL(get_balance(alice, smartbit), 0);
+
+
+         /**
+          * Claim any amount of collateral asset fees.  This should fail because claiming such fees are prohibited
+          * before the HARDFORK_CORE_BSIP_87_74_COLLATFEE_TIME.
+          */
+         trx.clear();
+         asset_claim_fees_operation claim_op;
+         claim_op.issuer = smartissuer.id;
+         claim_op.extensions.value.claim_from_asset_id = smartbit.id;
+         claim_op.amount_to_claim = jillcoin.amount(5 * std::pow(10, jillcoin.precision));
+         trx.operations.push_back(claim_op);
+         set_expiration(db, trx);
+         sign(trx, smartissuer_private_key);
+         GRAPHENE_REQUIRE_THROW(PUSH_TX(db, trx), fc::exception);
+
+
+         /**
+          * Advance to when the collateral fee container is activated
+          */
+         generate_blocks(HARDFORK_CORE_BSIP_87_74_COLLATFEE_TIME);
+         generate_block(); trx.clear(); set_expiration(db, trx);
+
+
+         /**
+          * Cause some collateral of JCOIN to be accumulated as collateral fee within the SMARTBIT asset type
+          */
+         // HACK: Before BSIP74 or BSIP87 are introduced, it is not formally possible to accumulate collateral fees.
+         // Therefore, the accumulation for this test will be informally induced by direct manipulation of the database.
+         // More formal tests will be provided with the PR for either BSIP74 or BSIP87.
+         // IMPORTANT: The use of this hack requires that no additional blocks are subsequently generated!
+         asset accumulation_amount = jillcoin.amount(40 * std::pow(10, jillcoin.precision)); // JCOIN
+         db.adjust_balance(alice.id, -accumulation_amount); // Deduct 40 JCOIN from alice as a "collateral fee"
+         smartbit.accumulate_fee(db, accumulation_amount); // Add 40 JCOIN from alice as a "collateral fee"
+
+
+         /**
+          * Attempt to change the backing asset.  This should fail because there are unclaimed collateral fees.
+          */
+         trx.clear();
+         asset_update_bitasset_operation change_backing_asset_op;
+         change_backing_asset_op.asset_to_update = smartbit.id;
+         change_backing_asset_op.issuer = smartissuer.id;
+         change_backing_asset_op.new_options.short_backing_asset = izzycoin.id;
+         trx.operations.push_back(change_backing_asset_op);
+         sign(trx, smartissuer_private_key);
+         REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "Must claim collateral-denominated fees");
+
+
+         /**
+          * Attempt to claim a negative amount of the collateral asset fees.
+          * This should fail because positive amounts are required.
+          */
+         trx.clear();
+         claim_op.amount_to_claim = jillcoin.amount(-9 * std::pow(10, jillcoin.precision));
+         trx.operations.push_back(claim_op);
+         set_expiration(db, trx);
+         sign(trx, smartissuer_private_key);
+         REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "amount_to_claim.amount > 0");
+
+
+         /**
+          * Claim all of the available collateral asset fees
+          */
+         trx.clear();
+         claim_op.amount_to_claim = accumulation_amount;
+         trx.operations.push_back(claim_op);
+         set_expiration(db, trx);
+         sign(trx, smartissuer_private_key);
+         PUSH_TX(db, trx);
+
+
+         /**
+          * Attempt to change the backing asset.
+          * This should succeed because there are no collateral asset fees are waiting to be claimed.
+          */
+         trx.clear();
+         trx.operations.push_back(change_backing_asset_op);
+         sign(trx, smartissuer_private_key);
+         PUSH_TX(db, trx);
+
+         // Confirm the change to the backing asset
+         BOOST_CHECK(smartbit_bitasset_data.options.short_backing_asset == izzycoin.id);
+
+      } FC_LOG_AND_RETHROW()
+   }
 
 BOOST_AUTO_TEST_SUITE_END()
