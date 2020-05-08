@@ -93,13 +93,12 @@ struct force_settle_database_fixture : database_fixture {
          creator.common_options.flags = flags & ~global_settle;
          creator.common_options.core_exchange_rate = price(asset(1, asset_id_type(1)), asset(1));
 
-         if (force_settlement_fee_percent.valid()) {
-            creator.common_options.extensions.value.force_settle_fee_percent = force_settlement_fee_percent;
-         }
-
          creator.bitasset_opts = bitasset_options();
          creator.bitasset_opts->force_settlement_offset_percent = force_settlement_offset_percent;
          creator.bitasset_opts->short_backing_asset = backing_asset;
+         if (force_settlement_fee_percent.valid()) {
+            creator.bitasset_opts->extensions.value.force_settle_fee_percent = force_settlement_fee_percent;
+         }
 
          trx.operations.push_back(std::move(creator));
          trx.validate();
@@ -597,7 +596,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
                            call_paul_id(db).collateral.value);
 
          // The asset's force settlement fee % should still not be set
-         BOOST_CHECK(!bitusd.options.extensions.value.force_settle_fee_percent.valid());
+         BOOST_CHECK(!bitusd.bitasset_data(db).options.extensions.value.force_settle_fee_percent.valid());
          // There should be no accumulated asset fees
          BOOST_CHECK(bitusd.dynamic_asset_data_id(db).accumulated_fees == 0);
          BOOST_CHECK(bitusd.dynamic_asset_data_id(db).accumulated_collateral_fees == 0);
@@ -607,10 +606,10 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          // 10. Asset owner sets the force-fee percentage to 3%
          ///////
          const uint16_t usd_fsf_percent_3 = 3 * GRAPHENE_1_PERCENT; // 3% Force-settlement fee % (BSIP87)
-         asset_update_operation uop;
+         asset_update_bitasset_operation uop;
          uop.issuer = assetowner.id;
          uop.asset_to_update = bitusd.get_id();
-         uop.new_options = bitusd.options;
+         uop.new_options = bitusd.bitasset_data(db).options;
          uop.new_options.extensions.value.force_settle_fee_percent = usd_fsf_percent_3;
 
          trx.clear();
@@ -620,9 +619,10 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          PUSH_TX(db, trx);
 
          // The force settlement fee % should be set
-         BOOST_CHECK(bitusd.options.extensions.value.force_settle_fee_percent.valid());
-         BOOST_CHECK_EQUAL(usd_fsf_percent_3, *bitusd.options.extensions.value.force_settle_fee_percent);
-
+         BOOST_CHECK(bitusd.bitasset_data(db).options.extensions.value.force_settle_fee_percent.valid());
+         BOOST_CHECK_EQUAL( usd_fsf_percent_3,
+                            *bitusd.bitasset_data(db).options.extensions.value.force_settle_fee_percent
+                          );
 
          ///////
          // 11. Paul gives Yanna 40 bitUSD and retains 10 bitUSD
@@ -684,7 +684,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
                            call_paul_id(db).collateral.value);
 
          // The asset's force settlement fee % should still not be set
-         BOOST_CHECK(bitusd.options.extensions.value.force_settle_fee_percent.valid());
+         BOOST_CHECK(bitusd.bitasset_data(db).options.extensions.value.force_settle_fee_percent.valid());
          // There should be some accumulated collateral-deonominated fees
          BOOST_CHECK(bitusd.dynamic_asset_data_id(db).accumulated_fees == 0);
          BOOST_CHECK(bitusd.dynamic_asset_data_id(db).accumulated_collateral_fees == yanna_fsf_fee_core);
@@ -694,10 +694,10 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          // 13. Asset owner updates the force-settlement fee to 4%
          ///////
          const uint16_t usd_fsf_percent_4 = 4 * GRAPHENE_1_PERCENT; // 4% Force-settlement fee % (BSIP87)
-         uop = asset_update_operation();
+         uop = asset_update_bitasset_operation();
          uop.issuer = assetowner.id;
          uop.asset_to_update = bitusd.get_id();
-         uop.new_options = bitusd.options;
+         uop.new_options = bitusd.bitasset_data(db).options;
          uop.new_options.extensions.value.force_settle_fee_percent = usd_fsf_percent_4;
 
          trx.clear();
@@ -707,9 +707,10 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          PUSH_TX(db, trx);
 
          // The force settlement fee % should be set
-         BOOST_CHECK(bitusd.options.extensions.value.force_settle_fee_percent.valid());
-         BOOST_CHECK_EQUAL(usd_fsf_percent_4, *bitusd.options.extensions.value.force_settle_fee_percent);
-
+         BOOST_CHECK(bitusd.bitasset_data(db).options.extensions.value.force_settle_fee_percent.valid());
+         BOOST_CHECK_EQUAL( usd_fsf_percent_4,
+                            *bitusd.bitasset_data(db).options.extensions.value.force_settle_fee_percent
+                          );
 
          ///////
          // 14. Paul gives Vikram 10 bitUSD and retains 0 bitUSD
@@ -776,7 +777,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
                  call_paul_id(db).collateral.value);
 
          // The asset's force settlement fee % should still not be set
-         BOOST_CHECK(bitusd.options.extensions.value.force_settle_fee_percent.valid());
+         BOOST_CHECK(bitusd.bitasset_data(db).options.extensions.value.force_settle_fee_percent.valid());
          // There should be some accumulated collateral-deonominated fees
          BOOST_CHECK(bitusd.dynamic_asset_data_id(db).accumulated_fees == 0);
          const uint64_t expected_accumulation_fsf_core_amount = yanna_fsf_fee_core + vikram_fsf_fee_core;
