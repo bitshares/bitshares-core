@@ -1408,14 +1408,15 @@ asset database::pay_force_settle_fees(const asset_object& collecting_asset, cons
 {
    FC_ASSERT( collecting_asset.get_id() != collat_receives.asset_id );
 
-   const asset_object& collat_asset = get(collat_receives.asset_id);
-   if( !collecting_asset.options.extensions.value.force_settle_fee_percent.valid()
-         || *collecting_asset.options.extensions.value.force_settle_fee_percent == 0 )
-      return collat_asset.amount(0);
+   const bitasset_options& collecting_bitasset_opts = collecting_asset.bitasset_data(*this).options;
+
+   if( !collecting_bitasset_opts.extensions.value.force_settle_fee_percent.valid()
+         || *collecting_bitasset_opts.extensions.value.force_settle_fee_percent == 0 )
+      return asset{ 0, collat_receives.asset_id };
 
    auto value = detail::calculate_percent(collat_receives.amount,
-                                          *collecting_asset.options.extensions.value.force_settle_fee_percent);
-   asset settle_fee = collat_asset.amount(value);
+                                          *collecting_bitasset_opts.extensions.value.force_settle_fee_percent);
+   asset settle_fee = asset{ value, collat_receives.asset_id };
 
    // Deposit fee in asset's dynamic data object:
    if( value > 0) {

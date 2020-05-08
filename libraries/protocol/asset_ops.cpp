@@ -210,6 +210,16 @@ void bitasset_options::validate() const
    FC_ASSERT(minimum_feeds > 0);
    FC_ASSERT(force_settlement_offset_percent <= GRAPHENE_100_PERCENT);
    FC_ASSERT(maximum_force_settlement_volume <= GRAPHENE_100_PERCENT);
+
+   if( extensions.value.initial_collateral_ratio.valid() )
+   {
+      FC_ASSERT( *extensions.value.initial_collateral_ratio >= GRAPHENE_MIN_COLLATERAL_RATIO );
+      FC_ASSERT( *extensions.value.initial_collateral_ratio <= GRAPHENE_MAX_COLLATERAL_RATIO );
+   }
+
+   if( extensions.value.force_settle_fee_percent.valid() )
+      FC_ASSERT( *extensions.value.force_settle_fee_percent <= GRAPHENE_100_PERCENT );
+
 }
 
 void asset_options::validate()const
@@ -246,8 +256,6 @@ void asset_options::validate()const
    }
    if( extensions.value.reward_percent.valid() )
       FC_ASSERT( *extensions.value.reward_percent <= GRAPHENE_100_PERCENT );
-   if( extensions.value.force_settle_fee_percent.valid() )
-      FC_ASSERT( *extensions.value.force_settle_fee_percent <= GRAPHENE_100_PERCENT );
 }
 
 void asset_claim_fees_operation::validate()const {
@@ -267,6 +275,7 @@ void asset_claim_pool_operation::validate()const {
 } } // namespace graphene::protocol
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_options )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::bitasset_options::ext )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::bitasset_options )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::additional_asset_options )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_create_operation::fee_parameters_type )
