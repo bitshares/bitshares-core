@@ -246,11 +246,11 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Starting app1 and waiting 500 ms" );
       app1.startup();
       #ifdef NDEBUG
-        #define LISTEN_WAIT_TIME (fc::milliseconds(30000))
+        #define NODE_STARTUP_WAIT_TIME (fc::milliseconds(30000))
       #else
-        #define LISTEN_WAIT_TIME (fc::milliseconds(120000))
+        #define NODE_STARTUP_WAIT_TIME (fc::milliseconds(120000))
       #endif
-      fc::wait_for( LISTEN_WAIT_TIME, [&app1] () {
+      fc::wait_for( NODE_STARTUP_WAIT_TIME, [&app1] () {
          const auto status = app1.p2p_node()->network_get_info();
          return status["listening_on"].as<fc::ip::endpoint>( 5 ).port() == 3939;
       });
@@ -273,12 +273,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Starting app2 and waiting for connection" );
       app2.startup();
 
-      #ifdef NDEBUG
-        #define CONNECT_WAIT_TIME (fc::milliseconds(10000))
-      #else
-        #define CONNECT_WAIT_TIME (fc::milliseconds(30000))
-      #endif
-      fc::wait_for( CONNECT_WAIT_TIME, [&app1] () { return app1.p2p_node()->get_connection_count() > 0; } );
+      fc::wait_for( NODE_STARTUP_WAIT_TIME, [&app1] () { return app1.p2p_node()->get_connection_count() > 0; } );
 
       BOOST_REQUIRE_EQUAL(app1.p2p_node()->get_connection_count(), 1u);
       BOOST_CHECK_EQUAL(std::string(app1.p2p_node()->get_connected_peers().front().host.get_address()), "127.0.0.1");

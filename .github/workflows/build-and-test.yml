@@ -70,10 +70,10 @@ jobs:
         df -h
     - name: Unit-Tests
       run: |
-        _build/tests/app_test
-        _build/tests/es_test
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
+        _build/tests/app_test -l message
+        _build/tests/es_test -l message
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l message
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test -l message
         df -h
     - name: Node-Test
       run: |
@@ -146,12 +146,12 @@ jobs:
         df -h
     - name: Unit-Tests
       run: |
-        _build/tests/app_test
+        _build/tests/app_test -l message
         df -h
-        _build/tests/es_test
+        _build/tests/es_test -l message
         df -h
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l message
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test -l message
         df -h
     - name: Node-Test
       run: |
@@ -336,9 +336,9 @@ jobs:
         df -h
     - name: Unit-Tests
       run: |
-        _build/tests/app_test
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test
+        _build/tests/app_test -l message
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l message
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/cli_test -l message
         df -h
     - name: Node-Test
       run: |
