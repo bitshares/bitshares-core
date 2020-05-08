@@ -925,7 +925,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          trx.operations.push_back(claim_op);
          set_expiration(db, trx);
          sign(trx, assetowner_private_key);
-         REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "Attempt to claim more collateral fees");
+         REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "Attempt to claim more backing-asset fees");
 
          // Attempt to claim with an invalid asset asset type
          trx.clear();
