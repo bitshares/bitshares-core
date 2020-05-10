@@ -493,7 +493,17 @@ void database_fixture::verify_asset_supplies( const database& db )
    map<asset_id_type,share_type> total_balances;
    map<asset_id_type,share_type> total_debts;
    share_type core_in_orders;
+   share_type core_inactive;
+   share_type core_pob;
+   share_type core_pol;
+   share_type pob_value;
+   share_type pol_value;
    share_type reported_core_in_orders;
+   share_type reported_core_inactive;
+   share_type reported_core_pob;
+   share_type reported_core_pol;
+   share_type reported_pob_value;
+   share_type reported_pol_value;
 
    for( const account_balance_object& b : acct_balance_index )
       total_balances[b.asset_type] += b.balance;
@@ -504,6 +514,11 @@ void database_fixture::verify_asset_supplies( const database& db )
    for( const account_statistics_object& a : statistics_index )
    {
       reported_core_in_orders += a.total_core_in_orders;
+      reported_core_inactive += a.total_core_inactive;
+      reported_core_pob += a.total_core_pob;
+      reported_core_pol += a.total_core_pol;
+      reported_pob_value += a.total_pob_value;
+      reported_pol_value += a.total_pol_value;
       total_balances[asset_id_type()] += a.pending_fees + a.pending_vested_fees;
    }
    for( const limit_order_object& o : db.get_index_type<limit_order_index>().indices() )
@@ -540,6 +555,25 @@ void database_fixture::verify_asset_supplies( const database& db )
       total_balances[ asset_id_type() ] += fba.accumulated_fba_fees;
    for( const balance_object& bo : db.get_index_type< balance_index >().indices() )
       total_balances[ bo.balance.asset_id ] += bo.balance.amount;
+   for( const ticket_object& to : db.get_index_type< ticket_index >().indices() )
+   {
+      if( to.amount.asset_id == asset_id_type() )
+      {
+         if( to.current_type == lock_forever && to.value == 0 )
+            core_inactive += to.amount.amount;
+         else if( to.current_type == lock_forever && to.value != 0 )
+         {
+            core_pob += to.amount.amount;
+            pob_value += to.value;
+         }
+         else
+         {
+            core_pol += to.amount.amount;
+            pol_value += to.value;
+         }
+      }
+      total_balances[ to.amount.asset_id ] += to.amount.amount;
+   }
 
    total_balances[asset_id_type()] += db.get_dynamic_global_properties().witness_budget;
 
@@ -561,6 +595,13 @@ void database_fixture::verify_asset_supplies( const database& db )
    }
 
    BOOST_CHECK_EQUAL( core_in_orders.value , reported_core_in_orders.value );
+   BOOST_CHECK_EQUAL( core_inactive.value , reported_core_inactive.value );
+   BOOST_CHECK_EQUAL( core_pob.value , reported_core_pob.value );
+   BOOST_CHECK_EQUAL( core_pol.value , reported_core_pol.value );
+   BOOST_CHECK_EQUAL( pob_value.value , reported_pob_value.value );
+   BOOST_CHECK_EQUAL( pol_value.value , reported_pol_value.value );
+   BOOST_CHECK_EQUAL( core_pob.value , db.get_dynamic_global_properties().total_pob.value );
+   BOOST_CHECK_EQUAL( core_inactive.value , db.get_dynamic_global_properties().total_inactive.value );
 //   wlog("***  End  asset supply verification ***");
 }
 
@@ -1272,6 +1313,61 @@ void database_fixture::fund_fee_pool( const account_object& from, const asset_ob
    PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
+}
+
+ticket_create_operation database_fixture::make_ticket_create_op( account_id_type account, ticket_type type,
+                                                                 const asset& amount ) const
+{
+   ticket_create_operation op;
+   op.account = account;
+   op.target_type = static_cast<uint8_t>(type);
+   op.amount = amount;
+   return op;
+}
+
+const ticket_object& database_fixture::create_ticket( account_id_type account, ticket_type type,
+                                                      const asset& amount )
+{
+   ticket_create_operation op = make_ticket_create_op( account, type, amount );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
+   const operation_result& op_result = ptx.operation_results.front();
+   trx.operations.clear();
+   verify_asset_supplies(db);
+   return db.get<ticket_object>( op_result.get<object_id_type>() );
+}
+
+ticket_update_operation database_fixture::make_ticket_update_op( const ticket_object& ticket, ticket_type type,
+                                                                 const optional<asset>& amount ) const
+{
+   ticket_update_operation op;
+   op.ticket = ticket.id;
+   op.account = ticket.account;
+   op.target_type = static_cast<uint8_t>(type);
+   op.amount_for_new_target = amount;
+   return op;
+}
+
+generic_operation_result database_fixture::update_ticket( const ticket_object& ticket, ticket_type type,
+                                                          const optional<asset>& amount )
+{
+   ticket_update_operation op = make_ticket_update_op( ticket, type, amount );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
+   const operation_result& op_result = ptx.operation_results.front();
+   trx.operations.clear();
+   verify_asset_supplies(db);
+   return op_result.get<generic_operation_result>();
 }
 
 void database_fixture::enable_fees()

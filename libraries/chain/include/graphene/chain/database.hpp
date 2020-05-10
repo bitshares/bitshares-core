@@ -539,6 +539,7 @@ namespace graphene { namespace chain {
          void update_core_exchange_rates();
          void update_maintenance_flag( bool new_maintenance_flag );
          void update_withdraw_permissions();
+         void process_tickets();
          bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
                                    const asset_bitasset_data_object* bitasset_ptr = nullptr );
          void clear_expired_htlcs();
@@ -593,7 +594,8 @@ namespace graphene { namespace chain {
          vector<uint64_t>                  _vote_tally_buffer;
          vector<uint64_t>                  _witness_count_histogram_buffer;
          vector<uint64_t>                  _committee_count_histogram_buffer;
-         uint64_t                          _total_voting_stake;
+         uint64_t                          _total_voting_stake[2]; // 0=committee, 1=witness,
+                                                                   // as in vote_id_type::vote_type
 
          flat_map<uint32_t,block_id_type>  _checkpoints;
 

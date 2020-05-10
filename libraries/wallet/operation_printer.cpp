@@ -216,4 +216,9 @@ std::string operation_result_printer::operator()(const asset& a)
    return _wallet.get_asset(a.asset_id).amount_to_pretty_string(a);
 }
 
+std::string operation_result_printer::operator()(const generic_operation_result& r)
+{
+   return fc::json::to_pretty_string(r);
+}
+
 }}} // graphene::wallet::detail

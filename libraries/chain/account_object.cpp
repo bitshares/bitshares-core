@@ -312,7 +312,8 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_object,
                     (graphene::db::object),
                     (membership_expiration_date)(registrar)(referrer)(lifetime_referrer)
                     (network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)
-                    (name)(owner)(active)(options)(statistics)(whitelisting_accounts)(blacklisting_accounts)
+                    (name)(owner)(active)(options)(num_committee_voted)(statistics)
+                    (whitelisting_accounts)(blacklisting_accounts)
                     (whitelisted_accounts)(blacklisted_accounts)
                     (cashback_vb)
                     (owner_special_authority)(active_special_authority)
@@ -330,6 +331,8 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_statistics_object,
                     (most_recent_op)
                     (total_ops)(removed_ops)
                     (total_core_in_orders)
+                    (total_core_inactive)(total_core_pob)(total_core_pol)
+                    (total_pob_value)(total_pol_value)
                     (core_in_balance)
                     (has_cashback_vb)
                     (is_voting)
