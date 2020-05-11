@@ -1467,9 +1467,25 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
          claim_op.extensions.value.claim_from_asset_id = smartbit.id;
          claim_op.amount_to_claim = jillcoin.amount(5 * jillcoin_unit);
          trx.operations.push_back(claim_op);
-         set_expiration(db, trx);
          sign(trx, smartissuer_private_key);
-         GRAPHENE_REQUIRE_THROW(PUSH_TX(db, trx), fc::exception);
+         REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "Collateral-denominated fees are not yet active");
+
+
+         /**
+          * Propose to claim any amount of collateral asset fees.
+          * This should fail because claiming such fees are prohibited before HARDFORK_CORE_BSIP_87_74_COLLATFEE_TIME.
+          */
+         proposal_create_operation cop;
+         cop.review_period_seconds = 86400;
+         uint32_t buffer_seconds = 60 * 60;
+         cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + buffer_seconds;
+         cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+         cop.proposed_ops.emplace_back(claim_op);
+
+         trx.clear();
+         trx.operations.push_back(cop);
+         // sign(trx, smartissuer_private_key);
+         REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "Collateral-denominated fees are not yet active");
 
 
          /**
@@ -1489,6 +1505,8 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
          asset accumulation_amount = jillcoin.amount(40 * jillcoin_unit); // JCOIN
          db.adjust_balance(alice_id, -accumulation_amount); // Deduct 40 JCOIN from alice as a "collateral fee"
          smartbit.accumulate_fee(db, accumulation_amount); // Add 40 JCOIN from alice as a "collateral fee"
+         BOOST_REQUIRE_EQUAL(get_balance(alice, jillcoin), (5000 * jillcoin_unit) - (40 * jillcoin_unit));
+         BOOST_CHECK(smartbit.dynamic_asset_data_id(db).accumulated_collateral_fees == accumulation_amount.amount);
 
 
          /**
@@ -1511,20 +1529,56 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
          trx.clear();
          claim_op.amount_to_claim = jillcoin.amount(-9 * jillcoin_unit);
          trx.operations.push_back(claim_op);
-         set_expiration(db, trx);
          sign(trx, smartissuer_private_key);
          REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "amount_to_claim.amount > 0");
 
 
          /**
-          * Claim all of the available collateral asset fees
+          * Attempt to claim 0 amount of the collateral asset fees.
+          * This should fail because positive amounts are required.
           */
          trx.clear();
-         claim_op.amount_to_claim = accumulation_amount;
+         claim_op.amount_to_claim = jillcoin.amount(0 * jillcoin_unit);
          trx.operations.push_back(claim_op);
-         set_expiration(db, trx);
+         sign(trx, smartissuer_private_key);
+         REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "amount_to_claim.amount > 0");
+
+
+         /**
+          * Attempt to claim excessive amount of collateral asset fees.
+          * This should fail because there are insufficient collateral fees.
+          */
+         trx.clear();
+         claim_op.amount_to_claim = accumulation_amount + jillcoin.amount(1);
+         trx.operations.push_back(claim_op);
+         sign(trx, smartissuer_private_key);
+         REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "Attempt to claim more backing-asset fees");
+
+
+         /**
+          * Claim some of the collateral asset fees
+          */
+         share_type part_of_accumulated_fees = accumulation_amount.amount / 4;
+         FC_ASSERT(part_of_accumulated_fees.value > 0); // Partial claim should be positive
+         share_type remainder_accumulated_fees = accumulation_amount.amount - part_of_accumulated_fees;
+         FC_ASSERT(remainder_accumulated_fees.value > 0); // Planned remainder should be positive
+         trx.clear();
+         claim_op.amount_to_claim = jillcoin.amount(part_of_accumulated_fees);
+         trx.operations.push_back(claim_op);
          sign(trx, smartissuer_private_key);
          PUSH_TX(db, trx);
+         BOOST_CHECK(smartbit.dynamic_asset_data_id(db).accumulated_collateral_fees == remainder_accumulated_fees);
+
+
+         /**
+          * Claim all the remaining collateral asset fees
+          */
+         trx.clear();
+         claim_op.amount_to_claim = jillcoin.amount(remainder_accumulated_fees);
+         trx.operations.push_back(claim_op);
+         sign(trx, smartissuer_private_key);
+         PUSH_TX(db, trx);
+         BOOST_CHECK(smartbit.dynamic_asset_data_id(db).accumulated_collateral_fees == 0); // 0 remainder
 
 
          /**
