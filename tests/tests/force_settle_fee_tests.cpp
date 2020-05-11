@@ -96,9 +96,7 @@ struct force_settle_database_fixture : database_fixture {
          creator.bitasset_opts = bitasset_options();
          creator.bitasset_opts->force_settlement_offset_percent = force_settlement_offset_percent;
          creator.bitasset_opts->short_backing_asset = backing_asset;
-         if (force_settlement_fee_percent.valid()) {
-            creator.bitasset_opts->extensions.value.force_settle_fee_percent = force_settlement_fee_percent;
-         }
+         creator.bitasset_opts->extensions.value.force_settle_fee_percent = force_settlement_fee_percent;
 
          trx.operations.push_back(std::move(creator));
          trx.validate();
@@ -520,7 +518,6 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          claim_op.extensions.value.claim_from_asset_id = bitusd.id;
          claim_op.amount_to_claim = core.amount(5 * std::pow(10, core.precision));
          trx.operations.push_back(claim_op);
-         set_expiration(db, trx);
          sign(trx, assetowner_private_key);
          REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "Collateral-denominated fees are not yet active");
 
@@ -861,7 +858,6 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          claim_op.extensions.value.claim_from_asset_id = bitusd.id;
          claim_op.amount_to_claim = core.amount(expected_accumulation_fsf_core_amount);
          trx.operations.push_back(claim_op);
-         set_expiration(db, trx);
          sign(trx, assetowner_private_key);
          PUSH_TX(db, trx);
 
@@ -912,7 +908,6 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          claim_op.extensions.value.claim_from_asset_id = bitusd.id;
          claim_op.amount_to_claim = core.amount(-5 * std::pow(10, core.precision));
          trx.operations.push_back(claim_op);
-         set_expiration(db, trx);
          sign(trx, assetowner_private_key);
          REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "amount_to_claim.amount > 0");
 
@@ -923,7 +918,6 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          claim_op.extensions.value.claim_from_asset_id = bitusd.id;
          claim_op.amount_to_claim = rachel_fsf_fee_core + 1;
          trx.operations.push_back(claim_op);
-         set_expiration(db, trx);
          sign(trx, assetowner_private_key);
          REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "Attempt to claim more backing-asset fees");
 
@@ -942,7 +936,6 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          claim_op.extensions.value.claim_from_asset_id = bitusd.id;
          claim_op.amount_to_claim = jillcoin.amount(rachel_fsf_fee_core.value);
          trx.operations.push_back(claim_op);
-         set_expiration(db, trx);
          sign(trx, assetowner_private_key);
          REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "is not backed by asset");
 
@@ -953,7 +946,6 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          claim_op.extensions.value.claim_from_asset_id = bitusd.id;
          claim_op.amount_to_claim = rachel_fsf_fee_core;
          trx.operations.push_back(claim_op);
-         set_expiration(db, trx);
          sign(trx, assetowner_private_key);
          PUSH_TX(db, trx);
          BOOST_CHECK(bitusd.dynamic_asset_data_id(db).accumulated_collateral_fees == 0);
