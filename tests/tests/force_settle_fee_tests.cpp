@@ -405,7 +405,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          // 1. Create assets
          ///////
          const uint16_t usd_fso_percent = 5 * GRAPHENE_1_PERCENT; // 5% Force-settlement offset fee %
-         const uint16_t usd_fsf_percent_0 = 0 * GRAPHENE_1_PERCENT; // 0% Force-settlement offset fee %
+         const uint16_t usd_fsf_percent_0 = 0 * GRAPHENE_1_PERCENT; // 0% Force-settlement fee %
 
          // Attempt and fail to create the smart asset with a force-settlement fee % before HARDFORK_CORE_BSIP87_TIME
          trx.clear();
@@ -683,7 +683,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          BOOST_CHECK_EQUAL(paul_initial_core - rachel_fso_remainder_core - michael_fso_remainder_core - yanna_fso_remainder_core,
                            call_paul_id(db).collateral.value);
 
-         // The asset's force settlement fee % should still not be set
+         // The asset's force settlement fee % should be valid
          BOOST_CHECK(bitusd.bitasset_data(db).options.extensions.value.force_settle_fee_percent.valid());
          // There should be some accumulated collateral-deonominated fees
          BOOST_CHECK(bitusd.dynamic_asset_data_id(db).accumulated_fees == 0);
