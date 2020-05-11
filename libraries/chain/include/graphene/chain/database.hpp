@@ -461,7 +461,6 @@ namespace graphene { namespace chain {
          bool fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
                                  const price& fill_price, const bool is_maker );
 
-
          bool check_call_orders( const asset_object& mia, bool enable_black_swan = true, bool for_new_limit_order = false,
                                  const asset_bitasset_data_object* bitasset_ptr = nullptr );
 
@@ -490,7 +489,7 @@ namespace graphene { namespace chain {
           */       
          asset pay_margin_fees(const asset_object& debt, const asset& receives );
          asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,
-                                const bool& is_maker);
+               const bool& is_maker);
 
          ///@}
 

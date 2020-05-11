@@ -283,7 +283,7 @@ namespace graphene { namespace protocol {
 
       price price_feed::max_short_squeeze_price()const
       {
-         return settlement_price * ratio_type( GRAPHENE_COLLATERAL_RATIO_DENOM, maximum_short_squeeze_ratio);
+         return settlement_price * ratio_type( GRAPHENE_COLLATERAL_RATIO_DENOM, maximum_short_squeeze_ratio );
       }
 
       price price_feed::maintenance_collateralization()const

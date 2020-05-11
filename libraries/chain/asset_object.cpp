@@ -182,7 +182,7 @@ uint16_t asset_bitasset_data_object::adjusted_mcfr(const price_feed& price_feed)
    if (options.extensions.value.margin_call_fee_ratio.valid())
    {
       uint16_t mcfr = *options.extensions.value.margin_call_fee_ratio;
-      // Reduce mcfr if it would take all (or even more) of the collateral
+      // Reduce mcfr if it causes parameters to go out of range
       if ( ( 1 > price_feed.maximum_short_squeeze_ratio
             || price_feed.maximum_short_squeeze_ratio >= price_feed.maintenance_collateral_ratio)
             || (1 > price_feed.maximum_short_squeeze_ratio - mcfr 

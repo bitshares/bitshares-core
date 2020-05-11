@@ -927,6 +927,7 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
    // TODO pass in mia and bitasset_data for better performance
    const asset_object& mia = receives.asset_id(*this);
    FC_ASSERT( mia.is_market_issued() );
+   const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
 
    // calculate any margin call fees NOTE: Paid in collateral asset
    asset margin_fee = asset(0);
@@ -951,7 +952,7 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
             if( maint_time <= HARDFORK_CORE_1270_TIME && maint_time > HARDFORK_CORE_343_TIME )
             {
                o.call_price = price::call_price( o.get_debt(), o.get_collateral(),
-                     mia.bitasset_data(*this).current_feed.maintenance_collateral_ratio );
+                     bitasset.current_feed.maintenance_collateral_ratio );
             }
          }
       });
@@ -1029,7 +1030,6 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
  * (due to hardfork changes in the calculation)
  * @param block_time the chain's current block time
  * @param feed the debt asset's price feed
- * @param mcfr the margin call fee ratio (include if the call order is the taker)
  * @returns the max short squeeze price
  */
 price database::get_max_short_squeeze_price( const fc::time_point_sec& block_time, const price_feed& feed)const

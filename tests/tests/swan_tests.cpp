@@ -224,7 +224,6 @@ BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
          price_feed feed;
          feed.settlement_price = settlement_price;
          feed.core_exchange_rate = settlement_price;
-         //wdump( (feed.max_short_squeeze_price()) );
          publish_feed( bitusd, feeder, feed );
       };
 
