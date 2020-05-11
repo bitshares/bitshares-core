@@ -1434,13 +1434,13 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
          generate_block(); trx.clear(); set_expiration(db, trx);
          const asset_object jillcoin = get_asset("JCOIN");
 
-         create_user_issued_asset("ICOIN", izzy, charge_market_fee, price, 2, market_fee_percent);
+         create_user_issued_asset("ICOIN", izzy_id(db), charge_market_fee, price, 2, market_fee_percent);
          generate_block();
          const asset_object izzycoin = get_asset("ICOIN");
 
          // Create the smart asset backed by JCOIN
          const uint16_t smartbit_market_fee_percent = 2 * GRAPHENE_1_PERCENT;
-         create_bitasset("SMARTBIT", smartissuer.id, smartbit_market_fee_percent,
+         create_bitasset("SMARTBIT", smartissuer_id, smartbit_market_fee_percent,
                          charge_market_fee, 2, jillcoin.id);
 
          // Obtain asset object after a block is generated to obtain the final object that is commited to the database
@@ -1462,7 +1462,7 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
           */
          trx.clear();
          asset_claim_fees_operation claim_op;
-         claim_op.issuer = smartissuer.id;
+         claim_op.issuer = smartissuer_id;
          claim_op.extensions.value.claim_from_asset_id = smartbit.id;
          claim_op.amount_to_claim = jillcoin.amount(5 * std::pow(10, jillcoin.precision));
          trx.operations.push_back(claim_op);
@@ -1486,7 +1486,7 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
          // More formal tests will be provided with the PR for either BSIP74 or BSIP87.
          // IMPORTANT: The use of this hack requires that no additional blocks are subsequently generated!
          asset accumulation_amount = jillcoin.amount(40 * std::pow(10, jillcoin.precision)); // JCOIN
-         db.adjust_balance(alice.id, -accumulation_amount); // Deduct 40 JCOIN from alice as a "collateral fee"
+         db.adjust_balance(alice_id, -accumulation_amount); // Deduct 40 JCOIN from alice as a "collateral fee"
          smartbit.accumulate_fee(db, accumulation_amount); // Add 40 JCOIN from alice as a "collateral fee"
 
 
@@ -1496,7 +1496,7 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
          trx.clear();
          asset_update_bitasset_operation change_backing_asset_op;
          change_backing_asset_op.asset_to_update = smartbit.id;
-         change_backing_asset_op.issuer = smartissuer.id;
+         change_backing_asset_op.issuer = smartissuer_id;
          change_backing_asset_op.new_options.short_backing_asset = izzycoin.id;
          trx.operations.push_back(change_backing_asset_op);
          sign(trx, smartissuer_private_key);
