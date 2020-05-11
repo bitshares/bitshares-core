@@ -967,12 +967,28 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          sign(trx, assetowner_private_key);
          REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "is not backed by asset");
 
-         // Attempt to claim all that can be claimed
+         // Attempt to claim part of all that can be claimed
+         share_type partial_claim_core = 1; // 1 satoshi
+         share_type expected_remainder_core = rachel_fsf_fee_core - partial_claim_core;
+         FC_ASSERT(expected_remainder_core.value > 0); // Remainder should be positive
          trx.clear();
          claim_op = asset_claim_fees_operation();
          claim_op.issuer = assetowner.id;
          claim_op.extensions.value.claim_from_asset_id = bitusd.id;
-         claim_op.amount_to_claim = rachel_fsf_fee_core;
+         claim_op.amount_to_claim = partial_claim_core;
+         trx.operations.push_back(claim_op);
+         set_expiration(db, trx);
+         sign(trx, assetowner_private_key);
+         PUSH_TX(db, trx);
+         BOOST_CHECK(bitusd.dynamic_asset_data_id(db).accumulated_collateral_fees == expected_remainder_core);
+
+         // Attempt to claim all that can be claimed
+         generate_block();
+         trx.clear();
+         claim_op = asset_claim_fees_operation();
+         claim_op.issuer = assetowner.id;
+         claim_op.extensions.value.claim_from_asset_id = bitusd.id;
+         claim_op.amount_to_claim = expected_remainder_core;
          trx.operations.push_back(claim_op);
          sign(trx, assetowner_private_key);
          PUSH_TX(db, trx);
