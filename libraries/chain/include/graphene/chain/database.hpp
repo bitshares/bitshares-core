@@ -489,8 +489,8 @@ namespace graphene { namespace chain {
           */       
          asset pay_margin_fees(const asset_object& debt, const asset& receives );
          asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,
-               const bool& is_maker);
-
+                               const bool& is_maker);
+         asset pay_force_settle_fees(const asset_object& collecting_asset, const asset& collat_receives);
          ///@}
 
 

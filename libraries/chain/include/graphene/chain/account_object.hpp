@@ -73,9 +73,9 @@ namespace graphene { namespace chain {
 
          bool has_cashback_vb = false; ///< redundantly store this for better maintenance performance
 
-         bool is_voting = false; ///< redundately store whether this account is voting for better maintenance performance
+         bool is_voting = false; ///< redundately store "if this account is voting" for better maintenance performance
 
-         time_point_sec last_vote_time; // add last time voted
+         time_point_sec last_vote_time; ///< last time voted
 
          /// Whether this account owns some CORE asset and is voting
          inline bool has_some_core_voting() const

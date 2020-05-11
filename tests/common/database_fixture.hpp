@@ -200,8 +200,9 @@ struct database_fixture {
    bool skip_key_index_test = false;
    uint32_t anon_acct_count;
    bool hf1270 = false;
+   bool bsip77 = false;
 
-    database_fixture(const fc::time_point_sec &initial_timestamp =
+   database_fixture(const fc::time_point_sec &initial_timestamp =
                         fc::time_point_sec(GRAPHENE_TESTING_GENESIS_TIMESTAMP));
    ~database_fixture();
 
@@ -283,13 +284,22 @@ struct database_fixture {
 
    const asset_object& get_asset( const string& symbol )const;
    const account_object& get_account( const string& name )const;
+   asset_create_operation make_bitasset( const string& name,
+                                       account_id_type issuer = GRAPHENE_WITNESS_ACCOUNT,
+                                       uint16_t market_fee_percent = 100 /*1%*/,
+                                       uint16_t flags = charge_market_fee,
+                                       uint16_t precision = 2,
+                                       asset_id_type backing_asset = {},
+                                       share_type max_supply = GRAPHENE_MAX_SHARE_SUPPLY,
+                                       optional<uint16_t> initial_cr = {} );
    const asset_object& create_bitasset(const string& name,
                                        account_id_type issuer = GRAPHENE_WITNESS_ACCOUNT,
                                        uint16_t market_fee_percent = 100 /*1%*/,
                                        uint16_t flags = charge_market_fee,
                                        uint16_t precision = 2,
                                        asset_id_type backing_asset = {},
-                                       share_type max_supply = GRAPHENE_MAX_SHARE_SUPPLY );
+                                       share_type max_supply = GRAPHENE_MAX_SHARE_SUPPLY,
+                                       optional<uint16_t> initial_cr = {} );
    const asset_object& create_prediction_market(const string& name,
                                        account_id_type issuer = GRAPHENE_WITNESS_ACCOUNT,
                                        uint16_t market_fee_percent = 100 /*1%*/,

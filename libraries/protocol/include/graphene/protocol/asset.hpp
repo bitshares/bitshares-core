@@ -208,6 +208,9 @@ namespace graphene { namespace protocol {
       /// Calculation: ~settlement_price * maintenance_collateral_ratio / GRAPHENE_COLLATERAL_RATIO_DENOM
       price maintenance_collateralization()const;
 
+      /// The result will be used to check new debt positions and position updates.
+      /// Calculation: ~settlement_price * initial_collateral_ratio / GRAPHENE_COLLATERAL_RATIO_DENOM
+      price calculate_initial_collateralization( uint16_t initial_collateral_ratio )const;
       ///@}
 
       friend bool operator == ( const price_feed& a, const price_feed& b )
