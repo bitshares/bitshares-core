@@ -524,6 +524,19 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          sign(trx, assetowner_private_key);
          REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "Collateral-denominated fees are not yet active");
 
+         // Early proposals to claim should also fail
+         proposal_create_operation cop;
+         cop.review_period_seconds = 86400;
+         uint32_t buffer_seconds = 60 * 60;
+         cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + buffer_seconds;
+         cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+         cop.proposed_ops.emplace_back(claim_op);
+
+         trx.clear();
+         trx.operations.push_back(cop);
+         // sign(trx, smartissuer_private_key);
+         REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "Collateral-denominated fees are not yet active");
+
 
          ///////
          // 7. Activate HARDFORK_CORE_BSIP87_TIME
@@ -912,6 +925,17 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          claim_op.extensions.value.claim_from_asset_id = bitusd.id;
          claim_op.amount_to_claim = core.amount(-5 * core_unit);
          trx.operations.push_back(claim_op);
+         sign(trx, assetowner_private_key);
+         REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "amount_to_claim.amount > 0");
+
+         // Attempt to claim 0 fees
+         trx.clear();
+         claim_op = asset_claim_fees_operation();
+         claim_op.issuer = assetowner.id;
+         claim_op.extensions.value.claim_from_asset_id = bitusd.id;
+         claim_op.amount_to_claim = core.amount(0 * core_unit);
+         trx.operations.push_back(claim_op);
+         set_expiration(db, trx);
          sign(trx, assetowner_private_key);
          REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "amount_to_claim.amount > 0");
 
