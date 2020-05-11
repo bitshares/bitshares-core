@@ -187,8 +187,7 @@ struct database_fixture {
    //   plugins
    graphene::app::application app;
    genesis_state_type genesis_state;
-   // this will give us access to some protected functions for testing
-   database &db;
+   chain::database &db;
    signed_transaction trx;
    public_key_type committee_key;
    account_id_type committee_account;
