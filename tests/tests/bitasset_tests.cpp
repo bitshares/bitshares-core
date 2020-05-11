@@ -1433,6 +1433,7 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
          create_user_issued_asset("JCOIN", jill, charge_market_fee, price, 2, market_fee_percent);
          generate_block(); trx.clear(); set_expiration(db, trx);
          const asset_object jillcoin = get_asset("JCOIN");
+         const int64_t jillcoin_unit = 100; // 100 satoshi JILLCOIN in 1 JILLCOIN
 
          create_user_issued_asset("ICOIN", izzy_id(db), charge_market_fee, price, 2, market_fee_percent);
          generate_block();
@@ -1451,8 +1452,8 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
          BOOST_CHECK(smartbit_bitasset_data.options.short_backing_asset == jillcoin.id);
 
          // Fund balances of the actors
-         issue_uia(alice, jillcoin.amount(5000 * std::pow(10, jillcoin.precision)));
-         BOOST_REQUIRE_EQUAL(get_balance(alice, jillcoin), 5000 * std::pow(10, jillcoin.precision));
+         issue_uia(alice, jillcoin.amount(5000 * jillcoin_unit));
+         BOOST_REQUIRE_EQUAL(get_balance(alice, jillcoin), 5000 * jillcoin_unit);
          BOOST_REQUIRE_EQUAL(get_balance(alice, smartbit), 0);
 
 
@@ -1464,7 +1465,7 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
          asset_claim_fees_operation claim_op;
          claim_op.issuer = smartissuer_id;
          claim_op.extensions.value.claim_from_asset_id = smartbit.id;
-         claim_op.amount_to_claim = jillcoin.amount(5 * std::pow(10, jillcoin.precision));
+         claim_op.amount_to_claim = jillcoin.amount(5 * jillcoin_unit);
          trx.operations.push_back(claim_op);
          set_expiration(db, trx);
          sign(trx, smartissuer_private_key);
@@ -1485,7 +1486,7 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
          // Therefore, the accumulation for this test will be informally induced by direct manipulation of the database.
          // More formal tests will be provided with the PR for either BSIP74 or BSIP87.
          // IMPORTANT: The use of this hack requires that no additional blocks are subsequently generated!
-         asset accumulation_amount = jillcoin.amount(40 * std::pow(10, jillcoin.precision)); // JCOIN
+         asset accumulation_amount = jillcoin.amount(40 * jillcoin_unit); // JCOIN
          db.adjust_balance(alice_id, -accumulation_amount); // Deduct 40 JCOIN from alice as a "collateral fee"
          smartbit.accumulate_fee(db, accumulation_amount); // Add 40 JCOIN from alice as a "collateral fee"
 
@@ -1508,7 +1509,7 @@ BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
           * This should fail because positive amounts are required.
           */
          trx.clear();
-         claim_op.amount_to_claim = jillcoin.amount(-9 * std::pow(10, jillcoin.precision));
+         claim_op.amount_to_claim = jillcoin.amount(-9 * jillcoin_unit);
          trx.operations.push_back(claim_op);
          set_expiration(db, trx);
          sign(trx, smartissuer_private_key);
