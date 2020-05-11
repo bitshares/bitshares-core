@@ -169,6 +169,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          const auto &core = asset_id_type()(db);
          asset_id_type bitusd_id = bitusd.id;
          asset_id_type core_id = core.id;
+         const int64_t bitusd_unit = asset::scaled_precision(bitusd.precision).value; // 100 satoshi USDBIT in 1 USDBIT
 
          // 2. Publish a feed for the smart asset
          update_feed_producers(bitusd_id(db), {feedproducer_id});
@@ -197,7 +198,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          // 4. Paul borrows 1000 bitUSD
          ///////
          // Paul will borrow bitUSD by providing 2x collateral required: 2 * 1/20 = 1/10
-         int64_t paul_initial_usd = 1000 * std::pow(10, bitusd.precision); // 100000
+         int64_t paul_initial_usd = 1000 * bitusd_unit; // 100000
          int64_t paul_initial_core = paul_initial_usd * 2 / 20; // 10000
          const call_order_object &call_paul = *borrow(paul, bitusd.amount(paul_initial_usd),
                                                       core.amount(paul_initial_core));
@@ -211,7 +212,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          // 5. Paul transfers 200 bitUSD to Rachel
          ///////
-         int64_t rachel_initial_usd = 200 * std::pow(10, bitusd.precision);
+         int64_t rachel_initial_usd = 200 * bitusd_unit;
          transfer(paul.id, rachel.id, asset(rachel_initial_usd, bitusd.id));
 
          BOOST_CHECK_EQUAL(get_balance(rachel, core), 0);
@@ -224,7 +225,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          // 6. Rachel force settles 20 bitUSD
          ///////
-         const int64_t rachel_settle_amount = 20 * std::pow(10, bitusd.precision);
+         const int64_t rachel_settle_amount = 20 * bitusd_unit;
          operation_result result = force_settle(rachel, bitusd.amount(rachel_settle_amount));
 
          force_settlement_id_type rachel_settle_id = result.get<object_id_type>();
@@ -421,6 +422,8 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
 
          const auto &bitusd = get_asset("USDBIT");
          const auto &core = asset_id_type()(db);
+         const int64_t core_unit = asset::scaled_precision(core.precision).value; // 100000 satoshi CORE in 1 CORE
+         const int64_t bitusd_unit = asset::scaled_precision(bitusd.precision).value; // 100 satoshi USDBIT in 1 USDBIT
 
 
          ///////
@@ -440,7 +443,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          // 3. Paul borrows 100 bitUSD
          ///////
          // Paul will borrow bitUSD by providing 2x collateral required: 2 * 20 = 40
-         int64_t paul_initial_usd = 100 * std::pow(10, bitusd.precision); // 10000
+         int64_t paul_initial_usd = 100 * bitusd_unit; // 10000
          int64_t paul_initial_core = paul_initial_usd * 2 * 20; // 400000
          const call_order_object &call_paul = *borrow(paul, bitusd.amount(paul_initial_usd),
                                                       core.amount(paul_initial_core));
@@ -454,7 +457,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          // 4. Paul gives Rachel 20 bitUSD and retains 80 bitUSD
          ///////
-         int64_t rachel_initial_usd = 20 * std::pow(10, bitusd.precision);
+         int64_t rachel_initial_usd = 20 * bitusd_unit;
          transfer(paul.id, rachel.id, asset(rachel_initial_usd, bitusd.id));
 
          BOOST_CHECK_EQUAL(get_balance(rachel, bitusd), rachel_initial_usd);
@@ -467,7 +470,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          // 5. Rachel force-settles 2 bitUSD which should be collected from Paul's debt position
          ///////
-         const int64_t rachel_settle_amount = 2 * std::pow(10, bitusd.precision);
+         const int64_t rachel_settle_amount = 2 * bitusd_unit;
          operation_result result = force_settle(rachel, bitusd.amount(rachel_settle_amount));
 
          force_settlement_id_type rachel_settle_id = result.get<object_id_type>();
@@ -516,7 +519,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          asset_claim_fees_operation claim_op;
          claim_op.issuer = assetowner.id;
          claim_op.extensions.value.claim_from_asset_id = bitusd.id;
-         claim_op.amount_to_claim = core.amount(5 * std::pow(10, core.precision));
+         claim_op.amount_to_claim = core.amount(5 * core_unit);
          trx.operations.push_back(claim_op);
          sign(trx, assetowner_private_key);
          REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "Collateral-denominated fees are not yet active");
@@ -538,7 +541,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          // 8. Paul gives Michael 30 bitUSD and retains 50 bitUSD
          ///////
-         int64_t michael_initial_usd = 30 * std::pow(10, bitusd.precision);
+         int64_t michael_initial_usd = 30 * bitusd_unit;
          transfer(paul.id, michael.id, asset(michael_initial_usd, bitusd.id));
 
          // Check Michael's balance
@@ -553,7 +556,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          // 9. Michael force-settles 5 bitUSD which should be collected from Paul's debt position
          ///////
-         const int64_t michael_settle_amount = 5 * std::pow(10, bitusd.precision);
+         const int64_t michael_settle_amount = 5 * bitusd_unit;
          result = force_settle(michael, bitusd.amount(michael_settle_amount));
 
          force_settlement_id_type michael_settle_id = result.get<object_id_type>();
@@ -624,7 +627,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          // 11. Paul gives Yanna 40 bitUSD and retains 10 bitUSD
          ///////
-         int64_t yanna_initial_usd = 40 * std::pow(10, bitusd.precision);
+         int64_t yanna_initial_usd = 40 * bitusd_unit;
          transfer(paul.id, yanna.id, asset(yanna_initial_usd, bitusd.id));
 
          // Check Yanna's balance
@@ -640,7 +643,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          // 12. Yanna force-settles 10 bitUSD which should be collected from Paul's debt position
          ///////
-         const int64_t yanna_settle_amount = 10 * std::pow(10, bitusd.precision);
+         const int64_t yanna_settle_amount = 10 * bitusd_unit;
          result = force_settle(yanna, bitusd.amount(yanna_settle_amount));
 
          force_settlement_id_type yanna_settle_id = result.get<object_id_type>();
@@ -712,7 +715,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          // 14. Paul gives Vikram 10 bitUSD and retains 0 bitUSD
          ///////
-         int64_t vikram_initial_usd = 10 * std::pow(10, bitusd.precision);
+         int64_t vikram_initial_usd = 10 * bitusd_unit;
          transfer(paul.id, vikram.id, asset(vikram_initial_usd, bitusd.id));
 
          // Check Yanna's balance
@@ -729,7 +732,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          // 15. Vikram force-settles 10 bitUSD which should be collected from Paul's debt position
          ///////
-         const int64_t vikram_settle_amount = 10 * std::pow(10, bitusd.precision);
+         const int64_t vikram_settle_amount = 10 * bitusd_unit;
          result = force_settle(vikram, bitusd.amount(vikram_settle_amount));
 
          force_settlement_id_type vikram_settle_id = result.get<object_id_type>();
@@ -896,6 +899,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
 
          // Check the asset owner's accumulated asset fees
          const auto &core = asset_id_type()(db);
+         const int64_t core_unit = asset::scaled_precision(core.precision).value; // 100000 satoshi CORE in 1 CORE
          const asset_object& bitusd = get_asset("USDBIT");
          BOOST_CHECK(bitusd.dynamic_asset_data_id(db).accumulated_fees == 0);
          BOOST_CHECK(bitusd.dynamic_asset_data_id(db).accumulated_collateral_fees > 0);
@@ -906,7 +910,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          asset_claim_fees_operation claim_op;
          claim_op.issuer = assetowner.id;
          claim_op.extensions.value.claim_from_asset_id = bitusd.id;
-         claim_op.amount_to_claim = core.amount(-5 * std::pow(10, core.precision));
+         claim_op.amount_to_claim = core.amount(-5 * core_unit);
          trx.operations.push_back(claim_op);
          sign(trx, assetowner_private_key);
          REQUIRE_EXCEPTION_WITH_TEXT(PUSH_TX(db, trx), "amount_to_claim.amount > 0");
@@ -1000,6 +1004,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          trx.clear();
 
          const auto &bitusd = get_asset("USDBIT");
+         const int64_t bitusd_unit = asset::scaled_precision(bitusd.precision).value; // 100 satoshi USDBIT in 1 USDBIT
          const auto &core = asset_id_type()(db);
 
 
@@ -1020,7 +1025,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          // 3. Paul borrows 100 bitUSD
          ///////
          // Paul will borrow bitUSD by providing 2x collateral required: 2 * 20 = 40
-         int64_t paul_initial_usd = 100 * std::pow(10, bitusd.precision); // 10000
+         int64_t paul_initial_usd = 100 * bitusd_unit; // 10000
          int64_t paul_initial_core = paul_initial_usd * 2 * 20; // 400000
          const call_order_object &call_paul = *borrow(paul, bitusd.amount(paul_initial_usd),
                                                       core.amount(paul_initial_core));
@@ -1034,7 +1039,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          // 4. Paul gives Rachel 20 bitUSD and retains 80 bitUSD
          ///////
-         int64_t rachel_initial_usd = 20 * std::pow(10, bitusd.precision);
+         int64_t rachel_initial_usd = 20 * bitusd_unit;
          transfer(paul.id, rachel.id, asset(rachel_initial_usd, bitusd.id));
 
          BOOST_CHECK_EQUAL(get_balance(rachel, bitusd), rachel_initial_usd);
@@ -1047,7 +1052,7 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          ///////
          // 5. Rachel force-settles 2 bitUSD which should be collected from Paul's debt position
          ///////
-         const int64_t rachel_settle_amount = 2 * std::pow(10, bitusd.precision); // 200 satoshi bitusd
+         const int64_t rachel_settle_amount = 2 * bitusd_unit; // 200 satoshi bitusd
          operation_result result = force_settle(rachel, bitusd.amount(rachel_settle_amount));
 
          force_settlement_id_type rachel_settle_id = result.get<object_id_type>();
