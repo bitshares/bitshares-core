@@ -220,8 +220,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
 
     price highest = settle_price;
     if (maint_time > HARDFORK_CORE_338_TIME)
-      highest = get_max_short_squeeze_price( maint_time, bitasset.current_feed, 
-            mia.options.extensions.value.margin_call_fee_ratio);
+      highest = get_max_short_squeeze_price( maint_time, bitasset.current_feed);
 
     const limit_order_index& limit_index = get_index_type<limit_order_index>();
     const auto& limit_price_index = limit_index.indices().get<by_price>();

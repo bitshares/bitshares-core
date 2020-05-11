@@ -682,11 +682,9 @@ namespace graphene { namespace chain {
           * (due to hardfork changes in the calculation)
           * @param block_time the chain's current block time
           * @param feed the debt asset's price feed
-          * @param mcfr the margin call fee ratio (include if the call order is the taker)
           * @returns the max short squeeze price
           */
-         price get_max_short_squeeze_price( const fc::time_point_sec& block_time, const price_feed& feed,
-               fc::optional<uint64_t> mcfr = fc::optional<uint64_t>())const;
+         price get_max_short_squeeze_price( const fc::time_point_sec& block_time, const price_feed& feed)const;
    };
 
    namespace detail

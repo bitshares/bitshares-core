@@ -71,7 +71,7 @@ void clearable_block::clear()
 }
 
 database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
-   : app(), db( *reinterpret_cast<unsafe_db*>( app.chain_database().get() ) )
+   : app(), db( *app.chain_database() )
 {
    try {
    int argc = buf::master_test_suite().argc;

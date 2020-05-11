@@ -46,7 +46,7 @@ namespace detail {
       }
    }
 
-   void check_asset_options_bsip74( const fc::time_point_sec& block_time, const asset_options& options)
+   void check_bitasset_options_bsip74( const fc::time_point_sec& block_time, const bitasset_options& options)
    {
       FC_ASSERT( block_time >= HARDFORK_CORE_BSIP74_TIME 
             || !options.extensions.value.margin_call_fee_ratio.valid(),
@@ -113,7 +113,10 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    if( op.bitasset_opts )
    {
+      detail::check_bitasset_options_bsip74(d.head_block_time(), *op.bitasset_opts);
+
       const asset_object& backing = op.bitasset_opts->short_backing_asset(d);
+      
       if( backing.is_market_issued() )
       {
          const asset_bitasset_data_object& backing_bitasset_data = backing.bitasset_data(d);
@@ -128,8 +131,6 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
       FC_ASSERT( op.bitasset_opts->feed_lifetime_sec > chain_parameters.block_interval &&
                  op.bitasset_opts->force_settlement_delay_sec > chain_parameters.block_interval );
    }
-
-   detail::check_asset_options_bsip74(d.head_block_time(), op.common_options);
 
    if( op.is_prediction_market )
    {
@@ -333,8 +334,6 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
               "Incorrect issuer for asset! (${o.issuer} != ${a.issuer})",
               ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
-   detail::check_asset_options_bsip74(d.head_block_time(), o.new_options);
-
    const auto& chain_parameters = d.get_global_properties().parameters;
 
    FC_ASSERT( o.new_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
@@ -468,6 +467,8 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 
    // hf 922_931 is a consensus/logic change. This hf cannot be removed.
    bool after_hf_core_922_931 = ( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_922_931_TIME );
+
+   detail::check_bitasset_options_bsip74(d.head_block_time(), op.new_options);
 
    // Are we changing the backing asset?
    if( op.new_options.short_backing_asset != current_bitasset_data.options.short_backing_asset )

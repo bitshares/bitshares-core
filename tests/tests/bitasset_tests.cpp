@@ -1473,82 +1473,18 @@ asset_id_type create_jmjcoin( database_fixture& fixture,
 void adjust_mcfr( database_fixture& fixture, const account_object& owner, const fc::ecc::private_key& pk,
       const asset_object& asset, fc::optional<uint16_t> ratio)
 {
-      additional_asset_options extras;
-      extras.margin_call_fee_ratio = ratio;   
+      bitasset_options new_options = asset.bitasset_data(fixture.db).options;
+      new_options.extensions.value.margin_call_fee_ratio = ratio;   
 
-      asset_update_operation update;
+      asset_update_bitasset_operation update;
       update.issuer = owner.id;
       update.asset_to_update = asset.id;
-      update.new_options = asset.options;
-      update.new_options.extensions.value = extras;
+      update.new_options = new_options;
       update.fee = fixture.db.get_global_properties().parameters.current_fees->calculate_fee(update);
       fixture.trx.operations.push_back( std::move(update) );
       fixture.sign(fixture.trx, pk);
       PUSH_TX(fixture.db, fixture.trx);
       fixture.trx.clear();   
-}
-
-BOOST_AUTO_TEST_CASE( mcfr_match_price_test )
-{
-   ACTORS( (charlie) (feeder1) (feeder2) (feeder3) )
-   const asset_id_type core_id;
-
-   // fast forward to a reasonable chain time
-   generate_blocks( HARDFORK_CORE_1270_TIME + 10 );
-   set_expiration( db, trx );
-
-   // first create the asset
-   asset_id_type my_asset_id = create_jmjcoin( *this, charlie_id, charlie_private_key, feeder1, feeder2, feeder3 );
-   publish_feed_jmjcoin( *this, price( asset(1, my_asset_id), asset(1, core_id) ), feeder1, feeder2, feeder3);
-   const asset_object& my_asset = my_asset_id(db);
-   const auto& bitasset_data = my_asset.bitasset_data(db);
-   const auto& price_feed = bitasset_data.current_feed;
-
-   price match_price( asset(100, my_asset_id), asset(100, core_id) );
-
-   // check the max_short_squeeze_price
-   price ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed );
-   BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
-   BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
-
-   BOOST_TEST_MESSAGE("Advancing past Hardfork BSIP74"); 
-   generate_blocks( HARDFORK_CORE_BSIP74_TIME + 10);
-   set_expiration( db, trx );
-   publish_feed_jmjcoin( *this, price( asset(1, my_asset_id), asset(1, core_id) ), feeder1, feeder2, feeder3);
-
-   // after hf74, a limit order can match a call order if the price is "feed_price / (mssr-mcfr)"
-   // the value should not change if mcfr is unset
-   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed, 
-         my_asset_id(db).options.extensions.value.margin_call_fee_ratio );
-   BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
-   BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
-
-   // adjusting the MCFR to be equal to MSSR should make the price the same as before
-   adjust_mcfr( *this, charlie, charlie_private_key, my_asset, GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO );
-   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed,
-         my_asset_id(db).options.extensions.value.margin_call_fee_ratio  );
-   BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
-   BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
-
-   // adjusting the MCFR to be greater than MSSR should make the price the same as before
-   adjust_mcfr( *this, charlie, charlie_private_key, my_asset, GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO + 1000 );
-   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed,
-         my_asset_id(db).options.extensions.value.margin_call_fee_ratio  );
-   BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
-   BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
-   
-   // adjusting the MCFR should adjust the max short squeeze price down
-   adjust_mcfr( *this, charlie, charlie_private_key, my_asset, 750);
-   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed,
-         my_asset_id(db).options.extensions.value.margin_call_fee_ratio  );
-   BOOST_CHECK_EQUAL( ssp.base.amount.value, 4 );
-   BOOST_CHECK_EQUAL( ssp.quote.amount.value, 7 );
-
-   // calling get_max_short_squeeze_price should not include MCFR if the MCFR value is not passed
-   // (as is the case when limit order is the maker)
-   ssp = db.get_max_short_squeeze_price( db.head_block_time(), price_feed );
-   BOOST_CHECK_EQUAL( ssp.base.amount.value, 2 );
-   BOOST_CHECK_EQUAL( ssp.quote.amount.value, 3 );
 }
 
 BOOST_AUTO_TEST_CASE( calculate_margin_fee_test )
@@ -1576,10 +1512,10 @@ BOOST_AUTO_TEST_CASE( calculate_margin_fee_test )
       BOOST_CHECK_EQUAL( db.calculate_margin_fee(my_asset, asset(100, core_id)).amount.value, 5 );
       // adjust MCFR to be equal to MSSR
       adjust_mcfr( *this, charlie, charlie_private_key, my_asset, 1500 );
-      BOOST_CHECK_EQUAL( db.calculate_margin_fee(my_asset, asset(100, core_id)).amount.value, 50 );
+      BOOST_CHECK_EQUAL( db.calculate_margin_fee(my_asset, asset(100, core_id)).amount.value, 49 );
       // adjust MCFR to be greater than MSSR (should not change fee)
       adjust_mcfr( *this, charlie, charlie_private_key, my_asset, 1600 );
-      BOOST_CHECK_EQUAL( db.calculate_margin_fee(my_asset, asset(100, core_id)).amount.value, 50 );
+      BOOST_CHECK_EQUAL( db.calculate_margin_fee(my_asset, asset(100, core_id)).amount.value, 49 );
    }
    FC_LOG_AND_RETHROW()
 }
@@ -1615,8 +1551,8 @@ BOOST_AUTO_TEST_CASE( bsip74_feed_price_test )
    // MCFR (margin call fee ratio) should not be adjustable until HF BSIP74
    {
       BOOST_TEST_MESSAGE( "Attempt to create a bitasset with margin call fee before HF (should fail)");
-      additional_asset_options extras;
-      extras.margin_call_fee_ratio = 100; 
+      bitasset_options new_options = bitasset_options();
+      new_options.extensions.value.margin_call_fee_ratio = 100; 
 
       asset_create_operation create;
       create.issuer = charlie_id;
@@ -1625,9 +1561,8 @@ BOOST_AUTO_TEST_CASE( bsip74_feed_price_test )
       create.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
       create.common_options.market_fee_percent = 0.1 * GRAPHENE_100_PERCENT; // 1%
       create.common_options.core_exchange_rate = price( asset(1,asset_id_type(1)), asset(1, core_id) );
-      create.common_options.extensions.value = extras;
       create.is_prediction_market = false;
-      create.bitasset_opts = bitasset_options();
+      create.bitasset_opts = new_options;
       trx.operations.push_back( std::move(create) );
       sign(trx, charlie_private_key);
       REQUIRE_EXCEPTION_WITH_TEXT( PUSH_TX(db, trx), "BSIP74" );
@@ -1648,15 +1583,15 @@ BOOST_AUTO_TEST_CASE( bsip74_feed_price_test )
 
    BOOST_TEST_MESSAGE("Existing Coins should still not have margin_call_fee_ratio set");
    my_asset = my_asset_id(db);
-   BOOST_CHECK(  !my_asset.options.extensions.value.margin_call_fee_ratio.valid() );
+   BOOST_CHECK(  !my_asset.bitasset_data(db).options.extensions.value.margin_call_fee_ratio.valid() );
 
    {
       BOOST_TEST_MESSAGE("BSIP 74 has passed, now update the fee");
       adjust_mcfr( *this, charlie, charlie_private_key, my_asset, 1050 );
 
       my_asset = my_asset_id(db);
-      BOOST_CHECK( my_asset.options.extensions.value.margin_call_fee_ratio.valid() );
-      BOOST_CHECK_EQUAL( *my_asset.options.extensions.value.margin_call_fee_ratio, 1050 );
+      BOOST_CHECK( my_asset.bitasset_data(db).options.extensions.value.margin_call_fee_ratio.valid() );
+      BOOST_CHECK_EQUAL( *my_asset.bitasset_data(db).options.extensions.value.margin_call_fee_ratio, 1050 );
    }
    {
       BOOST_TEST_MESSAGE("Verify margin fee is zero, as feeds are invalid");
@@ -1788,8 +1723,8 @@ BOOST_AUTO_TEST_CASE( bsip74_limit_price_test )
       BOOST_TEST_MESSAGE("BSIP 74 has passed, update the fee to 5%");
       adjust_mcfr( *this, charlie, charlie_private_key, my_asset, 1050);
       my_asset = my_asset_id(db);
-      BOOST_CHECK( my_asset.options.extensions.value.margin_call_fee_ratio.valid() );
-      BOOST_CHECK_EQUAL( *my_asset.options.extensions.value.margin_call_fee_ratio, 1050 );
+      BOOST_CHECK( my_asset.bitasset_data(db).options.extensions.value.margin_call_fee_ratio.valid() );
+      BOOST_CHECK_EQUAL( *my_asset.bitasset_data(db).options.extensions.value.margin_call_fee_ratio, 1050 );
    }
    {
       BOOST_TEST_MESSAGE("Verify margin fee is zero, as feeds are invalid");
@@ -1839,7 +1774,7 @@ BOOST_AUTO_TEST_CASE( bsip74_limit_price_test )
    auto bob_core_balance = db.get_balance(bob_id, core_id).amount.value;
    auto alice_core_balance = db.get_balance(alice_id, core_id).amount.value;
    {
-      BOOST_TEST_MESSAGE("Bob places order to sell JMJCOIN for CORE just below MSSR");
+      BOOST_TEST_MESSAGE("Bob places order to sell JMJCOIN for CORE below max short squeeze price");
       create_sell_order( bob_id, asset( 100 * prec, my_asset_id ), asset(174 * prec, core_id) );
       // Bob's order should have executed
       BOOST_CHECK_EQUAL( 0, num_limit_orders_on_books( db ) );
@@ -1865,7 +1800,6 @@ BOOST_AUTO_TEST_CASE( bsip74_limit_price_test )
 
 /**
  * In this test, the limit order is the maker, and the call is the taker.
- * Short squeeze price should be based on MSSR and MCFR
  * MCFR should be taken from the collateral that the call order receives,
  * but there is not enough collateral to do so.
  */
@@ -1895,8 +1829,8 @@ BOOST_AUTO_TEST_CASE( bsip74_insufficient_collateral_test )
    // MCFR (margin call fee ratio) should not be adjustable until HF BSIP74
    {
       BOOST_TEST_MESSAGE( "Attempt to create a bitasset with margin call fee before HF (should fail)");
-      additional_asset_options extras;
-      extras.margin_call_fee_ratio = 100; 
+      bitasset_options new_options = bitasset_options();
+      new_options.extensions.value.margin_call_fee_ratio = 1050;
 
       asset_create_operation create;
       create.issuer = charlie_id;
@@ -1905,9 +1839,8 @@ BOOST_AUTO_TEST_CASE( bsip74_insufficient_collateral_test )
       create.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
       create.common_options.market_fee_percent = 0.1 * GRAPHENE_100_PERCENT; // 1%
       create.common_options.core_exchange_rate = price( asset(1,asset_id_type(1)), asset(1, core_id) );
-      create.common_options.extensions.value = extras;
       create.is_prediction_market = false;
-      create.bitasset_opts = bitasset_options();
+      create.bitasset_opts = new_options;
       trx.operations.push_back( std::move(create) );
       sign(trx, charlie_private_key);
       REQUIRE_EXCEPTION_WITH_TEXT( PUSH_TX(db, trx), "BSIP74" );
@@ -1928,15 +1861,15 @@ BOOST_AUTO_TEST_CASE( bsip74_insufficient_collateral_test )
 
    BOOST_TEST_MESSAGE("Existing Coins should still not have margin_call_fee_ratio set");
    my_asset = my_asset_id(db);
-   BOOST_CHECK(  !my_asset.options.extensions.value.margin_call_fee_ratio.valid() );
+   BOOST_CHECK(  !my_asset.bitasset_data(db).options.extensions.value.margin_call_fee_ratio.valid() );
 
    {
       BOOST_TEST_MESSAGE("BSIP 74 has passed, now update the fee");
       adjust_mcfr( *this, charlie, charlie_private_key, my_asset, 1050 );
 
       my_asset = my_asset_id(db);
-      BOOST_CHECK( my_asset.options.extensions.value.margin_call_fee_ratio.valid() );
-      BOOST_CHECK_EQUAL( *my_asset.options.extensions.value.margin_call_fee_ratio, 1050 );
+      BOOST_CHECK( my_asset.bitasset_data(db).options.extensions.value.margin_call_fee_ratio.valid() );
+      BOOST_CHECK_EQUAL( *my_asset.bitasset_data(db).options.extensions.value.margin_call_fee_ratio, 1050 );
    }
    {
       BOOST_TEST_MESSAGE("Verify margin fee is zero, as feeds are invalid");
@@ -2016,9 +1949,8 @@ BOOST_AUTO_TEST_CASE( bsip74_insufficient_collateral_test )
    // the order should have executed, giving Alice what is left of her collateral
    // She received 10,000,000 JMJCOIN at 100:195, giving Bob 19,500,000 CORE, plus she paid a 5% (975,000) margin fee
    // that is 475,000 CORE more collateral than she had in the call order.
-   BOOST_CHECK_EQUAL( get_balance(alice, core), previous_core_balance_alice - 475000 );
    BOOST_TEST_MESSAGE("Alice lost all her collateral and then some. This should not happen.");
-   BOOST_CHECK(false);
+   BOOST_CHECK_GT( get_balance(alice, core), previous_core_balance_alice);
    BOOST_CHECK_EQUAL( get_balance(alice, my_asset_id(db) ), 0 );
    // and here are Bob's holdings
    BOOST_CHECK_EQUAL( get_balance( bob, core), previous_core_balance_bob + 19500000 );

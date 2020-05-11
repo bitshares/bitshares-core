@@ -34,7 +34,6 @@ namespace graphene { namespace protocol {
       fc::optional<flat_set<account_id_type>> whitelist_market_fee_sharing;
       // After BSIP81 activation, taker_fee_percent is the taker fee
       fc::optional<uint16_t> taker_fee_percent;
-      fc::optional<uint16_t> margin_call_fee_ratio; // fee to asset issuer for margin call trading
    };
 
    typedef extension<additional_asset_options> additional_asset_options_t;
@@ -102,6 +101,12 @@ namespace graphene { namespace protocol {
     * @note Changes to this struct will break protocol compatibility
     */
    struct bitasset_options {
+
+      struct ext
+      {
+         fc::optional<uint16_t> margin_call_fee_ratio; // BSIP 74
+      };
+
       /// Time before a price feed expires
       uint32_t feed_lifetime_sec = GRAPHENE_DEFAULT_PRICE_FEED_LIFETIME;
       /// Minimum number of unexpired feeds required to extract a median feed from
@@ -120,7 +125,7 @@ namespace graphene { namespace protocol {
       /// This field may only be updated if the current supply of the asset is zero.
       asset_id_type short_backing_asset;
 
-      extensions_type extensions;
+      extension<ext> extensions;
 
       /// Perform internal consistency checks.
       /// @throws fc::exception if any check fails
@@ -554,6 +559,9 @@ FC_REFLECT( graphene::protocol::asset_options,
             (description)
             (extensions)
           )
+
+FC_REFLECT( graphene::protocol::bitasset_options::ext, (margin_call_fee_ratio) )
+
 FC_REFLECT( graphene::protocol::bitasset_options,
             (feed_lifetime_sec)
             (minimum_feeds)
@@ -564,7 +572,7 @@ FC_REFLECT( graphene::protocol::bitasset_options,
             (extensions)
           )
 
-FC_REFLECT( graphene::protocol::additional_asset_options, (reward_percent)(whitelist_market_fee_sharing)(taker_fee_percent) (margin_call_fee_ratio) )
+FC_REFLECT( graphene::protocol::additional_asset_options, (reward_percent)(whitelist_market_fee_sharing)(taker_fee_percent) )
 FC_REFLECT( graphene::protocol::asset_create_operation::fee_parameters_type, (symbol3)(symbol4)(long_symbol)(price_per_kbyte) )
 FC_REFLECT( graphene::protocol::asset_global_settle_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::protocol::asset_settle_operation::fee_parameters_type, (fee) )

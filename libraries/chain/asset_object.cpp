@@ -177,6 +177,22 @@ string asset_object::amount_to_string(share_type amount) const
    return result;
 }
 
+uint16_t asset_bitasset_data_object::adjusted_mcfr(const price_feed& price_feed)const
+{
+   if (options.extensions.value.margin_call_fee_ratio.valid())
+   {
+      uint16_t mcfr = *options.extensions.value.margin_call_fee_ratio;
+      // Reduce mcfr if it would take all (or even more) of the collateral
+      if ( ( 1 > price_feed.maximum_short_squeeze_ratio
+            || price_feed.maximum_short_squeeze_ratio >= price_feed.maintenance_collateral_ratio)
+            || (1 > price_feed.maximum_short_squeeze_ratio - mcfr 
+            || price_feed.maximum_short_squeeze_ratio - mcfr >= price_feed.maintenance_collateral_ratio)) 
+         return price_feed.maximum_short_squeeze_ratio - 1;
+      return mcfr;
+   }
+   return 0;
+}
+
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_dynamic_data_object, (graphene::db::object),
                     (current_supply)(confidential_supply)(accumulated_fees)(accumulated_collateral_fees)(fee_pool) )
 

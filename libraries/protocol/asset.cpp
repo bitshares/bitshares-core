@@ -281,13 +281,9 @@ namespace graphene { namespace protocol {
                  / asset( static_cast<int64_t>(cp.denominator()), settlement_price.quote.asset_id ) );
       }
 
-      price price_feed::max_short_squeeze_price(const fc::optional<uint16_t>& mcfr)const
+      price price_feed::max_short_squeeze_price()const
       {
-         // NOTE: settlement price is in debt/collateral
-         if ( mcfr.valid() && *mcfr < maximum_short_squeeze_ratio )
-            return settlement_price * ratio_type( GRAPHENE_COLLATERAL_RATIO_DENOM, 
-                  maximum_short_squeeze_ratio - *mcfr + GRAPHENE_COLLATERAL_RATIO_DENOM );
-         return settlement_price * ratio_type( GRAPHENE_COLLATERAL_RATIO_DENOM, maximum_short_squeeze_ratio );
+         return settlement_price * ratio_type( GRAPHENE_COLLATERAL_RATIO_DENOM, maximum_short_squeeze_ratio);
       }
 
       price price_feed::maintenance_collateralization()const

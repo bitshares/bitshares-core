@@ -1032,12 +1032,11 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
  * @param mcfr the margin call fee ratio (include if the call order is the taker)
  * @returns the max short squeeze price
  */
-price database::get_max_short_squeeze_price( const fc::time_point_sec& block_time, const price_feed& feed,
-      fc::optional<uint64_t> mcfr)const
+price database::get_max_short_squeeze_price( const fc::time_point_sec& block_time, const price_feed& feed)const
 {
    if ( block_time <= HARDFORK_CORE_1270_TIME )
       return feed.max_short_squeeze_price_before_hf_1270();
-   return feed.max_short_squeeze_price(mcfr);
+   return feed.max_short_squeeze_price();
 }
 
 /**
@@ -1088,8 +1087,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     // looking for limit orders selling the most USD for the least CORE
     auto max_price = price::max( mia.id, bitasset.options.short_backing_asset );
     // stop when limit orders are selling too little USD for too much CORE
-    auto min_price = get_max_short_squeeze_price( maint_time, bitasset.current_feed, 
-         mia.options.extensions.value.margin_call_fee_ratio);
+    auto min_price = get_max_short_squeeze_price( maint_time, bitasset.current_feed);
 
     // NOTE limit_price_index is sorted from greatest to least
     auto limit_itr = limit_price_index.lower_bound( max_price );
@@ -1313,11 +1311,11 @@ asset database::calculate_margin_fee(const asset_object& debt, const asset& coll
    auto price_feed = ba.current_feed;
    if ( price_feed.settlement_price.is_null() 
          || price_feed.settlement_price.base.amount == 0
-         || !debt.options.extensions.value.margin_call_fee_ratio.valid())
+         || !ba.options.extensions.value.margin_call_fee_ratio.valid())
       return asset(0);
-   auto ratio = std::min(price_feed.maximum_short_squeeze_ratio, *debt.options.extensions.value.margin_call_fee_ratio);
+   auto ratio = ba.adjusted_mcfr(price_feed);
    auto amount = detail::calculate_ratio( collateral.amount, ratio );
-   return asset(amount, ba.options.short_backing_asset) ;
+   return asset(amount, collateral.asset_id) ;
 }
 
 /****

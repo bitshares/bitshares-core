@@ -198,10 +198,9 @@ namespace graphene { namespace protocol {
        *
        *  This is provided to ensure that a black swan cannot be trigged due to poor liquidity alone, it
        *  must be confirmed by having the max_short_squeeze_price() move below the black swan price.
-       * @param mcfr the margin call fee ratio for the debt asset (include only if call order is taker)
        * @returns the Maximum Short Squeeze price for this asset
        */
-      price max_short_squeeze_price( const fc::optional<uint16_t>& mcfr = fc::optional<uint16_t>())const;
+      price max_short_squeeze_price()const;
       /// Other implementation of max_short_squeeze_price() due to hardfork changes
       price max_short_squeeze_price_before_hf_1270()const;
 

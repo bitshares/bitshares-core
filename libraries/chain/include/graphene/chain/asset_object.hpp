@@ -300,6 +300,14 @@ namespace graphene { namespace chain {
           * @param next_maintenance_time the next chain maintenance time
           */
          void update_median_feeds(time_point_sec current_time, time_point_sec next_maintenance_time);
+
+         /***
+          * @brief Examines the current state of the asset, and adjusts margin call fee ratio
+          * if it is out of bounds. This prevents the possibility of a margin call returning no collateral
+          * @param mcfr the margin call fee ratio
+          * @returns the adjusted mcfr
+          */
+         uint16_t adjusted_mcfr(const price_feed& current_feed)const;
    };
 
    // key extractor for short backing asset
