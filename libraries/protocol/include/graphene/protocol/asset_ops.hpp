@@ -105,6 +105,7 @@ namespace graphene { namespace protocol {
       struct ext
       {
          fc::optional<uint16_t> margin_call_fee_ratio; // BSIP 74
+         fc::optional<uint16_t> current_margin_call_fee_ratio; // dynamic based on price feed and margin_call_fee_ratio
          /// After BSIP77, when creating a new debt position or updating an existing position,
          /// the position will be checked against this parameter.
          /// Unused for prediction markets, although we allow it to be set for simpler implementation
@@ -566,7 +567,7 @@ FC_REFLECT( graphene::protocol::asset_options,
           )
 
 FC_REFLECT( graphene::protocol::bitasset_options::ext, 
-      (margin_call_fee_ratio)(initial_collateral_ratio)(force_settle_fee_percent) )
+      (margin_call_fee_ratio)(current_margin_call_fee_ratio)(initial_collateral_ratio)(force_settle_fee_percent) )
 
 FC_REFLECT( graphene::protocol::bitasset_options,
             (feed_lifetime_sec)

@@ -302,8 +302,9 @@ namespace graphene { namespace chain {
           *
           * This calculates the median feed from @ref feeds, feed_lifetime_sec
           * in @ref options, and the given parameters.
-          * It may update the current_feed_publication_time, current_feed and
-          * current_maintenance_collateralization member variables.
+          * It may update the current_feed_publication_time, current_feed,
+          * current_maintenance_collateralization, and options.extensions.current_margin_call_fee_ratio 
+          * member variables.
           *
           * @param current_time the current time to use in the calculations
           * @param next_maintenance_time the next chain maintenance time
@@ -311,12 +312,12 @@ namespace graphene { namespace chain {
          void update_median_feeds(time_point_sec current_time, time_point_sec next_maintenance_time);
 
          /***
-          * @brief Examines the current state of the asset, and adjusts margin call fee ratio
-          * if it is out of bounds. This prevents the possibility of a margin call returning no collateral
-          * @param mcfr the margin call fee ratio
+          * @brief Examines the current state of the asset and feed, and adjusts current_mcfr (margin call fee ratio)
+          * if it is out of bounds. This should be called whenever 
+          * bitasset_options.extensions.value.margin_call_fee_ratio or the feed_price changes.
           * @returns the adjusted mcfr
           */
-         uint16_t adjusted_mcfr(const price_feed& current_feed)const;
+         uint16_t adjust_mcfr();
    };
 
    // key extractor for short backing asset

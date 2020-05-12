@@ -441,11 +441,10 @@ namespace graphene { namespace chain {
           * @param cull_if_small take care of dust
           * @param fill_price the transaction price
           * @param is_maker TRUE if this order is maker, FALSE if taker
-          * @param is_margin_call TRUE if this order is taking the other side of a margin call
           * @return true if the order was completely filled and thus freed.
           */
          bool fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives, 
-               bool cull_if_small, const price& fill_price, const bool is_maker, const bool is_margin_call = false );
+               bool cull_if_small, const price& fill_price, const bool is_maker );
          /***
           * @brief attempt to fill a call order
           * @param order the order
@@ -453,11 +452,10 @@ namespace graphene { namespace chain {
           * @param receives the collateral received by the buyer
           * @param fill_price the price the transaction executed at
           * @param is_maker TRUE if the buyer is the maker, FALSE if the buyer is the taker
-          * @param is_margin_call TRUE if this fill is due to a margin call
           * @returns TRUE if the order was completely filled
           */
          bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
-                               const price& fill_price, const bool is_maker, bool is_margin_call = false );
+                               const price& fill_price, const bool is_maker );
          bool fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
                                  const price& fill_price, const bool is_maker );
 

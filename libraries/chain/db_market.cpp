@@ -690,8 +690,9 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    order_pays = call_receives;
 
    int result = 0;
-   result |= fill_limit_order( bid, order_pays, order_receives, cull_taker, match_price, false, true );
-   result |= fill_call_order( ask, call_pays, call_receives, match_price, true ) << 1;      // the call order is maker
+   result |= fill_limit_order( bid, order_pays, order_receives, cull_taker, match_price,
+         false ); // limit order is the taker
+   result |= fill_call_order( ask, call_pays, call_receives, match_price, true ) << 1; // the call order is maker
    // result can be 0 when call order has target_collateral_ratio option set.
 
    return result;
@@ -800,7 +801,7 @@ asset database::match( const call_order_object& call,
 } FC_CAPTURE_AND_RETHROW( (call)(settle)(match_price)(max_settlement) ) }
 
 bool database::fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small,
-                           const price& fill_price, const bool is_maker, bool is_margin_call )
+                           const price& fill_price, const bool is_maker )
 { try {
    cull_if_small |= (head_block_time() < HARDFORK_555_TIME);
 
@@ -809,11 +810,7 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
 
    const account_object& seller = order.seller(*this);
 
-   asset issuer_fees;
-   if (!is_maker && is_margin_call)
-      issuer_fees = pay_margin_fees(pays.asset_id(*this), receives );
-   else
-      issuer_fees = pay_market_fees(&seller, receives.asset_id(*this), receives, is_maker);
+   const auto issuer_fees = pay_market_fees(&seller, receives.asset_id(*this), receives, is_maker);
 
    pay_order( seller, receives - issuer_fees, pays );
 
@@ -914,11 +911,10 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
  * @param receives what the call order will receive from the other party (debt)
  * @param fill_price the price at which the call order will execute
  * @param is_maker TRUE if the call order is the maker, FALSE if it is the taker
- * @param is_margin_call TRUE if this method was called due to a margin call
  * @returns TRUE if the call order was completely filled
  */
 bool database::fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
-      const price& fill_price, const bool is_maker, bool is_margin_call )
+      const price& fill_price, const bool is_maker )
 { try {
    FC_ASSERT( order.debt_type() == receives.asset_id );
    FC_ASSERT( order.collateral_type() == pays.asset_id );
@@ -930,9 +926,7 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
 
    // calculate any margin call fees NOTE: Paid in collateral asset
-   asset margin_fee = asset(0);
-   if (!is_maker && is_margin_call)
-      margin_fee = pay_margin_fees(mia, pays);
+   const auto margin_fee = pay_margin_fees(mia, pays);
 
    optional<asset> collateral_freed;
    // adjust the order
@@ -1272,7 +1266,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        if( filled_call && before_core_hardfork_343 )
           ++call_price_itr;
        // when for_new_limit_order is true, the call order is maker, otherwise the call order is taker
-       fill_call_order( call_order, call_pays, call_receives, match_price, for_new_limit_order, true);
+       fill_call_order( call_order, call_pays, call_receives, match_price, for_new_limit_order );
        if( !before_core_hardfork_1270 )
           call_collateral_itr = call_collateral_index.lower_bound( call_min );
        else if( !before_core_hardfork_343 )
@@ -1346,10 +1340,10 @@ asset database::calculate_margin_fee(const asset_object& debt, const asset& coll
    auto price_feed = ba.current_feed;
    if ( price_feed.settlement_price.is_null() 
          || price_feed.settlement_price.base.amount == 0
-         || !ba.options.extensions.value.margin_call_fee_ratio.valid())
+         || !ba.options.extensions.value.current_margin_call_fee_ratio.valid())
       return asset(0);
-   auto ratio = ba.adjusted_mcfr(price_feed);
-   auto amount = detail::calculate_ratio( collateral.amount, ratio );
+   auto amount = detail::calculate_ratio( collateral.amount,
+         *ba.options.extensions.value.current_margin_call_fee_ratio );
    return asset(amount, collateral.asset_id) ;
 }
 

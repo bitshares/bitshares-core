@@ -75,6 +75,7 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
          // update data derived from ICR
          current_initial_collateralization = price();
       }
+      adjust_mcfr();
       return;
    }
    if( current_feeds.size() == 1 )
@@ -90,6 +91,7 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
          // update data derived from ICR
          refresh_current_initial_collateralization();
       }
+      adjust_mcfr();
       return;
    }
 
@@ -118,6 +120,7 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
       // update data derived from ICR
       refresh_current_initial_collateralization();
    }
+   adjust_mcfr();
 }
 
 void asset_bitasset_data_object::refresh_current_initial_collateralization()
@@ -204,19 +207,25 @@ string asset_object::amount_to_string(share_type amount) const
    return result;
 }
 
-uint16_t asset_bitasset_data_object::adjusted_mcfr(const price_feed& price_feed)const
+uint16_t asset_bitasset_data_object::adjust_mcfr()
 {
    if (options.extensions.value.margin_call_fee_ratio.valid())
    {
-      uint16_t mcfr = *options.extensions.value.margin_call_fee_ratio;
+      auto mcfr = *options.extensions.value.margin_call_fee_ratio;
       // Reduce mcfr if it causes parameters to go out of range
-      if ( ( 1 > price_feed.maximum_short_squeeze_ratio
-            || price_feed.maximum_short_squeeze_ratio >= price_feed.maintenance_collateral_ratio)
-            || (1 > price_feed.maximum_short_squeeze_ratio - mcfr 
-            || price_feed.maximum_short_squeeze_ratio - mcfr >= price_feed.maintenance_collateral_ratio)) 
-         return price_feed.maximum_short_squeeze_ratio - 1;
+      if ( ( 1 > current_feed.maximum_short_squeeze_ratio
+            || current_feed.maximum_short_squeeze_ratio >= current_feed.maintenance_collateral_ratio)
+            || (1 > current_feed.maximum_short_squeeze_ratio - mcfr 
+            || current_feed.maximum_short_squeeze_ratio - mcfr >= current_feed.maintenance_collateral_ratio)) 
+         mcfr = current_feed.maximum_short_squeeze_ratio - 1;
+      options.extensions.value.current_margin_call_fee_ratio = mcfr;
       return mcfr;
    }
+   else
+   {
+      options.extensions.value.current_margin_call_fee_ratio = fc::optional<uint16_t>();
+   }
+   
    return 0;
 }
 
