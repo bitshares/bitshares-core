@@ -1842,4 +1842,54 @@ BOOST_AUTO_TEST_CASE( asset_in_collateral )
 
 } FC_LOG_AND_RETHROW() }
 
+
+BOOST_AUTO_TEST_CASE( get_trade_history )
+{ try {
+
+   app.enable_plugin("market_history");
+   graphene::app::application_options opt=app.get_options();
+   opt.has_market_history_plugin = true;
+   graphene::app::database_api db_api( db, &opt);
+
+   ACTORS((maker)(taker));
+
+   const auto& bitcny = create_user_issued_asset("CNY");
+   const auto& core   = asset_id_type()(db);
+
+   int64_t init_balance(10000000);
+   transfer( committee_account, maker_id, asset(init_balance) );
+   issue_uia( taker_id, bitcny.amount(init_balance) );
+
+   // maker create an order
+   create_sell_order(maker, core.amount(100000), bitcny.amount(20000));
+
+   // taker match it
+   create_sell_order(taker, bitcny.amount(200000), core.amount(100000));
+
+   generate_block();
+
+   auto history = db_api.get_trade_history( core.symbol, "CNY", db.head_block_time(), db.head_block_time() - fc::days(1) );
+   BOOST_REQUIRE_EQUAL( 1, history.size() );
+   BOOST_CHECK_EQUAL( "0.005", history[0].price );
+   BOOST_CHECK_EQUAL( "200", history[0].amount );
+   BOOST_CHECK_EQUAL( "1", history[0].value );
+   BOOST_CHECK_EQUAL( maker_id.instance.value, history[0].side1_account_id.instance.value );
+   BOOST_CHECK_EQUAL( taker_id.instance.value, history[0].side2_account_id.instance.value );
+   BOOST_CHECK_EQUAL( 20000, history[0].side1_was_selling.amount.value );
+   BOOST_CHECK_EQUAL( 100000, history[0].side2_was_selling.amount.value );
+
+   // opposite side
+   history = db_api.get_trade_history( "CNY", core.symbol, db.head_block_time(), db.head_block_time() - fc::days(1) );
+   BOOST_REQUIRE_EQUAL( 1, history.size() );
+   BOOST_CHECK_EQUAL( "200", history[0].price );
+   BOOST_CHECK_EQUAL( "1", history[0].amount );
+   BOOST_CHECK_EQUAL( "200", history[0].value );
+   BOOST_CHECK_EQUAL( maker_id.instance.value, history[0].side1_account_id.instance.value );
+   BOOST_CHECK_EQUAL( taker_id.instance.value, history[0].side2_account_id.instance.value );
+   BOOST_CHECK_EQUAL( 20000, history[0].side1_was_selling.amount.value );
+   BOOST_CHECK_EQUAL( 100000, history[0].side2_was_selling.amount.value );
+
+} FC_LOG_AND_RETHROW() }
+
+
 BOOST_AUTO_TEST_SUITE_END()
