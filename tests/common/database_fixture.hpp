@@ -183,6 +183,14 @@ public:
    void clear();
 };
 
+namespace test {
+/// set a reasonable expiration time for the transaction
+void set_expiration( const database& db, transaction& tx );
+
+bool _push_block( database& db, const signed_block& b, uint32_t skip_flags = 0 );
+processed_transaction _push_transaction( database& db, const signed_transaction& tx, uint32_t skip_flags = 0 );
+} // namespace test
+
 struct database_fixture {
    // the reason we use an app is to exercise the indexes of built-in
    //   plugins
@@ -346,6 +354,34 @@ struct database_fixture {
                                         const fc::ecc::private_key& signing_private_key = generate_private_key("null_key"),
                                         uint32_t skip_flags = ~0);
    const worker_object& create_worker(account_id_type owner, const share_type daily_pay = 1000, const fc::microseconds& duration = fc::days(2));
+   template<typename T>
+   proposal_create_operation make_proposal_create_op( const T& op, account_id_type proposer = GRAPHENE_TEMP_ACCOUNT,
+                                                      uint32_t timeout = 300, uint32_t review_period = 0 ) const
+   {
+      proposal_create_operation cop;
+      cop.fee_paying_account = proposer;
+      cop.expiration_time = db.head_block_time() + timeout;
+      cop.review_period_seconds = review_period;
+      cop.proposed_ops.emplace_back( op );
+      for( auto& o : cop.proposed_ops ) db.current_fee_schedule().set_fee(o.op);
+      return cop;
+   }
+   template<typename T>
+   const proposal_object& propose( const T& op, account_id_type proposer = GRAPHENE_TEMP_ACCOUNT,
+                                   uint32_t timeout = 300, uint32_t review_period = 0 )
+   {
+      proposal_create_operation cop = make_proposal_create_op( op, proposer, timeout, review_period );
+      trx.operations.clear();
+      trx.operations.push_back( cop );
+      for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+      trx.validate();
+      test::set_expiration( db, trx );
+      processed_transaction ptx = PUSH_TX(db, trx, ~0);
+      const operation_result& op_result = ptx.operation_results.front();
+      trx.operations.clear();
+      verify_asset_supplies(db);
+      return db.get<proposal_object>( op_result.get<object_id_type>() );
+   }
    uint64_t fund( const account_object& account, const asset& amount = asset(500000) );
    digest_type digest( const transaction& tx );
    void sign( signed_transaction& trx, const fc::ecc::private_key& key );
@@ -411,13 +447,5 @@ struct database_fixture {
    }
 
 };
-
-namespace test {
-/// set a reasonable expiration time for the transaction
-void set_expiration( const database& db, transaction& tx );
-
-bool _push_block( database& db, const signed_block& b, uint32_t skip_flags = 0 );
-processed_transaction _push_transaction( database& db, const signed_transaction& tx, uint32_t skip_flags = 0 );
-}
 
 } }
