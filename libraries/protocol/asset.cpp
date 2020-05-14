@@ -294,13 +294,6 @@ namespace graphene { namespace protocol {
          return ~settlement_price * ratio_type( maintenance_collateral_ratio, GRAPHENE_COLLATERAL_RATIO_DENOM );
       }
 
-      price price_feed::calculate_initial_collateralization( uint16_t initial_collateral_ratio )const
-      {
-         if( settlement_price.is_null() )
-            return price();
-         return ~settlement_price * ratio_type( initial_collateral_ratio, GRAPHENE_COLLATERAL_RATIO_DENOM );
-      }
-
 // compile-time table of powers of 10 using template metaprogramming
 
 template< int N >

@@ -56,6 +56,59 @@ namespace detail {
       }
    }
 
+   // TODO review and remove code below and links to it after HARDFORK_BSIP_48_75_TIME
+   void check_asset_options_hf_bsip_48_75(const fc::time_point_sec& block_time, const asset_options& options)
+   {
+      if ( !HARDFORK_BSIP_48_75_PASSED( block_time ) )
+      {
+         // new issuer permissions should not be set until activation of BSIP_48_75
+         FC_ASSERT( !(options.issuer_permissions & ~ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK),
+                    "New asset issuer permission bits should not be set before HARDFORK_BSIP_48_75_TIME" );
+         // Note: no check for flags here because we didn't check in the past
+      }
+   }
+
+   // TODO review and remove code below and links to it after HARDFORK_BSIP_48_75_TIME
+   void check_bitasset_options_hf_bsip_48_75(const fc::time_point_sec& block_time, const bitasset_options& options)
+   {
+      if ( !HARDFORK_BSIP_48_75_PASSED( block_time ) )
+      {
+         // new params should not be set until activation of BSIP_48_75
+         FC_ASSERT( !options.extensions.value.maintenance_collateral_ratio.valid(),
+                    "Maintenance collateral ratio should not be defined by asset owner "
+                    "before HARDFORK_BSIP_48_75_TIME" );
+         FC_ASSERT( !options.extensions.value.maximum_short_squeeze_ratio.valid(),
+                    "Maximum short squeeze ratio should not be defined by asset owner "
+                    "before HARDFORK_BSIP_48_75_TIME" );
+      }
+   }
+
+   // TODO review and remove code below and links to it after HARDFORK_BSIP_48_75_TIME
+   void check_asset_update_extensions_hf_bsip_48_75( const fc::time_point_sec& block_time,
+                                                     const asset_update_operation::ext& extensions )
+   {
+      if ( !HARDFORK_BSIP_48_75_PASSED( block_time ) )
+      {
+         // new extensions should not be set until activation of BSIP_48_75
+         FC_ASSERT( !extensions.new_precision.valid(),
+                    "new_precision should not be set before HARDFORK_BSIP_48_75_TIME" );
+         FC_ASSERT( !extensions.skip_core_exchange_rate.valid(),
+                    "skip_core_exchange_rate should not be set before HARDFORK_BSIP_48_75_TIME" );
+      }
+   }
+
+   // TODO review and remove code below and links to it after HARDFORK_BSIP_77_TIME
+   void check_asset_publish_feed_extensions_hf_bsip77( const fc::time_point_sec& block_time,
+                                                       const asset_publish_feed_operation::ext& extensions )
+   {
+      if ( !HARDFORK_BSIP_77_PASSED( block_time ) )
+      {
+         // new extensions should not be set until activation of BSIP_77
+         FC_ASSERT( !extensions.initial_collateral_ratio.valid(),
+                   "Initial collateral ratio should not be defined before HARDFORK_BSIP_77_TIME" );
+      }
+   }
+
    // TODO review and remove code below and links to it after HARDFORK_BSIP_77_TIME
    void check_bitasset_options_hf_bsip77(const fc::time_point_sec& block_time, const bitasset_options& options)
    {
@@ -93,10 +146,30 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    // Hardfork Checks:
    detail::check_asset_options_hf_1774(now, op.common_options);
+   detail::check_asset_options_hf_bsip_48_75(now, op.common_options);
    detail::check_asset_options_hf_bsip81(now, op.common_options);
    if( op.bitasset_opts ) {
+      detail::check_bitasset_options_hf_bsip_48_75( now, *op.bitasset_opts );
       detail::check_bitasset_options_hf_bsip77( now, *op.bitasset_opts );
       detail::check_bitasset_options_hf_bsip87( now, *op.bitasset_opts ); // HF_REMOVABLE
+   }
+
+   // TODO move the assertions to asset_options::validate() if not triggered before hardfork
+   if( HARDFORK_BSIP_48_75_PASSED( now ) )
+   {
+      FC_ASSERT( !(op.common_options.flags & ~ASSET_ISSUER_PERMISSION_MASK),
+                 "Can not set an unknown bit in flags" );
+      FC_ASSERT( !(op.common_options.flags & disable_mcr_update),
+                 "Can not set disable_mcr_update flag, it is for issuer permission only" );
+      FC_ASSERT( !(op.common_options.flags & disable_icr_update),
+                 "Can not set disable_icr_update flag, it is for issuer permission only" );
+      FC_ASSERT( !(op.common_options.flags & disable_mssr_update),
+                 "Can not set disable_mssr_update flag, it is for issuer permission only" );
+      if( !op.bitasset_opts.valid() )
+      {
+         FC_ASSERT( !(op.common_options.flags & ~UIA_ASSET_ISSUER_PERMISSION_MASK),
+                    "Can not set a flag for bitassets only to UIA" );
+      }
    }
 
    const auto& chain_parameters = d.get_global_properties().parameters;
@@ -220,6 +293,8 @@ void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
    FC_ASSERT( o.issuer == a.issuer );
    FC_ASSERT( !a.is_market_issued(), "Cannot manually issue a market-issued asset." );
 
+   FC_ASSERT( a.can_create_new_supply(), "Can not create new supply" );
+
    to_account = &o.issue_to_account(d);
    FC_ASSERT( is_authorized_asset( d, *to_account, a ) );
 
@@ -318,7 +393,9 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 
    // Hardfork Checks:
    detail::check_asset_options_hf_1774(now, o.new_options);
+   detail::check_asset_options_hf_bsip_48_75(now, o.new_options);
    detail::check_asset_options_hf_bsip81(now, o.new_options);
+   detail::check_asset_update_extensions_hf_bsip_48_75( now, o.extensions.value );
 
    const asset_object& a = o.asset_to_update(d);
    auto a_copy = a;
@@ -332,21 +409,34 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       validate_new_issuer( d, a, *o.new_issuer );
    }
 
+   uint16_t enabled_issuer_permissions_mask = a.options.get_enabled_issuer_permissions_mask();
    if( a.dynamic_asset_data_id(d).current_supply != 0 )
    {
       // new issuer_permissions must be subset of old issuer permissions
-      FC_ASSERT(!(o.new_options.issuer_permissions & ~a.options.issuer_permissions),
-                "Cannot reinstate previously revoked issuer permissions on an asset.");
+      FC_ASSERT(!(o.new_options.get_enabled_issuer_permissions_mask() & ~enabled_issuer_permissions_mask),
+                "Cannot reinstate previously revoked issuer permissions on an asset if current supply is non-zero.");
+      // precision can not be changed
+      FC_ASSERT( !o.extensions.value.new_precision.valid(),
+                 "Cannot update precision if current supply is non-zero" );
    }
 
    // changed flags must be subset of old issuer permissions
-   FC_ASSERT(!((o.new_options.flags ^ a.options.flags) & ~a.options.issuer_permissions),
-             "Flag change is forbidden by issuer permissions");
+   FC_ASSERT( !((o.new_options.flags ^ a.options.flags) & ~enabled_issuer_permissions_mask),
+              "Flag change is forbidden by issuer permissions" );
 
    asset_to_update = &a;
    FC_ASSERT( o.issuer == a.issuer,
               "Incorrect issuer for asset! (${o.issuer} != ${a.issuer})",
               ("o.issuer", o.issuer)("a.issuer", a.issuer) );
+
+   FC_ASSERT( a.can_update_max_supply() || a.options.max_supply == o.new_options.max_supply,
+              "Can not update max supply" );
+
+   if( o.extensions.value.new_precision.valid() )
+   {
+      FC_ASSERT( *o.extensions.value.new_precision != a.precision,
+                 "Specified a new precision but it does not change" );
+   }
 
    const auto& chain_parameters = d.get_global_properties().parameters;
 
@@ -377,7 +467,7 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
    }
 
    // For market-issued assets, if core change rate changed, update flag in bitasset data
-   if( asset_to_update->is_market_issued()
+   if( !o.extensions.value.skip_core_exchange_rate.valid() && asset_to_update->is_market_issued()
           && asset_to_update->options.core_exchange_rate != o.new_options.core_exchange_rate )
    {
       const auto& bitasset = asset_to_update->bitasset_data(d);
@@ -393,7 +483,16 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
    d.modify(*asset_to_update, [&o](asset_object& a) {
       if( o.new_issuer )
          a.issuer = *o.new_issuer;
-      a.options = o.new_options;
+      if( o.extensions.value.new_precision.valid() )
+         a.precision = *o.extensions.value.new_precision;
+      if( o.extensions.value.skip_core_exchange_rate.valid() )
+      {
+         const auto old_cer = a.options.core_exchange_rate;
+         a.options = o.new_options;
+         a.options.core_exchange_rate = old_cer;
+      }
+      else
+         a.options = o.new_options;
    });
 
    return void_result();
@@ -468,6 +567,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    const time_point_sec now = d.head_block_time();
 
    // Hardfork Checks:
+   detail::check_bitasset_options_hf_bsip_48_75( now, op.new_options );
    detail::check_bitasset_options_hf_bsip77( now, op.new_options );
    detail::check_bitasset_options_hf_bsip87( now, op.new_options ); // HF_REMOVABLE
 
@@ -479,18 +579,51 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 
    const asset_bitasset_data_object& current_bitasset_data = asset_obj.bitasset_data(d);
 
-   FC_ASSERT( !current_bitasset_data.has_settlement(), "Cannot update a bitasset after a global settlement has executed" );
+   FC_ASSERT( !current_bitasset_data.has_settlement(),
+              "Cannot update a bitasset after a global settlement has executed" );
+
+   if( !asset_obj.can_owner_update_mcr() )
+   {
+      // check if MCR will change
+      const auto& old_mcr = current_bitasset_data.options.extensions.value.maintenance_collateral_ratio;
+      const auto& new_mcr = op.new_options.extensions.value.maintenance_collateral_ratio;
+      bool mcr_changed = ( ( old_mcr.valid() != new_mcr.valid() )
+                           || ( old_mcr.valid() && *old_mcr != *new_mcr ) );
+      FC_ASSERT( !mcr_changed, "No permission to update MCR" );
+   }
+
+   if( !asset_obj.can_owner_update_icr() )
+   {
+      // check if ICR will change
+      const auto& old_icr = current_bitasset_data.options.extensions.value.initial_collateral_ratio;
+      const auto& new_icr = op.new_options.extensions.value.initial_collateral_ratio;
+      bool icr_changed = ( ( old_icr.valid() != new_icr.valid() )
+                           || ( old_icr.valid() && *old_icr != *new_icr ) );
+      FC_ASSERT( !icr_changed, "No permission to update ICR" );
+   }
+
+   if( !asset_obj.can_owner_update_mssr() )
+   {
+      // check if MSSR will change
+      const auto& old_mssr = current_bitasset_data.options.extensions.value.maximum_short_squeeze_ratio;
+      const auto& new_mssr = op.new_options.extensions.value.maximum_short_squeeze_ratio;
+      bool mssr_changed = ( ( old_mssr.valid() != new_mssr.valid() )
+                           || ( old_mssr.valid() && *old_mssr != *new_mssr ) );
+      FC_ASSERT( !mssr_changed, "No permission to update MSSR" );
+   }
 
    // hf 922_931 is a consensus/logic change. This hf cannot be removed.
-   bool after_hf_core_922_931 = ( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_922_931_TIME );
+   bool after_hf_core_922_931 = ( d.get_dynamic_global_properties().next_maintenance_time
+                                  > HARDFORK_CORE_922_931_TIME );
 
    // Are we changing the backing asset?
    if( op.new_options.short_backing_asset != current_bitasset_data.options.short_backing_asset )
    {
-      FC_ASSERT( asset_obj.dynamic_asset_data_id(d).current_supply == 0,
+      const asset_dynamic_data_object& dyn = asset_obj.dynamic_asset_data_id(d);
+      FC_ASSERT( dyn.current_supply == 0,
                  "Cannot update a bitasset if there is already a current supply." );
 
-      FC_ASSERT( asset_obj.dynamic_asset_data_id(d).accumulated_collateral_fees == 0,
+      FC_ASSERT( dyn.accumulated_collateral_fees == 0,
                  "Must claim collateral-denominated fees before changing backing asset." );
 
       const asset_object& new_backing_asset = op.new_options.short_backing_asset(d); // check if the asset exists
@@ -607,10 +740,34 @@ static bool update_bitasset_object_options(
    }
 
    // check if ICR will change
-   const auto& old_icr = bdo.options.extensions.value.initial_collateral_ratio;
-   const auto& new_icr = op.new_options.extensions.value.initial_collateral_ratio;
-   bool icr_changed = ( ( old_icr.valid() != new_icr.valid() )
-                        || ( old_icr.valid() && *old_icr != *new_icr ) );
+   if( !should_update_feeds )
+   {
+      const auto& old_icr = bdo.options.extensions.value.initial_collateral_ratio;
+      const auto& new_icr = op.new_options.extensions.value.initial_collateral_ratio;
+      bool icr_changed = ( ( old_icr.valid() != new_icr.valid() )
+                           || ( old_icr.valid() && *old_icr != *new_icr ) );
+      should_update_feeds = icr_changed;
+   }
+
+   // check if MCR will change
+   if( !should_update_feeds )
+   {
+      const auto& old_mcr = bdo.options.extensions.value.maintenance_collateral_ratio;
+      const auto& new_mcr = op.new_options.extensions.value.maintenance_collateral_ratio;
+      bool mcr_changed = ( ( old_mcr.valid() != new_mcr.valid() )
+                           || ( old_mcr.valid() && *old_mcr != *new_mcr ) );
+      should_update_feeds = mcr_changed;
+   }
+
+   // check if MSSR will change
+   if( !should_update_feeds )
+   {
+      const auto& old_mssr = bdo.options.extensions.value.maximum_short_squeeze_ratio;
+      const auto& new_mssr = op.new_options.extensions.value.maximum_short_squeeze_ratio;
+      bool mssr_changed = ( ( old_mssr.valid() != new_mssr.valid() )
+                           || ( old_mssr.valid() && *old_mssr != *new_mssr ) );
+      should_update_feeds = mssr_changed;
+   }
 
    bdo.options = op.new_options;
 
@@ -635,16 +792,11 @@ static bool update_bitasset_object_options(
 
    if( should_update_feeds )
    {
-      const auto old_feed = bdo.current_feed;
+      const price_feed old_feed = static_cast<price_feed>( bdo.current_feed );
       bdo.update_median_feeds( db.head_block_time(), next_maint_time );
 
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
-      return ( after_hf_core_868_890 && ! (old_feed == bdo.current_feed) );
-   }
-   else if( icr_changed ) // feeds not updated, but ICR changed
-   {
-      // update data derived from ICR
-      bdo.refresh_current_initial_collateralization();
+      return ( after_hf_core_868_890 && ! ( old_feed == static_cast<price_feed>( bdo.current_feed ) ) );
    }
 
    return false;
@@ -857,14 +1009,18 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
 
 void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_operation& o)
 { try {
-   database& d = db();
+   const database& d = db();
+   const time_point_sec now = d.head_block_time();
+
+   // TODO remove check after hard fork
+   detail::check_asset_publish_feed_extensions_hf_bsip77( now, o.extensions.value );
 
    const asset_object& base = o.asset_id(d);
    //Verify that this feed is for a market-issued asset and that asset is backed by the base
    FC_ASSERT( base.is_market_issued(), "Can only publish price feeds for market-issued assets" );
 
    const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
-   if( bitasset.is_prediction_market || d.head_block_time() <= HARDFORK_CORE_216_TIME )
+   if( bitasset.is_prediction_market || now <= HARDFORK_CORE_216_TIME )
    {
       FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
    }
@@ -873,7 +1029,7 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset,
               "Quote asset type in settlement price should be same as backing asset of this asset" );
 
-   if( d.head_block_time() > HARDFORK_480_TIME )
+   if( now > HARDFORK_480_TIME )
    {
       if( !o.feed.core_exchange_rate.is_null() )
       {
@@ -926,7 +1082,8 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
    auto old_feed =  bad.current_feed;
    // Store medians for this asset
    d.modify( bad , [&o,head_time,next_maint_time](asset_bitasset_data_object& a) {
-      a.feeds[o.publisher] = make_pair( head_time, o.feed );
+      a.feeds[o.publisher] = make_pair( head_time, price_feed_with_icr( o.feed,
+                                                      o.extensions.value.initial_collateral_ratio ) );
       a.update_median_feeds( head_time, next_maint_time );
    });
 
