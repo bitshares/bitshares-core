@@ -1515,7 +1515,7 @@ BOOST_AUTO_TEST_CASE( create_uia )
       creator.common_options.max_supply = 100000000;
       creator.precision = 2;
       creator.common_options.market_fee_percent = GRAPHENE_MAX_MARKET_FEE_PERCENT/100; /*1%*/
-      creator.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK;
+      creator.common_options.issuer_permissions = DEFAULT_UIA_ASSET_ISSUER_PERMISSION;
       creator.common_options.flags = charge_market_fee;
       creator.common_options.core_exchange_rate = price(asset(2),asset(1,asset_id_type(1)));
       trx.operations.push_back(std::move(creator));
@@ -1576,7 +1576,7 @@ BOOST_AUTO_TEST_CASE( update_uia )
 
       //Cannot convert to an MIA
       BOOST_TEST_MESSAGE( "Make sure we can't convert UIA to MIA" );
-      REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, ASSET_ISSUER_PERMISSION_MASK);
+      REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK);
       REQUIRE_THROW_WITH_VALUE(op, new_options.core_exchange_rate, price(asset(5), asset(5)));
 
       BOOST_TEST_MESSAGE( "Test updating core_exchange_rate" );
@@ -1623,7 +1623,7 @@ BOOST_AUTO_TEST_CASE( update_uia )
       op.new_options.issuer_permissions = test.options.issuer_permissions;
       op.new_options.flags = test.options.flags;
       BOOST_CHECK(!(test.options.issuer_permissions & white_list));
-      REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, UIA_ASSET_ISSUER_PERMISSION_MASK);
+      REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
 
       BOOST_TEST_MESSAGE( "We can change issuer to account_id_type(), but can't do it again" );
       op.new_issuer = account_id_type();

@@ -1299,11 +1299,11 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Initialize: Create user-issued assets
          //////
          upgrade_to_lifetime_member(assetissuer);
-         create_user_issued_asset("ACOIN1", assetissuer,  UIA_ASSET_ISSUER_PERMISSION_MASK);
-         create_user_issued_asset("BCOIN1", assetissuer,  UIA_ASSET_ISSUER_PERMISSION_MASK);
-         create_user_issued_asset("BCOIN2", assetissuer,  UIA_ASSET_ISSUER_PERMISSION_MASK);
-         create_user_issued_asset("BCOIN3", assetissuer,  UIA_ASSET_ISSUER_PERMISSION_MASK);
-         create_user_issued_asset("CCOIN1", assetissuer,  UIA_ASSET_ISSUER_PERMISSION_MASK);
+         create_user_issued_asset("ACOIN1", assetissuer,  DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
+         create_user_issued_asset("BCOIN1", assetissuer,  DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
+         create_user_issued_asset("BCOIN2", assetissuer,  DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
+         create_user_issued_asset("BCOIN3", assetissuer,  DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
+         create_user_issued_asset("CCOIN1", assetissuer,  DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
          generate_blocks(1);
          const asset_object &acoin1 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("ACOIN1");
          const asset_object &bcoin1 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("BCOIN1");
@@ -2585,8 +2585,8 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Initialize: Create user-issued assets
          //////
          upgrade_to_lifetime_member(alice);
-         create_user_issued_asset("ALICECOIN", alice, UIA_ASSET_ISSUER_PERMISSION_MASK);
-         create_user_issued_asset( "SPECIALCOIN", alice,  UIA_ASSET_ISSUER_PERMISSION_MASK);
+         create_user_issued_asset("ALICECOIN", alice, DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
+         create_user_issued_asset( "SPECIALCOIN", alice,  DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
          generate_blocks(1);
          const asset_object &alicecoin = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("ALICECOIN");
          const asset_object &specialcoin
@@ -5261,7 +5261,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Initialize: Create user-issued assets
          //////
          upgrade_to_lifetime_member(assetissuer);
-         create_user_issued_asset("SPECIALCOIN", assetissuer,  UIA_ASSET_ISSUER_PERMISSION_MASK);
+         create_user_issued_asset("SPECIALCOIN", assetissuer,  DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
          generate_blocks(1);
          const asset_object &specialcoin
                  = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SPECIALCOIN");
