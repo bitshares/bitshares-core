@@ -207,6 +207,7 @@ namespace graphene { namespace protocol {
       price maintenance_collateralization()const;
       ///@}
 
+      // TODO rename since it doesn't compare all member variables thus is misleading
       friend bool operator == ( const price_feed& a, const price_feed& b )
       {
          return std::tie( a.settlement_price, a.maintenance_collateral_ratio, a.maximum_short_squeeze_ratio ) ==

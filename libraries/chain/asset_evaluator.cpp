@@ -582,6 +582,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    FC_ASSERT( !current_bitasset_data.has_settlement(),
               "Cannot update a bitasset after a global settlement has executed" );
 
+   // TODO simplify code below when made sure operator==(optional,optional) works
    if( !asset_obj.can_owner_update_mcr() )
    {
       // check if MCR will change
@@ -591,7 +592,6 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
                            || ( old_mcr.valid() && *old_mcr != *new_mcr ) );
       FC_ASSERT( !mcr_changed, "No permission to update MCR" );
    }
-
    if( !asset_obj.can_owner_update_icr() )
    {
       // check if ICR will change
@@ -601,7 +601,6 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
                            || ( old_icr.valid() && *old_icr != *new_icr ) );
       FC_ASSERT( !icr_changed, "No permission to update ICR" );
    }
-
    if( !asset_obj.can_owner_update_mssr() )
    {
       // check if MSSR will change
@@ -739,6 +738,7 @@ static bool update_bitasset_object_options(
          is_witness_or_committee_fed = true;
    }
 
+   // TODO simplify code below when made sure operator==(optional,optional) works
    // check if ICR will change
    if( !should_update_feeds )
    {
@@ -748,7 +748,6 @@ static bool update_bitasset_object_options(
                            || ( old_icr.valid() && *old_icr != *new_icr ) );
       should_update_feeds = icr_changed;
    }
-
    // check if MCR will change
    if( !should_update_feeds )
    {
@@ -758,7 +757,6 @@ static bool update_bitasset_object_options(
                            || ( old_mcr.valid() && *old_mcr != *new_mcr ) );
       should_update_feeds = mcr_changed;
    }
-
    // check if MSSR will change
    if( !should_update_feeds )
    {

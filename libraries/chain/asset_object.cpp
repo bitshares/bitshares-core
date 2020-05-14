@@ -130,6 +130,7 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
    // Note: perhaps can defer updating current_maintenance_collateralization for better performance
    if( after_core_hardfork_1270 )
    {
+      // TODO move the 2 steps into one function if they're always done one after the other
       // update data derived from MCR
       current_maintenance_collateralization = current_feed.maintenance_collateralization();
       // update data derived from ICR
