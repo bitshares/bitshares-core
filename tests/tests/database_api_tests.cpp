@@ -1875,8 +1875,8 @@ BOOST_AUTO_TEST_CASE( get_trade_history )
    BOOST_CHECK_EQUAL( "1", history[0].value );
    BOOST_CHECK_EQUAL( maker_id.instance.value, history[0].side1_account_id.instance.value );
    BOOST_CHECK_EQUAL( taker_id.instance.value, history[0].side2_account_id.instance.value );
-   BOOST_CHECK_EQUAL( 20000, history[0].side1_was_selling.amount.value );
-   BOOST_CHECK_EQUAL( 100000, history[0].side2_was_selling.amount.value );
+   BOOST_CHECK_EQUAL( "BTS", history[0].side1_was_selling );
+   BOOST_CHECK_EQUAL( "CNY", history[0].side2_was_selling );
 
    // opposite side
    history = db_api.get_trade_history( "CNY", core.symbol, db.head_block_time(), db.head_block_time() - fc::days(1) );
@@ -1886,8 +1886,8 @@ BOOST_AUTO_TEST_CASE( get_trade_history )
    BOOST_CHECK_EQUAL( "200", history[0].value );
    BOOST_CHECK_EQUAL( maker_id.instance.value, history[0].side1_account_id.instance.value );
    BOOST_CHECK_EQUAL( taker_id.instance.value, history[0].side2_account_id.instance.value );
-   BOOST_CHECK_EQUAL( 20000, history[0].side1_was_selling.amount.value );
-   BOOST_CHECK_EQUAL( 100000, history[0].side2_was_selling.amount.value );
+   BOOST_CHECK_EQUAL( "BTS", history[0].side1_was_selling );
+   BOOST_CHECK_EQUAL( "CNY", history[0].side2_was_selling );
 
    // by sequence
    history = db_api.get_trade_history_by_sequence( core.symbol, "CNY", 2, db.head_block_time() - fc::days(1) );
@@ -1897,8 +1897,8 @@ BOOST_AUTO_TEST_CASE( get_trade_history )
    BOOST_CHECK_EQUAL( "1", history[0].value );
    BOOST_CHECK_EQUAL( maker_id.instance.value, history[0].side1_account_id.instance.value );
    BOOST_CHECK_EQUAL( taker_id.instance.value, history[0].side2_account_id.instance.value );
-   BOOST_CHECK_EQUAL( 20000, history[0].side1_was_selling.amount.value );
-   BOOST_CHECK_EQUAL( 100000, history[0].side2_was_selling.amount.value );
+   BOOST_CHECK_EQUAL( "BTS", history[0].side1_was_selling );
+   BOOST_CHECK_EQUAL( "CNY", history[0].side2_was_selling );
 
    // opposite side
    history = db_api.get_trade_history_by_sequence( "CNY", core.symbol, 2, db.head_block_time() - fc::days(1) );
@@ -1908,8 +1908,8 @@ BOOST_AUTO_TEST_CASE( get_trade_history )
    BOOST_CHECK_EQUAL( "200", history[0].value );
    BOOST_CHECK_EQUAL( maker_id.instance.value, history[0].side1_account_id.instance.value );
    BOOST_CHECK_EQUAL( taker_id.instance.value, history[0].side2_account_id.instance.value );
-   BOOST_CHECK_EQUAL( 20000, history[0].side1_was_selling.amount.value );
-   BOOST_CHECK_EQUAL( 100000, history[0].side2_was_selling.amount.value );
+   BOOST_CHECK_EQUAL( "BTS", history[0].side1_was_selling );
+   BOOST_CHECK_EQUAL( "CNY", history[0].side2_was_selling );
 
 } FC_LOG_AND_RETHROW() }
 
