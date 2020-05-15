@@ -286,6 +286,24 @@ void asset_options::validate()const
       FC_ASSERT( *extensions.value.reward_percent <= GRAPHENE_100_PERCENT );
 }
 
+void asset_options::validate_flags( bool is_market_issued )const
+{
+   FC_ASSERT( !(flags & ~ASSET_ISSUER_PERMISSION_MASK),
+              "Can not set an unknown bit in flags" );
+   // Note: global_settle is checked in validate(), so do not check again here
+   FC_ASSERT( !(flags & disable_mcr_update),
+              "Can not set disable_mcr_update flag, it is for issuer permission only" );
+   FC_ASSERT( !(flags & disable_icr_update),
+              "Can not set disable_icr_update flag, it is for issuer permission only" );
+   FC_ASSERT( !(flags & disable_mssr_update),
+              "Can not set disable_mssr_update flag, it is for issuer permission only" );
+   if( !is_market_issued )
+   {
+      FC_ASSERT( !(flags & ~UIA_ASSET_ISSUER_PERMISSION_MASK),
+                 "Can not set a flag for bitassets only to UIA" );
+   }
+}
+
 uint16_t asset_options::get_enabled_issuer_permissions_mask() const
 {
    return ( (issuer_permissions & ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK)

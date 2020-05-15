@@ -154,22 +154,10 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
       detail::check_bitasset_options_hf_bsip87( now, *op.bitasset_opts ); // HF_REMOVABLE
    }
 
-   // TODO move the assertions to asset_options::validate() if not triggered before hardfork
+   // TODO move as many validations as possible to validate() if not triggered before hardfork
    if( HARDFORK_BSIP_48_75_PASSED( now ) )
    {
-      FC_ASSERT( !(op.common_options.flags & ~ASSET_ISSUER_PERMISSION_MASK),
-                 "Can not set an unknown bit in flags" );
-      FC_ASSERT( !(op.common_options.flags & disable_mcr_update),
-                 "Can not set disable_mcr_update flag, it is for issuer permission only" );
-      FC_ASSERT( !(op.common_options.flags & disable_icr_update),
-                 "Can not set disable_icr_update flag, it is for issuer permission only" );
-      FC_ASSERT( !(op.common_options.flags & disable_mssr_update),
-                 "Can not set disable_mssr_update flag, it is for issuer permission only" );
-      if( !op.bitasset_opts.valid() )
-      {
-         FC_ASSERT( !(op.common_options.flags & ~UIA_ASSET_ISSUER_PERMISSION_MASK),
-                    "Can not set a flag for bitassets only to UIA" );
-      }
+      op.common_options.validate_flags( op.bitasset_opts.valid() );
    }
 
    const auto& chain_parameters = d.get_global_properties().parameters;
@@ -420,9 +408,26 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
                  "Cannot update precision if current supply is non-zero" );
    }
 
+   // TODO move as many validations as possible to validate() if not triggered before hardfork
+   if( HARDFORK_BSIP_48_75_PASSED( now ) )
+   {
+      o.new_options.validate_flags( a.is_market_issued() );
+   }
+
    // changed flags must be subset of old issuer permissions
-   FC_ASSERT( !((o.new_options.flags ^ a.options.flags) & ~enabled_issuer_permissions_mask),
-              "Flag change is forbidden by issuer permissions" );
+   if( HARDFORK_BSIP_48_75_PASSED( now ) )
+   {
+      // Note: if an invalid bit was set, it can be unset regardless of the permissions
+      uint16_t check_bits = ( a.is_market_issued() ? VALID_FLAGS_MASK : UIA_VALID_FLAGS_MASK );
+
+      FC_ASSERT( !((o.new_options.flags ^ a.options.flags) & check_bits & ~enabled_issuer_permissions_mask),
+                 "Flag change is forbidden by issuer permissions" );
+   }
+   else
+   {
+      FC_ASSERT( !((o.new_options.flags ^ a.options.flags) & ~a.options.issuer_permissions),
+                 "Flag change is forbidden by issuer permissions" );
+   }
 
    asset_to_update = &a;
    FC_ASSERT( o.issuer == a.issuer,

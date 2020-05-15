@@ -217,6 +217,19 @@ const static uint16_t DEFAULT_UIA_ASSET_ISSUER_PERMISSION =
         | override_authority
         | transfer_restricted
         | disable_confidential;
+// The bits that can be used in asset issuer permissions for non-UIA assets but not for UIA assets
+const static uint16_t NON_UIA_ONLY_ISSUER_PERMISSION_MASK =
+        ASSET_ISSUER_PERMISSION_MASK ^ UIA_ASSET_ISSUER_PERMISSION_MASK;
+// The bits that can be used in asset issuer permissions but can not be used in flags
+const static uint16_t PERMISSION_ONLY_MASK =
+        global_settle
+        | disable_mcr_update
+        | disable_icr_update
+        | disable_mssr_update;
+// The bits that can be used in flags for non-UIA assets
+const static uint16_t VALID_FLAGS_MASK = ASSET_ISSUER_PERMISSION_MASK & ~PERMISSION_ONLY_MASK;
+// the bits that can be used in flags for UIA assets
+const static uint16_t UIA_VALID_FLAGS_MASK = UIA_ASSET_ISSUER_PERMISSION_MASK;
 
 enum reserved_spaces {
     relative_protocol_ids = 0,

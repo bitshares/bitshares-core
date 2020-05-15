@@ -95,6 +95,10 @@ namespace graphene { namespace protocol {
       /// Perform internal consistency checks.
       /// @throws fc::exception if any check fails
       void validate()const;
+
+      /// Perform checks about @ref flags.
+      /// @throws fc::exception if any check fails
+      void validate_flags( bool is_market_issued )const;
    };
 
    /**
