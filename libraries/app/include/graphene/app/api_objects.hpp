@@ -137,9 +137,9 @@ namespace graphene { namespace app {
       string                     amount;
       string                     value;
       account_id_type            side1_account_id = GRAPHENE_NULL_ACCOUNT;
-      asset                      side1_was_selling;
+      string                     side1_was_selling;
       account_id_type            side2_account_id = GRAPHENE_NULL_ACCOUNT;
-      asset                      side2_was_selling;
+      string                     side2_was_selling;
    };
 
    struct extended_asset_object : asset_object
