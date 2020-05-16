@@ -38,7 +38,7 @@ jobs:
         sudo apt-get auto-remove -y
         sudo apt-get clean -y
         df -h
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
       with:
         submodules: recursive
     - name: Configure
@@ -109,7 +109,7 @@ jobs:
         sudo apt-get auto-remove -y
         sudo apt-get clean -y
         df -h
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
       with:
         submodules: recursive
     - name: Configure
@@ -257,7 +257,7 @@ jobs:
         sudo apt-get auto-remove -y
         sudo apt-get clean -y
         df -h
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
       with:
         submodules: recursive
     - name: Load external libraries
@@ -307,7 +307,7 @@ jobs:
         brew install ccache
         brew search boost
         brew install boost@1.60
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
       with:
         submodules: recursive
     - name: Configure
