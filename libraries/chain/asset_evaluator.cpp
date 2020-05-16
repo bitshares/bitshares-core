@@ -399,8 +399,20 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       validate_new_issuer( d, a, *o.new_issuer );
    }
 
-   const auto& dyn_data = a.dynamic_asset_data_id(d);
    uint16_t enabled_issuer_permissions_mask = a.options.get_enabled_issuer_permissions_mask();
+   if( hf_bsip_48_75_passed && a.is_market_issued() )
+   {
+      bitasset_data = &a.bitasset_data(d);
+      if( bitasset_data->is_prediction_market )
+      {
+         // Note: if the global_settle permission was unset, it should be corrected
+         FC_ASSERT( a_copy.can_global_settle(),
+                    "The global_settle permission should be enabled for prediction markets" );
+         enabled_issuer_permissions_mask |= global_settle;
+      }
+   }
+
+   const auto& dyn_data = a.dynamic_asset_data_id(d);
    if( dyn_data.current_supply != 0 )
    {
       // new issuer_permissions must be subset of old issuer permissions
@@ -453,7 +465,8 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 
       if( a.is_market_issued() )
       {
-         bitasset_data = &asset_to_update->bitasset_data(d);
+         if( !bitasset_data )
+            bitasset_data = &asset_to_update->bitasset_data(d);
          FC_ASSERT( !bitasset_data->is_prediction_market, "Can not update precision of a prediction market" );
       }
 
@@ -495,7 +508,7 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
          d.cancel_settle_order(*itr);
    }
 
-   // For market-issued assets, if core change rate changed, update flag in bitasset data
+   // For market-issued assets, if core exchange rate changed, update flag in bitasset data
    if( !o.extensions.value.skip_core_exchange_rate.valid() && asset_to_update->is_market_issued()
           && asset_to_update->options.core_exchange_rate != o.new_options.core_exchange_rate )
    {
