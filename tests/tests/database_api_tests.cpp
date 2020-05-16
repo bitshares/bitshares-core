@@ -1851,65 +1851,62 @@ BOOST_AUTO_TEST_CASE( get_trade_history )
    opt.has_market_history_plugin = true;
    graphene::app::database_api db_api( db, &opt);
 
-   ACTORS((maker)(taker));
+   ACTORS((bob)(alice));
 
-   const auto& bitcny = create_user_issued_asset("CNY");
-   const auto& core   = asset_id_type()(db);
+   const auto& eur = create_user_issued_asset("EUR");
+   asset_id_type eur_id = eur.id;
+   const auto& usd = create_user_issued_asset("USD");
+   asset_id_type usd_id = usd.id;
 
-   int64_t init_balance(10000000);
-   transfer( committee_account, maker_id, asset(init_balance) );
-   issue_uia( taker_id, bitcny.amount(init_balance) );
+   issue_uia( bob_id, usd.amount(1000000) );
+   issue_uia( alice_id, eur.amount(1000000) );
 
    // maker create an order
-   create_sell_order(maker, core.amount(100000), bitcny.amount(20000));
+   create_sell_order(bob, usd.amount(200), eur.amount(210));
 
    // taker match it
-   create_sell_order(taker, bitcny.amount(20000), core.amount(100000));
+   create_sell_order(alice, eur.amount(210), usd.amount(200));
 
    generate_block();
 
-   auto history = db_api.get_trade_history( core.symbol, "CNY", db.head_block_time(), db.head_block_time() - fc::days(1) );
+   // taker is selling
+   auto history = db_api.get_trade_history( "EUR", "USD", db.head_block_time(), db.head_block_time() - fc::days(1) );
    BOOST_REQUIRE_EQUAL( 1, history.size() );
-   BOOST_CHECK_EQUAL( "0.005", history[0].price );
-   BOOST_CHECK_EQUAL( "200", history[0].amount );
-   BOOST_CHECK_EQUAL( "1", history[0].value );
-   BOOST_CHECK_EQUAL( maker_id.instance.value, history[0].side1_account_id.instance.value );
-   BOOST_CHECK_EQUAL( taker_id.instance.value, history[0].side2_account_id.instance.value );
-   BOOST_CHECK_EQUAL( "BTS", history[0].side1_was_selling );
-   BOOST_CHECK_EQUAL( "CNY", history[0].side2_was_selling );
+   BOOST_CHECK_EQUAL( "1.05", history[0].price );
+   BOOST_CHECK_EQUAL( "2", history[0].amount );
+   BOOST_CHECK_EQUAL( "2.10", history[0].value );
+   BOOST_CHECK_EQUAL( "sell", history[0].type );
+   BOOST_CHECK_EQUAL( bob_id.instance.value, history[0].side1_account_id.instance.value );
+   BOOST_CHECK_EQUAL( alice_id.instance.value, history[0].side2_account_id.instance.value );
 
-   // opposite side
-   history = db_api.get_trade_history( "CNY", core.symbol, db.head_block_time(), db.head_block_time() - fc::days(1) );
+   // opposite side, taker is buying
+   history = db_api.get_trade_history( "USD", "EUR", db.head_block_time(), db.head_block_time() - fc::days(1) );
    BOOST_REQUIRE_EQUAL( 1, history.size() );
-   BOOST_CHECK_EQUAL( "200", history[0].price );
-   BOOST_CHECK_EQUAL( "1", history[0].amount );
-   BOOST_CHECK_EQUAL( "200", history[0].value );
-   BOOST_CHECK_EQUAL( maker_id.instance.value, history[0].side1_account_id.instance.value );
-   BOOST_CHECK_EQUAL( taker_id.instance.value, history[0].side2_account_id.instance.value );
-   BOOST_CHECK_EQUAL( "BTS", history[0].side1_was_selling );
-   BOOST_CHECK_EQUAL( "CNY", history[0].side2_was_selling );
+   BOOST_CHECK_EQUAL( "0.9523809523809523809", history[0].price );
+   BOOST_CHECK_EQUAL( "2.10", history[0].amount );
+   BOOST_CHECK_EQUAL( "2", history[0].value );
+   BOOST_CHECK_EQUAL( "buy", history[0].type );
+   BOOST_CHECK_EQUAL( bob_id.instance.value, history[0].side1_account_id.instance.value );
+   BOOST_CHECK_EQUAL( alice_id.instance.value, history[0].side2_account_id.instance.value );
 
    // by sequence
-   history = db_api.get_trade_history_by_sequence( core.symbol, "CNY", 2, db.head_block_time() - fc::days(1) );
-   BOOST_REQUIRE_EQUAL( 1, history.size() );
-   BOOST_CHECK_EQUAL( "0.005", history[0].price );
-   BOOST_CHECK_EQUAL( "200", history[0].amount );
-   BOOST_CHECK_EQUAL( "1", history[0].value );
-   BOOST_CHECK_EQUAL( maker_id.instance.value, history[0].side1_account_id.instance.value );
-   BOOST_CHECK_EQUAL( taker_id.instance.value, history[0].side2_account_id.instance.value );
-   BOOST_CHECK_EQUAL( "BTS", history[0].side1_was_selling );
-   BOOST_CHECK_EQUAL( "CNY", history[0].side2_was_selling );
+   history = db_api.get_trade_history_by_sequence( "EUR", "USD", 2, db.head_block_time() - fc::days(1) );
+   BOOST_CHECK_EQUAL( "1.05", history[0].price );
+   BOOST_CHECK_EQUAL( "2", history[0].amount );
+   BOOST_CHECK_EQUAL( "2.10", history[0].value );
+   BOOST_CHECK_EQUAL( "sell", history[0].type );
+   BOOST_CHECK_EQUAL( bob_id.instance.value, history[0].side1_account_id.instance.value );
+   BOOST_CHECK_EQUAL( alice_id.instance.value, history[0].side2_account_id.instance.value );
 
    // opposite side
-   history = db_api.get_trade_history_by_sequence( "CNY", core.symbol, 2, db.head_block_time() - fc::days(1) );
+   history = db_api.get_trade_history_by_sequence( "USD", "EUR", 2, db.head_block_time() - fc::days(1) );
    BOOST_REQUIRE_EQUAL( 1, history.size() );
-   BOOST_CHECK_EQUAL( "200", history[0].price );
-   BOOST_CHECK_EQUAL( "1", history[0].amount );
-   BOOST_CHECK_EQUAL( "200", history[0].value );
-   BOOST_CHECK_EQUAL( maker_id.instance.value, history[0].side1_account_id.instance.value );
-   BOOST_CHECK_EQUAL( taker_id.instance.value, history[0].side2_account_id.instance.value );
-   BOOST_CHECK_EQUAL( "BTS", history[0].side1_was_selling );
-   BOOST_CHECK_EQUAL( "CNY", history[0].side2_was_selling );
+   BOOST_CHECK_EQUAL( "0.9523809523809523809", history[0].price );
+   BOOST_CHECK_EQUAL( "2.10", history[0].amount );
+   BOOST_CHECK_EQUAL( "2", history[0].value );
+   BOOST_CHECK_EQUAL( "buy", history[0].type );
+   BOOST_CHECK_EQUAL( bob_id.instance.value, history[0].side1_account_id.instance.value );
+   BOOST_CHECK_EQUAL( alice_id.instance.value, history[0].side2_account_id.instance.value );
 
 } FC_LOG_AND_RETHROW() }
 
