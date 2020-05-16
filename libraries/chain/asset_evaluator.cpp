@@ -392,7 +392,7 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 
    if( o.new_issuer )
    {
-      FC_ASSERT( now  < HARDFORK_CORE_199_TIME,
+      FC_ASSERT( now < HARDFORK_CORE_199_TIME,
                  "Since Hardfork #199, updating issuer requires the use of asset_update_issuer_operation.");
       validate_new_issuer( d, a, *o.new_issuer );
    }
@@ -441,6 +441,21 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    {
       FC_ASSERT( *o.extensions.value.new_precision != a.precision,
                  "Specified a new precision but it does not change" );
+
+      if( a.is_market_issued() )
+      {
+         bitasset_data = &asset_to_update->bitasset_data(d);
+         FC_ASSERT( !bitasset_data->is_prediction_market, "Can not update precision of a prediction market" );
+      }
+
+      // If any other asset is backed by this asset, this asset's precision can't be updated
+      const auto& idx = d.get_index_type<graphene::chain::asset_bitasset_data_index>()
+                         .indices().get<by_short_backing_asset>();
+      auto itr = idx.lower_bound( o.asset_to_update );
+      bool backing_another_asset = ( itr != idx.end() && itr->options.short_backing_asset == o.asset_to_update );
+      FC_ASSERT( !backing_another_asset,
+                 "Asset ${a} is backed by this asset, can not update precision",
+                 ("a",itr->asset_id) );
    }
 
    const auto& chain_parameters = d.get_global_properties().parameters;
@@ -475,7 +490,7 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
    if( !o.extensions.value.skip_core_exchange_rate.valid() && asset_to_update->is_market_issued()
           && asset_to_update->options.core_exchange_rate != o.new_options.core_exchange_rate )
    {
-      const auto& bitasset = asset_to_update->bitasset_data(d);
+      const auto& bitasset = ( bitasset_data ? *bitasset_data : asset_to_update->bitasset_data(d) );
       if( !bitasset.asset_cer_updated )
       {
          d.modify( bitasset, [](asset_bitasset_data_object& b)
