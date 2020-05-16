@@ -385,6 +385,8 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    detail::check_asset_options_hf_bsip81(now, o.new_options);
    detail::check_asset_update_extensions_hf_bsip_48_75( now, o.extensions.value );
 
+   bool hf_bsip_48_75_passed = ( HARDFORK_BSIP_48_75_PASSED( now ) );
+
    const asset_object& a = o.asset_to_update(d);
    auto a_copy = a;
    a_copy.options = o.new_options;
@@ -397,8 +399,9 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       validate_new_issuer( d, a, *o.new_issuer );
    }
 
+   const auto& dyn_data = a.dynamic_asset_data_id(d);
    uint16_t enabled_issuer_permissions_mask = a.options.get_enabled_issuer_permissions_mask();
-   if( a.dynamic_asset_data_id(d).current_supply != 0 )
+   if( dyn_data.current_supply != 0 )
    {
       // new issuer_permissions must be subset of old issuer permissions
       FC_ASSERT(!(o.new_options.get_enabled_issuer_permissions_mask() & ~enabled_issuer_permissions_mask),
@@ -406,16 +409,22 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       // precision can not be changed
       FC_ASSERT( !o.extensions.value.new_precision.valid(),
                  "Cannot update precision if current supply is non-zero" );
+
+      if( hf_bsip_48_75_passed ) // TODO review after hard fork, probably can assert unconditionally
+      {
+         FC_ASSERT( dyn_data.current_supply <= o.new_options.max_supply,
+                    "Max supply should not be smaller than current supply" );
+      }
    }
 
    // TODO move as many validations as possible to validate() if not triggered before hardfork
-   if( HARDFORK_BSIP_48_75_PASSED( now ) )
+   if( hf_bsip_48_75_passed )
    {
       o.new_options.validate_flags( a.is_market_issued() );
    }
 
    // changed flags must be subset of old issuer permissions
-   if( HARDFORK_BSIP_48_75_PASSED( now ) )
+   if( hf_bsip_48_75_passed )
    {
       // Note: if an invalid bit was set, it can be unset regardless of the permissions
       uint16_t check_bits = ( a.is_market_issued() ? VALID_FLAGS_MASK : UIA_VALID_FLAGS_MASK );
