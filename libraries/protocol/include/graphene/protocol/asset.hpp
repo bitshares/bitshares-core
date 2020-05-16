@@ -202,17 +202,21 @@ namespace graphene { namespace protocol {
       /// Another implementation of max_short_squeeze_price() before the core-1270 hard fork
       price max_short_squeeze_price_before_hf_1270()const;
 
-      /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call territory.
+      /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call
+      /// territory.
       /// Calculation: ~settlement_price * maintenance_collateral_ratio / GRAPHENE_COLLATERAL_RATIO_DENOM
       price maintenance_collateralization()const;
-      ///@}
 
-      // TODO rename since it doesn't compare all member variables thus is misleading
-      friend bool operator == ( const price_feed& a, const price_feed& b )
+      /// Whether the parameters that affect margin calls in this price feed object are the same as the parameters
+      /// in the passed-in object
+      bool margin_call_params_equal( const price_feed& b ) const
       {
-         return std::tie( a.settlement_price, a.maintenance_collateral_ratio, a.maximum_short_squeeze_ratio ) ==
+         if( this == &b )
+            return true;
+         return std::tie(   settlement_price,   maintenance_collateral_ratio,   maximum_short_squeeze_ratio ) ==
                 std::tie( b.settlement_price, b.maintenance_collateral_ratio, b.maximum_short_squeeze_ratio );
       }
+      ///@}
 
       void validate() const;
       bool is_for( asset_id_type asset_id ) const;

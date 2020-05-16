@@ -234,13 +234,6 @@ namespace graphene { namespace chain {
       /// The result will be used to check new debt positions and position updates.
       /// Calculation: ~settlement_price * initial_collateral_ratio / GRAPHENE_COLLATERAL_RATIO_DENOM
       price calculate_initial_collateralization()const;
-
-      // TODO remove
-      friend bool operator == ( const price_feed_with_icr& a, const price_feed_with_icr& b )
-      {
-         return static_cast<const price_feed&>(a) == static_cast<const price_feed&>(b)
-                  && a.initial_collateral_ratio == b.initial_collateral_ratio;
-      }
    };
 
    /**

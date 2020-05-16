@@ -832,11 +832,11 @@ static bool update_bitasset_object_options(
 
    if( should_update_feeds )
    {
-      const price_feed old_feed = static_cast<price_feed>( bdo.current_feed );
+      const auto old_feed = bdo.current_feed;
       bdo.update_median_feeds( db.head_block_time(), next_maint_time );
 
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
-      return ( after_hf_core_868_890 && ! ( old_feed == static_cast<price_feed>( bdo.current_feed ) ) );
+      return ( after_hf_core_868_890 && !old_feed.margin_call_params_equal( bdo.current_feed ) );
    }
 
    return false;
@@ -1119,7 +1119,7 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
    const asset_object& base = *asset_ptr;
    const asset_bitasset_data_object& bad = *bitasset_ptr;
 
-   auto old_feed =  bad.current_feed;
+   auto old_feed = bad.current_feed;
    // Store medians for this asset
    d.modify( bad , [&o,head_time,next_maint_time](asset_bitasset_data_object& a) {
       a.feeds[o.publisher] = make_pair( head_time, price_feed_with_icr( o.feed,
@@ -1127,7 +1127,7 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
       a.update_median_feeds( head_time, next_maint_time );
    });
 
-   if( !(old_feed == bad.current_feed) )
+   if( !old_feed.margin_call_params_equal(bad.current_feed) )
    {
       // Check whether need to revive the asset and proceed if need
       if( bad.has_settlement() // has globally settled, implies head_block_time > HARDFORK_CORE_216_TIME
