@@ -845,6 +845,20 @@ void database_fixture::issue_uia( account_id_type recipient_id, asset amount )
    issue_uia( recipient_id(db), amount );
 }
 
+void database_fixture::reserve_asset( account_id_type account, asset amount )
+{
+   BOOST_TEST_MESSAGE( "Reserving asset" );
+   asset_reserve_operation op;
+   op.payer = account;
+   op.amount_to_reserve = amount;
+   trx.operations.clear();
+   trx.operations.push_back(op);
+   set_expiration( db, trx );
+   trx.validate();
+   PUSH_TX( db, trx, ~0 );
+   trx.operations.clear();
+}
+
 void database_fixture::change_fees(
    const fee_parameters::flat_set_type& new_params,
    uint32_t new_scale /* = 0 */

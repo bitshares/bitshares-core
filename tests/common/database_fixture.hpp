@@ -323,6 +323,7 @@ struct database_fixture {
                                                  additional_asset_options_t options = additional_asset_options_t());
    void issue_uia( const account_object& recipient, asset amount );
    void issue_uia( account_id_type recipient_id, asset amount );
+   void reserve_asset( account_id_type account, asset amount );
 
    const account_object& create_account(
       const string& name,
