@@ -287,5 +287,80 @@ BOOST_AUTO_TEST_CASE( hardfork_protection_test )
    }
 }
 
+BOOST_AUTO_TEST_CASE( prediction_market_global_settle_permission )
+{
+   try {
+
+      // Proceeds to a recent hard fork
+      generate_blocks( HARDFORK_CORE_1270_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((sam));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+
+      // create a prediction market
+      const asset_object& pm = create_prediction_market( "PDM", sam_id );
+      asset_id_type pm_id = pm.id;
+
+      BOOST_CHECK( pm_id(db).can_global_settle() );
+
+      // disable global_settle permission
+      asset_update_operation auop;
+      auop.issuer = sam_id;
+      auop.asset_to_update = pm_id;
+      auop.new_options = pm_id(db).options;
+      auop.new_options.issuer_permissions &= ~global_settle;
+
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( !pm_id(db).can_global_settle() );
+
+      // create some supply
+      borrow( sam, asset(100, pm_id), asset(100) );
+      BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).current_supply.value, 100 );
+
+      // try to enable global_settle again, should fail
+      auop.new_options.issuer_permissions |= global_settle;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      BOOST_CHECK( !pm_id(db).can_global_settle() );
+
+      // advance to bsip48/75 hard fork
+      generate_blocks( HARDFORK_BSIP_48_75_TIME );
+      set_expiration( db, trx );
+
+      BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).current_supply.value, 100 );
+      BOOST_CHECK( !pm_id(db).can_global_settle() );
+
+      // try to update the asset without enabling global_settle permission, should fail
+      auop.new_options.issuer_permissions &= ~global_settle;
+      auop.new_options.max_supply -= 1;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      BOOST_CHECK( !pm_id(db).can_global_settle() );
+
+      // try to enable global_settle again, should succeed
+      auop.new_options.issuer_permissions |= global_settle;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( pm_id(db).can_global_settle() );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
