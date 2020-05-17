@@ -362,5 +362,67 @@ BOOST_AUTO_TEST_CASE( prediction_market_global_settle_permission )
    }
 }
 
+BOOST_AUTO_TEST_CASE( update_max_supply )
+{
+   try {
+
+      // Proceeds to a recent hard fork
+      generate_blocks( HARDFORK_CORE_1270_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((sam));
+
+      // create a UIA
+      const asset_object& uia = create_user_issued_asset( "UIATEST", sam, charge_market_fee );
+      asset_id_type uia_id = uia.id;
+
+      // issue all to Sam
+      issue_uia( sam_id, uia.amount(uia.options.max_supply) );
+
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, uia_id(db).options.max_supply.value );
+
+      // update max supply to a smaller number
+      asset_update_operation auop;
+      auop.issuer = sam_id;
+      auop.asset_to_update = uia_id;
+      auop.new_options = uia_id(db).options;
+      auop.new_options.max_supply -= 1;
+
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, uia_id(db).options.max_supply.value + 1 );
+
+      // advance to bsip48/75 hard fork
+      generate_blocks( HARDFORK_BSIP_48_75_TIME );
+      set_expiration( db, trx );
+
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, uia_id(db).options.max_supply.value + 1 );
+
+      // able to set max supply to be equal to current supply
+      auop.new_options.max_supply += 1;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, uia_id(db).options.max_supply.value );
+
+      // no longer able to set max supply to a number smaller than current supply
+      auop.new_options.max_supply -= 1;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, uia_id(db).options.max_supply.value );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
