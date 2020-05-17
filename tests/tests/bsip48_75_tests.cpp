@@ -905,6 +905,77 @@ BOOST_AUTO_TEST_CASE( disable_new_supply_pm )
    }
 }
 
+BOOST_AUTO_TEST_CASE( skip_core_exchange_rate )
+{
+   try {
+
+      // advance to bsip48/75 hard fork
+      generate_blocks( HARDFORK_BSIP_48_75_TIME );
+      set_expiration( db, trx );
+
+      ACTORS((sam));
+
+      // create a UIA
+      const asset_object& uia = create_user_issued_asset( "UIATEST", sam, charge_market_fee );
+      asset_id_type uia_id = uia.id;
+
+      BOOST_CHECK( uia_id(db).options.core_exchange_rate == price(asset(1, uia_id), asset(1)) );
+
+      // prepare to update
+      asset_update_operation auop;
+      auop.issuer = sam_id;
+      auop.asset_to_update = uia_id;
+      auop.new_options = uia_id(db).options;
+
+      // update CER
+      auop.new_options.core_exchange_rate = price(asset(2, uia_id), asset(1));
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      // CER changed
+      BOOST_CHECK( uia_id(db).options.core_exchange_rate == price(asset(2, uia_id), asset(1)) );
+
+      // save value for later check
+      auto old_market_fee_percent = auop.new_options.market_fee_percent;
+      BOOST_CHECK_EQUAL( uia_id(db).options.market_fee_percent, old_market_fee_percent );
+
+      // set skip_core_exchange_rate to false, should fail
+      auop.new_options.core_exchange_rate = price(asset(3, uia_id), asset(1));
+      auop.extensions.value.skip_core_exchange_rate = false;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      // unable to propose either
+      BOOST_CHECK_THROW( propose( auop ), fc::exception );
+
+      // CER didn't change
+      BOOST_CHECK( uia_id(db).options.core_exchange_rate == price(asset(2, uia_id), asset(1)) );
+
+      // skip updating CER
+      auop.extensions.value.skip_core_exchange_rate = true;
+      auop.new_options.market_fee_percent = 120u;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      // CER didn't change
+      BOOST_CHECK( uia_id(db).options.core_exchange_rate == price(asset(2, uia_id), asset(1)) );
+      // market_fee_percent changed
+      BOOST_CHECK_EQUAL( uia_id(db).options.market_fee_percent, 120u );
+
+      // Able to propose the operation
+      propose( auop );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 
 BOOST_AUTO_TEST_SUITE_END()
 
