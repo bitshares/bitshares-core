@@ -70,10 +70,8 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
       current_feed = price_feed_with_icr();
       if( after_core_hardfork_1270 )
       {
-         // update data derived from MCR
-         current_maintenance_collateralization = price();
-         // update data derived from ICR
-         current_initial_collateralization = price();
+         // update data derived from MCR, ICR and etc
+         refresh_cache();
       }
       return;
    }
@@ -92,10 +90,8 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
             current_feed.maximum_short_squeeze_ratio = *exts.maximum_short_squeeze_ratio;
          if( exts.initial_collateral_ratio.valid() )
             current_feed.initial_collateral_ratio = *exts.initial_collateral_ratio;
-         // update data derived from MCR
-         current_maintenance_collateralization = current_feed.maintenance_collateralization();
-         // update data derived from ICR
-         refresh_current_initial_collateralization();
+         // update data derived from MCR, ICR and etc
+         refresh_cache();
       }
       return;
    }
@@ -130,25 +126,18 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
    // Note: perhaps can defer updating current_maintenance_collateralization for better performance
    if( after_core_hardfork_1270 )
    {
-      // TODO move the 2 steps into one function if they're always done one after the other
-      // update data derived from MCR
-      current_maintenance_collateralization = current_feed.maintenance_collateralization();
-      // update data derived from ICR
-      refresh_current_initial_collateralization();
+      // update data derived from MCR, ICR and etc
+      refresh_cache();
    }
 }
 
-void asset_bitasset_data_object::refresh_current_initial_collateralization()
+void asset_bitasset_data_object::refresh_cache()
 {
-   if( current_feed.settlement_price.is_null() )
-      current_initial_collateralization = price();
-   else
-   {
-      if( current_feed.initial_collateral_ratio > current_feed.maintenance_collateral_ratio ) // if ICR is above MCR
-         current_initial_collateralization = current_feed.calculate_initial_collateralization();
-      else // if ICR is not above MCR
-         current_initial_collateralization = current_maintenance_collateralization;
-   }
+   current_maintenance_collateralization = current_feed.maintenance_collateralization();
+   if( current_feed.initial_collateral_ratio > current_feed.maintenance_collateral_ratio ) // if ICR is above MCR
+      current_initial_collateralization = current_feed.calculate_initial_collateralization();
+   else // if ICR is not above MCR
+      current_initial_collateralization = current_maintenance_collateralization;
 }
 
 price price_feed_with_icr::calculate_initial_collateralization()const

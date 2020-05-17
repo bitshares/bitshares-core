@@ -263,18 +263,20 @@ namespace graphene { namespace chain {
          price_feed_with_icr current_feed;
          /// This is the publication time of the oldest feed which was factored into current_feed.
          time_point_sec current_feed_publication_time;
-         /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call territory.
+
+         /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin
+         /// call territory.
          /// This value is derived from @ref current_feed for better performance and should be kept consistent.
          price current_maintenance_collateralization;
          /// After BSIP77, when creating a new debt position or updating an existing position, the position
          /// will be checked against the `initial_collateral_ratio` (ICR) parameter in the bitasset options.
-         /// This value is derived from @ref current_feed and `ICR` for better performance and should be kept
-         /// consistent.
+         /// This value is derived from @ref current_feed (which includes `ICR`) for better performance and
+         /// should be kept consistent.
          price current_initial_collateralization;
 
-         /// Derive @ref current_initial_collateralization from other member variables.
-         /// Note: this assumes @ref current_maintenance_collateralization is fresh.
-         void refresh_current_initial_collateralization();
+         /// Derive @ref current_maintenance_collateralization and @ref current_initial_collateralization from
+         /// other member variables.
+         void refresh_cache();
 
          /// True if this asset implements a @ref prediction_market
          bool is_prediction_market = false;
