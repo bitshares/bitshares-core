@@ -686,5 +686,216 @@ BOOST_AUTO_TEST_CASE( update_max_supply )
    }
 }
 
+BOOST_AUTO_TEST_CASE( disable_new_supply_uia )
+{
+   try {
+
+      // advance to bsip48/75 hard fork
+      generate_blocks( HARDFORK_BSIP_48_75_TIME );
+      set_expiration( db, trx );
+
+      ACTORS((sam));
+
+      // create a UIA
+      const asset_object& uia = create_user_issued_asset( "UIATEST", sam, charge_market_fee );
+      asset_id_type uia_id = uia.id;
+
+      BOOST_CHECK( uia_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, 0 );
+
+      // issue some to Sam
+      issue_uia( sam_id, uia_id(db).amount( 100 ) );
+
+      BOOST_CHECK( uia_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, 100 );
+
+      // prepare to update
+      asset_update_operation auop;
+      auop.issuer = sam_id;
+      auop.asset_to_update = uia_id;
+      auop.new_options = uia_id(db).options;
+
+      // update flag to disable creation of new supply
+      auop.new_options.flags |= disable_new_supply;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( !uia_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, 100 );
+
+      // unable to issue more coins
+      BOOST_CHECK_THROW( issue_uia( sam_id, uia_id(db).amount( 100 ) ), fc::exception );
+
+      BOOST_CHECK( !uia_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, 100 );
+
+      // update flag to enable creation of new supply
+      auop.new_options.flags &= ~disable_new_supply;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( uia_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, 100 );
+
+      // issue some to Sam
+      issue_uia( sam_id, uia_id(db).amount( 100 ) );
+
+      BOOST_CHECK( uia_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, 200 );
+
+      // update flag to disable creation of new supply
+      auop.new_options.flags |= disable_new_supply;
+      // update permission to disable updating of disable_new_supply flag
+      auop.new_options.issuer_permissions |= disable_new_supply;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( !uia_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, 200 );
+
+      // unable to reinstall the permission
+      auop.new_options.issuer_permissions &= ~disable_new_supply;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      auop.new_options.issuer_permissions |= disable_new_supply;
+
+      BOOST_CHECK( !uia_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, 200 );
+
+      // unable to issue more coins
+      BOOST_CHECK_THROW( issue_uia( sam_id, uia_id(db).amount( 100 ) ), fc::exception );
+
+      BOOST_CHECK( !uia_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, 200 );
+
+      // unable to enable the disable_new_supply flag
+      auop.new_options.flags &= ~disable_new_supply;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      auop.new_options.flags |= disable_new_supply;
+
+      BOOST_CHECK( !uia_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, 200 );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( disable_new_supply_pm )
+{
+   try {
+
+      // advance to bsip48/75 hard fork
+      generate_blocks( HARDFORK_BSIP_48_75_TIME );
+      set_expiration( db, trx );
+
+      ACTORS((sam));
+
+      fund( sam, asset(10000) );
+
+      // create a PM
+      const asset_object& pm = create_prediction_market( "PDM", sam_id );
+      asset_id_type pm_id = pm.id;
+
+      BOOST_CHECK( pm_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).current_supply.value, 0 );
+
+      // Sam borrow some
+      borrow( sam, asset(100, pm_id), asset(100) );
+
+      BOOST_CHECK( pm_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).current_supply.value, 100 );
+
+      // prepare to update
+      asset_update_operation auop;
+      auop.issuer = sam_id;
+      auop.asset_to_update = pm_id;
+      auop.new_options = pm_id(db).options;
+
+      // update flag to disable creation of new supply
+      auop.new_options.flags |= disable_new_supply;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( !pm_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).current_supply.value, 100 );
+
+      // unable to borrow more
+      BOOST_CHECK_THROW( borrow( sam, asset(100, pm_id), asset(100) ), fc::exception );
+
+      BOOST_CHECK( !pm_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).current_supply.value, 100 );
+
+      // update flag to enable creation of new supply
+      auop.new_options.flags &= ~disable_new_supply;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( pm_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).current_supply.value, 100 );
+
+      // Sam borrow some
+      borrow( sam, asset(100, pm_id), asset(100) );
+
+      BOOST_CHECK( pm_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).current_supply.value, 200 );
+
+      // update flag to disable creation of new supply
+      auop.new_options.flags |= disable_new_supply;
+      // update permission to disable updating of disable_new_supply flag
+      auop.new_options.issuer_permissions |= disable_new_supply;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( !pm_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).current_supply.value, 200 );
+
+      // unable to reinstall the permission
+      auop.new_options.issuer_permissions &= ~disable_new_supply;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      auop.new_options.issuer_permissions |= disable_new_supply;
+
+      BOOST_CHECK( !pm_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).current_supply.value, 200 );
+
+      // unable to borrow more coins
+      BOOST_CHECK_THROW( borrow( sam, asset(100, pm_id), asset(100) ), fc::exception );
+
+      BOOST_CHECK( !pm_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).current_supply.value, 200 );
+
+      // unable to enable the disable_new_supply flag
+      auop.new_options.flags &= ~disable_new_supply;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      auop.new_options.flags |= disable_new_supply;
+
+      BOOST_CHECK( !pm_id(db).can_create_new_supply() );
+      BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).current_supply.value, 200 );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+
 BOOST_AUTO_TEST_SUITE_END()
 
