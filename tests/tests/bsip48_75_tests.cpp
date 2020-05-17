@@ -511,6 +511,9 @@ BOOST_AUTO_TEST_CASE( update_max_supply )
       BOOST_CHECK_EQUAL( uia_id(db).options.max_supply.value, GRAPHENE_MAX_SHARE_SUPPLY - 98 );
       BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, GRAPHENE_MAX_SHARE_SUPPLY - 100 );
 
+      // Able to propose the operation
+      propose( auop );
+
       // unable to reinstall the permission
       auop.new_options.issuer_permissions &= ~lock_max_supply;
       trx.operations.clear();
@@ -756,6 +759,9 @@ BOOST_AUTO_TEST_CASE( disable_new_supply_uia )
       BOOST_CHECK( !uia_id(db).can_create_new_supply() );
       BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, 200 );
 
+      // Able to propose the operation
+      propose( auop );
+
       // unable to reinstall the permission
       auop.new_options.issuer_permissions &= ~disable_new_supply;
       trx.operations.clear();
@@ -861,6 +867,9 @@ BOOST_AUTO_TEST_CASE( disable_new_supply_pm )
 
       BOOST_CHECK( !pm_id(db).can_create_new_supply() );
       BOOST_CHECK_EQUAL( pm_id(db).dynamic_data(db).current_supply.value, 200 );
+
+      // Able to propose the operation
+      propose( auop );
 
       // unable to reinstall the permission
       auop.new_options.issuer_permissions &= ~disable_new_supply;
