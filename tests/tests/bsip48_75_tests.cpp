@@ -976,6 +976,214 @@ BOOST_AUTO_TEST_CASE( skip_core_exchange_rate )
    }
 }
 
+BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
+{
+   try {
+
+      // Proceeds to a recent hard fork
+      generate_blocks( HARDFORK_CORE_1270_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((sam)(feeder));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( feeder, asset(init_amount) );
+
+      uint16_t bitmask = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK;
+      uint16_t uiamask = DEFAULT_UIA_ASSET_ISSUER_PERMISSION;
+
+      uint16_t bitflag = ~global_settle & ~committee_fed_asset; // high bits are set
+      uint16_t uiaflag = ~(bitmask ^ uiamask); // high bits are set
+
+      // Able to create UIA with invalid flags
+      asset_create_operation acop;
+      acop.issuer = sam_id;
+      acop.symbol = "SAMCOIN";
+      acop.precision = 2;
+      acop.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
+      acop.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      acop.common_options.market_fee_percent = 100;
+      acop.common_options.flags = uiaflag;
+      acop.common_options.issuer_permissions = uiamask;
+
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+
+      processed_transaction ptx = PUSH_TX(db, trx, ~0);
+      const asset_object& samcoin = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+      asset_id_type samcoin_id = samcoin.id;
+
+      // There are invalid bits in flags
+      BOOST_CHECK( samcoin_id(db).options.flags & ~UIA_VALID_FLAGS_MASK );
+
+      // Able to create MPA with invalid flags
+      asset_create_operation acop2 = acop;
+      acop2.symbol = "SAMBIT";
+      acop2.bitasset_opts = bitasset_options();
+      acop2.common_options.flags = bitflag;
+      acop2.common_options.issuer_permissions = bitmask;
+
+      trx.operations.clear();
+      trx.operations.push_back( acop2 );
+
+      ptx = PUSH_TX(db, trx, ~0);
+      const asset_object& sambit = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+      asset_id_type sambit_id = sambit.id;
+
+      // There are invalid bits in flags
+      BOOST_CHECK( sambit_id(db).options.flags & ~VALID_FLAGS_MASK );
+
+      // Unable to correct the invalid flags of the UIA
+      asset_update_operation auop;
+      auop.issuer = sam_id;
+      auop.asset_to_update = samcoin_id;
+      auop.new_options = samcoin_id(db).options;
+      auop.new_options.flags = 0;
+
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      // Unable to correct the invalid flags of the MPA
+      asset_update_operation auop2;
+      auop2.issuer = sam_id;
+      auop2.asset_to_update = sambit_id;
+      auop2.new_options = sambit_id(db).options;
+      auop2.new_options.flags = 0;
+
+      trx.operations.clear();
+      trx.operations.push_back( auop2 );
+
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      // advance to bsip48/75 hard fork
+      generate_blocks( HARDFORK_BSIP_48_75_TIME );
+      set_expiration( db, trx );
+
+      // take a look at flags of UIA
+      BOOST_CHECK( samcoin_id(db).options.flags != UIA_VALID_FLAGS_MASK );
+
+      // Try to update UIA but leave some invalid flags, should fail
+      auop.new_options = samcoin_id(db).options;
+      for( uint16_t bit = 0x8000; bit > 0; bit >>= 1 )
+      {
+         auop.new_options.flags = UIA_VALID_FLAGS_MASK | bit;
+         if( auop.new_options.flags == UIA_VALID_FLAGS_MASK )
+            continue;
+         trx.operations.clear();
+         trx.operations.push_back( auop );
+         BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+         // Unable to propose either if the bit is not a valid bit for MPA
+         if( !(bit & VALID_FLAGS_MASK) )
+            BOOST_CHECK_THROW( propose( auop ), fc::exception );
+      }
+
+      // Unset the invalid bits in flags, should succeed
+      auop.new_options.flags = UIA_VALID_FLAGS_MASK;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK_EQUAL( samcoin_id(db).options.flags, UIA_VALID_FLAGS_MASK );
+
+      // Able to propose too
+      propose( auop );
+
+      // take a look at flags of MPA
+      uint16_t valid_bitflag = VALID_FLAGS_MASK & ~committee_fed_asset;
+      BOOST_CHECK( sambit_id(db).options.flags != valid_bitflag );
+
+      // Try to update MPA but leave some invalid flags, should fail
+      auop2.new_options = sambit_id(db).options;
+      for( uint16_t bit = 0x8000; bit > 0; bit >>= 1 )
+      {
+         auop2.new_options.flags = valid_bitflag | bit;
+         if( auop2.new_options.flags == valid_bitflag )
+            continue;
+         trx.operations.clear();
+         trx.operations.push_back( auop2 );
+         BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+         // Unable to propose either
+         BOOST_CHECK_THROW( propose( auop2 ), fc::exception );
+      }
+
+      // Unset the invalid bits in flags, should succeed
+      auop2.new_options.flags = valid_bitflag;
+      trx.operations.clear();
+      trx.operations.push_back( auop2 );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK_EQUAL( sambit_id(db).options.flags, valid_bitflag );
+
+      // Able to propose too
+      propose( auop2 );
+
+      // Unable to create a new UIA with an unknown flag
+      acop.symbol = "NEWSAMCOIN";
+      for( uint16_t bit = 0x8000; bit > 0; bit >>= 1 )
+      {
+         acop.common_options.flags = UIA_VALID_FLAGS_MASK | bit;
+         if( acop.common_options.flags == UIA_VALID_FLAGS_MASK )
+            continue;
+         trx.operations.clear();
+         trx.operations.push_back( acop );
+         BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+         // Unable to propose either
+         BOOST_CHECK_THROW( propose( acop ), fc::exception );
+      }
+
+      // Able to create a new UIA with a valid flag
+      acop.common_options.flags = UIA_VALID_FLAGS_MASK;
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      ptx = PUSH_TX(db, trx, ~0);
+      const asset_object& newsamcoin = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+      asset_id_type newsamcoin_id = newsamcoin.id;
+
+      BOOST_CHECK_EQUAL( newsamcoin_id(db).options.flags, UIA_VALID_FLAGS_MASK );
+
+      // Able to propose too
+      propose( acop );
+
+      // Unable to create a new MPA with an unknown flag
+      acop2.symbol = "NEWSAMBIT";
+      for( uint16_t bit = 0x8000; bit > 0; bit >>= 1 )
+      {
+         acop2.common_options.flags = valid_bitflag | bit;
+         if( acop2.common_options.flags == valid_bitflag )
+            continue;
+         trx.operations.clear();
+         trx.operations.push_back( acop2 );
+         BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+         // Unable to propose either
+         BOOST_CHECK_THROW( propose( acop2 ), fc::exception );
+      }
+
+      // Able to create a new UIA with a valid flag
+      acop2.common_options.flags = valid_bitflag;
+      trx.operations.clear();
+      trx.operations.push_back( acop2 );
+      ptx = PUSH_TX(db, trx, ~0);
+      const asset_object& newsambit = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+      asset_id_type newsambit_id = newsambit.id;
+
+      BOOST_CHECK_EQUAL( newsambit_id(db).options.flags, valid_bitflag );
+
+      // Able to propose too
+      propose( acop2 );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 
 BOOST_AUTO_TEST_SUITE_END()
 
