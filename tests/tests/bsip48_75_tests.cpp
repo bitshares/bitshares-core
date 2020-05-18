@@ -1184,6 +1184,124 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
    }
 }
 
+BOOST_AUTO_TEST_CASE( update_asset_precision )
+{
+   try {
+
+      // advance to bsip48/75 hard fork
+      generate_blocks( HARDFORK_BSIP_48_75_TIME );
+      set_expiration( db, trx );
+
+      ACTORS((sam));
+
+      // create a prediction market
+      const asset_object& pm = create_prediction_market( "PDM", sam_id );
+      asset_id_type pm_id = pm.id;
+
+      BOOST_CHECK_EQUAL( pm_id(db).precision, 5 );
+
+      // prepare to update
+      asset_update_operation auop;
+      auop.issuer = sam_id;
+      auop.asset_to_update = pm_id;
+      auop.new_options = pm_id(db).options;
+
+      // Unable to update precision of a PM
+      auop.extensions.value.new_precision = 4;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      BOOST_CHECK_EQUAL( pm_id(db).precision, 5 );
+
+      // Able to propose the operation
+      propose( auop );
+
+      // create a UIA
+      const asset_object& uia = create_user_issued_asset( "UIATEST", sam, charge_market_fee );
+      asset_id_type uia_id = uia.id;
+
+      BOOST_CHECK_EQUAL( uia_id(db).precision, 2 );
+
+      // try to set new precision to be the same as the old precision, will fail
+      auop.asset_to_update = uia_id;
+      auop.new_options = uia_id(db).options;
+      auop.extensions.value.new_precision = 2;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      BOOST_CHECK_EQUAL( uia_id(db).precision, 2 );
+
+      // try to set new precision to a number which is too big, will fail
+      auop.asset_to_update = uia_id;
+      auop.new_options = uia_id(db).options;
+      auop.extensions.value.new_precision = 13;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      // Unable to propose either
+      BOOST_CHECK_THROW( propose( auop ), fc::exception );
+
+      BOOST_CHECK_EQUAL( uia_id(db).precision, 2 );
+
+      // update precision to a valid number, should succeed
+      auop.extensions.value.new_precision = 3;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK_EQUAL( uia_id(db).precision, 3 );
+
+      // create some supply
+      issue_uia( sam_id, asset( 100, uia_id ) );
+
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, 100 );
+
+      // try to update precision, will fail
+      auop.extensions.value.new_precision = 4;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      BOOST_CHECK_EQUAL( uia_id(db).precision, 3 );
+
+      // destroy all supply
+      reserve_asset( sam_id, asset( 100, uia_id ) );
+
+      BOOST_CHECK_EQUAL( uia_id(db).dynamic_data(db).current_supply.value, 0 );
+
+      // update precision, should succeed
+      auop.extensions.value.new_precision = 4;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK_EQUAL( uia_id(db).precision, 4 );
+
+      // create a MPA which is backed by the UIA
+      const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 10, charge_market_fee, 3, uia_id );
+      asset_id_type mpa_id = mpa.id;
+
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).options.short_backing_asset == uia_id );
+
+      // try to update precision of the UIA, will fail
+      auop.extensions.value.new_precision = 3;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      BOOST_CHECK_EQUAL( uia_id(db).precision, 4 );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 
 BOOST_AUTO_TEST_SUITE_END()
 
