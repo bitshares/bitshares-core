@@ -1310,6 +1310,362 @@ BOOST_AUTO_TEST_CASE( update_asset_precision )
    }
 }
 
+BOOST_AUTO_TEST_CASE( asset_owner_permissions_update_icr_mcr_mssr )
+{
+   try {
+
+      // advance to bsip48/75 hard fork
+      generate_blocks( HARDFORK_BSIP_48_75_TIME );
+      set_expiration( db, trx );
+
+      ACTORS((sam)(feeder));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( feeder, asset(init_amount) );
+
+      // create a MPA with a zero market_fee_percent
+      const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
+      asset_id_type mpa_id = mpa.id;
+
+      BOOST_CHECK( mpa_id(db).can_owner_update_icr() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_mcr() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_mssr() );
+
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio.valid() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.maintenance_collateral_ratio.valid() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.maximum_short_squeeze_ratio.valid() );
+
+      // add a price feed publisher and publish a feed
+      update_feed_producers( mpa_id, { feeder_id } );
+
+      price_feed f;
+      f.settlement_price = price( asset(1,mpa_id), asset(1) );
+      f.core_exchange_rate = price( asset(1,mpa_id), asset(1) );
+      f.maintenance_collateral_ratio = 1850;
+      f.maximum_short_squeeze_ratio = 1250;
+
+      uint16_t feed_icr = 1900;
+
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+      auto current_feed = mpa_id(db).bitasset_data(db).current_feed;
+      BOOST_CHECK( current_feed.settlement_price   == f.settlement_price );
+      BOOST_CHECK( current_feed.core_exchange_rate == f.core_exchange_rate );
+      BOOST_CHECK_EQUAL( current_feed.maintenance_collateral_ratio, f.maintenance_collateral_ratio );
+      BOOST_CHECK_EQUAL( current_feed.maximum_short_squeeze_ratio,  f.maximum_short_squeeze_ratio );
+      BOOST_CHECK_EQUAL( current_feed.initial_collateral_ratio,     feed_icr );
+
+      // disable owner's permission to update icr
+      asset_update_operation auop;
+      auop.issuer = sam_id;
+      auop.asset_to_update = mpa_id;
+      auop.new_options = mpa_id(db).options;
+      auop.new_options.issuer_permissions |= disable_icr_update;
+
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( !mpa_id(db).can_owner_update_icr() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_mcr() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_mssr() );
+
+      // check that owner can not update icr
+      asset_update_bitasset_operation aubop;
+      aubop.issuer = sam_id;
+      aubop.asset_to_update = mpa_id;
+      aubop.new_options = mpa_id(db).bitasset_data(db).options;
+      aubop.new_options.extensions.value.initial_collateral_ratio = 1950;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      aubop.new_options.extensions.value.initial_collateral_ratio.reset();
+
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio.valid() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.maintenance_collateral_ratio.valid() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.maximum_short_squeeze_ratio.valid() );
+
+      // disable owner's permission to update mcr
+      auop.new_options.issuer_permissions &= ~disable_icr_update;
+      auop.new_options.issuer_permissions |= disable_mcr_update;
+
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( mpa_id(db).can_owner_update_icr() );
+      BOOST_CHECK( !mpa_id(db).can_owner_update_mcr() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_mssr() );
+
+      // check that owner can not update mcr
+      aubop.new_options.extensions.value.maintenance_collateral_ratio = 1650;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      aubop.new_options.extensions.value.maintenance_collateral_ratio.reset();
+
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio.valid() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.maintenance_collateral_ratio.valid() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.maximum_short_squeeze_ratio.valid() );
+
+      // disable owner's permission to update mssr
+      auop.new_options.issuer_permissions &= ~disable_mcr_update;
+      auop.new_options.issuer_permissions |= disable_mssr_update;
+
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( mpa_id(db).can_owner_update_icr() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_mcr() );
+      BOOST_CHECK( !mpa_id(db).can_owner_update_mssr() );
+
+      // check that owner can not update mssr
+      aubop.new_options.extensions.value.maximum_short_squeeze_ratio = 1150;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      aubop.new_options.extensions.value.maximum_short_squeeze_ratio.reset();
+
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio.valid() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.maintenance_collateral_ratio.valid() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.maximum_short_squeeze_ratio.valid() );
+
+      // enable owner's permission to update mssr
+      auop.new_options.issuer_permissions &= ~disable_mssr_update;
+
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( mpa_id(db).can_owner_update_icr() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_mcr() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_mssr() );
+
+      // check that owner can update the ratios
+      aubop.new_options.extensions.value.initial_collateral_ratio = 1950;
+      aubop.new_options.extensions.value.maintenance_collateral_ratio = 1650;
+      aubop.new_options.extensions.value.maximum_short_squeeze_ratio = 1150;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio.valid() );
+      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.maintenance_collateral_ratio.valid() );
+      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.maximum_short_squeeze_ratio.valid() );
+
+      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio, 1950 );
+      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.maintenance_collateral_ratio, 1650 );
+      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.maximum_short_squeeze_ratio, 1150 );
+
+      current_feed = mpa_id(db).bitasset_data(db).current_feed;
+      BOOST_CHECK( current_feed.settlement_price   == f.settlement_price );
+      BOOST_CHECK( current_feed.core_exchange_rate == f.core_exchange_rate );
+      BOOST_CHECK_EQUAL( current_feed.maintenance_collateral_ratio, 1650 );
+      BOOST_CHECK_EQUAL( current_feed.maximum_short_squeeze_ratio,  1150 );
+      BOOST_CHECK_EQUAL( current_feed.initial_collateral_ratio,     1950 );
+
+      // Sam borrow some
+      borrow( sam, asset(1000, mpa_id), asset(2000) );
+
+      // disable owner's permission to update icr
+      auop.new_options.issuer_permissions |= disable_icr_update;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( !mpa_id(db).can_owner_update_icr() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_mcr() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_mssr() );
+
+      // check that owner can not update icr
+      aubop.new_options.extensions.value.initial_collateral_ratio = 1960;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      aubop.new_options.extensions.value.initial_collateral_ratio.reset();
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      // able to update other ratios
+      aubop.new_options.extensions.value.initial_collateral_ratio = 1950;
+      aubop.new_options.extensions.value.maintenance_collateral_ratio = 1600;
+      aubop.new_options.extensions.value.maximum_short_squeeze_ratio = 1100;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio.valid() );
+      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.maintenance_collateral_ratio.valid() );
+      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.maximum_short_squeeze_ratio.valid() );
+
+      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio, 1950 );
+      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.maintenance_collateral_ratio, 1600 );
+      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.maximum_short_squeeze_ratio, 1100 );
+
+      current_feed = mpa_id(db).bitasset_data(db).current_feed;
+      BOOST_CHECK( current_feed.settlement_price   == f.settlement_price );
+      BOOST_CHECK( current_feed.core_exchange_rate == f.core_exchange_rate );
+      BOOST_CHECK_EQUAL( current_feed.maintenance_collateral_ratio, 1600 );
+      BOOST_CHECK_EQUAL( current_feed.maximum_short_squeeze_ratio,  1100 );
+      BOOST_CHECK_EQUAL( current_feed.initial_collateral_ratio,     1950 );
+
+      // unable to enable the permission to update icr
+      auop.new_options.issuer_permissions &= ~disable_icr_update;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      auop.new_options.issuer_permissions |= disable_icr_update;
+
+      BOOST_CHECK( !mpa_id(db).can_owner_update_icr() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_mcr() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_mssr() );
+
+      // disable owner's permission to update mcr
+      auop.new_options.issuer_permissions |= disable_mcr_update;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( !mpa_id(db).can_owner_update_icr() );
+      BOOST_CHECK( !mpa_id(db).can_owner_update_mcr() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_mssr() );
+
+      // check that owner can not update mcr
+      aubop.new_options.extensions.value.maintenance_collateral_ratio = 1660;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      aubop.new_options.extensions.value.maintenance_collateral_ratio.reset();
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      // able to update other params that still has permission E.G. mssr
+      aubop.new_options.extensions.value.initial_collateral_ratio = 1950;
+      aubop.new_options.extensions.value.maintenance_collateral_ratio = 1600;
+      aubop.new_options.extensions.value.maximum_short_squeeze_ratio = 1010;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio.valid() );
+      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.maintenance_collateral_ratio.valid() );
+      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.maximum_short_squeeze_ratio.valid() );
+
+      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio, 1950 );
+      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.maintenance_collateral_ratio, 1600 );
+      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.maximum_short_squeeze_ratio, 1010 );
+
+      current_feed = mpa_id(db).bitasset_data(db).current_feed;
+      BOOST_CHECK( current_feed.settlement_price   == f.settlement_price );
+      BOOST_CHECK( current_feed.core_exchange_rate == f.core_exchange_rate );
+      BOOST_CHECK_EQUAL( current_feed.maintenance_collateral_ratio, 1600 );
+      BOOST_CHECK_EQUAL( current_feed.maximum_short_squeeze_ratio,  1010 );
+      BOOST_CHECK_EQUAL( current_feed.initial_collateral_ratio,     1950 );
+
+      // unable to enable the permission to update mcr
+      auop.new_options.issuer_permissions &= ~disable_mcr_update;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      auop.new_options.issuer_permissions |= disable_mcr_update;
+
+      BOOST_CHECK( !mpa_id(db).can_owner_update_icr() );
+      BOOST_CHECK( !mpa_id(db).can_owner_update_mcr() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_mssr() );
+
+      // disable owner's permission to update mssr
+      auop.new_options.issuer_permissions |= disable_mssr_update;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( !mpa_id(db).can_owner_update_icr() );
+      BOOST_CHECK( !mpa_id(db).can_owner_update_mcr() );
+      BOOST_CHECK( !mpa_id(db).can_owner_update_mssr() );
+
+      // check that owner can not update mssr
+      aubop.new_options.extensions.value.maximum_short_squeeze_ratio = 1020;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      aubop.new_options.extensions.value.maximum_short_squeeze_ratio.reset();
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      // able to update other params that still has permission E.G. force_settlement_delay_sec
+      aubop.new_options.extensions.value.initial_collateral_ratio = 1950;
+      aubop.new_options.extensions.value.maintenance_collateral_ratio = 1600;
+      aubop.new_options.extensions.value.maximum_short_squeeze_ratio = 1010;
+      aubop.new_options.force_settlement_delay_sec += 1;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_REQUIRE_EQUAL( mpa_id(db).bitasset_data(db).options.force_settlement_delay_sec,
+                           aubop.new_options.force_settlement_delay_sec );
+
+      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio.valid() );
+      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.maintenance_collateral_ratio.valid() );
+      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.maximum_short_squeeze_ratio.valid() );
+
+      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio, 1950 );
+      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.maintenance_collateral_ratio, 1600 );
+      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.maximum_short_squeeze_ratio, 1010 );
+
+      current_feed = mpa_id(db).bitasset_data(db).current_feed;
+      BOOST_CHECK( current_feed.settlement_price   == f.settlement_price );
+      BOOST_CHECK( current_feed.core_exchange_rate == f.core_exchange_rate );
+      BOOST_CHECK_EQUAL( current_feed.maintenance_collateral_ratio, 1600 );
+      BOOST_CHECK_EQUAL( current_feed.maximum_short_squeeze_ratio,  1010 );
+      BOOST_CHECK_EQUAL( current_feed.initial_collateral_ratio,     1950 );
+
+      // unable to enable the permission to update mssr
+      auop.new_options.issuer_permissions &= ~disable_mssr_update;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      BOOST_CHECK( !mpa_id(db).can_owner_update_icr() );
+      BOOST_CHECK( !mpa_id(db).can_owner_update_mcr() );
+      BOOST_CHECK( !mpa_id(db).can_owner_update_mssr() );
+
+      // publish a new feed
+      f.settlement_price = price( asset(2,mpa_id), asset(1) );
+      f.core_exchange_rate = price( asset(3,mpa_id), asset(1) );
+      f.maintenance_collateral_ratio = 1830;
+      f.maximum_short_squeeze_ratio = 1230;
+
+      feed_icr = 1930;
+
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+      // the values set by asset owners still take effect
+      current_feed = mpa_id(db).bitasset_data(db).current_feed;
+      BOOST_CHECK( current_feed.settlement_price   == f.settlement_price );
+      BOOST_CHECK( current_feed.core_exchange_rate == f.core_exchange_rate );
+      BOOST_CHECK_EQUAL( current_feed.maintenance_collateral_ratio, 1600 );
+      BOOST_CHECK_EQUAL( current_feed.maximum_short_squeeze_ratio,  1010 );
+      BOOST_CHECK_EQUAL( current_feed.initial_collateral_ratio,     1950 );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
 
 BOOST_AUTO_TEST_SUITE_END()
 
