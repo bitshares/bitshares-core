@@ -1122,8 +1122,10 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       // Able to propose too
       propose( auop2 );
 
-      // Unable to create a new UIA with an unknown flag
+      // Unable to create a new UIA with an unknown bit in flags
       acop.symbol = "NEWSAMCOIN";
+      // With all possible bits in permissions set to 1
+      acop2.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK;
       for( uint16_t bit = 0x8000; bit > 0; bit >>= 1 )
       {
          acop.common_options.flags = UIA_VALID_FLAGS_MASK | bit;
@@ -1136,7 +1138,7 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
          BOOST_CHECK_THROW( propose( acop ), fc::exception );
       }
 
-      // Able to create a new UIA with a valid flag
+      // Able to create a new UIA with a valid flags field
       acop.common_options.flags = UIA_VALID_FLAGS_MASK;
       trx.operations.clear();
       trx.operations.push_back( acop );
@@ -1149,8 +1151,10 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       // Able to propose too
       propose( acop );
 
-      // Unable to create a new MPA with an unknown flag
+      // Unable to create a new MPA with an unknown bit in flags
       acop2.symbol = "NEWSAMBIT";
+      // With all possible bits in permissions set to 1
+      acop2.common_options.issuer_permissions = ASSET_ISSUER_PERMISSION_MASK;
       for( uint16_t bit = 0x8000; bit > 0; bit >>= 1 )
       {
          acop2.common_options.flags = valid_bitflag | bit;
@@ -1163,7 +1167,7 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
          BOOST_CHECK_THROW( propose( acop2 ), fc::exception );
       }
 
-      // Able to create a new UIA with a valid flag
+      // Able to create a new MPA with a valid flags field
       acop2.common_options.flags = valid_bitflag;
       trx.operations.clear();
       trx.operations.push_back( acop2 );
@@ -1172,6 +1176,10 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       asset_id_type newsambit_id = newsambit.id;
 
       BOOST_CHECK_EQUAL( newsambit_id(db).options.flags, valid_bitflag );
+
+      BOOST_CHECK( !newsambit_id(db).can_owner_update_icr() );
+      BOOST_CHECK( !newsambit_id(db).can_owner_update_mcr() );
+      BOOST_CHECK( !newsambit_id(db).can_owner_update_mssr() );
 
       // Able to propose too
       propose( acop2 );
