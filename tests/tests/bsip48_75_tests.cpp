@@ -1470,6 +1470,37 @@ BOOST_AUTO_TEST_CASE( asset_owner_permissions_update_icr_mcr_mssr )
       BOOST_CHECK_EQUAL( current_feed.maximum_short_squeeze_ratio,  1150 );
       BOOST_CHECK_EQUAL( current_feed.initial_collateral_ratio,     1950 );
 
+      // check the ratios' valid range
+      aubop.new_options.extensions.value.initial_collateral_ratio = 1000;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      aubop.new_options.extensions.value.initial_collateral_ratio = 32001;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      aubop.new_options.extensions.value.initial_collateral_ratio = 1950;
+
+      aubop.new_options.extensions.value.maintenance_collateral_ratio = 1000;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      aubop.new_options.extensions.value.maintenance_collateral_ratio = 32001;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      aubop.new_options.extensions.value.maintenance_collateral_ratio = 1650;
+
+      aubop.new_options.extensions.value.maximum_short_squeeze_ratio = 1000;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      aubop.new_options.extensions.value.maximum_short_squeeze_ratio = 32001;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      aubop.new_options.extensions.value.maximum_short_squeeze_ratio = 1150;
+
       // Sam borrow some
       borrow( sam, asset(1000, mpa_id), asset(2000) );
 
@@ -1651,7 +1682,7 @@ BOOST_AUTO_TEST_CASE( asset_owner_permissions_update_icr_mcr_mssr )
 
       publish_feed( mpa_id, feeder_id, f, feed_icr );
 
-      // the values set by asset owners still take effect
+      // the values set by the asset owner still take effect
       current_feed = mpa_id(db).bitasset_data(db).current_feed;
       BOOST_CHECK( current_feed.settlement_price   == f.settlement_price );
       BOOST_CHECK( current_feed.core_exchange_rate == f.core_exchange_rate );
