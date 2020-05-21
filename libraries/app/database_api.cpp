@@ -1555,17 +1555,13 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
             trade.sequence = -itr->key.sequence;
             trade.side1_account_id = itr->op.account_id;
             if(itr->op.receives.asset_id == assets[0]->id)
-               trade.type = "buy";
-            else
                trade.type = "sell";
+            else
+               trade.type = "buy";
          }
-         else {
+         else
             trade.side2_account_id = itr->op.account_id;
-            if(itr->op.receives.asset_id == assets[1]->id)
-               trade.type = "sell";
-            else
-               trade.type = "buy";
-         }
+
          auto next_itr = std::next(itr);
          // Trades are usually tracked in each direction, exception: for global settlement only one side is recorded
          if( next_itr != history_idx.end() && next_itr->key.base == base_id && next_itr->key.quote == quote_id
@@ -1576,17 +1572,12 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
                trade.sequence = -next_itr->key.sequence;
                trade.side1_account_id = next_itr->op.account_id;
                if(next_itr->op.receives.asset_id == assets[0]->id)
-                  trade.type = "buy";
-               else
                   trade.type = "sell";
+               else
+                  trade.type = "buy";
             }
-            else {
+            else
                trade.side2_account_id = next_itr->op.account_id;
-               if(next_itr->op.receives.asset_id == assets[1]->id)
-                  trade.type = "sell";
-               else
-                  trade.type = "buy";
-            }
             // skip the other direction
             itr = next_itr;
          }
@@ -1682,17 +1673,12 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
             trade.sequence = -itr->key.sequence;
             trade.side1_account_id = itr->op.account_id;
             if(itr->op.receives.asset_id == assets[0]->id)
-               trade.type = "buy";
-            else
                trade.type = "sell";
+            else
+               trade.type = "buy";
          }
-         else {
+         else
             trade.side2_account_id = itr->op.account_id;
-            if(itr->op.receives.asset_id == assets[1]->id)
-               trade.type = "sell";
-            else
-               trade.type = "buy";
-         }
 
          auto next_itr = std::next(itr);
          // Trades are usually tracked in each direction, exception: for global settlement only one side is recorded
@@ -1704,17 +1690,12 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
                trade.sequence = -next_itr->key.sequence;
                trade.side1_account_id = next_itr->op.account_id;
                if(next_itr->op.receives.asset_id == assets[0]->id)
-                  trade.type = "buy";
-               else
                   trade.type = "sell";
+               else
+                  trade.type = "buy";
             }
-            else {
+            else
                trade.side2_account_id = next_itr->op.account_id;
-               if(next_itr->op.receives.asset_id == assets[1]->id)
-                  trade.type = "sell";
-               else
-                  trade.type = "buy";
-            }
             // skip the other direction
             itr = next_itr;
          }
