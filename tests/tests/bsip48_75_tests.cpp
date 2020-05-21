@@ -26,6 +26,7 @@
 
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/market_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 
 #include <boost/test/unit_test.hpp>
@@ -1689,6 +1690,156 @@ BOOST_AUTO_TEST_CASE( asset_owner_permissions_update_icr_mcr_mssr )
       BOOST_CHECK_EQUAL( current_feed.maintenance_collateral_ratio, 1600 );
       BOOST_CHECK_EQUAL( current_feed.maximum_short_squeeze_ratio,  1010 );
       BOOST_CHECK_EQUAL( current_feed.initial_collateral_ratio,     1950 );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( asset_owner_update_mcr_mssr )
+{
+   try {
+
+      // advance to bsip48/75 hard fork
+      generate_blocks( HARDFORK_BSIP_48_75_TIME );
+      set_expiration( db, trx );
+
+      ACTORS((sam)(feeder)(borrower)(seller));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( feeder, asset(init_amount) );
+      fund( borrower, asset(init_amount) );
+      fund( seller, asset(init_amount) );
+
+      // create a MPA with a zero market_fee_percent
+      const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
+      asset_id_type mpa_id = mpa.id;
+      asset_id_type core_id = asset_id_type();
+
+      // add a price feed publisher and publish a feed
+      update_feed_producers( mpa_id, { feeder_id } );
+
+      price_feed f;
+      f.settlement_price = price( asset(1,mpa_id), asset(1) );
+      f.core_exchange_rate = price( asset(1,mpa_id), asset(1) );
+      f.maintenance_collateral_ratio = 1850;
+      f.maximum_short_squeeze_ratio = 1250;
+
+      uint16_t feed_icr = 1900;
+
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+      auto current_feed = mpa_id(db).bitasset_data(db).current_feed;
+      BOOST_CHECK( current_feed.settlement_price   == f.settlement_price );
+      BOOST_CHECK( current_feed.core_exchange_rate == f.core_exchange_rate );
+      BOOST_CHECK_EQUAL( current_feed.maintenance_collateral_ratio, f.maintenance_collateral_ratio );
+      BOOST_CHECK_EQUAL( current_feed.maximum_short_squeeze_ratio,  f.maximum_short_squeeze_ratio );
+      BOOST_CHECK_EQUAL( current_feed.initial_collateral_ratio,     feed_icr );
+
+      // borrower borrows some and sends to seller
+      const call_order_object* call_ptr = borrow( borrower_id, asset(1000, mpa_id), asset(2000) );
+      BOOST_REQUIRE( call_ptr );
+      call_order_id_type call_id = call_ptr->id;
+      BOOST_CHECK_EQUAL( call_id(db).debt.value, 1000 );
+      BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2000 );
+
+      BOOST_CHECK_EQUAL( db.get_balance( borrower_id, mpa_id ).amount.value, 1000 );
+      BOOST_CHECK_EQUAL( db.get_balance( borrower_id, core_id ).amount.value, init_amount - 2000 );
+      BOOST_CHECK_EQUAL( db.get_balance( seller_id, mpa_id ).amount.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( seller_id, core_id ).amount.value, init_amount );
+
+      transfer( borrower_id, seller_id, asset(1000, mpa_id) );
+
+      BOOST_CHECK_EQUAL( db.get_balance( borrower_id, mpa_id ).amount.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( borrower_id, core_id ).amount.value, init_amount - 2000 );
+      BOOST_CHECK_EQUAL( db.get_balance( seller_id, mpa_id ).amount.value, 1000 );
+      BOOST_CHECK_EQUAL( db.get_balance( seller_id, core_id ).amount.value, init_amount );
+
+      // seller places orders
+      const limit_order_object* order1_ptr = create_sell_order( seller, asset(100, mpa_id), asset(105) );
+      BOOST_REQUIRE( order1_ptr );
+      limit_order_id_type order1_id = order1_ptr->id;
+      BOOST_CHECK_EQUAL( order1_id(db).for_sale.value, 100 );
+      BOOST_CHECK_EQUAL( order1_id(db).amount_to_receive().amount.value, 105 );
+
+      const limit_order_object* order2_ptr = create_sell_order( seller, asset(100, mpa_id), asset(115) );
+      BOOST_REQUIRE( order2_ptr );
+      limit_order_id_type order2_id = order2_ptr->id;
+      BOOST_CHECK_EQUAL( order2_id(db).for_sale.value, 100 );
+      BOOST_CHECK_EQUAL( order2_id(db).amount_to_receive().amount.value, 115 );
+
+      BOOST_CHECK_EQUAL( call_id(db).debt.value, 1000 );
+      BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2000 );
+      BOOST_CHECK_EQUAL( db.get_balance( borrower_id, mpa_id ).amount.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( borrower_id, core_id ).amount.value, init_amount - 2000 );
+      BOOST_CHECK_EQUAL( db.get_balance( seller_id, mpa_id ).amount.value, 800 );
+      BOOST_CHECK_EQUAL( db.get_balance( seller_id, core_id ).amount.value, init_amount );
+
+      // asset owner updates MCR and MSSR
+      asset_update_bitasset_operation aubop;
+      aubop.issuer = sam_id;
+      aubop.asset_to_update = mpa_id;
+      aubop.new_options = mpa_id(db).bitasset_data(db).options;
+      aubop.new_options.extensions.value.maintenance_collateral_ratio = 3000;
+      aubop.new_options.extensions.value.maximum_short_squeeze_ratio = 1100;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      PUSH_TX(db, trx, ~0);
+
+      current_feed = mpa_id(db).bitasset_data(db).current_feed;
+      BOOST_CHECK( current_feed.settlement_price   == f.settlement_price );
+      BOOST_CHECK( current_feed.core_exchange_rate == f.core_exchange_rate );
+      BOOST_CHECK_EQUAL( current_feed.maintenance_collateral_ratio, 3000 );
+      BOOST_CHECK_EQUAL( current_feed.maximum_short_squeeze_ratio,  1100 );
+      BOOST_CHECK_EQUAL( current_feed.initial_collateral_ratio,     feed_icr );
+
+      // borrower should get margin called
+      BOOST_REQUIRE( db.find( call_id ));
+      BOOST_CHECK_EQUAL( call_id(db).debt.value, 900 );
+      BOOST_CHECK_EQUAL( call_id(db).collateral.value, 1895 );
+
+      // limit order1 should be filled
+      BOOST_CHECK( !db.find( order1_id ));
+
+      // limit order2 should not change due to MSSR
+      BOOST_REQUIRE( db.find( order2_id ));
+      BOOST_CHECK_EQUAL( order2_id(db).for_sale.value, 100 );
+      BOOST_CHECK_EQUAL( order2_id(db).amount_to_receive().amount.value, 115 );
+
+      BOOST_CHECK_EQUAL( db.get_balance( borrower_id, mpa_id ).amount.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( borrower_id, core_id ).amount.value, init_amount - 2000 );
+      BOOST_CHECK_EQUAL( db.get_balance( seller_id, mpa_id ).amount.value, 800 );
+      BOOST_CHECK_EQUAL( db.get_balance( seller_id, core_id ).amount.value, init_amount + 105 );
+
+      // asset owner updates MSSR
+      aubop.new_options.extensions.value.maximum_short_squeeze_ratio = 1200;
+      trx.operations.clear();
+      trx.operations.push_back( aubop );
+      PUSH_TX(db, trx, ~0);
+
+      current_feed = mpa_id(db).bitasset_data(db).current_feed;
+      BOOST_CHECK( current_feed.settlement_price   == f.settlement_price );
+      BOOST_CHECK( current_feed.core_exchange_rate == f.core_exchange_rate );
+      BOOST_CHECK_EQUAL( current_feed.maintenance_collateral_ratio, 3000 );
+      BOOST_CHECK_EQUAL( current_feed.maximum_short_squeeze_ratio,  1200 );
+      BOOST_CHECK_EQUAL( current_feed.initial_collateral_ratio,     feed_icr );
+
+      // borrower should get margin called
+      BOOST_REQUIRE( db.find( call_id ));
+      BOOST_CHECK_EQUAL( call_id(db).debt.value, 800 );
+      BOOST_CHECK_EQUAL( call_id(db).collateral.value, 1780 );
+
+      // limit order2 should be filled
+      BOOST_CHECK( !db.find( order2_id ));
+
+      BOOST_CHECK_EQUAL( db.get_balance( borrower_id, mpa_id ).amount.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( borrower_id, core_id ).amount.value, init_amount - 2000 );
+      BOOST_CHECK_EQUAL( db.get_balance( seller_id, mpa_id ).amount.value, 800 );
+      BOOST_CHECK_EQUAL( db.get_balance( seller_id, core_id ).amount.value, init_amount + 105 + 115 );
 
       generate_block();
 
