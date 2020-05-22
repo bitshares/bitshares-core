@@ -117,9 +117,10 @@ jobs:
         pwd
         df -h .
         mkdir -p _build
-        sudo mkdir -p /_build/libraries
-        sudo chmod a+rwx /_build/libraries
+        sudo mkdir -p /_build/libraries /_build/programs
+        sudo chmod a+rwx /_build/libraries /_build/programs
         ln -s /_build/libraries _build/libraries
+        ln -s /_build/programs _build/programs
         ls -al _build
         pushd _build
         export -n BOOST_ROOT BOOST_INCLUDEDIR BOOST_LIBRARYDIR
@@ -146,6 +147,9 @@ jobs:
         df -h
         make -j 2 -C _build
         df -h
+        du -hs _build/libraries/* _build/programs/* _build/tests/*
+        du -hs _build/*
+        du -hs /_build/*
     - name: Unit-Tests
       run: |
         _build/tests/app_test -l message
