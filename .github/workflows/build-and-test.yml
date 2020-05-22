@@ -114,11 +114,13 @@ jobs:
         submodules: recursive
     - name: Configure
       run: |
+        pwd
+        df -h .
         mkdir -p _build
-        sudo mkdir -p /mnt/libraries /mnt/tests
-        sudo chmod a+rwx /mnt/libraries /mnt/tests
-        ln -s /mnt/libraries _build/libraries
-        ln -s /mnt/tests _build/tests
+        sudo mkdir -p /_build/libraries
+        sudo chmod a+rwx /_build/libraries
+        ln -s /_build/libraries _build/libraries
+        ls -al _build
         pushd _build
         export -n BOOST_ROOT BOOST_INCLUDEDIR BOOST_LIBRARYDIR
         cmake -D CMAKE_BUILD_TYPE=Debug \
