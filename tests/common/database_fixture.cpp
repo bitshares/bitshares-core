@@ -621,6 +621,7 @@ signed_block database_fixture::generate_block(uint32_t skip, const fc::ecc::priv
                             db.get_scheduled_witness(miss_blocks + 1),
                             key, skip);
    db.clear_pending();
+   verify_asset_supplies(db);
    return block;
 }
 
