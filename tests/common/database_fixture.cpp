@@ -706,7 +706,8 @@ asset_create_operation database_fixture::make_bitasset(
    uint16_t precision /* = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS */,
    asset_id_type backing_asset /* = CORE */,
    share_type max_supply,  /* = GRAPHENE_MAX_SHARE_SUPPLY */
-   optional<uint16_t> initial_cr /* = {} */
+   optional<uint16_t> initial_cr, /* = {} */
+   optional<uint16_t> margin_call_fee_ratio /* = {} */
    )
 {
    asset_create_operation creator;
@@ -724,6 +725,7 @@ asset_create_operation database_fixture::make_bitasset(
    creator.bitasset_opts = bitasset_options();
    creator.bitasset_opts->short_backing_asset = backing_asset;
    creator.bitasset_opts->extensions.value.initial_collateral_ratio = initial_cr;
+   creator.bitasset_opts->extensions.value.margin_call_fee_ratio = margin_call_fee_ratio;
    return creator;
 }
 
@@ -735,11 +737,13 @@ const asset_object& database_fixture::create_bitasset(
    uint16_t precision /* = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS */,
    asset_id_type backing_asset /* = CORE */,
    share_type max_supply,  /* = GRAPHENE_MAX_SHARE_SUPPLY */
-   optional<uint16_t> initial_cr /* = {} */
+   optional<uint16_t> initial_cr, /* = {} */
+   optional<uint16_t> margin_call_fee_ratio /* = {} */
    )
 { try {
    asset_create_operation creator = make_bitasset( name, issuer, market_fee_percent, flags,
-                                                   precision, backing_asset, max_supply, initial_cr );
+                                                   precision, backing_asset, max_supply, initial_cr,
+                                                   margin_call_fee_ratio );
    trx.operations.clear();
    trx.operations.push_back(std::move(creator));
    trx.validate();

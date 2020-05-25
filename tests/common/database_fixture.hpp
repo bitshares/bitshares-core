@@ -290,7 +290,8 @@ struct database_fixture {
                                        uint16_t precision = 2,
                                        asset_id_type backing_asset = {},
                                        share_type max_supply = GRAPHENE_MAX_SHARE_SUPPLY,
-                                       optional<uint16_t> initial_cr = {} );
+                                       optional<uint16_t> initial_cr = {},
+                                       optional<uint16_t> margin_call_fee_ratio = {} );
    const asset_object& create_bitasset(const string& name,
                                        account_id_type issuer = GRAPHENE_WITNESS_ACCOUNT,
                                        uint16_t market_fee_percent = 100 /*1%*/,
@@ -298,7 +299,8 @@ struct database_fixture {
                                        uint16_t precision = 2,
                                        asset_id_type backing_asset = {},
                                        share_type max_supply = GRAPHENE_MAX_SHARE_SUPPLY,
-                                       optional<uint16_t> initial_cr = {} );
+                                       optional<uint16_t> initial_cr = {},
+                                       optional<uint16_t> margin_call_fee_ratio = {} );
    const asset_object& create_prediction_market(const string& name,
                                        account_id_type issuer = GRAPHENE_WITNESS_ACCOUNT,
                                        uint16_t market_fee_percent = 100 /*1%*/,
