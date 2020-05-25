@@ -211,6 +211,9 @@ void bitasset_options::validate() const
    FC_ASSERT(force_settlement_offset_percent <= GRAPHENE_100_PERCENT);
    FC_ASSERT(maximum_force_settlement_volume <= GRAPHENE_100_PERCENT);
 
+   if( extensions.value.margin_call_fee_ratio.valid() )
+      FC_ASSERT( *extensions.value.margin_call_fee_ratio <= GRAPHENE_COLLATERAL_RATIO_DENOM );
+
    if( extensions.value.initial_collateral_ratio.valid() )
    {
       FC_ASSERT( *extensions.value.initial_collateral_ratio >= GRAPHENE_MIN_COLLATERAL_RATIO );
