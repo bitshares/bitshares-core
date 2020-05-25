@@ -30,10 +30,18 @@ namespace graphene { namespace chain {
 
 namespace detail {
    void check_asset_options_hf_1774(const fc::time_point_sec& block_time, const asset_options& options);
-   void check_bitasset_options_hf_bsip77(const fc::time_point_sec& block_time, const bitasset_options& options);
+
+   void check_bitasset_options_hf_bsip74(const fc::time_point_sec& block_time,
+                                         const bitasset_options& options); // HF_REMOVABLE
+
+   void check_bitasset_options_hf_bsip77(const fc::time_point_sec& block_time,
+                                         const bitasset_options& options); // HF_REMOVABLE
+
    void check_asset_options_hf_bsip81(const fc::time_point_sec& block_time, const asset_options& options);
+
    void check_bitasset_options_hf_bsip87(const fc::time_point_sec& block_time,
                                          const bitasset_options& options); // HF_REMOVABLE
+
    void check_asset_claim_fees_hardfork_87_74_collatfee(const fc::time_point_sec& block_time,
                                                         const asset_claim_fees_operation& op); // HF_REMOVABLE
 }
@@ -52,34 +60,28 @@ struct proposal_operation_hardfork_visitor
    void operator()(const T &v) const {}
 
    void operator()(const graphene::chain::asset_create_operation &v) const {
-
       detail::check_asset_options_hf_1774(block_time, v.common_options);
       detail::check_asset_options_hf_bsip81(block_time, v.common_options);
       if( v.bitasset_opts.valid() ) {
-         detail::check_bitasset_options_hf_bsip77( block_time, *v.bitasset_opts );
+         detail::check_bitasset_options_hf_bsip74( block_time, *v.bitasset_opts ); // HF_REMOVABLE
+         detail::check_bitasset_options_hf_bsip77( block_time, *v.bitasset_opts ); // HF_REMOVABLE
          detail::check_bitasset_options_hf_bsip87( block_time, *v.bitasset_opts ); // HF_REMOVABLE
       }
-
    }
 
    void operator()(const graphene::chain::asset_update_operation &v) const {
-
       detail::check_asset_options_hf_1774(block_time, v.new_options);
       detail::check_asset_options_hf_bsip81(block_time, v.new_options);
-
    }
 
    void operator()(const graphene::chain::asset_update_bitasset_operation &v) const {
-
-      detail::check_bitasset_options_hf_bsip77( block_time, v.new_options );
+      detail::check_bitasset_options_hf_bsip74( block_time, v.new_options ); // HF_REMOVABLE
+      detail::check_bitasset_options_hf_bsip77( block_time, v.new_options ); // HF_REMOVABLE
       detail::check_bitasset_options_hf_bsip87( block_time, v.new_options ); // HF_REMOVABLE
-
    }
 
    void operator()(const graphene::chain::asset_claim_fees_operation &v) const {
-
       detail::check_asset_claim_fees_hardfork_87_74_collatfee(block_time, v); // HF_REMOVABLE
-
    }
 
    void operator()(const graphene::chain::committee_member_update_global_parameters_operation &op) const {
