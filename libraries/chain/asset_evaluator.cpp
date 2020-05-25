@@ -995,11 +995,18 @@ void_result asset_claim_fees_evaluator::do_evaluate( const asset_claim_fees_oper
 
    container_ddo = &container_asset->dynamic_asset_data_id(d);
 
-   FC_ASSERT( o.amount_to_claim.amount <= ((container_asset->get_id() == o.amount_to_claim.asset_id) ?
-                                           container_ddo->accumulated_fees :
-                                           container_ddo->accumulated_collateral_fees),
-              "Attempt to claim more fees than have accumulated within asset ${a} (${id})",
-              ("a",container_asset->symbol)("id",container_asset->id)("ddo",*container_ddo) );
+   if (container_asset->get_id() == o.amount_to_claim.asset_id) {
+      FC_ASSERT( o.amount_to_claim.amount <= container_ddo->accumulated_fees,
+                 "Attempt to claim more fees than have accumulated within asset ${a} (${id}). "
+                 "Asset DDO: ${ddo}. Fee claim: ${claim}.", ("a",container_asset->symbol)
+                 ("id",container_asset->id)("ddo",*container_ddo)("claim",o.amount_to_claim) );
+   } else {
+      FC_ASSERT( o.amount_to_claim.amount <= container_ddo->accumulated_collateral_fees,
+                 "Attempt to claim more backing-asset fees than have accumulated within asset ${a} (${id}) "
+                 "backed by (${fid}). Asset DDO: ${ddo}. Fee claim: ${claim}.", ("a",container_asset->symbol)
+                 ("id",container_asset->id)("fid",o.amount_to_claim.asset_id)("ddo",*container_ddo)
+                 ("claim",o.amount_to_claim) );
+   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
