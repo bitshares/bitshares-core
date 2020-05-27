@@ -17,6 +17,7 @@
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/custom_authority_object.hpp>
+#include <graphene/chain/ticket_object.hpp>
 #include <graphene/chain/impacted.hpp>
 #include <graphene/chain/hardfork.hpp>
 
