@@ -212,7 +212,7 @@ void bitasset_options::validate() const
    FC_ASSERT(maximum_force_settlement_volume <= GRAPHENE_100_PERCENT);
 
    if( extensions.value.margin_call_fee_ratio.valid() )
-      FC_ASSERT( *extensions.value.margin_call_fee_ratio <= GRAPHENE_COLLATERAL_RATIO_DENOM );
+      FC_ASSERT( *extensions.value.margin_call_fee_ratio <= GRAPHENE_MAX_COLLATERAL_RATIO );
 
    if( extensions.value.initial_collateral_ratio.valid() )
    {

@@ -467,7 +467,15 @@ namespace graphene { namespace chain {
           * @returns TRUE if the order was completely filled
           */
          bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
-                               const price& fill_price, const bool is_maker, const asset& margin_fee = asset(0) );
+                               const price& fill_price, const bool is_maker, const asset& margin_fee );
+
+         // Overload provides compatible default value for margin_fee: (margin_fee.asset_id == pays.asset_id)
+         bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
+                               const price& fill_price, const bool is_maker )
+         {
+            return fill_call_order( order, pays, receives, fill_price, is_maker, asset(0, pays.asset_id) );
+         }
+
          bool fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
                                  const price& fill_price, const bool is_maker );
 

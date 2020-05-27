@@ -714,7 +714,7 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    // receives is the margin call fee that is paid by the call order owner to the asset issuer.
    // Margin call fee should equal = X*MCFR/settle_price, to within rounding error.
    FC_ASSERT(call_pays >= order_receives);
-   const asset& margin_call_fee = call_pays - order_receives;
+   const asset margin_call_fee = call_pays - order_receives;
 
    int result = 0;
    result |= fill_limit_order( bid, order_pays, order_receives, cull_taker, match_price, false ); // taker
@@ -1308,8 +1308,6 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
           ++call_price_itr;
 
        // when for_new_limit_order is true, the call order is maker, otherwise the call order is taker
-       // BSIP74: Pass the calculated margin call fee into fill_call_order()
-       // Margin call fee should equal = X*MCFR/match_price, to within rounding error.
        fill_call_order( call_order, call_pays, call_receives, match_price, for_new_limit_order, margin_call_fee);
 
        if( !before_core_hardfork_1270 )

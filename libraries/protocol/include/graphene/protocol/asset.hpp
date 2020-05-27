@@ -264,14 +264,15 @@ namespace graphene { namespace protocol {
 
       /**
        * Ratio between max_short_squeeze_price and margin_call_order_price.
-       * This ratio, if it multiplied margin_call_order_price, would yield the max_short_squeeze_price,
-       * apart perhaps for truncation (rounding) error.
+       *
+       * This ratio, if it multiplied margin_call_order_price (expressed in DEBT/COLLATERAL), would
+       * yield the max_short_squeeze_price, apart perhaps for truncation (rounding) error.
        *
        * When a margin call is taker, matching an existing order on the books, it is possible the call
-       * gets a better realized price than the order price that it offered at.
-       * In this case, the margin call fee is proportionaly reduced. This ratio is used to calculate the price
-       * at which the call relinquishes collateral (to meet both trade and fee obligations)
-       * based on actual realized match price.
+       * gets a better realized price than the order price that it offered at.  In this case, the margin
+       * call fee is proportionaly reduced. This ratio is used to calculate the price at which the call
+       * relinquishes collateral (to meet both trade and fee obligations) based on actual realized match
+       * price.
        *
        * This function enacts the same flooring as margin_call_order_price() (MSSR - MCFR is floored at
        * 1.00).  This ensures we apply the same fee truncation in the taker case as the maker case.
