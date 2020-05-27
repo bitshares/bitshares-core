@@ -171,7 +171,7 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
-      share_type      calculate_fee( const fee_parameters_type& k )const;
+      share_type      calculate_fee( const fee_parameters_type& k, optional<uint64_t> sub_asset_creation_fee )const;
    };
 
    /**
