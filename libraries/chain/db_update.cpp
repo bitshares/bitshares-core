@@ -509,7 +509,8 @@ void database::update_expired_feeds()
                abdo.feed_cer_updated = false;
             }
          });
-         if( !b.current_feed.settlement_price.is_null() && !( b.current_feed == old_median_feed ) ) // `==` check is safe here
+         if( !b.current_feed.settlement_price.is_null()
+               && !b.current_feed.margin_call_params_equal( old_median_feed ) )
          {
             asset_ptr = &b.asset_id( *this );
             check_call_orders( *asset_ptr, true, false, &b );

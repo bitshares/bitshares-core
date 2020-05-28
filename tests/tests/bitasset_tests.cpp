@@ -334,7 +334,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
       BOOST_TEST_MESSAGE("Verify feed producers are registered for JMJBIT");
       const asset_bitasset_data_object& obj = bit_jmj_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(obj.feeds.size(), 3ul);
-      BOOST_CHECK(obj.current_feed == price_feed());
+      BOOST_CHECK( obj.current_feed.margin_call_params_equal( price_feed() ) );
 
       BOOST_CHECK( bit_usd_id == obj.options.short_backing_asset );
    }

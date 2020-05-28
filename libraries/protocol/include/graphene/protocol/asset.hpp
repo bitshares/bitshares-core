@@ -281,20 +281,21 @@ namespace graphene { namespace protocol {
        */
       ratio_type margin_call_pays_ratio(const fc::optional<uint16_t> margin_call_fee_ratio)const;
 
-      /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call territory.
+      /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call
+      /// territory.
       /// Calculation: ~settlement_price * maintenance_collateral_ratio / GRAPHENE_COLLATERAL_RATIO_DENOM
       price maintenance_collateralization()const;
 
-      /// The result will be used to check new debt positions and position updates.
-      /// Calculation: ~settlement_price * initial_collateral_ratio / GRAPHENE_COLLATERAL_RATIO_DENOM
-      price calculate_initial_collateralization( uint16_t initial_collateral_ratio )const;
-      ///@}
-
-      friend bool operator == ( const price_feed& a, const price_feed& b )
+      /// Whether the parameters that affect margin calls in this price feed object are the same as the parameters
+      /// in the passed-in object
+      bool margin_call_params_equal( const price_feed& b ) const
       {
-         return std::tie( a.settlement_price, a.maintenance_collateral_ratio, a.maximum_short_squeeze_ratio ) ==
+         if( this == &b )
+            return true;
+         return std::tie(   settlement_price,   maintenance_collateral_ratio,   maximum_short_squeeze_ratio ) ==
                 std::tie( b.settlement_price, b.maintenance_collateral_ratio, b.maximum_short_squeeze_ratio );
       }
+      ///@}
 
       void validate() const;
       bool is_for( asset_id_type asset_id ) const;
@@ -305,10 +306,8 @@ namespace graphene { namespace protocol {
 FC_REFLECT( graphene::protocol::asset, (amount)(asset_id) )
 FC_REFLECT( graphene::protocol::price, (base)(quote) )
 
-#define GRAPHENE_PRICE_FEED_FIELDS (settlement_price)(maintenance_collateral_ratio)(maximum_short_squeeze_ratio) \
-   (core_exchange_rate)
-
-FC_REFLECT( graphene::protocol::price_feed, GRAPHENE_PRICE_FEED_FIELDS )
+FC_REFLECT( graphene::protocol::price_feed,
+            (settlement_price)(maintenance_collateral_ratio)(maximum_short_squeeze_ratio)(core_exchange_rate) )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::price )

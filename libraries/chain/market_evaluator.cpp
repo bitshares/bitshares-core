@@ -189,6 +189,8 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    FC_ASSERT( _debt_asset->is_market_issued(), "Unable to cover ${sym} as it is not a collateralized asset.",
               ("sym", _debt_asset->symbol) );
 
+   FC_ASSERT( o.delta_debt.amount <= 0 || _debt_asset->can_create_new_supply(), "Can not create new supply" );
+
    _dynamic_data_obj = &_debt_asset->dynamic_asset_data_id(d);
 
    /***

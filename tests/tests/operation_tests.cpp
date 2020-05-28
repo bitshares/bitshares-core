@@ -967,6 +967,189 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr
    }
 }
 
+BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr_is_fed )
+{
+   try {
+
+      auto hf_time = HARDFORK_BSIP_77_TIME;
+      generate_blocks( hf_time );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((dan)(sam)(alice)(bob));
+      const auto& bitusd = create_bitasset( "USDBIT", sam.id, 100, charge_market_fee, 2, {},
+                                            GRAPHENE_MAX_SHARE_SUPPLY, {} ); // ICR is not set
+      const auto& core   = asset_id_type()(db);
+
+      transfer(committee_account, dan_id, asset(10000000));
+      transfer(committee_account, sam_id, asset(10000000));
+      transfer(committee_account, alice_id, asset(10000000));
+      transfer(committee_account, bob_id, asset(10000000));
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
+      current_feed.maximum_short_squeeze_ratio = 1100; // need to set this explicitly, testnet has a different default
+      publish_feed( bitusd, sam, current_feed, 1050 ); // ICR = 1.05
+
+      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      BOOST_TEST_MESSAGE( "ICR 1.05, MCR 1.75" );
+      BOOST_TEST_MESSAGE( "attempting to borrow using <=1.75x collateral at 1:1 price should not be allowed" );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17499) ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "alice borrow using 1.7501x collateral at 1:1 price should be allowed" );
+      BOOST_CHECK( borrow( alice, bitusd.amount(10000), core.amount(17501) ) != nullptr );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 10000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 17501 );
+      BOOST_TEST_MESSAGE( "ICR 1.05, MCR 1.75, Alice CR 1.7501" );
+
+      // Update ICR
+      BOOST_TEST_MESSAGE( "Updating ICR to 1.85" );
+      publish_feed( bitusd, sam, current_feed, 1850 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 1.7501" );
+
+      BOOST_TEST_MESSAGE( "alice adding more collateral should be allowed" );
+      BOOST_CHECK( borrow( alice, bitusd.amount(0), core.amount(18000-17501) ) != nullptr );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 10000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 18000 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 1.8000" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral should not be allowed if CR<=1.85 and not margin called" );
+      GRAPHENE_REQUIRE_THROW( cover( alice, bitusd.amount(0), core.amount(1)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "alice borrow using 1.8502x collateral at 1:1 price should be allowed" );
+      BOOST_CHECK( borrow( alice, bitusd.amount(0), core.amount(18502-18000) ) != nullptr );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 10000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 18502 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 1.8502" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral to >1.85x should be allowed" );
+      cover( alice, bitusd.amount(0), core.amount(1) );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 10000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 18501 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 1.8501" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral to <=1.85x should not be allowed if not margin called" );
+      GRAPHENE_REQUIRE_THROW( cover( alice, bitusd.amount(0), core.amount(1)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "alice borrow using 4x collateral at 1:1 price" );
+      BOOST_CHECK( borrow( alice, bitusd.amount(100000-10000), core.amount(400000-18501) ) != nullptr );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 4.0000" );
+
+      BOOST_TEST_MESSAGE( "alice place an order to sell usd at 1.05" );
+      const limit_order_id_type alice_sell_id = create_sell_order( alice, bitusd.amount(1000), core.amount(1050) )->id;
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow too much using 1.75x collateral at 1:1 price should not be allowed" );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow less using 1.75x collateral at 1:1 price should be allowed and margin called" );
+      BOOST_CHECK( !borrow( bob, bitusd.amount(100), core.amount(175) ) );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      const call_order_id_type bob_call_id = borrow( bob, bitusd.amount(100), asset(200))->id;
+      BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 + 100 );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 200 );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow too much more using 1.75x collateral at 1:1 price should not be allowed" );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000-100), core.amount(17500-200) ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "bob attempting to reduce collateral to 1.75x at 1:1 price should be allowed and margin called" );
+      BOOST_CHECK( !borrow( bob, bitusd.amount(0), core.amount(175-200) ) );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 + 100 );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 105 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 + 105 );
+      BOOST_CHECK( !db.find<call_order_object>( bob_call_id ) );
+
+      BOOST_TEST_MESSAGE( "alice cancel sell order" );
+      cancel_limit_order( alice_sell_id(db) );
+
+      BOOST_TEST_MESSAGE( "dan attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      borrow( dan, bitusd.amount(5000), asset(10000));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 );
+
+      BOOST_TEST_MESSAGE( "sam update price feed so dan's position will enter margin call territory." );
+      current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(180);
+      publish_feed( bitusd, sam, current_feed, 1850 );
+
+      BOOST_TEST_MESSAGE( "dan covering 2500 usd and freeing 5000 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(5000)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan covering 2500 usd and freeing 5001 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(5001)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5000 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(5000)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 4999 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(4999)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan covering 2500 usd and freeing 4999 core should be allowed..." );
+      cover( dan, bitusd.amount(2500), asset(4999));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 2500 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 + 4999  );
+
+      BOOST_TEST_MESSAGE( "dan covering 0 usd and freeing 1 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), core.amount(1)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan adding 1 core as collateral should be allowed..." );
+      borrow( dan, bitusd.amount(0), asset(1));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 2500 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 + 4999 - 1  );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5002 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(5002)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5003 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), asset(5003) ), fc::exception );
+
+      // CR of Alice's postion is now 4.0 / 1.8 ~= 2.2222
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 2.222222" );
+
+      BOOST_TEST_MESSAGE( "alice adding more collateral should be allowed" );
+      const call_order_id_type alice_call_id = borrow( alice, bitusd.amount(0), asset(1))->id;
+      BOOST_CHECK_EQUAL( alice_call_id(db).collateral.value, 400000 + 1 );
+      BOOST_CHECK_EQUAL( alice_call_id(db).debt.value, 100000 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 2.222228" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral to >1.85x should be allowed" );
+      cover( alice, bitusd.amount(0), core.amount(67000) );
+      BOOST_CHECK_EQUAL( alice_call_id(db).collateral.value, 333001 );
+      BOOST_CHECK_EQUAL( alice_call_id(db).debt.value, 100000 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 1.850006" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral to <=1.85x should not be allowed if not margin called" );
+      GRAPHENE_REQUIRE_THROW( cover( alice, bitusd.amount(0), core.amount(1) ), fc::exception );
+
+      // Update ICR
+      BOOST_TEST_MESSAGE( "Updating ICR to 1.84" );
+      publish_feed( bitusd, sam, current_feed, 1840 );
+      BOOST_TEST_MESSAGE( "ICR 1.84, MCR 1.75, Alice CR 1.850006" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral to >1.84x should be allowed" );
+      cover( alice, bitusd.amount(0), core.amount(1) );
+      BOOST_CHECK_EQUAL( alice_call_id(db).collateral.value, 333000 );
+      BOOST_CHECK_EQUAL( alice_call_id(db).debt.value, 100000 );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( call_order_update_validation_test )
 {
    call_order_update_operation op;
@@ -1515,7 +1698,7 @@ BOOST_AUTO_TEST_CASE( create_uia )
       creator.common_options.max_supply = 100000000;
       creator.precision = 2;
       creator.common_options.market_fee_percent = GRAPHENE_MAX_MARKET_FEE_PERCENT/100; /*1%*/
-      creator.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK;
+      creator.common_options.issuer_permissions = DEFAULT_UIA_ASSET_ISSUER_PERMISSION;
       creator.common_options.flags = charge_market_fee;
       creator.common_options.core_exchange_rate = price(asset(2),asset(1,asset_id_type(1)));
       trx.operations.push_back(std::move(creator));
@@ -1576,7 +1759,7 @@ BOOST_AUTO_TEST_CASE( update_uia )
 
       //Cannot convert to an MIA
       BOOST_TEST_MESSAGE( "Make sure we can't convert UIA to MIA" );
-      REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, ASSET_ISSUER_PERMISSION_MASK);
+      REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK);
       REQUIRE_THROW_WITH_VALUE(op, new_options.core_exchange_rate, price(asset(5), asset(5)));
 
       BOOST_TEST_MESSAGE( "Test updating core_exchange_rate" );
@@ -1623,7 +1806,7 @@ BOOST_AUTO_TEST_CASE( update_uia )
       op.new_options.issuer_permissions = test.options.issuer_permissions;
       op.new_options.flags = test.options.flags;
       BOOST_CHECK(!(test.options.issuer_permissions & white_list));
-      REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, UIA_ASSET_ISSUER_PERMISSION_MASK);
+      REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
 
       BOOST_TEST_MESSAGE( "We can change issuer to account_id_type(), but can't do it again" );
       op.new_issuer = account_id_type();

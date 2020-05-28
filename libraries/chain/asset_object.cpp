@@ -49,9 +49,9 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
 {
    bool after_core_hardfork_1270 = ( next_maintenance_time > HARDFORK_CORE_1270_TIME ); // call price caching issue
    current_feed_publication_time = current_time;
-   vector<std::reference_wrapper<const price_feed>> current_feeds;
+   vector<std::reference_wrapper<const price_feed_with_icr>> current_feeds;
    // find feeds that were alive at current_time
-   for( const pair<account_id_type, pair<time_point_sec,price_feed>>& f : feeds )
+   for( const pair<account_id_type, pair<time_point_sec,price_feed_with_icr>>& f : feeds )
    {
       if( (current_time - f.second.first).to_seconds() < options.feed_lifetime_sec &&
           f.second.first != time_point_sec() )
@@ -67,13 +67,11 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
       //... don't calculate a median, and set a null feed
       feed_cer_updated = false; // new median cer is null, won't update asset_object anyway, set to false for better performance
       current_feed_publication_time = current_time;
-      current_feed = price_feed();
+      current_feed = price_feed_with_icr();
       if( after_core_hardfork_1270 )
       {
-         // update data derived from MCR
-         current_maintenance_collateralization = price();
-         // update data derived from ICR
-         current_initial_collateralization = price();
+         // update data derived from MCR, ICR and etc
+         refresh_cache();
       }
       return;
    }
@@ -85,25 +83,40 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
       // Note: perhaps can defer updating current_maintenance_collateralization for better performance
       if( after_core_hardfork_1270 )
       {
-         // update data derived from MCR
-         current_maintenance_collateralization = current_feed.maintenance_collateralization();
-         // update data derived from ICR
-         refresh_current_initial_collateralization();
+         const auto& exts = options.extensions.value;
+         if( exts.maintenance_collateral_ratio.valid() )
+            current_feed.maintenance_collateral_ratio = *exts.maintenance_collateral_ratio;
+         if( exts.maximum_short_squeeze_ratio.valid() )
+            current_feed.maximum_short_squeeze_ratio = *exts.maximum_short_squeeze_ratio;
+         if( exts.initial_collateral_ratio.valid() )
+            current_feed.initial_collateral_ratio = *exts.initial_collateral_ratio;
+         // update data derived from MCR, ICR and etc
+         refresh_cache();
       }
       return;
    }
 
    // *** Begin Median Calculations ***
-   price_feed median_feed;
+   price_feed_with_icr median_feed;
    const auto median_itr = current_feeds.begin() + current_feeds.size() / 2;
 #define CALCULATE_MEDIAN_VALUE(r, data, field_name) \
    std::nth_element( current_feeds.begin(), median_itr, current_feeds.end(), \
-                     [](const price_feed& a, const price_feed& b) { \
+                     [](const price_feed_with_icr& a, const price_feed_with_icr& b) { \
       return a.field_name < b.field_name; \
    }); \
    median_feed.field_name = median_itr->get().field_name;
 
-   BOOST_PP_SEQ_FOR_EACH( CALCULATE_MEDIAN_VALUE, ~, GRAPHENE_PRICE_FEED_FIELDS )
+#define CHECK_AND_CALCULATE_MEDIAN_VALUE(r, data, field_name) \
+   if( options.extensions.value.field_name.valid() ) { \
+      median_feed.field_name = *options.extensions.value.field_name; \
+   } else { \
+      CALCULATE_MEDIAN_VALUE(r, data, field_name); \
+   }
+
+   BOOST_PP_SEQ_FOR_EACH( CALCULATE_MEDIAN_VALUE, ~, (settlement_price)(core_exchange_rate) )
+   BOOST_PP_SEQ_FOR_EACH( CHECK_AND_CALCULATE_MEDIAN_VALUE, ~,
+                          (maintenance_collateral_ratio)(maximum_short_squeeze_ratio)(initial_collateral_ratio) )
+#undef CHECK_AND_CALCULATE_MEDIAN_VALUE
 #undef CALCULATE_MEDIAN_VALUE
    // *** End Median Calculations ***
 
@@ -113,25 +126,25 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
    // Note: perhaps can defer updating current_maintenance_collateralization for better performance
    if( after_core_hardfork_1270 )
    {
-      // update data derived from MCR
-      current_maintenance_collateralization = current_feed.maintenance_collateralization();
-      // update data derived from ICR
-      refresh_current_initial_collateralization();
+      // update data derived from MCR, ICR and etc
+      refresh_cache();
    }
 }
 
-void asset_bitasset_data_object::refresh_current_initial_collateralization()
+void asset_bitasset_data_object::refresh_cache()
 {
-   if( current_feed.settlement_price.is_null() )
-      current_initial_collateralization = price();
-   else
-   {
-      const auto& icr = options.extensions.value.initial_collateral_ratio;
-      if( icr.valid() && *icr > current_feed.maintenance_collateral_ratio ) // if ICR is set and is above MCR
-         current_initial_collateralization = current_feed.calculate_initial_collateralization( *icr );
-      else // if ICR is not set, or not above MCR
-         current_initial_collateralization = current_maintenance_collateralization;
-   }
+   current_maintenance_collateralization = current_feed.maintenance_collateralization();
+   if( current_feed.initial_collateral_ratio > current_feed.maintenance_collateral_ratio ) // if ICR is above MCR
+      current_initial_collateralization = current_feed.calculate_initial_collateralization();
+   else // if ICR is not above MCR
+      current_initial_collateralization = current_maintenance_collateralization;
+}
+
+price price_feed_with_icr::calculate_initial_collateralization()const
+{
+   if( settlement_price.is_null() )
+      return price();
+   return ~settlement_price * ratio_type( initial_collateral_ratio, GRAPHENE_COLLATERAL_RATIO_DENOM );
 }
 
 asset asset_object::amount_from_string(string amount_string) const
@@ -222,6 +235,8 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_bitasset_data_object, (gr
                     (asset_cer_updated)
                     (feed_cer_updated)
                   )
+
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::price_feed_with_icr )
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::asset_bitasset_data_object )

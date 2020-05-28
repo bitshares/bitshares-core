@@ -112,7 +112,8 @@ void  asset_create_operation::validate()const
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( is_valid_symbol(symbol) );
    common_options.validate();
-   if( common_options.issuer_permissions & (disable_force_settle|global_settle) )
+   if( common_options.issuer_permissions
+         & (disable_force_settle|global_settle|disable_mcr_update|disable_icr_update|disable_mssr_update) )
       FC_ASSERT( bitasset_opts.valid() );
    if( is_prediction_market )
    {
@@ -135,6 +136,15 @@ void asset_update_operation::validate()const
 
    asset dummy = asset(1, asset_to_update) * new_options.core_exchange_rate;
    FC_ASSERT(dummy.asset_id == asset_id_type());
+
+   if( extensions.value.new_precision.valid() )
+      FC_ASSERT( *extensions.value.new_precision <= 12 );
+
+   if( extensions.value.skip_core_exchange_rate.valid() )
+   {
+      FC_ASSERT( *extensions.value.skip_core_exchange_rate == true,
+                 "If skip_core_exchange_rate is specified, it can only be true" );
+   }
 }
 
 void asset_update_issuer_operation::validate()const
@@ -167,6 +177,12 @@ void asset_publish_feed_operation::validate()const
    FC_ASSERT( !feed.settlement_price.is_null() );
    FC_ASSERT( !feed.core_exchange_rate.is_null() );
    FC_ASSERT( feed.is_for( asset_id ) );
+
+   if( extensions.value.initial_collateral_ratio.valid() )
+   {
+      FC_ASSERT( *extensions.value.initial_collateral_ratio >= GRAPHENE_MIN_COLLATERAL_RATIO );
+      FC_ASSERT( *extensions.value.initial_collateral_ratio <= GRAPHENE_MAX_COLLATERAL_RATIO );
+   }
 }
 
 void asset_reserve_operation::validate()const
@@ -228,6 +244,16 @@ void bitasset_options::validate() const
       FC_ASSERT( *extensions.value.initial_collateral_ratio >= GRAPHENE_MIN_COLLATERAL_RATIO );
       FC_ASSERT( *extensions.value.initial_collateral_ratio <= GRAPHENE_MAX_COLLATERAL_RATIO );
    }
+   if( extensions.value.maintenance_collateral_ratio.valid() )
+   {
+      FC_ASSERT( *extensions.value.maintenance_collateral_ratio >= GRAPHENE_MIN_COLLATERAL_RATIO );
+      FC_ASSERT( *extensions.value.maintenance_collateral_ratio <= GRAPHENE_MAX_COLLATERAL_RATIO );
+   }
+   if( extensions.value.maximum_short_squeeze_ratio.valid() )
+   {
+      FC_ASSERT( *extensions.value.maximum_short_squeeze_ratio >= GRAPHENE_MIN_COLLATERAL_RATIO );
+      FC_ASSERT( *extensions.value.maximum_short_squeeze_ratio <= GRAPHENE_MAX_COLLATERAL_RATIO );
+   }
 
    if( extensions.value.force_settle_fee_percent.valid() )
       FC_ASSERT( *extensions.value.force_settle_fee_percent <= GRAPHENE_100_PERCENT );
@@ -248,8 +274,10 @@ void asset_options::validate()const
    FC_ASSERT( max_market_fee >= 0 && max_market_fee <= GRAPHENE_MAX_SHARE_SUPPLY );
    // There must be no high bits in permissions whose meaning is not known.
    FC_ASSERT( !(issuer_permissions & ~ASSET_ISSUER_PERMISSION_MASK) );
-   // The global_settle flag may never be set (this is a permission only)
-   FC_ASSERT( !(flags & global_settle) );
+   // The permission-only bits can not be set in flag
+   FC_ASSERT( !(flags & global_settle),
+              "Can not set global_settle flag, it is for issuer permission only" );
+
    // the witness_fed and committee_fed flags cannot be set simultaneously
    FC_ASSERT( (flags & (witness_fed_asset | committee_fed_asset)) != (witness_fed_asset | committee_fed_asset) );
    core_exchange_rate.validate();
@@ -268,6 +296,30 @@ void asset_options::validate()const
    }
    if( extensions.value.reward_percent.valid() )
       FC_ASSERT( *extensions.value.reward_percent <= GRAPHENE_100_PERCENT );
+}
+
+void asset_options::validate_flags( bool is_market_issued )const
+{
+   FC_ASSERT( !(flags & ~ASSET_ISSUER_PERMISSION_MASK),
+              "Can not set an unknown bit in flags" );
+   // Note: global_settle is checked in validate(), so do not check again here
+   FC_ASSERT( !(flags & disable_mcr_update),
+              "Can not set disable_mcr_update flag, it is for issuer permission only" );
+   FC_ASSERT( !(flags & disable_icr_update),
+              "Can not set disable_icr_update flag, it is for issuer permission only" );
+   FC_ASSERT( !(flags & disable_mssr_update),
+              "Can not set disable_mssr_update flag, it is for issuer permission only" );
+   if( !is_market_issued )
+   {
+      FC_ASSERT( !(flags & ~UIA_ASSET_ISSUER_PERMISSION_MASK),
+                 "Can not set a flag for bitassets only to UIA" );
+   }
+}
+
+uint16_t asset_options::get_enabled_issuer_permissions_mask() const
+{
+   return ( (issuer_permissions & ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK)
+          | (~issuer_permissions & ASSET_ISSUER_PERMISSION_DISABLE_BITS_MASK) );
 }
 
 void asset_claim_fees_operation::validate()const {
@@ -290,6 +342,10 @@ GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_options )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::bitasset_options::ext )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::bitasset_options )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::additional_asset_options )
+
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_operation::ext )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_publish_feed_operation::ext )
+
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_create_operation::fee_parameters_type )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_global_settle_operation::fee_parameters_type )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_settle_operation::fee_parameters_type )
@@ -304,6 +360,7 @@ GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_feed
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_publish_feed_operation::fee_parameters_type )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_issue_operation::fee_parameters_type )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_reserve_operation::fee_parameters_type )
+
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_create_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_global_settle_operation )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::asset_settle_operation )

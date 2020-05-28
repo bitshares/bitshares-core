@@ -891,6 +891,20 @@ void database_fixture::issue_uia( account_id_type recipient_id, asset amount )
    issue_uia( recipient_id(db), amount );
 }
 
+void database_fixture::reserve_asset( account_id_type account, asset amount )
+{
+   BOOST_TEST_MESSAGE( "Reserving asset" );
+   asset_reserve_operation op;
+   op.payer = account;
+   op.amount_to_reserve = amount;
+   trx.operations.clear();
+   trx.operations.push_back(op);
+   set_expiration( db, trx );
+   trx.validate();
+   PUSH_TX( db, trx, ~0 );
+   trx.operations.clear();
+}
+
 void database_fixture::change_fees(
    const fee_parameters::flat_set_type& new_params,
    uint32_t new_scale /* = 0 */
@@ -1158,7 +1172,8 @@ void database_fixture::update_feed_producers( const asset_object& mia, flat_set<
    verify_asset_supplies(db);
 } FC_CAPTURE_AND_RETHROW( (mia)(producers) ) }
 
-void database_fixture::publish_feed( const asset_object& mia, const account_object& by, const price_feed& f )
+void database_fixture::publish_feed( const asset_object& mia, const account_object& by, const price_feed& f,
+                                     const optional<uint16_t> icr )
 {
    set_expiration( db, trx );
    trx.operations.clear();
@@ -1168,7 +1183,12 @@ void database_fixture::publish_feed( const asset_object& mia, const account_obje
    op.asset_id = mia.id;
    op.feed = f;
    if( op.feed.core_exchange_rate.is_null() )
+   {
       op.feed.core_exchange_rate = op.feed.settlement_price;
+      if( db.head_block_time() > HARDFORK_480_TIME )
+         op.feed.core_exchange_rate.quote.asset_id = asset_id_type();
+   }
+   op.extensions.value.initial_collateral_ratio = icr;
    trx.operations.emplace_back( std::move(op) );
 
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
@@ -1178,23 +1198,10 @@ void database_fixture::publish_feed( const asset_object& mia, const account_obje
    verify_asset_supplies(db);
 }
 
-/***
- * @brief helper method to add a price feed
- *
- * Adds a price feed for asset2, pushes the transaction, and generates the block
- *
- * @param fixture the database_fixture
- * @param publisher who is publishing the feed
- * @param asset1 the base asset
- * @param amount1 the amount of the base asset
- * @param asset2 the quote asset
- * @param amount2 the amount of the quote asset
- * @param core_id id of core (helps with core_exchange_rate)
- */
 void database_fixture::publish_feed(const account_id_type& publisher,
       const asset_id_type& asset1, int64_t amount1,
       const asset_id_type& asset2, int64_t amount2,
-      const asset_id_type& core_id)
+      const asset_id_type& core_id, const optional<uint16_t> icr)
 {
    const asset_object& a1 = asset1(db);
    const asset_object& a2 = asset2(db);
@@ -1204,9 +1211,13 @@ void database_fixture::publish_feed(const account_id_type& publisher,
    op.asset_id = asset2;
    op.feed.settlement_price = ~price(a1.amount(amount1),a2.amount(amount2));
    op.feed.core_exchange_rate = ~price(core.amount(amount1), a2.amount(amount2));
+   op.extensions.value.initial_collateral_ratio = icr;
    trx.operations.clear();
-   trx.operations.push_back(std::move(op));
+   trx.operations.emplace_back(std::move(op));
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
+   set_expiration( db, trx );
    PUSH_TX( db, trx, ~0);
+   verify_asset_supplies(db);
    generate_block();
    trx.clear();
 }
