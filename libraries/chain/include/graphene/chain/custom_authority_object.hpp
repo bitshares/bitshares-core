@@ -100,8 +100,7 @@ namespace graphene { namespace chain {
             composite_key<custom_authority_object,
                member<custom_authority_object, time_point_sec, &custom_authority_object::valid_to>,
                member<object, object_id_type, &object::id>
-            >,
-            composite_key_compare<std::greater<time_point_sec>, std::less<object_id_type>>
+            >
          >
       >
    > custom_authority_multi_index_type;

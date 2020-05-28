@@ -3660,6 +3660,61 @@ BOOST_AUTO_TEST_CASE( defaults_test )
   }
 }
 
+BOOST_AUTO_TEST_CASE( sub_asset_creation_fee_test )
+{ try {
+   fee_schedule schedule;
+
+   asset_create_operation::fee_parameters_type default_ac_fee;
+
+   asset_create_operation op;
+   op.symbol = "TEST.SUB";
+
+   auto op_size = fc::raw::pack_size(op);
+
+   auto expected_data_fee = op.calculate_data_fee( op_size, default_ac_fee.price_per_kbyte );
+   int64_t expected_fee = default_ac_fee.long_symbol + expected_data_fee;
+
+   // no fees set yet -> default
+   BOOST_TEST_MESSAGE("Testing default fee schedule");
+   asset fee = schedule.calculate_fee( op );
+   BOOST_CHECK_EQUAL( fee.amount.value, expected_fee );
+
+   // set fee + check
+   asset_create_operation::fee_parameters_type ac_fee;
+   ac_fee.long_symbol = 100100;
+   ac_fee.symbol4 = 2000200;
+   ac_fee.symbol3 = 30000300;
+   ac_fee.price_per_kbyte = 1050;
+
+   schedule.parameters.insert( ac_fee );
+
+   expected_data_fee = op.calculate_data_fee( op_size, ac_fee.price_per_kbyte );
+   expected_fee = ac_fee.long_symbol + expected_data_fee;
+
+   fee = schedule.calculate_fee( op );
+   BOOST_CHECK_EQUAL( fee.amount.value, expected_fee );
+
+   // set fee for account_transfer_operation, no change on asset creation fee
+   BOOST_TEST_MESSAGE("Testing our fee schedule without sub-asset creation fee enabled");
+   account_transfer_operation::fee_parameters_type at_fee;
+   at_fee.fee = 5500;
+
+   schedule.parameters.insert( at_fee );
+
+   fee = schedule.calculate_fee( op );
+   BOOST_CHECK_EQUAL( fee.amount.value, expected_fee );
+
+   // enable sub-asset creation fee
+   BOOST_TEST_MESSAGE("Testing our fee schedule with sub-asset creation fee enabled");
+   schedule.parameters.insert( ticket_create_operation::fee_parameters_type() );
+
+   expected_fee = at_fee.fee + expected_data_fee;
+
+   fee = schedule.calculate_fee( op );
+   BOOST_CHECK_EQUAL( fee.amount.value, expected_fee );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE( issue_429_test )
 {
    try

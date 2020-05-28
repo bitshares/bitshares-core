@@ -191,6 +191,7 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          obj.owner            = o.owner;
          obj.active           = o.active;
          obj.options          = o.options;
+         obj.num_committee_voted = o.options.num_committee_voted();
          obj.statistics = d.create<account_statistics_object>([&obj](account_statistics_object& s){
                              s.owner = obj.id;
                              s.name = obj.name;
@@ -283,15 +284,15 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
    // update account statistics
    if( o.new_options.valid() )
    {
-      d.modify( acnt->statistics( d ), [&]( account_statistics_object& aso )
+      if ( o.new_options->voting_account != acnt->options.voting_account
+           || o.new_options->votes != acnt->options.votes )
       {
-         if(o.new_options->is_voting() != acnt->options.is_voting())
-            aso.is_voting = !aso.is_voting;
-
-         if((o.new_options->votes != acnt->options.votes ||
-               o.new_options->voting_account != acnt->options.voting_account))
+         d.modify( acnt->statistics( d ), [&d,&o]( account_statistics_object& aso )
+         {
+            aso.is_voting = o.new_options->is_voting();
             aso.last_vote_time = d.head_block_time();
-      } );
+         } );
+      }
    }
 
    // update account object
@@ -306,7 +307,11 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
          a.active = *o.active;
          a.top_n_control_flags = 0;
       }
-      if( o.new_options ) a.options = *o.new_options;
+      if( o.new_options )
+      {
+         a.options = *o.new_options;
+         a.num_committee_voted = a.options.num_committee_voted();
+      }
       if( o.extensions.value.owner_special_authority.valid() )
       {
          a.owner_special_authority = *(o.extensions.value.owner_special_authority);

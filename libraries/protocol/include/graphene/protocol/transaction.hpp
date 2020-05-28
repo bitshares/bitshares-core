@@ -254,6 +254,7 @@ namespace graphene { namespace protocol {
     * @param sigs a set of public keys
     * @param get_active callback function to retrieve active authorities of a given account
     * @param get_owner  callback function to retrieve owner authorities of a given account
+    * @param get_custom callback function to retrieve viable custom authorities for a given account and operation
     * @param allow_non_immediate_owner whether to allow owner authority of non-immediately
     *            required accounts to authorize operations
     * @param ignore_custom_operation_required_auths See issue #210; whether to ignore the

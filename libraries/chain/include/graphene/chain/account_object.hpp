@@ -69,18 +69,36 @@ namespace graphene { namespace chain {
           */
          share_type total_core_in_orders;
 
-         share_type core_in_balance = 0; ///< redundantly store core balance here for better maintenance performance
+         /// Total amount of core token in inactive lock_forever tickets
+         share_type total_core_inactive;
+
+         /// Total amount of core token in active lock_forever tickets
+         share_type total_core_pob;
+
+         /// Total amount of core token in other tickets
+         share_type total_core_pol;
+
+         /// Total value of tickets whose current type is lock_forever
+         share_type total_pob_value;
+
+         /// Total value of tickets whose current type is not lock_forever
+         share_type total_pol_value;
+
+         /// Redundantly store core balance in this object for better maintenance performance.
+         /// Only updates on maintenance.
+         share_type core_in_balance;
 
          bool has_cashback_vb = false; ///< redundantly store this for better maintenance performance
 
-         bool is_voting = false; ///< redundately store whether this account is voting for better maintenance performance
+         bool is_voting = false; ///< redundately store "if this account is voting" for better maintenance performance
 
-         time_point_sec last_vote_time; // add last time voted
+         time_point_sec last_vote_time; ///< last time voted
 
          /// Whether this account owns some CORE asset and is voting
          inline bool has_some_core_voting() const
          {
-            return is_voting && ( total_core_in_orders > 0 || core_in_balance > 0 || has_cashback_vb );
+            return is_voting && ( total_core_in_orders > 0 || core_in_balance > 0 || has_cashback_vb
+                                  || total_core_pol > 0 );
          }
 
          /**
@@ -196,6 +214,9 @@ namespace graphene { namespace chain {
 
          typedef account_options  options_type;
          account_options options;
+
+         /// Pre-calculated for better performance on chain maintenance
+         uint16_t num_committee_voted;
 
          /// The reference implementation records the account's statistics in a separate object. This field contains the
          /// ID of that object.
@@ -398,7 +419,6 @@ namespace graphene { namespace chain {
     */
    typedef generic_index<account_object, account_multi_index_type> account_index;
 
-   struct by_owner;
    struct by_maintenance_seq;
 
    /**
@@ -408,8 +428,6 @@ namespace graphene { namespace chain {
       account_statistics_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-         ordered_unique< tag<by_owner>,
-                         member< account_statistics_object, account_id_type, &account_statistics_object::owner > >,
          ordered_unique< tag<by_maintenance_seq>,
             composite_key<
                account_statistics_object,

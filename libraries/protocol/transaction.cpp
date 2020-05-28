@@ -409,6 +409,7 @@ set<public_key_type> signed_transaction::minimize_required_signatures(
          uint32_t max_recursion )const
 {
    set< public_key_type > s = get_required_signatures( chain_id, available_keys, get_active, get_owner,
+                                                       allow_non_immediate_owner,
                                                        ignore_custom_operation_required_auths, max_recursion );
    flat_set< public_key_type > result( s.begin(), s.end() );
 
