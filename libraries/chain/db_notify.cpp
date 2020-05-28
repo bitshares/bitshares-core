@@ -17,6 +17,7 @@
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/custom_authority_object.hpp>
+#include <graphene/chain/ticket_object.hpp>
 #include <graphene/chain/impacted.hpp>
 #include <graphene/chain/hardfork.hpp>
 
@@ -305,6 +306,14 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // account
    }
+   void operator()( const ticket_create_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+   }
+   void operator()( const ticket_update_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+   }
 };
 
 } // namespace detail
@@ -409,6 +418,12 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
            FC_ASSERT( cust_auth_obj != nullptr );
            accounts.insert( cust_auth_obj->account );
            add_authority_accounts( accounts, cust_auth_obj->auth );
+           break;
+        } case ticket_object_type:{
+           const auto* aobj = dynamic_cast<const ticket_object*>( obj );
+           FC_ASSERT( aobj != nullptr );
+           accounts.insert( aobj->account );
+           break;
         }
       }
    }

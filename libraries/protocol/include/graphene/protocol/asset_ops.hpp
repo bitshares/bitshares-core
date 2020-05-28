@@ -118,6 +118,7 @@ namespace graphene { namespace protocol {
          fc::optional<uint16_t> maintenance_collateral_ratio; // BSIP-75
          /// After BSIP75, the asset owner can update MSSR directly
          fc::optional<uint16_t> maximum_short_squeeze_ratio;  // BSIP-75
+         fc::optional<uint16_t> margin_call_fee_ratio; // BSIP 74
          fc::optional<uint16_t> force_settle_fee_percent;  // BSIP-87
       };
 
@@ -182,7 +183,7 @@ namespace graphene { namespace protocol {
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
-      share_type      calculate_fee( const fee_parameters_type& k )const;
+      share_type      calculate_fee( const fee_parameters_type& k, optional<uint64_t> sub_asset_creation_fee )const;
    };
 
    /**
@@ -594,6 +595,7 @@ FC_REFLECT( graphene::protocol::bitasset_options::ext,
             (initial_collateral_ratio)
             (maintenance_collateral_ratio)
             (maximum_short_squeeze_ratio)
+            (margin_call_fee_ratio)
             (force_settle_fee_percent)
           )
 

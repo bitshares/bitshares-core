@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2020 Abit More, and contributors.
  *
  * The MIT License
  *
@@ -22,16 +22,32 @@
  * THE SOFTWARE.
  */
 #pragma once
+#include <graphene/chain/evaluator.hpp>
 
-#include <graphene/protocol/config.hpp>
+#include <graphene/protocol/ticket.hpp>
 
-#define GRAPHENE_MIN_UNDO_HISTORY 10
-#define GRAPHENE_MAX_UNDO_HISTORY 10000
+namespace graphene { namespace chain {
 
-#define GRAPHENE_MAX_NESTED_OBJECTS (200)
+   class ticket_object;
 
-#define GRAPHENE_CURRENT_DB_VERSION                          "20200510"
+   class ticket_create_evaluator : public evaluator<ticket_create_evaluator>
+   {
+      public:
+         typedef ticket_create_operation operation_type;
 
-#define GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT             4
-#define GRAPHENE_RECENTLY_MISSED_COUNT_DECREMENT             3
+         void_result do_evaluate( const ticket_create_operation& op );
+         object_id_type do_apply( const ticket_create_operation& op );
+   };
 
+   class ticket_update_evaluator : public evaluator<ticket_update_evaluator>
+   {
+      public:
+         typedef ticket_update_operation operation_type;
+
+         void_result do_evaluate( const ticket_update_operation& op );
+         generic_operation_result do_apply( const ticket_update_operation& op );
+
+         const ticket_object* _ticket = nullptr;
+   };
+
+} } // graphene::chain

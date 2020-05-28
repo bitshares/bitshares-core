@@ -29,6 +29,7 @@
 #include <graphene/protocol/market.hpp>
 
 #include <graphene/chain/committee_member_object.hpp>
+#include <graphene/chain/ticket_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/database.hpp>
@@ -300,7 +301,8 @@ struct database_fixture {
                                        uint16_t precision = 2,
                                        asset_id_type backing_asset = {},
                                        share_type max_supply = GRAPHENE_MAX_SHARE_SUPPLY,
-                                       optional<uint16_t> initial_cr = {} );
+                                       optional<uint16_t> initial_cr = {},
+                                       optional<uint16_t> margin_call_fee_ratio = {} );
    const asset_object& create_bitasset(const string& name,
                                        account_id_type issuer = GRAPHENE_WITNESS_ACCOUNT,
                                        uint16_t market_fee_percent = 100 /*1%*/,
@@ -308,7 +310,8 @@ struct database_fixture {
                                        uint16_t precision = 2,
                                        asset_id_type backing_asset = {},
                                        share_type max_supply = GRAPHENE_MAX_SHARE_SUPPLY,
-                                       optional<uint16_t> initial_cr = {} );
+                                       optional<uint16_t> initial_cr = {},
+                                       optional<uint16_t> margin_call_fee_ratio = {} );
    const asset_object& create_prediction_market(const string& name,
                                        account_id_type issuer = GRAPHENE_WITNESS_ACCOUNT,
                                        uint16_t market_fee_percent = 100 /*1%*/,
@@ -397,6 +400,13 @@ struct database_fixture {
    void transfer( account_id_type from, account_id_type to, const asset& amount, const asset& fee = asset() );
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );
    void fund_fee_pool( const account_object& from, const asset_object& asset_to_fund, const share_type amount );
+   ticket_create_operation make_ticket_create_op( account_id_type account, ticket_type type,
+                                                  const asset& amount )const;
+   const ticket_object& create_ticket( account_id_type account, ticket_type type, const asset& amount );
+   ticket_update_operation make_ticket_update_op( const ticket_object& ticket, ticket_type type,
+                                                  const optional<asset>& amount )const;
+   generic_operation_result update_ticket( const ticket_object& ticket, ticket_type type,
+                                           const optional<asset>& amount );
    /**
     * NOTE: This modifies the database directly. You will probably have to call this each time you
     * finish creating a block

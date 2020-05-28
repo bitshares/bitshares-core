@@ -626,6 +626,8 @@ void database::_apply_block( const signed_block& next_block )
    update_signing_witness(signing_witness, next_block);
    update_last_irreversible_block();
 
+   process_tickets();
+
    // Are we at the maintenance interval?
    if( maint_needed )
       perform_chain_maintenance(next_block, global_props);

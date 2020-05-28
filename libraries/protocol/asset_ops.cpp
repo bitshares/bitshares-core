@@ -41,7 +41,7 @@ bool is_valid_symbol( const string& symbol )
     if( symbol.size() < GRAPHENE_MIN_ASSET_SYMBOL_LENGTH )
         return false;
 
-    if( symbol.substr(0,3) == "BIT" ) 
+    if( symbol.substr(0,3) == "BIT" )
         return false;
 
     if( symbol.size() > GRAPHENE_MAX_ASSET_SYMBOL_LENGTH )
@@ -79,17 +79,26 @@ share_type asset_issue_operation::calculate_fee(const fee_parameters_type& k)con
    return k.fee + calculate_data_fee( fc::raw::pack_size(memo), k.price_per_kbyte );
 }
 
-share_type asset_create_operation::calculate_fee(const asset_create_operation::fee_parameters_type& param)const
+share_type asset_create_operation::calculate_fee( const asset_create_operation::fee_parameters_type& param,
+                                                  optional<uint64_t> sub_asset_creation_fee )const
 {
-   auto core_fee_required = param.long_symbol; 
+   share_type core_fee_required = param.long_symbol;
 
-   switch(symbol.size()) {
+   if( sub_asset_creation_fee.valid() && symbol.find('.') != std::string::npos )
+   {
+      core_fee_required = *sub_asset_creation_fee;
+   }
+   else
+   {
+      switch( symbol.size() )
+      {
       case 3: core_fee_required = param.symbol3;
           break;
       case 4: core_fee_required = param.symbol4;
           break;
       default:
           break;
+      }
    }
 
    // common_options contains several lists and a string. Charge fees for its size
@@ -226,6 +235,9 @@ void bitasset_options::validate() const
    FC_ASSERT(minimum_feeds > 0);
    FC_ASSERT(force_settlement_offset_percent <= GRAPHENE_100_PERCENT);
    FC_ASSERT(maximum_force_settlement_volume <= GRAPHENE_100_PERCENT);
+
+   if( extensions.value.margin_call_fee_ratio.valid() )
+      FC_ASSERT( *extensions.value.margin_call_fee_ratio <= GRAPHENE_MAX_COLLATERAL_RATIO );
 
    if( extensions.value.initial_collateral_ratio.valid() )
    {
