@@ -46,6 +46,14 @@ namespace detail {
       }
    }
 
+   void check_bitasset_options_hf_bsip74( const fc::time_point_sec& block_time, const bitasset_options& options)
+   {
+      // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
+      FC_ASSERT( block_time >= HARDFORK_CORE_BSIP74_TIME
+            || !options.extensions.value.margin_call_fee_ratio.valid(),
+            "A BitAsset's MCFR cannot be set before Hardfork BSIP74" );
+   }
+
    // TODO review and remove code below and links to it after HARDFORK_BSIP_81_TIME
    void check_asset_options_hf_bsip81(const fc::time_point_sec& block_time, const asset_options& options)
    {
@@ -95,7 +103,8 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    detail::check_asset_options_hf_1774(now, op.common_options);
    detail::check_asset_options_hf_bsip81(now, op.common_options);
    if( op.bitasset_opts ) {
-      detail::check_bitasset_options_hf_bsip77( now, *op.bitasset_opts );
+      detail::check_bitasset_options_hf_bsip74( now, *op.bitasset_opts ); // HF_REMOVABLE
+      detail::check_bitasset_options_hf_bsip77( now, *op.bitasset_opts ); // HF_REMOVABLE
       detail::check_bitasset_options_hf_bsip87( now, *op.bitasset_opts ); // HF_REMOVABLE
    }
 
@@ -468,7 +477,8 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    const time_point_sec now = d.head_block_time();
 
    // Hardfork Checks:
-   detail::check_bitasset_options_hf_bsip77( now, op.new_options );
+   detail::check_bitasset_options_hf_bsip74( now, op.new_options ); // HF_REMOVABLE
+   detail::check_bitasset_options_hf_bsip77( now, op.new_options ); // HF_REMOVABLE
    detail::check_bitasset_options_hf_bsip87( now, op.new_options ); // HF_REMOVABLE
 
    const asset_object& asset_obj = op.asset_to_update(d);
@@ -567,13 +577,17 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
  * @brief Apply requested changes to bitasset options
  *
  * This applies the requested changes to the bitasset object. It also cleans up the
- * releated feeds
+ * releated feeds, and checks conditions that might necessitate a call to check_call_orders.
+ * Called from asset_update_bitasset_evaluator::do_apply().
  *
  * @param op the requested operation
  * @param db the database
  * @param bdo the actual database object
  * @param asset_to_update the asset_object related to this bitasset_data_object
- * @returns true if the feed price is changed, and after hf core-868-890
+ *
+ * @returns true if we should check call orders, such as if if the feed price is changed, or some
+ *    cases after hf core-868-890, or if the margin_call_fee_ratio has changed, which affects the
+ *    matching price of margin call orders.
  */
 static bool update_bitasset_object_options(
       const asset_update_bitasset_operation& op, database& db,
@@ -612,6 +626,13 @@ static bool update_bitasset_object_options(
    bool icr_changed = ( ( old_icr.valid() != new_icr.valid() )
                         || ( old_icr.valid() && *old_icr != *new_icr ) );
 
+   // check if MCFR will change
+   const auto& old_mcfr = bdo.options.extensions.value.margin_call_fee_ratio;
+   const auto& new_mcfr = op.new_options.extensions.value.margin_call_fee_ratio;
+   const bool mcfr_changed = ( ( old_mcfr.valid() != new_mcfr.valid() )
+                               || ( old_mcfr.valid() && *old_mcfr != *new_mcfr ) );
+
+   // Apply changes to bitasset options
    bdo.options = op.new_options;
 
    // are we modifying the underlying? If so, reset the feeds
@@ -633,21 +654,25 @@ static bool update_bitasset_object_options(
       }
    }
 
+   bool feed_actually_changed = false;
    if( should_update_feeds )
    {
       const auto old_feed = bdo.current_feed;
       bdo.update_median_feeds( db.head_block_time(), next_maint_time );
 
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
-      return ( after_hf_core_868_890 && ! (old_feed == bdo.current_feed) );
+      feed_actually_changed = ( after_hf_core_868_890 && ! (old_feed == bdo.current_feed) );
    }
    else if( icr_changed ) // feeds not updated, but ICR changed
    {
-      // update data derived from ICR
+      // update data derived from ICR (would otherwise happen as side effect of update_median_feeds)
       bdo.refresh_current_initial_collateralization();
    }
 
-   return false;
+   // Conditions under which a call to check_call_orders is needed in response to the updates applied here:
+   const bool retval = feed_actually_changed || mcfr_changed;
+
+   return retval;
 }
 
 void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& op)
@@ -829,8 +854,8 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
          //            performance loss. Needs testing.
          if( d.head_block_time() >= HARDFORK_CORE_1780_TIME )
          {
-	    const bool is_maker = false; // Settlement orders are takers
-            auto issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d), settled_amount , is_maker );
+            auto issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d),
+                  settled_amount, false );
             settled_amount -= issuer_fees;
          }
 
