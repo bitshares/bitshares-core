@@ -47,6 +47,8 @@
 #include <random>
 #include <graphene/chain/htlc_object.hpp>
 
+// Dependencies for the voting and witness tests
+#include <graphene/chain/witness_object.hpp>
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
@@ -1258,6 +1260,458 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
 
 
    /**
+    * Test of authorization of one account (Alice) authorizing another key
+    * for restricted trading between between ACOIN1 and any BCOIN (BCOIN1, BCOIN2, and BCOIN3).
+    *
+    * The restricted trading authortization will be constructed with one custom authority
+    * containing two "logical_or" branches.  One branch authorizes selling ACOINs for BCOINs.
+    * Another branch authorizes selling BCOINs for ACOINs.
+    */
+   BOOST_AUTO_TEST_CASE(authorized_restricted_trading_key) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Fund some accounts
+         //////
+         ACTORS((assetissuer)(alice))
+         fund(alice, asset(5000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+
+
+         //////
+         // Define a key that can be authorized
+         // This can be a new key or an existing key. The existing key may even be the active key of an account.
+         //////
+         fc::ecc::private_key some_private_key = generate_private_key("some key");
+         public_key_type some_public_key = public_key_type(some_private_key.get_public_key());
+
+
+         //////
+         // Initialize: Create user-issued assets
+         //////
+         upgrade_to_lifetime_member(assetissuer);
+         create_user_issued_asset("ACOIN1", assetissuer,  DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
+         create_user_issued_asset("BCOIN1", assetissuer,  DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
+         create_user_issued_asset("BCOIN2", assetissuer,  DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
+         create_user_issued_asset("BCOIN3", assetissuer,  DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
+         create_user_issued_asset("CCOIN1", assetissuer,  DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
+         generate_blocks(1);
+         const asset_object &acoin1 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("ACOIN1");
+         const asset_object &bcoin1 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("BCOIN1");
+         const asset_object &bcoin2 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("BCOIN2");
+         const asset_object &bcoin3 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("BCOIN3");
+         const asset_object &ccoin1 = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("CCOIN1");
+
+         //////
+         // Initialize: Issue UIAs
+         //////
+
+         // Lambda for issuing an asset to an account
+         auto issue_amount_to = [](const account_id_type &issuer, const asset &amount, const account_id_type &to) {
+            asset_issue_operation op;
+            op.issuer = issuer;
+            op.asset_to_issue = amount;
+            op.issue_to_account = to;
+
+            return op;
+         };
+
+         // assetissuer issues A1, B1, and C1 to alice
+         asset_issue_operation issue_a1_to_alice_op
+                 = issue_amount_to(assetissuer.get_id(), asset(1000, acoin1.id), alice.get_id());
+         asset_issue_operation issue_b1_to_alice_op
+                 = issue_amount_to(assetissuer.get_id(), asset(2000, bcoin1.id), alice.get_id());
+         asset_issue_operation issue_c1_to_alice_op
+                 = issue_amount_to(assetissuer.get_id(), asset(2000, ccoin1.id), alice.get_id());
+         trx.clear();
+         trx.operations = {issue_a1_to_alice_op, issue_b1_to_alice_op, issue_c1_to_alice_op};
+         sign(trx, assetissuer_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Some key attempts to create a limit order on behalf of Alice
+         // This should fail because the key is not authorized to trade with her account
+         //////
+         set_expiration( db, trx );
+         trx.operations.clear();
+
+         limit_order_create_operation buy_order;
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = acoin1.amount(60);
+         buy_order.min_to_receive = bcoin1.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+         // The failure should not indicate any rejected custom auths because no CAA applies for the key's attempt
+         // "rejected_custom_auths":[]
+         EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] {PUSH_TX(db, trx);});
+
+
+         //////
+         // Alice authorizes a particular key to place limit orders that offer the any asset for sale
+         //////
+         custom_authority_create_operation authorize_limit_orders;
+         authorize_limit_orders.account = alice.get_id();
+         authorize_limit_orders.auth.add_authority(some_public_key, 1);
+         authorize_limit_orders.auth.weight_threshold = 1;
+         authorize_limit_orders.enabled = true;
+         authorize_limit_orders.valid_to = db.head_block_time() + 1000;
+         authorize_limit_orders.operation_type = operation::tag<limit_order_create_operation>::value;
+
+         auto amount_to_sell_index = member_index<limit_order_create_operation>("amount_to_sell");
+         auto min_to_receive_index = member_index<limit_order_create_operation>("min_to_receive");
+         auto asset_id_index = member_index<asset>("asset_id");
+
+         // Define the two set of assets: ACOINs and BCOINs
+         restriction is_acoin_rx = restriction(asset_id_index, FUNC(in),
+                                               flat_set<asset_id_type>{acoin1.id});
+         restriction is_bcoin_rx = restriction(asset_id_index, FUNC(in),
+                                               flat_set<asset_id_type>{bcoin1.id, bcoin2.id, bcoin3.id});
+
+         // Custom Authority 1: Sell ACOINs to buy BCOINs
+         restriction sell_acoin_rx = restriction(amount_to_sell_index, FUNC(attr), vector<restriction>{is_acoin_rx});
+
+         restriction buy_bcoin_rx = restriction(min_to_receive_index, FUNC(attr), vector<restriction>{is_bcoin_rx});
+
+         vector<restriction> branch_sell_acoin_buy_bcoin = {sell_acoin_rx, buy_bcoin_rx};
+
+
+         // Custom Authority 2: Sell BCOINs to buy ACOINs
+         restriction sell_bcoin_rx = restriction(amount_to_sell_index, FUNC(attr), vector<restriction>{is_bcoin_rx});
+         restriction buy_acoin_rx = restriction(min_to_receive_index, FUNC(attr), vector<restriction>{is_acoin_rx});
+
+         vector<restriction> branch_sell_bcoin_buy_acoin = {sell_bcoin_rx, buy_acoin_rx};
+
+
+         unsigned_int dummy_index = 999;
+         restriction trade_acoin_for_bcoin_rx = restriction(dummy_index, FUNC(logical_or),
+                                                            vector<vector<restriction>>{branch_sell_acoin_buy_bcoin,
+                                                                                        branch_sell_bcoin_buy_acoin});
+         authorize_limit_orders.restrictions = {trade_acoin_for_bcoin_rx};
+         //[
+         //  {
+         //    "member_index": 999,
+         //    "restriction_type": 11,
+         //    "argument": [
+         //      40,
+         //      [
+         //        [
+         //          {
+         //            "member_index": 2,
+         //            "restriction_type": 10,
+         //            "argument": [
+         //              39,
+         //              [
+         //                {
+         //                  "member_index": 1,
+         //                  "restriction_type": 6,
+         //                  "argument": [
+         //                    27,
+         //                    [
+         //                      "1.3.2"
+         //                    ]
+         //                  ],
+         //                  "extensions": []
+         //                }
+         //              ]
+         //            ],
+         //            "extensions": []
+         //          },
+         //          {
+         //            "member_index": 3,
+         //            "restriction_type": 10,
+         //            "argument": [
+         //              39,
+         //              [
+         //                {
+         //                  "member_index": 1,
+         //                  "restriction_type": 6,
+         //                  "argument": [
+         //                    27,
+         //                    [
+         //                      "1.3.3",
+         //                      "1.3.4",
+         //                      "1.3.5"
+         //                    ]
+         //                  ],
+         //                  "extensions": []
+         //                }
+         //              ]
+         //            ],
+         //            "extensions": []
+         //          }
+         //        ],
+         //        [
+         //          {
+         //            "member_index": 2,
+         //            "restriction_type": 10,
+         //            "argument": [
+         //              39,
+         //              [
+         //                {
+         //                  "member_index": 1,
+         //                  "restriction_type": 6,
+         //                  "argument": [
+         //                    27,
+         //                    [
+         //                      "1.3.3",
+         //                      "1.3.4",
+         //                      "1.3.5"
+         //                    ]
+         //                  ],
+         //                  "extensions": []
+         //                }
+         //              ]
+         //            ],
+         //            "extensions": []
+         //          },
+         //          {
+         //            "member_index": 3,
+         //            "restriction_type": 10,
+         //            "argument": [
+         //              39,
+         //              [
+         //                {
+         //                  "member_index": 1,
+         //                  "restriction_type": 6,
+         //                  "argument": [
+         //                    27,
+         //                    [
+         //                      "1.3.2"
+         //                    ]
+         //                  ],
+         //                  "extensions": []
+         //                }
+         //              ]
+         //            ],
+         //            "extensions": []
+         //          }
+         //        ]
+         //      ]
+         //    ],
+         //    "extensions": []
+         //  }
+         //]
+
+         // Broadcast the authorization
+         trx.clear();
+         trx.operations = {authorize_limit_orders};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         // Authorize the cancellation of orders
+         custom_authority_create_operation authorize_limit_order_cancellations;
+         authorize_limit_order_cancellations.account = alice.get_id();
+         authorize_limit_order_cancellations.auth.add_authority(some_public_key, 1);
+         authorize_limit_order_cancellations.auth.weight_threshold = 1;
+         authorize_limit_order_cancellations.enabled = true;
+         authorize_limit_order_cancellations.valid_to = db.head_block_time() + 1000;
+         authorize_limit_order_cancellations.operation_type = operation::tag<limit_order_cancel_operation>::value;
+         trx.clear();
+         trx.operations = {authorize_limit_order_cancellations};
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the buy order transaction
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice
+         // This should succeed because Bob is authorized to create limit orders
+         //////
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         auto processed_buy = PUSH_TX(db, trx);
+         const limit_order_object *buy_order_object =
+            db.find<limit_order_object>( processed_buy.operation_results[0].get<object_id_type>() );
+
+
+         //////
+         // The key attempts to cancel the limit order on behalf of Alice
+         // This should succeed because the key is authorized to cancel limit orders
+         //////
+         limit_order_cancel_operation cancel_order;
+         cancel_order.fee_paying_account = alice_id;
+         cancel_order.order = buy_order_object->id;
+         trx.clear();
+         trx.operations = {cancel_order};
+         sign(trx, some_private_key);
+         auto processed_cancelled = PUSH_TX(db, trx);
+
+
+         //////
+         // Advance the blockchain to generate a distinctive hash ID for the buy order transaction
+         //////
+         generate_blocks(1);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell ACOIN1 for CCOIN1
+         // This should fail because the key is not authorized to sell ACOIN1 for CCOIN1
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = acoin1.amount(60);
+         buy_order.min_to_receive = ccoin1.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell CCOIN1 for ACOIN1
+         // This should fail because the key is not authorized to create this exchange offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = ccoin1.amount(60);
+         buy_order.min_to_receive = acoin1.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell BCOIN1 for CCOIN1
+         // This should fail because the key is not authorized to create this exchange offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = bcoin1.amount(60);
+         buy_order.min_to_receive = ccoin1.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell CCOIN1 for BCOIN1
+         // This should fail because the key is not authorized to create this exchange offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = ccoin1.amount(60);
+         buy_order.min_to_receive = bcoin1.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell BCOIN1 for BCOIN2
+         // This should fail because the key is NOT authorized to create this exchange offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = bcoin1.amount(60);
+         buy_order.min_to_receive = bcoin2.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell ACOIN1 for BCOIN1
+         // This should succeed because the key is authorized to create this offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = acoin1.amount(60);
+         buy_order.min_to_receive = bcoin1.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell ACOIN1 for BCOIN2
+         // This should succeed because the key is authorized to create this offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = acoin1.amount(60);
+         buy_order.min_to_receive = bcoin2.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell ACOIN1 for BCOIN3
+         // This should succeed because the key is authorized to create this offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = acoin1.amount(60);
+         buy_order.min_to_receive = bcoin3.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         PUSH_TX(db, trx);
+
+
+         //////
+         // The key attempts to create a limit order on behalf of Alice to sell BCOIN1 for ACOIN1
+         // This should succeed because the key is authorized to create this offer
+         //////
+         buy_order = limit_order_create_operation();
+         buy_order.seller = alice_id;
+         buy_order.amount_to_sell = bcoin1.amount(60);
+         buy_order.min_to_receive = acoin1.amount(15);
+         buy_order.expiration = time_point_sec::maximum();
+
+         trx.clear();
+         trx.operations = {buy_order};
+         sign(trx, some_private_key);
+         PUSH_TX(db, trx);
+
+      } FC_LOG_AND_RETHROW()
+   }
+
+
+   /**
     * Test of authorization of one account (feedproducer) authorizing another account (Bob)
     * to publish feeds. The authorization remains associated with account even when the account changes its keys.
     */
@@ -2131,8 +2585,8 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Initialize: Create user-issued assets
          //////
          upgrade_to_lifetime_member(alice);
-         create_user_issued_asset("ALICECOIN", alice, UIA_ASSET_ISSUER_PERMISSION_MASK);
-         create_user_issued_asset( "SPECIALCOIN", alice,  UIA_ASSET_ISSUER_PERMISSION_MASK);
+         create_user_issued_asset("ALICECOIN", alice, DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
+         create_user_issued_asset( "SPECIALCOIN", alice,  DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
          generate_blocks(1);
          const asset_object &alicecoin = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("ALICECOIN");
          const asset_object &specialcoin
@@ -4807,7 +5261,7 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          // Initialize: Create user-issued assets
          //////
          upgrade_to_lifetime_member(assetissuer);
-         create_user_issued_asset("SPECIALCOIN", assetissuer,  UIA_ASSET_ISSUER_PERMISSION_MASK);
+         create_user_issued_asset("SPECIALCOIN", assetissuer,  DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
          generate_blocks(1);
          const asset_object &specialcoin
                  = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("SPECIALCOIN");
@@ -5265,6 +5719,515 @@ BOOST_AUTO_TEST_CASE(custom_auths) { try {
          }
 
       } FC_LOG_AND_RETHROW()
+   }
+
+   /**
+    * Test of CAA for account_update_operation
+    *
+    * Scenario: Test of authorization of one account (alice) authorizing a key
+    * to ONLY update the voting slate of an account
+    */
+   BOOST_AUTO_TEST_CASE(authorized_voting_key) {
+      try {
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Accounts
+         //////
+         ACTORS((alice));
+         fund(alice, asset(500000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+         upgrade_to_lifetime_member(alice);
+
+         // Arbitrarily identify one of the active witnesses
+         flat_set<witness_id_type> witnesses = db.get_global_properties().active_witnesses;
+         auto itr_witnesses = witnesses.begin();
+         witness_id_type witness0_id = itr_witnesses[0];
+         const auto& idx = db.get_index_type<witness_index>().indices().get<by_id>();
+         witness_object witness0_obj = *idx.find(witness0_id);
+
+
+         //////
+         // Define a key that can be authorized
+         // This can be a new key or an existing key. The existing key may even be the active key of an account.
+         //////
+         fc::ecc::private_key some_private_key = generate_private_key("some key");
+         public_key_type some_public_key = public_key_type(some_private_key.get_public_key());
+
+
+         //////
+         // The key attempts to update the voting slate of Alice
+         // This should fail because the key is not authorized by Alice to update any part of her account
+         //////
+         {
+            account_update_operation uop;
+            uop.account = alice.get_id();
+            account_options alice_options = alice.options;
+            auto insert_result = alice_options.votes.insert(witness0_obj.vote_id);
+            if (!insert_result.second)
+               FC_THROW("Account ${account} was already voting for witness ${witness}",
+                        ("account", alice)("witness", "init0"));
+            uop.new_options = alice_options;
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(uop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should not indicate any rejected custom auths because no CAA applies for Bob's attempt
+            // "rejected_custom_auths":[]
+            EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] { PUSH_TX(db, trx); });
+         }
+
+
+         //////
+         // Alice authorizes the key to update her voting slate
+         // by authorizing account updates EXCEPT for
+         // updating the owner key
+         // updating the active key
+         // updating the memo key
+         // updating the special owner authority
+         // updating the special active authority
+         //////
+         {
+            custom_authority_create_operation authorize_account_update;
+            authorize_account_update.account = alice.get_id();
+            authorize_account_update.auth.add_authority(some_public_key, 1);
+            authorize_account_update.auth.weight_threshold = 1;
+            authorize_account_update.enabled = true;
+            authorize_account_update.valid_to = db.head_block_time() + 86400;
+            authorize_account_update.operation_type = operation::tag<account_update_operation>::value;
+
+            // Shall not update the owner key member
+            auto owner_index = member_index<account_update_operation>("owner");
+            restriction no_owner = restriction(owner_index, FUNC(eq), void_t());
+
+            // Shall not update the active key member
+            auto active_index = member_index<account_update_operation>("active");
+            restriction no_active = restriction(active_index, FUNC(eq), void_t());
+
+            // Shall not update the memo key member of the new_options member
+            auto new_options_index = member_index<account_update_operation>("new_options");
+            auto memo_index = member_index<account_options>("memo_key");
+            restriction same_memo = restriction(new_options_index, FUNC(attr),
+                                                vector<restriction>{
+                                                        restriction(memo_index, FUNC(eq), alice.options.memo_key)});
+
+            // Shall not update the extensions member
+            auto ext_index = member_index<account_update_operation>("extensions");
+            restriction no_ext = restriction(ext_index, FUNC(eq), void_t());
+
+            auto owner_special_index = member_index<account_update_operation::ext>("owner_special_authority");
+            restriction no_special_owner = restriction(ext_index, FUNC(attr),
+                                                       vector<restriction>{
+                                                               restriction(owner_special_index, FUNC(eq), void_t())});
+
+            auto active_special_index = member_index<account_update_operation::ext>("active_special_authority");
+            restriction no_special_active = restriction(ext_index, FUNC(attr),
+                                                        vector<restriction>{
+                                                                restriction(active_special_index, FUNC(eq), void_t())});
+
+            // Shall not update the extensions member of the new_options member
+            auto new_options_ext_index = member_index<account_options>("extensions");
+            restriction no_new_options_ext = restriction(new_options_index, FUNC(attr), vector<restriction>{
+                    restriction(new_options_ext_index, FUNC(eq), void_t())});
+
+            // Combine all of the shall not restrictions
+            vector<restriction> shall_not_restrictions = {no_owner, no_active, no_special_owner, no_special_active,
+                                                          same_memo};
+            authorize_account_update.restrictions = shall_not_restrictions;
+            //[
+            //  {
+            //    "member_index": 2,
+            //    "restriction_type": 0,
+            //    "argument": [
+            //      0,
+            //      {}
+            //    ],
+            //    "extensions": []
+            //  },
+            //  {
+            //    "member_index": 3,
+            //    "restriction_type": 0,
+            //    "argument": [
+            //      0,
+            //      {}
+            //    ],
+            //    "extensions": []
+            //  },
+            //  {
+            //    "member_index": 5,
+            //    "restriction_type": 10,
+            //    "argument": [
+            //      39,
+            //      [
+            //        {
+            //          "member_index": 1,
+            //          "restriction_type": 0,
+            //          "argument": [
+            //            0,
+            //            {}
+            //          ],
+            //          "extensions": []
+            //        }
+            //      ]
+            //    ],
+            //    "extensions": []
+            //  },
+            //  {
+            //    "member_index": 5,
+            //    "restriction_type": 10,
+            //    "argument": [
+            //      39,
+            //      [
+            //        {
+            //          "member_index": 2,
+            //          "restriction_type": 0,
+            //          "argument": [
+            //            0,
+            //            {}
+            //          ],
+            //          "extensions": []
+            //        }
+            //      ]
+            //    ],
+            //    "extensions": []
+            //  },
+            //  {
+            //    "member_index": 4,
+            //    "restriction_type": 10,
+            //    "argument": [
+            //      39,
+            //      [
+            //        {
+            //          "member_index": 0,
+            //          "restriction_type": 0,
+            //          "argument": [
+            //            5,
+            //            "BTS7zsqi7QUAjTAdyynd6DVe8uv4K8gCTRHnAoMN9w9CA1xLCTDVv"
+            //          ],
+            //          "extensions": []
+            //        }
+            //      ]
+            //    ],
+            //    "extensions": []
+            //  }
+            //]
+
+            // Broadcast the transaction
+            trx.clear();
+            trx.operations = {authorize_account_update};
+            sign(trx, alice_private_key);
+            PUSH_TX(db, trx);
+         }
+
+
+         //////
+         // The key attempts to update the owner key for alice
+         // This should fail because it is NOT authorized by alice
+         // It violates Restriction 1 (index-0)
+         //////
+         {
+            account_update_operation uop;
+            uop.account = alice.get_id();
+
+            uop.owner = authority(1, some_public_key, 1);
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(uop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_owner_auth);
+            // The failure should indicate the rejection path
+            // {"success":false,"rejection_path":[[0,0],[2,"predicate_was_false"]]}
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // The key attempts to update the active key for alice
+         // This should fail because it is NOT authorized by alice
+         // It violates Restriction 2 (index-1)
+         //////
+         {
+            account_update_operation uop;
+            uop.account = alice.get_id();
+
+            uop.active = authority(1, some_public_key, 1);
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(uop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should indicate the rejection path
+            // {"success":false,"rejection_path":[[0,1],[2,"predicate_was_false"]]}
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,1],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // The key attempts to update the special owner key for alice
+         // This should fail because it is NOT authorized by alice
+         // It violates Restriction 3 (index-2)
+         //////
+         {
+            account_update_operation uop;
+            uop.account = alice.get_id();
+
+            uop.extensions.value.owner_special_authority = no_special_authority();
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(uop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_owner_auth);
+            // The failure should indicate the rejection path
+            // "rejection_path":[[0,2],[0,0],[2,"predicate_was_false"]
+            // [0,2]: 0 is the rejection_indicator for an index to a sub-restriction; 2 is the index value for Restriction 3
+            // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for the only argument
+            // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,2],[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // The key attempts to update the special active key for alice
+         // This should fail because it is NOT authorized by alice
+         // It violates Restriction 4 (index-3)
+         //////
+         {
+            account_update_operation uop;
+            uop.account = alice.get_id();
+
+            uop.extensions.value.active_special_authority = no_special_authority();
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(uop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should indicate the rejection path
+            // "rejection_path":[[0,3],[0,0],[2,"predicate_was_false"]
+            // [0,3]: 0 is the rejection_indicator for an index to a sub-restriction; 3 is the index value for Restriction 4
+            // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for the only argument
+            // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,3],[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // The key attempts to update the memo key for alice
+         // This should fail because it is NOT authorized by alice
+         // It violates Restriction 5 (index-4)
+         //////
+         {
+            account_update_operation uop;
+            uop.account = alice.get_id();
+
+            account_options alice_options = alice.options;
+            alice_options.memo_key = some_public_key;
+            uop.new_options = alice_options;
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(uop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should indicate the rejection path
+            // "rejection_path":[[0,4],[0,0],[2,"predicate_was_false"]
+            // [0,4]: 0 is the rejection_indicator for an index to a sub-restriction; 4 is the index value for Restriction 5
+            // [0,0]: 0 is the rejection_indicator for an index to a sub-restriction; 0 is the index value for the only argument
+            // [2,"predicate_was_false"]: 0 is the rejection_indicator for rejection_reason; "predicate_was_false" is the reason
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,4],[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // The key attempts to update the voting slate for alice
+         // This should succeed because the key is authorized by alice
+         //////
+         {
+            account_update_operation uop;
+            uop.account = alice.get_id();
+            account_options alice_options = alice.options;
+            auto insert_result = alice_options.votes.insert(witness0_obj.vote_id);
+            if (!insert_result.second)
+               FC_THROW("Account ${account} was already voting for witness ${witness}",
+                        ("account", alice)("witness", "init0"));
+            uop.new_options = alice_options;
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(uop));
+            sign(trx, some_private_key);
+            PUSH_TX(db, trx);
+         }
+
+      } FC_LOG_AND_RETHROW()
+   }
+
+
+   /**
+    * Test of CAA for witness_update_operation
+    *
+    * Scenario: Test of authorization of one account (alice) authorizing a key
+    * to ONLY change the signing key of a witness account
+    */
+   BOOST_AUTO_TEST_CASE(authorized_change_witness_signing_key) {
+      try {
+
+         //////
+         // Initialize the blockchain
+         //////
+         generate_blocks(HARDFORK_BSIP_40_TIME);
+         generate_blocks(5);
+         db.modify(global_property_id_type()(db), [](global_property_object &gpo) {
+            gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+         });
+         set_expiration(db, trx);
+
+
+         //////
+         // Initialize: Accounts
+         //////
+         // Create a new witness account (witness0)
+         ACTORS((witness0));
+         // Upgrade witness account to LTM
+         upgrade_to_lifetime_member(witness0.id);
+         generate_block();
+
+         // Create the witnesses
+         // Get the witness0 identifier after a block has been generated
+         // to be sure of using the most up-to-date identifier for the account
+         const account_id_type witness0_identifier = get_account("witness0").id;
+         create_witness(witness0_identifier, witness0_private_key);
+
+         generate_block();
+
+         // Find the witness ID for witness0
+         const auto& idx = db.get_index_type<witness_index>().indices().get<by_account>();
+         witness_object witness0_obj = *idx.find(witness0_identifier);
+         BOOST_CHECK(witness0_obj.witness_account == witness0_identifier);
+
+
+         //////
+         // Define a key that can be authorized
+         // This can be a new key or an existing key. The existing key may even be the active key of an account.
+         //////
+         fc::ecc::private_key some_private_key = generate_private_key("some key");
+         public_key_type some_public_key = public_key_type(some_private_key.get_public_key());
+
+
+         //////
+         // Define an alternate witness signing key
+         //////
+         fc::ecc::private_key alternate_signing_private_key = generate_private_key("some signing key");
+         public_key_type alternate_signing_public_key = public_key_type(alternate_signing_private_key.get_public_key());
+         // The current signing key should be different than the alternate signing public key
+         BOOST_CHECK(witness0_obj.signing_key != alternate_signing_public_key);
+
+
+         //////
+         // The key attempts to update the signing key of witness0
+         // This should fail because the key is NOT authorized by witness0 to update the signing key
+         //////
+         {
+            witness_update_operation wop;
+            wop.witness = witness0_obj.id;
+            wop.witness_account = witness0_obj.witness_account;
+
+            wop.new_signing_key = alternate_signing_public_key;
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(wop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should not indicate any rejected custom auths because no CAA applies for the key's attempt
+            // "rejected_custom_auths":[]
+            EXPECT_EXCEPTION_STRING("\"rejected_custom_auths\":[]", [&] { PUSH_TX(db, trx); });
+         }
+
+
+         //////
+         // Alice authorizes the key to only update the witness signing key
+         //////
+         {
+            custom_authority_create_operation authorize_update_signing_key;
+            authorize_update_signing_key.account = witness0.get_id();
+            authorize_update_signing_key.auth.add_authority(some_public_key, 1);
+            authorize_update_signing_key.auth.weight_threshold = 1;
+            authorize_update_signing_key.enabled = true;
+            authorize_update_signing_key.valid_to = db.head_block_time() + 86400;
+            authorize_update_signing_key.operation_type = operation::tag<witness_update_operation>::value;
+            auto url_index = member_index<witness_update_operation>("new_url");
+            restriction no_url = restriction(url_index, FUNC(eq), void_t());
+            authorize_update_signing_key.restrictions = {no_url};
+            //[
+            //  {
+            //    "member_index": 3,
+            //    "restriction_type": 0,
+            //    "argument": [
+            //      0,
+            //      {}
+            //    ]
+            //  }
+            //]
+
+            // Broadcast the transaction
+            trx.clear();
+            trx.operations = {authorize_update_signing_key};
+            sign(trx, witness0_private_key);
+            PUSH_TX(db, trx);
+         }
+
+
+         //////
+         // The key attempts to update the URL of witness0
+         // This should fail because the key is NOT authorized by witness0 to update the URL
+         //////
+         {
+            witness_update_operation wop;
+            wop.witness = witness0_obj.id;
+            wop.witness_account = witness0_obj.witness_account;
+
+            wop.new_url = "NEW_URL";
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(wop));
+            sign(trx, some_private_key);
+            BOOST_CHECK_THROW(PUSH_TX(db, trx), tx_missing_active_auth);
+            // The failure should indicate the rejection path
+            // {"success":false,"rejection_path":[[0,0],[2,"predicate_was_false"]]}
+            EXPECT_EXCEPTION_STRING("\"rejection_path\":[[0,0],[2,\"predicate_was_false\"]]", [&] {PUSH_TX(db, trx);});
+         }
+
+
+         //////
+         // The key attempts to update the signing key of witness0
+         // This should succeed because the key is authorized by witness0 to update the signing key
+         //////
+         {
+            witness_update_operation wop;
+            wop.witness = witness0_obj.id;
+            wop.witness_account = witness0_obj.witness_account;
+
+            wop.new_signing_key = alternate_signing_public_key;
+
+            trx.clear();
+            trx.operations.emplace_back(std::move(wop));
+            sign(trx, some_private_key);
+            PUSH_TX(db, trx);
+
+            // Check the current signing key for witness0
+            witness_object updated_witness0_obj = *idx.find(witness0_obj.witness_account);
+            BOOST_CHECK(updated_witness0_obj.witness_account == witness0_obj.witness_account);
+            BOOST_CHECK(updated_witness0_obj.signing_key == alternate_signing_public_key);
+         }
+
+      }
+      FC_LOG_AND_RETHROW()
    }
 
 BOOST_AUTO_TEST_SUITE_END()

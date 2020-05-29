@@ -31,6 +31,8 @@ namespace graphene { namespace protocol {
 
 share_type custom_authority_create_operation::calculate_fee(const fee_parameters_type& k)const {
    share_type core_fee_required = k.basic_fee;
+   // Note: practically the `*` won't cause an integer overflow, because k.price_per_byte is 32 bit
+   //       and the results of pack_size() won't be too big
    core_fee_required += k.price_per_byte * (fc::raw::pack_size(restrictions) + fc::raw::pack_size(auth));
    return core_fee_required;
 }
@@ -58,6 +60,8 @@ void custom_authority_create_operation::validate()const {
 
 share_type custom_authority_update_operation::calculate_fee(const fee_parameters_type& k)const {
    share_type core_fee_required = k.basic_fee;
+   // Note: practically the `*` won't cause an integer overflow, because k.price_per_byte is 32 bit
+   //       and the results of pack_size() won't be too big
    core_fee_required += k.price_per_byte * fc::raw::pack_size(restrictions_to_add);
    if (new_auth)
       core_fee_required += k.price_per_byte * fc::raw::pack_size(*new_auth);
@@ -78,6 +82,19 @@ void custom_authority_update_operation::validate()const {
       FC_ASSERT(!new_auth->is_impossible(), "Cannot use an impossible authority threshold");
       FC_ASSERT(new_auth->address_auths.size() == 0, "Address auth is not supported");
    }
+   FC_ASSERT( new_enabled.valid() || new_valid_from.valid() || new_valid_to.valid() || new_auth.valid()
+              || !restrictions_to_remove.empty() || !restrictions_to_add.empty(),
+              "Must update something" );
+}
+
+void custom_authority_delete_operation::validate()const {
+   FC_ASSERT(fee.amount >= 0, "Fee amount can not be negative");
+
+   FC_ASSERT(account != GRAPHENE_TEMP_ACCOUNT
+             && account != GRAPHENE_COMMITTEE_ACCOUNT
+             && account != GRAPHENE_WITNESS_ACCOUNT
+             && account != GRAPHENE_RELAXED_COMMITTEE_ACCOUNT,
+             "Can not delete custom authority for special accounts");
 }
 
 } } // graphene::protocol

@@ -108,6 +108,26 @@ namespace graphene { namespace protocol {
    };
 
    template<>
+   class fee_helper<ticket_create_operation> {
+     public:
+      const ticket_create_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      {
+         static ticket_create_operation::fee_parameters_type param;
+         return param;
+      }
+   };
+
+   template<>
+   class fee_helper<ticket_update_operation> {
+     public:
+      const ticket_update_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const
+      {
+         static ticket_update_operation::fee_parameters_type param;
+         return param;
+      }
+   };
+
+   template<>
    class fee_helper<htlc_create_operation> {
      public:
       const htlc_create_operation::fee_parameters_type& cget(const fee_parameters::flat_set_type& parameters)const

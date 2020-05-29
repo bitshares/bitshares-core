@@ -32,6 +32,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/buyback_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
@@ -201,7 +202,7 @@ void database::pay_workers( share_type& budget )
 void database::update_active_witnesses()
 { try {
    assert( _witness_count_histogram_buffer.size() > 0 );
-   share_type stake_target = (_total_voting_stake-_witness_count_histogram_buffer[0]) / 2;
+   share_type stake_target = (_total_voting_stake[1]-_witness_count_histogram_buffer[0]) / 2;
 
    /// accounts that vote for 0 or 1 witness do not get to express an opinion on
    /// the number of witnesses to have (they abstain and are non-voting accounts)
@@ -303,7 +304,7 @@ void database::update_active_witnesses()
 void database::update_active_committee_members()
 { try {
    assert( _committee_count_histogram_buffer.size() > 0 );
-   share_type stake_target = (_total_voting_stake-_committee_count_histogram_buffer[0]) / 2;
+   share_type stake_target = (_total_voting_stake[0]-_committee_count_histogram_buffer[0]) / 2;
 
    /// accounts that vote for 0 or 1 committee member do not get to express an opinion on
    /// the number of committee members to have (they abstain and are non-voting accounts)
@@ -971,6 +972,22 @@ void process_hf_1465( database& db )
    }
 }
 
+/****
+ * @brief a one-time data process to correct current_supply of BTS token in the BitShares mainnet
+ */
+void process_hf_2103( database& db )
+{
+   const balance_object* bal = db.find( balance_id_type( HARDFORK_CORE_2103_BALANCE_ID ) );
+   if( bal != nullptr && bal->balance.amount < 0 )
+   {
+      const asset_dynamic_data_object& ddo = bal->balance.asset_id(db).dynamic_data(db);
+      db.modify<asset_dynamic_data_object>( ddo, [bal](asset_dynamic_data_object& obj) {
+         obj.current_supply -= bal->balance.amount;
+      });
+      db.remove( *bal );
+   }
+}
+
 void update_median_feeds(database& db)
 {
    time_point_sec head_time = db.head_block_time();
@@ -1063,6 +1080,7 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
    } // for each market issued asset
 }
 
+
 /**
  * @brief Remove any custom active authorities whose expiration dates are in the past
  * @param db A mutable database reference
@@ -1074,9 +1092,84 @@ void delete_expired_custom_authorities( database& db )
       db.remove(*index.begin());
 }
 
+namespace detail {
+
+   struct vote_recalc_times
+   {
+      time_point_sec full_power_time;
+      time_point_sec zero_power_time;
+   };
+
+   struct vote_recalc_options
+   {
+      vote_recalc_options( uint32_t f, uint32_t d, uint32_t s )
+      : full_power_seconds(f), recalc_steps(d), seconds_per_step(s)
+      {
+         total_recalc_seconds = ( recalc_steps - 1 ) * seconds_per_step; // should not overflow
+         power_percents_to_subtract.reserve( recalc_steps - 1 );
+         for( uint32_t i = 1; i < recalc_steps; ++i )
+            power_percents_to_subtract.push_back( GRAPHENE_100_PERCENT * i / recalc_steps ); // should not overflow
+      }
+
+      vote_recalc_times get_vote_recalc_times( const time_point_sec now ) const
+      {
+         return { now - full_power_seconds, now - full_power_seconds - total_recalc_seconds };
+      }
+
+      uint32_t full_power_seconds;
+      uint32_t recalc_steps; // >= 1
+      uint32_t seconds_per_step;
+      uint32_t total_recalc_seconds;
+      vector<uint16_t> power_percents_to_subtract;
+
+      static const vote_recalc_options witness();
+      static const vote_recalc_options committee();
+      static const vote_recalc_options worker();
+      static const vote_recalc_options delegator();
+
+      // return the stake that is "recalced to X"
+      uint64_t get_recalced_voting_stake( const uint64_t stake, const time_point_sec last_vote_time,
+                                         const vote_recalc_times& recalc_times ) const
+      {
+         if( last_vote_time > recalc_times.full_power_time )
+            return stake;
+         if( last_vote_time <= recalc_times.zero_power_time )
+            return 0;
+         uint32_t diff = recalc_times.full_power_time.sec_since_epoch() - last_vote_time.sec_since_epoch();
+         uint32_t steps_to_subtract_minus_1 = diff / seconds_per_step;
+         fc::uint128_t stake_to_subtract( stake );
+         stake_to_subtract *= power_percents_to_subtract[steps_to_subtract_minus_1];
+         stake_to_subtract /= GRAPHENE_100_PERCENT;
+         return stake - static_cast<uint64_t>(stake_to_subtract);
+      }
+   };
+
+   const vote_recalc_options vote_recalc_options::witness()
+   {
+      static const vote_recalc_options o( 360*86400, 8, 45*86400 );
+      return o;
+   }
+   const vote_recalc_options vote_recalc_options::committee()
+   {
+      static const vote_recalc_options o( 360*86400, 8, 45*86400 );
+      return o;
+   }
+   const vote_recalc_options vote_recalc_options::worker()
+   {
+      static const vote_recalc_options o( 360*86400, 8, 45*86400 );
+      return o;
+   }
+   const vote_recalc_options vote_recalc_options::delegator()
+   {
+      static const vote_recalc_options o( 360*86400, 8, 45*86400 );
+      return o;
+   }
+}
+
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
 {
    const auto& gpo = get_global_properties();
+   const auto& dgpo = get_dynamic_global_properties();
 
    distribute_fba_balances(*this);
    create_buyback_orders(*this);
@@ -1084,72 +1177,166 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    struct vote_tally_helper {
       database& d;
       const global_property_object& props;
+      const dynamic_global_property_object& dprops;
+      const time_point_sec now;
+      const bool hf2103_passed;
+      const bool pob_activated;
 
-      vote_tally_helper(database& d, const global_property_object& gpo)
-         : d(d), props(gpo)
+      optional<detail::vote_recalc_times> witness_recalc_times;
+      optional<detail::vote_recalc_times> committee_recalc_times;
+      optional<detail::vote_recalc_times> worker_recalc_times;
+      optional<detail::vote_recalc_times> delegator_recalc_times;
+
+      vote_tally_helper( database& db )
+         : d(db), props( d.get_global_properties() ), dprops( d.get_dynamic_global_properties() ),
+           now( d.head_block_time() ), hf2103_passed( HARDFORK_CORE_2103_PASSED( now ) ),
+           pob_activated( dprops.total_pob > 0 || dprops.total_inactive > 0 )
       {
-         d._vote_tally_buffer.resize(props.next_available_vote_id);
-         d._witness_count_histogram_buffer.resize(props.parameters.maximum_witness_count / 2 + 1);
-         d._committee_count_histogram_buffer.resize(props.parameters.maximum_committee_count / 2 + 1);
-         d._total_voting_stake = 0;
+         d._vote_tally_buffer.resize( props.next_available_vote_id, 0 );
+         d._witness_count_histogram_buffer.resize( props.parameters.maximum_witness_count / 2 + 1, 0 );
+         d._committee_count_histogram_buffer.resize( props.parameters.maximum_committee_count / 2 + 1, 0 );
+         d._total_voting_stake[0] = 0;
+         d._total_voting_stake[1] = 0;
+         if( hf2103_passed )
+         {
+            witness_recalc_times   = detail::vote_recalc_options::witness().get_vote_recalc_times( now );
+            committee_recalc_times = detail::vote_recalc_options::committee().get_vote_recalc_times( now );
+            worker_recalc_times    = detail::vote_recalc_options::worker().get_vote_recalc_times( now );
+            delegator_recalc_times = detail::vote_recalc_options::delegator().get_vote_recalc_times( now );
+         }
       }
 
       void operator()( const account_object& stake_account, const account_statistics_object& stats )
       {
-         if( props.parameters.count_non_member_votes || stake_account.is_member(d.head_block_time()) )
+         // PoB activation
+         if( pob_activated && stats.total_core_pob == 0 && stats.total_core_inactive == 0 )
+            return;
+
+         if( props.parameters.count_non_member_votes || stake_account.is_member( now ) )
          {
             // There may be a difference between the account whose stake is voting and the one specifying opinions.
-            // Usually they're the same, but if the stake account has specified a voting_account, that account is the one
-            // specifying the opinions.
-            const account_object* opinion_account_ptr =
-                  (stake_account.options.voting_account ==
-                   GRAPHENE_PROXY_TO_SELF_ACCOUNT)? &stake_account
-                                     : d.find(stake_account.options.voting_account);
+            // Usually they're the same, but if the stake account has specified a voting_account, that account is the
+            // one specifying the opinions.
+            bool directly_voting = ( stake_account.options.voting_account == GRAPHENE_PROXY_TO_SELF_ACCOUNT );
+            const account_object* opinion_account_ptr = ( directly_voting ? &stake_account
+                                                          : d.find(stake_account.options.voting_account) );
 
             if( !opinion_account_ptr ) // skip non-exist account
                return;
 
             const account_object& opinion_account = *opinion_account_ptr;
 
-            uint64_t voting_stake = stats.total_core_in_orders.value
+            uint64_t voting_stake[3]; // 0=committee, 1=witness, 2=worker, as in vote_id_type::vote_type
+            uint64_t num_committee_voting_stake; // number of committee members
+            voting_stake[2] = ( pob_activated ? 0 : stats.total_core_in_orders.value )
                   + (stake_account.cashback_vb.valid() ? (*stake_account.cashback_vb)(d).balance.amount.value: 0)
                   + stats.core_in_balance.value;
+
+            //PoB
+            const uint64_t pol_amount = stats.total_core_pol.value;
+            const uint64_t pol_value = stats.total_pol_value.value;
+            const uint64_t pob_amount = stats.total_core_pob.value;
+            const uint64_t pob_value = stats.total_pob_value.value;
+            if( pob_amount == 0 )
+            {
+               voting_stake[2] += pol_value;
+            }
+            else if( pol_amount == 0 ) // and pob_amount > 0
+            {
+               if( pob_amount <= voting_stake[2] )
+               {
+                  voting_stake[2] += ( pob_value - pob_amount );
+               }
+               else
+               {
+                  auto base_value = static_cast<fc::uint128_t>( voting_stake[2] ) * pob_value / pob_amount;
+                  voting_stake[2] = static_cast<uint64_t>( base_value );
+               }
+            }
+            else if( pob_amount <= pol_amount ) // pob_amount > 0 && pol_amount > 0
+            {
+               auto base_value = static_cast<fc::uint128_t>( pob_value ) * pol_value / pol_amount;
+               auto diff_value = static_cast<fc::uint128_t>( pob_amount ) * pol_value / pol_amount;
+               base_value += ( pol_value - diff_value );
+               voting_stake[2] += static_cast<uint64_t>( base_value );
+            }
+            else // pob_amount > pol_amount > 0
+            {
+               auto base_value = static_cast<fc::uint128_t>( pol_value ) * pob_value / pob_amount;
+               fc::uint128_t diff_amount = pob_amount - pol_amount;
+               if( diff_amount <= voting_stake[2] )
+               {
+                  auto diff_value = static_cast<fc::uint128_t>( pol_amount ) * pob_value / pob_amount;
+                  base_value += ( pob_value - diff_value );
+                  voting_stake[2] += static_cast<uint64_t>( base_value - diff_amount );
+               }
+               else // diff_amount > voting_stake[2]
+               {
+                  base_value += static_cast<fc::uint128_t>( voting_stake[2] ) * pob_value / pob_amount;
+                  voting_stake[2] = static_cast<uint64_t>( base_value );
+               }
+            }
+
+            // Shortcut
+            if( voting_stake[2] == 0 )
+               return;
+
+            // Recalculate votes
+            if( !hf2103_passed )
+            {
+               voting_stake[0] = voting_stake[2];
+               voting_stake[1] = voting_stake[2];
+               num_committee_voting_stake = voting_stake[2];
+            }
+            else
+            {
+               if( !directly_voting )
+               {
+                  voting_stake[2] = detail::vote_recalc_options::delegator().get_recalced_voting_stake(
+                                          voting_stake[2], stats.last_vote_time, *delegator_recalc_times );
+               }
+               const account_statistics_object& opinion_account_stats = ( directly_voting ? stats
+                                          : opinion_account.statistics( d ) );
+               voting_stake[1] = detail::vote_recalc_options::witness().get_recalced_voting_stake(
+                                    voting_stake[2], opinion_account_stats.last_vote_time, *witness_recalc_times );
+               voting_stake[0] = detail::vote_recalc_options::committee().get_recalced_voting_stake(
+                                    voting_stake[2], opinion_account_stats.last_vote_time, *committee_recalc_times );
+               num_committee_voting_stake = voting_stake[0];
+               if( opinion_account.num_committee_voted > 1 )
+                  voting_stake[0] /= opinion_account.num_committee_voted;
+               voting_stake[2] = detail::vote_recalc_options::worker().get_recalced_voting_stake(
+                                    voting_stake[2], opinion_account_stats.last_vote_time, *worker_recalc_times );
+            }
 
             for( vote_id_type id : opinion_account.options.votes )
             {
                uint32_t offset = id.instance();
+               uint32_t type = std::min( id.type(), vote_id_type::vote_type::worker ); // cap the data
                // if they somehow managed to specify an illegal offset, ignore it.
                if( offset < d._vote_tally_buffer.size() )
-                  d._vote_tally_buffer[offset] += voting_stake;
+                  d._vote_tally_buffer[offset] += voting_stake[type];
             }
 
-            if( opinion_account.options.num_witness <= props.parameters.maximum_witness_count )
+            // votes for a number greater than maximum_witness_count are skipped here
+            if( voting_stake[1] > 0
+                  && opinion_account.options.num_witness <= props.parameters.maximum_witness_count )
             {
-               uint16_t offset = std::min(size_t(opinion_account.options.num_witness/2),
-                                          d._witness_count_histogram_buffer.size() - 1);
-               // votes for a number greater than maximum_witness_count
-               // are turned into votes for maximum_witness_count.
-               //
-               // in particular, this takes care of the case where a
-               // member was voting for a high number, then the
-               // parameter was lowered.
-               d._witness_count_histogram_buffer[offset] += voting_stake;
+               uint16_t offset = opinion_account.options.num_witness / 2;
+               d._witness_count_histogram_buffer[offset] += voting_stake[1];
             }
-            if( opinion_account.options.num_committee <= props.parameters.maximum_committee_count )
+            // votes for a number greater than maximum_committee_count are skipped here
+            if( num_committee_voting_stake > 0
+                  && opinion_account.options.num_committee <= props.parameters.maximum_committee_count )
             {
-               uint16_t offset = std::min(size_t(opinion_account.options.num_committee/2),
-                                          d._committee_count_histogram_buffer.size() - 1);
-               // votes for a number greater than maximum_committee_count
-               // are turned into votes for maximum_committee_count.
-               //
-               // same rationale as for witnesses
-               d._committee_count_histogram_buffer[offset] += voting_stake;
+               uint16_t offset = opinion_account.options.num_committee / 2;
+               d._committee_count_histogram_buffer[offset] += num_committee_voting_stake;
             }
 
-            d._total_voting_stake += voting_stake;
+            d._total_voting_stake[0] += num_committee_voting_stake;
+            d._total_voting_stake[1] += voting_stake[1];
          }
       }
-   } tally_helper(*this, gpo);
+   } tally_helper(*this);
 
    perform_account_maintenance( tally_helper );
 
@@ -1168,8 +1355,6 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    update_active_committee_members();
    update_worker_votes();
 
-   const auto& dgpo = get_dynamic_global_properties();
-   
    modify(gpo, [&dgpo](global_property_object& p) {
       // Remove scaling of account registration fee
       p.parameters.get_mutable_fees().get<account_create_operation>().basic_fee >>= p.parameters.account_fee_scale_bitshifts *
@@ -1232,6 +1417,10 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    // make sure current_supply is less than or equal to max_supply
    if ( dgpo.next_maintenance_time <= HARDFORK_CORE_1465_TIME && next_maintenance_time > HARDFORK_CORE_1465_TIME )
       process_hf_1465(*this);
+
+   // Fix supply issue
+   if ( dgpo.next_maintenance_time <= HARDFORK_CORE_2103_TIME && next_maintenance_time > HARDFORK_CORE_2103_TIME )
+      process_hf_2103(*this);
 
    modify(dgpo, [next_maintenance_time](dynamic_global_property_object& d) {
       d.next_maintenance_time = next_maintenance_time;

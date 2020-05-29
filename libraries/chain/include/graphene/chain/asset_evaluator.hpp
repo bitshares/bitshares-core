@@ -79,6 +79,7 @@ namespace graphene { namespace chain {
          void_result do_apply( const asset_update_operation& o );
 
          const asset_object* asset_to_update = nullptr;
+         const asset_bitasset_data_object* bitasset_data = nullptr;
    };
 
    class asset_update_issuer_evaluator : public evaluator<asset_update_issuer_evaluator>
@@ -166,6 +167,9 @@ namespace graphene { namespace chain {
 
          void_result do_evaluate( const asset_claim_fees_operation& o );
          void_result do_apply( const asset_claim_fees_operation& o );
+
+         const asset_object* container_asset = nullptr;
+         const asset_dynamic_data_object* container_ddo = nullptr;
    };
 
    class asset_claim_pool_evaluator : public evaluator<asset_claim_pool_evaluator>
