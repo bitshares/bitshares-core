@@ -117,7 +117,7 @@ namespace graphene { namespace protocol {
       extensions_type extensions;
 
       account_id_type fee_payer()const { return account; }
-      void validate()const {}
+      void validate()const;
       share_type calculate_fee(const fee_parameters_type& k)const { return k.fee; }
    };
 

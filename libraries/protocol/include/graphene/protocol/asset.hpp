@@ -169,7 +169,7 @@ namespace graphene { namespace protocol {
        *  and a minimum value of 1.000.  (denominated in GRAPHENE_COLLATERAL_RATIO_DENOM)
        *
        *  A black swan event occurs when value_of_collateral equals
-       *  value_of_debt, to avoid a black swan a margin call is
+       *  value_of_debt * MSSR.  To avoid a black swan a margin call is
        *  executed when value_of_debt * required_maintenance_collateral
        *  equals value_of_collateral using rate.
        *
@@ -192,27 +192,110 @@ namespace graphene { namespace protocol {
       /** Fixed point between 1.000 and 10.000, implied fixed point denominator is GRAPHENE_COLLATERAL_RATIO_DENOM */
       uint16_t maximum_short_squeeze_ratio = GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO;
 
-      /** When selling collateral to pay off debt, the least amount of debt to receive should be
+      /**
+       * This is the price at which a call order will relinquish COLLATERAL when margin called. It is
+       * also the price that establishes the minimum amount of collateral per debt that call orders must
+       * maintain to avoid possibility of black swan.  A call order maintaining less collateral per debt
+       * than this price is unable to meet the combined obligation to sell collateral at the Margin Call
+       * Offer Price (MCOP) *AND* to pay the margin call fee. The MSSP is related to the MCOP, but the
+       * MSSP accounts for the need to reserve extra collateral to pay the margin call fee, whereas the
+       * MCOP only accounts for the collateral to be traded to the call buyer.  Prior to the
+       * introduction of the Margin Call Fee Ratio (MCFR) with BSIP-74, the two prices (MSSP and MCOP)
+       * were identical, and MSSP could be thought of as "the price at which you are forced to sell
+       * collateral if margin called," but this latter concept is now embodied by the MCOP.
+       *
+       * The Maximum Short Squeeze Price is computed as follows, in units of DEBT per COLLATERAL:
+       *
+       *   MSSP = settlement_price / MSSR;
+       *
+       * @return The MSSP in units of DEBT per COLLATERAL.
+       */
+      price max_short_squeeze_price()const;
+      /**
+       * Older implementation of max_short_squeeze_price() due to hardfork changes. It came with
+       * the following commentary:
+       *
+       * When selling collateral to pay off debt, the least amount of debt to receive should be
        *  min_usd = max_short_squeeze_price() * collateral
        *
        *  This is provided to ensure that a black swan cannot be trigged due to poor liquidity alone, it
        *  must be confirmed by having the max_short_squeeze_price() move below the black swan price.
+       * @returns the Maximum Short Squeeze price for this asset
        */
-      price max_short_squeeze_price()const;
-      /// Another implementation of max_short_squeeze_price() before the core-1270 hard fork
       price max_short_squeeze_price_before_hf_1270()const;
 
-      /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call territory.
+      /**
+       * Compute price at which margin calls offer to sell collateral.
+       *
+       * Margin calls offer a greater amount of COLLATERAL asset to the market to buy back DEBT
+       * asset than would otherwise be required in a fair exchange at the settlement_price.
+       * (I.e. they sell collateral "cheaper" than its price feed value.) This is done to attract a
+       * quick buyer of the call in order to preserve healthy collateralization of the DEBT asset
+       * overall.  The price at which the call is offered, in comparison to the settlement price, is
+       * determined by the Maximum Short Squeeze Ratio (MSSR) and the Margin Call Fee Ratio (MCFR)
+       * as follows, in units of DEBT per COLLATERAL:
+       *
+       *   MCOP = settlement_price / (MSSR - MCFR);
+       *
+       * Compare with Maximum Short Squeeze Price (MSSP), which is computed as follows:
+       *
+       *   MSSP = settlement_price / MSSR;
+       *
+       * Since BSIP-74, we distinguish between Maximum Short Squeeze Price (MSSP) and Margin Call
+       * Order Price (MCOP). Margin calls previously offered collateral at the MSSP, but now they
+       * offer slightly less collateral per debt if Margin Call Fee Ratio (MCFR) is set, because
+       * the call order must reserve some collateral to pay the fee.  We must still retain the
+       * concept of MSSP, as it communicates the minimum collateralization before black swan may be
+       * triggered, but we add this new method to calculate MCOP.
+       *
+       * Note that when we calculate the MCOP, we enact a price floor to ensure the margin call never
+       * offers LESS collateral than the DEBT is worth. As such, it's important to calculate the
+       * realized fee, when trading at the offer price, as a delta between total relinquished collateral
+       * (DEBT*MSSP) and collateral sold to the buyer (DEBT*MCOP).  If you instead try to calculate the
+       * fee by direct multiplication of MCFR, you will get the wrong answer if the price was
+       * floored. (Fee is truncated when price is floored.)
+       *
+       * @param margin_call_fee_ratio MCFR value currently in effect. If zero or unset, returns
+       *    same result as @ref max_short_squeeze_price().
+       *
+       * @return The MCOP in units of DEBT per COLLATERAL.
+       */
+      price margin_call_order_price(const fc::optional<uint16_t> margin_call_fee_ratio)const;
+
+      /**
+       * Ratio between max_short_squeeze_price and margin_call_order_price.
+       *
+       * This ratio, if it multiplied margin_call_order_price (expressed in DEBT/COLLATERAL), would
+       * yield the max_short_squeeze_price, apart perhaps for truncation (rounding) error.
+       *
+       * When a margin call is taker, matching an existing order on the books, it is possible the call
+       * gets a better realized price than the order price that it offered at.  In this case, the margin
+       * call fee is proportionaly reduced. This ratio is used to calculate the price at which the call
+       * relinquishes collateral (to meet both trade and fee obligations) based on actual realized match
+       * price.
+       *
+       * This function enacts the same flooring as margin_call_order_price() (MSSR - MCFR is floored at
+       * 1.00).  This ensures we apply the same fee truncation in the taker case as the maker case.
+       *
+       * @return (MSSR - MCFR) / MSSR
+       */
+      ratio_type margin_call_pays_ratio(const fc::optional<uint16_t> margin_call_fee_ratio)const;
+
+      /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call
+      /// territory.
       /// Calculation: ~settlement_price * maintenance_collateral_ratio / GRAPHENE_COLLATERAL_RATIO_DENOM
       price maintenance_collateralization()const;
 
-      ///@}
-
-      friend bool operator == ( const price_feed& a, const price_feed& b )
+      /// Whether the parameters that affect margin calls in this price feed object are the same as the parameters
+      /// in the passed-in object
+      bool margin_call_params_equal( const price_feed& b ) const
       {
-         return std::tie( a.settlement_price, a.maintenance_collateral_ratio, a.maximum_short_squeeze_ratio ) ==
+         if( this == &b )
+            return true;
+         return std::tie(   settlement_price,   maintenance_collateral_ratio,   maximum_short_squeeze_ratio ) ==
                 std::tie( b.settlement_price, b.maintenance_collateral_ratio, b.maximum_short_squeeze_ratio );
       }
+      ///@}
 
       void validate() const;
       bool is_for( asset_id_type asset_id ) const;
@@ -223,10 +306,8 @@ namespace graphene { namespace protocol {
 FC_REFLECT( graphene::protocol::asset, (amount)(asset_id) )
 FC_REFLECT( graphene::protocol::price, (base)(quote) )
 
-#define GRAPHENE_PRICE_FEED_FIELDS (settlement_price)(maintenance_collateral_ratio)(maximum_short_squeeze_ratio) \
-   (core_exchange_rate)
-
-FC_REFLECT( graphene::protocol::price_feed, GRAPHENE_PRICE_FEED_FIELDS )
+FC_REFLECT( graphene::protocol::price_feed,
+            (settlement_price)(maintenance_collateral_ratio)(maximum_short_squeeze_ratio)(core_exchange_rate) )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::price )

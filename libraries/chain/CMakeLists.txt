@@ -45,6 +45,7 @@ add_library( graphene_chain
              transfer_evaluator.cpp
              proposal_evaluator.cpp
              market_evaluator.cpp
+             ticket_evaluator.cpp
              vesting_balance_evaluator.cpp
              withdraw_permission_evaluator.cpp
              worker_evaluator.cpp
@@ -60,6 +61,7 @@ add_library( graphene_chain
              market_object.cpp
              proposal_object.cpp
              vesting_balance_object.cpp
+             ticket_object.cpp
              small_objects.cpp
 
              block_database.cpp

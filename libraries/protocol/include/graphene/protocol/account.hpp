@@ -64,6 +64,14 @@ namespace graphene { namespace protocol {
          return ( voting_account != GRAPHENE_PROXY_TO_SELF_ACCOUNT || !votes.empty() );
       }
 
+      uint16_t num_committee_voted() const
+      {
+         if( voting_account != GRAPHENE_PROXY_TO_SELF_ACCOUNT )
+            return 0;
+         return std::count_if( votes.begin(), votes.end(),
+                               [](vote_id_type v){ return v.type() == vote_id_type::vote_type::committee; } );
+      }
+
       void validate()const;
    };
 

@@ -410,9 +410,30 @@ namespace graphene { namespace chain {
           */
          ///@{
          int match( const limit_order_object& taker, const limit_order_object& maker, const price& trade_price );
+         /***
+          * @brief Match limit order as taker to a call order as maker
+          * @param taker the order that is removing liquidity from the book
+          * @param maker the order that put liquidity on the book
+          * @param trade_price the price the trade should execute at
+          * @param feed_price the price of the current feed
+          * @param maintenance_collateral_ratio the maintenance collateral ratio
+          * @param maintenance_collateralization the maintenance collateralization
+          * @param call_pays_price price call order pays. Call order may pay more collateral
+          *    than limit order takes if call order subject to a margin call fee.
+          * @returns 0 if no orders were matched, 1 if taker was filled, 2 if maker was filled, 3 if both were filled
+          */
          int match( const limit_order_object& taker, const call_order_object& maker, const price& trade_price,
                     const price& feed_price, const uint16_t maintenance_collateral_ratio,
-                    const optional<price>& maintenance_collateralization );
+                    const optional<price>& maintenance_collateralization,
+                    const price& call_pays_price);
+         // If separate call_pays_price not provided, assume call pays at trade_price:
+         int match( const limit_order_object& taker, const call_order_object& maker, const price& trade_price,
+                    const price& feed_price, const uint16_t maintenance_collateral_ratio,
+                    const optional<price>& maintenance_collateralization) {
+            return match(taker, maker, trade_price, feed_price, maintenance_collateral_ratio,
+                         maintenance_collateralization, trade_price);
+         }
+
          ///@}
 
          /// Matches the two orders, the first parameter is taker, the second is maker.
@@ -424,12 +445,37 @@ namespace graphene { namespace chain {
                    const price& fill_price);
 
          /**
+          * @brief fills limit order
+          * @param order the order
+          * @param pays what the account is paying
+          * @param receives what the account is receiving
+          * @param cull_if_small take care of dust
+          * @param fill_price the transaction price
+          * @param is_maker TRUE if this order is maker, FALSE if taker
           * @return true if the order was completely filled and thus freed.
           */
-         bool fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small,
-                                const price& fill_price, const bool is_maker );
+         bool fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives,
+               bool cull_if_small, const price& fill_price, const bool is_maker );
+         /***
+          * @brief attempt to fill a call order
+          * @param order the order
+          * @param pays what the buyer pays for the collateral
+          * @param receives the collateral received by the buyer
+          * @param fill_price the price the transaction executed at
+          * @param is_maker TRUE if the buyer is the maker, FALSE if the buyer is the taker
+          * @param margin_fee Margin call fees paid in collateral asset
+          * @returns TRUE if the order was completely filled
+          */
          bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
-                               const price& fill_price, const bool is_maker );
+                               const price& fill_price, const bool is_maker, const asset& margin_fee );
+
+         // Overload provides compatible default value for margin_fee: (margin_fee.asset_id == pays.asset_id)
+         bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
+                               const price& fill_price, const bool is_maker )
+         {
+            return fill_call_order( order, pays, receives, fill_price, is_maker, asset(0, pays.asset_id) );
+         }
+
          bool fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
                                  const price& fill_price, const bool is_maker );
 
@@ -439,8 +485,16 @@ namespace graphene { namespace chain {
          // helpers to fill_order
          void pay_order( const account_object& receiver, const asset& receives, const asset& pays );
 
-         asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
-         asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives );
+         /**
+          * @brief Calculate the market fee that is to be taken
+          * @param trade_asset the asset (passed in to avoid a lookup)
+          * @param trade_amount the quantity that the fee calculation is based upon
+          * @param is_maker TRUE if this is the fee for a maker, FALSE if taker
+          */
+         asset calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount, const bool& is_maker);
+         asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,
+                               const bool& is_maker);
+         asset pay_force_settle_fees(const asset_object& collecting_asset, const asset& collat_receives);
          ///@}
 
 
@@ -537,6 +591,7 @@ namespace graphene { namespace chain {
          void update_core_exchange_rates();
          void update_maintenance_flag( bool new_maintenance_flag );
          void update_withdraw_permissions();
+         void process_tickets();
          bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
                                    const asset_bitasset_data_object* bitasset_ptr = nullptr );
          void clear_expired_htlcs();
@@ -591,7 +646,8 @@ namespace graphene { namespace chain {
          vector<uint64_t>                  _vote_tally_buffer;
          vector<uint64_t>                  _witness_count_histogram_buffer;
          vector<uint64_t>                  _committee_count_histogram_buffer;
-         uint64_t                          _total_voting_stake;
+         uint64_t                          _total_voting_stake[2]; // 0=committee, 1=witness,
+                                                                   // as in vote_id_type::vote_type
 
          flat_map<uint32_t,block_id_type>  _checkpoints;
 

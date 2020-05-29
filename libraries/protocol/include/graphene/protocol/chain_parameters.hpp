@@ -83,11 +83,12 @@ namespace graphene { namespace protocol {
       {
          optional< htlc_options > updatable_htlc_options;
          optional< custom_authority_options_type > custom_authority_options;
+         optional< uint16_t > market_fee_network_percent;
+         optional< uint16_t > maker_fee_discount_percent;
       };
 
       extension<ext> extensions;
 
-      /** defined in fee_schedule.cpp */
       void validate()const;
       
       chain_parameters();
@@ -95,6 +96,12 @@ namespace graphene { namespace protocol {
       chain_parameters(chain_parameters&& other);
       chain_parameters& operator=(const chain_parameters& other);
       chain_parameters& operator=(chain_parameters&& other);
+
+      /// If @ref market_fee_network_percent is valid, return the value it contains, otherwise return 0
+      uint16_t get_market_fee_network_percent() const;
+
+      /// If @ref maker_fee_discount_percent is valid, return the value it contains, otherwise return 0
+      uint16_t get_maker_fee_discount_percent() const;
 
       private:
       static void safe_copy(chain_parameters& to, const chain_parameters& from);
@@ -117,6 +124,8 @@ FC_REFLECT( graphene::protocol::custom_authority_options_type,
 FC_REFLECT( graphene::protocol::chain_parameters::ext,
       (updatable_htlc_options)
       (custom_authority_options)
+      (market_fee_network_percent)
+      (maker_fee_discount_percent)
 )
 
 FC_REFLECT( graphene::protocol::chain_parameters,

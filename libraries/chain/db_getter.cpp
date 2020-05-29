@@ -116,7 +116,8 @@ vector<authority> database::get_viable_custom_authorities(
          else if (rejected_authorities != nullptr)
             rejected_authorities->insert(std::make_pair(cust_auth.get().id, std::move(result)));
       } catch (fc::exception& e) {
-         rejected_authorities->insert(std::make_pair(cust_auth.get().id, std::move(e)));
+         if (rejected_authorities != nullptr)
+            rejected_authorities->insert(std::make_pair(cust_auth.get().id, std::move(e)));
       }
    }
 
@@ -137,10 +138,7 @@ uint32_t database::last_non_undoable_block_num() const
 
 const account_statistics_object& database::get_account_stats_by_owner( account_id_type owner )const
 {
-   auto& idx = get_index_type<account_stats_index>().indices().get<by_owner>();
-   auto itr = idx.find( owner );
-   FC_ASSERT( itr != idx.end(), "Can not find account statistics object for owner ${a}", ("a",owner) );
-   return *itr;
+   return account_statistics_id_type(owner.instance)(*this);
 }
 
 const witness_schedule_object& database::get_witness_schedule_object()const

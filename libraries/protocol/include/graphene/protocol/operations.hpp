@@ -34,6 +34,7 @@
 #include <graphene/protocol/fba.hpp>
 #include <graphene/protocol/market.hpp>
 #include <graphene/protocol/proposal.hpp>
+#include <graphene/protocol/ticket.hpp>
 #include <graphene/protocol/transfer.hpp>
 #include <graphene/protocol/vesting.hpp>
 #include <graphene/protocol/withdraw_permission.hpp>
@@ -105,7 +106,9 @@ namespace graphene { namespace protocol {
             htlc_refund_operation,           // VIRTUAL
             custom_authority_create_operation,
             custom_authority_update_operation,
-            custom_authority_delete_operation
+            custom_authority_delete_operation,
+            ticket_create_operation,
+            ticket_update_operation
          > operation;
 
    /// @} // operations group

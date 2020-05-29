@@ -6,4 +6,4 @@
 "node.blckchnd.com:4243",            // blckchnd     (Germany)
 "seed.roelandp.nl:1776",             // roelandp     (Canada)
 "seed.bts.bangzi.info:55501",        // Bangzi       (Germany)
-"seeds.bitshares.eu:1776",           // pc
+"seeds.btsnodes.com:1776",           // Community
