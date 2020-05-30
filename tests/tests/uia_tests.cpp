@@ -34,8 +34,6 @@
 
 #include <fc/crypto/digest.hpp>
 
-#include <locale>
-
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;

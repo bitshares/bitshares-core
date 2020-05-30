@@ -1842,4 +1842,73 @@ BOOST_AUTO_TEST_CASE( asset_in_collateral )
 
 } FC_LOG_AND_RETHROW() }
 
+
+BOOST_AUTO_TEST_CASE( get_trade_history )
+{ try {
+
+   app.enable_plugin("market_history");
+   graphene::app::application_options opt=app.get_options();
+   opt.has_market_history_plugin = true;
+   graphene::app::database_api db_api( db, &opt);
+
+   ACTORS((bob)(alice));
+
+   const auto& eur = create_user_issued_asset("EUR");
+   asset_id_type eur_id = eur.id;
+   const auto& usd = create_user_issued_asset("USD");
+   asset_id_type usd_id = usd.id;
+
+   issue_uia( bob_id, usd.amount(1000000) );
+   issue_uia( alice_id, eur.amount(1000000) );
+
+   // maker create an order
+   create_sell_order(bob, usd.amount(200), eur.amount(210));
+
+   // taker match it
+   create_sell_order(alice, eur.amount(210), usd.amount(200));
+
+   generate_block();
+
+   // taker is selling
+   auto history = db_api.get_trade_history( "EUR", "USD", db.head_block_time(), db.head_block_time() - fc::days(1) );
+   BOOST_REQUIRE_EQUAL( 1, history.size() );
+   BOOST_CHECK_EQUAL( "1.05", history[0].price );
+   BOOST_CHECK_EQUAL( "2", history[0].amount );
+   BOOST_CHECK_EQUAL( "2.10", history[0].value );
+   BOOST_CHECK_EQUAL( "sell", history[0].type );
+   BOOST_CHECK_EQUAL( bob_id.instance.value, history[0].side1_account_id.instance.value );
+   BOOST_CHECK_EQUAL( alice_id.instance.value, history[0].side2_account_id.instance.value );
+
+   // opposite side, taker is buying
+   history = db_api.get_trade_history( "USD", "EUR", db.head_block_time(), db.head_block_time() - fc::days(1) );
+   BOOST_REQUIRE_EQUAL( 1, history.size() );
+   BOOST_CHECK_EQUAL( "0.9523809523809523809", history[0].price );
+   BOOST_CHECK_EQUAL( "2.10", history[0].amount );
+   BOOST_CHECK_EQUAL( "2", history[0].value );
+   BOOST_CHECK_EQUAL( "buy", history[0].type );
+   BOOST_CHECK_EQUAL( bob_id.instance.value, history[0].side1_account_id.instance.value );
+   BOOST_CHECK_EQUAL( alice_id.instance.value, history[0].side2_account_id.instance.value );
+
+   // by sequence
+   history = db_api.get_trade_history_by_sequence( "EUR", "USD", 2, db.head_block_time() - fc::days(1) );
+   BOOST_CHECK_EQUAL( "1.05", history[0].price );
+   BOOST_CHECK_EQUAL( "2", history[0].amount );
+   BOOST_CHECK_EQUAL( "2.10", history[0].value );
+   BOOST_CHECK_EQUAL( "sell", history[0].type );
+   BOOST_CHECK_EQUAL( bob_id.instance.value, history[0].side1_account_id.instance.value );
+   BOOST_CHECK_EQUAL( alice_id.instance.value, history[0].side2_account_id.instance.value );
+
+   // opposite side
+   history = db_api.get_trade_history_by_sequence( "USD", "EUR", 2, db.head_block_time() - fc::days(1) );
+   BOOST_REQUIRE_EQUAL( 1, history.size() );
+   BOOST_CHECK_EQUAL( "0.9523809523809523809", history[0].price );
+   BOOST_CHECK_EQUAL( "2.10", history[0].amount );
+   BOOST_CHECK_EQUAL( "2", history[0].value );
+   BOOST_CHECK_EQUAL( "buy", history[0].type );
+   BOOST_CHECK_EQUAL( bob_id.instance.value, history[0].side1_account_id.instance.value );
+   BOOST_CHECK_EQUAL( alice_id.instance.value, history[0].side2_account_id.instance.value );
+
+} FC_LOG_AND_RETHROW() }
+
+
 BOOST_AUTO_TEST_SUITE_END()

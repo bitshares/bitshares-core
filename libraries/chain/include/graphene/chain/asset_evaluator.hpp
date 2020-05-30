@@ -79,6 +79,7 @@ namespace graphene { namespace chain {
          void_result do_apply( const asset_update_operation& o );
 
          const asset_object* asset_to_update = nullptr;
+         const asset_bitasset_data_object* bitasset_data = nullptr;
    };
 
    class asset_update_issuer_evaluator : public evaluator<asset_update_issuer_evaluator>

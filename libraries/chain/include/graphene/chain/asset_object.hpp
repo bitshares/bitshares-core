@@ -99,6 +99,16 @@ namespace graphene { namespace chain {
          bool is_transfer_restricted()const { return options.flags & transfer_restricted; }
          bool can_override()const { return options.flags & override_authority; }
          bool allow_confidential()const { return !(options.flags & asset_issuer_permission_flags::disable_confidential); }
+         /// @return true if max supply of the asset can be updated
+         bool can_update_max_supply()const { return !(options.flags & lock_max_supply); }
+         /// @return true if can create new supply for the asset
+         bool can_create_new_supply()const { return !(options.flags & disable_new_supply); }
+         /// @return true if the asset owner can update MCR directly
+         bool can_owner_update_mcr()const { return !(options.issuer_permissions & disable_mcr_update); }
+         /// @return true if the asset owner can update ICR directly
+         bool can_owner_update_icr()const { return !(options.issuer_permissions & disable_icr_update); }
+         /// @return true if the asset owner can update MSSR directly
+         bool can_owner_update_mssr()const { return !(options.issuer_permissions & disable_mssr_update); }
 
          /// Helper function to get an asset object with the given amount in this asset's type
          asset amount(share_type a)const { return asset(a, id); }
@@ -208,6 +218,25 @@ namespace graphene { namespace chain {
    };
 
    /**
+    *  @brief defines market parameters for margin positions, extended with an initial_collateral_ratio field
+    */
+   struct price_feed_with_icr : public price_feed
+   {
+      /// After BSIP77, when creating a new debt position or updating an existing position,
+      /// the position will be checked against this parameter.
+      /// Fixed point between 1.000 and 10.000, implied fixed point denominator is GRAPHENE_COLLATERAL_RATIO_DENOM
+      uint16_t initial_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
+
+      price_feed_with_icr( const price_feed& pf = {}, const optional<uint16_t>& icr = {} )
+      : price_feed( pf ), initial_collateral_ratio( icr.valid() ? *icr : pf.maintenance_collateral_ratio )
+      {}
+
+      /// The result will be used to check new debt positions and position updates.
+      /// Calculation: ~settlement_price * initial_collateral_ratio / GRAPHENE_COLLATERAL_RATIO_DENOM
+      price calculate_initial_collateralization()const;
+   };
+
+   /**
     *  @brief contains properties that only apply to bitassets (market issued assets)
     *
     *  @ingroup object
@@ -228,15 +257,26 @@ namespace graphene { namespace chain {
          /// Feeds published for this asset. If issuer is not committee, the keys in this map are the feed publishing
          /// accounts; otherwise, the feed publishers are the currently active committee_members and witnesses and this map
          /// should be treated as an implementation detail. The timestamp on each feed is the time it was published.
-         flat_map<account_id_type, pair<time_point_sec,price_feed>> feeds;
+         flat_map<account_id_type, pair<time_point_sec,price_feed_with_icr>> feeds;
          /// This is the currently active price feed, calculated as the median of values from the currently active
          /// feeds.
-         price_feed current_feed;
+         price_feed_with_icr current_feed;
          /// This is the publication time of the oldest feed which was factored into current_feed.
          time_point_sec current_feed_publication_time;
-         /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call territory.
+
+         /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin
+         /// call territory.
          /// This value is derived from @ref current_feed for better performance and should be kept consistent.
          price current_maintenance_collateralization;
+         /// After BSIP77, when creating a new debt position or updating an existing position, the position
+         /// will be checked against the `initial_collateral_ratio` (ICR) parameter in the bitasset options.
+         /// This value is derived from @ref current_feed (which includes `ICR`) for better performance and
+         /// should be kept consistent.
+         price current_initial_collateralization;
+
+         /// Derive @ref current_maintenance_collateralization and @ref current_initial_collateralization from
+         /// other member variables.
+         void refresh_cache();
 
          /// True if this asset implements a @ref prediction_market
          bool is_prediction_market = false;
@@ -364,6 +404,9 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_dynamic_data_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_bitasset_data_object)
 
+FC_REFLECT_DERIVED( graphene::chain::price_feed_with_icr, (graphene::protocol::price_feed),
+                    (initial_collateral_ratio) )
+
 FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (symbol)
                     (precision)
@@ -376,6 +419,8 @@ FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
 
 FC_REFLECT_TYPENAME( graphene::chain::asset_bitasset_data_object )
 FC_REFLECT_TYPENAME( graphene::chain::asset_dynamic_data_object )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::price_feed_with_icr )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::asset_object )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::asset_bitasset_data_object )

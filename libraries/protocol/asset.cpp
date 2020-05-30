@@ -281,10 +281,41 @@ namespace graphene { namespace protocol {
                  / asset( static_cast<int64_t>(cp.denominator()), settlement_price.quote.asset_id ) );
       }
 
+
+      // Documentation in header.
+      // Calculation:  MSSP = settlement_price / MSSR
       price price_feed::max_short_squeeze_price()const
       {
          // settlement price is in debt/collateral
          return settlement_price * ratio_type( GRAPHENE_COLLATERAL_RATIO_DENOM, maximum_short_squeeze_ratio );
+      }
+
+      // Documentation in header.
+      // Calculation:  MCOP = settlement_price / (MSSR - MCFR); result is in debt/collateral
+      price price_feed::margin_call_order_price(const fc::optional<uint16_t> maybe_mcfr)const
+      {
+         const uint16_t mcfr = maybe_mcfr.valid() ? *maybe_mcfr : 0;
+         uint16_t numerator = (mcfr < maximum_short_squeeze_ratio) ?
+            (maximum_short_squeeze_ratio - mcfr) : GRAPHENE_COLLATERAL_RATIO_DENOM; // won't underflow
+         if (numerator < GRAPHENE_COLLATERAL_RATIO_DENOM)
+            numerator = GRAPHENE_COLLATERAL_RATIO_DENOM; // floor at 1.00
+         return settlement_price * ratio_type( GRAPHENE_COLLATERAL_RATIO_DENOM, numerator );
+      }
+
+      // Reason for this function is explained in header.
+      // Calculation: (MSSR - MCFR) / MSSR
+      ratio_type price_feed::margin_call_pays_ratio(const fc::optional<uint16_t> maybe_mcfr)const
+      {
+         if (!maybe_mcfr.valid())
+            return ratio_type(1,1);
+         const uint16_t mcfr = *maybe_mcfr;
+         uint16_t numerator = (mcfr < maximum_short_squeeze_ratio) ?
+            (maximum_short_squeeze_ratio - mcfr) : GRAPHENE_COLLATERAL_RATIO_DENOM; // won't underflow
+         if (numerator < GRAPHENE_COLLATERAL_RATIO_DENOM)
+            numerator = GRAPHENE_COLLATERAL_RATIO_DENOM; // floor at 1.00
+         return ratio_type( numerator, maximum_short_squeeze_ratio );
+         // Note: This ratio, if it multiplied margin_call_order_price, would yield the
+         // max_short_squeeze_price, apart perhaps for truncation (rounding) error.
       }
 
       price price_feed::maintenance_collateralization()const
