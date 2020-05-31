@@ -73,7 +73,7 @@ void_result ticket_update_evaluator::do_evaluate(const ticket_update_operation& 
 
    FC_ASSERT( _ticket->current_type != lock_forever, "Can not to update a ticket that is locked forever" );
 
-   FC_ASSERT( _ticket->target_type != op.target_type, "Target type does not change" );
+   FC_ASSERT( static_cast<uint64_t>(_ticket->target_type) != op.target_type, "Target type does not change" );
 
    if( op.amount_for_new_target.valid() )
    {
