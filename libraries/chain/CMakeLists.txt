@@ -77,8 +77,27 @@ target_link_libraries( graphene_chain fc graphene_db graphene_protocol )
 target_include_directories( graphene_chain
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/include" )
 
+set( GRAPHENE_CHAIN_BIG_FILES
+     db_init.cpp
+     db_block.cpp
+     db_maint.cpp
+     db_market.cpp
+     database.cpp
+     block_database.cpp
+   )
+
 if(MSVC)
-  set_source_files_properties( db_init.cpp db_block.cpp database.cpp block_database.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
+  set_source_files_properties( ${GRAPHENE_CHAIN_BIG_FILES} PROPERTIES COMPILE_FLAGS "/bigobj" )
+else( MSVC )
+   if( MINGW )
+      set_source_files_properties( ${GRAPHENE_CHAIN_BIG_FILES} PROPERTIES COMPILE_FLAGS -Wa,-mbig-obj )
+      if( (CMAKE_BUILD_TYPE MATCHES Release) OR (CMAKE_BUILD_TYPE MATCHES RelWithDebInfo) )
+         # Use -Os to avoid string table overflow
+         set_source_files_properties( database.cpp PROPERTIES COMPILE_FLAGS -Os )
+         set_source_files_properties( database.cpp PROPERTIES LINK_FLAGS -Os )
+         set_source_files_properties( database.cpp PROPERTIES STATIC_LIBRARY_FLAGS -Os )
+      endif( CMAKE_BUILD_TYPE )
+   endif( MINGW )
 endif(MSVC)
 
 # Support for CMake < 3.4
