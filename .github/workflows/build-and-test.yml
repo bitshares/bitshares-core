@@ -293,6 +293,7 @@ jobs:
               -D CMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
               -D CMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
               -D CMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+              -D GRAPHENE_DISABLE_UNITY_BUILD=ON \
               ..
     - name: Load Cache
       uses: actions/cache@v1
