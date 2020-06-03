@@ -173,7 +173,11 @@ bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
       for( auto& account_id : impacted )
       {
          if(!add_elasticsearch( account_id, oho, b.block_num() ))
+         {
+            elog( "Error adding data to Elastic Search: block num ${b}, account ${a}, data ${d}",
+                  ("b",b.block_num()) ("a",account_id) ("d", oho) );
             return false;
+         }
       }
    }
    // we send bulk at end of block when we are in sync for better real time client experience
@@ -184,7 +188,16 @@ bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
       {
          prepare.clear();
          if(!graphene::utilities::SendBulk(std::move(es)))
+         {
+            // Note: although called with `std::move()`, `es` is not updated in `SendBulk()`
+            elog( "Error sending ${n} lines of bulk data to Elastic Search, the first lines are:",
+                  ("n",es.bulk_lines.size()) );
+            for( size_t i = 0; i < es.bulk_lines.size() && i < 10; ++i )
+            {
+               edump( (es.bulk_lines[i]) );
+            }
             return false;
+         }
          else
             bulk_lines.clear();
       }
@@ -300,7 +313,16 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
       prepare.clear();
       populateESstruct();
       if(!graphene::utilities::SendBulk(std::move(es)))
+      {
+         // Note: although called with `std::move()`, `es` is not updated in `SendBulk()`
+         elog( "Error sending ${n} lines of bulk data to Elastic Search, the first lines are:",
+               ("n",es.bulk_lines.size()) );
+         for( size_t i = 0; i < es.bulk_lines.size() && i < 10; ++i )
+         {
+            edump( (es.bulk_lines[i]) );
+         }
          return false;
+      }
       else
          bulk_lines.clear();
    }
