@@ -999,10 +999,10 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::get_key_references to set max limit value")
          ("api-limit-get-htlc-by",boost::program_options::value<uint64_t>()->default_value(100),
           "For database_api_impl::get_htlc_by_from and get_htlc_by_to to set max limit value")
-         ("api-limit-get-full-accounts",boost::program_options::value<uint64_t>()->default_value(10),
-          "For database_api_impl::get_full_accounts to set max limit value")
-         ("api-limit-get-full-accounts-lists",boost::program_options::value<uint64_t>()->default_value(100),
-          "For database_api_impl::get_full_accounts to set max limit value")
+         ("api-limit-get-full-accounts",boost::program_options::value<uint64_t>()->default_value(50),
+          "For database_api_impl::get_full_accounts to set max accounts to query at once")
+         ("api-limit-get-full-accounts-lists",boost::program_options::value<uint64_t>()->default_value(500),
+          "For database_api_impl::get_full_accounts to set max items to return in the lists")
          ("api-limit-get-call-orders",boost::program_options::value<uint64_t>()->default_value(300),
           "For database_api_impl::get_call_orders and get_call_orders_by_account to set max limit value")
          ("api-limit-get-settle-orders",boost::program_options::value<uint64_t>()->default_value(300),
