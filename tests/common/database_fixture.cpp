@@ -264,6 +264,8 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    {
       options.insert(std::make_pair("api-limit-get-full-accounts", boost::program_options::variable_value
          ((uint64_t)200, false)));
+      options.insert(std::make_pair("api-limit-get-full-accounts-lists", boost::program_options::variable_value
+         ((uint64_t)120, false)));
    }
       // add account tracking for ahplugin for special test case with track-account enabled
    if( !options.count("track-account") && current_test_name == "track_account") {
