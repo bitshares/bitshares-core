@@ -77,37 +77,22 @@ BOOST_AUTO_TEST_CASE( api_limit_get_full_accounts ) {
 
    try {
       graphene::app::database_api db_api(db, &(this->app.get_options()));
-
-      const account_object& alice = create_account("alice");
-      const account_object& bob = create_account("bob");
-      const account_object& carl = create_account("carl");
-      const account_object& dan = create_account("dan");
-      const account_object& fred = create_account("fred");
-      const account_object& henry = create_account("henry");
-      const account_object& kevin = create_account("kevin");
-      const account_object& laura = create_account("laura");
-      const account_object& lucy = create_account("lucy");
-      const account_object& martin = create_account("martin");
-      const account_object& patty = create_account("patty");
-
+      
       vector<string> accounts;
-      accounts.push_back(alice.name);
-      accounts.push_back(bob.name);
-      accounts.push_back(carl.name);
-      accounts.push_back(dan.name);
-      accounts.push_back(fred.name);
-      accounts.push_back(henry.name);
-      accounts.push_back(kevin.name);
-      accounts.push_back(laura.name);
-      accounts.push_back(lucy.name);
-      accounts.push_back(martin.name);
-      accounts.push_back(patty.name);
 
+      for( size_t i = 0; i < 51; ++i )
+      {
+         string account_name = "testaccount" + fc::to_string(i);
+         create_account( account_name );
+         accounts.push_back( account_name );
+      }
+
+      // Too many accounts
       GRAPHENE_CHECK_THROW(db_api.get_full_accounts(accounts, false), fc::exception);
 
       accounts.erase(accounts.begin());
       auto full_accounts = db_api.get_full_accounts(accounts, false);
-      BOOST_CHECK(full_accounts.size() == 10);
+      BOOST_CHECK(full_accounts.size() == 50);
 
       // not an account
       accounts.erase(accounts.begin());
@@ -115,7 +100,7 @@ BOOST_AUTO_TEST_CASE( api_limit_get_full_accounts ) {
 
       // non existing accounts will be ignored in the results
       full_accounts = db_api.get_full_accounts(accounts, false);
-      BOOST_CHECK(full_accounts.size() == 9);
+      BOOST_CHECK(full_accounts.size() == 49);
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
