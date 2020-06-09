@@ -6,4 +6,6 @@
 "node.blckchnd.com:4243",            // blckchnd     (Germany)
 "seed.roelandp.nl:1776",             // roelandp     (Canada)
 "seed.bts.bangzi.info:55501",        // Bangzi       (Germany)
+"seed1.xbts.io:1776",                // xbts.io      (Germany)
+"seed2.xbts.io:1776",                // xbts.io      (Germany)
 "seeds.btsnodes.com:1776",           // Community
