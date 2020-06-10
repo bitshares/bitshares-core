@@ -1,5 +1,4 @@
-"seed.testnet.bitshares.eu:1776",   // BitShares Europe
-"176.9.148.19:16543",               // Uptick.rocks
-"btstestnet.roelandp.nl:1779",      // Roelandp
-"seed-test.liondani.com:1776",      // liondani
+"btstestnet.roelandp.nl:1779",          // Roelandp
+"seed-test.liondani.com:1776",          // liondani
 "bts-testnet-seed1.abit-more.com:1779", // Abit
+"testnet-seed.xbts.io:1776",            // xbts.io
