@@ -136,7 +136,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
       "rpc-endpoint",
       boost::program_options::variable_value(string("127.0.0.1:" + std::to_string(server_port_number)), false)
    );
-   cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
+   cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir.path()), false));
    cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
    app1->initialize(app_dir.path(), cfg);
 

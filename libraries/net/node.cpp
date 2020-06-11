@@ -1356,7 +1356,7 @@ namespace graphene { namespace net { namespace detail {
       item_hash_t head_block_id = _delegate->get_head_block_id();
       user_data["last_known_block_hash"] = fc::variant( head_block_id, 1 );
       user_data["last_known_block_number"] = _delegate->get_block_number(head_block_id);
-      user_data["last_known_block_time"] = _delegate->get_block_time(head_block_id);
+      user_data["last_known_block_time"] = _delegate->get_block_time(head_block_id); 
 
       if (!_hard_fork_block_numbers.empty())
         user_data["last_known_fork_block_number"] = _hard_fork_block_numbers.back();
@@ -4184,6 +4184,7 @@ namespace graphene { namespace net { namespace detail {
 
     void node_impl::add_node(const fc::ip::endpoint& ep)
     {
+       dlog("Attempting to add node ${ip}", ("ip", ep));
       VERIFY_CORRECT_THREAD();
       // if we're connecting to them, we believe they're not firewalled
       potential_peer_record updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(ep);
@@ -5076,12 +5077,14 @@ namespace graphene { namespace net { namespace detail {
 
     fc::time_point_sec statistics_gathering_node_delegate_wrapper::get_block_time(const item_hash_t& block_id)
     {
-      INVOKE_AND_COLLECT_STATISTICS(get_block_time, block_id);
+      //INVOKE_AND_COLLECT_STATISTICS(get_block_time, block_id);
+      return _node_delegate->get_block_time(block_id);
     }
 
     item_hash_t statistics_gathering_node_delegate_wrapper::get_head_block_id() const
     {
-      INVOKE_AND_COLLECT_STATISTICS(get_head_block_id);
+      //INVOKE_AND_COLLECT_STATISTICS(get_head_block_id);
+      _node_delegate->get_head_block_id();
     }
 
     uint32_t statistics_gathering_node_delegate_wrapper::estimate_last_known_fork_from_git_revision_timestamp(uint32_t unix_timestamp) const
