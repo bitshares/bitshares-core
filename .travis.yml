@@ -30,8 +30,12 @@ env:
 jobs:
   include:
     - stage: build for cache
-      script: ./programs/build_helpers/build_protocol
-    - stage: build, test and scan partly with sonar
+      script: ./programs/build_helpers/build_for_cache
+    - stage: build and test
       script: ./programs/build_helpers/build_and_test
-    - stage: scan fully with sonar
-      script: ./programs/build_helpers/scan_with_sonar
+    - stage: scan with sonar, step 1
+      script: ./programs/build_helpers/scan_with_sonar_step_1
+    - stage: scan with sonar, step 2
+      script: ./programs/build_helpers/scan_with_sonar_step_2
+    - stage: scan with sonar, step 3
+      script: ./programs/build_helpers/scan_with_sonar_step_3
