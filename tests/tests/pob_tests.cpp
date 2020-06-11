@@ -2644,20 +2644,7 @@ BOOST_AUTO_TEST_CASE( update_from_withdrawing_to_charging_then_withdraw_again )
       // downgrade again
       result = update_ticket( tick_1_id(db), lock_180_days, {} );
       BOOST_CHECK_EQUAL( result.new_objects.size(), 0u );
-
-      // current type should not change
-      BOOST_CHECK( tick_1_id(db).target_type == lock_180_days );
-      BOOST_CHECK( tick_1_id(db).current_type == lock_360_days );
-      BOOST_CHECK( tick_1_id(db).status == withdrawing );
-      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
-      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 100 * 4 );
-      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
-
-      BOOST_CHECK( tick_1_id(db).next_type_downgrade_time == down_time );
-      BOOST_CHECK( tick_1_id(db).next_auto_update_time == down_time );
-
-      // generate a block
-      generate_block();
+      BOOST_CHECK_EQUAL( result.updated_objects.size(), 1u );
 
       // the ticket should have downgraded
       BOOST_CHECK( tick_1_id(db).target_type == lock_180_days );
@@ -2703,15 +2690,32 @@ BOOST_AUTO_TEST_CASE( update_from_withdrawing_to_charging_then_withdraw_again )
       // should have downgraded if not changed to upgrade
       BOOST_CHECK( tick_1_id(db).next_type_downgrade_time < db.head_block_time() );
 
-      // cancel charging
-      result = update_ticket( tick_1_id(db), lock_180_days, {} );
-      BOOST_CHECK_EQUAL( result.new_objects.size(), 0u );
+      // partially cancel charging
+      result = update_ticket( tick_1_id(db), lock_180_days, asset(10) );
+      BOOST_REQUIRE_EQUAL( result.new_objects.size(), 1u );
+      BOOST_REQUIRE_EQUAL( result.updated_objects.size(), 1u );
+      BOOST_CHECK_EQUAL( result.removed_objects.size(), 0u );
+      BOOST_CHECK( *result.updated_objects.begin() == tick_1_id );
 
-      BOOST_CHECK( tick_1_id(db).target_type == lock_180_days );
+      // the new ticket is stable
+      ticket_id_type tick_2_id = *result.new_objects.begin();
+
+      BOOST_REQUIRE( db.find( tick_2_id ) );
+      BOOST_CHECK( tick_2_id(db).target_type == lock_180_days );
+      BOOST_CHECK( tick_2_id(db).current_type == lock_180_days );
+      BOOST_CHECK( tick_2_id(db).status == stable );
+      BOOST_CHECK( tick_2_id(db).next_auto_update_time == time_point_sec::maximum() );
+      BOOST_CHECK( tick_2_id(db).next_type_downgrade_time == time_point_sec::maximum() );
+      BOOST_CHECK( tick_2_id(db).amount == asset(10) );
+      BOOST_CHECK_EQUAL( tick_2_id(db).value.value, 10 * 2 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
+
+      // check the remainder
+      BOOST_CHECK( tick_1_id(db).target_type == lock_720_days );
       BOOST_CHECK( tick_1_id(db).current_type == lock_180_days );
-      BOOST_CHECK( tick_1_id(db).status == withdrawing );
-      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
-      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 100 * 2 );
+      BOOST_CHECK( tick_1_id(db).status == charging );
+      BOOST_CHECK( tick_1_id(db).amount == asset(90) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 90 * 2 );
       BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
 
       BOOST_CHECK( tick_1_id(db).next_type_downgrade_time == down_time + 180*86400 );
@@ -2721,14 +2725,31 @@ BOOST_AUTO_TEST_CASE( update_from_withdrawing_to_charging_then_withdraw_again )
       // generate a block
       generate_block();
 
+      // no change
+      BOOST_CHECK( tick_1_id(db).target_type == lock_720_days );
+      BOOST_CHECK( tick_1_id(db).current_type == lock_180_days );
+      BOOST_CHECK( tick_1_id(db).status == charging );
+      BOOST_CHECK( tick_1_id(db).amount == asset(90) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 90 * 2 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
+
+      BOOST_CHECK( tick_1_id(db).next_type_downgrade_time == down_time + 180*86400 );
+      // should have downgraded if not changed to upgrade
+      BOOST_CHECK( tick_1_id(db).next_type_downgrade_time < db.head_block_time() );
+
+      // cancel charging
+      result = update_ticket( tick_1_id(db), lock_180_days, {} );
+      BOOST_CHECK_EQUAL( result.new_objects.size(), 0u );
+      BOOST_CHECK_EQUAL( result.updated_objects.size(), 1u );
+
       // the ticket is now stable
       BOOST_CHECK( tick_1_id(db).target_type == lock_180_days );
       BOOST_CHECK( tick_1_id(db).current_type == lock_180_days );
       BOOST_CHECK( tick_1_id(db).status == stable );
       BOOST_CHECK( tick_1_id(db).next_auto_update_time == time_point_sec::maximum() );
       BOOST_CHECK( tick_1_id(db).next_type_downgrade_time == time_point_sec::maximum() );
-      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
-      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 100 * 2 );
+      BOOST_CHECK( tick_1_id(db).amount == asset(90) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 90 * 2 );
       BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
 
       // downgrade again
@@ -2738,14 +2759,14 @@ BOOST_AUTO_TEST_CASE( update_from_withdrawing_to_charging_then_withdraw_again )
       BOOST_CHECK( tick_1_id(db).target_type == liquid );
       BOOST_CHECK( tick_1_id(db).current_type == liquid );
       BOOST_CHECK( tick_1_id(db).status == withdrawing );
-      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
-      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 100 );
+      BOOST_CHECK( tick_1_id(db).amount == asset(90) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 90 );
       BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
 
       BOOST_CHECK( tick_1_id(db).next_type_downgrade_time != time_point_sec::maximum() );
       down_time = tick_1_id(db).next_type_downgrade_time;
 
-      // 30 days passed
+      // X days passed, 30 days to downgrade
       generate_blocks( down_time - fc::days(30) );
       set_expiration( db, trx );
 
@@ -2756,8 +2777,8 @@ BOOST_AUTO_TEST_CASE( update_from_withdrawing_to_charging_then_withdraw_again )
       BOOST_CHECK( tick_1_id(db).target_type == lock_720_days );
       BOOST_CHECK( tick_1_id(db).current_type == liquid );
       BOOST_CHECK( tick_1_id(db).status == charging );
-      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
-      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 100 );
+      BOOST_CHECK( tick_1_id(db).amount == asset(90) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 90 );
       BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
 
       BOOST_CHECK( tick_1_id(db).next_type_downgrade_time == down_time );
@@ -2769,8 +2790,8 @@ BOOST_AUTO_TEST_CASE( update_from_withdrawing_to_charging_then_withdraw_again )
       BOOST_CHECK( tick_1_id(db).target_type == liquid );
       BOOST_CHECK( tick_1_id(db).current_type == liquid );
       BOOST_CHECK( tick_1_id(db).status == withdrawing );
-      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
-      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 100 );
+      BOOST_CHECK( tick_1_id(db).amount == asset(90) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 90 );
       BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
 
       BOOST_CHECK( tick_1_id(db).next_type_downgrade_time == down_time );
@@ -2786,8 +2807,8 @@ BOOST_AUTO_TEST_CASE( update_from_withdrawing_to_charging_then_withdraw_again )
       BOOST_CHECK( tick_1_id(db).target_type == lock_720_days );
       BOOST_CHECK( tick_1_id(db).current_type == liquid );
       BOOST_CHECK( tick_1_id(db).status == charging );
-      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
-      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 100 );
+      BOOST_CHECK( tick_1_id(db).amount == asset(90) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 90 );
       BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
 
       BOOST_CHECK( tick_1_id(db).next_type_downgrade_time == down_time );
@@ -2800,24 +2821,33 @@ BOOST_AUTO_TEST_CASE( update_from_withdrawing_to_charging_then_withdraw_again )
       BOOST_CHECK( tick_1_id(db).target_type == lock_720_days );
       BOOST_CHECK( tick_1_id(db).current_type == liquid );
       BOOST_CHECK( tick_1_id(db).status == charging );
-      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
-      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 100 );
+      BOOST_CHECK( tick_1_id(db).amount == asset(90) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 90 );
       BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
 
       BOOST_CHECK( tick_1_id(db).next_type_downgrade_time == down_time );
       // should have freed if not changed to upgrade
       BOOST_CHECK( tick_1_id(db).next_type_downgrade_time < db.head_block_time() );
 
-      // cancel charging
-      result = update_ticket( tick_1_id(db), liquid, {} );
-      BOOST_CHECK_EQUAL( result.new_objects.size(), 0u );
+      // partially cancel charging
+      result = update_ticket( tick_1_id(db), liquid, asset(15) );
+      BOOST_REQUIRE_EQUAL( result.new_objects.size(), 1u );
+      BOOST_REQUIRE_EQUAL( result.updated_objects.size(), 1u );
+      BOOST_REQUIRE_EQUAL( result.removed_objects.size(), 1u );
+      BOOST_CHECK( *result.updated_objects.begin() == tick_1_id );
 
-      BOOST_CHECK( tick_1_id(db).target_type == liquid );
+      // the new created ticket is freed already
+      ticket_id_type tick_3_id = *result.new_objects.begin();
+      BOOST_CHECK( *result.removed_objects.begin() == tick_3_id );
+      BOOST_CHECK( !db.find( tick_3_id ) );
+
+      // check the remainder
+      BOOST_CHECK( tick_1_id(db).target_type == lock_720_days );
       BOOST_CHECK( tick_1_id(db).current_type == liquid );
-      BOOST_CHECK( tick_1_id(db).status == withdrawing );
-      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
-      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 100 );
-      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
+      BOOST_CHECK( tick_1_id(db).status == charging );
+      BOOST_CHECK( tick_1_id(db).amount == asset(75) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 75 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance + 15 );
 
       BOOST_CHECK( tick_1_id(db).next_type_downgrade_time == down_time );
       // should have freed if not changed to upgrade
@@ -2826,10 +2856,37 @@ BOOST_AUTO_TEST_CASE( update_from_withdrawing_to_charging_then_withdraw_again )
       // generate a block
       generate_block();
 
-      // the ticket is now freed
+      // no change
+      BOOST_CHECK( tick_1_id(db).target_type == lock_720_days );
+      BOOST_CHECK( tick_1_id(db).current_type == liquid );
+      BOOST_CHECK( tick_1_id(db).status == charging );
+      BOOST_CHECK( tick_1_id(db).amount == asset(75) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 75 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance + 15 );
+
+      BOOST_CHECK( tick_1_id(db).next_type_downgrade_time == down_time );
+      // should have freed if not changed to upgrade
+      BOOST_CHECK( tick_1_id(db).next_type_downgrade_time < db.head_block_time() );
+
+      // cancel charging
+      result = update_ticket( tick_1_id(db), liquid, {} );
+      BOOST_CHECK_EQUAL( result.new_objects.size(), 0u );
+      BOOST_CHECK_EQUAL( result.updated_objects.size(), 0u );
+      BOOST_REQUIRE_EQUAL( result.removed_objects.size(), 1u );
+      BOOST_CHECK( *result.removed_objects.begin() == tick_1_id );
+
+      // the ticket is freed
       BOOST_CHECK( !db.find( tick_1_id ) );
 
-      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance + 100 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance + 90 );
+
+      // generate a block
+      generate_block();
+
+      // the ticket is freed
+      BOOST_CHECK( !db.find( tick_1_id ) );
+
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance + 90 );
 
    } FC_LOG_AND_RETHROW()
 }
