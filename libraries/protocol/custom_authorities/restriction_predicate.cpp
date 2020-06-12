@@ -50,6 +50,12 @@ restriction_predicate_function get_restriction_predicate(vector<restriction> rs,
          return get_restriction_predicate_list_8(typelist::index_of<operation_list_8::list, Op>(), std::move(rs));
       if (typelist::contains<operation_list_9::list, Op>())
          return get_restriction_predicate_list_9(typelist::index_of<operation_list_9::list, Op>(), std::move(rs));
+      if (typelist::contains<operation_list_10::list, Op>())
+         return get_restriction_predicate_list_10(typelist::index_of<operation_list_10::list, Op>(), std::move(rs));
+      if (typelist::contains<operation_list_11::list, Op>())
+         return get_restriction_predicate_list_11(typelist::index_of<operation_list_11::list, Op>(), std::move(rs));
+      if (typelist::contains<operation_list_12::list, Op>())
+         return get_restriction_predicate_list_12(typelist::index_of<operation_list_12::list, Op>(), std::move(rs));
       if (typelist::contains<virtual_operations_list::list, Op>())
          FC_THROW_EXCEPTION( fc::assert_exception, "Virtual operations not allowed!" );
 
@@ -58,7 +64,8 @@ restriction_predicate_function get_restriction_predicate(vector<restriction> rs,
                                                         operation_list_3::list, operation_list_4::list,
                                                         operation_list_5::list, operation_list_6::list,
                                                         operation_list_7::list, operation_list_8::list,
-                                                        operation_list_9::list,
+                                                        operation_list_9::list, operation_list_10::list,
+                                                        operation_list_11::list, operation_list_12::list,
                                                         virtual_operations_list::list>,
                                        Op>(), "");
       FC_THROW_EXCEPTION(fc::assert_exception,

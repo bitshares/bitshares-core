@@ -227,7 +227,11 @@ namespace graphene { namespace chain {
       /// Fixed point between 1.000 and 10.000, implied fixed point denominator is GRAPHENE_COLLATERAL_RATIO_DENOM
       uint16_t initial_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
 
-      price_feed_with_icr( const price_feed& pf = {}, const optional<uint16_t>& icr = {} )
+      price_feed_with_icr()
+      : price_feed(), initial_collateral_ratio( maintenance_collateral_ratio )
+      {}
+
+      price_feed_with_icr( const price_feed& pf, const optional<uint16_t>& icr = {} )
       : price_feed( pf ), initial_collateral_ratio( icr.valid() ? *icr : pf.maintenance_collateral_ratio )
       {}
 

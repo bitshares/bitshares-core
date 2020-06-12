@@ -1854,9 +1854,7 @@ BOOST_AUTO_TEST_CASE( get_trade_history )
    ACTORS((bob)(alice));
 
    const auto& eur = create_user_issued_asset("EUR");
-   asset_id_type eur_id = eur.id;
    const auto& usd = create_user_issued_asset("USD");
-   asset_id_type usd_id = usd.id;
 
    issue_uia( bob_id, usd.amount(1000000) );
    issue_uia( alice_id, eur.amount(1000000) );

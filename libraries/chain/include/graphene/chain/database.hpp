@@ -556,7 +556,7 @@ namespace graphene { namespace chain {
 
          //////////////////// db_block.cpp ////////////////////
 
-       public:
+      public:
          // these were formerly private, but they have a fairly well-defined API, so let's make them public
          void                  apply_block( const signed_block& next_block, uint32_t skip = skip_nothing );
          processed_transaction apply_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
@@ -581,6 +581,9 @@ namespace graphene { namespace chain {
          uint32_t update_witness_missed_blocks( const signed_block& b );
 
          //////////////////// db_update.cpp ////////////////////
+      public:
+         generic_operation_result process_tickets();
+      private:
          void update_global_dynamic_data( const signed_block& b, const uint32_t missed_blocks );
          void update_signing_witness(const witness_object& signing_witness, const signed_block& new_block);
          void update_last_irreversible_block();
@@ -591,7 +594,6 @@ namespace graphene { namespace chain {
          void update_core_exchange_rates();
          void update_maintenance_flag( bool new_maintenance_flag );
          void update_withdraw_permissions();
-         void process_tickets();
          bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
                                    const asset_bitasset_data_object* bitasset_ptr = nullptr );
          void clear_expired_htlcs();

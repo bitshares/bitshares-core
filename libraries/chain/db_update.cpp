@@ -602,8 +602,9 @@ void database::clear_expired_htlcs()
    }
 }
 
-void database::process_tickets()
+generic_operation_result database::process_tickets()
 {
+   generic_operation_result result;
    share_type total_delta_pob;
    share_type total_delta_inactive;
    auto& idx = get_index_type<ticket_index>().indices().get<by_next_update>();
@@ -619,6 +620,7 @@ void database::process_tickets()
             aso.total_core_pol -= ticket.amount.amount;
             aso.total_pol_value -= ticket.value;
          });
+         result.removed_objects.insert( ticket.id );
          remove( ticket );
       }
       else
@@ -628,6 +630,7 @@ void database::process_tickets()
          modify( ticket, []( ticket_object& o ) {
             o.auto_update();
          });
+         result.updated_objects.insert( ticket.id );
 
          share_type delta_inactive_amount;
          share_type delta_forever_amount;
@@ -687,6 +690,8 @@ void database::process_tickets()
          dgp.total_inactive += total_delta_inactive;
       });
    }
+
+   return result;
 }
 
 } }
