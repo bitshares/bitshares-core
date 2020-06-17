@@ -200,7 +200,7 @@ struct predicate_compare<Field, Argument, std::enable_if_t<std::is_same<Field, A
    // Simple comparison, same types
    constexpr static bool valid = true;
    constexpr int8_t operator()(const Field& f, const Argument& a) const {
-      return f<a? -1 : (f>a? 1 : 0);
+      return f<a? -1 : (a<f? 1 : 0);
    }
 };
 template<typename Field, typename Argument>
