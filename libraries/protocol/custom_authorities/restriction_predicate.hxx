@@ -23,6 +23,7 @@
  */
 
 #include <graphene/protocol/restriction_predicate.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 
 #include <fc/exception/exception.hpp>
 
@@ -50,7 +51,8 @@ template<typename T> constexpr static bool is_flat_set = is_flat_set_impl<T>::va
 // We use our own is_integral which does not consider bools integral (to disallow comparison between bool and ints)
 template<typename T> constexpr static bool is_integral = !std::is_same<T, bool>::value &&
                                                          !std::is_same<T, safe<bool>>::value &&
-                                                         (is_safe<T> || std::is_integral<T>::value);
+                                                         (is_safe<T> || std::is_integral<T>::value ||
+                                                          std::is_same<T, fc::unsigned_int>::value);
 
 // Metafunction to check if two types are comparable, which means not void_t, and either the same or both integral
 template<typename T, typename U>
@@ -74,6 +76,7 @@ const auto& to_num(const I& i) { return i; }
 template<typename I>
 const auto& to_num(const fc::safe<I>& i) { return i.value; }
 inline auto to_num(const fc::time_point_sec& t) { return t.sec_since_epoch(); }
+inline auto to_num(const fc::unsigned_int& ui) { return ui.value; }
 
 namespace safenum = boost::safe_numerics::safe_compare;
 
@@ -397,6 +400,14 @@ struct attribute_assertion<extension<Extension>> {
       };
    }
 };
+template<typename Pointed>
+struct attribute_assertion<std::shared_ptr<Pointed>> {
+   static object_restriction_predicate<std::shared_ptr<Pointed>> create(vector<restriction>&& rs) {
+      return [p=restrictions_to_predicate<Pointed>(std::move(rs), false)](const shared_ptr<Pointed>& x) {
+         return p(*x);
+      };
+   }
+};
 
 template<typename Variant>
 struct variant_assertion {
@@ -465,8 +476,59 @@ object_restriction_predicate<Field> make_predicate(ArgVariant arg) {
    });
 }
 
+// A template checking whether a predicate is valid with the provided field type and any restriction argument type
+template<typename Field, typename = void>
+struct predicate_is_valid_for_field {
+   template<typename Predicate>
+   struct filter {
+      template<typename Argument>
+      struct argument_filter {
+         constexpr static bool value = Predicate::template unwrap<Field, Argument>::valid;
+      };
+
+      constexpr static bool value = typelist::any<restriction::argument_type::list, argument_filter>;
+   };
+};
+// Specialization for reflected struct fields; they are always valid because we can use an attribute_assert on them
+template<typename Struct>
+struct predicate_is_valid_for_field<Struct, std::enable_if_t<fc::reflector<Struct>::is_defined::value>> {
+   template<typename>
+   struct filter { constexpr static bool value = true; };
+};
+// Specialization for extension fields; they are always valid because we can use an attribute_assert on them
+template<typename Ext>
+struct predicate_is_valid_for_field<extension<Ext>, void> {
+   template<typename>
+   struct filter { constexpr static bool value = true; };
+};
+// Specialization for static variant fields; they are always valid because we can use a variant_assert on them
+template<typename... Ts>
+struct predicate_is_valid_for_field<static_variant<Ts...>, void> {
+   template<typename>
+   struct filter { constexpr static bool value = true; };
+};
+// Specialization for shared_ptr fields; they are valid if the thing pointed to is
+template<typename Pointed>
+struct predicate_is_valid_for_field<std::shared_ptr<Pointed>, void>
+      : public predicate_is_valid_for_field<std::decay_t<Pointed>> {};
+
+// Check if any predicate can be used with the provided field type and any known argument type
+template<typename Field>
+constexpr bool any_predicate_applies() {
+   using PredicateTypes = typelist::list<typelist::wrapped<predicate_eq>, typelist::wrapped<predicate_ne>,
+                                         typelist::wrapped<predicate_lt>, typelist::wrapped<predicate_le>,
+                                         typelist::wrapped<predicate_gt>, typelist::wrapped<predicate_ge>,
+                                         typelist::wrapped<predicate_in>, typelist::wrapped<predicate_not_in>,
+                                         typelist::wrapped<predicate_has_all>, typelist::wrapped<predicate_has_none>>;
+   return typelist::any<PredicateTypes, predicate_is_valid_for_field<Field>::template filter>;
+}
+
 template<typename Field>
 object_restriction_predicate<Field> create_predicate_function(restriction_function func, restriction_argument arg) {
+   // This checks that all fields of all objects can be used with at least one predicate
+   static_assert(any_predicate_applies<Field>(),
+                 "This new field type is not yet supported by Custom Active Authorities. Please add support for it.");
+
    try {
       switch(func) {
       case restriction::func_eq:
@@ -539,7 +601,7 @@ object_restriction_predicate<Object> create_field_predicate(restriction&& r, sho
 template<typename Object>
 object_restriction_predicate<Object> create_field_predicate(restriction&&, long) {
    FC_THROW_EXCEPTION(fc::assert_exception, "Invalid restriction references member of non-object type: ${O}",
-                      ("O", fc::get_typename<Object>::name()));
+                      ("O", fc::get_typename<std::decay_t<Object>>::name()));
 }
 
 template<typename Object>
