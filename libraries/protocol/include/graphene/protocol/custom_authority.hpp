@@ -134,3 +134,10 @@ FC_REFLECT(graphene::protocol::custom_authority_update_operation,
            (fee)(account)(authority_to_update)(new_enabled)(new_valid_from)
            (new_valid_to)(new_auth)(restrictions_to_remove)(restrictions_to_add)(extensions))
 FC_REFLECT(graphene::protocol::custom_authority_delete_operation, (fee)(account)(authority_to_delete)(extensions))
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION(graphene::protocol::custom_authority_create_operation::fee_parameters_type)
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION(graphene::protocol::custom_authority_update_operation::fee_parameters_type)
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION(graphene::protocol::custom_authority_delete_operation::fee_parameters_type)
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION(graphene::protocol::custom_authority_create_operation)
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION(graphene::protocol::custom_authority_update_operation)
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION(graphene::protocol::custom_authority_delete_operation)

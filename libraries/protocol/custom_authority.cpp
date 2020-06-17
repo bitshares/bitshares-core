@@ -98,3 +98,10 @@ void custom_authority_delete_operation::validate()const {
 }
 
 } } // graphene::protocol
+
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION(graphene::protocol::custom_authority_create_operation::fee_parameters_type)
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION(graphene::protocol::custom_authority_update_operation::fee_parameters_type)
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION(graphene::protocol::custom_authority_delete_operation::fee_parameters_type)
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION(graphene::protocol::custom_authority_create_operation)
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION(graphene::protocol::custom_authority_update_operation)
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION(graphene::protocol::custom_authority_delete_operation)
