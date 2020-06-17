@@ -37,24 +37,18 @@ list(APPEND CUSTOM_AUTHS_FILES
      custom_authorities/create_predicate_fwd_1.cpp
      custom_authorities/create_predicate_fwd_2.cpp
      custom_authorities/create_predicate_fwd_3.cpp
-     custom_authorities/restriction_predicate.cpp
-     custom_authorities/list_1.cpp
-     custom_authorities/list_2.cpp
-     custom_authorities/list_3.cpp
-     custom_authorities/list_4.cpp
-     custom_authorities/list_5.cpp
-     custom_authorities/list_6.cpp
-     custom_authorities/list_7.cpp
-     custom_authorities/list_8.cpp
-     custom_authorities/list_9.cpp
-     custom_authorities/list_10.cpp
-     custom_authorities/list_11.cpp
-     custom_authorities/list_12.cpp)
+     custom_authorities/restriction_predicate.cpp)
+
+foreach(LIST_NUM RANGE 1 12)
+    configure_file("custom_authorities/list.cpp.in" "${CMAKE_CURRENT_BINARY_DIR}/custom_authorities/list_${LIST_NUM}.cpp")
+    list(APPEND CUSTOM_AUTHS_FILES "${CMAKE_CURRENT_BINARY_DIR}/custom_authorities/list_${LIST_NUM}.cpp")
+endforeach(LIST_NUM)
 
 file(GLOB CUSTOM_AUTHS_HEADERS "custom_authorities/*.hxx")
 
 add_library( graphene_protocol_custom_auths ${CUSTOM_AUTHS_FILES} ${CUSTOM_AUTHS_HEADERS} )
 target_link_libraries( graphene_protocol_custom_auths fc )
+target_include_directories(graphene_protocol_custom_auths PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/custom_authorities")
 target_include_directories( graphene_protocol_custom_auths PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 
 if( MSVC )
