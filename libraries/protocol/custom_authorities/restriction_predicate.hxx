@@ -62,9 +62,36 @@ constexpr static bool comparable_types = !std::is_same<T, void_t>::value &&
 // Metafunction to check if type is a container
 template<typename, typename = void>
 struct is_container_impl : std::false_type {};
+template<>
+struct is_container_impl<vector<char>> : std::false_type {};
 template<typename T>
 struct is_container_impl<T, make_void<typename T::value_type, decltype(declval<T>().size())>> : std::true_type {};
 template<typename T> constexpr static bool is_container = is_container_impl<T>::value;
+
+// Metafunction to check if type is string-like
+template<typename>
+struct is_stringish_impl : std::false_type {};
+template<>
+struct is_stringish_impl<std::string> : std::true_type {};
+template<>
+struct is_stringish_impl<std::vector<char>> : std::true_type {};
+template<>
+struct is_stringish_impl<fc::sha1> : std::true_type {};
+template<>
+struct is_stringish_impl<fc::sha256> : std::true_type {};
+template<>
+struct is_stringish_impl<fc::ripemd160> : std::true_type {};
+template<>
+struct is_stringish_impl<fc::hash160> : std::true_type {};
+template<typename T> constexpr static bool is_stringish = is_stringish_impl<T>::value;
+
+// Convert stringish types to strings
+inline const string& to_string(const string& str) { return str; }
+inline string to_string(const std::vector<char>& vec) { return string(vec.begin(), vec.end()); }
+inline string to_string(const fc::sha1& hash) { return hash.str(); }
+inline string to_string(const fc::sha256& hash) { return hash.str(); }
+inline string to_string(const fc::ripemd160& hash) { return hash.str(); }
+inline string to_string(const fc::hash160& hash) { return hash.str(); }
 
 // Type alias for a predicate on a particular field type
 template<typename Field>
@@ -166,10 +193,25 @@ struct predicate_eq<Field, Argument, std::enable_if_t<is_integral<Field> && is_i
    constexpr bool operator()(const Field& f, const Argument& a) const { return safenum::equal(to_num(f), to_num(a)); }
 };
 template<typename Field, typename Argument>
+struct predicate_eq<Field, Argument, std::enable_if_t<is_stringish<Field> && is_stringish<Argument> &&
+                                                      !std::is_same<Field, Argument>::value>> {
+   // Converting comparison, stringish types
+   constexpr static bool valid = true;
+   bool operator()(const Field& f, const Argument& a) const { return to_string(f) == to_string(a); }
+};
+template<typename Field, typename Argument>
 struct predicate_eq<Field, Argument, std::enable_if_t<is_container<Field> && is_integral<Argument>>> {
    // Compare container size against int
    constexpr static bool valid = true;
    bool operator()(const Field& f, const Argument& a) const { return safenum::equal(f.size(), to_num(a)); }
+};
+template<typename... Ts, typename Argument>
+struct predicate_eq<static_variant<Ts...>, Argument, std::enable_if_t<is_integral<Argument>>> {
+   // Compare static_variant.which() against int
+   constexpr static bool valid = true;
+   bool operator()(const static_variant<Ts...>& f, const Argument& a) const {
+      return safenum::equal(f.which(), to_num(a));
+   }
 };
 template<typename Field, typename Argument>
 struct predicate_eq<fc::optional<Field>, Argument, std::enable_if_t<comparable_types<Field, Argument>>>
@@ -213,6 +255,33 @@ struct predicate_compare<Field, Argument, std::enable_if_t<is_integral<Field> &&
       auto na = to_num(a);
       return safenum::less_than(nf, na)? -1 : (safenum::greater_than(nf, na)? 1 : 0);
    }
+};
+template<typename Field, typename Argument>
+struct predicate_compare<Field, Argument, std::enable_if_t<is_stringish<Field> && is_stringish<Argument> &&
+                                                           !std::is_same<Field, Argument>::value>> {
+   // Converting comparison, stringish types
+   constexpr static bool valid = true;
+   constexpr int8_t operator()(const Field& f, const Argument& a) const {
+      auto sf = to_string(f);
+      auto sa = to_string(a);
+      return sf < sa? -1 : (sa < sf? 1 : 0);
+   }
+};
+template<typename Field, typename Argument>
+struct predicate_compare<Field, Argument, std::enable_if_t<is_container<Field> && is_integral<Argument>>>
+      : public predicate_compare<size_t, Argument> {
+   // Compare container size against int
+   using base = predicate_compare<size_t, Argument>;
+   constexpr static bool valid = true;
+   bool operator()(const Field& f, const Argument& a) const { return base::operator()(f.size(), a); }
+};
+template<typename... Ts, typename Argument>
+struct predicate_compare<static_variant<Ts...>, Argument, std::enable_if_t<is_integral<Argument>>>
+      : public predicate_compare<size_t, Argument> {
+   // Compare static_variant.which() against int
+   using base = predicate_compare<size_t, Argument>;
+   constexpr static bool valid = true;
+   bool operator()(const static_variant<Ts...>& f, const Argument& a) const { return base::operator()(f.which(), a); }
 };
 template<typename Field, typename Argument>
 struct predicate_compare<fc::optional<Field>, Argument, void> : predicate_compare<Field, Argument> {
