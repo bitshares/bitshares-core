@@ -205,6 +205,13 @@ struct predicate_eq<Field, Argument, std::enable_if_t<is_container<Field> && is_
    constexpr static bool valid = true;
    bool operator()(const Field& f, const Argument& a) const { return safenum::equal(f.size(), to_num(a)); }
 };
+template<typename Field, typename Argument>
+struct predicate_eq<Field, Argument, std::enable_if_t<is_stringish<Field> && !is_container<Field>
+                                                      && is_integral<Argument>>> {
+   // Compare stringish size against int
+   constexpr static bool valid = true;
+   bool operator()(const Field& f, const Argument& a) const { return safenum::equal(to_string(f).size(), to_num(a)); }
+};
 template<typename... Ts, typename Argument>
 struct predicate_eq<static_variant<Ts...>, Argument, std::enable_if_t<is_integral<Argument>>> {
    // Compare static_variant.which() against int
@@ -274,6 +281,15 @@ struct predicate_compare<Field, Argument, std::enable_if_t<is_container<Field> &
    using base = predicate_compare<size_t, Argument>;
    constexpr static bool valid = true;
    bool operator()(const Field& f, const Argument& a) const { return base::operator()(f.size(), a); }
+};
+template<typename Field, typename Argument>
+struct predicate_compare<Field, Argument, std::enable_if_t<is_stringish<Field> && !is_container<Field>
+                                                           && is_integral<Argument>>>
+      : public predicate_compare<size_t, Argument> {
+   // Compare stringish size against int
+   using base = predicate_compare<size_t, Argument>;
+   constexpr static bool valid = true;
+   bool operator()(const Field& f, const Argument& a) const { return base::operator()(to_string(f).size(), a); }
 };
 template<typename... Ts, typename Argument>
 struct predicate_compare<static_variant<Ts...>, Argument, std::enable_if_t<is_integral<Argument>>>
