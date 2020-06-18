@@ -59,36 +59,39 @@ struct restriction {
    /*  3 */ string, \
    /*  4 */ time_point_sec, \
    /*  5 */ public_key_type, \
-   /*  6 */ fc::sha256, \
-   /*  7 */ account_id_type, \
-   /*  8 */ asset_id_type, \
-   /*  9 */ htlc_id_type, \
-   /* 10 */ committee_member_id_type, \
-   /* 11 */ witness_id_type, \
-   /* 12 */ limit_order_id_type, \
-   /* 13 */ proposal_id_type, \
-   /* 14 */ withdraw_permission_id_type, \
-   /* 15 */ vesting_balance_id_type, \
-   /* 16 */ balance_id_type, \
-   /* 17 */ flat_set<bool>, \
-   /* 18 */ flat_set<int64_t>, \
-   /* 19 */ flat_set<string>, \
-   /* 20 */ flat_set<time_point_sec>, \
-   /* 21 */ flat_set<public_key_type>, \
-   /* 22 */ flat_set<fc::sha256>, \
-   /* 23 */ flat_set<account_id_type>, \
-   /* 24 */ flat_set<asset_id_type>, \
-   /* 25 */ flat_set<htlc_id_type>, \
-   /* 26 */ flat_set<committee_member_id_type>, \
-   /* 27 */ flat_set<witness_id_type>, \
-   /* 28 */ flat_set<limit_order_id_type>, \
-   /* 29 */ flat_set<proposal_id_type>, \
-   /* 30 */ flat_set<withdraw_permission_id_type>, \
-   /* 31 */ flat_set<vesting_balance_id_type>, \
-   /* 32 */ flat_set<balance_id_type>, \
-   /* 33 */ vector<restriction>, \
-   /* 34 */ vector<vector<restriction>>, \
-   /* 35 */ variant_assert_argument_type
+   /*  6 */ fc::sha1, \
+   /*  7 */ fc::sha256, \
+   /*  8 */ fc::ripemd160, \
+   /*  9 */ fc::hash160, \
+   /* 10 */ account_id_type, \
+   /* 11 */ asset_id_type, \
+   /* 12 */ htlc_id_type, \
+   /* 13 */ committee_member_id_type, \
+   /* 14 */ witness_id_type, \
+   /* 15 */ limit_order_id_type, \
+   /* 16 */ proposal_id_type, \
+   /* 17 */ withdraw_permission_id_type, \
+   /* 18 */ vesting_balance_id_type, \
+   /* 19 */ balance_id_type, \
+   /* 20 */ flat_set<bool>, \
+   /* 21 */ flat_set<int64_t>, \
+   /* 22 */ flat_set<string>, \
+   /* 23 */ flat_set<time_point_sec>, \
+   /* 24 */ flat_set<public_key_type>, \
+   /* 25 */ flat_set<fc::sha256>, \
+   /* 26 */ flat_set<account_id_type>, \
+   /* 27 */ flat_set<asset_id_type>, \
+   /* 28 */ flat_set<htlc_id_type>, \
+   /* 29 */ flat_set<committee_member_id_type>, \
+   /* 30 */ flat_set<witness_id_type>, \
+   /* 31 */ flat_set<limit_order_id_type>, \
+   /* 32 */ flat_set<proposal_id_type>, \
+   /* 33 */ flat_set<withdraw_permission_id_type>, \
+   /* 34 */ flat_set<vesting_balance_id_type>, \
+   /* 35 */ flat_set<balance_id_type>, \
+   /* 36 */ vector<restriction>, \
+   /* 37 */ vector<vector<restriction>>, \
+   /* 38 */ variant_assert_argument_type
 
    using argument_type = fc::static_variant<GRAPHENE_OP_RESTRICTION_ARGUMENTS_VARIADIC>;
 
