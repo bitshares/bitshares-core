@@ -376,8 +376,9 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
                             && ~call_obj->call_price < _bitasset_data->current_feed.settlement_price )
                        || ( old_collateralization.valid() && call_obj->debt <= *old_debt
                                                           && call_obj->collateralization() > *old_collateralization ),
-               "Can only increase collateral ratio without increasing debt if would trigger a margin call that "
-               "cannot be fully filled",
+               "Can only increase collateral ratio without increasing debt when the debt position's "
+               "collateral ratio is lower than required initial collateral ratio (ICR), "
+               "if not to trigger a margin call that be fully filled immediately",
                ("old_debt", old_debt)
                ("new_debt", call_obj->debt)
                ("old_collateralization", old_collateralization)
