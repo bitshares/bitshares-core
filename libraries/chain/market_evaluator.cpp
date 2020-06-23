@@ -370,12 +370,13 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
             // after BSIP77, CR of the new/updated position is required to be above max(ICR,MCR).
             // The `current_initial_collateralization` variable has been initialized according to the logic,
             // so we directly use it here.
-            FC_ASSERT( ( !before_core_hardfork_1270
+            bool check = ( !before_core_hardfork_1270
                             && call_obj->collateralization() > _bitasset_data->current_initial_collateralization )
                        || ( before_core_hardfork_1270
                             && ~call_obj->call_price < _bitasset_data->current_feed.settlement_price )
                        || ( old_collateralization.valid() && call_obj->debt <= *old_debt
-                                                          && call_obj->collateralization() > *old_collateralization ),
+                                                          && call_obj->collateralization() > *old_collateralization );
+            FC_ASSERT( check,
                "Can only increase collateral ratio without increasing debt when the debt position's "
                "collateral ratio is lower than required initial collateral ratio (ICR), "
                "if not to trigger a margin call that be fully filled immediately",
