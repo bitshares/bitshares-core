@@ -120,11 +120,6 @@ void verify_account_votes( const database& db, const account_options& options )
 void_result account_create_evaluator::do_evaluate( const account_create_operation& op )
 { try {
    database& d = db();
-   if( d.head_block_time() < HARDFORK_516_TIME )
-   {
-      FC_ASSERT( !op.extensions.value.owner_special_authority.valid() );
-      FC_ASSERT( !op.extensions.value.active_special_authority.valid() );
-   }
 
    FC_ASSERT( fee_paying_account->is_lifetime_member(), "Only Lifetime members may register an account." );
    FC_ASSERT( op.referrer(d).is_member(d.head_block_time()), "The referrer must be either a lifetime or annual subscriber." );
@@ -196,6 +191,7 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          obj.owner            = o.owner;
          obj.active           = o.active;
          obj.options          = o.options;
+         obj.num_committee_voted = o.options.num_committee_voted();
          obj.statistics = d.create<account_statistics_object>([&obj](account_statistics_object& s){
                              s.owner = obj.id;
                              s.name = obj.name;
@@ -212,17 +208,6 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
             obj.allowed_assets->emplace( o.extensions.value.buyback_options->asset_to_buy );
          }
    });
-
-   /*
-   if( has_small_percent )
-   {
-      wlog( "Account affected by #453 registered in block ${n}:  ${na} reg=${reg} ref=${ref}:${refp} ltr=${ltr}:${ltrp}",
-         ("n", db().head_block_num()) ("na", new_acnt_object.id)
-         ("reg", o.registrar) ("ref", o.referrer) ("ltr", new_acnt_object.lifetime_referrer)
-         ("refp", new_acnt_object.referrer_rewards_percentage) ("ltrp", new_acnt_object.lifetime_referrer_fee_percentage) );
-      wlog( "Affected account object is ${o}", ("o", new_acnt_object) );
-   }
-   */
 
    const auto& dynamic_properties = d.get_dynamic_global_properties();
    d.modify(dynamic_properties, [](dynamic_global_property_object& p) {
@@ -268,11 +253,6 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
 void_result account_update_evaluator::do_evaluate( const account_update_operation& o )
 { try {
    database& d = db();
-   if( d.head_block_time() < HARDFORK_516_TIME )
-   {
-      FC_ASSERT( !o.extensions.value.owner_special_authority.valid() );
-      FC_ASSERT( !o.extensions.value.active_special_authority.valid() );
-   }
 
    try
    {
@@ -304,15 +284,15 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
    // update account statistics
    if( o.new_options.valid() )
    {
-      d.modify( acnt->statistics( d ), [&]( account_statistics_object& aso )
+      if ( o.new_options->voting_account != acnt->options.voting_account
+           || o.new_options->votes != acnt->options.votes )
       {
-         if(o.new_options->is_voting() != acnt->options.is_voting())
-            aso.is_voting = !aso.is_voting;
-
-         if((o.new_options->votes != acnt->options.votes ||
-               o.new_options->voting_account != acnt->options.voting_account))
+         d.modify( acnt->statistics( d ), [&d,&o]( account_statistics_object& aso )
+         {
+            aso.is_voting = o.new_options->is_voting();
             aso.last_vote_time = d.head_block_time();
-      } );
+         } );
+      }
    }
 
    // update account object
@@ -327,7 +307,11 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
          a.active = *o.active;
          a.top_n_control_flags = 0;
       }
-      if( o.new_options ) a.options = *o.new_options;
+      if( o.new_options )
+      {
+         a.options = *o.new_options;
+         a.num_committee_voted = a.options.num_committee_voted();
+      }
       if( o.extensions.value.owner_special_authority.valid() )
       {
          a.owner_special_authority = *(o.extensions.value.owner_special_authority);

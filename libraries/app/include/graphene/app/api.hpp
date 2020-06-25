@@ -29,8 +29,8 @@
 #include <graphene/protocol/confidential.hpp>
 
 #include <graphene/market_history/market_history_plugin.hpp>
-
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
+#include <graphene/custom_operations/custom_operations_plugin.hpp>
 
 #include <graphene/elasticsearch/elasticsearch_plugin.hpp>
 
@@ -54,6 +54,8 @@ namespace graphene { namespace app {
    using namespace graphene::chain;
    using namespace graphene::market_history;
    using namespace graphene::grouped_orders;
+   using namespace graphene::custom_operations;
+
    using namespace fc::ecc;
    using std::string;
    using std::vector;
@@ -149,10 +151,10 @@ namespace graphene { namespace app {
           */
          history_operation_detail get_account_history_by_operations(
             const std::string account_id_or_name,
-            vector<uint16_t> operation_types,
+            flat_set<uint16_t> operation_types,
             uint32_t start,
             unsigned limit
-         );
+         )const;
 
          /**
           * @brief Get only asked operations relevant to the specified account
@@ -518,6 +520,31 @@ namespace graphene { namespace app {
          application& _app;
          graphene::app::database_api database_api;
    };
+
+   /**
+    * @brief The custom_operations_api class exposes access to standard custom objects parsed by the
+    * custom_operations_plugin.
+    */
+   class custom_operations_api
+   {
+      public:
+         custom_operations_api(application& app):_app(app), database_api( *app.chain_database(),
+               &(app.get_options()) ){}
+
+         /**
+          * @brief Get all stored objects of an account in a particular catalog
+          *
+          * @param account The account ID or name to get info from
+          * @param catalog Category classification. Each account can store multiple catalogs.
+          *
+          * @return The vector of objects of the account or empty
+          */
+         vector<account_storage_object> get_storage_info(std::string account_id_or_name, std::string catalog)const;
+
+   private:
+         application& _app;
+         graphene::app::database_api database_api;
+   };
 } } // graphene::app
 
 extern template class fc::api<graphene::app::block_api>;
@@ -528,6 +555,7 @@ extern template class fc::api<graphene::app::crypto_api>;
 extern template class fc::api<graphene::app::asset_api>;
 extern template class fc::api<graphene::app::orders_api>;
 extern template class fc::api<graphene::debug_witness::debug_api>;
+extern template class fc::api<graphene::app::custom_operations_api>;
 
 namespace graphene { namespace app {
    /**
@@ -569,6 +597,8 @@ namespace graphene { namespace app {
          fc::api<orders_api> orders()const;
          /// @brief Retrieve the debug API (if available)
          fc::api<graphene::debug_witness::debug_api> debug()const;
+         /// @brief Retrieve the custom operations API
+         fc::api<custom_operations_api> custom_operations()const;
 
          /// @brief Called to enable an API, not reflected.
          void enable_api( const string& api_name );
@@ -584,6 +614,7 @@ namespace graphene { namespace app {
          optional< fc::api<asset_api> > _asset_api;
          optional< fc::api<orders_api> > _orders_api;
          optional< fc::api<graphene::debug_witness::debug_api> > _debug_api;
+         optional< fc::api<custom_operations_api> > _custom_operations_api;
    };
 
 }}  // graphene::app
@@ -650,6 +681,9 @@ FC_API(graphene::app::orders_api,
        (get_tracked_groups)
        (get_grouped_limit_orders)
      )
+FC_API(graphene::app::custom_operations_api,
+       (get_storage_info)
+     )
 FC_API(graphene::app::login_api,
        (login)
        (block)
@@ -661,4 +695,5 @@ FC_API(graphene::app::login_api,
        (asset)
        (orders)
        (debug)
+       (custom_operations)
      )

@@ -29,7 +29,23 @@ else()
                       DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/api_documentation_standin.cpp )
 endif()
 
-add_library( graphene_wallet wallet.cpp ${CMAKE_CURRENT_BINARY_DIR}/api_documentation.cpp ${HEADERS} )
+set( SOURCES
+     operation_printer.cpp
+     reflect_util.cpp
+     wallet.cpp
+     wallet_account.cpp
+     wallet_api_impl.cpp
+     wallet_asset.cpp
+     wallet_builder.cpp
+     wallet_debug.cpp
+     wallet_network.cpp
+     wallet_results.cpp
+     wallet_sign.cpp
+     wallet_transfer.cpp
+     wallet_voting.cpp
+   )
+
+add_library( graphene_wallet ${SOURCES} ${CMAKE_CURRENT_BINARY_DIR}/api_documentation.cpp ${HEADERS} )
 target_link_libraries( graphene_wallet PRIVATE graphene_app graphene_net graphene_chain graphene_utilities fc ${CMAKE_DL_LIBS} ${PLATFORM_SPECIFIC_LIBS} )
 target_include_directories( graphene_db PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 

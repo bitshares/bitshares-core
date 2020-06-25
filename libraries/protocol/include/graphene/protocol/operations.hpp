@@ -30,9 +30,11 @@
 #include <graphene/protocol/custom.hpp>
 #include <graphene/protocol/committee_member.hpp>
 #include <graphene/protocol/confidential.hpp>
+#include <graphene/protocol/custom_authority.hpp>
 #include <graphene/protocol/fba.hpp>
 #include <graphene/protocol/market.hpp>
 #include <graphene/protocol/proposal.hpp>
+#include <graphene/protocol/ticket.hpp>
 #include <graphene/protocol/transfer.hpp>
 #include <graphene/protocol/vesting.hpp>
 #include <graphene/protocol/withdraw_permission.hpp>
@@ -101,7 +103,12 @@ namespace graphene { namespace protocol {
             htlc_redeem_operation,
             htlc_redeemed_operation,         // VIRTUAL
             htlc_extend_operation,
-            htlc_refund_operation            // VIRTUAL
+            htlc_refund_operation,           // VIRTUAL
+            custom_authority_create_operation,
+            custom_authority_update_operation,
+            custom_authority_delete_operation,
+            ticket_create_operation,
+            ticket_update_operation
          > operation;
 
    /// @} // operations group
@@ -112,10 +119,11 @@ namespace graphene { namespace protocol {
     *
     *  @return a set of required authorities for @ref op
     */
-   void operation_get_required_authorities( const operation& op, 
+   void operation_get_required_authorities( const operation& op,
                                             flat_set<account_id_type>& active,
                                             flat_set<account_id_type>& owner,
-                                            vector<authority>&  other );
+                                            vector<authority>& other,
+                                            bool ignore_custom_operation_required_auths );
 
    void operation_validate( const operation& op );
 

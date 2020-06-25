@@ -85,7 +85,7 @@ int main( int argc, char** argv )
 
       idump( (witnesses) );
 
-      for( int32_t i = 0; i < op.count(); ++i )
+      for( size_t i = 0; i < op.count(); ++i )
       {
          op.set_which(i);
          op.visit( size_check_type_visitor(i) );

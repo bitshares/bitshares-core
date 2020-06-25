@@ -101,6 +101,9 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       // Markets / feeds
       vector<limit_order_object>         get_limit_orders( const std::string& a, const std::string& b,
                                                            uint32_t limit)const;
+      vector<limit_order_object>         get_limit_orders_by_account( const string& account_name_or_id,
+                                                                      optional<uint32_t> limit,
+                                                                      optional<limit_order_id_type> start_id );
       vector<limit_order_object>         get_account_limit_orders( const string& account_name_or_id,
                                                                    const string &base,
                                                                    const string &quote, uint32_t limit,
@@ -150,8 +153,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       uint64_t get_committee_count()const;
 
       // Workers
-      vector<worker_object> get_all_workers()const;
-      vector<optional<worker_object>> get_workers_by_account(const std::string account_id_or_name)const;
+      vector<worker_object> get_all_workers( const optional<bool> is_expired = optional<bool>() )const;
+      vector<worker_object> get_workers_by_account(const std::string account_id_or_name)const;
       uint64_t get_worker_count()const;
 
       // Votes

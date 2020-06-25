@@ -35,6 +35,14 @@ namespace graphene { namespace protocol {
       uint32_t max_preimage_size;
    };
 
+   struct custom_authority_options_type
+   {
+      uint32_t max_custom_authority_lifetime_seconds = GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS;
+      uint32_t max_custom_authorities_per_account = GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITIES_PER_ACCOUNT;
+      uint32_t max_custom_authorities_per_account_op = GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITIES_PER_ACCOUNT_OP;
+      uint32_t max_custom_authority_restrictions = GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_RESTRICTIONS;
+   };
+
    struct chain_parameters
    {
       /** using a shared_ptr breaks the circular dependency created between operations and the fee schedule */
@@ -74,11 +82,13 @@ namespace graphene { namespace protocol {
       struct ext
       {
          optional< htlc_options > updatable_htlc_options;
+         optional< custom_authority_options_type > custom_authority_options;
+         optional< uint16_t > market_fee_network_percent;
+         optional< uint16_t > maker_fee_discount_percent;
       };
 
       extension<ext> extensions;
 
-      /** defined in fee_schedule.cpp */
       void validate()const;
       
       chain_parameters();
@@ -86,6 +96,12 @@ namespace graphene { namespace protocol {
       chain_parameters(chain_parameters&& other);
       chain_parameters& operator=(const chain_parameters& other);
       chain_parameters& operator=(chain_parameters&& other);
+
+      /// If @ref market_fee_network_percent is valid, return the value it contains, otherwise return 0
+      uint16_t get_market_fee_network_percent() const;
+
+      /// If @ref maker_fee_discount_percent is valid, return the value it contains, otherwise return 0
+      uint16_t get_maker_fee_discount_percent() const;
 
       private:
       static void safe_copy(chain_parameters& to, const chain_parameters& from);
@@ -98,8 +114,18 @@ FC_REFLECT( graphene::protocol::htlc_options,
       (max_preimage_size)
 )
 
+FC_REFLECT( graphene::protocol::custom_authority_options_type,
+      (max_custom_authority_lifetime_seconds)
+      (max_custom_authorities_per_account)
+      (max_custom_authorities_per_account_op)
+      (max_custom_authority_restrictions)
+)
+
 FC_REFLECT( graphene::protocol::chain_parameters::ext,
       (updatable_htlc_options)
+      (custom_authority_options)
+      (market_fee_network_percent)
+      (maker_fee_discount_percent)
 )
 
 FC_REFLECT( graphene::protocol::chain_parameters,

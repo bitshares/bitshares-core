@@ -45,12 +45,14 @@ add_library( graphene_chain
              transfer_evaluator.cpp
              proposal_evaluator.cpp
              market_evaluator.cpp
+             ticket_evaluator.cpp
              vesting_balance_evaluator.cpp
              withdraw_permission_evaluator.cpp
              worker_evaluator.cpp
              htlc_evaluator.cpp
              confidential_evaluator.cpp
              special_authority_evaluation.cpp
+             custom_authority_evaluator.cpp
              buyback.cpp
 
              account_object.cpp
@@ -59,6 +61,7 @@ add_library( graphene_chain
              market_object.cpp
              proposal_object.cpp
              vesting_balance_object.cpp
+             ticket_object.cpp
              small_objects.cpp
 
              block_database.cpp
@@ -74,17 +77,36 @@ target_link_libraries( graphene_chain fc graphene_db graphene_protocol )
 target_include_directories( graphene_chain
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/include" )
 
+set( GRAPHENE_CHAIN_BIG_FILES
+     db_init.cpp
+     db_block.cpp
+     db_maint.cpp
+     db_market.cpp
+     database.cpp
+     block_database.cpp
+   )
+
 if(MSVC)
-  set_source_files_properties( db_init.cpp db_block.cpp database.cpp block_database.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
+  set_source_files_properties( ${GRAPHENE_CHAIN_BIG_FILES} PROPERTIES COMPILE_FLAGS "/bigobj" )
+else( MSVC )
+   if( MINGW )
+      set_source_files_properties( ${GRAPHENE_CHAIN_BIG_FILES} PROPERTIES COMPILE_FLAGS -Wa,-mbig-obj )
+      if( (CMAKE_BUILD_TYPE MATCHES Release) OR (CMAKE_BUILD_TYPE MATCHES RelWithDebInfo) )
+         # Use -Os to avoid string table overflow
+         set_source_files_properties( database.cpp PROPERTIES COMPILE_FLAGS -Os )
+         set_source_files_properties( database.cpp PROPERTIES LINK_FLAGS -Os )
+         set_source_files_properties( database.cpp PROPERTIES STATIC_LIBRARY_FLAGS -Os )
+      endif( CMAKE_BUILD_TYPE )
+   endif( MINGW )
 endif(MSVC)
 
-# Support for CMake < 3.7
-if (${CMAKE_VERSION} VERSION_LESS "3.7.0")
-    MESSAGE(STATUS "Configuring for legacy CMake (CMake version ${CMAKE_VERSION} older than 3.7.0)")
+# Support for CMake < 3.4
+if (${CMAKE_VERSION} VERSION_LESS "3.4.0")
+    MESSAGE(STATUS "Configuring for legacy CMake (CMake version ${CMAKE_VERSION} older than 3.4.0)")
     MESSAGE(STATUS "  Target propertes not supported (SOURCE_DIR, BINARY_DIR)")
 
-    set(GRAPHENE_CHAIN_BIN_LEGACY "${PROJECT_BINARY_DIR}")
-    set(GRAPHENE_CHAIN_SOURCE_LEGACY "${PROJECT_SOURCE_DIR}")
+    set(GRAPHENE_CHAIN_BIN_LEGACY "${PROJECT_BINARY_DIR}/libraries/chain" CACHE STRING "Path to fc chain")
+    set(GRAPHENE_CHAIN_SOURCE_LEGACY "${PROJECT_SOURCE_DIR}/libraries/chain" CACHE STRING "Path to fc chain")
 endif ()
 
 INSTALL( TARGETS

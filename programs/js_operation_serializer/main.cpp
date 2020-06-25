@@ -37,10 +37,12 @@
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/custom_operations/custom_operations_plugin.hpp>
 
 #include <iostream>
 
 using namespace graphene::chain;
+using namespace graphene::custom_operations;
 
 namespace detail_ns {
 
@@ -291,7 +293,7 @@ struct serializer< fc::static_variant<T...>, false >
       {
          init = true;
          fc::static_variant<T...> var;
-         for( int i = 0; i < var.count(); ++i )
+         for( size_t i = 0; i < var.count(); ++i )
          {
             var.set_which(i);
             var.visit( register_type_visitor() );
@@ -370,7 +372,7 @@ int main( int argc, char** argv )
     operation op;
 
     std::cout << "ChainTypes.operations=\n";
-    for( int i = 0; i < op.count(); ++i )
+    for( size_t i = 0; i < op.count(); ++i )
     {
        op.set_which(i);
        op.visit( detail_ns::serialize_type_visitor(i) );
@@ -392,6 +394,8 @@ int main( int argc, char** argv )
     detail_ns::serializer<operation>::init();
     detail_ns::serializer<transaction>::init();
     detail_ns::serializer<signed_transaction>::init();
+    detail_ns::serializer<account_storage_map>::init();
+
     for( const auto& gen : detail_ns::serializers )
        gen();
 

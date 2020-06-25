@@ -22,8 +22,6 @@ class application_impl : public net::node_delegate
 
       void reset_p2p_node(const fc::path& data_dir);
 
-      std::vector<fc::ip::endpoint> resolve_string_to_ip_endpoints(const std::string& endpoint_string);
-
       void new_connection( const fc::http::websocket_connection_ptr& c );
 
       void reset_websocket_server();

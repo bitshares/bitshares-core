@@ -1,11 +1,11 @@
 get_target_property(GRAPHENE_CHAIN_SOURCE graphene_chain SOURCE_DIR)
 get_target_property(GRAPHENE_CHAIN_BIN graphene_chain BINARY_DIR)
 
-# This is here only to support CMake < 3.7
+# This is here only to support CMake < 3.4
 if (NOT GRAPHENE_CHAIN_SOURCE)
   set(GRAPHENE_CHAIN_SOURCE ${GRAPHENE_CHAIN_SOURCE_LEGACY})
 endif()
-# This is here only to support CMake < 3.7
+# This is here only to support CMake < 3.4
 if (NOT GRAPHENE_CHAIN_BIN)
   set(GRAPHENE_CHAIN_BIN ${GRAPHENE_CHAIN_BIN_LEGACY})
 endif()
