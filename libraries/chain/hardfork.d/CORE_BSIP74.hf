@@ -1,4 +1,4 @@
 // bitshares-core BSIP 74 add margin call fee
 #ifndef HARDFORK_CORE_BSIP74_TIME
-#define HARDFORK_CORE_BSIP74_TIME (fc::time_point_sec( 1679955066 ) ) // Temporary date until actual hardfork date is set
+#define HARDFORK_CORE_BSIP74_TIME (fc::time_point_sec( 1596117300 )) // Thursday, July 30, 2020 13:55:00 UTC
 #endif
