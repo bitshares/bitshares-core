@@ -43,7 +43,6 @@
 #include <fc/io/fstream.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/rpc/websocket_api.hpp>
-#include <fc/network/resolve.hpp>
 #include <fc/crypto/base64.hpp>
 
 #include <boost/filesystem/path.hpp>
@@ -125,41 +124,14 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    if( _options->count("seed-node") )
    {
       auto seeds = _options->at("seed-node").as<vector<string>>();
-      for( const string& endpoint_string : seeds )
-      {
-         try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
-            for (const fc::ip::endpoint& endpoint : endpoints)
-            {
-               ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-               _p2p_network->add_node(endpoint);
-               _p2p_network->connect_to_endpoint(endpoint);
-            }
-         } catch( const fc::exception& e ) {
-            wlog( "caught exception ${e} while adding seed node ${endpoint}",
-                     ("e", e.to_detail_string())("endpoint", endpoint_string) );
-         }
-      }
+      _p2p_network->add_seed_nodes(seeds);
    }
 
    if( _options->count("seed-nodes") )
    {
       auto seeds_str = _options->at("seed-nodes").as<string>();
       auto seeds = fc::json::from_string(seeds_str).as<vector<string>>(2);
-      for( const string& endpoint_string : seeds )
-      {
-         try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
-            for (const fc::ip::endpoint& endpoint : endpoints)
-            {
-               ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-               _p2p_network->add_node(endpoint);
-            }
-         } catch( const fc::exception& e ) {
-            wlog( "caught exception ${e} while adding seed node ${endpoint}",
-                     ("e", e.to_detail_string())("endpoint", endpoint_string) );
-         }
-      }
+      _p2p_network->add_seed_nodes(seeds);
    }
    else
    {
@@ -167,20 +139,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       vector<string> seeds = {
          #include "../egenesis/seed-nodes.txt"
       };
-      for( const string& endpoint_string : seeds )
-      {
-         try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
-            for (const fc::ip::endpoint& endpoint : endpoints)
-            {
-               ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-               _p2p_network->add_node(endpoint);
-            }
-         } catch( const fc::exception& e ) {
-            wlog( "caught exception ${e} while adding seed node ${endpoint}",
-                     ("e", e.to_detail_string())("endpoint", endpoint_string) );
-         }
-      }
+      _p2p_network->add_seed_nodes(seeds);
    }
 
    if( _options->count("p2p-endpoint") )
@@ -195,36 +154,6 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
                                         _chain_db->head_block_id()),
                            std::vector<uint32_t>());
 } FC_CAPTURE_AND_RETHROW() }
-
-std::vector<fc::ip::endpoint> application_impl::resolve_string_to_ip_endpoints(const std::string& endpoint_string)
-{
-   try
-   {
-      string::size_type colon_pos = endpoint_string.find(':');
-      if (colon_pos == std::string::npos)
-         FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
-                  ("endpoint_string", endpoint_string));
-      std::string port_string = endpoint_string.substr(colon_pos + 1);
-      try
-      {
-         uint16_t port = boost::lexical_cast<uint16_t>(port_string);
-
-         std::string hostname = endpoint_string.substr(0, colon_pos);
-         std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
-         if (endpoints.empty())
-            FC_THROW_EXCEPTION( fc::unknown_host_exception,
-                                "The host name can not be resolved: ${hostname}",
-                                ("hostname", hostname) );
-         return endpoints;
-      }
-      catch (const boost::bad_lexical_cast&)
-      {
-         FC_THROW("Bad port: ${port}", ("port", port_string));
-      }
-   }
-   FC_CAPTURE_AND_RETHROW((endpoint_string))
-}
-
 
 void application_impl::new_connection( const fc::http::websocket_connection_ptr& c )
 {
@@ -343,11 +272,47 @@ void application_impl::set_api_limit() {
    if(_options->count("api-limit-get-limit-orders")){
       _app_options.api_limit_get_limit_orders = _options->at("api-limit-get-limit-orders").as<uint64_t>();
    }
+   if(_options->count("api-limit-get-limit-orders-by-account")){
+      _app_options.api_limit_get_limit_orders_by_account = _options->at("api-limit-get-limit-orders-by-account").as<uint64_t>();
+   }
    if(_options->count("api-limit-get-order-book")){
       _app_options.api_limit_get_order_book = _options->at("api-limit-get-order-book").as<uint64_t>();
    }
    if(_options->count("api-limit-list-htlcs")){
       _app_options.api_limit_list_htlcs = _options->at("api-limit-list-htlcs").as<uint64_t>();
+   }
+   if(_options->count("api-limit-lookup-accounts")) {
+      _app_options.api_limit_lookup_accounts = _options->at("api-limit-lookup-accounts").as<uint64_t>();
+   }
+   if(_options->count("api-limit-lookup-witness-accounts")) {
+      _app_options.api_limit_lookup_witness_accounts = _options->at("api-limit-lookup-witness-accounts").as<uint64_t>();
+   }
+   if(_options->count("api-limit-lookup-committee-member-accounts")) {
+      _app_options.api_limit_lookup_committee_member_accounts = _options->at("api-limit-lookup-committee-member-accounts").as<uint64_t>();
+   }
+   if(_options->count("api-limit-lookup-vote-ids")) {
+      _app_options.api_limit_lookup_vote_ids = _options->at("api-limit-lookup-vote-ids").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-account-limit-orders")) {
+      _app_options.api_limit_get_account_limit_orders = _options->at("api-limit-get-account-limit-orders").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-collateral-bids")) {
+      _app_options.api_limit_get_collateral_bids = _options->at("api-limit-get-collateral-bids").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-top-markets")) {
+      _app_options.api_limit_get_top_markets = _options->at("api-limit-get-top-markets").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-trade-history")) {
+      _app_options.api_limit_get_trade_history = _options->at("api-limit-get-trade-history").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-trade-history-by-sequence")) {
+      _app_options.api_limit_get_trade_history_by_sequence = _options->at("api-limit-get-trade-history-by-sequence").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-withdraw-permissions-by-giver")) {
+      _app_options.api_limit_get_withdraw_permissions_by_giver = _options->at("api-limit-get-withdraw-permissions-by-giver").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-withdraw-permissions-by-recipient")) {
+      _app_options.api_limit_get_withdraw_permissions_by_recipient = _options->at("api-limit-get-withdraw-permissions-by-recipient").as<uint64_t>();
    }
 }
 
@@ -477,6 +442,9 @@ void application_impl::startup()
    if( _active_plugins.find( "market_history" ) != _active_plugins.end() )
       _app_options.has_market_history_plugin = true;
 
+   if( _active_plugins.find( "api_helper_indexes" ) != _active_plugins.end() )
+      _app_options.has_api_helper_indexes_plugin = true;
+
    if( _options->count("api-access") ) {
 
       fc::path api_access_file = _options->at("api-access").as<boost::filesystem::path>();
@@ -500,6 +468,7 @@ void application_impl::startup()
       wild_access.allowed_apis.push_back( "network_broadcast_api" );
       wild_access.allowed_apis.push_back( "history_api" );
       wild_access.allowed_apis.push_back( "orders_api" );
+      wild_access.allowed_apis.push_back( "custom_operations_api" );
       _apiaccess.permission_map["*"] = wild_access;
    }
 
@@ -1015,35 +984,59 @@ void application::set_program_options(boost::program_options::options_descriptio
           "Whether to enable tracking of votes of standby witnesses and committee members. "
           "Set it to true to provide accurate data to API clients, set to false for slightly better performance.")
          ("api-limit-get-account-history-operations",boost::program_options::value<uint64_t>()->default_value(100),
-          "For history_api::get_account_history_operations to set its default limit value as 100")
+          "For history_api::get_account_history_operations to set max limit value")
          ("api-limit-get-account-history",boost::program_options::value<uint64_t>()->default_value(100),
-          "For history_api::get_account_history to set its default limit value as 100")
+          "For history_api::get_account_history to set max limit value")
          ("api-limit-get-grouped-limit-orders",boost::program_options::value<uint64_t>()->default_value(101),
-          "For orders_api::get_grouped_limit_orders to set its default limit value as 101")
+          "For orders_api::get_grouped_limit_orders to set max limit value")
          ("api-limit-get-relative-account-history",boost::program_options::value<uint64_t>()->default_value(100),
-          "For history_api::get_relative_account_history to set its default limit value as 100")
+          "For history_api::get_relative_account_history to set max limit value")
          ("api-limit-get-account-history-by-operations",boost::program_options::value<uint64_t>()->default_value(100),
-          "For history_api::get_account_history_by_operations to set its default limit value as 100")
+          "For history_api::get_account_history_by_operations to set max limit value")
          ("api-limit-get-asset-holders",boost::program_options::value<uint64_t>()->default_value(100),
-          "For asset_api::get_asset_holders to set its default limit value as 100")
+          "For asset_api::get_asset_holders to set max limit value")
          ("api-limit-get-key-references",boost::program_options::value<uint64_t>()->default_value(100),
-          "For database_api_impl::get_key_references to set its default limit value as 100")
+          "For database_api_impl::get_key_references to set max limit value")
          ("api-limit-get-htlc-by",boost::program_options::value<uint64_t>()->default_value(100),
-          "For database_api_impl::get_htlc_by_from and get_htlc_by_to to set its default limit value as 100")
-         ("api-limit-get-full-accounts",boost::program_options::value<uint64_t>()->default_value(10),
-          "For database_api_impl::get_full_accounts to set its account default limit values as 10")
-         ("api-limit-get-full-accounts-lists",boost::program_options::value<uint64_t>()->default_value(100),
-          "For database_api_impl::get_full_accounts to set its lists default limit values as 100")
+          "For database_api_impl::get_htlc_by_from and get_htlc_by_to to set max limit value")
+         ("api-limit-get-full-accounts",boost::program_options::value<uint64_t>()->default_value(50),
+          "For database_api_impl::get_full_accounts to set max accounts to query at once")
+         ("api-limit-get-full-accounts-lists",boost::program_options::value<uint64_t>()->default_value(500),
+          "For database_api_impl::get_full_accounts to set max items to return in the lists")
          ("api-limit-get-call-orders",boost::program_options::value<uint64_t>()->default_value(300),
-          "For database_api_impl::get_call_orders and get_call_orders_by_account to set its default limit values as 300")
+          "For database_api_impl::get_call_orders and get_call_orders_by_account to set max limit value")
          ("api-limit-get-settle-orders",boost::program_options::value<uint64_t>()->default_value(300),
-          "For database_api_impl::get_settle_orders and get_settle_orders_by_account to set its default limit values as 300")
+          "For database_api_impl::get_settle_orders and get_settle_orders_by_account to set max limit value")
          ("api-limit-get-assets",boost::program_options::value<uint64_t>()->default_value(101),
-          "For database_api_impl::list_assets and get_assets_by_issuer to set its default limit values as 101")
+          "For database_api_impl::list_assets and get_assets_by_issuer to set max limit value")
          ("api-limit-get-limit-orders",boost::program_options::value<uint64_t>()->default_value(300),
-          "For database_api_impl::get_limit_orders to set its default limit value as 300")
+          "For database_api_impl::get_limit_orders to set max limit value")
+         ("api-limit-get-limit-orders-by-account",boost::program_options::value<uint64_t>()->default_value(101),
+          "For database_api_impl::get_limit_orders_by_account to set max limit value")
          ("api-limit-get-order-book",boost::program_options::value<uint64_t>()->default_value(50),
-          "For database_api_impl::get_order_book to set its default limit value as 50")
+          "For database_api_impl::get_order_book to set max limit value")
+         ("api-limit-lookup-accounts",boost::program_options::value<uint64_t>()->default_value(1000),
+          "For database_api_impl::lookup_accounts to set max limit value")
+         ("api-limit-lookup-witness-accounts",boost::program_options::value<uint64_t>()->default_value(1000),
+          "For database_api_impl::lookup_witness_accounts to set max limit value")
+         ("api-limit-lookup-committee-member-accounts",boost::program_options::value<uint64_t>()->default_value(1000),
+          "For database_api_impl::lookup_committee_member_accounts to set max limit value")
+         ("api-limit-lookup-vote-ids",boost::program_options::value<uint64_t>()->default_value(1000),
+          "For database_api_impl::lookup_vote_ids to set max limit value")
+         ("api-limit-get-account-limit-orders",boost::program_options::value<uint64_t>()->default_value(101),
+          "For database_api_impl::get_account_limit_orders to set max limit value")
+         ("api-limit-get-collateral-bids",boost::program_options::value<uint64_t>()->default_value(100),
+          "For database_api_impl::get_collateral_bids to set max limit value")
+         ("api-limit-get-top-markets",boost::program_options::value<uint64_t>()->default_value(100),
+          "For database_api_impl::get_top_markets to set max limit value")
+         ("api-limit-get-trade-history",boost::program_options::value<uint64_t>()->default_value(100),
+          "For database_api_impl::get_trade_history to set max limit value")
+         ("api-limit-get-trade-history-by-sequence",boost::program_options::value<uint64_t>()->default_value(100),
+          "For database_api_impl::get_trade_history_by_sequence to set max limit value")
+         ("api-limit-get-withdraw-permissions-by-giver",boost::program_options::value<uint64_t>()->default_value(101),
+          "For database_api_impl::get_withdraw_permissions_by_giver to set max limit value")
+         ("api-limit-get-withdraw-permissions-by-recipient",boost::program_options::value<uint64_t>()->default_value(101),
+          "For database_api_impl::get_withdraw_permissions_by_recipient to set max limit value")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()

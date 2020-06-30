@@ -43,6 +43,8 @@
 
 #include <map>
 
+namespace graphene { namespace protocol { struct predicate_result; } }
+
 namespace graphene { namespace chain {
    using graphene::db::abstract_object;
    using graphene::db::object;
@@ -279,6 +281,17 @@ namespace graphene { namespace chain {
 
          node_property_object& node_properties();
 
+         /**
+          * @brief Get a list of custom authorities which can validate the provided operation for the provided account
+          * @param account The account whose authority is required
+          * @param op The operation requring the specified account's authority
+          * @param rejected_authorities [Optional] A pointer to a map that should be populated with the custom
+          * authorities which were valid, but rejected because the operation did not comply with the restrictions
+          * @return A vector of authorities which can be used to authorize op in place of account
+          */
+         vector<authority> get_viable_custom_authorities(
+                 account_id_type account, const operation& op,
+                 rejected_predicate_map* rejected_authorities = nullptr )const;
 
          uint32_t last_non_undoable_block_num() const;
          //////////////////// db_init.cpp ////////////////////
@@ -365,6 +378,13 @@ namespace graphene { namespace chain {
          void cancel_bid(const collateral_bid_object& bid, bool create_virtual_op = true);
          void execute_bid( const collateral_bid_object& bid, share_type debt_covered, share_type collateral_from_fund, const price_feed& current_feed );
 
+      private:
+         template<typename IndexType>
+         void globally_settle_asset_impl( const asset_object& bitasset,
+                                          const price& settle_price,
+                                          const IndexType& call_index );
+
+      public:
          /**
           * @brief Process a new limit order through the markets
           * @param order The new order to process
@@ -390,9 +410,30 @@ namespace graphene { namespace chain {
           */
          ///@{
          int match( const limit_order_object& taker, const limit_order_object& maker, const price& trade_price );
+         /***
+          * @brief Match limit order as taker to a call order as maker
+          * @param taker the order that is removing liquidity from the book
+          * @param maker the order that put liquidity on the book
+          * @param trade_price the price the trade should execute at
+          * @param feed_price the price of the current feed
+          * @param maintenance_collateral_ratio the maintenance collateral ratio
+          * @param maintenance_collateralization the maintenance collateralization
+          * @param call_pays_price price call order pays. Call order may pay more collateral
+          *    than limit order takes if call order subject to a margin call fee.
+          * @returns 0 if no orders were matched, 1 if taker was filled, 2 if maker was filled, 3 if both were filled
+          */
          int match( const limit_order_object& taker, const call_order_object& maker, const price& trade_price,
                     const price& feed_price, const uint16_t maintenance_collateral_ratio,
-                    const optional<price>& maintenance_collateralization );
+                    const optional<price>& maintenance_collateralization,
+                    const price& call_pays_price);
+         // If separate call_pays_price not provided, assume call pays at trade_price:
+         int match( const limit_order_object& taker, const call_order_object& maker, const price& trade_price,
+                    const price& feed_price, const uint16_t maintenance_collateral_ratio,
+                    const optional<price>& maintenance_collateralization) {
+            return match(taker, maker, trade_price, feed_price, maintenance_collateral_ratio,
+                         maintenance_collateralization, trade_price);
+         }
+
          ///@}
 
          /// Matches the two orders, the first parameter is taker, the second is maker.
@@ -404,12 +445,37 @@ namespace graphene { namespace chain {
                    const price& fill_price);
 
          /**
+          * @brief fills limit order
+          * @param order the order
+          * @param pays what the account is paying
+          * @param receives what the account is receiving
+          * @param cull_if_small take care of dust
+          * @param fill_price the transaction price
+          * @param is_maker TRUE if this order is maker, FALSE if taker
           * @return true if the order was completely filled and thus freed.
           */
-         bool fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small,
-                                const price& fill_price, const bool is_maker );
+         bool fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives,
+               bool cull_if_small, const price& fill_price, const bool is_maker );
+         /***
+          * @brief attempt to fill a call order
+          * @param order the order
+          * @param pays what the buyer pays for the collateral
+          * @param receives the collateral received by the buyer
+          * @param fill_price the price the transaction executed at
+          * @param is_maker TRUE if the buyer is the maker, FALSE if the buyer is the taker
+          * @param margin_fee Margin call fees paid in collateral asset
+          * @returns TRUE if the order was completely filled
+          */
          bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
-                               const price& fill_price, const bool is_maker );
+                               const price& fill_price, const bool is_maker, const asset& margin_fee );
+
+         // Overload provides compatible default value for margin_fee: (margin_fee.asset_id == pays.asset_id)
+         bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
+                               const price& fill_price, const bool is_maker )
+         {
+            return fill_call_order( order, pays, receives, fill_price, is_maker, asset(0, pays.asset_id) );
+         }
+
          bool fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
                                  const price& fill_price, const bool is_maker );
 
@@ -419,9 +485,16 @@ namespace graphene { namespace chain {
          // helpers to fill_order
          void pay_order( const account_object& receiver, const asset& receives, const asset& pays );
 
-         asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
-         asset pay_market_fees( const asset_object& recv_asset, const asset& receives );
-         asset pay_market_fees( const account_object& seller, const asset_object& recv_asset, const asset& receives );
+         /**
+          * @brief Calculate the market fee that is to be taken
+          * @param trade_asset the asset (passed in to avoid a lookup)
+          * @param trade_amount the quantity that the fee calculation is based upon
+          * @param is_maker TRUE if this is the fee for a maker, FALSE if taker
+          */
+         asset calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount, const bool& is_maker);
+         asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,
+                               const bool& is_maker);
+         asset pay_force_settle_fees(const asset_object& collecting_asset, const asset& collat_receives);
          ///@}
 
 
@@ -483,7 +556,7 @@ namespace graphene { namespace chain {
 
          //////////////////// db_block.cpp ////////////////////
 
-       public:
+      public:
          // these were formerly private, but they have a fairly well-defined API, so let's make them public
          void                  apply_block( const signed_block& next_block, uint32_t skip = skip_nothing );
          processed_transaction apply_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
@@ -499,6 +572,8 @@ namespace graphene { namespace chain {
 
          const witness_object& validate_block_header( uint32_t skip, const signed_block& next_block )const;
          const witness_object& _validate_block_header( const signed_block& next_block )const;
+         void verify_signing_witness( const signed_block& new_block, const fork_item& fork_entry )const;
+         void update_witnesses( fork_item& fork_entry )const;
          void create_block_summary(const signed_block& next_block);
 
          //////////////////// db_witness_schedule.cpp ////////////////////
@@ -506,6 +581,9 @@ namespace graphene { namespace chain {
          uint32_t update_witness_missed_blocks( const signed_block& b );
 
          //////////////////// db_update.cpp ////////////////////
+      public:
+         generic_operation_result process_tickets();
+      private:
          void update_global_dynamic_data( const signed_block& b, const uint32_t missed_blocks );
          void update_signing_witness(const witness_object& signing_witness, const signed_block& new_block);
          void update_last_irreversible_block();
@@ -570,7 +648,8 @@ namespace graphene { namespace chain {
          vector<uint64_t>                  _vote_tally_buffer;
          vector<uint64_t>                  _witness_count_histogram_buffer;
          vector<uint64_t>                  _committee_count_histogram_buffer;
-         uint64_t                          _total_voting_stake;
+         uint64_t                          _total_voting_stake[2]; // 0=committee, 1=witness,
+                                                                   // as in vote_id_type::vote_type
 
          flat_map<uint32_t,block_id_type>  _checkpoints;
 

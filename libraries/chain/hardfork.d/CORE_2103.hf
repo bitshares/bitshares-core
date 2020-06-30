@@ -1,0 +1,6 @@
+// bitshares-core issue #2103 250M BTS supply
+#ifndef HARDFORK_CORE_2103_TIME
+#define HARDFORK_CORE_2103_TIME (fc::time_point_sec( 1596117300 )) // Thursday, July 30, 2020 13:55:00 UTC
+#define HARDFORK_CORE_2103_PASSED(now) (now >= HARDFORK_CORE_2103_TIME)
+#define HARDFORK_CORE_2103_BALANCE_ID 56720 // 1.15.56720
+#endif

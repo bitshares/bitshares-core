@@ -742,7 +742,7 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
    {
       const asset_bitasset_data_object& obj = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(obj.feeds.size(), 3u);
-      BOOST_CHECK(obj.current_feed == price_feed());
+      BOOST_CHECK( obj.current_feed.margin_call_params_equal( price_feed() ) );
    }
    {
       const asset_object& bit_usd = bit_usd_id(db);
@@ -2008,8 +2008,6 @@ BOOST_AUTO_TEST_CASE( vbo_withdraw_different )
 BOOST_AUTO_TEST_CASE( top_n_special )
 {
    ACTORS( (alice)(bob)(chloe)(dan)(izzy)(stan) );
-
-   generate_blocks( HARDFORK_516_TIME );
 
    try
    {

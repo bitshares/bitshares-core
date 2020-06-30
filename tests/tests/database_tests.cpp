@@ -86,7 +86,7 @@ BOOST_AUTO_TEST_CASE(failed_modify_test)
    BOOST_CHECK_THROW(db.modify(obj, [](account_balance_object& obj) {
       throw 5;
    }), int);
-   BOOST_CHECK_NE((long)db.find_object(obj_id), (long)nullptr);
+   BOOST_CHECK(db.find_object(obj_id));
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( flat_index_test )
@@ -229,8 +229,8 @@ BOOST_AUTO_TEST_CASE( required_approval_index_test ) // see https://github.com/b
 
    database db1;
    db1.initialize_indexes();
-   const auto& proposals = db1.get_index_type< primary_index< proposal_index > >();
-   const auto& required_approvals = proposals.get_secondary_index< required_approval_index >()._account_to_proposals;
+   const auto& required_approvals = db1.add_secondary_index<primary_index<proposal_index>, required_approval_index>()
+                                       ->_account_to_proposals;
 
    // Create a proposal
    const auto& prop = db1.create<proposal_object>( [this,alice_id,agnetha_id]( object& o ) {
@@ -279,8 +279,8 @@ BOOST_AUTO_TEST_CASE( required_approval_index_test ) // see https://github.com/b
    database db2;
    db2.initialize_indexes();
    const auto& reloaded_proposals = db2.get_index_type< primary_index< proposal_index > >();
-   const auto& reloaded_approvals = reloaded_proposals.get_secondary_index<required_approval_index>()
-                                                                                              ._account_to_proposals;
+   const auto& reloaded_approvals = db2.add_secondary_index<primary_index<proposal_index>, required_approval_index>()
+                                       ->_account_to_proposals;
    const_cast< primary_index< proposal_index >& >( reloaded_proposals ).load( serialized );
    const auto& prop2 = *reloaded_proposals.indices().begin();
 

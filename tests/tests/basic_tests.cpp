@@ -291,7 +291,29 @@ BOOST_AUTO_TEST_CASE( price_test )
     dummy.maximum_short_squeeze_ratio = 1234;
     dummy.settlement_price = price(asset(1000), asset(2000, asset_id_type(1)));
     price_feed dummy2 = dummy;
-    BOOST_CHECK(dummy == dummy2);
+    price_feed dummy3 = dummy;
+    dummy3.core_exchange_rate = price( asset(11), asset(13, asset_id_type(1)) );
+    BOOST_CHECK( dummy.margin_call_params_equal( dummy ) );
+    BOOST_CHECK( dummy.margin_call_params_equal( dummy2 ) );
+    BOOST_CHECK( dummy.margin_call_params_equal( dummy3 ) );
+    dummy.maximum_short_squeeze_ratio = 1235;
+    BOOST_CHECK( dummy.margin_call_params_equal( dummy ) );
+    BOOST_CHECK( !dummy.margin_call_params_equal( dummy2 ) );
+    BOOST_CHECK( !dummy.margin_call_params_equal( dummy3 ) );
+    dummy2.maximum_short_squeeze_ratio = 1235;
+    BOOST_CHECK( dummy.margin_call_params_equal( dummy ) );
+    BOOST_CHECK( dummy.margin_call_params_equal( dummy2 ) );
+    BOOST_CHECK( !dummy.margin_call_params_equal( dummy3 ) );
+    dummy2.maintenance_collateral_ratio = 1003;
+    BOOST_CHECK( dummy.margin_call_params_equal( dummy ) );
+    BOOST_CHECK( !dummy.margin_call_params_equal( dummy2 ) );
+    BOOST_CHECK( !dummy.margin_call_params_equal( dummy3 ) );
+    dummy3.maximum_short_squeeze_ratio = 1235;
+    BOOST_CHECK( dummy.margin_call_params_equal( dummy3 ) );
+    dummy3.settlement_price = price( asset(1), asset(3, asset_id_type(1)) );
+    BOOST_CHECK( !dummy.margin_call_params_equal( dummy3 ) );
+    dummy3.settlement_price = price( asset(1), asset(2, asset_id_type(1)) );
+    BOOST_CHECK( dummy.margin_call_params_equal( dummy3 ) );
 }
 
 BOOST_AUTO_TEST_CASE( price_multiplication_test )
