@@ -20,6 +20,7 @@ jobs:
     steps:
     - name: Install dependencies
       run: |
+        sudo apt-get update
         sudo apt-get install -y \
                      ccache \
                      parallel \
@@ -91,6 +92,7 @@ jobs:
     steps:
     - name: Install dependencies
       run: |
+        sudo apt-get update
         sudo apt-get install -y \
                      ccache \
                      parallel \
@@ -182,6 +184,7 @@ jobs:
     - name: Install dependencies
       if: steps.cache-libs.outputs.cache-hit != 'true'
       run: |
+        sudo apt-get update
         sudo apt-get install -y \
                      g++-mingw-w64-x86-64 \
                      mingw-w64-tools
@@ -260,6 +263,7 @@ jobs:
     steps:
     - name: Install dependencies
       run: |
+        sudo apt-get update
         sudo apt-get install -y \
                      ccache \
                      g++-mingw-w64-x86-64 \
