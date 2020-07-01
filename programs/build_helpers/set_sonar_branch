@@ -45,9 +45,9 @@ else
     BRANCH="$TRAVIS_BRANCH"
     case "$TRAVIS_BRANCH" in
 	master|develop|testnet|hardfork)
-	    # Long-lived branches stand for themselves
+	    # Long-lived branches stand for themselves, no target
 	    echo "Detected long-lived branch '$TRAVIS_BRANCH'"
-	    TARGET="$TRAVIS_BRANCH"
+	    TARGET=
 	    FETCH="$TRAVIS_BRANCH"
 	    ;;
 	*test*release*)
