@@ -92,6 +92,7 @@ jobs:
     steps:
     - name: Install dependencies
       run: |
+        df -h
         sudo apt-get update
         sudo apt-get install -y \
                      ccache \
@@ -111,6 +112,8 @@ jobs:
         sudo apt-get auto-remove -y
         sudo apt-get clean -y
         df -h
+        du -hs /mnt/*
+        ls -alr /mnt/
     - uses: actions/checkout@v2
       with:
         submodules: recursive
