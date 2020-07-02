@@ -308,6 +308,9 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::limit_order_object,
                     (expiration)(seller)(for_sale)(sell_price)(deferred_fee)(deferred_paid_fee)
                   )
 
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::filled_order_object,(graphene::db::object),(fee)(order_id)(account_id)(pays)(receives)(fill_price)(is_maker) )
+
+
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::call_order_object, (graphene::db::object),
                     (borrower)(collateral)(debt)(call_price)(target_collateral_ratio) )
 
@@ -320,6 +323,8 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::collateral_bid_object, (graphen
                     (bidder)(inv_swan_price) )
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::limit_order_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::ugly_limit_order_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::filled_order_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::call_order_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::force_settlement_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::collateral_bid_object )

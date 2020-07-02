@@ -67,6 +67,16 @@ class limit_order_object : public abstract_object<limit_order_object>
       asset_id_type receive_asset_id()const { return sell_price.quote.asset_id; }
 };
 
+struct ugly_limit_order_object
+{
+      ugly_limit_order_object( const limit_order_object& o )
+      : seller(o.seller), for_sale(o.for_sale), sell_price(o.sell_price) {}
+
+      account_id_type  seller;
+      share_type       for_sale; ///< asset id is sell_price.base.asset_id
+      price            sell_price;
+};
+
 struct by_price;
 struct by_expiration;
 struct by_account;
@@ -108,6 +118,34 @@ typedef multi_index_container<
 > limit_order_multi_index_type;
 
 typedef generic_index<limit_order_object, limit_order_multi_index_type> limit_order_index;
+
+class filled_order_object : public abstract_object<filled_order_object>
+{
+public:
+      static const uint8_t space_id = implementation_ids;
+      static const uint8_t type_id  = impl_filled_order_object_type;
+	  
+      filled_order_object(){}
+      filled_order_object( object_id_type o, account_id_type a, asset p, asset r, asset f, price fp, bool m )
+         :order_id(o),account_id(a),pays(p),receives(r),fee(f),fill_price(fp),is_maker(m) {}
+
+      object_id_type      order_id;
+      account_id_type     account_id;
+      asset               pays;
+      asset               receives;
+      asset               fee; // paid by receiving account
+      price               fill_price;
+      bool                is_maker;
+};
+
+typedef multi_index_container<
+   filled_order_object,
+   indexed_by<
+      ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >
+   >
+> filled_order_multi_index_type;
+
+typedef generic_index< filled_order_object, filled_order_multi_index_type > filled_order_index;
 
 /**
  * @class call_order_object
@@ -283,13 +321,19 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::limit_order_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::call_order_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::force_settlement_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::collateral_bid_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::filled_order_object)
+
+FC_REFLECT( graphene::chain::ugly_limit_order_object, (seller)(for_sale)(sell_price) )
 
 FC_REFLECT_TYPENAME( graphene::chain::limit_order_object )
+FC_REFLECT_TYPENAME( graphene::chain::filled_order_object )
 FC_REFLECT_TYPENAME( graphene::chain::call_order_object )
 FC_REFLECT_TYPENAME( graphene::chain::force_settlement_object )
 FC_REFLECT_TYPENAME( graphene::chain::collateral_bid_object )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::limit_order_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::ugly_limit_order_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::filled_order_object )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::call_order_object )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::force_settlement_object )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::collateral_bid_object )

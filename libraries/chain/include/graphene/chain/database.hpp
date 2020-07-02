@@ -40,6 +40,7 @@
 #include <fc/signals.hpp>
 
 #include <fc/log/logger.hpp>
+#include <fc/filesystem.hpp>
 
 #include <map>
 
@@ -561,6 +562,13 @@ namespace graphene { namespace chain {
          void                  apply_block( const signed_block& next_block, uint32_t skip = skip_nothing );
          processed_transaction apply_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
          operation_result      apply_operation( transaction_evaluation_state& eval_state, const operation& op );
+
+         // Ugly snapshots
+         fc::path                                         _ugly_snapshot_path;
+         uint32_t                                         _ugly_snapshot_start_block;
+         flat_set<std::pair<asset_id_type,asset_id_type>> _ugly_snapshot_markets;
+         void create_ugly_snapshot();
+		 void record_ugly_filled_order(object_id_type o, account_id_type a, asset p, asset r, asset f, price fp, bool m);
 
       private:
          void                  _apply_block( const signed_block& next_block );

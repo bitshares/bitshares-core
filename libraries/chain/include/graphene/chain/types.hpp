@@ -45,4 +45,5 @@ GRAPHENE_DEFINE_IDS(chain, implementation_ids, impl_,
                     (special_authority)
                     (buyback)
                     (fba_accumulator)
-                    (collateral_bid))
+                    (collateral_bid)
+                    (filled_order))
