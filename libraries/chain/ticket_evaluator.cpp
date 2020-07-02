@@ -123,8 +123,19 @@ generic_operation_result ticket_update_evaluator::do_apply(const ticket_update_o
       d.modify( stat, [delta_value](account_statistics_object& aso) {
          aso.total_pol_value += delta_value;
       });
-      result.updated_objects.insert( stat.id );
    }
+
+   // Do auto-update now.
+   // Note: calling process_tickets() here won't affect other tickets,
+   //       since head_block_time is not updated after last call,
+   //       even when called via a proposal this time or last time
+   generic_operation_result process_result = d.process_tickets();
+   result.removed_objects.insert( process_result.removed_objects.begin(), process_result.removed_objects.end() );
+   result.updated_objects.insert( process_result.updated_objects.begin(), process_result.updated_objects.end() );
+   for( const auto id : result.new_objects )
+      result.updated_objects.erase( id );
+   for( const auto id : result.removed_objects )
+      result.updated_objects.erase( id );
 
    return result;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
