@@ -76,38 +76,44 @@ BOOST_AUTO_TEST_CASE( api_limit_get_key_references ){
 BOOST_AUTO_TEST_CASE( api_limit_get_full_accounts ) {
 
    try {
-      graphene::app::database_api db_api(db, &(this->app.get_options()));
+      ACTOR(alice);
 
-      const account_object& alice = create_account("alice");
-      const account_object& bob = create_account("bob");
-      const account_object& carl = create_account("carl");
-      const account_object& dan = create_account("dan");
-      const account_object& fred = create_account("fred");
-      const account_object& henry = create_account("henry");
-      const account_object& kevin = create_account("kevin");
-      const account_object& laura = create_account("laura");
-      const account_object& lucy = create_account("lucy");
-      const account_object& martin = create_account("martin");
-      const account_object& patty = create_account("patty");
+      graphene::app::application_options opt = app.get_options();
+      opt.has_api_helper_indexes_plugin = true;
+      graphene::app::database_api db_api( db, &opt );
 
       vector<string> accounts;
-      accounts.push_back(alice.name);
-      accounts.push_back(bob.name);
-      accounts.push_back(carl.name);
-      accounts.push_back(dan.name);
-      accounts.push_back(fred.name);
-      accounts.push_back(henry.name);
-      accounts.push_back(kevin.name);
-      accounts.push_back(laura.name);
-      accounts.push_back(lucy.name);
-      accounts.push_back(martin.name);
-      accounts.push_back(patty.name);
 
+      for( size_t i = 0; i < 50; ++i )
+      {
+         string account_name = "testaccount" + fc::to_string(i);
+         create_account( account_name );
+         accounts.push_back( account_name );
+      }
+      accounts.push_back( "alice" );
+
+      transfer_operation op;
+      op.from = alice_id;
+      op.amount = asset(1);
+      for( size_t i = 0; i < 501; ++i )
+      {
+         propose( op, alice_id );
+      }
+
+      // Too many accounts
       GRAPHENE_CHECK_THROW(db_api.get_full_accounts(accounts, false), fc::exception);
 
       accounts.erase(accounts.begin());
       auto full_accounts = db_api.get_full_accounts(accounts, false);
-      BOOST_CHECK(full_accounts.size() == 10);
+      BOOST_CHECK(full_accounts.size() == 50);
+
+      // The default max list size is 500
+      BOOST_REQUIRE( full_accounts.find("alice") != full_accounts.end() );
+      BOOST_CHECK_EQUAL( full_accounts["alice"].proposals.size(), 500u );
+      BOOST_CHECK( full_accounts["alice"].more_data_available.proposals );
+      BOOST_REQUIRE( full_accounts.find("testaccount9") != full_accounts.end() );
+      BOOST_CHECK_EQUAL( full_accounts["testaccount9"].proposals.size(), 0 );
+      BOOST_CHECK( !full_accounts["testaccount9"].more_data_available.proposals );
 
       // not an account
       accounts.erase(accounts.begin());
@@ -115,7 +121,7 @@ BOOST_AUTO_TEST_CASE( api_limit_get_full_accounts ) {
 
       // non existing accounts will be ignored in the results
       full_accounts = db_api.get_full_accounts(accounts, false);
-      BOOST_CHECK(full_accounts.size() == 9);
+      BOOST_CHECK(full_accounts.size() == 49);
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
@@ -262,17 +268,41 @@ BOOST_AUTO_TEST_CASE( api_limit_lookup_witness_accounts ) {
 BOOST_AUTO_TEST_CASE( api_limit_get_full_accounts2 ) {
 
    try {
-      graphene::app::database_api db_api(db, &(this->app.get_options()));
+      ACTOR(alice);
+
+      graphene::app::application_options opt = app.get_options();
+      opt.has_api_helper_indexes_plugin = true;
+      graphene::app::database_api db_api( db, &opt );
+
       vector<string> accounts;
-      for (int i=0; i<201; i++) {
+      for (int i=0; i<200; i++) {
          std::string acct_name = "mytempacct" + std::to_string(i);
          const account_object& account_name=create_account(acct_name);
          accounts.push_back(account_name.name);
       }
+      accounts.push_back( "alice" );
+
+      transfer_operation op;
+      op.from = alice_id;
+      op.amount = asset(1);
+      for( size_t i = 0; i < 501; ++i )
+      {
+         propose( op, alice_id );
+      }
+
       GRAPHENE_CHECK_THROW(db_api.get_full_accounts(accounts, false), fc::exception);
       accounts.erase(accounts.begin());
       auto full_accounts = db_api.get_full_accounts(accounts, false);
       BOOST_REQUIRE_EQUAL(full_accounts.size(), 200u);
+
+      // The updated max list size is 120
+      BOOST_REQUIRE( full_accounts.find("alice") != full_accounts.end() );
+      BOOST_CHECK_EQUAL( full_accounts["alice"].proposals.size(), 120u );
+      BOOST_CHECK( full_accounts["alice"].more_data_available.proposals );
+      BOOST_REQUIRE( full_accounts.find("mytempacct9") != full_accounts.end() );
+      BOOST_CHECK_EQUAL( full_accounts["mytempacct9"].proposals.size(), 0 );
+      BOOST_CHECK( !full_accounts["mytempacct9"].more_data_available.proposals );
+
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;

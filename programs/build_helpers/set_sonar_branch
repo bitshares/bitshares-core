@@ -24,62 +24,62 @@ clear_branch () {
 
 ORIGINAL_TARGET="$( grep 'sonar\.branch\.target' "$1" | sed 's=^.*[:=] *==' )"
 
+BRANCH=
 TARGET="$ORIGINAL_TARGET"
-FETCH=
 
-if [ -n "$TRAVIS_PULL_REQUEST" -a "$TRAVIS_PULL_REQUEST" != false ]; then
+if [ -n "$TRAVIS_PULL_REQUEST" -a "$TRAVIS_PULL_REQUEST" != "false" ]; then
     # PRs work per default, remove sonar.branch.* since they only work with sonar.pullrequest.*
     echo "Detected PR '$TRAVIS_PULL_REQUEST'"
     TARGET=
-    FETCH="$TRAVIS_BRANCH"
 elif [ -n "$TRAVIS_TAG" ]; then
     # Tag build is either master or testnet
     echo "Detected tag '$TRAVIS_TAG'"
+    BRANCH="$TRAVIS_BRANCH"
     case "$TRAVIS_TAG" in
-	*test*) TARGET=testnet; FETCH=testnet; ;;
-	*)	TARGET=master;  FETCH=master; ;;
+	*test*) TARGET=testnet; ;;
+	*)	TARGET=master; ;;
     esac
 else
+    BRANCH="$TRAVIS_BRANCH"
     case "$TRAVIS_BRANCH" in
 	master|develop|testnet|hardfork)
-	    # Long-lived branches stand for themselves
+	    # Long-lived branches stand for themselves, no target
 	    echo "Detected long-lived branch '$TRAVIS_BRANCH'"
-	    TARGET="$TRAVIS_BRANCH"
-	    FETCH="$TRAVIS_BRANCH"
+	    TARGET=
 	    ;;
 	*test*release*)
 	    # Testnet release branch will be merged into testnet
 	    echo "Detected testnet release branch '$TRAVIS_BRANCH'"
 	    TARGET=testnet
-	    FETCH=testnet
 	    ;;
 	*release*)
 	    # Release branch will be merged into default (master)
 	    echo "Detected release branch '$TRAVIS_BRANCH'"
 	    TARGET=master
-	    FETCH=master
 	    ;;
 	*)
 	    # All other branches should have sonar.branch.target in their
 	    # sonar.properties, leave it unchanged
 	    echo "Detected normal branch '$TRAVIS_BRANCH'"
-	    FETCH="$TARGET"
     esac
 fi
 
-echo "Branch target '$TARGET', fetch target '$FETCH'"
+echo "Branch '$BRANCH', target '$TARGET'"
 
-if [ "$TARGET" != "$ORIGINAL_TARGET" ]; then
+git fetch --no-tags --unshallow
+git fetch --no-tags origin +refs/heads/$TRAVIS_BRANCH:refs/remotes/origin/$TRAVIS_BRANCH
+if [ -n "$TARGET" ]; then
+    git fetch --no-tags origin +refs/heads/$TARGET:refs/remotes/origin/$TARGET
+fi
+
+if [ "x$TARGET" != "x$ORIGINAL_TARGET" ]; then
     clear_branch "$1"
     if [ -n "$TARGET" ]; then
         echo "sonar.branch.target=$TARGET" >>"$1"
     fi
 fi
-#if [ -n "$FETCH" ]; then
-    # Unfortunately this leads to sonar failing. Apparently it needs a full
-    # clone, not a shallow one. Since our repo is somewhat large and this is
-    # only required for blame annotations, disabled for now.
-    #git fetch --depth=50 origin "$FETCH:$FETCH"
-#fi
+if [ -n "$BRANCH" ]; then
+    echo "sonar.branch.name=$BRANCH" >>"$1"
+fi
 
 exit 0
