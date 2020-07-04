@@ -66,8 +66,10 @@ fi
 
 echo "Branch '$BRANCH', target '$TARGET'"
 
-if [ "$TRAVIS_PULL_REQUEST" = "false" -a "$TRAVIS_REPO_SLUG" = "bitshares/bitshares-core" ]; then
-    git fetch --unshallow
+git fetch --no-tags --unshallow
+git fetch --no-tags origin +refs/heads/$TRAVIS_BRANCH:refs/remotes/origin/$TRAVIS_BRANCH
+if [ -n "$TARGET" ]; then
+    git fetch --no-tags origin +refs/heads/$TARGET:refs/remotes/origin/$TARGET
 fi
 
 if [ "x$TARGET" != "x$ORIGINAL_TARGET" ]; then
