@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2019 Contributors.
  *
  * The MIT License
  *
@@ -21,25 +21,21 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#pragma once
-#include <graphene/protocol/types.hpp>
-#include <graphene/db/generic_index.hpp>
 
-namespace graphene { namespace chain {
+#include "restriction_predicate.hxx"
+#include "sliced_lists.hxx"
 
-class witness_schedule_object : public graphene::db::abstract_object<witness_schedule_object>
-{
-   public:
-      static constexpr uint8_t space_id = implementation_ids;
-      static constexpr uint8_t type_id = impl_witness_schedule_object_type;
+namespace graphene { namespace protocol {
+using result_type = object_restriction_predicate<operation>;
 
-      vector< witness_id_type > current_shuffled_witnesses;
-};
-
+result_type get_restriction_predicate_list_11(size_t idx, vector<restriction> rs) {
+   return typelist::runtime::dispatch(operation_list_11::list(), idx, [&rs] (auto t) -> result_type {
+      using Op = typename decltype(t)::type;
+      return [p=restrictions_to_predicate<Op>(std::move(rs), true)] (const operation& op) {
+         FC_ASSERT(op.which() == operation::tag<Op>::value,
+                   "Supplied operation is incorrect type for restriction predicate");
+         return p(op.get<Op>());
+      };
+   });
+}
 } }
-
-MAP_OBJECT_ID_TO_TYPE(graphene::chain::witness_schedule_object)
-
-FC_REFLECT_TYPENAME( graphene::chain::witness_schedule_object )
-
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::witness_schedule_object )

@@ -58,8 +58,8 @@ namespace graphene { namespace chain {
    class asset_dynamic_data_object : public abstract_object<asset_dynamic_data_object>
    {
       public:
-         static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_asset_dynamic_data_object_type;
+         static constexpr uint8_t space_id = implementation_ids;
+         static constexpr uint8_t type_id  = impl_asset_dynamic_data_object_type;
 
          /// The number of shares currently in existence
          share_type current_supply;
@@ -79,8 +79,8 @@ namespace graphene { namespace chain {
    class asset_object : public graphene::db::abstract_object<asset_object>
    {
       public:
-         static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id  = asset_object_type;
+         static constexpr uint8_t space_id = protocol_ids;
+         static constexpr uint8_t type_id  = asset_object_type;
 
          /// This function does not check if any registered asset has this symbol or not; it simply checks whether the
          /// symbol would be valid.
@@ -227,7 +227,11 @@ namespace graphene { namespace chain {
       /// Fixed point between 1.000 and 10.000, implied fixed point denominator is GRAPHENE_COLLATERAL_RATIO_DENOM
       uint16_t initial_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
 
-      price_feed_with_icr( const price_feed& pf = {}, const optional<uint16_t>& icr = {} )
+      price_feed_with_icr()
+      : price_feed(), initial_collateral_ratio( maintenance_collateral_ratio )
+      {}
+
+      price_feed_with_icr( const price_feed& pf, const optional<uint16_t>& icr = {} )
       : price_feed( pf ), initial_collateral_ratio( icr.valid() ? *icr : pf.maintenance_collateral_ratio )
       {}
 
@@ -245,8 +249,8 @@ namespace graphene { namespace chain {
    class asset_bitasset_data_object : public abstract_object<asset_bitasset_data_object>
    {
       public:
-         static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_asset_bitasset_data_object_type;
+         static constexpr uint8_t space_id = implementation_ids;
+         static constexpr uint8_t type_id  = impl_asset_bitasset_data_object_type;
 
          /// The asset this object belong to
          asset_id_type asset_id;

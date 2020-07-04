@@ -573,9 +573,9 @@ account_object wallet_api::get_account(string account_name_or_id) const
 
 extended_asset_object wallet_api::get_asset(string asset_name_or_id) const
 {
-   auto a = my->find_asset(asset_name_or_id);
-   FC_ASSERT(a);
-   return *a;
+   auto found_asset = my->find_asset(asset_name_or_id);
+   FC_ASSERT( found_asset, "Unable to find asset '${a}'", ("a",asset_name_or_id) );
+   return *found_asset;
 }
 
 asset_bitasset_data_object wallet_api::get_bitasset_data(string asset_name_or_id) const

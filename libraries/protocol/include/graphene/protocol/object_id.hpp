@@ -107,8 +107,8 @@ namespace graphene { namespace db {
    template<uint8_t SpaceID, uint8_t TypeID>
    struct object_id
    {
-      static const uint8_t space_id = SpaceID;
-      static const uint8_t type_id = TypeID;
+      static constexpr uint8_t space_id = SpaceID;
+      static constexpr uint8_t type_id = TypeID;
 
       object_id() = default;
       object_id( unsigned_int i ):instance(i){}

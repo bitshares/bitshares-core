@@ -192,7 +192,11 @@ void application_impl::reset_websocket_server()
    if( !_options->count("rpc-endpoint") )
       return;
 
-   _websocket_server = std::make_shared<fc::http::websocket_server>();
+   string proxy_forward_header;
+   if( _options->count("proxy-forwarded-for-header") )
+      proxy_forward_header = _options->at("proxy-forwarded-for-header").as<string>();
+
+   _websocket_server = std::make_shared<fc::http::websocket_server>( proxy_forward_header );
    _websocket_server->on_connection( std::bind(&application_impl::new_connection, this, std::placeholders::_1) );
 
    ilog("Configured websocket rpc to listen on ${ip}", ("ip",_options->at("rpc-endpoint").as<string>()));
@@ -210,8 +214,13 @@ void application_impl::reset_websocket_tls_server()
       return;
    }
 
+   string proxy_forward_header;
+   if( _options->count("proxy-forwarded-for-header") )
+      proxy_forward_header = _options->at("proxy-forwarded-for-header").as<string>();
+
    string password = _options->count("server-pem-password") ? _options->at("server-pem-password").as<string>() : "";
-   _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>( _options->at("server-pem").as<string>(), password );
+   _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>(
+                                 _options->at("server-pem").as<string>(), password, proxy_forward_header );
    _websocket_tls_server->on_connection( std::bind(&application_impl::new_connection, this, std::placeholders::_1) );
 
    ilog("Configured websocket TLS rpc to listen on ${ip}", ("ip",_options->at("rpc-tls-endpoint").as<string>()));
@@ -974,6 +983,9 @@ void application::set_program_options(boost::program_options::options_descriptio
           "Endpoint for TLS websocket RPC to listen on")
          ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"), "The TLS certificate file for this server")
          ("server-pem-password,P", bpo::value<string>()->implicit_value(""), "Password for this certificate")
+         ("proxy-forwarded-for-header", bpo::value<string>()->implicit_value("X-Forwarded-For-Client"),
+          "A HTTP header similar to X-Forwarded-For (XFF), used by the RPC server to extract clients' address info, "
+          "usually added by a trusted reverse proxy")
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
@@ -999,10 +1011,10 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::get_key_references to set max limit value")
          ("api-limit-get-htlc-by",boost::program_options::value<uint64_t>()->default_value(100),
           "For database_api_impl::get_htlc_by_from and get_htlc_by_to to set max limit value")
-         ("api-limit-get-full-accounts",boost::program_options::value<uint64_t>()->default_value(10),
-          "For database_api_impl::get_full_accounts to set max limit value")
-         ("api-limit-get-full-accounts-lists",boost::program_options::value<uint64_t>()->default_value(100),
-          "For database_api_impl::get_full_accounts to set max limit value")
+         ("api-limit-get-full-accounts",boost::program_options::value<uint64_t>()->default_value(50),
+          "For database_api_impl::get_full_accounts to set max accounts to query at once")
+         ("api-limit-get-full-accounts-lists",boost::program_options::value<uint64_t>()->default_value(500),
+          "For database_api_impl::get_full_accounts to set max items to return in the lists")
          ("api-limit-get-call-orders",boost::program_options::value<uint64_t>()->default_value(300),
           "For database_api_impl::get_call_orders and get_call_orders_by_account to set max limit value")
          ("api-limit-get-settle-orders",boost::program_options::value<uint64_t>()->default_value(300),
