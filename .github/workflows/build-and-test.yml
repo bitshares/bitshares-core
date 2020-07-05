@@ -281,7 +281,6 @@ jobs:
       uses: actions/cache@v1
       with:
         path: libs
-        id: cache-libs
         key: mingw64-libs-${{ env.BOOST_VERSION }}_${{ env.CURL_VERSION }}_${{ env.OPENSSL_VERSION }}_${{ env.ZLIB_VERSION }}
     - name: Configure
       run: |
