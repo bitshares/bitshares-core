@@ -23,6 +23,7 @@
  */
 
 #include <graphene/protocol/restriction_predicate.hpp>
+#include <graphene/protocol/fee_schedule.hpp>
 
 #include <fc/exception/exception.hpp>
 
@@ -50,7 +51,8 @@ template<typename T> constexpr static bool is_flat_set = is_flat_set_impl<T>::va
 // We use our own is_integral which does not consider bools integral (to disallow comparison between bool and ints)
 template<typename T> constexpr static bool is_integral = !std::is_same<T, bool>::value &&
                                                          !std::is_same<T, safe<bool>>::value &&
-                                                         (is_safe<T> || std::is_integral<T>::value);
+                                                         (is_safe<T> || std::is_integral<T>::value ||
+                                                          std::is_same<T, fc::unsigned_int>::value);
 
 // Metafunction to check if two types are comparable, which means not void_t, and either the same or both integral
 template<typename T, typename U>
@@ -60,9 +62,36 @@ constexpr static bool comparable_types = !std::is_same<T, void_t>::value &&
 // Metafunction to check if type is a container
 template<typename, typename = void>
 struct is_container_impl : std::false_type {};
+template<>
+struct is_container_impl<vector<char>> : std::false_type {};
 template<typename T>
 struct is_container_impl<T, make_void<typename T::value_type, decltype(declval<T>().size())>> : std::true_type {};
 template<typename T> constexpr static bool is_container = is_container_impl<T>::value;
+
+// Metafunction to check if type is string-like
+template<typename>
+struct is_stringish_impl : std::false_type {};
+template<>
+struct is_stringish_impl<std::string> : std::true_type {};
+template<>
+struct is_stringish_impl<std::vector<char>> : std::true_type {};
+template<>
+struct is_stringish_impl<fc::sha1> : std::true_type {};
+template<>
+struct is_stringish_impl<fc::sha256> : std::true_type {};
+template<>
+struct is_stringish_impl<fc::ripemd160> : std::true_type {};
+template<>
+struct is_stringish_impl<fc::hash160> : std::true_type {};
+template<typename T> constexpr static bool is_stringish = is_stringish_impl<T>::value;
+
+// Convert stringish types to strings
+inline const string& to_string(const string& str) { return str; }
+inline string to_string(const std::vector<char>& vec) { return string(vec.begin(), vec.end()); }
+inline string to_string(const fc::sha1& hash) { return hash.str(); }
+inline string to_string(const fc::sha256& hash) { return hash.str(); }
+inline string to_string(const fc::ripemd160& hash) { return hash.str(); }
+inline string to_string(const fc::hash160& hash) { return hash.str(); }
 
 // Type alias for a predicate on a particular field type
 template<typename Field>
@@ -74,6 +103,7 @@ const auto& to_num(const I& i) { return i; }
 template<typename I>
 const auto& to_num(const fc::safe<I>& i) { return i.value; }
 inline auto to_num(const fc::time_point_sec& t) { return t.sec_since_epoch(); }
+inline auto to_num(const fc::unsigned_int& ui) { return ui.value; }
 
 namespace safenum = boost::safe_numerics::safe_compare;
 
@@ -163,10 +193,32 @@ struct predicate_eq<Field, Argument, std::enable_if_t<is_integral<Field> && is_i
    constexpr bool operator()(const Field& f, const Argument& a) const { return safenum::equal(to_num(f), to_num(a)); }
 };
 template<typename Field, typename Argument>
+struct predicate_eq<Field, Argument, std::enable_if_t<is_stringish<Field> && is_stringish<Argument> &&
+                                                      !std::is_same<Field, Argument>::value>> {
+   // Converting comparison, stringish types
+   constexpr static bool valid = true;
+   bool operator()(const Field& f, const Argument& a) const { return to_string(f) == to_string(a); }
+};
+template<typename Field, typename Argument>
 struct predicate_eq<Field, Argument, std::enable_if_t<is_container<Field> && is_integral<Argument>>> {
    // Compare container size against int
    constexpr static bool valid = true;
    bool operator()(const Field& f, const Argument& a) const { return safenum::equal(f.size(), to_num(a)); }
+};
+template<typename Field, typename Argument>
+struct predicate_eq<Field, Argument, std::enable_if_t<is_stringish<Field> && !is_container<Field>
+                                                      && is_integral<Argument>>> {
+   // Compare stringish size against int
+   constexpr static bool valid = true;
+   bool operator()(const Field& f, const Argument& a) const { return safenum::equal(to_string(f).size(), to_num(a)); }
+};
+template<typename... Ts, typename Argument>
+struct predicate_eq<static_variant<Ts...>, Argument, std::enable_if_t<is_integral<Argument>>> {
+   // Compare static_variant.which() against int
+   constexpr static bool valid = true;
+   bool operator()(const static_variant<Ts...>& f, const Argument& a) const {
+      return safenum::equal(f.which(), to_num(a));
+   }
 };
 template<typename Field, typename Argument>
 struct predicate_eq<fc::optional<Field>, Argument, std::enable_if_t<comparable_types<Field, Argument>>>
@@ -197,7 +249,7 @@ struct predicate_compare<Field, Argument, std::enable_if_t<std::is_same<Field, A
    // Simple comparison, same types
    constexpr static bool valid = true;
    constexpr int8_t operator()(const Field& f, const Argument& a) const {
-      return f<a? -1 : (f>a? 1 : 0);
+      return f<a? -1 : (a<f? 1 : 0);
    }
 };
 template<typename Field, typename Argument>
@@ -210,6 +262,42 @@ struct predicate_compare<Field, Argument, std::enable_if_t<is_integral<Field> &&
       auto na = to_num(a);
       return safenum::less_than(nf, na)? -1 : (safenum::greater_than(nf, na)? 1 : 0);
    }
+};
+template<typename Field, typename Argument>
+struct predicate_compare<Field, Argument, std::enable_if_t<is_stringish<Field> && is_stringish<Argument> &&
+                                                           !std::is_same<Field, Argument>::value>> {
+   // Converting comparison, stringish types
+   constexpr static bool valid = true;
+   constexpr int8_t operator()(const Field& f, const Argument& a) const {
+      auto sf = to_string(f);
+      auto sa = to_string(a);
+      return sf < sa? -1 : (sa < sf? 1 : 0);
+   }
+};
+template<typename Field, typename Argument>
+struct predicate_compare<Field, Argument, std::enable_if_t<is_container<Field> && is_integral<Argument>>>
+      : public predicate_compare<size_t, Argument> {
+   // Compare container size against int
+   using base = predicate_compare<size_t, Argument>;
+   constexpr static bool valid = true;
+   bool operator()(const Field& f, const Argument& a) const { return base::operator()(f.size(), a); }
+};
+template<typename Field, typename Argument>
+struct predicate_compare<Field, Argument, std::enable_if_t<is_stringish<Field> && !is_container<Field>
+                                                           && is_integral<Argument>>>
+      : public predicate_compare<size_t, Argument> {
+   // Compare stringish size against int
+   using base = predicate_compare<size_t, Argument>;
+   constexpr static bool valid = true;
+   bool operator()(const Field& f, const Argument& a) const { return base::operator()(to_string(f).size(), a); }
+};
+template<typename... Ts, typename Argument>
+struct predicate_compare<static_variant<Ts...>, Argument, std::enable_if_t<is_integral<Argument>>>
+      : public predicate_compare<size_t, Argument> {
+   // Compare static_variant.which() against int
+   using base = predicate_compare<size_t, Argument>;
+   constexpr static bool valid = true;
+   bool operator()(const static_variant<Ts...>& f, const Argument& a) const { return base::operator()(f.which(), a); }
 };
 template<typename Field, typename Argument>
 struct predicate_compare<fc::optional<Field>, Argument, void> : predicate_compare<Field, Argument> {
@@ -397,6 +485,14 @@ struct attribute_assertion<extension<Extension>> {
       };
    }
 };
+template<typename Pointed>
+struct attribute_assertion<std::shared_ptr<Pointed>> {
+   static object_restriction_predicate<std::shared_ptr<Pointed>> create(vector<restriction>&& rs) {
+      return [p=restrictions_to_predicate<Pointed>(std::move(rs), false)](const shared_ptr<Pointed>& x) {
+         return p(*x);
+      };
+   }
+};
 
 template<typename Variant>
 struct variant_assertion {
@@ -465,8 +561,59 @@ object_restriction_predicate<Field> make_predicate(ArgVariant arg) {
    });
 }
 
+// A template checking whether a predicate is valid with the provided field type and any restriction argument type
+template<typename Field, typename = void>
+struct predicate_is_valid_for_field {
+   template<typename Predicate>
+   struct filter {
+      template<typename Argument>
+      struct argument_filter {
+         constexpr static bool value = Predicate::template unwrap<Field, Argument>::valid;
+      };
+
+      constexpr static bool value = typelist::any<restriction::argument_type::list, argument_filter>;
+   };
+};
+// Specialization for reflected struct fields; they are always valid because we can use an attribute_assert on them
+template<typename Struct>
+struct predicate_is_valid_for_field<Struct, std::enable_if_t<fc::reflector<Struct>::is_defined::value>> {
+   template<typename>
+   struct filter { constexpr static bool value = true; };
+};
+// Specialization for extension fields; they are always valid because we can use an attribute_assert on them
+template<typename Ext>
+struct predicate_is_valid_for_field<extension<Ext>, void> {
+   template<typename>
+   struct filter { constexpr static bool value = true; };
+};
+// Specialization for static variant fields; they are always valid because we can use a variant_assert on them
+template<typename... Ts>
+struct predicate_is_valid_for_field<static_variant<Ts...>, void> {
+   template<typename>
+   struct filter { constexpr static bool value = true; };
+};
+// Specialization for shared_ptr fields; they are valid if the thing pointed to is
+template<typename Pointed>
+struct predicate_is_valid_for_field<std::shared_ptr<Pointed>, void>
+      : public predicate_is_valid_for_field<std::decay_t<Pointed>> {};
+
+// Check if any predicate can be used with the provided field type and any known argument type
+template<typename Field>
+constexpr bool any_predicate_applies() {
+   using PredicateTypes = typelist::list<typelist::wrapped<predicate_eq>, typelist::wrapped<predicate_ne>,
+                                         typelist::wrapped<predicate_lt>, typelist::wrapped<predicate_le>,
+                                         typelist::wrapped<predicate_gt>, typelist::wrapped<predicate_ge>,
+                                         typelist::wrapped<predicate_in>, typelist::wrapped<predicate_not_in>,
+                                         typelist::wrapped<predicate_has_all>, typelist::wrapped<predicate_has_none>>;
+   return typelist::any<PredicateTypes, predicate_is_valid_for_field<Field>::template filter>;
+}
+
 template<typename Field>
 object_restriction_predicate<Field> create_predicate_function(restriction_function func, restriction_argument arg) {
+   // This checks that all fields of all objects can be used with at least one predicate
+   static_assert(any_predicate_applies<Field>(),
+                 "This new field type is not yet supported by Custom Active Authorities. Please add support for it.");
+
    try {
       switch(func) {
       case restriction::func_eq:
@@ -539,7 +686,7 @@ object_restriction_predicate<Object> create_field_predicate(restriction&& r, sho
 template<typename Object>
 object_restriction_predicate<Object> create_field_predicate(restriction&&, long) {
    FC_THROW_EXCEPTION(fc::assert_exception, "Invalid restriction references member of non-object type: ${O}",
-                      ("O", fc::get_typename<Object>::name()));
+                      ("O", fc::get_typename<std::decay_t<Object>>::name()));
 }
 
 template<typename Object>
