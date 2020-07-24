@@ -34,6 +34,7 @@ market_ticker::market_ticker(const market_ticker_object& mto,
                              const order_book& orders)
 {
    time = now;
+   mto_id = mto.id;
    base = asset_base.symbol;
    quote = asset_quote.symbol;
    percent_change = "0";

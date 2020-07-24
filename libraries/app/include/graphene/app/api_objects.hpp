@@ -108,6 +108,7 @@ namespace graphene { namespace app {
       string                     percent_change;
       string                     base_volume;
       string                     quote_volume;
+      optional<object_id_type>   mto_id;
 
       market_ticker() {}
       market_ticker(const market_ticker_object& mto,
