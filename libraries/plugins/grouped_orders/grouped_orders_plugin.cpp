@@ -279,12 +279,14 @@ void grouped_orders_plugin::plugin_initialize(const boost::program_options::vari
    else
       my->_tracked_groups = fc::json::from_string("[10,100]").as<flat_set<uint16_t>>(2);
 
-   database().add_secondary_index< primary_index<limit_order_index>, detail::limit_order_group_index >( my->_tracked_groups );
-
 } FC_CAPTURE_AND_RETHROW() }
 
 void grouped_orders_plugin::plugin_startup()
 {
+   auto& groups = *database().add_secondary_index< primary_index<limit_order_index>,
+                                                   detail::limit_order_group_index >( my->_tracked_groups );
+   for( const auto& order : database().get_index_type< limit_order_index >().indices() )
+      groups.object_inserted( order );
 }
 
 const flat_set<uint16_t>& grouped_orders_plugin::tracked_groups() const

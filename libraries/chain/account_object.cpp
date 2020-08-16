@@ -36,10 +36,10 @@ share_type cut_fee(share_type a, uint16_t p)
    if( p == GRAPHENE_100_PERCENT )
       return a;
 
-   fc::uint128 r(a.value);
+   fc::uint128_t r = a.value;
    r *= p;
    r /= GRAPHENE_100_PERCENT;
-   return r.to_uint64();
+   return static_cast<uint64_t>(r);
 }
 
 void account_balance_object::adjust_balance(const asset& delta)
@@ -256,19 +256,6 @@ void account_member_index::object_modified(const object& after)
 
 }
 
-void account_referrer_index::object_inserted( const object& obj )
-{
-}
-void account_referrer_index::object_removed( const object& obj )
-{
-}
-void account_referrer_index::about_to_modify( const object& before )
-{
-}
-void account_referrer_index::object_modified( const object& after  )
-{
-}
-
 const uint8_t  balances_by_account_index::bits = 20;
 const uint64_t balances_by_account_index::mask = (1ULL << balances_by_account_index::bits) - 1;
 
@@ -325,7 +312,8 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_object,
                     (graphene::db::object),
                     (membership_expiration_date)(registrar)(referrer)(lifetime_referrer)
                     (network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)
-                    (name)(owner)(active)(options)(statistics)(whitelisting_accounts)(blacklisting_accounts)
+                    (name)(owner)(active)(options)(num_committee_voted)(statistics)
+                    (whitelisting_accounts)(blacklisting_accounts)
                     (whitelisted_accounts)(blacklisted_accounts)
                     (cashback_vb)
                     (owner_special_authority)(active_special_authority)
@@ -343,6 +331,8 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_statistics_object,
                     (most_recent_op)
                     (total_ops)(removed_ops)
                     (total_core_in_orders)
+                    (total_core_inactive)(total_core_pob)(total_core_pol)
+                    (total_pob_value)(total_pol_value)
                     (core_in_balance)
                     (has_cashback_vb)
                     (is_voting)

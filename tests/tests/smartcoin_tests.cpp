@@ -132,7 +132,7 @@ BOOST_AUTO_TEST_CASE(bsip36)
 
       // Check current default witnesses, default chain is configured with 10 witnesses
       auto witnesses = db.get_global_properties().active_witnesses;
-      BOOST_CHECK_EQUAL(witnesses.size(), 10u);
+      BOOST_CHECK_EQUAL(witnesses.size(), INITIAL_WITNESS_COUNT);
       BOOST_CHECK_EQUAL(witnesses.begin()[0].instance.value, 1u);
       BOOST_CHECK_EQUAL(witnesses.begin()[1].instance.value, 2u);
       BOOST_CHECK_EQUAL(witnesses.begin()[2].instance.value, 3u);
@@ -142,13 +142,18 @@ BOOST_AUTO_TEST_CASE(bsip36)
       BOOST_CHECK_EQUAL(witnesses.begin()[6].instance.value, 7u);
       BOOST_CHECK_EQUAL(witnesses.begin()[7].instance.value, 8u);
       BOOST_CHECK_EQUAL(witnesses.begin()[8].instance.value, 9u);
-      BOOST_CHECK_EQUAL(witnesses.begin()[9].instance.value, 10u);
 
       // We need to activate 11 witnesses by voting for each of them.
       // Each witness is voted with incremental stake so last witness created will be the ones with more votes
+
+      // by default we have 9 witnesses, we need to vote for desired witness count (11) to increase them
+      vote_for_committee_and_witnesses(9, 11);
+
       int c = 0;
       for (auto l : witness_map) {
-         int stake = 100 + c + 1;
+         // voting stake have step of 100
+         // so vote_for_committee_and_witnesses() with stake=10 does not affect the expected result
+         int stake = 100 * (c + 1);
          transfer(committee_account, l.first, asset(stake));
          {
             account_update_operation op;
@@ -206,7 +211,7 @@ BOOST_AUTO_TEST_CASE(bsip36)
       BOOST_CHECK_EQUAL(itr[1].first.instance.value, 17u);
 
       // Activate witness11 with voting stake, will kick the witness with less votes(witness0) out of the active list
-      transfer(committee_account, witness11_id, asset(121));
+      transfer(committee_account, witness11_id, asset(1200));
       set_expiration(db, trx);
       {
          account_update_operation op;
@@ -328,7 +333,7 @@ BOOST_AUTO_TEST_CASE(bsip36)
       BOOST_CHECK_EQUAL(itr[0].first.instance.value, 17u);
 
       // Reactivate witness0
-      transfer(committee_account, witness0_id, asset(100));
+      transfer(committee_account, witness0_id, asset(1000));
       set_expiration(db, trx);
       {
          account_update_operation op;

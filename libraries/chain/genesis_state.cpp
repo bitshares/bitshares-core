@@ -25,6 +25,8 @@
 #include <graphene/chain/genesis_state.hpp>
 #include <graphene/protocol/fee_schedule.hpp>
 
+#include <fc/io/raw.hpp>
+
 namespace graphene { namespace chain {
 
 chain_id_type genesis_state_type::compute_chain_id() const

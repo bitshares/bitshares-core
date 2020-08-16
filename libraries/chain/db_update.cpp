@@ -31,13 +31,12 @@
 #include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/ticket_object.hpp>
 #include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 
 #include <graphene/protocol/fee_schedule.hpp>
-
-#include <fc/uint128.hpp>
 
 namespace graphene { namespace chain {
 
@@ -381,6 +380,13 @@ void database::clear_expired_orders()
             cancel_settle_order(order);
             continue;
          }
+         if( GRAPHENE_100_PERCENT == mia.options.force_settlement_offset_percent ) // settle something for nothing
+         {
+            ilog( "Canceling a force settlement in ${asset} because settlement offset is 100%",
+                  ("asset", mia_object.symbol));
+            cancel_settle_order(order);
+            continue;
+         }
          if( max_settlement_volume.asset_id != current_asset )
             max_settlement_volume = mia_object.amount(mia.max_force_settlement_volume(mia_object.dynamic_data(*this).current_supply));
          // When current_asset_finished is true, this would be the 2nd time processing the same order.
@@ -412,9 +418,9 @@ void database::clear_expired_orders()
          {
             auto& pays = order.balance;
             auto receives = (order.balance * mia.current_feed.settlement_price);
-            receives.amount = ( fc::uint128_t(receives.amount.value) *
+            receives.amount = static_cast<uint64_t>( fc::uint128_t(receives.amount.value) *
                                 (GRAPHENE_100_PERCENT - mia.options.force_settlement_offset_percent) /
-                                GRAPHENE_100_PERCENT ).to_uint64();
+                                GRAPHENE_100_PERCENT );
             assert(receives <= order.balance * mia.current_feed.settlement_price);
             settlement_price = pays / receives;
          }
@@ -503,7 +509,8 @@ void database::update_expired_feeds()
                abdo.feed_cer_updated = false;
             }
          });
-         if( !b.current_feed.settlement_price.is_null() && !( b.current_feed == old_median_feed ) ) // `==` check is safe here
+         if( !b.current_feed.settlement_price.is_null()
+               && !b.current_feed.margin_call_params_equal( old_median_feed ) )
          {
             asset_ptr = &b.asset_id( *this );
             check_call_orders( *asset_ptr, true, false, &b );
@@ -585,15 +592,106 @@ void database::clear_expired_htlcs()
          && htlc_idx.begin()->conditions.time_lock.expiration <= head_block_time() )
    {
       const htlc_object& obj = *htlc_idx.begin();
-      adjust_balance( obj.transfer.from, asset(obj.transfer.amount, obj.transfer.asset_id) );
-      // virtual op
-      htlc_refund_operation vop( obj.id, obj.transfer.from );
-      vop.htlc_id = htlc_idx.begin()->id;
+      const auto amount = asset(obj.transfer.amount, obj.transfer.asset_id);
+      adjust_balance( obj.transfer.from, amount );
+      // notify related parties
+      htlc_refund_operation vop( obj.id, obj.transfer.from, obj.transfer.to, amount,
+         obj.conditions.hash_lock.preimage_hash, obj.conditions.hash_lock.preimage_size );
       push_applied_operation( vop );
-
-      // remove the db object
-      remove( *htlc_idx.begin() );
+      remove( obj );
    }
+}
+
+generic_operation_result database::process_tickets()
+{
+   generic_operation_result result;
+   share_type total_delta_pob;
+   share_type total_delta_inactive;
+   auto& idx = get_index_type<ticket_index>().indices().get<by_next_update>();
+   while( !idx.empty() && idx.begin()->next_auto_update_time <= head_block_time() )
+   {
+      const ticket_object& ticket = *idx.begin();
+      const auto& stat = get_account_stats_by_owner( ticket.account );
+      if( ticket.status == withdrawing && ticket.current_type == liquid )
+      {
+         adjust_balance( ticket.account, ticket.amount );
+         // Note: amount.asset_id is checked when creating the ticket, so no check here
+         modify( stat, [&ticket](account_statistics_object& aso) {
+            aso.total_core_pol -= ticket.amount.amount;
+            aso.total_pol_value -= ticket.value;
+         });
+         result.removed_objects.insert( ticket.id );
+         remove( ticket );
+      }
+      else
+      {
+         ticket_type old_type = ticket.current_type;
+         share_type old_value = ticket.value;
+         modify( ticket, []( ticket_object& o ) {
+            o.auto_update();
+         });
+         result.updated_objects.insert( ticket.id );
+
+         share_type delta_inactive_amount;
+         share_type delta_forever_amount;
+         share_type delta_forever_value;
+         share_type delta_other_amount;
+         share_type delta_other_value;
+
+         if( old_type == lock_forever ) // It implies that the new type is lock_forever too
+         {
+            if( ticket.value == 0 )
+            {
+               total_delta_pob -= ticket.amount.amount;
+               total_delta_inactive += ticket.amount.amount;
+               delta_inactive_amount = ticket.amount.amount;
+               delta_forever_amount = -ticket.amount.amount;
+            }
+            delta_forever_value = ticket.value - old_value;
+         }
+         else // old_type != lock_forever
+         {
+            if( ticket.current_type == lock_forever )
+            {
+               total_delta_pob += ticket.amount.amount;
+               delta_forever_amount = ticket.amount.amount;
+               delta_forever_value = ticket.value;
+               delta_other_amount = -ticket.amount.amount;
+               delta_other_value = -old_value;
+            }
+            else // ticket.current_type != lock_forever
+            {
+               delta_other_value = ticket.value - old_value;
+            }
+         }
+
+         // Note: amount.asset_id is checked when creating the ticket, so no check here
+         modify( stat, [delta_inactive_amount,delta_forever_amount,delta_forever_value,
+                        delta_other_amount,delta_other_value](account_statistics_object& aso) {
+            aso.total_core_inactive += delta_inactive_amount;
+            aso.total_core_pob += delta_forever_amount;
+            aso.total_core_pol += delta_other_amount;
+            aso.total_pob_value += delta_forever_value;
+            aso.total_pol_value += delta_other_value;
+         });
+
+      }
+      // TODO if a lock_forever ticket lost all the value, remove it
+   }
+
+   // TODO merge stable tickets with the same account and the same type
+
+   // Update global data
+   if( total_delta_pob != 0 || total_delta_inactive != 0 )
+   {
+      modify( get_dynamic_global_properties(),
+              [total_delta_pob,total_delta_inactive]( dynamic_global_property_object& dgp ) {
+         dgp.total_pob += total_delta_pob;
+         dgp.total_inactive += total_delta_inactive;
+      });
+   }
+
+   return result;
 }
 
 } }

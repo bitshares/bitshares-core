@@ -35,6 +35,7 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/evaluator.hpp>
+#include <graphene/chain/witness_schedule_object.hpp>
 
 #include <graphene/protocol/fee_schedule.hpp>
 
@@ -130,10 +131,18 @@ bool database::push_block(const signed_block& new_block, uint32_t skip)
 bool database::_push_block(const signed_block& new_block)
 { try {
    uint32_t skip = get_node_properties().skip_flags;
-   // TODO: If the block is greater than the head block and before the next maintenance interval
-   // verify that the block signer is in the current set of active witnesses.
 
-   shared_ptr<fork_item> new_head = _fork_db.push_block(new_block);
+   const auto now = fc::time_point::now().sec_since_epoch();
+   if( _fork_db.head() && new_block.timestamp.sec_since_epoch() > now - 86400 )
+   {
+      // verify that the block signer is in the current set of active witnesses.
+      shared_ptr<fork_item> prev_block = _fork_db.fetch_block( new_block.previous );
+      GRAPHENE_ASSERT( prev_block, unlinkable_block_exception, "block does not link to known chain" );
+      if( prev_block->scheduled_witnesses && !(skip&(skip_witness_schedule_check|skip_witness_signature)) )
+         verify_signing_witness( new_block, *prev_block );
+   }
+
+   const shared_ptr<fork_item> new_head = _fork_db.push_block(new_block);
    //If the head block from the longest chain does not build off of the current head, we need to switch forks.
    if( new_head->data.previous != head_block_id() )
    {
@@ -159,6 +168,7 @@ bool database::_push_block(const signed_block& new_block)
                try {
                   undo_database::session session = _undo_db.start_undo_session();
                   apply_block( (*ritr)->data, skip );
+                  update_witnesses( **ritr );
                   _block_id_to_block.store( (*ritr)->id, (*ritr)->data );
                   session.commit();
                }
@@ -203,6 +213,8 @@ bool database::_push_block(const signed_block& new_block)
    try {
       auto session = _undo_db.start_undo_session();
       apply_block(new_block, skip);
+      if( new_block.timestamp.sec_since_epoch() > now - 86400 )
+         update_witnesses( *new_head );
       _block_id_to_block.store(new_block.id(), new_block);
       session.commit();
    } catch ( const fc::exception& e ) {
@@ -213,6 +225,35 @@ bool database::_push_block(const signed_block& new_block)
 
    return false;
 } FC_CAPTURE_AND_RETHROW( (new_block) ) }
+
+void database::verify_signing_witness( const signed_block& new_block, const fork_item& fork_entry )const
+{
+   FC_ASSERT( new_block.timestamp >= fork_entry.next_block_time );
+   uint32_t slot_num = ( new_block.timestamp - fork_entry.next_block_time ).to_seconds() / block_interval();
+   uint64_t index = ( fork_entry.next_block_aslot + slot_num ) % fork_entry.scheduled_witnesses->size();
+   const auto& scheduled_witness = (*fork_entry.scheduled_witnesses)[index];
+   FC_ASSERT( new_block.witness == scheduled_witness.first, "Witness produced block at wrong time",
+              ("block witness",new_block.witness)("scheduled",scheduled_witness)("slot_num",slot_num) );
+   FC_ASSERT( new_block.validate_signee( scheduled_witness.second ) );
+}
+
+void database::update_witnesses( fork_item& fork_entry )const
+{
+   if( fork_entry.scheduled_witnesses ) return;
+
+   const dynamic_global_property_object& dpo = get_dynamic_global_properties();
+   fork_entry.next_block_aslot = dpo.current_aslot + 1;
+   fork_entry.next_block_time = get_slot_time( 1 );
+
+   const witness_schedule_object& wso = get_witness_schedule_object();
+   fork_entry.scheduled_witnesses = std::make_shared< vector< pair< witness_id_type, public_key_type > > >();
+   fork_entry.scheduled_witnesses->reserve( wso.current_shuffled_witnesses.size() );
+   for( size_t i = 0; i < wso.current_shuffled_witnesses.size(); ++i )
+   {
+       const auto& witness = wso.current_shuffled_witnesses[i](*this);
+       fork_entry.scheduled_witnesses->emplace_back( wso.current_shuffled_witnesses[i], witness.signing_key );
+   }
+}
 
 /**
  * Attempts to push the transaction into the pending queue
@@ -585,6 +626,8 @@ void database::_apply_block( const signed_block& next_block )
    update_signing_witness(signing_witness, next_block);
    update_last_irreversible_block();
 
+   process_tickets();
+
    // Are we at the maintenance interval?
    if( maint_needed )
       perform_chain_maintenance(next_block, global_props);
@@ -636,7 +679,12 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    auto& trx_idx = get_mutable_index_type<transaction_index>();
    const chain_id_type& chain_id = get_chain_id();
    if( !(skip & skip_transaction_dupe_check) )
-      FC_ASSERT( trx_idx.indices().get<by_trx_id>().find(trx.id()) == trx_idx.indices().get<by_trx_id>().end() );
+   {
+      GRAPHENE_ASSERT( trx_idx.indices().get<by_trx_id>().find(trx.id()) == trx_idx.indices().get<by_trx_id>().end(),
+                       duplicate_transaction,
+                       "Transaction '${txid}' is already in the database",
+                       ("txid",trx.id()) );
+   }
    transaction_evaluation_state eval_state(this);
    const chain_parameters& chain_parameters = get_global_properties().parameters;
    eval_state._trx = &trx;
@@ -644,13 +692,15 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    if( !(skip & skip_transaction_signatures) )
    {
       bool allow_non_immediate_owner = ( head_block_time() >= HARDFORK_CORE_584_TIME );
-      auto get_active = [&]( account_id_type id ) { return &id(*this).active; };
-      auto get_owner  = [&]( account_id_type id ) { return &id(*this).owner;  };
-      trx.verify_authority( chain_id,
-                            get_active,
-                            get_owner,
-                            allow_non_immediate_owner,
-                            get_global_properties().parameters.max_authority_depth );
+      auto get_active = [this]( account_id_type id ) { return &id(*this).active; };
+      auto get_owner  = [this]( account_id_type id ) { return &id(*this).owner;  };
+      auto get_custom = [this]( account_id_type id, const operation& op, rejected_predicate_map* rejects ) {
+         return get_viable_custom_authorities(id, op, rejects);
+      };
+
+      trx.verify_authority(chain_id, get_active, get_owner, get_custom, allow_non_immediate_owner,
+                           MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(head_block_time()),
+                           get_global_properties().parameters.max_authority_depth);
    }
 
    //Skip all manner of expiration and TaPoS checking if we're on block 1; It's impossible that the transaction is
@@ -804,7 +854,7 @@ fc::future<void> database::precompute_parallel( const signed_block& block, const
    block.id();
 
    if( workers.empty() )
-      return fc::future< void >( fc::promise< void >::ptr( new fc::promise< void >( true ) ) );
+      return fc::future< void >( fc::promise< void >::create( true ) );
 
    auto first = workers.begin();
    auto worker = first;

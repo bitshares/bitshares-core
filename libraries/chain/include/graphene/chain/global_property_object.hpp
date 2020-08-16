@@ -27,8 +27,6 @@
 #include <graphene/chain/types.hpp>
 #include <graphene/db/object.hpp>
 
-#include <fc/uint128.hpp>
-
 namespace graphene { namespace chain {
 
    /**
@@ -76,6 +74,8 @@ namespace graphene { namespace chain {
          time_point_sec    next_maintenance_time;
          time_point_sec    last_budget_time;
          share_type        witness_budget;
+         share_type        total_pob;
+         share_type        total_inactive;
          uint32_t          accounts_registered_this_interval = 0;
          /**
           *  Every time a block is missed this increases by
@@ -83,8 +83,6 @@ namespace graphene { namespace chain {
           *  every time a block is found it decreases by
           *  RECENTLY_MISSED_COUNT_DECREMENT.  It is
           *  never less than 0.
-          *
-          *  If the recently_missed_count hits 2*UNDO_HISTORY then no new blocks may be pushed.
           */
          uint32_t          recently_missed_count = 0;
 
