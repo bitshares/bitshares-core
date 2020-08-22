@@ -562,6 +562,9 @@ void database::notify_changed_objects()
            GRAPHENE_TRY_NOTIFY( removed_objects, removed_ids, removed, removed_accounts_impacted )
       }
    }
+} catch( const graphene::chain::plugin_exception& e ) {
+   elog( "Caught plugin exception: ${e}", ("e", e.to_detail_string() ) );
+   throw;
 } FC_CAPTURE_AND_LOG( (0) ) }
 
 } } // namespace graphene::chain
