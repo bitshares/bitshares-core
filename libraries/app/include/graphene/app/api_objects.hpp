@@ -192,3 +192,5 @@ FC_REFLECT( graphene::app::market_trade, (sequence)(date)(price)(amount)(value)(
 
 FC_REFLECT_DERIVED( graphene::app::extended_asset_object, (graphene::chain::asset_object),
                     (total_in_collateral)(total_backing_collateral) );
+
+
