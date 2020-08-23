@@ -112,7 +112,7 @@ bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer)
          elog( "401 error: Unauthorized" );
       }
       else {
-         elog( "${code} error: ${e}", ("code", http_code) ("e", CurlReadBuffer) );
+         elog( "${code} error: ${e}", ("code", std::to_string(http_code)) ("e", CurlReadBuffer) );
       }
       return false;
    }
