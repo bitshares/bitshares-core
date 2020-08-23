@@ -1364,9 +1364,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
       }
    } tally_helper(*this);
 
-   ilog("begin >>> perform_account_maintenance" );
    perform_account_maintenance( tally_helper );
-   ilog("end >>> perform_account_maintenance" );
    
    struct clear_canary {
       clear_canary(vector<uint64_t>& target): target(target){}
