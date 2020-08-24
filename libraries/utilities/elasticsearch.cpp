@@ -106,10 +106,10 @@ bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer)
    }
    else {
       if(http_code == 413) {
-         elog( "413 error: Can be low disk space" );
+         elog( "413 error: Can be low disk space. ${e}", ("e", CurlReadBuffer) );
       }
       else if(http_code == 401) {
-         elog( "401 error: Unauthorized" );
+         elog( "401 error: Unauthorized. ${e}", ("e", CurlReadBuffer) );
       }
       else {
          elog( "${code} error: ${e}", ("code", std::to_string(http_code)) ("e", CurlReadBuffer) );
