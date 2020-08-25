@@ -647,6 +647,12 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 
 vector<account_statistics_object> database_api_impl::get_top_voting_power_accounts(uint32_t limit)const
 {
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_top_n_voting_accounts;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    vector<account_statistics_object> result;
 
    auto last_vote_tally_time = _db.get_dynamic_global_properties().last_vote_tally_time;

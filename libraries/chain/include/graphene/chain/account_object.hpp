@@ -100,7 +100,10 @@ namespace graphene { namespace chain {
          uint64_t vp_committee = 0;     ///<  the final voting power for the committees.
          uint64_t vp_witness = 0;       ///<  the final voting power for the witnesses.
          uint64_t vp_worker = 0;        ///<  the final voting power for the workers.
-         time_point_sec vote_tally_time;///<  timestamp of the last count of votes. if there is no statistics, the date is less than `_db.get_dynamic_global_properties().last_vote_tally_time`.
+
+         /// timestamp of the last count of votes. 
+         /// if there is no statistics, the date is less than `_db.get_dynamic_global_properties().last_vote_tally_time`.
+         time_point_sec vote_tally_time; 
 
          /// Whether this account owns some CORE asset and is voting
          inline bool has_some_core_voting() const
@@ -318,8 +321,6 @@ namespace graphene { namespace chain {
             return !is_basic_account(now);
          }
 
-         account_id_type get_voting_account()const { return options.voting_account; }
-
          account_id_type get_id()const { return id; }
    };
 
@@ -411,7 +412,6 @@ namespace graphene { namespace chain {
    typedef generic_index<account_balance_object, account_balance_object_multi_index_type> account_balance_index;
 
    struct by_name;
-   struct by_voting_account;
 
    /**
     * @ingroup object_index
@@ -421,7 +421,6 @@ namespace graphene { namespace chain {
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_unique< tag<by_name>, member<account_object, string, &account_object::name> >
-         // ordered_non_unique< tag<by_voting_account>, const_mem_fun< account_object, account_id_type, &account_object::get_voting_account > >
       >
    > account_multi_index_type;
 
