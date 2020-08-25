@@ -95,15 +95,16 @@ namespace graphene { namespace chain {
          time_point_sec last_vote_time; ///< last time voted
 
          /// Voting Power Stats
+         ///@{
          uint64_t vp_all = 0;           ///<  all voting power.
          uint64_t vp_active = 0;        ///<  active voting power, if there is no attenuation, it is equal to vp_all.
          uint64_t vp_committee = 0;     ///<  the final voting power for the committees.
          uint64_t vp_witness = 0;       ///<  the final voting power for the witnesses.
          uint64_t vp_worker = 0;        ///<  the final voting power for the workers.
-
          /// timestamp of the last count of votes. 
          /// if there is no statistics, the date is less than `_db.get_dynamic_global_properties().last_vote_tally_time`.
          time_point_sec vote_tally_time; 
+         ///@}
 
          /// Whether this account owns some CORE asset and is voting
          inline bool has_some_core_voting() const

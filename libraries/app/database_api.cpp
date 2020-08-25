@@ -461,9 +461,9 @@ std::map<string,full_account> database_api::get_full_accounts( const vector<stri
    return my->get_full_accounts( names_or_ids, subscribe );
 }
 
-vector<account_statistics_object> database_api::get_top_voting_power_accounts(uint32_t limit)const
+vector<account_statistics_object> database_api::get_top_voters(uint32_t limit)const
 {
-   return my->get_top_voting_power_accounts( limit );
+   return my->get_top_voters( limit );
 }
 
 std::map<std::string, full_account> database_api_impl::get_full_accounts( const vector<std::string>& names_or_ids,
@@ -645,10 +645,10 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
    return results;
 }
 
-vector<account_statistics_object> database_api_impl::get_top_voting_power_accounts(uint32_t limit)const
+vector<account_statistics_object> database_api_impl::get_top_voters(uint32_t limit)const
 {
    FC_ASSERT( _app_options, "Internal error" );
-   const auto configured_limit = _app_options->api_limit_get_top_n_voting_accounts;
+   const auto configured_limit = _app_options->api_limit_get_top_voters;
    FC_ASSERT( limit <= configured_limit,
               "limit can not be greater than ${configured_limit}",
               ("configured_limit", configured_limit) );

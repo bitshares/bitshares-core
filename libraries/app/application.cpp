@@ -269,8 +269,8 @@ void application_impl::set_api_limit() {
    if(_options->count("api-limit-get-full-accounts-lists")) {
       _app_options.api_limit_get_full_accounts_lists = _options->at("api-limit-get-full-accounts-lists").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-top-n-voting-accounts")) {
-      _app_options.api_limit_get_top_n_voting_accounts = _options->at("api-limit-get-top-n-voting-accounts").as<uint64_t>();
+   if(_options->count("api-limit-get-top-voters")) {
+      _app_options.api_limit_get_top_voters = _options->at("api-limit-get-top-voters").as<uint64_t>();
    }
    if(_options->count("api-limit-get-call-orders")) {
       _app_options.api_limit_get_call_orders = _options->at("api-limit-get-call-orders").as<uint64_t>();
@@ -1018,8 +1018,8 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::get_full_accounts to set max accounts to query at once")
          ("api-limit-get-full-accounts-lists",boost::program_options::value<uint64_t>()->default_value(500),
           "For database_api_impl::get_full_accounts to set max items to return in the lists")
-         ("api-limit-get-top-n-voting-accounts",boost::program_options::value<uint64_t>()->default_value(200),
-          "For database_api_impl::get_top_voting_power_accounts to set max limit value")
+         ("api-limit-get-top-voters",boost::program_options::value<uint64_t>()->default_value(200),
+          "For database_api_impl::get_top_voters to set max limit value")
          ("api-limit-get-call-orders",boost::program_options::value<uint64_t>()->default_value(300),
           "For database_api_impl::get_call_orders and get_call_orders_by_account to set max limit value")
          ("api-limit-get-settle-orders",boost::program_options::value<uint64_t>()->default_value(300),

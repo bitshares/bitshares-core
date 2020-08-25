@@ -284,7 +284,7 @@ class database_api
        * @param limit Max number of results
        * @return Desc Sorted voting power vector
        */
-      vector<account_statistics_object> get_top_voting_power_accounts(uint32_t limit)const;
+      vector<account_statistics_object> get_top_voters(uint32_t limit)const;
 
       /**
        * @brief Get info of an account by name
@@ -955,7 +955,7 @@ FC_API(graphene::app::database_api,
    (get_account_id_from_string)
    (get_accounts)
    (get_full_accounts)
-   (get_top_voting_power_accounts)
+   (get_top_voters)
    (get_account_by_name)
    (get_account_references)
    (lookup_account_names)
