@@ -17,7 +17,7 @@ cleanup () {
 echo "Starting witness node..." 1>&2
 programs/witness_node/witness_node --data-dir "$DATA_DIR" \
 			--checkpoint '[131072,"0000000000000000000000000000000000000001"]' \
-			--rpc-endpoint 127.0.0.1:8090 >node.log 2>&1 &
+			--rpc-endpoint 127.0.0.1:8090 --force-validate >node.log 2>&1 &
 NODE_PID=$!
 
 echo "Waiting for cli_wallet start..." 1>&2 &
