@@ -461,6 +461,11 @@ std::map<string,full_account> database_api::get_full_accounts( const vector<stri
    return my->get_full_accounts( names_or_ids, subscribe );
 }
 
+vector<account_statistics_object> database_api::get_top_voters(uint32_t limit)const
+{
+   return my->get_top_voters( limit );
+}
+
 std::map<std::string, full_account> database_api_impl::get_full_accounts( const vector<std::string>& names_or_ids,
                                                                           optional<bool> subscribe )
 {
@@ -638,6 +643,27 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       results[account_name_or_id] = acnt;
    }
    return results;
+}
+
+vector<account_statistics_object> database_api_impl::get_top_voters(uint32_t limit)const
+{
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_top_voters;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   vector<account_statistics_object> result;
+
+   auto last_vote_tally_time = _db.get_dynamic_global_properties().last_vote_tally_time;
+   const auto& idx = _db.get_index_type<account_stats_index>().indices().get<by_voting_power_active>();
+
+   for(auto itr = idx.begin(); result.size() < limit && itr != idx.end() && itr->vote_tally_time >= last_vote_tally_time; ++itr)
+   {
+      result.emplace_back(*itr);
+   }
+
+   return result;
 }
 
 optional<account_object> database_api::get_account_by_name( string name )const

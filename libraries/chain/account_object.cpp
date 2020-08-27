@@ -330,6 +330,8 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::account_statistics_object,
                     (has_cashback_vb)
                     (is_voting)
                     (last_vote_time)
+                    (vp_all)(vp_active)(vp_committee)(vp_witness)(vp_worker)
+                    (vote_tally_time)
                     (lifetime_fees_paid)
                     (pending_fees)(pending_vested_fees)
                   )

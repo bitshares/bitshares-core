@@ -101,6 +101,7 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::dynamic_global_property_object,
                     (time)
                     (current_witness)
                     (next_maintenance_time)
+                    (last_vote_tally_time)
                     (last_budget_time)
                     (witness_budget)
                     (total_pob)

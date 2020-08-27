@@ -72,6 +72,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
                                                      optional<bool> subscribe )const;
       std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids,
                                                        optional<bool> subscribe );
+      vector<account_statistics_object> get_top_voters(uint32_t limit)const;
       optional<account_object> get_account_by_name( string name )const;
       vector<account_id_type> get_account_references( const std::string account_id_or_name )const;
       vector<optional<account_object>> lookup_account_names(const vector<string>& account_names)const;

@@ -280,6 +280,13 @@ class database_api
                                                        optional<bool> subscribe = optional<bool>() );
 
       /**
+       * @brief Returns vector of voting power sorted by reverse vp_active
+       * @param limit Max number of results
+       * @return Desc Sorted voting power vector
+       */
+      vector<account_statistics_object> get_top_voters(uint32_t limit)const;
+
+      /**
        * @brief Get info of an account by name
        * @param name Name of the account to retrieve
        * @return The account holding the provided name
@@ -948,6 +955,7 @@ FC_API(graphene::app::database_api,
    (get_account_id_from_string)
    (get_accounts)
    (get_full_accounts)
+   (get_top_voters)
    (get_account_by_name)
    (get_account_references)
    (lookup_account_names)
