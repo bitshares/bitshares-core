@@ -323,7 +323,7 @@ jobs:
         brew install autoconf automake libtool
         brew install ccache
         brew search boost
-        brew install boost@1.60
+        brew install bitshares/boost160/boost@1.60
     - uses: actions/checkout@v2
       with:
         submodules: recursive
