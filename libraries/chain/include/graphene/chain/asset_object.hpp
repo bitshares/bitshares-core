@@ -424,6 +424,7 @@ FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (dynamic_asset_data_id)
                     (bitasset_data_id)
                     (buyback_account)
+                    (for_liquidity_pool)
                   )
 
 FC_REFLECT_TYPENAME( graphene::chain::asset_bitasset_data_object )
