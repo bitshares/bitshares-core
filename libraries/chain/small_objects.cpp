@@ -34,6 +34,7 @@
 #include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
+#include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/special_authority_object.hpp>
 #include <graphene/chain/transaction_history_object.hpp>
@@ -197,6 +198,17 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::custom_authority_object, (graph
                                (account)(enabled)(valid_from)(valid_to)(operation_type)
                                (auth)(restrictions)(restriction_counter) )
 
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::liquidity_pool_object, (graphene::db::object),
+                    (asset_a)
+                    (asset_b)
+                    (balance_a)
+                    (balance_b)
+                    (share_asset)
+                    (taker_fee_percent)
+                    (withdrawal_fee_percent)
+                  )
+
+
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::balance_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::block_summary_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::budget_record )
@@ -219,3 +231,4 @@ GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::witness_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::witness_schedule_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::worker_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::custom_authority_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::liquidity_pool_object )
