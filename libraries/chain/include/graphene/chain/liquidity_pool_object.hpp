@@ -31,8 +31,6 @@
 
 #include <boost/multi_index/composite_key.hpp>
 
-//#include <fc/uint128.hpp>
-
 namespace graphene { namespace chain {
 
 using namespace graphene::db;
