@@ -89,7 +89,7 @@ namespace graphene { namespace chain {
 
          /// @return true if this is a market-issued asset; false otherwise.
          bool is_market_issued()const { return bitasset_data_id.valid(); }
-         /// @return true if this is a share assetof a liquidity pool; false otherwise.
+         /// @return true if this is a share asset of a liquidity pool; false otherwise.
          bool is_liquidity_pool_share_asset()const { return for_liquidity_pool.valid(); }
          /// @return true if users may request force-settlement of this market-issued asset; false otherwise
          bool can_force_settle()const { return !(options.flags & disable_force_settle); }
