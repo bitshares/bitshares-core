@@ -103,7 +103,7 @@ generic_operation_result liquidity_pool_delete_evaluator::do_apply(const liquidi
    database& d = db();
    generic_operation_result result;
 
-   result.new_objects.insert( _share_asset->id );
+   result.updated_objects.insert( _share_asset->id );
    d.modify( *_share_asset, [](asset_object& ao) {
       ao.for_liquidity_pool.reset();
    });
