@@ -206,6 +206,7 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::liquidity_pool_object, (graphen
                     (share_asset)
                     (taker_fee_percent)
                     (withdrawal_fee_percent)
+                    (virtual_value)
                   )
 
 
