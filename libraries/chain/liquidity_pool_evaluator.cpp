@@ -359,7 +359,8 @@ generic_exchange_operation_result liquidity_pool_exchange_evaluator::do_apply(
    FC_ASSERT( asset_market_fee <= _pool_pays, "Market fee should not be greater than the amount to receive" );
    asset account_receives = _pool_pays - asset_market_fee;
 
-   d.adjust_balance( op.account, account_receives );
+   if( account_receives.amount > 0 )
+      d.adjust_balance( op.account, account_receives );
 
    if( op.amount_to_sell.asset_id == _pool->asset_a )
    {
