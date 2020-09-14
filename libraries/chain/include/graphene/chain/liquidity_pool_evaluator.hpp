@@ -94,7 +94,12 @@ namespace graphene { namespace chain {
 
          const liquidity_pool_object* _pool = nullptr;
          const asset_object* _pool_pays_asset = nullptr;
+         const asset_object* _pool_receives_asset = nullptr;
          asset _pool_pays;
+         asset _pool_receives;
+         asset _account_receives;
+         asset _maker_market_fee;
+         asset _taker_market_fee;
    };
 
 } } // graphene::chain

@@ -316,10 +316,17 @@ void_result liquidity_pool_exchange_evaluator::do_evaluate(const liquidity_pool_
    FC_ASSERT( is_authorized_asset( d, *fee_paying_account, asset_obj_b ),
               "The account is unauthorized by asset B" );
 
+   _pool_receives_asset = ( op.amount_to_sell.asset_id == _pool->asset_a ? &asset_obj_a : &asset_obj_b );
+
+   _maker_market_fee = d.calculate_market_fee( *_pool_receives_asset, op.amount_to_sell, true );
+   FC_ASSERT( _maker_market_fee < op.amount_to_sell,
+              "Aborting since the maker market fee of the selling asset is too high" );
+   _pool_receives = op.amount_to_sell - _maker_market_fee;
+
    fc::uint128_t delta;
    if( op.amount_to_sell.asset_id == _pool->asset_a )
    {
-      share_type new_balance_a = _pool->balance_a + op.amount_to_sell.amount;
+      share_type new_balance_a = _pool->balance_a + _pool_receives.amount;
       // round up
       fc::uint128_t new_balance_b = ( _pool->virtual_value + new_balance_a.value - 1 ) / new_balance_a.value;
       FC_ASSERT( new_balance_b <= _pool->balance_b, "Internal error" );
@@ -328,7 +335,7 @@ void_result liquidity_pool_exchange_evaluator::do_evaluate(const liquidity_pool_
    }
    else
    {
-      share_type new_balance_b = _pool->balance_b + op.amount_to_sell.amount;
+      share_type new_balance_b = _pool->balance_b + _pool_receives.amount;
       // round up
       fc::uint128_t new_balance_a = ( _pool->virtual_value + new_balance_b.value - 1 ) / new_balance_b.value;
       FC_ASSERT( new_balance_a <= _pool->balance_a, "Internal error" );
@@ -339,10 +346,13 @@ void_result liquidity_pool_exchange_evaluator::do_evaluate(const liquidity_pool_
    fc::uint128_t pool_taker_fee = delta * _pool->taker_fee_percent / GRAPHENE_100_PERCENT;
    FC_ASSERT( pool_taker_fee <= delta, "Taker fee percent of the pool is too high" );
 
-   share_type pool_pays_amount = static_cast<int64_t>( delta - pool_taker_fee );
-   FC_ASSERT( pool_pays_amount >= op.min_to_receive.amount, "Unable to exchange at expected price" );
+   _pool_pays = asset( static_cast<int64_t>( delta - pool_taker_fee ), op.min_to_receive.asset_id );
 
-   _pool_pays = asset( pool_pays_amount, op.min_to_receive.asset_id );
+   _taker_market_fee = d.calculate_market_fee( *_pool_pays_asset, _pool_pays, false );
+   FC_ASSERT( _taker_market_fee <= _pool_pays, "Market fee should not be greater than the amount to receive" );
+   _account_receives = _pool_pays - _taker_market_fee;
+
+   FC_ASSERT( _account_receives.amount >= op.min_to_receive.amount, "Unable to exchange at expected price" );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -354,18 +364,18 @@ generic_exchange_operation_result liquidity_pool_exchange_evaluator::do_apply(
    generic_exchange_operation_result result;
 
    d.adjust_balance( op.account, -op.amount_to_sell );
+   d.adjust_balance( op.account, _account_receives );
 
-   const auto asset_market_fee = d.pay_market_fees( fee_paying_account, *_pool_pays_asset, _pool_pays, false );
-   FC_ASSERT( asset_market_fee <= _pool_pays, "Market fee should not be greater than the amount to receive" );
-   asset account_receives = _pool_pays - asset_market_fee;
+   // TODO whose registrar and referrer should receive the shared maker market fee?
+   d.pay_market_fees( &_pool->share_asset(d).issuer(d), *_pool_receives_asset, op.amount_to_sell, true,
+                      _maker_market_fee );
+   d.pay_market_fees( fee_paying_account, *_pool_pays_asset, _pool_pays, false, _taker_market_fee );
 
-   if( account_receives.amount > 0 )
-      d.adjust_balance( op.account, account_receives );
-
+   const auto old_virtual_value = _pool->virtual_value;
    if( op.amount_to_sell.asset_id == _pool->asset_a )
    {
       d.modify( *_pool, [&op,this]( liquidity_pool_object& lpo ){
-         lpo.balance_a += op.amount_to_sell.amount;
+         lpo.balance_a += _pool_receives.amount;
          lpo.balance_b -= _pool_pays.amount;
          lpo.update_virtual_value();
       });
@@ -373,17 +383,19 @@ generic_exchange_operation_result liquidity_pool_exchange_evaluator::do_apply(
    else
    {
       d.modify( *_pool, [&op,this]( liquidity_pool_object& lpo ){
-         lpo.balance_b += op.amount_to_sell.amount;
+         lpo.balance_b += _pool_receives.amount;
          lpo.balance_a -= _pool_pays.amount;
          lpo.update_virtual_value();
       });
    }
 
    FC_ASSERT( _pool->balance_a > 0 && _pool->balance_b > 0, "Internal error" );
+   FC_ASSERT( _pool->virtual_value >= old_virtual_value, "Internal error" );
 
    result.paid.emplace_back( op.amount_to_sell );
-   result.received.emplace_back( account_receives );
-   result.fees.emplace_back( asset_market_fee );
+   result.received.emplace_back( _account_receives );
+   result.fees.emplace_back( _maker_market_fee );
+   result.fees.emplace_back( _taker_market_fee );
 
    return result;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
