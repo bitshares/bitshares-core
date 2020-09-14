@@ -221,6 +221,9 @@ BOOST_AUTO_TEST_CASE( create_delete_proposal_test )
       // current supply of the share asset is not zero
       BOOST_CHECK_THROW( create_liquidity_pool( sam_id, core.id, lpa.id, usd.id, 0, 0 ), fc::exception );
 
+      // Unable to issue a liquidity pool share asset
+      BOOST_CHECK_THROW( issue_uia( sam, lpa1.amount(1) ), fc::exception );
+
       // Sam is able to delete an empty pool owned by him
       generic_operation_result result = delete_liquidity_pool( sam_id, lpo1.id );
       BOOST_CHECK( !db.find( lp_id1 ) );
@@ -228,7 +231,7 @@ BOOST_AUTO_TEST_CASE( create_delete_proposal_test )
       BOOST_CHECK_EQUAL( result.new_objects.size(), 0u );
       BOOST_REQUIRE_EQUAL( result.updated_objects.size(), 1u );
       BOOST_CHECK( *result.updated_objects.begin() == lpa1.id );
-      BOOST_CHECK_EQUAL( result.removed_objects.size(), 1u );
+      BOOST_REQUIRE_EQUAL( result.removed_objects.size(), 1u );
       BOOST_CHECK( *result.removed_objects.begin() == lp_id1 );
 
       // Other pools are still there
@@ -239,6 +242,321 @@ BOOST_AUTO_TEST_CASE( create_delete_proposal_test )
       BOOST_CHECK_THROW( delete_liquidity_pool( ted_id, lp_id1 ), fc::exception );
       // Ted is not able to delete a pool owned by sam
       BOOST_CHECK_THROW( delete_liquidity_pool( ted_id, lp_id2 ), fc::exception );
+
+      // the asset is now a simple asset, able to issue
+      issue_uia( sam, lpa1.amount(1) );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( deposit_withdrawal_test )
+{ try {
+
+      // Pass the hard fork time
+      generate_blocks( HARDFORK_LIQUIDITY_POOL_TIME );
+      set_expiration( db, trx );
+
+      ACTORS((sam)(ted));
+
+      additional_asset_options_t eur_options, usd_options;
+      eur_options.value.taker_fee_percent = 50; // 0.5% taker fee
+      usd_options.value.taker_fee_percent = 80; // 0.8% taker fee
+
+      const asset_object& eur = create_user_issued_asset( "MYEUR", sam, charge_market_fee,
+                                                 price(asset(1, asset_id_type(1)), asset(1)),
+                                                 4, 20, eur_options ); // 0.2% maker fee
+      const asset_object& usd = create_user_issued_asset( "MYUSD", ted, charge_market_fee,
+                                                 price(asset(1, asset_id_type(1)), asset(1)),
+                                                 4, 30, usd_options ); // 0.3% maker fee
+      const asset_object& lpa = create_user_issued_asset( "LPATEST", sam, charge_market_fee );
+
+      asset_id_type core_id = asset_id_type();
+      asset_id_type eur_id = eur.id;
+      asset_id_type usd_id = usd.id;
+      asset_id_type lpa_id = lpa.id;
+
+      int64_t init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      issue_uia( sam, eur.amount(init_amount) );
+      issue_uia( ted, eur.amount(init_amount) );
+      issue_uia( sam, usd.amount(init_amount) );
+      issue_uia( ted, usd.amount(init_amount) );
+
+      int64_t expected_balance_sam_eur = init_amount;
+      int64_t expected_balance_sam_usd = init_amount;
+      int64_t expected_balance_sam_lpa = 0;
+      int64_t expected_balance_ted_eur = init_amount;
+      int64_t expected_balance_ted_usd = init_amount;
+      int64_t expected_balance_ted_lpa = 0;
+
+      const auto& check_balances = [&]() {
+         BOOST_CHECK_EQUAL( db.get_balance( sam_id, eur_id ).amount.value, expected_balance_sam_eur );
+         BOOST_CHECK_EQUAL( db.get_balance( sam_id, usd_id ).amount.value, expected_balance_sam_usd );
+         BOOST_CHECK_EQUAL( db.get_balance( sam_id, lpa_id ).amount.value, expected_balance_sam_lpa );
+         BOOST_CHECK_EQUAL( db.get_balance( ted_id, eur_id ).amount.value, expected_balance_ted_eur );
+         BOOST_CHECK_EQUAL( db.get_balance( ted_id, usd_id ).amount.value, expected_balance_ted_usd );
+         BOOST_CHECK_EQUAL( db.get_balance( ted_id, lpa_id ).amount.value, expected_balance_ted_lpa );
+      };
+
+      check_balances();
+
+      int64_t expected_pool_balance_a = 0;
+      int64_t expected_pool_balance_b = 0;
+      int64_t expected_lp_supply = 0;
+
+      // create a liquidity pool
+      const liquidity_pool_object& lpo = create_liquidity_pool( sam_id, eur.id, usd.id, lpa.id, 200, 300 );
+      liquidity_pool_id_type lp_id = lpo.id;
+
+      BOOST_CHECK( lpo.asset_a == eur_id );
+      BOOST_CHECK( lpo.asset_b == usd_id );
+      BOOST_CHECK( lpo.share_asset == lpa_id );
+      BOOST_CHECK( lpo.taker_fee_percent == 200 );
+      BOOST_CHECK( lpo.withdrawal_fee_percent == 300 );
+
+      BOOST_CHECK_EQUAL( lpo.balance_a.value, expected_pool_balance_a);
+      BOOST_CHECK_EQUAL( lpo.balance_b.value, expected_pool_balance_b);
+      BOOST_CHECK( lpo.virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
+      BOOST_CHECK_EQUAL( lpa.dynamic_data(db).current_supply.value, expected_lp_supply );
+
+      BOOST_CHECK( lpa.is_liquidity_pool_share_asset() );
+      BOOST_CHECK( *lpa.for_liquidity_pool == lp_id );
+
+      check_balances();
+
+      // Unable to deposit to a liquidity pool with invalid data
+      // non-positive amounts
+      for( int64_t i = -1; i <= 1; ++i )
+      {
+         for( int64_t j = -1; j <= 1; ++j )
+         {
+            if( i > 0 && j > 0 )
+               continue;
+            BOOST_CHECK_THROW( deposit_to_liquidity_pool( sam_id, lp_id, asset( i, eur_id ), asset( j, usd_id ) ),
+                               fc::exception );
+         }
+      }
+      // Insufficient balance
+      BOOST_CHECK_THROW( deposit_to_liquidity_pool( sam_id, lp_id,
+                            asset( init_amount + 1, eur_id ), asset( 1, usd_id ) ), fc::exception );
+      BOOST_CHECK_THROW( deposit_to_liquidity_pool( sam_id, lp_id,
+                            asset( 1, eur_id ), asset( init_amount + 1, usd_id ) ), fc::exception );
+      // asset ID mismatch
+      BOOST_CHECK_THROW( deposit_to_liquidity_pool( sam_id, lp_id, asset( 1, core_id ), asset( 1, usd_id ) ),
+                         fc::exception );
+      BOOST_CHECK_THROW( deposit_to_liquidity_pool( sam_id, lp_id, asset( 1, eur_id ), asset( 1, lpa_id ) ),
+                         fc::exception );
+      BOOST_CHECK_THROW( deposit_to_liquidity_pool( sam_id, lp_id, asset( 1, usd_id ), asset( 1, eur_id ) ),
+                         fc::exception );
+      // non-exist pool
+      BOOST_CHECK_THROW( deposit_to_liquidity_pool( sam_id, lp_id+1, asset( 1, eur_id ), asset( 1, usd_id ) ),
+                         fc::exception );
+      // pool empty but not owner depositting
+      BOOST_CHECK_THROW( deposit_to_liquidity_pool( ted_id, lp_id, asset( 1, eur_id ), asset( 1, usd_id ) ),
+                         fc::exception );
+
+      // The owner is able to do the initial deposit
+      generic_exchange_operation_result result;
+      result = deposit_to_liquidity_pool( sam_id, lp_id, asset( 1000, eur_id ), asset( 1200, usd_id ) );
+
+      BOOST_REQUIRE_EQUAL( result.paid.size(), 2u );
+      BOOST_CHECK( result.paid.front() == asset( 1000, eur_id ) );
+      BOOST_CHECK( result.paid.back() == asset( 1200, usd_id ) );
+      BOOST_REQUIRE_EQUAL( result.received.size(), 1u );
+      BOOST_CHECK( result.received.front() == asset( 1200, lpa_id ) );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 0u );
+
+      expected_pool_balance_a = 1000;
+      expected_pool_balance_b = 1200;
+      expected_lp_supply = 1200;
+      BOOST_CHECK_EQUAL( lpo.balance_a.value, expected_pool_balance_a);
+      BOOST_CHECK_EQUAL( lpo.balance_b.value, expected_pool_balance_b);
+      BOOST_CHECK( lpo.virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
+      BOOST_CHECK_EQUAL( lpa.dynamic_data(db).current_supply.value, expected_lp_supply );
+
+      expected_balance_sam_eur -= 1000;
+      expected_balance_sam_usd -= 1200;
+      expected_balance_sam_lpa += 1200;
+      check_balances();
+
+      // unable to delete a pool that is not empty
+      BOOST_CHECK_THROW( delete_liquidity_pool( sam_id, lp_id ), fc::exception );
+
+      // Sam tries to deposit more
+      result = deposit_to_liquidity_pool( sam_id, lp_id, asset( 200, eur_id ), asset( 120, usd_id ) );
+
+      BOOST_REQUIRE_EQUAL( result.paid.size(), 2u );
+      BOOST_CHECK( result.paid.front() == asset( 100, eur_id ) );
+      BOOST_CHECK( result.paid.back() == asset( 120, usd_id ) );
+      BOOST_REQUIRE_EQUAL( result.received.size(), 1u );
+      BOOST_CHECK( result.received.front() == asset( 120, lpa_id ) );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 0u );
+
+      expected_pool_balance_a += 100;
+      expected_pool_balance_b += 120;
+      expected_lp_supply += 120;
+      BOOST_CHECK_EQUAL( lpo.balance_a.value, expected_pool_balance_a);
+      BOOST_CHECK_EQUAL( lpo.balance_b.value, expected_pool_balance_b);
+      BOOST_CHECK( lpo.virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
+      BOOST_CHECK_EQUAL( lpa.dynamic_data(db).current_supply.value, expected_lp_supply );
+
+      expected_balance_sam_eur -= 100;
+      expected_balance_sam_usd -= 120;
+      expected_balance_sam_lpa += 120;
+      check_balances();
+
+      // Unable to reserve all the supply of the LP token
+      BOOST_CHECK_THROW( reserve_asset( sam_id, asset( expected_balance_sam_lpa, lpa_id ) ), fc::exception );
+
+      // Ted deposits
+      result = deposit_to_liquidity_pool( ted_id, lp_id, asset( 12347, eur_id ), asset( 56890, usd_id ) );
+
+      int64_t new_lp_supply = 14816; // 1320 * 12347 / 1100, round down
+      int64_t new_a = 12347;
+      int64_t new_b = 14816;
+
+      BOOST_REQUIRE_EQUAL( result.paid.size(), 2u );
+      BOOST_CHECK( result.paid.front() == asset( new_a, eur_id ) );
+      BOOST_CHECK( result.paid.back() == asset( new_b, usd_id ) );
+      BOOST_REQUIRE_EQUAL( result.received.size(), 1u );
+      BOOST_CHECK( result.received.front() == asset( new_lp_supply, lpa_id ) );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 0u );
+
+      expected_pool_balance_a += new_a; // 1100 + 12347 = 13447
+      expected_pool_balance_b += new_b; // 1320 + 14816 = 16136
+      expected_lp_supply += new_lp_supply; // 16136
+      BOOST_CHECK_EQUAL( lpo.balance_a.value, expected_pool_balance_a);
+      BOOST_CHECK_EQUAL( lpo.balance_b.value, expected_pool_balance_b);
+      BOOST_CHECK( lpo.virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
+      BOOST_CHECK_EQUAL( lpa.dynamic_data(db).current_supply.value, expected_lp_supply );
+
+      expected_balance_ted_eur -= new_a;
+      expected_balance_ted_usd -= new_b;
+      expected_balance_ted_lpa += new_lp_supply;
+      check_balances();
+
+      // Unable to withdraw with invalid data
+      // non-positive amount
+      BOOST_CHECK_THROW( withdraw_from_liquidity_pool( ted_id, lp_id, asset( -1, lpa_id ) ),
+                         fc::exception );
+      BOOST_CHECK_THROW( withdraw_from_liquidity_pool( ted_id, lp_id, asset( 0, lpa_id ) ),
+                         fc::exception );
+      // insufficient balance
+      BOOST_CHECK_THROW( withdraw_from_liquidity_pool( ted_id, lp_id, asset( expected_balance_ted_lpa + 1, lpa_id ) ),
+                         fc::exception );
+      // asset ID mismatch
+      BOOST_CHECK_THROW( withdraw_from_liquidity_pool( ted_id, lp_id, asset( 10, core_id ) ),
+                         fc::exception );
+      BOOST_CHECK_THROW( withdraw_from_liquidity_pool( ted_id, lp_id, asset( 10, usd_id ) ),
+                         fc::exception );
+      BOOST_CHECK_THROW( withdraw_from_liquidity_pool( ted_id, lp_id, asset( 10, eur_id ) ),
+                         fc::exception );
+      // non-exist pool
+      BOOST_CHECK_THROW( withdraw_from_liquidity_pool( ted_id, lp_id+1, asset( 10, usd_id ) ),
+                         fc::exception );
+
+      // Ted reserve some LP token
+      reserve_asset( ted_id, asset( 14810, lpa_id ) );
+
+      expected_lp_supply -= 14810; // 16136 - 14810 = 1326
+      BOOST_CHECK_EQUAL( lpa.dynamic_data(db).current_supply.value, expected_lp_supply );
+
+      expected_balance_ted_lpa -= 14810; // 6
+      check_balances();
+
+      // Ted deposits again
+      result = deposit_to_liquidity_pool( ted_id, lp_id, asset( 12347, eur_id ), asset( 56890, usd_id ) );
+
+      new_lp_supply = 1217; // 1326 * 12347 / 13447, round down
+      new_a = 12342; // 1217 * 13447 / 1326, round up
+      new_b = 14810; // 1217 * 16136 / 1326, round up
+
+      BOOST_REQUIRE_EQUAL( result.paid.size(), 2u );
+      BOOST_CHECK( result.paid.front() == asset( new_a, eur_id ) );
+      BOOST_CHECK( result.paid.back() == asset( new_b, usd_id ) );
+      BOOST_REQUIRE_EQUAL( result.received.size(), 1u );
+      BOOST_CHECK( result.received.front() == asset( new_lp_supply, lpa_id ) );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 0u );
+
+      expected_pool_balance_a += new_a; // 13447 + 12342 = 25789
+      expected_pool_balance_b += new_b; // 16136 + 14810 = 30946
+      expected_lp_supply += new_lp_supply; // 1326 + 1217 = 2543
+      BOOST_CHECK_EQUAL( lpo.balance_a.value, expected_pool_balance_a);
+      BOOST_CHECK_EQUAL( lpo.balance_b.value, expected_pool_balance_b);
+      BOOST_CHECK( lpo.virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
+      BOOST_CHECK_EQUAL( lpa.dynamic_data(db).current_supply.value, expected_lp_supply );
+
+      expected_balance_ted_eur -= new_a;
+      expected_balance_ted_usd -= new_b;
+      expected_balance_ted_lpa += new_lp_supply;
+      check_balances();
+
+      // Ted withdraws some LP token
+      result = withdraw_from_liquidity_pool( ted_id, lp_id, asset( 7, lpa_id ) );
+
+      new_lp_supply = -7;
+      new_a = -68; // - (7 * 25789 / 2543, round down, = 70, deduct withdrawal fee 70 * 3%, round down, = 2)
+      new_b = -83; // - (7 * 30946 / 2543, round down, = 85, deduct withdrawal fee 85 * 3%, round down, = 2)
+
+      BOOST_REQUIRE_EQUAL( result.paid.size(), 1u );
+      BOOST_CHECK( result.paid.front() == asset( -new_lp_supply, lpa_id ) );
+      BOOST_REQUIRE_EQUAL( result.received.size(), 2u );
+      BOOST_CHECK( result.received.front() == asset( -new_a, eur_id ) );
+      BOOST_CHECK( result.received.back() == asset( -new_b, usd_id ) );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 0u );
+
+      expected_pool_balance_a += new_a; // 25789 - 68 = 25721
+      expected_pool_balance_b += new_b; // 30946 - 83 = 30863
+      expected_lp_supply += new_lp_supply; // 2543 - 7 = 2536
+      BOOST_CHECK_EQUAL( lpo.balance_a.value, expected_pool_balance_a);
+      BOOST_CHECK_EQUAL( lpo.balance_b.value, expected_pool_balance_b);
+      BOOST_CHECK( lpo.virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
+      BOOST_CHECK_EQUAL( lpa.dynamic_data(db).current_supply.value, expected_lp_supply );
+
+      expected_balance_ted_eur -= new_a;
+      expected_balance_ted_usd -= new_b;
+      expected_balance_ted_lpa += new_lp_supply;
+      check_balances();
+
+      // Ted reserve the rest LP token
+      reserve_asset( ted_id, asset( expected_balance_ted_lpa, lpa_id ) );
+
+      expected_lp_supply -= expected_balance_ted_lpa; // 1320
+      BOOST_CHECK_EQUAL( lpa.dynamic_data(db).current_supply.value, expected_lp_supply );
+
+      expected_balance_ted_lpa = 0;
+      check_balances();
+
+      // Sam withdraws all
+      result = withdraw_from_liquidity_pool( sam_id, lp_id, asset( 1320, lpa_id ) );
+
+      new_lp_supply = -1320;
+      new_a = -25721;
+      new_b = -30863;
+
+      BOOST_REQUIRE_EQUAL( result.paid.size(), 1u );
+      BOOST_CHECK( result.paid.front() == asset( -new_lp_supply, lpa_id ) );
+      BOOST_REQUIRE_EQUAL( result.received.size(), 2u );
+      BOOST_CHECK( result.received.front() == asset( -new_a, eur_id ) );
+      BOOST_CHECK( result.received.back() == asset( -new_b, usd_id ) );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 0u );
+
+      expected_pool_balance_a = 0;
+      expected_pool_balance_b = 0;
+      expected_lp_supply = 0;
+      BOOST_CHECK_EQUAL( lpo.balance_a.value, expected_pool_balance_a);
+      BOOST_CHECK_EQUAL( lpo.balance_b.value, expected_pool_balance_b);
+      BOOST_CHECK( lpo.virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
+      BOOST_CHECK_EQUAL( lpa.dynamic_data(db).current_supply.value, expected_lp_supply );
+
+      expected_balance_sam_eur -= new_a;
+      expected_balance_sam_usd -= new_b;
+      expected_balance_sam_lpa += new_lp_supply; // 0
+      check_balances();
 
       generate_block();
 
