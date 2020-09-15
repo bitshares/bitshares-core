@@ -558,6 +558,105 @@ BOOST_AUTO_TEST_CASE( deposit_withdrawal_test )
       expected_balance_sam_lpa += new_lp_supply; // 0
       check_balances();
 
+      // prepare for asset update
+      asset_update_operation auop;
+      auop.issuer = sam_id;
+      auop.asset_to_update = lpa_id;
+      auop.new_options = lpa_id(db).options;
+
+      // set max supply to a smaller number
+      auop.new_options.max_supply = 2000;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK_EQUAL( lpa_id(db).options.max_supply.value, 2000 );
+
+      // Unable to do initial deposit if to create more than the max supply
+      BOOST_CHECK_THROW( deposit_to_liquidity_pool( sam_id, lp_id, asset( 2001, eur_id ), asset( 100, usd_id ) ),
+                         fc::exception );
+      BOOST_CHECK_THROW( deposit_to_liquidity_pool( sam_id, lp_id, asset( 100, eur_id ), asset( 2001, usd_id ) ),
+                         fc::exception );
+      BOOST_CHECK_THROW( deposit_to_liquidity_pool( sam_id, lp_id, asset( 2001, eur_id ), asset( 2001, usd_id ) ),
+                         fc::exception );
+
+      // Able to deposit less
+      result = deposit_to_liquidity_pool( sam_id, lp_id, asset( 1000, eur_id ), asset( 1200, usd_id ) );
+
+      BOOST_REQUIRE_EQUAL( result.paid.size(), 2u );
+      BOOST_CHECK( result.paid.front() == asset( 1000, eur_id ) );
+      BOOST_CHECK( result.paid.back() == asset( 1200, usd_id ) );
+      BOOST_REQUIRE_EQUAL( result.received.size(), 1u );
+      BOOST_CHECK( result.received.front() == asset( 1200, lpa_id ) );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 0u );
+
+      expected_pool_balance_a = 1000;
+      expected_pool_balance_b = 1200;
+      expected_lp_supply = 1200;
+      BOOST_CHECK_EQUAL( lpo.balance_a.value, expected_pool_balance_a);
+      BOOST_CHECK_EQUAL( lpo.balance_b.value, expected_pool_balance_b);
+      BOOST_CHECK( lpo.virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
+      BOOST_CHECK_EQUAL( lpa.dynamic_data(db).current_supply.value, expected_lp_supply );
+
+      expected_balance_sam_eur -= 1000;
+      expected_balance_sam_usd -= 1200;
+      expected_balance_sam_lpa += 1200;
+      check_balances();
+
+      // Try to deposit more to create more than max supply, will be capped at max supply
+      result = deposit_to_liquidity_pool( sam_id, lp_id, asset( 1000, eur_id ), asset( 1200, usd_id ) );
+
+      new_lp_supply = 800; // 2000 - 1200
+      new_a = 667; // 800 * 1000 / 1200, round up
+      new_b = 800;
+
+      BOOST_REQUIRE_EQUAL( result.paid.size(), 2u );
+      BOOST_CHECK( result.paid.front() == asset( new_a, eur_id ) );
+      BOOST_CHECK( result.paid.back() == asset( new_b, usd_id ) );
+      BOOST_REQUIRE_EQUAL( result.received.size(), 1u );
+      BOOST_CHECK( result.received.front() == asset( new_lp_supply, lpa_id ) );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 0u );
+
+      expected_pool_balance_a += new_a;
+      expected_pool_balance_b += new_b;
+      expected_lp_supply = 2000;
+      BOOST_CHECK_EQUAL( lpo.balance_a.value, expected_pool_balance_a);
+      BOOST_CHECK_EQUAL( lpo.balance_b.value, expected_pool_balance_b);
+      BOOST_CHECK( lpo.virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
+      BOOST_CHECK_EQUAL( lpa.dynamic_data(db).current_supply.value, expected_lp_supply );
+
+      expected_balance_sam_eur -= new_a;
+      expected_balance_sam_usd -= new_b;
+      expected_balance_sam_lpa += new_lp_supply;
+      check_balances();
+
+      // Unable to deposit more
+      BOOST_CHECK_THROW( deposit_to_liquidity_pool( sam_id, lp_id, asset( 2, eur_id ), asset( 2, usd_id ) ),
+                         fc::exception );
+
+      // set max supply to a bigger number
+      auop.new_options.max_supply = 3000;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK_EQUAL( lpa_id(db).options.max_supply.value, 3000 );
+
+      // Able to deposit more
+      deposit_to_liquidity_pool( sam_id, lp_id, asset( 2, eur_id ), asset( 2, usd_id ) );
+
+      // update flag to disable creation of new supply
+      auop.new_options.flags |= disable_new_supply;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      BOOST_CHECK( !lpa_id(db).can_create_new_supply() );
+
+      // Unable to deposit more
+      BOOST_CHECK_THROW( deposit_to_liquidity_pool( sam_id, lp_id, asset( 2, eur_id ), asset( 2, usd_id ) ),
+                         fc::exception );
+
       generate_block();
 
    } catch (fc::exception& e) {
