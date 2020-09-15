@@ -889,6 +889,7 @@ BOOST_AUTO_TEST_CASE( exchange_test )
       expected_balance_ted_usd -= 1000;
       check_balances();
 
+      // Generates a block
       generate_block();
 
    } catch (fc::exception& e) {
