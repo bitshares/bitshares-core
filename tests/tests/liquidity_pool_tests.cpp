@@ -470,6 +470,10 @@ BOOST_AUTO_TEST_CASE( deposit_withdrawal_test )
       expected_balance_ted_lpa -= 14810; // 6
       check_balances();
 
+      // Ted fails to deposit with too small amounts
+      BOOST_CHECK_THROW( deposit_to_liquidity_pool( ted_id, lp_id, asset( 8, eur_id ), asset( 8, usd_id ) ),
+                         fc::exception );
+
       // Ted deposits again
       result = deposit_to_liquidity_pool( ted_id, lp_id, asset( 12347, eur_id ), asset( 56890, usd_id ) );
 
