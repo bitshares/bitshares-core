@@ -1243,7 +1243,8 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
             uint64_t voting_stake[3]; // 0=committee, 1=witness, 2=worker, as in vote_id_type::vote_type
             uint64_t num_committee_voting_stake; // number of committee members
             voting_stake[2] = ( pob_activated ? 0 : stats.total_core_in_orders.value )
-                  + (stake_account.cashback_vb.valid() ? (*stake_account.cashback_vb)(d).balance.amount.value: 0)
+                  + ( ( !hf2262_passed && stake_account.cashback_vb.valid() ) ?
+                           (*stake_account.cashback_vb)(d).balance.amount.value : 0 )
                   + ( hf2262_passed ? 0 : stats.core_in_balance.value );
 
             // voting power stats
