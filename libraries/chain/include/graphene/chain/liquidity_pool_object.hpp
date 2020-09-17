@@ -65,6 +65,7 @@ class liquidity_pool_object : public abstract_object<liquidity_pool_object>
 struct by_share_asset;
 struct by_asset_a;
 struct by_asset_b;
+struct by_asset_ab;
 
 /**
 * @ingroup object_index
@@ -78,14 +79,19 @@ typedef multi_index_container<
       ordered_unique< tag<by_asset_a>,
          composite_key< liquidity_pool_object,
             member< liquidity_pool_object, asset_id_type, &liquidity_pool_object::asset_a >,
-            member< liquidity_pool_object, asset_id_type, &liquidity_pool_object::asset_b >,
             member< object, object_id_type, &object::id>
          >
       >,
       ordered_unique< tag<by_asset_b>,
          composite_key< liquidity_pool_object,
             member< liquidity_pool_object, asset_id_type, &liquidity_pool_object::asset_b >,
+            member< object, object_id_type, &object::id>
+         >
+      >,
+      ordered_unique< tag<by_asset_ab>,
+         composite_key< liquidity_pool_object,
             member< liquidity_pool_object, asset_id_type, &liquidity_pool_object::asset_a >,
+            member< liquidity_pool_object, asset_id_type, &liquidity_pool_object::asset_b >,
             member< object, object_id_type, &object::id>
          >
       >
