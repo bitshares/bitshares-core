@@ -491,9 +491,10 @@ namespace graphene { namespace chain {
           * @param trade_amount the quantity that the fee calculation is based upon
           * @param is_maker TRUE if this is the fee for a maker, FALSE if taker
           */
-         asset calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount, const bool& is_maker);
+         asset calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount,
+                                     const bool& is_maker )const;
          asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,
-                               const bool& is_maker);
+                               const bool& is_maker, const optional<asset>& calculated_market_fees = {});
          asset pay_force_settle_fees(const asset_object& collecting_asset, const asset& collat_receives);
          ///@}
 

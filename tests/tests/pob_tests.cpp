@@ -3504,4 +3504,228 @@ BOOST_AUTO_TEST_CASE( multiple_tickets )
    }
 }
 
+BOOST_AUTO_TEST_CASE( hf2262_test )
+{ try {
+
+      // Proceed to a time near the core-2262 hard fork.
+      // Note: only works if the maintenance interval is less than 14 days
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks( HARDFORK_CORE_2262_TIME - mi );
+      set_expiration( db, trx );
+
+      ACTORS((sam));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+
+      int64_t sam_balance = init_amount;
+
+      // create a ticket
+      const ticket_object& tick_1 = create_ticket( sam_id, lock_180_days, asset(100) );
+      ticket_id_type tick_1_id = tick_1.id;
+
+      BOOST_CHECK( tick_1_id(db).account == sam_id );
+      BOOST_CHECK( tick_1_id(db).target_type == lock_180_days );
+      BOOST_CHECK( tick_1_id(db).current_type == liquid );
+      BOOST_CHECK( tick_1_id(db).status == charging );
+      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 100 );
+      sam_balance -= 100;
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
+
+      auto create_time =  db.head_block_time();
+
+      // activate hf2262
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      generate_block();
+
+      BOOST_REQUIRE( db.head_block_time() < create_time + fc::days(14) );
+
+      BOOST_CHECK( tick_1_id(db).account == sam_id );
+      BOOST_CHECK( tick_1_id(db).target_type == lock_180_days );
+      BOOST_CHECK( tick_1_id(db).current_type == liquid );
+      BOOST_CHECK( tick_1_id(db).status == charging );
+      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
+
+      // 14 days passed
+      generate_blocks( create_time + fc::days(14) );
+      set_expiration( db, trx );
+
+      // no change
+      BOOST_CHECK( tick_1_id(db).account == sam_id );
+      BOOST_CHECK( tick_1_id(db).target_type == lock_180_days );
+      BOOST_CHECK( tick_1_id(db).current_type == liquid );
+      BOOST_CHECK( tick_1_id(db).status == charging );
+      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
+
+      // unable to update ticket if not to change target type
+      BOOST_CHECK_THROW( update_ticket( tick_1_id(db), lock_180_days, {} ), fc::exception );
+      BOOST_CHECK_THROW( update_ticket( tick_1_id(db), lock_180_days, asset(1) ), fc::exception );
+      BOOST_CHECK_THROW( update_ticket( tick_1_id(db), lock_180_days, asset(100) ), fc::exception );
+
+      // split ticket 1, cancel some
+      auto result = update_ticket( tick_1_id(db), liquid, asset(6) );
+
+      BOOST_CHECK( tick_1_id(db).account == sam_id );
+      BOOST_CHECK( tick_1_id(db).target_type == lock_180_days );
+      BOOST_CHECK( tick_1_id(db).current_type == liquid );
+      BOOST_CHECK( tick_1_id(db).status == charging );
+      BOOST_CHECK( tick_1_id(db).amount == asset(94) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
+
+      BOOST_REQUIRE_EQUAL( result.new_objects.size(), 1u );
+
+      ticket_id_type tick_2_id = *result.new_objects.begin();
+      BOOST_CHECK( tick_2_id(db).target_type == liquid );
+      BOOST_CHECK( tick_2_id(db).current_type == liquid );
+      BOOST_CHECK( tick_2_id(db).status == withdrawing );
+      BOOST_CHECK( tick_2_id(db).amount == asset(6) );
+      BOOST_CHECK_EQUAL( tick_2_id(db).value.value, 0 );
+
+      // 1 day passed
+      generate_blocks( db.head_block_time() + fc::days(1) );
+      set_expiration( db, trx );
+
+      // ticket should be stable now
+      BOOST_CHECK( tick_1_id(db).account == sam_id );
+      BOOST_CHECK( tick_1_id(db).target_type == lock_180_days );
+      BOOST_CHECK( tick_1_id(db).current_type == lock_180_days );
+      BOOST_CHECK( tick_1_id(db).status == stable );
+      BOOST_CHECK( tick_1_id(db).next_auto_update_time == time_point_sec::maximum() );
+      BOOST_CHECK( tick_1_id(db).next_type_downgrade_time == time_point_sec::maximum() );
+      BOOST_CHECK( tick_1_id(db).amount == asset(94) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 94 * 2 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
+
+      // split ticket 1, downgrade some
+      result = update_ticket( tick_1_id(db), liquid, asset(10) );
+
+      BOOST_CHECK( tick_1_id(db).account == sam_id );
+      BOOST_CHECK( tick_1_id(db).target_type == lock_180_days );
+      BOOST_CHECK( tick_1_id(db).current_type == lock_180_days );
+      BOOST_CHECK( tick_1_id(db).status == stable );
+      BOOST_CHECK( tick_1_id(db).next_auto_update_time == time_point_sec::maximum() );
+      BOOST_CHECK( tick_1_id(db).next_type_downgrade_time == time_point_sec::maximum() );
+      BOOST_CHECK( tick_1_id(db).amount == asset(84) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 84 * 2 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
+
+      BOOST_REQUIRE_EQUAL( result.new_objects.size(), 1u );
+
+      ticket_id_type tick_3_id = *result.new_objects.begin();
+      BOOST_CHECK( tick_3_id(db).target_type == liquid );
+      BOOST_CHECK( tick_3_id(db).current_type == liquid );
+      BOOST_CHECK( tick_3_id(db).status == withdrawing );
+      BOOST_CHECK( tick_3_id(db).amount == asset(10) );
+      BOOST_CHECK_EQUAL( tick_3_id(db).value.value, 0 );
+
+      // update ticket 1, downgrade all
+      update_ticket( tick_1_id(db), liquid, {} );
+
+      // check new data
+      BOOST_CHECK( tick_1_id(db).account == sam_id );
+      BOOST_CHECK( tick_1_id(db).target_type == liquid );
+      BOOST_CHECK( tick_1_id(db).current_type == liquid );
+      BOOST_CHECK( tick_1_id(db).status == withdrawing );
+      BOOST_CHECK( tick_1_id(db).amount == asset(84) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
+
+      // create a new ticket
+      const ticket_object& tick_4 = create_ticket( sam_id, lock_360_days, asset(200) );
+      ticket_id_type tick_4_id = tick_4.id;
+
+      BOOST_CHECK( tick_4_id(db).account == sam_id );
+      BOOST_CHECK( tick_4_id(db).target_type == lock_360_days );
+      BOOST_CHECK( tick_4_id(db).current_type == liquid );
+      BOOST_CHECK( tick_4_id(db).status == charging );
+      BOOST_CHECK( tick_4_id(db).amount == asset(200) );
+      BOOST_CHECK_EQUAL( tick_4_id(db).value.value, 0 );
+      sam_balance -= 200;
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
+
+   } FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE( hf2262_auto_update_test )
+{ try {
+
+      INVOKE( one_lock_360_ticket );
+
+      // activate hf2262
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks( HARDFORK_CORE_2262_TIME - mi );
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+
+      GET_ACTOR( sam );
+
+      int64_t sam_balance = db.get_balance( sam_id, asset_id_type() ).amount.value;
+
+      ticket_id_type tick_1_id; // default value
+
+      // withdraw the ticket
+      auto result = update_ticket( tick_1_id(db), liquid, {} );
+      BOOST_CHECK_EQUAL( result.new_objects.size(), 0u );
+
+      BOOST_CHECK( tick_1_id(db).target_type == liquid );
+      BOOST_CHECK( tick_1_id(db).current_type == lock_180_days );
+      BOOST_CHECK( tick_1_id(db).status == withdrawing );
+      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 100 * 2 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
+
+      // 179 days passed
+      generate_blocks( db.head_block_time() + fc::days(179) );
+      set_expiration( db, trx );
+
+      // no change
+      BOOST_CHECK( tick_1_id(db).target_type == liquid );
+      BOOST_CHECK( tick_1_id(db).current_type == lock_180_days );
+      BOOST_CHECK( tick_1_id(db).status == withdrawing );
+      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 100  * 2 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
+
+      // 1 day passed
+      generate_blocks( db.head_block_time() + fc::days(1) );
+      set_expiration( db, trx );
+
+      // the ticket should have downgraded
+      BOOST_CHECK( tick_1_id(db).target_type == liquid );
+      BOOST_CHECK( tick_1_id(db).current_type == liquid );
+      BOOST_CHECK( tick_1_id(db).status == withdrawing );
+      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
+
+      // 179 days passed
+      generate_blocks( db.head_block_time() + fc::days(179) );
+      set_expiration( db, trx );
+
+      // no change
+      BOOST_CHECK( tick_1_id(db).target_type == liquid );
+      BOOST_CHECK( tick_1_id(db).current_type == liquid );
+      BOOST_CHECK( tick_1_id(db).status == withdrawing );
+      BOOST_CHECK( tick_1_id(db).amount == asset(100) );
+      BOOST_CHECK_EQUAL( tick_1_id(db).value.value, 0 );
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance );
+
+      // 1 day passed
+      generate_blocks( db.head_block_time() + fc::days(1) );
+      set_expiration( db, trx );
+
+      // the ticket should be freed
+      BOOST_CHECK( !db.find( tick_1_id ) );
+
+      BOOST_CHECK_EQUAL( db.get_balance( sam_id, asset_id_type() ).amount.value, sam_balance + 100 );
+
+   } FC_LOG_AND_RETHROW()
+}
+
+
 BOOST_AUTO_TEST_SUITE_END()

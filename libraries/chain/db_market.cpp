@@ -1339,7 +1339,8 @@ void database::pay_order( const account_object& receiver, const asset& receives,
    adjust_balance(receiver.get_id(), receives);
 }
 
-asset database::calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount, const bool& is_maker)
+asset database::calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount,
+                                      const bool& is_maker )const
 {
    assert( trade_asset.id == trade_amount.asset_id );
 
@@ -1374,9 +1375,10 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
 
 
 asset database::pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,
-                                const bool& is_maker)
+                                const bool& is_maker, const optional<asset>& calculated_market_fees )
 {
-   const auto market_fees = calculate_market_fee( recv_asset, receives, is_maker );
+   const auto market_fees = ( calculated_market_fees.valid() ? *calculated_market_fees
+                                    : calculate_market_fee( recv_asset, receives, is_maker ) );
    auto issuer_fees = market_fees;
    FC_ASSERT( issuer_fees <= receives, "Market fee shouldn't be greater than receives");
    //Don't dirty undo state if not actually collecting any fees

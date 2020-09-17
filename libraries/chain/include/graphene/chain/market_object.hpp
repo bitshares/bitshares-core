@@ -44,8 +44,8 @@ using namespace graphene::db;
 class limit_order_object : public abstract_object<limit_order_object>
 {
    public:
-      static const uint8_t space_id = protocol_ids;
-      static const uint8_t type_id  = limit_order_object_type;
+      static constexpr uint8_t space_id = protocol_ids;
+      static constexpr uint8_t type_id  = limit_order_object_type;
 
       time_point_sec   expiration;
       account_id_type  seller;
@@ -119,8 +119,8 @@ typedef generic_index<limit_order_object, limit_order_multi_index_type> limit_or
 class call_order_object : public abstract_object<call_order_object>
 {
    public:
-      static const uint8_t space_id = protocol_ids;
-      static const uint8_t type_id  = call_order_object_type;
+      static constexpr uint8_t space_id = protocol_ids;
+      static constexpr uint8_t type_id  = call_order_object_type;
 
       asset get_collateral()const { return asset( collateral, call_price.base.asset_id ); }
       asset get_debt()const { return asset( debt, debt_type() ); }
@@ -168,8 +168,8 @@ class call_order_object : public abstract_object<call_order_object>
 class force_settlement_object : public abstract_object<force_settlement_object>
 {
    public:
-      static const uint8_t space_id = protocol_ids;
-      static const uint8_t type_id  = force_settlement_object_type;
+      static constexpr uint8_t space_id = protocol_ids;
+      static constexpr uint8_t type_id  = force_settlement_object_type;
 
       account_id_type   owner;
       asset             balance;
@@ -189,8 +189,8 @@ class force_settlement_object : public abstract_object<force_settlement_object>
 class collateral_bid_object : public abstract_object<collateral_bid_object>
 {
    public:
-      static const uint8_t space_id = implementation_ids;
-      static const uint8_t type_id  = impl_collateral_bid_object_type;
+      static constexpr uint8_t space_id = implementation_ids;
+      static constexpr uint8_t type_id  = impl_collateral_bid_object_type;
 
       asset get_additional_collateral()const { return inv_swan_price.base; }
       asset get_debt_covered()const { return inv_swan_price.quote; }

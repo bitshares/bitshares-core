@@ -147,6 +147,18 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!op.new_parameters.current_fees->exists<ticket_update_operation>(),
                    "Unable to define fees for ticket operations prior to hardfork 2103");
       }
+      if (!HARDFORK_LIQUIDITY_POOL_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.current_fees->exists<liquidity_pool_create_operation>(),
+                   "Unable to define fees for liquidity pool operations prior to the LP hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<liquidity_pool_delete_operation>(),
+                   "Unable to define fees for liquidity pool operations prior to the LP hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<liquidity_pool_deposit_operation>(),
+                   "Unable to define fees for liquidity pool operations prior to the LP hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<liquidity_pool_withdraw_operation>(),
+                   "Unable to define fees for liquidity pool operations prior to the LP hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<liquidity_pool_exchange_operation>(),
+                   "Unable to define fees for liquidity pool operations prior to the LP hardfork");
+      }
    }
    void operator()(const graphene::chain::htlc_create_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
@@ -181,6 +193,21 @@ struct proposal_operation_hardfork_visitor
    }
    void operator()(const graphene::chain::ticket_update_operation &op) const {
       FC_ASSERT( HARDFORK_CORE_2103_PASSED(block_time), "Not allowed until hardfork 2103" );
+   }
+   void operator()(const graphene::chain::liquidity_pool_create_operation &op) const {
+      FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
+   }
+   void operator()(const graphene::chain::liquidity_pool_delete_operation &op) const {
+      FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
+   }
+   void operator()(const graphene::chain::liquidity_pool_deposit_operation &op) const {
+      FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
+   }
+   void operator()(const graphene::chain::liquidity_pool_withdraw_operation &op) const {
+      FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
+   }
+   void operator()(const graphene::chain::liquidity_pool_exchange_operation &op) const {
+      FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
    }
 
    // loop and self visit in proposals

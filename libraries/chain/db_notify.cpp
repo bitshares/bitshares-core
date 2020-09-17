@@ -18,6 +18,7 @@
 #include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/custom_authority_object.hpp>
 #include <graphene/chain/ticket_object.hpp>
+#include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/impacted.hpp>
 #include <graphene/chain/hardfork.hpp>
 
@@ -314,6 +315,26 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // account
    }
+   void operator()( const liquidity_pool_create_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+   }
+   void operator()( const liquidity_pool_delete_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+   }
+   void operator()( const liquidity_pool_deposit_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+   }
+   void operator()( const liquidity_pool_withdraw_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+   }
+   void operator()( const liquidity_pool_exchange_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+   }
 };
 
 } // namespace detail
@@ -423,6 +444,9 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
            const auto* aobj = dynamic_cast<const ticket_object*>( obj );
            FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->account );
+           break;
+        } case liquidity_pool_object_type:{
+           // no account info in the object although it does have an owner
            break;
         }
       }
@@ -562,6 +586,9 @@ void database::notify_changed_objects()
            GRAPHENE_TRY_NOTIFY( removed_objects, removed_ids, removed, removed_accounts_impacted )
       }
    }
+} catch( const graphene::chain::plugin_exception& e ) {
+   elog( "Caught plugin exception: ${e}", ("e", e.to_detail_string() ) );
+   throw;
 } FC_CAPTURE_AND_LOG( (0) ) }
 
 } } // namespace graphene::chain

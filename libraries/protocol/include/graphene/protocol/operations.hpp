@@ -32,6 +32,7 @@
 #include <graphene/protocol/confidential.hpp>
 #include <graphene/protocol/custom_authority.hpp>
 #include <graphene/protocol/fba.hpp>
+#include <graphene/protocol/liquidity_pool.hpp>
 #include <graphene/protocol/market.hpp>
 #include <graphene/protocol/proposal.hpp>
 #include <graphene/protocol/ticket.hpp>
@@ -108,7 +109,12 @@ namespace graphene { namespace protocol {
             custom_authority_update_operation,
             custom_authority_delete_operation,
             ticket_create_operation,
-            ticket_update_operation
+            ticket_update_operation,
+            liquidity_pool_create_operation,
+            liquidity_pool_delete_operation,
+            liquidity_pool_deposit_operation,
+            liquidity_pool_withdraw_operation,
+            liquidity_pool_exchange_operation
          > operation;
 
    /// @} // operations group

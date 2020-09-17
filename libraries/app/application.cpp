@@ -192,7 +192,11 @@ void application_impl::reset_websocket_server()
    if( !_options->count("rpc-endpoint") )
       return;
 
-   _websocket_server = std::make_shared<fc::http::websocket_server>();
+   string proxy_forward_header;
+   if( _options->count("proxy-forwarded-for-header") )
+      proxy_forward_header = _options->at("proxy-forwarded-for-header").as<string>();
+
+   _websocket_server = std::make_shared<fc::http::websocket_server>( proxy_forward_header );
    _websocket_server->on_connection( std::bind(&application_impl::new_connection, this, std::placeholders::_1) );
 
    ilog("Configured websocket rpc to listen on ${ip}", ("ip",_options->at("rpc-endpoint").as<string>()));
@@ -210,8 +214,13 @@ void application_impl::reset_websocket_tls_server()
       return;
    }
 
+   string proxy_forward_header;
+   if( _options->count("proxy-forwarded-for-header") )
+      proxy_forward_header = _options->at("proxy-forwarded-for-header").as<string>();
+
    string password = _options->count("server-pem-password") ? _options->at("server-pem-password").as<string>() : "";
-   _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>( _options->at("server-pem").as<string>(), password );
+   _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>(
+                                 _options->at("server-pem").as<string>(), password, proxy_forward_header );
    _websocket_tls_server->on_connection( std::bind(&application_impl::new_connection, this, std::placeholders::_1) );
 
    ilog("Configured websocket TLS rpc to listen on ${ip}", ("ip",_options->at("rpc-tls-endpoint").as<string>()));
@@ -259,6 +268,9 @@ void application_impl::set_api_limit() {
    }
    if(_options->count("api-limit-get-full-accounts-lists")) {
       _app_options.api_limit_get_full_accounts_lists = _options->at("api-limit-get-full-accounts-lists").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-top-voters")) {
+      _app_options.api_limit_get_top_voters = _options->at("api-limit-get-top-voters").as<uint64_t>();
    }
    if(_options->count("api-limit-get-call-orders")) {
       _app_options.api_limit_get_call_orders = _options->at("api-limit-get-call-orders").as<uint64_t>();
@@ -313,6 +325,9 @@ void application_impl::set_api_limit() {
    }
    if(_options->count("api-limit-get-withdraw-permissions-by-recipient")) {
       _app_options.api_limit_get_withdraw_permissions_by_recipient = _options->at("api-limit-get-withdraw-permissions-by-recipient").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-liquidity-pools")) {
+      _app_options.api_limit_get_liquidity_pools = _options->at("api-limit-get-liquidity-pools").as<uint64_t>();
    }
 }
 
@@ -974,6 +989,9 @@ void application::set_program_options(boost::program_options::options_descriptio
           "Endpoint for TLS websocket RPC to listen on")
          ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"), "The TLS certificate file for this server")
          ("server-pem-password,P", bpo::value<string>()->implicit_value(""), "Password for this certificate")
+         ("proxy-forwarded-for-header", bpo::value<string>()->implicit_value("X-Forwarded-For-Client"),
+          "A HTTP header similar to X-Forwarded-For (XFF), used by the RPC server to extract clients' address info, "
+          "usually added by a trusted reverse proxy")
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
@@ -1003,6 +1021,8 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::get_full_accounts to set max accounts to query at once")
          ("api-limit-get-full-accounts-lists",boost::program_options::value<uint64_t>()->default_value(500),
           "For database_api_impl::get_full_accounts to set max items to return in the lists")
+         ("api-limit-get-top-voters",boost::program_options::value<uint64_t>()->default_value(200),
+          "For database_api_impl::get_top_voters to set max limit value")
          ("api-limit-get-call-orders",boost::program_options::value<uint64_t>()->default_value(300),
           "For database_api_impl::get_call_orders and get_call_orders_by_account to set max limit value")
          ("api-limit-get-settle-orders",boost::program_options::value<uint64_t>()->default_value(300),
@@ -1037,6 +1057,8 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::get_withdraw_permissions_by_giver to set max limit value")
          ("api-limit-get-withdraw-permissions-by-recipient",boost::program_options::value<uint64_t>()->default_value(101),
           "For database_api_impl::get_withdraw_permissions_by_recipient to set max limit value")
+         ("api-limit-get-liquidity-pools",boost::program_options::value<uint64_t>()->default_value(101),
+          "For database_api_impl::get_liquidity_pools_* to set max limit value")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()

@@ -150,7 +150,6 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    app1->startup_plugins();
 
    app1->startup();
-   fc::usleep(fc::milliseconds(500));
 
    return app1;
 }
@@ -299,16 +298,6 @@ public:
 
 struct cli_fixture
 {
-   class dummy
-   {
-   public:
-      ~dummy()
-      {
-         // wait for everything to finish up
-         fc::usleep(fc::milliseconds(500));
-      }
-   };
-   dummy dmy;
    int server_port_number;
    fc::temp_directory app_dir;
    std::shared_ptr<graphene::app::application> app1;
@@ -1001,17 +990,12 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
          }
       }
 
-      // wait for everything to finish up
-      fc::usleep(fc::seconds(1));
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
    }
    app1->shutdown();
    app1.reset();
-   // Intentional delay after app1->shutdown
-   std::cout << "cli_multisig_transaction conclusion: Intentional delay" << std::endl;
-   fc::usleep(fc::seconds(1));
 }
 
 graphene::wallet::plain_keys decrypt_keys( const std::string& password, const vector<char>& cipher_keys )
@@ -1041,6 +1025,7 @@ BOOST_AUTO_TEST_CASE( saving_keys_wallet_test ) {
    BOOST_CHECK( pk.keys.size() == 1 ); // nathan key
 
    BOOST_CHECK( generate_block( cli.app1 ) );
+   // Intentional delay
    fc::usleep( fc::seconds(1) );
 
    wallet = fc::json::from_file( path ).as<graphene::wallet::wallet_data>( 2 * GRAPHENE_MAX_NESTED_OBJECTS );
@@ -1225,17 +1210,12 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
          BOOST_CHECK(generate_block(app1));
       }
 
-      // wait for everything to finish up
-      fc::usleep(fc::seconds(1));
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
    }
    app1->shutdown();
    app1.reset();
-   // Intentional delay after app1->shutdown
-   std::cout << "cli_create_htlc conclusion: Intentional delay" << std::endl;
-   fc::usleep(fc::seconds(1));
 }
 
 static string encapsulate( const graphene::wallet::signed_message& msg )
@@ -1807,15 +1787,10 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
       } 
       con.wallet_api_ptr->unlock("supersecret");        
 
-      // wait for everything to finish up
-      fc::usleep(fc::seconds(1));
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
    }
    app1->shutdown();
    app1.reset();
-   // Intentional delay after app1->shutdown
-   std::cout << "cli_create_htlc conclusion: Intentional delay" << std::endl;
-   fc::usleep(fc::seconds(1));
 }
