@@ -1,0 +1,5 @@
+// Delays the stuck chain fix until this time, to avoid replay problem in testnet
+// 2018-11-28T00:00:00+0200
+#ifndef HARDFORK_TEST_20171128_TIME
+#define HARDFORK_TEST_20171128_TIME (fc::time_point_sec( 1543356000 ))
+#endif
