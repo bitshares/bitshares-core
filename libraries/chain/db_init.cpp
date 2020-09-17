@@ -36,6 +36,7 @@
 #include <graphene/chain/confidential_object.hpp>
 #include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
+#include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
@@ -57,6 +58,7 @@
 #include <graphene/chain/committee_member_evaluator.hpp>
 #include <graphene/chain/confidential_evaluator.hpp>
 #include <graphene/chain/custom_evaluator.hpp>
+#include <graphene/chain/liquidity_pool_evaluator.hpp>
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/proposal_evaluator.hpp>
 #include <graphene/chain/ticket_evaluator.hpp>
@@ -129,6 +131,11 @@ void database::initialize_evaluators()
    register_evaluator<custom_authority_delete_evaluator>();
    register_evaluator<ticket_create_evaluator>();
    register_evaluator<ticket_update_evaluator>();
+   register_evaluator<liquidity_pool_create_evaluator>();
+   register_evaluator<liquidity_pool_delete_evaluator>();
+   register_evaluator<liquidity_pool_deposit_evaluator>();
+   register_evaluator<liquidity_pool_withdraw_evaluator>();
+   register_evaluator<liquidity_pool_exchange_evaluator>();
 }
 
 void database::initialize_indexes()
@@ -154,6 +161,7 @@ void database::initialize_indexes()
    add_index< primary_index< htlc_index> >();
    add_index< primary_index< custom_authority_index> >();
    add_index< primary_index<ticket_index> >();
+   add_index< primary_index<liquidity_pool_index> >();
 
    //Implementation object indexes
    add_index< primary_index<transaction_index                             > >();

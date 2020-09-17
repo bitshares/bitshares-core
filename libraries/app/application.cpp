@@ -326,6 +326,9 @@ void application_impl::set_api_limit() {
    if(_options->count("api-limit-get-withdraw-permissions-by-recipient")) {
       _app_options.api_limit_get_withdraw_permissions_by_recipient = _options->at("api-limit-get-withdraw-permissions-by-recipient").as<uint64_t>();
    }
+   if(_options->count("api-limit-get-liquidity-pools")) {
+      _app_options.api_limit_get_liquidity_pools = _options->at("api-limit-get-liquidity-pools").as<uint64_t>();
+   }
 }
 
 void application_impl::startup()
@@ -1054,6 +1057,8 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::get_withdraw_permissions_by_giver to set max limit value")
          ("api-limit-get-withdraw-permissions-by-recipient",boost::program_options::value<uint64_t>()->default_value(101),
           "For database_api_impl::get_withdraw_permissions_by_recipient to set max limit value")
+         ("api-limit-get-liquidity-pools",boost::program_options::value<uint64_t>()->default_value(101),
+          "For database_api_impl::get_liquidity_pools_* to set max limit value")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
