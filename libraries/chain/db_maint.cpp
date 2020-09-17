@@ -41,6 +41,7 @@
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/special_authority_object.hpp>
+#include <graphene/chain/ticket_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/vote_count.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -1091,6 +1092,22 @@ void delete_expired_custom_authorities( database& db )
       db.remove(*index.begin());
 }
 
+/// A one-time data process to set values of existing liquid tickets to zero.
+void process_hf_2262( database& db )
+{
+   for( const auto& ticket_obj : db.get_index_type<ticket_index>().indices().get<by_id>() )
+   {
+      if( ticket_obj.current_type != liquid ) // only update liquid tickets
+         continue;
+      db.modify( db.get_account_stats_by_owner( ticket_obj.account ), [&ticket_obj](account_statistics_object& aso) {
+         aso.total_pol_value -= ticket_obj.value;
+      });
+      db.modify( ticket_obj, []( ticket_object& t ) {
+         t.value = 0;
+      });
+   }
+}
+
 namespace detail {
 
    struct vote_recalc_times
@@ -1180,6 +1197,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
       const dynamic_global_property_object& dprops;
       const time_point_sec now;
       const bool hf2103_passed;
+      const bool hf2262_passed;
       const bool pob_activated;
 
       optional<detail::vote_recalc_times> witness_recalc_times;
@@ -1190,6 +1208,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
       vote_tally_helper( database& db )
          : d(db), props( d.get_global_properties() ), dprops( d.get_dynamic_global_properties() ), 
            now( d.head_block_time() ), hf2103_passed( HARDFORK_CORE_2103_PASSED( now ) ),
+           hf2262_passed( HARDFORK_CORE_2262_PASSED( now ) ),
            pob_activated( dprops.total_pob > 0 || dprops.total_inactive > 0 )
       {
          d._vote_tally_buffer.resize( props.next_available_vote_id, 0 );
@@ -1224,8 +1243,9 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
             uint64_t voting_stake[3]; // 0=committee, 1=witness, 2=worker, as in vote_id_type::vote_type
             uint64_t num_committee_voting_stake; // number of committee members
             voting_stake[2] = ( pob_activated ? 0 : stats.total_core_in_orders.value )
-                  + (stake_account.cashback_vb.valid() ? (*stake_account.cashback_vb)(d).balance.amount.value: 0)
-                  + stats.core_in_balance.value;
+                  + ( ( !hf2262_passed && stake_account.cashback_vb.valid() ) ?
+                           (*stake_account.cashback_vb)(d).balance.amount.value : 0 )
+                  + ( hf2262_passed ? 0 : stats.core_in_balance.value );
 
             // voting power stats
             uint64_t vp_all = 0;       ///<  all voting power.
@@ -1447,6 +1467,10 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    // Fix supply issue
    if ( dgpo.next_maintenance_time <= HARDFORK_CORE_2103_TIME && next_maintenance_time > HARDFORK_CORE_2103_TIME )
       process_hf_2103(*this);
+
+   // Update tickets. Note: the new values will take effect only on the next maintenance interval
+   if ( dgpo.next_maintenance_time <= HARDFORK_CORE_2262_TIME && next_maintenance_time > HARDFORK_CORE_2262_TIME )
+      process_hf_2262(*this);
 
    modify(dgpo, [last_vote_tally_time, next_maintenance_time](dynamic_global_property_object& d) {
       d.next_maintenance_time = next_maintenance_time;
