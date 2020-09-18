@@ -17,8 +17,10 @@ The `Dockerfile` performs the following steps:
 8. Add a local bitshares user and set `$HOME` to `/var/lib/bitshares`
 9. Make `/var/lib/bitshares` and `/etc/bitshares` a docker *volume*
 10. Expose ports `8091` and `9091`
-11. Add default config from `docker/default_config.ini` and entry point script
-12. Run entry point script by default
+11. Add default config from `docker/default_config.ini` and
+    `docker/default_logging.ini`
+12. Add an entry point script
+13. Run the entry point script by default
 
 The entry point simplifies the use of parameters for the `witness_node`
 (which is run by default when spinning up the container).
@@ -47,7 +49,7 @@ The default configuration is:
     rpc-endpoint = 0.0.0.0:8091
     bucket-size = [60,300,900,1800,3600,14400,86400]
     history-per-size = 1000
-    max-ops-per-account = 1000
+    max-ops-per-account = 100
     partial-operations = true
 
 # Docker Compose

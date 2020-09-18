@@ -107,8 +107,8 @@ typedef static_variant<
 class worker_object : public abstract_object<worker_object>
 {
    public:
-      static const uint8_t space_id = protocol_ids;
-      static const uint8_t type_id =  worker_object_type;
+      static constexpr uint8_t space_id = protocol_ids;
+      static constexpr uint8_t type_id =  worker_object_type;
 
       /// ID of the account which owns this worker
       account_id_type worker_account;

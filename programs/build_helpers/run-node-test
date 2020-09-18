@@ -1,0 +1,54 @@
+#!/bin/sh
+
+DATA_DIR="`mktemp -d`"
+
+cleanup () {
+    kill -9 $NODE_PID $CLI_PID
+    if [ "$1" != 0 ]; then
+	echo "----- node.log -----"
+	cat node.log
+	echo "----- cli.log -----"
+	cat cli.log
+    fi
+    rm -rf node.log cli.log "$DATA_DIR"
+    exit $1
+}
+
+echo "Starting witness node..." 1>&2
+programs/witness_node/witness_node --data-dir "$DATA_DIR" \
+			--checkpoint '[131072,"0000000000000000000000000000000000000001"]' \
+			--rpc-endpoint 127.0.0.1:8090 --force-validate >node.log 2>&1 &
+NODE_PID=$!
+
+echo "Waiting for cli_wallet start..." 1>&2 &
+CLI_PID=$!
+sleep 5
+_START="`date +%s`"
+while ! ps -p "$CLI_PID" >/dev/null && [ $((`date +%s` - $_START)) -lt 120 ]; do
+    programs/cli_wallet/cli_wallet -sws://127.0.0.1:8090 -d -H127.0.0.1:8091 >cli.log 2>&1 &
+    CLI_PID=$!
+    sleep 10
+done
+
+if ! ps -p "$CLI_PID" >/dev/null; then
+    echo "Failed to start?!" 1>&2
+    cleanup 1
+fi
+
+echo "Waiting for head_block 131071..." 1>&2
+touch "$DATA_DIR"/info.json
+_START="`date +%s`"
+while [ $(( `date +%s` - $_START )) -lt 180 ]; do
+    sleep 2
+    curl --silent -o "$DATA_DIR"/info.json --data '{"id":0,"method":"info","params":[]}' \
+	 http://127.0.0.1:8091/rpc
+    tr , '\n' <"$DATA_DIR"/info.json | grep head_block_num
+    if tr , '\n' <"$DATA_DIR"/info.json | grep head_block_num.*131071; then
+	echo "Success!" 1>&2
+	cleanup 0
+    fi
+done
+
+echo "Failed to sync?!" 1>&2
+
+cleanup 1

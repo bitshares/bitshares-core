@@ -308,8 +308,11 @@ namespace graphene { namespace app {
        return *_custom_operations_api;
     }
 
-    vector<order_history_object> history_api::get_fill_order_history( std::string asset_a, std::string asset_b, uint32_t limit  )const
+    vector<order_history_object> history_api::get_fill_order_history( std::string asset_a, std::string asset_b,
+                                                                      uint32_t limit )const
     {
+       auto market_hist_plugin = _app.get_plugin<market_history_plugin>( "market_history" );
+       FC_ASSERT( market_hist_plugin, "Market history plugin is not enabled" );
        FC_ASSERT(_app.chain_database());
        const auto& db = *_app.chain_database();
        asset_id_type a = database_api.get_asset_id_from_string( asset_a );
@@ -476,9 +479,9 @@ namespace graphene { namespace app {
 
     flat_set<uint32_t> history_api::get_market_history_buckets()const
     {
-       auto hist = _app.get_plugin<market_history_plugin>( "market_history" );
-       FC_ASSERT( hist );
-       return hist->tracked_buckets();
+       auto market_hist_plugin = _app.get_plugin<market_history_plugin>( "market_history" );
+       FC_ASSERT( market_hist_plugin, "Market history plugin is not enabled" );
+       return market_hist_plugin->tracked_buckets();
     }
 
     history_operation_detail history_api::get_account_history_by_operations( const std::string account_id_or_name,
@@ -514,7 +517,11 @@ namespace graphene { namespace app {
                                                            uint32_t bucket_seconds,
                                                            fc::time_point_sec start, fc::time_point_sec end )const
     { try {
+
+       auto market_hist_plugin = _app.get_plugin<market_history_plugin>( "market_history" );
+       FC_ASSERT( market_hist_plugin, "Market history plugin is not enabled" );
        FC_ASSERT(_app.chain_database());
+
        const auto& db = *_app.chain_database();
        asset_id_type a = database_api.get_asset_id_from_string( asset_a );
        asset_id_type b = database_api.get_asset_id_from_string( asset_b );

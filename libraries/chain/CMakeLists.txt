@@ -36,6 +36,7 @@ add_library( graphene_chain
              exceptions.cpp
 
              evaluator.cpp
+             liquidity_pool_evaluator.cpp
              balance_evaluator.cpp
              account_evaluator.cpp
              assert_evaluator.cpp
@@ -90,13 +91,10 @@ if(MSVC)
   set_source_files_properties( ${GRAPHENE_CHAIN_BIG_FILES} PROPERTIES COMPILE_FLAGS "/bigobj" )
 else( MSVC )
    if( MINGW )
+      # Note: Even with the big-obj property and the -Os property set,
+      #       "string table overflow" and "File too big" errors may still occur on database.cpp.
+      #       Can set GRAPHENE_DISABLE_UNITY_BUILD to ON to get around the issue.
       set_source_files_properties( ${GRAPHENE_CHAIN_BIG_FILES} PROPERTIES COMPILE_FLAGS -Wa,-mbig-obj )
-      if( (CMAKE_BUILD_TYPE MATCHES Release) OR (CMAKE_BUILD_TYPE MATCHES RelWithDebInfo) )
-         # Use -Os to avoid string table overflow
-         set_source_files_properties( database.cpp PROPERTIES COMPILE_FLAGS -Os )
-         set_source_files_properties( database.cpp PROPERTIES LINK_FLAGS -Os )
-         set_source_files_properties( database.cpp PROPERTIES STATIC_LIBRARY_FLAGS -Os )
-      endif( CMAKE_BUILD_TYPE )
    endif( MINGW )
 endif(MSVC)
 
