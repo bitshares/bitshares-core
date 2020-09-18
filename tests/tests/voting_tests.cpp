@@ -817,9 +817,10 @@ BOOST_AUTO_TEST_CASE( witness_votes_calculation )
       generate_blocks( tick_start_time + fc::days(60+180) );
       generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
 
+      bool has_hf_2262 = ( HARDFORK_CORE_2262_PASSED( db.get_dynamic_global_properties().next_maintenance_time ) );
       // check votes
       base4 = 40 * 6 + (114 - 40) - 40;
-      expected_votes[4] = base4 - base4 * 6 / 8; // 585 days
+      expected_votes[4] = ( has_hf_2262 ? 0 : (base4 - base4 * 6 / 8) ); // 585 days
       base7 = 20 * 8 * 6 + (30 - 20) * 6 + (117 - 30 - 20) - (30 - 20);
       expected_votes[7] = 0; // 720 days
 
@@ -829,8 +830,11 @@ BOOST_AUTO_TEST_CASE( witness_votes_calculation )
       }
 
       expected_active_witnesses = original_wits;
-      expected_active_witnesses.erase( *expected_active_witnesses.rbegin() );
-      expected_active_witnesses.insert( wit_ids[4] );
+      if( !has_hf_2262 )
+      {
+         expected_active_witnesses.erase( *expected_active_witnesses.rbegin() );
+         expected_active_witnesses.insert( wit_ids[4] );
+      }
       BOOST_CHECK( db.get_global_properties().active_witnesses == expected_active_witnesses );
 
    } FC_LOG_AND_RETHROW()
