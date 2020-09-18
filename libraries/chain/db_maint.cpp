@@ -1107,6 +1107,22 @@ void process_hf_2262( database& db )
          t.value = 0;
       });
    }
+   // Code for testnet, begin
+   const ticket_object* t15 = db.find( ticket_id_type(15) ); // a ticket whose target is lock_forever
+   if( t15 && t15->account == account_id_type(3833) ) // its current type should be lock_720_days at hf time
+   {
+      db.modify( *t15, [&db]( ticket_object& t ) {
+         t.next_auto_update_time = db.head_block_time() + fc::seconds(60);
+      });
+   }
+   const ticket_object* t33 = db.find( ticket_id_type(33) ); // a ticket whose target is lock_720_days
+   if( t33 && t33->account == account_id_type(3833) ) // its current type should be liquid at hf time
+   {
+      db.modify( *t33, [&db]( ticket_object& t ) {
+         t.next_auto_update_time = db.head_block_time() + fc::seconds(30);
+      });
+   }
+   // Code for testnet, end
 }
 
 namespace detail {
