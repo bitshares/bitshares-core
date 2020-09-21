@@ -112,5 +112,6 @@ void operation_get_required_authorities( const operation& op,
 } } // namespace graphene::protocol
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::generic_operation_result )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::generic_exchange_operation_result )
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::op_wrapper )

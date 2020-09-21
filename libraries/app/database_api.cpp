@@ -461,6 +461,11 @@ std::map<string,full_account> database_api::get_full_accounts( const vector<stri
    return my->get_full_accounts( names_or_ids, subscribe );
 }
 
+vector<account_statistics_object> database_api::get_top_voters(uint32_t limit)const
+{
+   return my->get_top_voters( limit );
+}
+
 std::map<std::string, full_account> database_api_impl::get_full_accounts( const vector<std::string>& names_or_ids,
                                                                           optional<bool> subscribe )
 {
@@ -638,6 +643,27 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       results[account_name_or_id] = acnt;
    }
    return results;
+}
+
+vector<account_statistics_object> database_api_impl::get_top_voters(uint32_t limit)const
+{
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_top_voters;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   vector<account_statistics_object> result;
+
+   auto last_vote_tally_time = _db.get_dynamic_global_properties().last_vote_tally_time;
+   const auto& idx = _db.get_index_type<account_stats_index>().indices().get<by_voting_power_active>();
+
+   for(auto itr = idx.begin(); result.size() < limit && itr != idx.end() && itr->vote_tally_time >= last_vote_tally_time; ++itr)
+   {
+      result.emplace_back(*itr);
+   }
+
+   return result;
 }
 
 optional<account_object> database_api::get_account_by_name( string name )const
@@ -1707,6 +1733,141 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
       ++itr;
    }
 
+   return result;
+}
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
+// Liquidity pools                                                  //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<liquidity_pool_object> database_api::get_liquidity_pools_by_asset_a(
+            std::string asset_symbol_or_id,
+            optional<uint32_t> limit,
+            optional<liquidity_pool_id_type> start_id )const
+{
+   return my->get_liquidity_pools_by_asset_a(
+            asset_symbol_or_id,
+            limit,
+            start_id );
+}
+
+vector<liquidity_pool_object> database_api_impl::get_liquidity_pools_by_asset_a(
+            std::string asset_symbol_or_id,
+            optional<uint32_t> limit,
+            optional<liquidity_pool_id_type> start_id )const
+{
+   return get_liquidity_pools_by_asset_x<by_asset_a>(
+            asset_symbol_or_id,
+            limit,
+            start_id );
+}
+
+vector<liquidity_pool_object> database_api::get_liquidity_pools_by_asset_b(
+            std::string asset_symbol_or_id,
+            optional<uint32_t> limit,
+            optional<liquidity_pool_id_type> start_id )const
+{
+   return my->get_liquidity_pools_by_asset_b(
+            asset_symbol_or_id,
+            limit,
+            start_id );
+}
+
+vector<liquidity_pool_object> database_api_impl::get_liquidity_pools_by_asset_b(
+            std::string asset_symbol_or_id,
+            optional<uint32_t> limit,
+            optional<liquidity_pool_id_type> start_id )const
+{
+   return get_liquidity_pools_by_asset_x<by_asset_b>(
+            asset_symbol_or_id,
+            limit,
+            start_id );
+}
+
+vector<liquidity_pool_object> database_api::get_liquidity_pools_by_both_assets(
+            std::string asset_symbol_or_id_a,
+            std::string asset_symbol_or_id_b,
+            optional<uint32_t> limit,
+            optional<liquidity_pool_id_type> start_id )const
+{
+   return my->get_liquidity_pools_by_both_assets(
+            asset_symbol_or_id_a,
+            asset_symbol_or_id_b,
+            limit,
+            start_id );
+}
+
+vector<liquidity_pool_object> database_api_impl::get_liquidity_pools_by_both_assets(
+            std::string asset_symbol_or_id_a,
+            std::string asset_symbol_or_id_b,
+            optional<uint32_t> olimit,
+            optional<liquidity_pool_id_type> ostart_id )const
+{
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   vector<liquidity_pool_object> results;
+
+   asset_id_type asset_id_a = get_asset_from_string(asset_symbol_or_id_a)->id;
+   asset_id_type asset_id_b = get_asset_from_string(asset_symbol_or_id_b)->id;
+   if( asset_id_a > asset_id_b )
+      std::swap( asset_id_a, asset_id_b );
+
+   liquidity_pool_id_type start_id = ostart_id.valid() ? *ostart_id : liquidity_pool_id_type();
+
+   const auto& idx = _db.get_index_type<liquidity_pool_index>().indices().get<by_asset_ab>();
+   auto lower_itr = idx.lower_bound( std::make_tuple( asset_id_a, asset_id_b, start_id ) );
+   auto upper_itr = idx.upper_bound( std::make_tuple( asset_id_a, asset_id_b ) );
+
+   results.reserve( limit );
+   uint32_t count = 0;
+   for ( ; lower_itr != upper_itr && count < limit; ++lower_itr, ++count)
+   {
+      results.emplace_back( *lower_itr );
+   }
+
+   return results;
+}
+
+vector<optional<liquidity_pool_object>> database_api::get_liquidity_pools_by_share_asset(
+            const vector<std::string>& asset_symbols_or_ids,
+            optional<bool> subscribe )const
+{
+   return my->get_liquidity_pools_by_share_asset(
+            asset_symbols_or_ids,
+            subscribe );
+}
+
+vector<optional<liquidity_pool_object>> database_api_impl::get_liquidity_pools_by_share_asset(
+            const vector<std::string>& asset_symbols_or_ids,
+            optional<bool> subscribe )const
+{
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
+   FC_ASSERT( asset_symbols_or_ids.size() <= configured_limit,
+              "size of the querying list can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   bool to_subscribe = get_whether_to_subscribe( subscribe );
+   vector<optional<liquidity_pool_object>> result; result.reserve(asset_symbols_or_ids.size());
+   std::transform(asset_symbols_or_ids.begin(), asset_symbols_or_ids.end(), std::back_inserter(result),
+                  [this,to_subscribe](std::string id_or_name) -> optional<liquidity_pool_object> {
+
+      const asset_object* asset_obj = get_asset_from_string( id_or_name, false );
+      if( asset_obj == nullptr || !asset_obj->is_liquidity_pool_share_asset() )
+         return {};
+      const liquidity_pool_object& lp_obj = (*asset_obj->for_liquidity_pool)(_db);
+      if( to_subscribe )
+         subscribe_to_item( lp_obj.id );
+      return lp_obj;
+   });
    return result;
 }
 

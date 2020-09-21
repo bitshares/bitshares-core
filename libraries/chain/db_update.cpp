@@ -604,6 +604,9 @@ void database::clear_expired_htlcs()
 
 generic_operation_result database::process_tickets()
 {
+   const auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+   ticket_version version = ( HARDFORK_CORE_2262_PASSED(maint_time) ? ticket_v2 : ticket_v1 );
+
    generic_operation_result result;
    share_type total_delta_pob;
    share_type total_delta_inactive;
@@ -627,8 +630,8 @@ generic_operation_result database::process_tickets()
       {
          ticket_type old_type = ticket.current_type;
          share_type old_value = ticket.value;
-         modify( ticket, []( ticket_object& o ) {
-            o.auto_update();
+         modify( ticket, [version]( ticket_object& o ) {
+            o.auto_update( version );
          });
          result.updated_objects.insert( ticket.id );
 

@@ -34,6 +34,12 @@
 #define BOOST_TEST_MODULE Elastic Search Database Tests
 #include <boost/test/included/unit_test.hpp>
 
+#ifdef NDEBUG
+  #define ES_WAIT_TIME (fc::milliseconds(1000))
+#else
+  #define ES_WAIT_TIME (fc::milliseconds(3000))
+#endif
+
 using namespace graphene::chain;
 using namespace graphene::chain::test;
 using namespace graphene::app;
@@ -54,7 +60,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
 
       // delete all first
       auto delete_account_history = graphene::utilities::deleteAll(es);
-      fc::usleep(fc::milliseconds(1000)); // this is because index.refresh_interval, nothing to worry
+      fc::usleep(ES_WAIT_TIME); // this is because index.refresh_interval, nothing to worry
 
       if(delete_account_history) { // all records deleted
 
@@ -64,7 +70,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          auto bob = create_account("bob");
 
          generate_block();
-         fc::usleep(fc::milliseconds(1000));
+         fc::usleep(ES_WAIT_TIME);
 
          // for later use
          //int asset_create_op_id = operation::tag<asset_create_operation>::value;
@@ -83,13 +89,13 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
          auto first_id = j["hits"]["hits"][size_t(0)]["_id"].as_string();
-         BOOST_CHECK_EQUAL(first_id, "2.9.1"); // this should be 0? are they inserted in the right order?
+         BOOST_CHECK_EQUAL(first_id, "2.9.0");
 
          generate_block();
          auto willie = create_account("willie");
          generate_block();
 
-         fc::usleep(fc::milliseconds(1000)); // index.refresh_interval
+         fc::usleep(ES_WAIT_TIME); // index.refresh_interval
 
          es.endpoint = es.index_prefix + "*/data/_count";
          res = graphene::utilities::simpleQuery(es);
@@ -104,7 +110,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          transfer(account_id_type()(db), bob, asset(300));
 
          generate_block();
-         fc::usleep(fc::milliseconds(1000)); // index.refresh_interval
+         fc::usleep(ES_WAIT_TIME); // index.refresh_interval
 
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
@@ -145,14 +151,14 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
       auto delete_objects = graphene::utilities::deleteAll(es);
 
       generate_block();
-      fc::usleep(fc::milliseconds(1000));
+      fc::usleep(ES_WAIT_TIME);
 
       if(delete_objects) { // all records deleted
 
          // asset and bitasset
          create_bitasset("USD", account_id_type());
          generate_block();
-         fc::usleep(fc::milliseconds(1000));
+         fc::usleep(ES_WAIT_TIME);
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
          es.endpoint = es.index_prefix + "*/data/_count";
@@ -195,10 +201,10 @@ BOOST_AUTO_TEST_CASE(elasticsearch_suite) {
       es.elasticsearch_url = "http://localhost:9200/";
       es.index_prefix = "bitshares-";
       auto delete_account_history = graphene::utilities::deleteAll(es);
-      fc::usleep(fc::milliseconds(1000));
+      fc::usleep(ES_WAIT_TIME);
       es.index_prefix = "objects-";
       auto delete_objects = graphene::utilities::deleteAll(es);
-      fc::usleep(fc::milliseconds(1000));
+      fc::usleep(ES_WAIT_TIME);
 
       if(delete_account_history && delete_objects) { // all records deleted
 
@@ -224,7 +230,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
       auto delete_account_history = graphene::utilities::deleteAll(es);
 
       generate_block();
-      fc::usleep(fc::milliseconds(1000));
+      fc::usleep(ES_WAIT_TIME);
 
       if(delete_account_history) {
 
@@ -237,7 +243,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
          create_bitasset("OIL", dan.id); // create op 6
 
          generate_block();
-         fc::usleep(fc::milliseconds(1000));
+         fc::usleep(ES_WAIT_TIME);
 
          graphene::app::history_api hist_api(app);
          app.enable_plugin("elasticsearch");
@@ -506,7 +512,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
          create_account("alice");
 
          generate_block();
-         fc::usleep(fc::milliseconds(1000));
+         fc::usleep(ES_WAIT_TIME);
 
          // f(C, 0, 4, 10) = { 7 }
          histories = hist_api.get_account_history("alice", operation_history_id_type(0), 4, operation_history_id_type(10));

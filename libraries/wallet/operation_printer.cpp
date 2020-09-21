@@ -218,7 +218,13 @@ std::string operation_result_printer::operator()(const asset& a)
 
 std::string operation_result_printer::operator()(const generic_operation_result& r)
 {
-   return fc::json::to_pretty_string(r);
+   return fc::json::to_string(r);
+}
+
+std::string operation_result_printer::operator()(const generic_exchange_operation_result& r)
+{
+   // TODO show pretty amounts instead of raw json
+   return fc::json::to_string(r);
 }
 
 }}} // graphene::wallet::detail
