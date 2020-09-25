@@ -94,6 +94,18 @@ namespace graphene { namespace chain {
 
          time_point_sec last_vote_time; ///< last time voted
 
+         /// Voting Power Stats
+         ///@{
+         uint64_t vp_all = 0;           ///<  all voting power.
+         uint64_t vp_active = 0;        ///<  active voting power, if there is no attenuation, it is equal to vp_all.
+         uint64_t vp_committee = 0;     ///<  the final voting power for the committees.
+         uint64_t vp_witness = 0;       ///<  the final voting power for the witnesses.
+         uint64_t vp_worker = 0;        ///<  the final voting power for the workers.
+         /// timestamp of the last count of votes. 
+         /// if there is no statistics, the date is less than `_db.get_dynamic_global_properties().last_vote_tally_time`.
+         time_point_sec vote_tally_time; 
+         ///@}
+
          /// Whether this account owns some CORE asset and is voting
          inline bool has_some_core_voting() const
          {
@@ -419,7 +431,8 @@ namespace graphene { namespace chain {
    typedef generic_index<account_object, account_multi_index_type> account_index;
 
    struct by_maintenance_seq;
-
+   struct by_voting_power_active;
+   
    /**
     * @ingroup object_index
     */
@@ -432,6 +445,17 @@ namespace graphene { namespace chain {
                account_statistics_object,
                const_mem_fun<account_statistics_object, bool, &account_statistics_object::need_maintenance>,
                member<account_statistics_object, string, &account_statistics_object::name>
+            >
+         >,
+         ordered_non_unique< tag<by_voting_power_active>,
+            composite_key<
+               account_statistics_object,
+               member<account_statistics_object, time_point_sec, &account_statistics_object::vote_tally_time>,
+               member<account_statistics_object, uint64_t, &account_statistics_object::vp_active>
+            >,
+            composite_key_compare<
+               std::greater< time_point_sec >,
+               std::greater< uint64_t >
             >
          >
       >

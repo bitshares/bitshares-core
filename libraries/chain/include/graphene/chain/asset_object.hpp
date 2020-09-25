@@ -89,6 +89,8 @@ namespace graphene { namespace chain {
 
          /// @return true if this is a market-issued asset; false otherwise.
          bool is_market_issued()const { return bitasset_data_id.valid(); }
+         /// @return true if this is a share asset of a liquidity pool; false otherwise.
+         bool is_liquidity_pool_share_asset()const { return for_liquidity_pool.valid(); }
          /// @return true if users may request force-settlement of this market-issued asset; false otherwise
          bool can_force_settle()const { return !(options.flags & disable_force_settle); }
          /// @return true if the issuer of this market-issued asset may globally settle the asset; false otherwise
@@ -143,6 +145,9 @@ namespace graphene { namespace chain {
          optional<asset_bitasset_data_id_type> bitasset_data_id;
 
          optional<account_id_type> buyback_account;
+
+         /// The ID of the liquidity pool if the asset is the share asset of a liquidity pool
+         optional<liquidity_pool_id_type> for_liquidity_pool;
 
          asset_id_type get_id()const { return id; }
 
@@ -419,6 +424,7 @@ FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (dynamic_asset_data_id)
                     (bitasset_data_id)
                     (buyback_account)
+                    (for_liquidity_pool)
                   )
 
 FC_REFLECT_TYPENAME( graphene::chain::asset_bitasset_data_object )

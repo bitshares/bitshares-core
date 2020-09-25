@@ -239,6 +239,15 @@ bool generate_maintenance_block(std::shared_ptr<graphene::app::application> app)
 }
 
 ///////////
+/// Check if hardfork core-2262 has passed
+///////////
+bool is_hf2262_passed(std::shared_ptr<graphene::app::application> app) {
+   auto db = app->chain_database();
+   auto maint_time = db->get_dynamic_global_properties().next_maintenance_time;
+   return HARDFORK_CORE_2262_PASSED( maint_time );
+}
+
+///////////
 /// @brief a class to make connecting to the application server easier
 ///////////
 class client_connection
@@ -451,7 +460,8 @@ BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
       init1_obj = con.wallet_api_ptr->get_witness("init1");
       witness_object init2_obj = con.wallet_api_ptr->get_witness("init2");
       int init1_middle_votes = init1_obj.total_votes;
-      BOOST_CHECK(init1_middle_votes > init1_start_votes);
+      if( !is_hf2262_passed(app1) )
+         BOOST_CHECK(init1_middle_votes > init1_start_votes);
 
       // Vote for a 2nd witness
       int init2_start_votes = init2_obj.total_votes;
@@ -465,9 +475,11 @@ BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
       init1_obj = con.wallet_api_ptr->get_witness("init1");
 
       int init2_middle_votes = init2_obj.total_votes;
-      BOOST_CHECK(init2_middle_votes > init2_start_votes);
+      if( !is_hf2262_passed(app1) )
+         BOOST_CHECK(init2_middle_votes > init2_start_votes);
       int init1_last_votes = init1_obj.total_votes;
-      BOOST_CHECK(init1_last_votes > init1_start_votes);
+      if( !is_hf2262_passed(app1) )
+         BOOST_CHECK(init1_last_votes > init1_start_votes);
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;

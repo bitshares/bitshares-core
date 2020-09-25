@@ -290,6 +290,8 @@ void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
    FC_ASSERT( o.issuer == a.issuer );
    FC_ASSERT( !a.is_market_issued(), "Cannot manually issue a market-issued asset." );
 
+   FC_ASSERT( !a.is_liquidity_pool_share_asset(), "Cannot manually issue a liquidity pool share asset." );
+
    FC_ASSERT( a.can_create_new_supply(), "Can not create new supply" );
 
    to_account = &o.issue_to_account(d);
@@ -324,11 +326,21 @@ void_result asset_reserve_evaluator::do_evaluate( const asset_reserve_operation&
       ("sym", a.symbol)
    );
 
-   from_account = &o.payer(d);
+   from_account = fee_paying_account;
    FC_ASSERT( is_authorized_asset( d, *from_account, a ) );
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
-   FC_ASSERT( (asset_dyn_data->current_supply - o.amount_to_reserve.amount) >= 0 );
+   if( !a.is_liquidity_pool_share_asset() )
+   {
+      FC_ASSERT( asset_dyn_data->current_supply >= o.amount_to_reserve.amount,
+                 "Can not reserve an amount that is more than the current supply" );
+   }
+   else
+   {
+      FC_ASSERT( asset_dyn_data->current_supply > o.amount_to_reserve.amount,
+                 "The asset is a liquidity pool share asset thus can only reserve an amount "
+                 "that is less than the current supply" );
+   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

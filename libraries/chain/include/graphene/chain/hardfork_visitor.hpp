@@ -49,6 +49,11 @@ struct hardfork_visitor {
    using BSIP_40_ops = TL::list<custom_authority_create_operation, custom_authority_update_operation,
                                 custom_authority_delete_operation>;
    using hf2103_ops = TL::list<ticket_create_operation, ticket_update_operation>;
+   using liquidity_pool_ops = TL::list< liquidity_pool_create_operation,
+                                        liquidity_pool_delete_operation,
+                                        liquidity_pool_deposit_operation,
+                                        liquidity_pool_withdraw_operation,
+                                        liquidity_pool_exchange_operation >;
    fc::time_point_sec now;
 
    hardfork_visitor(fc::time_point_sec now) : now(now) {}
@@ -64,6 +69,9 @@ struct hardfork_visitor {
    template<typename Op>
    std::enable_if_t<TL::contains<hf2103_ops, Op>(), bool>
    visit() { return HARDFORK_CORE_2103_PASSED(now); }
+   template<typename Op>
+   std::enable_if_t<TL::contains<liquidity_pool_ops, Op>(), bool>
+   visit() { return HARDFORK_LIQUIDITY_POOL_PASSED(now); }
    /// @}
 
    /// typelist::runtime::dispatch adaptor

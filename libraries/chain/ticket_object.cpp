@@ -29,7 +29,7 @@
 using namespace graphene::chain;
 
 void ticket_object::init_new( time_point_sec now, account_id_type new_account,
-                              ticket_type new_target_type, const asset& new_amount )
+                              ticket_type new_target_type, const asset& new_amount, ticket_version version )
 {
    account = new_account;
    target_type = new_target_type;
@@ -40,11 +40,11 @@ void ticket_object::init_new( time_point_sec now, account_id_type new_account,
    next_auto_update_time = now + seconds_per_charging_step;
    next_type_downgrade_time = time_point_sec::maximum();
 
-   update_value();
+   update_value( version );
 }
 
 void ticket_object::init_split( time_point_sec now, const ticket_object& old_ticket,
-                                ticket_type new_target_type, const asset& new_amount )
+                                ticket_type new_target_type, const asset& new_amount, ticket_version version )
 {
    account = old_ticket.account;
    target_type = old_ticket.target_type;
@@ -55,10 +55,10 @@ void ticket_object::init_split( time_point_sec now, const ticket_object& old_tic
    next_auto_update_time = old_ticket.next_auto_update_time;
    next_type_downgrade_time = old_ticket.next_type_downgrade_time;
 
-   update_target_type( now, new_target_type );
+   update_target_type( now, new_target_type, version );
 }
 
-void ticket_object::update_target_type( time_point_sec now, ticket_type new_target_type )
+void ticket_object::update_target_type( time_point_sec now, ticket_type new_target_type, ticket_version version )
 {
    if( current_type < new_target_type )
    {
@@ -89,16 +89,16 @@ void ticket_object::update_target_type( time_point_sec now, ticket_type new_targ
    }
    target_type = new_target_type;
 
-   update_value();
+   update_value( version );
 }
 
-void ticket_object::adjust_amount( const asset& delta_amount )
+void ticket_object::adjust_amount( const asset& delta_amount, ticket_version version )
 {
    amount += delta_amount;
-   update_value();
+   update_value( version );
 }
 
-void ticket_object::auto_update()
+void ticket_object::auto_update( ticket_version version )
 {
    if( status == charging )
    {
@@ -119,7 +119,7 @@ void ticket_object::auto_update()
          {
             status = withdrawing;
             next_auto_update_time += seconds_per_lock_forever_update_step;
-            value = amount.amount * value_multiplier(current_type);
+            value = amount.amount * value_multiplier( current_type, version );
          }
       }
    }
@@ -128,7 +128,8 @@ void ticket_object::auto_update()
       // Note: current_type != liquid, guaranteed by the caller
       if( current_type == lock_forever )
       {
-         share_type delta_value = amount.amount * value_multiplier(current_type) / lock_forever_update_steps;
+         share_type delta_value = amount.amount * value_multiplier( current_type, version )
+                                                / lock_forever_update_steps;
          if( delta_value <= 0 )
             delta_value = 1;
          if( value <= delta_value )
@@ -157,14 +158,14 @@ void ticket_object::auto_update()
       }
    }
 
-   update_value();
+   update_value( version );
 }
 
-void ticket_object::update_value()
+void ticket_object::update_value( ticket_version version )
 {
    if( current_type != lock_forever )
    {
-      value = amount.amount * value_multiplier(current_type);
+      value = amount.amount * value_multiplier( current_type, version );
    }
    // else lock forever and to be updated, do nothing here
 }
