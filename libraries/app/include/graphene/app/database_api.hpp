@@ -718,6 +718,24 @@ class database_api
             const vector<std::string>& asset_symbols_or_ids,
             optional<bool> subscribe = optional<bool>() )const;
 
+      /**
+       * @brief Get a list of liquidity pools by the name or ID of the owner account
+       * @param account_name_or_id name or ID of the owner account
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start share asset id, fetch pools whose share asset IDs are greater than or equal to this ID
+       * @return The liquidity pools
+       *
+       * @note
+       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of pools
+       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<liquidity_pool_object> get_liquidity_pools_by_owner(
+            std::string account_name_or_id,
+            optional<uint32_t> limit = 101,
+            optional<asset_id_type> start_id = optional<asset_id_type>() )const;
+
       ///////////////
       // Witnesses //
       ///////////////
@@ -1094,6 +1112,7 @@ FC_API(graphene::app::database_api,
    (get_liquidity_pools_by_asset_b)
    (get_liquidity_pools_by_both_assets)
    (get_liquidity_pools_by_share_asset)
+   (get_liquidity_pools_by_owner)
 
    // Witnesses
    (get_witnesses)

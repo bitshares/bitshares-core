@@ -158,6 +158,10 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<optional<liquidity_pool_object>> get_liquidity_pools_by_share_asset(
             const vector<std::string>& asset_symbols_or_ids,
             optional<bool> subscribe = optional<bool>() )const;
+      vector<liquidity_pool_object> get_liquidity_pools_by_owner(
+            std::string account_name_or_id,
+            optional<uint32_t> limit = 101,
+            optional<asset_id_type> start_id = optional<asset_id_type>() )const;
 
       // Witnesses
       vector<optional<witness_object>> get_witnesses(const vector<witness_id_type>& witness_ids)const;
