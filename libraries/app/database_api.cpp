@@ -1742,6 +1742,45 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
+vector<liquidity_pool_object> database_api::list_liquidity_pools(
+            optional<uint32_t> limit,
+            optional<liquidity_pool_id_type> start_id )const
+{
+   return my->list_liquidity_pools(
+            limit,
+            start_id );
+}
+
+vector<liquidity_pool_object> database_api_impl::list_liquidity_pools(
+            optional<uint32_t> olimit,
+            optional<liquidity_pool_id_type> ostart_id )const
+{
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   vector<liquidity_pool_object> results;
+
+   liquidity_pool_id_type start_id = ostart_id.valid() ? *ostart_id : liquidity_pool_id_type();
+
+   const auto& idx = _db.get_index_type<liquidity_pool_index>().indices().get<by_id>();
+   auto lower_itr = idx.lower_bound( start_id );
+   auto upper_itr = idx.end();
+
+   results.reserve( limit );
+   uint32_t count = 0;
+   for ( ; lower_itr != upper_itr && count < limit; ++lower_itr, ++count)
+   {
+      results.emplace_back( *lower_itr );
+   }
+
+   return results;
+}
+
 vector<liquidity_pool_object> database_api::get_liquidity_pools_by_asset_a(
             std::string asset_symbol_or_id,
             optional<uint32_t> limit,

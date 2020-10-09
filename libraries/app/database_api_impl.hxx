@@ -139,6 +139,9 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
                                                                         unsigned limit = 100 )const;
 
       // Liquidity pools
+      vector<liquidity_pool_object> list_liquidity_pools(
+            optional<uint32_t> limit = 101,
+            optional<liquidity_pool_id_type> start_id = optional<liquidity_pool_id_type>() )const;
       vector<liquidity_pool_object> get_liquidity_pools_by_asset_a(
             std::string asset_symbol_or_id,
             optional<uint32_t> limit = 101,

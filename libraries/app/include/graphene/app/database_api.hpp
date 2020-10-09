@@ -632,6 +632,21 @@ class database_api
       /////////////////////
 
       /**
+       * @brief Get a list of liquidity pools
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start liquidity pool id, fetch pools whose IDs are greater than or equal to this ID
+       * @return The liquidity pools
+       *
+       * @note
+       * 1. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 2. @p start_id can be omitted or be null, if so the api will return the "first page" of pools
+       * 3. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<liquidity_pool_object> list_liquidity_pools(
+            optional<uint32_t> limit = 101,
+            optional<liquidity_pool_id_type> start_id = optional<liquidity_pool_id_type>() )const;
+
+      /**
        * @brief Get a list of liquidity pools by the symbol or ID of the first asset in the pool
        * @param asset_symbol_or_id symbol name or ID of the asset
        * @param limit  The limitation of items each query can fetch, not greater than a configured value
@@ -1074,6 +1089,7 @@ FC_API(graphene::app::database_api,
    (get_trade_history_by_sequence)
 
    // Liquidity pools
+   (list_liquidity_pools)
    (get_liquidity_pools_by_asset_a)
    (get_liquidity_pools_by_asset_b)
    (get_liquidity_pools_by_both_assets)
