@@ -18,7 +18,7 @@ programs/build_helpers/buildstep prepare.sonar.part3 1 "cp sonar-project.propert
 programs/build_helpers/buildstep run.sonar.part3 1500 "which sonar-scanner && sonar-scanner"
 programs/build_helpers/buildstep prepare.sonar.full3 1 "cp sonar-project.properties.bak sonar-project.properties"
 du -hs sonar_cache
-# The forth pass, scan all files
+# The fourth pass, scan all files
 programs/build_helpers/buildstep run.sonar.full 1500 "which sonar-scanner && sonar-scanner"
 du -hs sonar_cache
 programs/build_helpers/buildstep end 0
