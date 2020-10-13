@@ -35,6 +35,7 @@
 #include <graphene/chain/confidential_object.hpp>
 #include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
+#include <graphene/chain/ticket_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 
@@ -1024,6 +1025,43 @@ class database_api
       vector<htlc_object> list_htlcs(const htlc_id_type start, uint32_t limit) const;
 
 
+      /////////////
+      // Tickets //
+      /////////////
+
+      /**
+       * @brief Get a list of tickets
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start ticket id, fetch tickets whose IDs are greater than or equal to this ID
+       * @return The tickets
+       *
+       * @note
+       * 1. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 2. @p start_id can be omitted or be null, if so the api will return the "first page" of tickets
+       * 3. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<ticket_object> list_tickets(
+            optional<uint32_t> limit = 101,
+            optional<ticket_id_type> start_id = optional<ticket_id_type>() )const;
+
+      /**
+       * @brief Get a list of tickets by the name or ID of the owner account
+       * @param account_name_or_id name or ID of the owner account
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start ticket id, fetch tickets whose IDs are greater than or equal to this ID
+       * @return The tickets
+       *
+       * @note
+       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of tickets
+       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<ticket_object> get_tickets_by_account(
+            std::string account_name_or_id,
+            optional<uint32_t> limit = 101,
+            optional<ticket_id_type> start_id = optional<ticket_id_type>() )const;
+
 private:
       std::shared_ptr< database_api_impl > my;
 };
@@ -1160,4 +1198,8 @@ FC_API(graphene::app::database_api,
    (get_htlc_by_from)
    (get_htlc_by_to)
    (list_htlcs)
+
+   // Tickets
+   (list_tickets)
+   (get_tickets_by_account)
 )

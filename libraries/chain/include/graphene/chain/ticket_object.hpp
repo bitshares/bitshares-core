@@ -117,7 +117,7 @@ class ticket_object : public abstract_object<ticket_object>
 };
 
 struct by_next_update;
-struct by_account_type;
+struct by_account;
 
 /**
 * @ingroup object_index
@@ -132,10 +132,9 @@ typedef multi_index_container<
             member< object, object_id_type, &object::id>
          >
       >,
-      ordered_unique< tag<by_account_type>,
+      ordered_unique< tag<by_account>,
          composite_key< ticket_object,
             member< ticket_object, account_id_type, &ticket_object::account>,
-            member< ticket_object, ticket_type, &ticket_object::current_type>,
             member< object, object_id_type, &object::id>
          >
       >
