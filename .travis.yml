@@ -37,7 +37,3 @@ jobs:
       script: ./programs/build_helpers/scan_with_sonar_step_1
     - stage: scan with sonar, step 2
       script: ./programs/build_helpers/scan_with_sonar_step_2
-    - stage: scan with sonar, step 3
-      script: ./programs/build_helpers/scan_with_sonar_step_3
-    - stage: scan with sonar, step 4
-      script: ./programs/build_helpers/scan_with_sonar_step_4
