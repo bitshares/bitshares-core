@@ -223,6 +223,15 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
                                           htlc_id_type start, uint32_t limit) const;
       vector<htlc_object> list_htlcs(const htlc_id_type lower_bound_id, uint32_t limit) const;
 
+      // Tickets
+      vector<ticket_object> list_tickets(
+            optional<uint32_t> limit = 101,
+            optional<ticket_id_type> start_id = optional<ticket_id_type>() )const;
+      vector<ticket_object> get_tickets_by_account(
+            std::string account_name_or_id,
+            optional<uint32_t> limit = 101,
+            optional<ticket_id_type> start_id = optional<ticket_id_type>() )const;
+
    //private:
 
       ////////////////////////////////////////////////

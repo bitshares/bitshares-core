@@ -2791,6 +2791,95 @@ vector<htlc_object> database_api_impl::list_htlcs(const htlc_id_type start, uint
 
 //////////////////////////////////////////////////////////////////////
 //                                                                  //
+// Tickets                                                          //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<ticket_object> database_api::list_tickets(
+            optional<uint32_t> limit,
+            optional<ticket_id_type> start_id )const
+{
+   return my->list_tickets(
+            limit,
+            start_id );
+}
+
+vector<ticket_object> database_api_impl::list_tickets(
+            optional<uint32_t> olimit,
+            optional<ticket_id_type> ostart_id )const
+{
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_tickets;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   vector<ticket_object> results;
+
+   ticket_id_type start_id = ostart_id.valid() ? *ostart_id : ticket_id_type();
+
+   const auto& idx = _db.get_index_type<ticket_index>().indices().get<by_id>();
+   auto lower_itr = idx.lower_bound( start_id );
+   auto upper_itr = idx.end();
+
+   results.reserve( limit );
+   uint32_t count = 0;
+   for ( ; lower_itr != upper_itr && count < limit; ++lower_itr, ++count)
+   {
+      results.emplace_back( *lower_itr );
+   }
+
+   return results;
+}
+
+vector<ticket_object> database_api::get_tickets_by_account(
+            std::string account_name_or_id,
+            optional<uint32_t> limit,
+            optional<ticket_id_type> start_id )const
+{
+   return my->get_tickets_by_account(
+            account_name_or_id,
+            limit,
+            start_id );
+}
+
+vector<ticket_object> database_api_impl::get_tickets_by_account(
+            std::string account_name_or_id,
+            optional<uint32_t> olimit,
+            optional<ticket_id_type> ostart_id )const
+{
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_tickets;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   vector<ticket_object> results;
+
+   account_id_type account = get_account_from_string(account_name_or_id)->id;
+
+   ticket_id_type start_id = ostart_id.valid() ? *ostart_id : ticket_id_type();
+
+   const auto& idx = _db.get_index_type<ticket_index>().indices().get<by_account>();
+   auto lower_itr = idx.lower_bound( std::make_tuple( account, start_id ) );
+   auto upper_itr = idx.upper_bound( account );
+
+   results.reserve( limit );
+   uint32_t count = 0;
+   for ( ; lower_itr != upper_itr && count < limit; ++lower_itr, ++count)
+   {
+      results.emplace_back( *lower_itr );
+   }
+
+   return results;
+}
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
 // Private methods                                                  //
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
