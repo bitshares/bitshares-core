@@ -669,6 +669,20 @@ BOOST_AUTO_TEST_CASE( deposit_withdrawal_test )
 
       generate_block();
 
+      graphene::market_history::liquidity_pool_ticker_id_type ticker_id( lp_id.instance );
+      const auto& ticker = db.get< graphene::market_history::liquidity_pool_ticker_object >( ticker_id );
+      BOOST_CHECK_EQUAL( ticker._24h_deposit_count, 7u );
+      BOOST_CHECK_EQUAL( ticker.total_deposit_count, 7u );
+      BOOST_CHECK_EQUAL( ticker._24h_withdrawal_count, 2u );
+      BOOST_CHECK_EQUAL( ticker.total_withdrawal_count, 2u );
+
+      generate_blocks( db.head_block_time() + fc::days(2) );
+
+      BOOST_CHECK_EQUAL( ticker._24h_deposit_count, 0u );
+      BOOST_CHECK_EQUAL( ticker.total_deposit_count, 7u );
+      BOOST_CHECK_EQUAL( ticker._24h_withdrawal_count, 0u );
+      BOOST_CHECK_EQUAL( ticker.total_withdrawal_count, 2u );
+
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -899,6 +913,21 @@ BOOST_AUTO_TEST_CASE( exchange_test )
 
       // Generates a block
       generate_block();
+      BOOST_CHECK_EQUAL( eur_id(db).dynamic_data(db).accumulated_fees.value, expected_accumulated_fees_eur );
+
+      graphene::market_history::liquidity_pool_ticker_id_type ticker_id( lp_id.instance );
+      const auto& ticker = db.get< graphene::market_history::liquidity_pool_ticker_object >( ticker_id );
+      BOOST_CHECK_EQUAL( ticker._24h_exchange_a2b_count, 1u );
+      BOOST_CHECK_EQUAL( ticker.total_exchange_a2b_count, 1u );
+      BOOST_CHECK_EQUAL( ticker._24h_exchange_b2a_count, 1u );
+      BOOST_CHECK_EQUAL( ticker.total_exchange_b2a_count, 1u );
+
+      generate_blocks( db.head_block_time() + fc::days(2) );
+
+      BOOST_CHECK_EQUAL( ticker._24h_exchange_a2b_count, 0u );
+      BOOST_CHECK_EQUAL( ticker.total_exchange_a2b_count, 1u );
+      BOOST_CHECK_EQUAL( ticker._24h_exchange_b2a_count, 0u );
+      BOOST_CHECK_EQUAL( ticker.total_exchange_b2a_count, 1u );
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));

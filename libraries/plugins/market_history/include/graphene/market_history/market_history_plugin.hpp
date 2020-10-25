@@ -25,6 +25,7 @@
 
 #include <graphene/app/plugin.hpp>
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/operation_history_object.hpp>
 
 #include <fc/thread/future.hpp>
 #include <fc/uint128.hpp>
@@ -53,7 +54,10 @@ enum market_history_object_type
    order_history_object_type = 0,
    bucket_object_type = 1,
    market_ticker_object_type = 2,
-   market_ticker_meta_object_type = 3
+   market_ticker_meta_object_type = 3,
+   liquidity_pool_history_object_type = 4,
+   liquidity_pool_ticker_meta_object_type = 5,
+   liquidity_pool_ticker_object_type = 6
 };
 
 struct bucket_key
@@ -217,6 +221,124 @@ typedef generic_index<order_history_object, order_history_multi_index_type> hist
 typedef generic_index<market_ticker_object, market_ticker_object_multi_index_type> market_ticker_index;
 
 
+/** Stores operation histories related to liquidity pools */
+struct liquidity_pool_history_object : public abstract_object<liquidity_pool_history_object>
+{
+   static constexpr uint8_t space_id = MARKET_HISTORY_SPACE_ID;
+   static constexpr uint8_t type_id  = liquidity_pool_history_object_type;
+
+   liquidity_pool_id_type   pool;
+   uint64_t                 sequence = 0;
+   fc::time_point_sec       time;
+   int64_t                  op_type;
+   operation_history_object op;
+};
+
+struct by_pool_seq;
+struct by_pool_time;
+
+typedef multi_index_container<
+   liquidity_pool_history_object,
+   indexed_by<
+      ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+      ordered_unique< tag<by_pool_seq>,
+         composite_key< liquidity_pool_history_object,
+            member<liquidity_pool_history_object, liquidity_pool_id_type, &liquidity_pool_history_object::pool>,
+            member<liquidity_pool_history_object, uint64_t, &liquidity_pool_history_object::sequence>
+         >,
+         composite_key_compare<
+            std::less< liquidity_pool_id_type >,
+            std::greater< uint64_t >
+         >
+      >,
+      ordered_unique< tag<by_pool_time>,
+         composite_key< liquidity_pool_history_object,
+            member<liquidity_pool_history_object, liquidity_pool_id_type, &liquidity_pool_history_object::pool>,
+            member<liquidity_pool_history_object, time_point_sec, &liquidity_pool_history_object::time>,
+            member<liquidity_pool_history_object, uint64_t, &liquidity_pool_history_object::sequence>
+         >,
+         composite_key_compare<
+            std::less< liquidity_pool_id_type >,
+            std::greater< time_point_sec >,
+            std::greater< uint64_t >
+         >
+      >
+   >
+> liquidity_pool_history_multi_index_type;
+
+typedef generic_index< liquidity_pool_history_object,
+                       liquidity_pool_history_multi_index_type > liquidity_pool_history_index;
+
+
+/// Stores meta data for liquidity pool tickers
+struct liquidity_pool_ticker_meta_object : public abstract_object<liquidity_pool_ticker_meta_object>
+{
+   static constexpr uint8_t space_id = MARKET_HISTORY_SPACE_ID;
+   static constexpr uint8_t type_id  = liquidity_pool_ticker_meta_object_type;
+
+   object_id_type      rolling_min_lp_his_id;
+   bool                skip_min_lp_his_id = false;
+};
+
+using liquidity_pool_ticker_id_type = object_id<MARKET_HISTORY_SPACE_ID, liquidity_pool_ticker_object_type>;
+
+/// Stores ticker data for liquidity pools
+struct liquidity_pool_ticker_object : public abstract_object<liquidity_pool_ticker_object>
+{
+   static constexpr uint8_t space_id = MARKET_HISTORY_SPACE_ID;
+   static constexpr uint8_t type_id  = liquidity_pool_ticker_object_type;
+
+   uint32_t            _24h_deposit_count = 0;
+   fc::uint128_t       _24h_deposit_amount_a = 0;
+   fc::uint128_t       _24h_deposit_amount_b = 0;
+   fc::uint128_t       _24h_deposit_share_amount = 0;
+   uint32_t            _24h_withdrawal_count = 0;
+   fc::uint128_t       _24h_withdrawal_amount_a = 0;
+   fc::uint128_t       _24h_withdrawal_amount_b = 0;
+   fc::uint128_t       _24h_withdrawal_share_amount = 0;
+   fc::uint128_t       _24h_withdrawal_fee_a = 0;
+   fc::uint128_t       _24h_withdrawal_fee_b = 0;
+   uint32_t            _24h_exchange_a2b_count = 0;
+   fc::uint128_t       _24h_exchange_a2b_amount_a = 0;
+   fc::uint128_t       _24h_exchange_a2b_amount_b = 0;
+   uint32_t            _24h_exchange_b2a_count = 0;
+   fc::uint128_t       _24h_exchange_b2a_amount_a = 0;
+   fc::uint128_t       _24h_exchange_b2a_amount_b = 0;
+   fc::uint128_t       _24h_exchange_fee_a = 0;
+   fc::uint128_t       _24h_exchange_fee_b = 0;
+   share_type          _24h_balance_delta_a;
+   share_type          _24h_balance_delta_b;
+   uint64_t            total_deposit_count = 0;
+   fc::uint128_t       total_deposit_amount_a = 0;
+   fc::uint128_t       total_deposit_amount_b = 0;
+   fc::uint128_t       total_deposit_share_amount = 0;
+   uint64_t            total_withdrawal_count = 0;
+   fc::uint128_t       total_withdrawal_amount_a = 0;
+   fc::uint128_t       total_withdrawal_amount_b = 0;
+   fc::uint128_t       total_withdrawal_share_amount = 0;
+   fc::uint128_t       total_withdrawal_fee_a = 0;
+   fc::uint128_t       total_withdrawal_fee_b = 0;
+   uint64_t            total_exchange_a2b_count = 0;
+   fc::uint128_t       total_exchange_a2b_amount_a = 0;
+   fc::uint128_t       total_exchange_a2b_amount_b = 0;
+   uint64_t            total_exchange_b2a_count = 0;
+   fc::uint128_t       total_exchange_b2a_amount_a = 0;
+   fc::uint128_t       total_exchange_b2a_amount_b = 0;
+   fc::uint128_t       total_exchange_fee_a = 0;
+   fc::uint128_t       total_exchange_fee_b = 0;
+};
+
+typedef multi_index_container<
+   liquidity_pool_ticker_object,
+   indexed_by<
+      ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >
+   >
+> liquidity_pool_ticker_multi_index_type;
+
+typedef generic_index< liquidity_pool_ticker_object,
+                       liquidity_pool_ticker_multi_index_type > liquidity_pool_ticker_index;
+
+
 namespace detail
 {
     class market_history_plugin_impl;
@@ -270,3 +392,47 @@ FC_REFLECT_DERIVED( graphene::market_history::market_ticker_object, (graphene::d
                     (base_volume)(quote_volume) )
 FC_REFLECT_DERIVED( graphene::market_history::market_ticker_meta_object, (graphene::db::object),
                     (rolling_min_order_his_id)(skip_min_order_his_id) )
+FC_REFLECT_DERIVED( graphene::market_history::liquidity_pool_history_object, (graphene::db::object),
+                    (pool)(sequence)(time)(op_type)(op) )
+FC_REFLECT_DERIVED( graphene::market_history::liquidity_pool_ticker_meta_object, (graphene::db::object),
+                    (rolling_min_lp_his_id)(skip_min_lp_his_id) )
+FC_REFLECT_DERIVED( graphene::market_history::liquidity_pool_ticker_object, (graphene::db::object),
+                    (_24h_deposit_count)
+                    (_24h_deposit_amount_a)
+                    (_24h_deposit_amount_b)
+                    (_24h_deposit_share_amount)
+                    (_24h_withdrawal_count)
+                    (_24h_withdrawal_amount_a)
+                    (_24h_withdrawal_amount_b)
+                    (_24h_withdrawal_share_amount)
+                    (_24h_withdrawal_fee_a)
+                    (_24h_withdrawal_fee_b)
+                    (_24h_exchange_a2b_count)
+                    (_24h_exchange_a2b_amount_a)
+                    (_24h_exchange_a2b_amount_b)
+                    (_24h_exchange_b2a_count)
+                    (_24h_exchange_b2a_amount_a)
+                    (_24h_exchange_b2a_amount_b)
+                    (_24h_exchange_fee_a)
+                    (_24h_exchange_fee_b)
+                    (_24h_balance_delta_a)
+                    (_24h_balance_delta_b)
+                    (total_deposit_count)
+                    (total_deposit_amount_a)
+                    (total_deposit_amount_b)
+                    (total_deposit_share_amount)
+                    (total_withdrawal_count)
+                    (total_withdrawal_amount_a)
+                    (total_withdrawal_amount_b)
+                    (total_withdrawal_share_amount)
+                    (total_withdrawal_fee_a)
+                    (total_withdrawal_fee_b)
+                    (total_exchange_a2b_count)
+                    (total_exchange_a2b_amount_a)
+                    (total_exchange_a2b_amount_b)
+                    (total_exchange_b2a_count)
+                    (total_exchange_b2a_amount_a)
+                    (total_exchange_b2a_amount_b)
+                    (total_exchange_fee_a)
+                    (total_exchange_fee_b)
+                  )
