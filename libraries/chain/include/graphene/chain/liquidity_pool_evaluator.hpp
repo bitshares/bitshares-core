@@ -82,6 +82,8 @@ namespace graphene { namespace chain {
          const asset_dynamic_data_object* _share_asset_dyn_data = nullptr;
          asset _pool_pays_a;
          asset _pool_pays_b;
+         asset _fee_a;
+         asset _fee_b;
    };
 
    class liquidity_pool_exchange_evaluator : public evaluator<liquidity_pool_exchange_evaluator>
@@ -100,6 +102,7 @@ namespace graphene { namespace chain {
          asset _account_receives;
          asset _maker_market_fee;
          asset _taker_market_fee;
+         asset _pool_taker_fee;
    };
 
 } } // graphene::chain

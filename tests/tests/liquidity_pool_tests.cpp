@@ -513,7 +513,9 @@ BOOST_AUTO_TEST_CASE( deposit_withdrawal_test )
       BOOST_REQUIRE_EQUAL( result.received.size(), 2u );
       BOOST_CHECK( result.received.front() == asset( -new_a, eur_id ) );
       BOOST_CHECK( result.received.back() == asset( -new_b, usd_id ) );
-      BOOST_REQUIRE_EQUAL( result.fees.size(), 0u );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 2u );
+      BOOST_CHECK( result.fees.front() == asset( 2, eur_id ) );
+      BOOST_CHECK( result.fees.back() == asset( 2, usd_id ) );
 
       expected_pool_balance_a += new_a; // 25789 - 68 = 25721
       expected_pool_balance_b += new_b; // 30946 - 83 = 30863
@@ -549,7 +551,9 @@ BOOST_AUTO_TEST_CASE( deposit_withdrawal_test )
       BOOST_REQUIRE_EQUAL( result.received.size(), 2u );
       BOOST_CHECK( result.received.front() == asset( -new_a, eur_id ) );
       BOOST_CHECK( result.received.back() == asset( -new_b, usd_id ) );
-      BOOST_REQUIRE_EQUAL( result.fees.size(), 0u );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 2u );
+      BOOST_CHECK( result.fees.front() == asset( 0, eur_id ) );
+      BOOST_CHECK( result.fees.back() == asset( 0, usd_id ) );
 
       expected_pool_balance_a = 0;
       expected_pool_balance_b = 0;
@@ -816,6 +820,7 @@ BOOST_AUTO_TEST_CASE( exchange_test )
       int64_t delta_a = 998; // 1000 - 2
       // tmp_delta = 1200 - round_up( 1000 * 1200 / (1000+998) ) = 1200 - 601 = 599
       int64_t delta_b = -588; // - ( 599 - round_down(599 * 2%) ) = - ( 599 - 11 ) = -588
+      int64_t pool_taker_fee = 11;
       int64_t taker_fee = 4; // 588 * 0.8%, usd
       int64_t ted_receives = 584; // 588 - 4
 
@@ -830,9 +835,10 @@ BOOST_AUTO_TEST_CASE( exchange_test )
       BOOST_CHECK( result.paid.front() == asset( 1000, eur_id ) );
       BOOST_REQUIRE_EQUAL( result.received.size(), 1u );
       BOOST_CHECK( result.received.front() == asset( ted_receives, usd_id ) );
-      BOOST_REQUIRE_EQUAL( result.fees.size(), 2u );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 3u );
       BOOST_CHECK( result.fees.front() == asset( maker_fee, eur_id ) );
-      BOOST_CHECK( result.fees.back() == asset( taker_fee, usd_id ) );
+      BOOST_CHECK( result.fees.at(1) == asset( taker_fee, usd_id ) );
+      BOOST_CHECK( result.fees.back() == asset( pool_taker_fee, usd_id ) );
 
       expected_pool_balance_a += delta_a; // 1000 + 998 = 1998
       expected_pool_balance_b += delta_b; // 1200 - 588 = 612
@@ -855,6 +861,7 @@ BOOST_AUTO_TEST_CASE( exchange_test )
       delta_b = 997; // 1000 - 3
       // tmp_delta = 1998 - round_up( 1998 * 612 / (612+997) ) = 1998 - 760 = 1238
       delta_a = -1214; // - ( 1238 - round_down(1238 * 2%) ) = - ( 1238 - 24 ) = -1214
+      pool_taker_fee = 24;
       taker_fee = 6; // 1214 * 0.5%, eur
       ted_receives = 1208; // 1214 - 6
 
@@ -869,9 +876,10 @@ BOOST_AUTO_TEST_CASE( exchange_test )
       BOOST_CHECK( result.paid.front() == asset( 1000, usd_id ) );
       BOOST_REQUIRE_EQUAL( result.received.size(), 1u );
       BOOST_CHECK( result.received.front() == asset( ted_receives, eur_id ) );
-      BOOST_REQUIRE_EQUAL( result.fees.size(), 2u );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 3u );
       BOOST_CHECK( result.fees.front() == asset( maker_fee, usd_id ) );
-      BOOST_CHECK( result.fees.back() == asset( taker_fee, eur_id ) );
+      BOOST_CHECK( result.fees.at(1) == asset( taker_fee, eur_id ) );
+      BOOST_CHECK( result.fees.back() == asset( pool_taker_fee, eur_id ) );
 
       expected_pool_balance_a += delta_a; // 1998 - 1214 = 784
       expected_pool_balance_b += delta_b; // 612 + 997 = 1609
