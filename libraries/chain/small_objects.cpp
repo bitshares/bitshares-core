@@ -63,6 +63,8 @@ FC_REFLECT_DERIVED_NO_TYPENAME(
    (worker_budget)
    (leftover_worker_funds)
    (supply_delta)
+   (max_supply)
+   (current_supply)
 )
 
 FC_REFLECT_DERIVED_NO_TYPENAME(
