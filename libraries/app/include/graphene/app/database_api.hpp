@@ -598,30 +598,31 @@ class database_api
       vector<market_ticker> get_top_markets(uint32_t limit)const;
 
       /**
-       * @brief Returns recent trades for the market base:quote, ordered by time, most recent first.
-       * Note: Currently, timezone offsets are not supported. The time must be UTC. The range is [stop, start).
-       *       In case when there are more than 100 trades occurred in the same second, this API only returns
-       *       the first 100 records, can use another API @ref get_trade_history_by_sequence to query for the rest.
+       * @brief Get market transactions occurred in the market base:quote, ordered by time, most recent first.
        * @param base symbol or ID of the base asset
        * @param quote symbol or ID of the quote asset
-       * @param start Start time as a UNIX timestamp, the latest trade to retrieve
-       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
-       * @param limit Number of trasactions to retrieve, capped at 100.
-       * @return Recent transactions in the market
+       * @param start Start time as a UNIX timestamp, the latest transactions to retrieve
+       * @param stop Stop time as a UNIX timestamp, the earliest transactions to retrieve
+       * @param limit Maximum quantity of transactions to retrieve, capped at 100.
+       * @return Transactions in the market
+       * @note The time must be UTC, timezone offsets are not supported. The range is [stop, start].
+       *       In case when there are more than 100 transactions occurred in the same second,
+       *       this API only returns the most recent 100 records, the rest records can be retrieved
+       *       with the @ref get_trade_history_by_sequence API.
        */
       vector<market_trade> get_trade_history( const string& base, const string& quote,
                                               fc::time_point_sec start, fc::time_point_sec stop,
                                               unsigned limit = 100 )const;
 
       /**
-       * @brief Returns trades for the market base:quote, ordered by time, most recent first.
-       * Note: Currently, timezone offsets are not supported. The time must be UTC. The range is [stop, start).
+       * @brief Get market transactions occurred in the market base:quote, ordered by time, most recent first.
        * @param base symbol or ID of the base asset
        * @param quote symbol or ID of the quote asset
-       * @param start Start sequence as an Integer, the latest trade to retrieve
-       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
-       * @param limit Number of trasactions to retrieve, capped at 100
+       * @param start Start sequence as an Integer, the latest transaction to retrieve
+       * @param stop Stop time as a UNIX timestamp, the earliest transactions to retrieve
+       * @param limit Maximum quantity of transactions to retrieve, capped at 100
        * @return Transactions in the market
+       * @note The time must be UTC, timezone offsets are not supported. The range is [stop, start].
        */
       vector<market_trade> get_trade_history_by_sequence( const string& base, const string& quote,
                                                           int64_t start, fc::time_point_sec stop,
