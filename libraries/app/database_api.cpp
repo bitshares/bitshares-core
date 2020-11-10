@@ -1756,8 +1756,7 @@ vector<extended_liquidity_pool_object> database_api_impl::list_liquidity_pools(
    auto upper_itr = idx.end();
 
    results.reserve( limit );
-   uint32_t count = 0;
-   for ( ; lower_itr != upper_itr && count < limit; ++lower_itr, ++count)
+   for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
    {
       results.emplace_back( extend_liquidity_pool( *lower_itr, with_stats ) );
    }
@@ -1863,8 +1862,7 @@ vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by
    auto upper_itr = idx.upper_bound( std::make_tuple( asset_id_a, asset_id_b ) );
 
    results.reserve( limit );
-   uint32_t count = 0;
-   for ( ; lower_itr != upper_itr && count < limit; ++lower_itr, ++count)
+   for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
    {
       results.emplace_back( extend_liquidity_pool( *lower_itr, with_stats ) );
    }
@@ -2004,14 +2002,12 @@ vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by
    auto upper_itr = idx.upper_bound( owner );
 
    results.reserve( limit );
-   uint32_t count = 0;
-   for ( ; lower_itr != upper_itr && count < limit; ++lower_itr )
+   for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
    {
       const asset_object& asset_obj = *lower_itr;
       if( !asset_obj.is_liquidity_pool_share_asset() ) // TODO improve performance
          continue;
       results.emplace_back( extend_liquidity_pool( (*asset_obj.for_liquidity_pool)(_db), with_stats ) );
-      ++count;
    }
 
    return results;

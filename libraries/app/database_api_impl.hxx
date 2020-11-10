@@ -331,8 +331,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          auto upper_itr = idx.upper_bound( asset_id );
 
          results.reserve( limit );
-         uint32_t count = 0;
-         for ( ; lower_itr != upper_itr && count < limit; ++lower_itr, ++count)
+         for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
          {
             results.emplace_back( extend_liquidity_pool( *lower_itr, with_stats ) );
          }
