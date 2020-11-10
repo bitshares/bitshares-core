@@ -236,6 +236,8 @@ struct liquidity_pool_history_object : public abstract_object<liquidity_pool_his
 
 struct by_pool_seq;
 struct by_pool_time;
+struct by_pool_op_type_seq;
+struct by_pool_op_type_time;
 
 typedef multi_index_container<
    liquidity_pool_history_object,
@@ -259,6 +261,32 @@ typedef multi_index_container<
          >,
          composite_key_compare<
             std::less< liquidity_pool_id_type >,
+            std::greater< time_point_sec >,
+            std::greater< uint64_t >
+         >
+      >,
+      ordered_unique< tag<by_pool_op_type_seq>,
+         composite_key< liquidity_pool_history_object,
+            member<liquidity_pool_history_object, liquidity_pool_id_type, &liquidity_pool_history_object::pool>,
+            member<liquidity_pool_history_object, int64_t, &liquidity_pool_history_object::op_type>,
+            member<liquidity_pool_history_object, uint64_t, &liquidity_pool_history_object::sequence>
+         >,
+         composite_key_compare<
+            std::less< liquidity_pool_id_type >,
+            std::less< int64_t >,
+            std::greater< uint64_t >
+         >
+      >,
+      ordered_unique< tag<by_pool_op_type_time>,
+         composite_key< liquidity_pool_history_object,
+            member<liquidity_pool_history_object, liquidity_pool_id_type, &liquidity_pool_history_object::pool>,
+            member<liquidity_pool_history_object, int64_t, &liquidity_pool_history_object::op_type>,
+            member<liquidity_pool_history_object, time_point_sec, &liquidity_pool_history_object::time>,
+            member<liquidity_pool_history_object, uint64_t, &liquidity_pool_history_object::sequence>
+         >,
+         composite_key_compare<
+            std::less< liquidity_pool_id_type >,
+            std::less< int64_t >,
             std::greater< time_point_sec >,
             std::greater< uint64_t >
          >

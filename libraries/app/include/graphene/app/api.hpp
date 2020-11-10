@@ -220,6 +220,65 @@ namespace graphene { namespace app {
           * it means this API server supports OHLCV data aggregated in 5-minute buckets.
           */
          flat_set<uint32_t> get_market_history_buckets()const;
+
+         /**
+          * @brief Get history of a liquidity pool
+          * @param pool_id ID of the liquidity pool to query
+          * @param start A UNIX timestamp. Optional.
+          *              If specified, only the operations occurred not later than this time will be returned.
+          * @param stop  A UNIX timestamp. Optional.
+          *              If specified, only the operations occurred later than this time will be returned.
+          * @param limit Maximum quantity of operations in the history to retrieve.
+          *              Optional. If not specified, at most 101 records will be returned.
+          * @param operation_type Optional. If specified, only the operations whose type is the specified type
+          *                       will be returned. Otherwise all operations will be returned.
+          * @return operation history of the liquidity pool, ordered by time, most recent first.
+          *
+          * @note
+          * 1. The time must be UTC. The range is (stop, start].
+          * 2. In case when there are more than 100 operations occurred in the same second, this API only returns
+          *    the most recent records, the rest records can be retrieved with the
+          *    @ref get_liquidity_pool_history_by_sequence API.
+          * 3. List of operation type code: 59-creation, 60-deletion, 61-deposit, 62-withdrawal, 63-exchange.
+          * 4. Can only omit one or more arguments in the end of the list, but not one or more in the middle.
+          *    If need to not specify an individual argument, can specify \c null in the place.
+          */
+         vector<liquidity_pool_history_object> get_liquidity_pool_history(
+               liquidity_pool_id_type pool_id,
+               optional<fc::time_point_sec> start = optional<fc::time_point_sec>(),
+               optional<fc::time_point_sec> stop = optional<fc::time_point_sec>(),
+               optional<uint32_t> limit = 101,
+               optional<int64_t> operation_type = optional<int64_t>() )const;
+
+         /**
+          * @brief Get history of a liquidity pool
+          * @param pool_id ID of the liquidity pool to query
+          * @param start An Integer. Optional.
+          *              If specified, only the operations whose sequences are not greater than this will be returned.
+          * @param stop  A UNIX timestamp. Optional.
+          *              If specified, only operations occurred later than this time will be returned.
+          * @param limit Maximum quantity of operations in the history to retrieve.
+          *              Optional. If not specified, at most 101 records will be returned.
+          * @param operation_type Optional. If specified, only the operations whose type is the specified type
+          *                       will be returned. Otherwise all operations will be returned.
+          * @return operation history of the liquidity pool, ordered by time, most recent first.
+          *
+          * @note
+          * 1. The time must be UTC. The range is (stop, start].
+          * 2. In case when there are more than 100 operations occurred in the same second, this API only returns
+          *    the most recent records, the rest records can be retrieved with the
+          *    @ref get_liquidity_pool_history_by_sequence API.
+          * 3. List of operation type code: 59-creation, 60-deletion, 61-deposit, 62-withdrawal, 63-exchange.
+          * 4. Can only omit one or more arguments in the end of the list, but not one or more in the middle.
+          *    If need to not specify an individual argument, can specify \c null in the place.
+          */
+         vector<liquidity_pool_history_object> get_liquidity_pool_history_by_sequence(
+               liquidity_pool_id_type pool_id,
+               optional<uint64_t> start = optional<uint64_t>(),
+               optional<fc::time_point_sec> stop = optional<fc::time_point_sec>(),
+               optional<uint32_t> limit = 101,
+               optional<int64_t> operation_type = optional<int64_t>() )const;
+
       private:
            application& _app;
            graphene::app::database_api database_api;
@@ -645,6 +704,8 @@ FC_API(graphene::app::history_api,
        (get_fill_order_history)
        (get_market_history)
        (get_market_history_buckets)
+       (get_liquidity_pool_history)
+       (get_liquidity_pool_history_by_sequence)
      )
 FC_API(graphene::app::block_api,
        (get_blocks)
