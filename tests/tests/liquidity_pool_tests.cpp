@@ -924,6 +924,27 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
       BOOST_CHECK_EQUAL( ticker._24h_exchange_b2a_count, 1u );
       BOOST_CHECK_EQUAL( ticker.total_exchange_b2a_count, 1u );
 
+      // Check database API
+      graphene::app::database_api db_api( db, &( app.get_options() ) );
+
+      // get pool without statistics
+      auto pools = db_api.get_liquidity_pools( { lp_id } );
+      BOOST_REQUIRE_EQUAL( pools.size(), 1u );
+      BOOST_REQUIRE( pools.front().valid() );
+      BOOST_CHECK( !pools.front()->statistics.valid() );
+
+      // get pool with statistics
+      pools = db_api.get_liquidity_pools( { lp_id }, {}, true );
+      BOOST_REQUIRE_EQUAL( pools.size(), 1u );
+      BOOST_REQUIRE( pools.front().valid() );
+      BOOST_REQUIRE( pools.front()->statistics.valid() );
+      BOOST_CHECK( pools.front()->statistics->id == ticker_id );
+      BOOST_CHECK_EQUAL( pools.front()->statistics->_24h_exchange_a2b_count, 1u );
+      BOOST_CHECK_EQUAL( pools.front()->statistics->_24h_exchange_a2b_count, 1u );
+      BOOST_CHECK_EQUAL( pools.front()->statistics->total_exchange_a2b_count, 1u );
+      BOOST_CHECK_EQUAL( pools.front()->statistics->_24h_exchange_b2a_count, 1u );
+      BOOST_CHECK_EQUAL( pools.front()->statistics->total_exchange_b2a_count, 1u );
+
       generate_blocks( db.head_block_time() + fc::days(2) );
 
       BOOST_CHECK_EQUAL( ticker._24h_exchange_a2b_count, 0u );
