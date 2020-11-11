@@ -28,6 +28,8 @@
 #include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 
+#include <graphene/app/api.hpp>
+
 #include <boost/test/unit_test.hpp>
 
 using namespace graphene::chain;
@@ -35,7 +37,7 @@ using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( liquidity_pool_tests, database_fixture )
 
-BOOST_AUTO_TEST_CASE( hardfork_time_test )
+BOOST_AUTO_TEST_CASE( liquidity_pool_hardfork_time_test )
 {
    try {
 
@@ -91,7 +93,7 @@ BOOST_AUTO_TEST_CASE( hardfork_time_test )
    }
 }
 
-BOOST_AUTO_TEST_CASE( create_delete_proposal_test )
+BOOST_AUTO_TEST_CASE( liquidity_pool_create_delete_proposal_test )
 { try {
 
       // Pass the hard fork time
@@ -237,7 +239,7 @@ BOOST_AUTO_TEST_CASE( create_delete_proposal_test )
       // Other pools are still there
       BOOST_CHECK( db.find( lp_id2 ) );
       BOOST_CHECK( db.find( lp_id3 ) );
-     
+
       // Ted is not able to delete a pool that does not exist
       BOOST_CHECK_THROW( delete_liquidity_pool( ted_id, lp_id1 ), fc::exception );
       // Ted is not able to delete a pool owned by sam
@@ -254,7 +256,7 @@ BOOST_AUTO_TEST_CASE( create_delete_proposal_test )
    }
 }
 
-BOOST_AUTO_TEST_CASE( deposit_withdrawal_test )
+BOOST_AUTO_TEST_CASE( liquidity_pool_deposit_withdrawal_test )
 { try {
 
       // Pass the hard fork time
@@ -689,7 +691,7 @@ BOOST_AUTO_TEST_CASE( deposit_withdrawal_test )
    }
 }
 
-BOOST_AUTO_TEST_CASE( exchange_test )
+BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
 { try {
 
       // Pass the hard fork time
@@ -928,6 +930,46 @@ BOOST_AUTO_TEST_CASE( exchange_test )
       BOOST_CHECK_EQUAL( ticker.total_exchange_a2b_count, 1u );
       BOOST_CHECK_EQUAL( ticker._24h_exchange_b2a_count, 0u );
       BOOST_CHECK_EQUAL( ticker.total_exchange_b2a_count, 1u );
+
+      // Check history API
+      graphene::app::history_api hist_api(app);
+      auto head_time = db.head_block_time();
+
+      // all histories
+      auto histories = hist_api.get_liquidity_pool_history( lp_id );
+      BOOST_CHECK_EQUAL( histories.size(), 4u );
+
+      // limit = 3
+      histories = hist_api.get_liquidity_pool_history( lp_id, {}, {}, 3 );
+      BOOST_CHECK_EQUAL( histories.size(), 3u );
+
+      // only deposits
+      histories = hist_api.get_liquidity_pool_history( lp_id, {}, {}, {}, 59 );
+      BOOST_CHECK_EQUAL( histories.size(), 1u );
+
+      // time too early
+      histories = hist_api.get_liquidity_pool_history( lp_id, head_time - fc::days(3) );
+      BOOST_CHECK_EQUAL( histories.size(), 0u );
+
+      // time too late
+      histories = hist_api.get_liquidity_pool_history( lp_id, head_time, head_time - fc::days(1) );
+      BOOST_CHECK_EQUAL( histories.size(), 0u );
+
+      // time is fine, only exchanges
+      histories = hist_api.get_liquidity_pool_history( lp_id, {}, head_time - fc::days(3), {}, 63 );
+      BOOST_CHECK_EQUAL( histories.size(), 2u );
+
+      // start = 2, limit = 3, so result sequence == {1,2}
+      histories = hist_api.get_liquidity_pool_history_by_sequence( lp_id, 2, {}, 3 );
+      BOOST_CHECK_EQUAL( histories.size(), 2u );
+
+      // start = 2, limit = 1, so result sequence == {2}
+      histories = hist_api.get_liquidity_pool_history_by_sequence( lp_id, 2, {}, 1 );
+      BOOST_CHECK_EQUAL( histories.size(), 1u );
+
+      // start = 3, limit is default, but exchange only, so result sequence == {3}
+      histories = hist_api.get_liquidity_pool_history_by_sequence( lp_id, 3, head_time - fc::days(3), {}, 63 );
+      BOOST_CHECK_EQUAL( histories.size(), 1u );
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
