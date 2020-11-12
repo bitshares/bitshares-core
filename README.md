@@ -97,9 +97,10 @@ In order to run a full node with all the account histories (which is usually not
 
 | Default | Full | Minimal  | ElasticSearch
 | --- | --- | --- | ---
-| 150G HDD, 16G RAM | 640G SSD, 64G RAM * | 120G HDD, 4G RAM | 1TB SSD, 32G RAM
+| 150G HDD, 16G RAM | 640G SSD, 64G RAM * | 120G HDD, 4G RAM | 1TB SSD, 64G RAM **
 
-\* For this setup, allocate at least 500GB of SSD as swap.
+\* Allocate at least 500GB of SSD as swap.
+\** Allocate 48GB of RAM to ElasticSearch.
 
 To use the command-line wallet or other wallets / clients with the node, the node need to be started with RPC connection enabled, which can be done by starting the node with the `--rpc-endpoint` parameter, E.G.
 
