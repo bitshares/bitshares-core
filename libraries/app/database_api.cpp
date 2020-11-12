@@ -713,15 +713,7 @@ vector<optional<account_object>> database_api::lookup_account_names(const vector
 
 vector<optional<account_object>> database_api_impl::lookup_account_names(const vector<string>& account_names)const
 {
-   const auto& accounts_by_name = _db.get_index_type<account_index>().indices().get<by_name>();
-   vector<optional<account_object> > result;
-   result.reserve(account_names.size());
-   std::transform(account_names.begin(), account_names.end(), std::back_inserter(result),
-                  [&accounts_by_name](const string& name) -> optional<account_object> {
-      auto itr = accounts_by_name.find(name);
-      return itr == accounts_by_name.end()? optional<account_object>() : *itr;
-   });
-   return result;
+   return get_accounts( account_names, false );
 }
 
 map<string,account_id_type> database_api::lookup_accounts( const string& lower_bound_name,
@@ -994,20 +986,7 @@ vector<optional<extended_asset_object>> database_api::lookup_asset_symbols(
 vector<optional<extended_asset_object>> database_api_impl::lookup_asset_symbols(
                                                          const vector<string>& symbols_or_ids )const
 {
-   const auto& assets_by_symbol = _db.get_index_type<asset_index>().indices().get<by_symbol>();
-   vector<optional<extended_asset_object> > result;
-   result.reserve(symbols_or_ids.size());
-   std::transform(symbols_or_ids.begin(), symbols_or_ids.end(), std::back_inserter(result),
-                  [this, &assets_by_symbol](const string& symbol_or_id) -> optional<extended_asset_object> {
-      if( !symbol_or_id.empty() && std::isdigit(symbol_or_id[0]) )
-      {
-         auto ptr = _db.find(variant(symbol_or_id, 1).as<asset_id_type>(1));
-         return ptr == nullptr? optional<extended_asset_object>() : extend_asset( *ptr );
-      }
-      auto itr = assets_by_symbol.find(symbol_or_id);
-      return itr == assets_by_symbol.end()? optional<extended_asset_object>() : extend_asset( *itr );
-   });
-   return result;
+   return get_assets( symbols_or_ids, false );
 }
 
 //////////////////////////////////////////////////////////////////////
