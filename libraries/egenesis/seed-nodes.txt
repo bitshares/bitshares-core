@@ -3,7 +3,6 @@
 "bts.lafona.net:1776",               // lafona         (France)
 "bts-seed1.abit-more.com:62015",     // abit           (China)
 "seed.roelandp.nl:1776",             // roelandp       (Canada)
-"seed.bts.bangzi.info:55501",        // Bangzi         (Germany)
 "seed1.xbts.io:1776",                // xbts.io        (Germany)
 "seed2.xbts.io:1776",                // xbts.io        (Germany)
 "seed.bitshares.org:666",            // bitshares.org  (France)
