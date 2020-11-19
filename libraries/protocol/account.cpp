@@ -202,7 +202,7 @@ void account_create_operation::validate()const
       FC_ASSERT( active == authority::null_authority() );
       size_t n_markets = extensions.value.buyback_options->markets.size();
       FC_ASSERT( n_markets > 0 );
-      for( const asset_id_type m : extensions.value.buyback_options->markets )
+      for( const asset_id_type& m : extensions.value.buyback_options->markets )
       {
          FC_ASSERT( m != extensions.value.buyback_options->asset_to_buy );
       }

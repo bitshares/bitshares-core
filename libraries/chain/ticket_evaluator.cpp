@@ -138,9 +138,9 @@ generic_operation_result ticket_update_evaluator::do_apply(const ticket_update_o
    generic_operation_result process_result = d.process_tickets();
    result.removed_objects.insert( process_result.removed_objects.begin(), process_result.removed_objects.end() );
    result.updated_objects.insert( process_result.updated_objects.begin(), process_result.updated_objects.end() );
-   for( const auto id : result.new_objects )
+   for( const auto& id : result.new_objects )
       result.updated_objects.erase( id );
-   for( const auto id : result.removed_objects )
+   for( const auto& id : result.removed_objects )
       result.updated_objects.erase( id );
 
    return result;

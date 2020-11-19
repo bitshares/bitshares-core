@@ -374,7 +374,7 @@ generic_exchange_operation_result liquidity_pool_exchange_evaluator::do_apply(
    const auto old_virtual_value = _pool->virtual_value;
    if( op.amount_to_sell.asset_id == _pool->asset_a )
    {
-      d.modify( *_pool, [&op,this]( liquidity_pool_object& lpo ){
+      d.modify( *_pool, [this]( liquidity_pool_object& lpo ){
          lpo.balance_a += _pool_receives.amount;
          lpo.balance_b -= _pool_pays.amount;
          lpo.update_virtual_value();
@@ -382,7 +382,7 @@ generic_exchange_operation_result liquidity_pool_exchange_evaluator::do_apply(
    }
    else
    {
-      d.modify( *_pool, [&op,this]( liquidity_pool_object& lpo ){
+      d.modify( *_pool, [this]( liquidity_pool_object& lpo ){
          lpo.balance_b += _pool_receives.amount;
          lpo.balance_a -= _pool_pays.amount;
          lpo.update_virtual_value();
