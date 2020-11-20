@@ -1,11 +1,11 @@
 BitShares Core
 ==============
 
-[Build Status](https://travis-ci.org/bitshares/bitshares-core/branches):
+[Build Status](https://travis-ci.com/bitshares/bitshares-core/branches):
 
 `master` | `develop` | `hardfork` | `testnet` | `bitshares-fc` 
  --- | --- | --- | --- | ---
- [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=master)](https://travis-ci.org/bitshares/bitshares-core) | [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=develop)](https://travis-ci.org/bitshares/bitshares-core) | [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=hardfork)](https://travis-ci.org/bitshares/bitshares-core) | [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=testnet)](https://travis-ci.org/bitshares/bitshares-core) | [![](https://travis-ci.org/bitshares/bitshares-fc.svg?branch=master)](https://travis-ci.org/bitshares/bitshares-fc) 
+ [![](https://travis-ci.com/bitshares/bitshares-core.svg?branch=master)](https://travis-ci.com/bitshares/bitshares-core) | [![](https://travis-ci.com/bitshares/bitshares-core.svg?branch=develop)](https://travis-ci.com/bitshares/bitshares-core) | [![](https://travis-ci.com/bitshares/bitshares-core.svg?branch=hardfork)](https://travis-ci.com/bitshares/bitshares-core) | [![](https://travis-ci.com/bitshares/bitshares-core.svg?branch=testnet)](https://travis-ci.com/bitshares/bitshares-core) | [![](https://travis-ci.com/bitshares/bitshares-fc.svg?branch=master)](https://travis-ci.com/bitshares/bitshares-fc) 
  [![](https://github.com/bitshares/bitshares-core/workflows/Github%20Autobuild/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=branch%3Amaster) | [![](https://github.com/bitshares/bitshares-core/workflows/Github%20Autobuild/badge.svg?branch=develop)](https://github.com/bitshares/bitshares-core/actions?query=branch%3Adevelop) | [![](https://github.com/bitshares/bitshares-core/workflows/Github%20Autobuild/badge.svg?branch=hardfork)](https://github.com/bitshares/bitshares-core/actions?query=branch%3Ahardfork) | [![](https://github.com/bitshares/bitshares-core/workflows/Github%20Autobuild/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=branch%3Atestnet) | [![](https://github.com/bitshares/bitshares-fc/workflows/Github%20Autobuild/badge.svg?branch=master)](https://github.com/bitshares/bitshares-fc/actions?query=branch%3Amaster)
 
 * [Getting Started](#getting-started)
