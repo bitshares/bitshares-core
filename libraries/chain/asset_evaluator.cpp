@@ -952,7 +952,7 @@ void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_f
             ++itr;
       }
       //Now, add any new publishers
-      for( const account_id_type acc : o.new_feed_producers )
+      for( const account_id_type& acc : o.new_feed_producers )
       {
          a.feeds[acc];
       }

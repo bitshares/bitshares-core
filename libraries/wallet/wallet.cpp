@@ -1129,7 +1129,7 @@ string wallet_api::help()const
 {
    std::vector<std::string> method_names = my->method_documentation.get_method_names();
    std::stringstream ss;
-   for (const std::string method_name : method_names)
+   for (const std::string& method_name : method_names)
    {
       try
       {

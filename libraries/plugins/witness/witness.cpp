@@ -217,7 +217,7 @@ void witness_plugin::stop_block_production()
 void witness_plugin::refresh_witness_key_cache()
 {
    const auto& db = database();
-   for( const chain::witness_id_type wit_id : _witnesses )
+   for( const chain::witness_id_type& wit_id : _witnesses )
    {
       const chain::witness_object* wit_obj = db.find( wit_id );
       if( wit_obj )

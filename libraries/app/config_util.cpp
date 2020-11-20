@@ -214,7 +214,7 @@ static void load_config_file(const fc::path& config_ini_path, const bpo::options
 {
    graphene::app::detail::deduplicator dedup;
    bpo::options_description unique_options("BitShares Witness Node");
-   for( const boost::shared_ptr<bpo::option_description> opt : cfg_options.options() )
+   for( const boost::shared_ptr<bpo::option_description>& opt : cfg_options.options() )
    {
       const boost::shared_ptr<bpo::option_description> od = dedup.next(opt);
       if( !od ) continue;
@@ -263,7 +263,7 @@ static void create_new_config_file(const fc::path& config_ini_path, const fc::pa
    graphene::app::detail::deduplicator dedup(modify_option_defaults);
    std::ofstream out_cfg(config_ini_path.preferred_string());
    std::string plugin_header_surrounding( 78, '=' );
-   for( const boost::shared_ptr<bpo::option_description> opt : cfg_options.options() )
+   for( const boost::shared_ptr<bpo::option_description>& opt : cfg_options.options() )
    {
       const boost::shared_ptr<bpo::option_description> od = dedup.next(opt);
       if( !od ) continue;
