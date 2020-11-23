@@ -6,7 +6,10 @@ env:
 jobs:
   test-release:
     name: Build and run tests in Release mode
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ ubuntu-16.04, ubuntu-18.04 ]
+    runs-on: ${{ matrix.os }}
     services:
       elasticsearch:
         image: docker://elasticsearch:7.4.2
