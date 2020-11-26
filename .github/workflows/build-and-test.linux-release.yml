@@ -1,11 +1,11 @@
-name: Github Autobuild Linux Release
+name: Github CI Linux Release
 on: [ push, pull_request ]
 env:
   CCACHE_COMPRESS: exists means true
   CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
 jobs:
   test-release:
-    name: Build and run tests in Release mode
+    name: Build and test in Release mode
     strategy:
       matrix:
         os: [ ubuntu-16.04, ubuntu-18.04 ]

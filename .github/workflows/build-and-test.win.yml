@@ -1,4 +1,4 @@
-name: Github Autobuild Windows MinGW64
+name: Github CI Windows MinGW64
 on: [ push, pull_request ]
 env:
   CCACHE_COMPRESS: exists means true
@@ -11,7 +11,7 @@ env:
   ZLIB_VERSION: 1.2.11
 jobs:
   prepare-mingw64-libs:
-    name: Build 3rd-party libraries required for windows cross-build
+    name: Build required 3rd-party libraries
     runs-on: ubuntu-latest
     steps:
     - name: Load Cache

@@ -1,11 +1,11 @@
-name: Github Autobuild Linux Debug
+name: Github CI Linux Debug
 on: [ push, pull_request ]
 env:
   CCACHE_COMPRESS: exists means true
   CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
 jobs:
   test-debug:
-    name: Build and run tests in Debug mode
+    name: Build and test in Debug mode
     strategy:
       matrix:
         os: [ ubuntu-16.04, ubuntu-18.04 ]
