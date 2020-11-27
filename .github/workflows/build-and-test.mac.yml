@@ -1,11 +1,11 @@
-name: Github Autobuild macOS
+name: Github CI macOS
 on: [ push, pull_request ]
 env:
   CCACHE_COMPRESS: exists means true
   CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
 jobs:
   build-osx:
-    name: Build and run tests on OSX
+    name: Build and test in macOS
     runs-on: macos-latest
     steps:
     - name: Install dependencies

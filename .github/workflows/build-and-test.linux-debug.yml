@@ -1,12 +1,15 @@
-name: Github Autobuild Linux Debug
+name: Github CI Linux Debug
 on: [ push, pull_request ]
 env:
   CCACHE_COMPRESS: exists means true
   CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
 jobs:
   test-debug:
-    name: Build and run tests in Debug mode
-    runs-on: ubuntu-latest
+    name: Build and test in Debug mode
+    strategy:
+      matrix:
+        os: [ ubuntu-16.04, ubuntu-18.04 ]
+    runs-on: ${{ matrix.os }}
     services:
       elasticsearch:
         image: docker://elasticsearch:7.4.2
@@ -16,6 +19,10 @@ jobs:
       run: |
         df -h
         sudo apt-get update
+        openssl_ver=`sudo apt-cache madison openssl | grep xenial-updates | awk '{print $3}'`
+        libssl_ver=`sudo apt-cache madison libssl-dev | grep xenial-updates | awk '{print $3}'`
+        [ -n "${openssl_ver}" ] && [ -n "${libssl_ver}" ] && \
+          sudo apt-get install -y --allow-downgrades openssl=${openssl_ver} libssl-dev=${libssl_ver}
         sudo apt-get install -y \
                      ccache \
                      parallel \
