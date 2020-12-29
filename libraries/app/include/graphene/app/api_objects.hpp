@@ -30,6 +30,7 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
+#include <graphene/chain/liquidity_pool_object.hpp>
 
 #include <graphene/api_helper_indexes/api_helper_indexes.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
@@ -152,6 +153,15 @@ namespace graphene { namespace app {
       optional<share_type> total_backing_collateral;
    };
 
+   struct extended_liquidity_pool_object : liquidity_pool_object
+   {
+      extended_liquidity_pool_object() {}
+      explicit extended_liquidity_pool_object( const liquidity_pool_object& o ) : liquidity_pool_object( o ) {}
+      explicit extended_liquidity_pool_object( liquidity_pool_object&& o ) : liquidity_pool_object( std::move(o) ) {}
+
+      optional<liquidity_pool_ticker_object> statistics;
+   };
+
 } }
 
 FC_REFLECT( graphene::app::more_data,
@@ -193,4 +203,6 @@ FC_REFLECT( graphene::app::market_trade, (sequence)(date)(price)(amount)(value)(
 FC_REFLECT_DERIVED( graphene::app::extended_asset_object, (graphene::chain::asset_object),
                     (total_in_collateral)(total_backing_collateral) );
 
+FC_REFLECT_DERIVED( graphene::app::extended_liquidity_pool_object, (graphene::chain::liquidity_pool_object),
+                    (statistics) );
 

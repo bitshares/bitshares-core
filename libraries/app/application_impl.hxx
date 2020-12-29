@@ -41,6 +41,7 @@ class application_impl : public net::node_delegate
       void set_dbg_init_key( graphene::chain::genesis_state_type& genesis, const std::string& init_key );
       void set_api_limit();
 
+      void initialize();
       void startup();
 
       fc::optional< api_access_info > get_api_access_info(const string& username)const;
@@ -179,6 +180,9 @@ class application_impl : public net::node_delegate
       virtual void error_encountered(const std::string& message, const fc::oexception& error) override;
 
       uint8_t get_current_block_interval_in_seconds() const override;
+
+      /// Returns whether a plugin is enabled
+      bool is_plugin_enabled(const string& name) const;
 
       application* _self;
 

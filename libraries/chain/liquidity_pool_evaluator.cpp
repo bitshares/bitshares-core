@@ -241,6 +241,8 @@ void_result liquidity_pool_withdraw_evaluator::do_evaluate(const liquidity_pool_
    {
       _pool_pays_a = asset( _pool->balance_a, _pool->asset_a );
       _pool_pays_b = asset( _pool->balance_b, _pool->asset_b );
+      _fee_a = asset( 0, _pool->asset_a );
+      _fee_b = asset( 0, _pool->asset_b );
    }
    else
    {
@@ -258,6 +260,8 @@ void_result liquidity_pool_withdraw_evaluator::do_evaluate(const liquidity_pool_
       FC_ASSERT( a128 > 0 || b128 > 0, "Aborting due to zero outcome" );
       _pool_pays_a = asset( static_cast<int64_t>( a128 ), _pool->asset_a );
       _pool_pays_b = asset( static_cast<int64_t>( b128 ), _pool->asset_b );
+      _fee_a = asset( static_cast<int64_t>( fee_a ), _pool->asset_a );
+      _fee_b = asset( static_cast<int64_t>( fee_b ), _pool->asset_b );
    }
 
    return void_result();
@@ -292,6 +296,8 @@ generic_exchange_operation_result liquidity_pool_withdraw_evaluator::do_apply(
    result.paid.emplace_back( op.share_amount );
    result.received.emplace_back( _pool_pays_a );
    result.received.emplace_back( _pool_pays_b );
+   result.fees.emplace_back( _fee_a );
+   result.fees.emplace_back( _fee_b );
 
    return result;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -354,6 +360,8 @@ void_result liquidity_pool_exchange_evaluator::do_evaluate(const liquidity_pool_
 
    FC_ASSERT( _account_receives.amount >= op.min_to_receive.amount, "Unable to exchange at expected price" );
 
+   _pool_taker_fee = asset( static_cast<int64_t>( pool_taker_fee ), op.min_to_receive.asset_id );
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
@@ -396,6 +404,7 @@ generic_exchange_operation_result liquidity_pool_exchange_evaluator::do_apply(
    result.received.emplace_back( _account_receives );
    result.fees.emplace_back( _maker_market_fee );
    result.fees.emplace_back( _taker_market_fee );
+   result.fees.emplace_back( _pool_taker_fee );
 
    return result;
 } FC_CAPTURE_AND_RETHROW( (op) ) }

@@ -28,6 +28,8 @@
 #include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 
+#include <graphene/app/api.hpp>
+
 #include <boost/test/unit_test.hpp>
 
 using namespace graphene::chain;
@@ -35,7 +37,7 @@ using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( liquidity_pool_tests, database_fixture )
 
-BOOST_AUTO_TEST_CASE( hardfork_time_test )
+BOOST_AUTO_TEST_CASE( liquidity_pool_hardfork_time_test )
 {
    try {
 
@@ -91,7 +93,7 @@ BOOST_AUTO_TEST_CASE( hardfork_time_test )
    }
 }
 
-BOOST_AUTO_TEST_CASE( create_delete_proposal_test )
+BOOST_AUTO_TEST_CASE( liquidity_pool_create_delete_proposal_test )
 { try {
 
       // Pass the hard fork time
@@ -237,7 +239,7 @@ BOOST_AUTO_TEST_CASE( create_delete_proposal_test )
       // Other pools are still there
       BOOST_CHECK( db.find( lp_id2 ) );
       BOOST_CHECK( db.find( lp_id3 ) );
-     
+
       // Ted is not able to delete a pool that does not exist
       BOOST_CHECK_THROW( delete_liquidity_pool( ted_id, lp_id1 ), fc::exception );
       // Ted is not able to delete a pool owned by sam
@@ -254,7 +256,7 @@ BOOST_AUTO_TEST_CASE( create_delete_proposal_test )
    }
 }
 
-BOOST_AUTO_TEST_CASE( deposit_withdrawal_test )
+BOOST_AUTO_TEST_CASE( liquidity_pool_deposit_withdrawal_test )
 { try {
 
       // Pass the hard fork time
@@ -513,7 +515,9 @@ BOOST_AUTO_TEST_CASE( deposit_withdrawal_test )
       BOOST_REQUIRE_EQUAL( result.received.size(), 2u );
       BOOST_CHECK( result.received.front() == asset( -new_a, eur_id ) );
       BOOST_CHECK( result.received.back() == asset( -new_b, usd_id ) );
-      BOOST_REQUIRE_EQUAL( result.fees.size(), 0u );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 2u );
+      BOOST_CHECK( result.fees.front() == asset( 2, eur_id ) );
+      BOOST_CHECK( result.fees.back() == asset( 2, usd_id ) );
 
       expected_pool_balance_a += new_a; // 25789 - 68 = 25721
       expected_pool_balance_b += new_b; // 30946 - 83 = 30863
@@ -549,7 +553,9 @@ BOOST_AUTO_TEST_CASE( deposit_withdrawal_test )
       BOOST_REQUIRE_EQUAL( result.received.size(), 2u );
       BOOST_CHECK( result.received.front() == asset( -new_a, eur_id ) );
       BOOST_CHECK( result.received.back() == asset( -new_b, usd_id ) );
-      BOOST_REQUIRE_EQUAL( result.fees.size(), 0u );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 2u );
+      BOOST_CHECK( result.fees.front() == asset( 0, eur_id ) );
+      BOOST_CHECK( result.fees.back() == asset( 0, usd_id ) );
 
       expected_pool_balance_a = 0;
       expected_pool_balance_b = 0;
@@ -665,13 +671,27 @@ BOOST_AUTO_TEST_CASE( deposit_withdrawal_test )
 
       generate_block();
 
+      graphene::market_history::liquidity_pool_ticker_id_type ticker_id( lp_id.instance );
+      const auto& ticker = db.get< graphene::market_history::liquidity_pool_ticker_object >( ticker_id );
+      BOOST_CHECK_EQUAL( ticker._24h_deposit_count, 7u );
+      BOOST_CHECK_EQUAL( ticker.total_deposit_count, 7u );
+      BOOST_CHECK_EQUAL( ticker._24h_withdrawal_count, 2u );
+      BOOST_CHECK_EQUAL( ticker.total_withdrawal_count, 2u );
+
+      generate_blocks( db.head_block_time() + fc::days(2) );
+
+      BOOST_CHECK_EQUAL( ticker._24h_deposit_count, 0u );
+      BOOST_CHECK_EQUAL( ticker.total_deposit_count, 7u );
+      BOOST_CHECK_EQUAL( ticker._24h_withdrawal_count, 0u );
+      BOOST_CHECK_EQUAL( ticker.total_withdrawal_count, 2u );
+
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
    }
 }
 
-BOOST_AUTO_TEST_CASE( exchange_test )
+BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
 { try {
 
       // Pass the hard fork time
@@ -816,6 +836,7 @@ BOOST_AUTO_TEST_CASE( exchange_test )
       int64_t delta_a = 998; // 1000 - 2
       // tmp_delta = 1200 - round_up( 1000 * 1200 / (1000+998) ) = 1200 - 601 = 599
       int64_t delta_b = -588; // - ( 599 - round_down(599 * 2%) ) = - ( 599 - 11 ) = -588
+      int64_t pool_taker_fee = 11;
       int64_t taker_fee = 4; // 588 * 0.8%, usd
       int64_t ted_receives = 584; // 588 - 4
 
@@ -830,9 +851,10 @@ BOOST_AUTO_TEST_CASE( exchange_test )
       BOOST_CHECK( result.paid.front() == asset( 1000, eur_id ) );
       BOOST_REQUIRE_EQUAL( result.received.size(), 1u );
       BOOST_CHECK( result.received.front() == asset( ted_receives, usd_id ) );
-      BOOST_REQUIRE_EQUAL( result.fees.size(), 2u );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 3u );
       BOOST_CHECK( result.fees.front() == asset( maker_fee, eur_id ) );
-      BOOST_CHECK( result.fees.back() == asset( taker_fee, usd_id ) );
+      BOOST_CHECK( result.fees.at(1) == asset( taker_fee, usd_id ) );
+      BOOST_CHECK( result.fees.back() == asset( pool_taker_fee, usd_id ) );
 
       expected_pool_balance_a += delta_a; // 1000 + 998 = 1998
       expected_pool_balance_b += delta_b; // 1200 - 588 = 612
@@ -855,6 +877,7 @@ BOOST_AUTO_TEST_CASE( exchange_test )
       delta_b = 997; // 1000 - 3
       // tmp_delta = 1998 - round_up( 1998 * 612 / (612+997) ) = 1998 - 760 = 1238
       delta_a = -1214; // - ( 1238 - round_down(1238 * 2%) ) = - ( 1238 - 24 ) = -1214
+      pool_taker_fee = 24;
       taker_fee = 6; // 1214 * 0.5%, eur
       ted_receives = 1208; // 1214 - 6
 
@@ -869,9 +892,10 @@ BOOST_AUTO_TEST_CASE( exchange_test )
       BOOST_CHECK( result.paid.front() == asset( 1000, usd_id ) );
       BOOST_REQUIRE_EQUAL( result.received.size(), 1u );
       BOOST_CHECK( result.received.front() == asset( ted_receives, eur_id ) );
-      BOOST_REQUIRE_EQUAL( result.fees.size(), 2u );
+      BOOST_REQUIRE_EQUAL( result.fees.size(), 3u );
       BOOST_CHECK( result.fees.front() == asset( maker_fee, usd_id ) );
-      BOOST_CHECK( result.fees.back() == asset( taker_fee, eur_id ) );
+      BOOST_CHECK( result.fees.at(1) == asset( taker_fee, eur_id ) );
+      BOOST_CHECK( result.fees.back() == asset( pool_taker_fee, eur_id ) );
 
       expected_pool_balance_a += delta_a; // 1998 - 1214 = 784
       expected_pool_balance_b += delta_b; // 612 + 997 = 1609
@@ -891,6 +915,81 @@ BOOST_AUTO_TEST_CASE( exchange_test )
 
       // Generates a block
       generate_block();
+      BOOST_CHECK_EQUAL( eur_id(db).dynamic_data(db).accumulated_fees.value, expected_accumulated_fees_eur );
+
+      graphene::market_history::liquidity_pool_ticker_id_type ticker_id( lp_id.instance );
+      const auto& ticker = db.get< graphene::market_history::liquidity_pool_ticker_object >( ticker_id );
+      BOOST_CHECK_EQUAL( ticker._24h_exchange_a2b_count, 1u );
+      BOOST_CHECK_EQUAL( ticker.total_exchange_a2b_count, 1u );
+      BOOST_CHECK_EQUAL( ticker._24h_exchange_b2a_count, 1u );
+      BOOST_CHECK_EQUAL( ticker.total_exchange_b2a_count, 1u );
+
+      // Check database API
+      graphene::app::database_api db_api( db, &( app.get_options() ) );
+
+      // get pool without statistics
+      auto pools = db_api.get_liquidity_pools( { lp_id } );
+      BOOST_REQUIRE_EQUAL( pools.size(), 1u );
+      BOOST_REQUIRE( pools.front().valid() );
+      BOOST_CHECK( !pools.front()->statistics.valid() );
+
+      // get pool with statistics
+      pools = db_api.get_liquidity_pools( { lp_id }, {}, true );
+      BOOST_REQUIRE_EQUAL( pools.size(), 1u );
+      BOOST_REQUIRE( pools.front().valid() );
+      BOOST_REQUIRE( pools.front()->statistics.valid() );
+      BOOST_CHECK( pools.front()->statistics->id == ticker_id );
+      BOOST_CHECK_EQUAL( pools.front()->statistics->_24h_exchange_a2b_count, 1u );
+      BOOST_CHECK_EQUAL( pools.front()->statistics->total_exchange_a2b_count, 1u );
+      BOOST_CHECK_EQUAL( pools.front()->statistics->_24h_exchange_b2a_count, 1u );
+      BOOST_CHECK_EQUAL( pools.front()->statistics->total_exchange_b2a_count, 1u );
+
+      generate_blocks( db.head_block_time() + fc::days(2) );
+
+      BOOST_CHECK_EQUAL( ticker._24h_exchange_a2b_count, 0u );
+      BOOST_CHECK_EQUAL( ticker.total_exchange_a2b_count, 1u );
+      BOOST_CHECK_EQUAL( ticker._24h_exchange_b2a_count, 0u );
+      BOOST_CHECK_EQUAL( ticker.total_exchange_b2a_count, 1u );
+
+      // Check history API
+      graphene::app::history_api hist_api(app);
+      auto head_time = db.head_block_time();
+
+      // all histories
+      auto histories = hist_api.get_liquidity_pool_history( lp_id );
+      BOOST_CHECK_EQUAL( histories.size(), 4u );
+
+      // limit = 3
+      histories = hist_api.get_liquidity_pool_history( lp_id, {}, {}, 3 );
+      BOOST_CHECK_EQUAL( histories.size(), 3u );
+
+      // only deposits
+      histories = hist_api.get_liquidity_pool_history( lp_id, {}, {}, {}, 59 );
+      BOOST_CHECK_EQUAL( histories.size(), 1u );
+
+      // time too early
+      histories = hist_api.get_liquidity_pool_history( lp_id, head_time - fc::days(3) );
+      BOOST_CHECK_EQUAL( histories.size(), 0u );
+
+      // time too late
+      histories = hist_api.get_liquidity_pool_history( lp_id, head_time, head_time - fc::days(1) );
+      BOOST_CHECK_EQUAL( histories.size(), 0u );
+
+      // time is fine, only exchanges
+      histories = hist_api.get_liquidity_pool_history( lp_id, {}, head_time - fc::days(3), {}, 63 );
+      BOOST_CHECK_EQUAL( histories.size(), 2u );
+
+      // start = 2, limit = 3, so result sequence == {1,2}
+      histories = hist_api.get_liquidity_pool_history_by_sequence( lp_id, 2, {}, 3 );
+      BOOST_CHECK_EQUAL( histories.size(), 2u );
+
+      // start = 2, limit = 1, so result sequence == {2}
+      histories = hist_api.get_liquidity_pool_history_by_sequence( lp_id, 2, {}, 1 );
+      BOOST_CHECK_EQUAL( histories.size(), 1u );
+
+      // start = 3, limit is default, but exchange only, so result sequence == {3}
+      histories = hist_api.get_liquidity_pool_history_by_sequence( lp_id, 3, head_time - fc::days(3), {}, 63 );
+      BOOST_CHECK_EQUAL( histories.size(), 1u );
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
