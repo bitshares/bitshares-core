@@ -306,8 +306,8 @@ void_result proposal_create_evaluator::do_evaluate( const proposal_create_operat
                "Proposals containing operations requiring non-account authorities are not yet implemented." );
 
    // If we're dealing with the committee authority, make sure this transaction has a sufficient review period.
-   if( _required_active_auths.count( GRAPHENE_COMMITTEE_ACCOUNT ) ||
-       _required_owner_auths.count( GRAPHENE_COMMITTEE_ACCOUNT ) )
+   if( _required_active_auths.count( GRAPHENE_COMMITTEE_ACCOUNT ) > 0 ||
+       _required_owner_auths.count( GRAPHENE_COMMITTEE_ACCOUNT ) > 0 )
    {
       GRAPHENE_ASSERT( o.review_period_seconds.valid(),
                        proposal_create_review_period_required,

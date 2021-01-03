@@ -787,17 +787,17 @@ void market_history_plugin::plugin_initialize(const boost::program_options::vari
    database().add_index< primary_index< simple_index< liquidity_pool_ticker_meta_object > > >();
    database().add_index< primary_index< liquidity_pool_ticker_index, 8 > >(); // 256 pools per chunk
 
-   if( options.count( "bucket-size" ) == 1u )
+   if( options.count( "bucket-size" ) > 0 )
    {
       const std::string& buckets = options["bucket-size"].as<string>();
       my->_tracked_buckets = fc::json::from_string(buckets).as<flat_set<uint32_t>>(2);
       my->_tracked_buckets.erase( 0 );
    }
-   if( options.count( "history-per-size" ) == 1u )
+   if( options.count( "history-per-size" ) > 0 )
       my->_maximum_history_per_bucket_size = options["history-per-size"].as<uint32_t>();
-   if( options.count( "max-order-his-records-per-market" ) == 1u )
+   if( options.count( "max-order-his-records-per-market" ) > 0 )
       my->_max_order_his_records_per_market = options["max-order-his-records-per-market"].as<uint32_t>();
-   if( options.count( "max-order-his-seconds-per-market" ) == 1u )
+   if( options.count( "max-order-his-seconds-per-market" ) > 0 )
       my->_max_order_his_seconds_per_market = options["max-order-his-seconds-per-market"].as<uint32_t>();
 } FC_CAPTURE_AND_RETHROW() }
 
