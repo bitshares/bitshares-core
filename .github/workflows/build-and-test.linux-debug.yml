@@ -83,6 +83,8 @@ jobs:
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
         df -h
+        make -j 2 -C _build chain_test
+        make -j 2 -C _build cli_wallet
         make -j 2 -C _build
         df -h
         du -hs _build/libraries/* _build/programs/* _build/tests/*
