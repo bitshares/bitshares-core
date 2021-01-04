@@ -42,9 +42,9 @@ jobs:
         df -h
     - name: Unit-Tests
       run: |
-        _build/tests/app_test -l message
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l message
-        _build/tests/cli_test -l message
+        _build/tests/app_test -l test_suite
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
+        _build/tests/cli_test -l test_suite
         df -h
     - name: Node-Test
       run: |
