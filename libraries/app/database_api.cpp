@@ -3206,7 +3206,7 @@ void database_api_impl::on_applied_block()
          */
          default: break;
       }
-      if( market.valid() && _market_subscriptions.count(*market) )
+      if( market.valid() && _market_subscriptions.count(*market) > 0 )
          // FIXME this may cause fill_order_operation be pushed before order creation
          subscribed_markets_ops[*market].emplace_back(std::make_pair(op.op, op.result));
    }

@@ -83,6 +83,8 @@ jobs:
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
         df -h
+        make -j 2 -C _build chain_test
+        make -j 2 -C _build cli_wallet
         make -j 2 -C _build
         df -h
         du -hs _build/libraries/* _build/programs/* _build/tests/*
@@ -90,12 +92,12 @@ jobs:
         du -hs /_build/*
     - name: Unit-Tests
       run: |
-        _build/tests/app_test -l message
+        _build/tests/app_test -l test_suite
         df -h
-        _build/tests/es_test -l message
+        _build/tests/es_test -l test_suite
         df -h
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l message
-        _build/tests/cli_test -l message
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
+        _build/tests/cli_test -l test_suite
         df -h
     - name: Node-Test
       run: |

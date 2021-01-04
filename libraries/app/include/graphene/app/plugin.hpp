@@ -138,7 +138,7 @@ namespace impl {
 
 #define DEFAULT_VALUE_VECTOR(value) default_value({fc::json::to_string(value)}, fc::json::to_string(value))
 #define LOAD_VALUE_SET(options, name, container, type) \
-if( options.count(name) ) { \
+if( options.count(name) > 0 ) { \
       const std::vector<std::string>& ops = options[name].as<std::vector<std::string>>(); \
       std::transform(ops.begin(), ops.end(), std::inserter(container, container.end()), &graphene::app::impl::dejsonify<type>); \
 }

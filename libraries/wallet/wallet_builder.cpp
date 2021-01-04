@@ -33,16 +33,17 @@ namespace graphene { namespace wallet { namespace detail {
       return trx_handle;
    }
 
-   void wallet_api_impl::add_operation_to_builder_transaction(transaction_handle_type transaction_handle, const operation& op)
+   void wallet_api_impl::add_operation_to_builder_transaction(transaction_handle_type transaction_handle,
+         const operation& op)
    {
-      FC_ASSERT(_builder_transactions.count(transaction_handle));
+      FC_ASSERT(_builder_transactions.count(transaction_handle) > 0);
       _builder_transactions[transaction_handle].operations.emplace_back(op);
    }
 
    void wallet_api_impl::replace_operation_in_builder_transaction(transaction_handle_type handle,
          uint32_t operation_index, const operation& new_op)
    {
-      FC_ASSERT(_builder_transactions.count(handle));
+      FC_ASSERT(_builder_transactions.count(handle) > 0);
       signed_transaction& trx = _builder_transactions[handle];
       FC_ASSERT( operation_index < trx.operations.size());
       trx.operations[operation_index] = new_op;
@@ -50,7 +51,7 @@ namespace graphene { namespace wallet { namespace detail {
 
    asset wallet_api_impl::set_fees_on_builder_transaction(transaction_handle_type handle, string fee_asset)
    {
-      FC_ASSERT(_builder_transactions.count(handle));
+      FC_ASSERT(_builder_transactions.count(handle) > 0);
 
       auto fee_asset_obj = get_asset(fee_asset);
       asset total_fee = fee_asset_obj.amount(0);
@@ -75,14 +76,14 @@ namespace graphene { namespace wallet { namespace detail {
 
    transaction wallet_api_impl::preview_builder_transaction(transaction_handle_type handle)
    {
-      FC_ASSERT(_builder_transactions.count(handle));
+      FC_ASSERT(_builder_transactions.count(handle) > 0);
       return _builder_transactions[handle];
    }
 
    signed_transaction wallet_api_impl::sign_builder_transaction(transaction_handle_type 
          transaction_handle, bool broadcast )
    {
-      FC_ASSERT(_builder_transactions.count(transaction_handle));
+      FC_ASSERT(_builder_transactions.count(transaction_handle) > 0);
 
       return _builder_transactions[transaction_handle] =
             sign_transaction(_builder_transactions[transaction_handle], broadcast);
@@ -91,7 +92,7 @@ namespace graphene { namespace wallet { namespace detail {
    signed_transaction wallet_api_impl::sign_builder_transaction2(transaction_handle_type
          transaction_handle, const vector<public_key_type>& signing_keys, bool broadcast)
    {
-      FC_ASSERT(_builder_transactions.count(transaction_handle));
+      FC_ASSERT(_builder_transactions.count(transaction_handle) > 0);
 
       return _builder_transactions[transaction_handle] =
             sign_transaction2(_builder_transactions[transaction_handle], signing_keys, broadcast);
@@ -100,7 +101,7 @@ namespace graphene { namespace wallet { namespace detail {
    signed_transaction wallet_api_impl::propose_builder_transaction( transaction_handle_type handle,
          time_point_sec expiration, uint32_t review_period_seconds, bool broadcast)
    {
-      FC_ASSERT(_builder_transactions.count(handle));
+      FC_ASSERT(_builder_transactions.count(handle) > 0);
       proposal_create_operation op;
       op.expiration_time = expiration;
       signed_transaction& trx = _builder_transactions[handle];
@@ -117,7 +118,7 @@ namespace graphene { namespace wallet { namespace detail {
    signed_transaction wallet_api_impl::propose_builder_transaction2( transaction_handle_type handle,
       string account_name_or_id, time_point_sec expiration, uint32_t review_period_seconds, bool broadcast )
    {
-      FC_ASSERT(_builder_transactions.count(handle));
+      FC_ASSERT(_builder_transactions.count(handle) > 0);
       proposal_create_operation op;
       op.fee_paying_account = get_account(account_name_or_id).get_id();
       op.expiration_time = expiration;
