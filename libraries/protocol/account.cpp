@@ -29,20 +29,24 @@ namespace graphene { namespace protocol {
 
 /**
  * Names must comply with the following grammar (RFC 1035):
+ * @code
  * <domain> ::= <subdomain> | " "
  * <subdomain> ::= <label> | <subdomain> "." <label>
  * <label> ::= <letter> [ [ <ldh-str> ] <let-dig> ]
  * <ldh-str> ::= <let-dig-hyp> | <let-dig-hyp> <ldh-str>
  * <let-dig-hyp> ::= <let-dig> | "-"
  * <let-dig> ::= <letter> | <digit>
+ * @endcode
  *
  * Which is equivalent to the following:
  *
+ * @code
  * <domain> ::= <subdomain> | " "
  * <subdomain> ::= <label> ("." <label>)*
  * <label> ::= <letter> [ [ <let-dig-hyp>+ ] <let-dig> ]
  * <let-dig-hyp> ::= <let-dig> | "-"
  * <let-dig> ::= <letter> | <digit>
+ * @endcode
  *
  * I.e. a valid name consists of a dot-separated sequence
  * of one or more labels consisting of the following rules:

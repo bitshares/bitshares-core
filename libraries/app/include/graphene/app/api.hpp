@@ -127,14 +127,14 @@ namespace graphene { namespace app {
 
          /**
           * @brief Get operations relevant to the specificed account
-          * @param account_id_or_name The account ID or name whose history should be queried
+          * @param account_name_or_id The account name or ID whose history should be queried
           * @param stop ID of the earliest operation to retrieve
           * @param limit Maximum number of operations to retrieve (must not exceed 100)
           * @param start ID of the most recent operation to retrieve
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
          vector<operation_history_object> get_account_history(
-            const std::string account_id_or_name,
+            const std::string account_name_or_id,
             operation_history_id_type stop = operation_history_id_type(),
             unsigned limit = 100,
             operation_history_id_type start = operation_history_id_type()
@@ -142,7 +142,7 @@ namespace graphene { namespace app {
 
          /**
           * @brief Get operations relevant to the specified account filtering by operation type
-          * @param account_id_or_name The account ID or name whose history should be queried
+          * @param account_name_or_id The account name or ID whose history should be queried
           * @param operation_types The IDs of the operation we want to get operations in the account
           * ( 0 = transfer , 1 = limit order create, ...)
           * @param start the sequence number where to start looping back throw the history
@@ -150,7 +150,7 @@ namespace graphene { namespace app {
           * @return history_operation_detail
           */
          history_operation_detail get_account_history_by_operations(
-            const std::string account_id_or_name,
+            const std::string account_name_or_id,
             flat_set<uint16_t> operation_types,
             uint32_t start,
             unsigned limit
@@ -158,7 +158,7 @@ namespace graphene { namespace app {
 
          /**
           * @brief Get only asked operations relevant to the specified account
-          * @param account_id_or_name The account ID or name whose history should be queried
+          * @param account_name_or_id The account name or ID whose history should be queried
           * @param operation_type The type of the operation we want to get operations in the account
           * ( 0 = transfer , 1 = limit order create, ...)
           * @param stop ID of the earliest operation to retrieve
@@ -167,7 +167,7 @@ namespace graphene { namespace app {
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
          vector<operation_history_object> get_account_history_operations(
-            const std::string account_id_or_name,
+            const std::string account_name_or_id,
             int operation_type,
             operation_history_id_type start = operation_history_id_type(),
             operation_history_id_type stop = operation_history_id_type(),
@@ -178,7 +178,7 @@ namespace graphene { namespace app {
           * @brief Get operations relevant to the specified account referenced
           * by an event numbering specific to the account. The current number of operations
           * for the account can be found in the account statistics (or use 0 for start).
-          * @param account_id_or_name The account ID or name whose history should be queried
+          * @param account_name_or_id The account name or ID whose history should be queried
           * @param stop Sequence number of earliest operation. 0 is default and will
           * query 'limit' number of operations.
           * @param limit Maximum number of operations to retrieve (must not exceed 100)
@@ -186,7 +186,7 @@ namespace graphene { namespace app {
           * 0 is default, which will start querying from the most recent operation.
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
-         vector<operation_history_object> get_relative_account_history( const std::string account_id_or_name,
+         vector<operation_history_object> get_relative_account_history( const std::string account_name_or_id,
                                                                         uint64_t stop = 0,
                                                                         unsigned limit = 100,
                                                                         uint64_t start = 0) const;
@@ -562,8 +562,8 @@ namespace graphene { namespace app {
          /**
           * @brief Get grouped limit orders in given market.
           *
-          * @param base_asset ID or symbol of asset being sold
-          * @param quote_asset ID or symbol of asset being purchased
+          * @param base_asset symbol or ID of asset being sold
+          * @param quote_asset symbol or ID of asset being purchased
           * @param group Maximum price diff within each order group, have to be one of configured values
           * @param start Optional price to indicate the first order group to retrieve
           * @param limit Maximum number of order groups to retrieve (must not exceed 101)
@@ -593,12 +593,12 @@ namespace graphene { namespace app {
          /**
           * @brief Get all stored objects of an account in a particular catalog
           *
-          * @param account The account ID or name to get info from
+          * @param account_name_or_id The account name or ID to get info from
           * @param catalog Category classification. Each account can store multiple catalogs.
           *
           * @return The vector of objects of the account or empty
           */
-         vector<account_storage_object> get_storage_info(std::string account_id_or_name, std::string catalog)const;
+         vector<account_storage_object> get_storage_info(std::string account_name_or_id, std::string catalog)const;
 
    private:
          application& _app;
