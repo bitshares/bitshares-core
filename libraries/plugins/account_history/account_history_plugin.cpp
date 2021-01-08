@@ -327,13 +327,13 @@ void account_history_plugin::plugin_initialize(const boost::program_options::var
    database().add_index< primary_index< account_transaction_history_index > >();
 
    LOAD_VALUE_SET(options, "track-account", my->_tracked_accounts, graphene::chain::account_id_type);
-   if (options.count("partial-operations")) {
+   if (options.count("partial-operations") > 0) {
        my->_partial_operations = options["partial-operations"].as<bool>();
    }
-   if (options.count("max-ops-per-account")) {
+   if (options.count("max-ops-per-account") > 0) {
        my->_max_ops_per_account = options["max-ops-per-account"].as<uint64_t>();
    }
-   if (options.count("extended-max-ops-per-account")) {
+   if (options.count("extended-max-ops-per-account") > 0) {
        auto emopa = options["extended-max-ops-per-account"].as<uint64_t>();
        my->_extended_max_ops_per_account = (emopa > my->_max_ops_per_account) ? emopa : my->_max_ops_per_account;
    }

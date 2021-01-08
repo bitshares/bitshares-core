@@ -266,7 +266,7 @@ FC_REFLECT( graphene::protocol::stealth_confirmation,
             (one_time_key)(to)(encrypted_memo) )
 
 FC_REFLECT( graphene::protocol::stealth_confirmation::memo_data,
-            (from)(amount)(blinding_factor)(commitment)(check) );
+            (from)(amount)(blinding_factor)(commitment)(check) )
 
 FC_REFLECT( graphene::protocol::blind_memo,
             (from)(amount)(message)(check) )

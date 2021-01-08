@@ -483,34 +483,34 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
    my->_oho_index = database().add_index< primary_index< operation_history_index > >();
    database().add_index< primary_index< account_transaction_history_index > >();
 
-   if (options.count("elasticsearch-node-url")) {
+   if (options.count("elasticsearch-node-url") > 0) {
       my->_elasticsearch_node_url = options["elasticsearch-node-url"].as<std::string>();
    }
-   if (options.count("elasticsearch-bulk-replay")) {
+   if (options.count("elasticsearch-bulk-replay") > 0) {
       my->_elasticsearch_bulk_replay = options["elasticsearch-bulk-replay"].as<uint32_t>();
    }
-   if (options.count("elasticsearch-bulk-sync")) {
+   if (options.count("elasticsearch-bulk-sync") > 0) {
       my->_elasticsearch_bulk_sync = options["elasticsearch-bulk-sync"].as<uint32_t>();
    }
-   if (options.count("elasticsearch-visitor")) {
+   if (options.count("elasticsearch-visitor") > 0) {
       my->_elasticsearch_visitor = options["elasticsearch-visitor"].as<bool>();
    }
-   if (options.count("elasticsearch-basic-auth")) {
+   if (options.count("elasticsearch-basic-auth") > 0) {
       my->_elasticsearch_basic_auth = options["elasticsearch-basic-auth"].as<std::string>();
    }
-   if (options.count("elasticsearch-index-prefix")) {
+   if (options.count("elasticsearch-index-prefix") > 0) {
       my->_elasticsearch_index_prefix = options["elasticsearch-index-prefix"].as<std::string>();
    }
-   if (options.count("elasticsearch-operation-object")) {
+   if (options.count("elasticsearch-operation-object") > 0) {
       my->_elasticsearch_operation_object = options["elasticsearch-operation-object"].as<bool>();
    }
-   if (options.count("elasticsearch-start-es-after-block")) {
+   if (options.count("elasticsearch-start-es-after-block") > 0) {
       my->_elasticsearch_start_es_after_block = options["elasticsearch-start-es-after-block"].as<uint32_t>();
    }
-   if (options.count("elasticsearch-operation-string")) {
+   if (options.count("elasticsearch-operation-string") > 0) {
       my->_elasticsearch_operation_string = options["elasticsearch-operation-string"].as<bool>();
    }
-   if (options.count("elasticsearch-mode")) {
+   if (options.count("elasticsearch-mode") > 0) {
       const auto option_number = options["elasticsearch-mode"].as<uint16_t>();
       if(option_number > mode::all)
          FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Elasticsearch mode not valid");

@@ -122,7 +122,7 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
    _options = &options;
    LOAD_VALUE_SET(options, "witness-id", _witnesses, chain::witness_id_type)
 
-   if( options.count("private-key") )
+   if( options.count("private-key") > 0 )
    {
       const std::vector<std::string> key_id_to_wif_pair_strings = options["private-key"].as<std::vector<std::string>>();
       for (const std::string& key_id_to_wif_pair_string : key_id_to_wif_pair_strings)
@@ -130,7 +130,7 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
          add_private_key(key_id_to_wif_pair_string);
       }
    }
-   if (options.count("private-key-file"))
+   if (options.count("private-key-file") > 0)
    {
       const std::vector<boost::filesystem::path> key_id_to_wif_pair_files =
             options["private-key-file"].as<std::vector<boost::filesystem::path>>();
@@ -154,7 +154,7 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
          }
       }
    }
-   if(options.count("required-participation"))
+   if(options.count("required-participation") > 0)
    {
        auto required_participation = options["required-participation"].as<uint32_t>();
        FC_ASSERT(required_participation <= 100);
@@ -217,7 +217,7 @@ void witness_plugin::stop_block_production()
 void witness_plugin::refresh_witness_key_cache()
 {
    const auto& db = database();
-   for( const chain::witness_id_type wit_id : _witnesses )
+   for( const chain::witness_id_type& wit_id : _witnesses )
    {
       const chain::witness_object* wit_obj = db.find( wit_id );
       if( wit_obj )
