@@ -97,10 +97,12 @@ namespace graphene { namespace protocol {
       chain_parameters& operator=(const chain_parameters& other);
       chain_parameters& operator=(chain_parameters&& other);
 
-      /// If @ref market_fee_network_percent is valid, return the value it contains, otherwise return 0
+      /// If @c market_fee_network_percent in @ref extensions is valid, return the value it contains,
+      /// otherwise return 0
       uint16_t get_market_fee_network_percent() const;
 
-      /// If @ref maker_fee_discount_percent is valid, return the value it contains, otherwise return 0
+      /// If @c maker_fee_discount_percent in @ref extensions is valid, return the value it contains,
+      /// otherwise return 0
       uint16_t get_maker_fee_discount_percent() const;
 
       private:
