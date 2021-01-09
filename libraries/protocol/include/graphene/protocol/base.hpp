@@ -78,7 +78,7 @@ namespace graphene { namespace protocol {
     *
     *    Each operation contains enough information to enumerate all accounts for which the
     *    operation should apear in its account history.  This principle enables us to easily
-    *    define and enforce the @balance_calculation. This is superset of the @ref defined_authority
+    *    define and enforce the @ref balance_calculation. This is superset of the @ref defined_authority
     *
     *  @{
     */

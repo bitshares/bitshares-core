@@ -99,7 +99,7 @@ void template_plugin::plugin_initialize(const boost::program_options::variables_
       my->onBlock(b);
    } );
 
-   if (options.count("template_plugin")) {
+   if (options.count("template_plugin") > 0) {
       my->_plugin_option = options["template_plugin"].as<std::string>();
    }
 }

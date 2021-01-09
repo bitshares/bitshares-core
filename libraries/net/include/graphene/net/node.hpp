@@ -71,7 +71,9 @@ namespace graphene { namespace net {
          /**
           *  @brief Called when a new block comes in from the network
           *
+          *  @param blk_msg the message which contains the block
           *  @param sync_mode true if the message was fetched through the sync process, false during normal operation
+          *  @param contained_transaction_message_ids container for the transactions to write back into
           *  @returns true if this message caused the blockchain to switch forks, false if it did not
           *
           *  @throws exception if error validating the item, otherwise the item is

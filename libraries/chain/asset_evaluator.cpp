@@ -951,13 +951,13 @@ void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_f
       //First, remove any old publishers who are no longer publishers
       for( auto itr = a.feeds.begin(); itr != a.feeds.end(); )
       {
-         if( !o.new_feed_producers.count(itr->first) )
+         if( o.new_feed_producers.count(itr->first) == 0 )
             itr = a.feeds.erase(itr);
          else
             ++itr;
       }
       //Now, add any new publishers
-      for( const account_id_type acc : o.new_feed_producers )
+      for( const account_id_type& acc : o.new_feed_producers )
       {
          a.feeds[acc];
       }
@@ -1131,17 +1131,17 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    //Verify that the publisher is authoritative to publish a feed
    if( base.options.flags & witness_fed_asset )
    {
-      FC_ASSERT( d.get(GRAPHENE_WITNESS_ACCOUNT).active.account_auths.count(o.publisher),
+      FC_ASSERT( d.get(GRAPHENE_WITNESS_ACCOUNT).active.account_auths.count(o.publisher) > 0,
                  "Only active witnesses are allowed to publish price feeds for this asset" );
    }
    else if( base.options.flags & committee_fed_asset )
    {
-      FC_ASSERT( d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.account_auths.count(o.publisher),
+      FC_ASSERT( d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.account_auths.count(o.publisher) > 0,
                  "Only active committee members are allowed to publish price feeds for this asset" );
    }
    else
    {
-      FC_ASSERT( bitasset.feeds.count(o.publisher),
+      FC_ASSERT( bitasset.feeds.count(o.publisher) > 0,
                  "The account is not in the set of allowed price feed producers of this asset" );
    }
 

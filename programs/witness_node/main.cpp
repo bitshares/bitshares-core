@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
          return 1;
       }
 
-      if( options.count("version") )
+      if( options.count("version") > 0 )
       {
          std::cout << "Version: " << graphene::utilities::git_revision_description << "\n";
          std::cout << "SHA: " << graphene::utilities::git_revision_sha << "\n";
@@ -126,14 +126,14 @@ int main(int argc, char** argv) {
          std::cout << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version << "\n";
          return 0;
       }
-      if( options.count("help") )
+      if( options.count("help") > 0 )
       {
          std::cout << app_options << "\n";
          return 0;
       }
 
       fc::path data_dir;
-      if( options.count("data-dir") )
+      if( options.count("data-dir") > 0 )
       {
          data_dir = options["data-dir"].as<boost::filesystem::path>();
          if( data_dir.is_relative() )
@@ -144,13 +144,13 @@ int main(int argc, char** argv) {
       std::set<std::string> plugins;
       boost::split(plugins, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
 
-      if(plugins.count("account_history") && plugins.count("elasticsearch")) {
+      if( plugins.count("account_history") > 0 && plugins.count("elasticsearch") > 0 ) {
          std::cerr << "Plugin conflict: Cannot load both account_history plugin and elasticsearch plugin\n";
          return 1;
       }
 
-      if( !plugins.count("api_helper_indexes") && !options.count("ignore-api-helper-indexes-warning")
-          && ( options.count("rpc-endpoint") || options.count("rpc-tls-endpoint") ) )
+      if( plugins.count("api_helper_indexes") == 0 && options.count("ignore-api-helper-indexes-warning") == 0
+          && ( options.count("rpc-endpoint") > 0 || options.count("rpc-tls-endpoint") > 0 ) )
       {
          std::cerr << "\nIf this is an API node, please enable api_helper_indexes plugin."
                       "\nIf this is not an API node, please start with \"--ignore-api-helper-indexes-warning\""

@@ -36,7 +36,8 @@ namespace graphene { namespace chain {
    * @brief Grants another account authority to withdraw a limited amount of funds per interval
    *
    * The primary purpose of this object is to enable recurring payments on the blockchain. An account which wishes to
-   * process a recurring payment may use a @ref withdraw_permission_claim_operation to reference an object of this type
+   * process a recurring payment may use a @ref graphene::protocol::withdraw_permission_claim_operation
+   * to reference an object of this type
    * and withdraw up to @ref withdrawal_limit from @ref withdraw_from_account. Only @ref authorized_account may do
    * this. Any number of withdrawals may be made so long as the total amount withdrawn per period does not exceed the
    * limit for any given period.

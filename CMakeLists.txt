@@ -239,7 +239,7 @@ else( WIN32 ) # Apple AND Linux
     if( APPLE )
         # Apple Specific Options Here
         message( STATUS "Configuring BitShares-Testnet on OS X" )
-        set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -stdlib=libc++ -Wall" )
+        set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -stdlib=libc++ -Wall -fvisibility-inlines-hidden -fvisibility=hidden" )
     else( APPLE )
         if ( "${CMAKE_SYSTEM_NAME}" STREQUAL "OpenBSD" )
             # OpenBSD Specific Options

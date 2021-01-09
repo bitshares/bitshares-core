@@ -62,7 +62,7 @@ void debug_witness_plugin::plugin_initialize(const boost::program_options::varia
    ilog("debug_witness plugin:  plugin_initialize() begin");
    _options = &options;
 
-   if( options.count("debug-private-key") )
+   if( options.count("debug-private-key") > 0 )
    {
       const std::vector<std::string> key_id_to_wif_pair_strings = options["debug-private-key"].as<std::vector<std::string>>();
       for (const std::string& key_id_to_wif_pair_string : key_id_to_wif_pair_strings)

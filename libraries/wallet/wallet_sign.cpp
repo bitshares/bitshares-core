@@ -161,10 +161,10 @@ namespace graphene { namespace wallet { namespace detail {
       const memo_data *memo = &md;
 
       try {
-         FC_ASSERT( _keys.count(memo->to) || _keys.count(memo->from),
+         FC_ASSERT( _keys.count(memo->to) > 0 || _keys.count(memo->from) > 0,
                     "Memo is encrypted to a key ${to} or ${from} not in this wallet.",
                     ("to", memo->to)("from",memo->from) );
-         if( _keys.count(memo->to) ) {
+         if( _keys.count(memo->to) > 0 ) {
             auto my_key = wif_to_key(_keys.at(memo->to));
             FC_ASSERT(my_key, "Unable to recover private key to decrypt memo. Wallet may be corrupted.");
             clear_text = memo->get_message(*my_key, memo->from);

@@ -412,6 +412,7 @@ void database::initialize_budget_record( fc::time_point_sec now, budget_record& 
    rec.from_initial_reserve = core.reserved(*this);
    rec.from_accumulated_fees = core_dd.accumulated_fees;
    rec.from_unused_witness_budget = dpo.witness_budget;
+   rec.max_supply = core.options.max_supply;
 
    if(    (dpo.last_budget_time == fc::time_point_sec())
        || (now <= dpo.last_budget_time) )
@@ -536,6 +537,7 @@ void database::process_budget()
          _dpo.last_budget_time = now;
       });
 
+      rec.current_supply = core.current_supply;
       create< budget_record_object >( [&]( budget_record_object& _rec )
       {
          _rec.time = head_block_time();
