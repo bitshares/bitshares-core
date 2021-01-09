@@ -26,7 +26,7 @@ Sigve Kvalsvik <bitsharesblocks@gmail.com>
 albert <393259066@qq.com>
 Ryan R. Fox <ryan@ryanrfox.com>
 Valentine Zavgorodnev <i@valzav.com>
-Michael Vandeberg <vandeberg@cryptonomex.com>
+Michael Vandeberg <mvandeberg@users.noreply.github.com>
 James Calfee <james@jcalfee.info>
 Alexey Frolov <alexey.frolov@aetsoft.by>
 syalon <hanomirin@foxmail.com>
@@ -34,7 +34,7 @@ takaaki7 <nakama67006700@gmail.com>
 Nicolas Wack <wackou@gmail.com>
 Taconator <TheTaconator@users.noreply.github.com>
 Qi Xing <cwyyprog@163.com>
-Anton Autushka <a.autushka@aetsoft.by>
+Anton Autushka <antoninus.liberalis@gmail.com>
 Chronos <chronos.crypto@gmail.com>
 Wei Yang <richard.weiyang@gmail.com>
 Zapata <marco.tessari@gmail.com>
@@ -45,11 +45,11 @@ Tengfei Niu <spartucus@users.noreply.github.com>
 Tiago Peralta <tperalta82@gmail.com>
 ioBanker <37595908+ioBanker@users.noreply.github.com>
 Karl Semich <0xloem@gmail.com>
-Michael Vandeberg <vandeberg@steemit.com>
 SahkanDesertHawk <panasiuki@gmail.com>
 Scott Howard <showard314@gmail.com>
 Tydus <Tydus@Tydus.org>
 William <tmfc@homtail.com>
+bangzi1001 <36911788+bangzi1001@users.noreply.github.com>
 d.yakovitsky <d.yakovitsky@aetsoft.by>
 ddylko <ddylko@ddylkoPC>
 iHashFury <iPerky@users.noreply.github.com>
@@ -69,12 +69,13 @@ Ken Code <ken@BitShares-Munich.de>
 Krzysztof Szumny <krzysztof.szumny@stxnext.pl>
 Paul Brossier <piem@piem.org>
 Roelandp <dnaleor@gmail.com>
+Semen Martynov <semen.martynov@gmail.com>
 Thomas Freedman <thom@ozarkholler.com>
 Troglodactyl <troglodactyl@gmail.com>
 VoR0220 <catalanor0220@gmail.com>
 alt <pch957@163.com>
-bangzi1001 <36911788+bangzi1001@users.noreply.github.com>
 bitcube <root@seed.cubeconnex.com>
 lafona <lafona@protonmail.com>
 liondani <liondani@gmx.com>
 lososeg <ya.lososeg@gmail.com>
+xiao93 <42384581+xiao93@users.noreply.github.com>
