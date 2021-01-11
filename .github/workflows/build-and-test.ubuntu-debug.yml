@@ -1,11 +1,11 @@
-name: Github CI Linux Release
+name: Ubuntu Debug Build
 on: [ push, pull_request ]
 env:
   CCACHE_COMPRESS: exists means true
   CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
 jobs:
-  test-release:
-    name: Build and test in Release mode
+  test-debug:
+    name: Build and test in Debug mode
     strategy:
       matrix:
         os: [ ubuntu-16.04, ubuntu-18.04 ]
@@ -17,6 +17,7 @@ jobs:
     steps:
     - name: Install dependencies
       run: |
+        df -h
         sudo apt-get update
         openssl_ver=`sudo apt-cache madison openssl | grep xenial-updates | awk '{print $3}'`
         libssl_ver=`sudo apt-cache madison libssl-dev | grep xenial-updates | awk '{print $3}'`
@@ -40,15 +41,28 @@ jobs:
         sudo apt-get auto-remove -y
         sudo apt-get clean -y
         df -h
+        sudo du -hs /mnt/*
+        sudo ls -alr /mnt/
     - uses: actions/checkout@v2
       with:
         submodules: recursive
     - name: Configure
       run: |
+        pwd
+        df -h .
         mkdir -p _build
+        sudo mkdir -p /_build/libraries /_build/programs /mnt/_build/tests
+        sudo chmod a+rwx /_build/libraries /_build/programs /mnt/_build/tests
+        ln -s /_build/libraries _build/libraries
+        ln -s /_build/programs _build/programs
+        ln -s /mnt/_build/tests _build/tests
+        sudo ln -s /_build/libraries /mnt/_build/libraries
+        sudo ln -s /_build/programs /mnt/_build/programs
+        sudo ln -s /mnt/_build/tests /_build/tests
+        ls -al _build
         pushd _build
         export -n BOOST_ROOT BOOST_INCLUDEDIR BOOST_LIBRARYDIR
-        cmake -D CMAKE_BUILD_TYPE=Release \
+        cmake -D CMAKE_BUILD_TYPE=Debug \
               -D CMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON \
               -D CMAKE_C_COMPILER=gcc \
               -D CMAKE_C_COMPILER_LAUNCHER=ccache \
@@ -60,20 +74,28 @@ jobs:
       uses: actions/cache@v1
       with:
         path: ccache
-        key: ccache-release-${{ github.ref }}-${{ github.sha }}
+        key: ccache-debug-${{ github.ref }}-${{ github.sha }}
         restore-keys: |
-          ccache-release-${{ github.ref }}-
-          ccache-release-
+          ccache-debug-${{ github.ref }}-
+          ccache-debug-
     - name: Build
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
+        df -h
+        make -j 2 -C _build chain_test
+        make -j 2 -C _build cli_wallet
         make -j 2 -C _build
         df -h
+        du -hs _build/libraries/* _build/programs/* _build/tests/*
+        du -hs _build/*
+        du -hs /_build/*
     - name: Unit-Tests
       run: |
         _build/tests/app_test -l test_suite
+        df -h
         _build/tests/es_test -l test_suite
+        df -h
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
         _build/tests/cli_test -l test_suite
         df -h
