@@ -1,4 +1,4 @@
-name: Ubuntu Debug Build
+name: Ubuntu Debug
 on: [ push, pull_request ]
 env:
   CCACHE_COMPRESS: exists means true
