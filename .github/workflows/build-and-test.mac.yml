@@ -1,4 +1,4 @@
-name: Github CI macOS
+name: macOS
 on: [ push, pull_request ]
 env:
   CCACHE_COMPRESS: exists means true

@@ -1,4 +1,4 @@
-name: Github CI Windows MinGW64
+name: Windows MinGW64
 on: [ push, pull_request ]
 env:
   CCACHE_COMPRESS: exists means true
