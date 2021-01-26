@@ -42,7 +42,9 @@ BOOST_AUTO_TEST_CASE( api_limit_get_key_references ){
    vector< public_key_type >  numbered_key_id;
    numbered_private_keys.reserve( num_keys );
 
-   graphene::app::database_api db_api1( db, &( app.get_options() ));
+   graphene::app::application_options opt1 = app.get_options();
+   opt1.has_api_helper_indexes_plugin = false;
+   graphene::app::database_api db_api1( db, &opt1 );
    BOOST_CHECK_THROW( db_api1.get_key_references(numbered_key_id), fc::exception );
 
    graphene::app::application_options opt = app.get_options();

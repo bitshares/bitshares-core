@@ -236,7 +236,58 @@ void application_impl::set_dbg_init_key( graphene::chain::genesis_state_type& ge
       genesis.initial_witness_candidates[i].block_signing_key = init_pubkey;
 }
 
+void application_impl::initialize()
+{
+   if( _options->count("force-validate") > 0 )
+   {
+      ilog( "All transaction signatures will be validated" );
+      _force_validate = true;
+   }
 
+   if ( _options->count("enable-subscribe-to-all") > 0 )
+      _app_options.enable_subscribe_to_all = _options->at( "enable-subscribe-to-all" ).as<bool>();
+
+   set_api_limit();
+
+   if( is_plugin_enabled( "market_history" ) )
+      _app_options.has_market_history_plugin = true;
+   else
+      ilog("Market history plugin is not enabled");
+
+   if( is_plugin_enabled( "api_helper_indexes" ) )
+      _app_options.has_api_helper_indexes_plugin = true;
+   else
+      ilog("API helper indexes plugin is not enabled");
+
+   if( _options->count("api-access") > 0 )
+   {
+
+      fc::path api_access_file = _options->at("api-access").as<boost::filesystem::path>();
+
+      FC_ASSERT( fc::exists(api_access_file),
+            "Failed to load file from ${path}", ("path", api_access_file) );
+
+      _apiaccess = fc::json::from_file( api_access_file ).as<api_access>( 20 );
+      ilog( "Using api access file from ${path}",
+            ("path", api_access_file) );
+   }
+   else
+   {
+      // TODO:  Remove this generous default access policy
+      // when the UI logs in properly
+      _apiaccess = api_access();
+      api_access_info wild_access;
+      wild_access.password_hash_b64 = "*";
+      wild_access.password_salt_b64 = "*";
+      wild_access.allowed_apis.push_back( "database_api" );
+      wild_access.allowed_apis.push_back( "network_broadcast_api" );
+      wild_access.allowed_apis.push_back( "history_api" );
+      wild_access.allowed_apis.push_back( "orders_api" );
+      wild_access.allowed_apis.push_back( "custom_operations_api" );
+      _apiaccess.permission_map["*"] = wild_access;
+   }
+
+}
 
 void application_impl::set_api_limit() {
    if (_options->count("api-limit-get-account-history-operations")) {
@@ -326,8 +377,15 @@ void application_impl::set_api_limit() {
    if(_options->count("api-limit-get-withdraw-permissions-by-recipient")) {
       _app_options.api_limit_get_withdraw_permissions_by_recipient = _options->at("api-limit-get-withdraw-permissions-by-recipient").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-liquidity-pools")) {
+   if(_options->count("api-limit-get-tickets") > 0) {
+      _app_options.api_limit_get_tickets = _options->at("api-limit-get-tickets").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-liquidity-pools") > 0) {
       _app_options.api_limit_get_liquidity_pools = _options->at("api-limit-get-liquidity-pools").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-liquidity-pool-history") > 0) {
+      _app_options.api_limit_get_liquidity_pool_history =
+            _options->at("api-limit-get-liquidity-pool-history").as<uint64_t>();
    }
 }
 
@@ -353,7 +411,7 @@ void application_impl::startup()
             modified_genesis = true;
 
             ilog(
-               "Used genesis timestamp:  ${timestamp} (PLEASE RECORD THIS)", 
+               "Used genesis timestamp:  ${timestamp} (PLEASE RECORD THIS)",
                ("timestamp", genesis.initial_timestamp.to_iso_string())
             );
          }
@@ -443,50 +501,6 @@ void application_impl::startup()
       throw;
    }
 
-   if( _options->count("force-validate") )
-   {
-      ilog( "All transaction signatures will be validated" );
-      _force_validate = true;
-   }
-
-   if ( _options->count("enable-subscribe-to-all") )
-      _app_options.enable_subscribe_to_all = _options->at( "enable-subscribe-to-all" ).as<bool>();
-
-   set_api_limit();
-
-   if( _active_plugins.find( "market_history" ) != _active_plugins.end() )
-      _app_options.has_market_history_plugin = true;
-
-   if( _active_plugins.find( "api_helper_indexes" ) != _active_plugins.end() )
-      _app_options.has_api_helper_indexes_plugin = true;
-
-   if( _options->count("api-access") ) {
-
-      fc::path api_access_file = _options->at("api-access").as<boost::filesystem::path>();
-
-      FC_ASSERT( fc::exists(api_access_file), 
-            "Failed to load file from ${path}", ("path", api_access_file) );
-
-      _apiaccess = fc::json::from_file( api_access_file ).as<api_access>( 20 );
-      ilog( "Using api access file from ${path}",
-            ("path", api_access_file) );
-   }
-   else
-   {
-      // TODO:  Remove this generous default access policy
-      // when the UI logs in properly
-      _apiaccess = api_access();
-      api_access_info wild_access;
-      wild_access.password_hash_b64 = "*";
-      wild_access.password_salt_b64 = "*";
-      wild_access.allowed_apis.push_back( "database_api" );
-      wild_access.allowed_apis.push_back( "network_broadcast_api" );
-      wild_access.allowed_apis.push_back( "history_api" );
-      wild_access.allowed_apis.push_back( "orders_api" );
-      wild_access.allowed_apis.push_back( "custom_operations_api" );
-      _apiaccess.permission_map["*"] = wild_access;
-   }
-
    reset_p2p_node(_data_dir);
    reset_websocket_server();
    reset_websocket_tls_server();
@@ -508,6 +522,11 @@ optional< api_access_info > application_impl::get_api_access_info(const string& 
 void application_impl::set_api_access_info(const string& username, api_access_info&& permissions)
 {
    _apiaccess.permission_map.insert(std::make_pair(username, std::move(permissions)));
+}
+
+bool application_impl::is_plugin_enabled(const string& name) const
+{
+   return !(_active_plugins.find(name) == _active_plugins.end());
 }
 
 /**
@@ -1057,8 +1076,12 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::get_withdraw_permissions_by_giver to set max limit value")
          ("api-limit-get-withdraw-permissions-by-recipient",boost::program_options::value<uint64_t>()->default_value(101),
           "For database_api_impl::get_withdraw_permissions_by_recipient to set max limit value")
-         ("api-limit-get-liquidity-pools",boost::program_options::value<uint64_t>()->default_value(101),
-          "For database_api_impl::get_liquidity_pools_* to set max limit value")
+         ("api-limit-get-tickets", boost::program_options::value<uint64_t>()->default_value(101),
+          "Set maximum limit value for database APIs which query for tickets")
+         ("api-limit-get-liquidity-pools", boost::program_options::value<uint64_t>()->default_value(101),
+          "Set maximum limit value for database APIs which query for liquidity pools")
+         ("api-limit-get-liquidity-pool-history", boost::program_options::value<uint64_t>()->default_value(101),
+          "Set maximum limit value for APIs which query for history of liquidity pools")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
@@ -1078,11 +1101,13 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
    my->_data_dir = data_dir;
    my->_options = &options;
 
-   if ( options.count("io-threads") )
+   if ( options.count("io-threads") > 0 )
    {
       const uint16_t num_threads = options["io-threads"].as<uint16_t>();
       fc::asio::default_io_service_scope::set_num_threads(num_threads);
    }
+
+   my->initialize();
 }
 
 void application::startup()
@@ -1117,7 +1142,7 @@ std::shared_ptr<abstract_plugin> application::get_plugin(const string& name) con
 
 bool application::is_plugin_enabled(const string& name) const
 {
-   return !(my->_active_plugins.find(name) == my->_active_plugins.end());
+   return my->is_plugin_enabled(name);
 }
 
 net::node_ptr application::p2p_node()
@@ -1165,8 +1190,11 @@ void graphene::app::application::add_available_plugin(std::shared_ptr<graphene::
 void application::shutdown_plugins()
 {
    for( auto& entry : my->_active_plugins )
+   {
+      ilog( "Stopping plugin ${name}", ( "name", entry.second->plugin_name() ) );
       entry.second->plugin_shutdown();
-   return;
+      ilog( "Stopped plugin ${name}", ( "name", entry.second->plugin_name() ) );
+   }
 }
 void application::shutdown()
 {
@@ -1182,18 +1210,21 @@ void application::shutdown()
 void application::initialize_plugins( const boost::program_options::variables_map& options )
 {
    for( auto& entry : my->_active_plugins )
+   {
+      ilog( "Initializing plugin ${name}", ( "name", entry.second->plugin_name() ) );
       entry.second->plugin_initialize( options );
-   return;
+      ilog( "Initialized plugin ${name}", ( "name", entry.second->plugin_name() ) );
+   }
 }
 
 void application::startup_plugins()
 {
    for( auto& entry : my->_active_plugins )
    {
+      ilog( "Starting plugin ${name}", ( "name", entry.second->plugin_name() ) );
       entry.second->plugin_startup();
-      ilog( "Plugin ${name} started", ( "name", entry.second->plugin_name() ) );
+      ilog( "Started plugin ${name}", ( "name", entry.second->plugin_name() ) );
    }
-   return;
 }
 
 const application_options& application::get_options()

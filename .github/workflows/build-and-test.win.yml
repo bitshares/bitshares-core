@@ -1,0 +1,152 @@
+name: Windows MinGW64
+on: [ push, pull_request ]
+env:
+  CCACHE_COMPRESS: exists means true
+  CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
+  # The following are for windows cross-build only:
+  BOOST_VERSION: 1_69_0
+  BOOST_DOTTED_VERSION: 1.69.0
+  CURL_VERSION: 7.67.0
+  OPENSSL_VERSION: 1.1.1d
+  ZLIB_VERSION: 1.2.11
+jobs:
+  prepare-mingw64-libs:
+    name: Build required 3rd-party libraries
+    runs-on: ubuntu-latest
+    steps:
+    - name: Load Cache
+      id: cache-libs
+      uses: actions/cache@v1
+      with:
+        path: libs
+        key: mingw64-libs-${{ env.BOOST_VERSION }}_${{ env.CURL_VERSION }}_${{ env.OPENSSL_VERSION }}_${{ env.ZLIB_VERSION }}
+    - name: Install dependencies
+      if: steps.cache-libs.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+                     g++-mingw-w64-x86-64 \
+                     mingw-w64-tools
+    - name: Download library sources
+      if: steps.cache-libs.outputs.cache-hit != 'true'
+      run: |
+        curl -LO https://dl.bintray.com/boostorg/release/${{ env.BOOST_DOTTED_VERSION }}/source/boost_${{ env.BOOST_VERSION }}.tar.bz2
+        curl -LO https://curl.haxx.se/download/curl-${{ env.CURL_VERSION }}.tar.bz2
+        curl -LO https://www.openssl.org/source/openssl-${{ env.OPENSSL_VERSION }}.tar.gz
+        curl -LO https://zlib.net/zlib-${{ env.ZLIB_VERSION }}.tar.gz
+    - name: Build zlib
+      if: steps.cache-libs.outputs.cache-hit != 'true'
+      run: |
+        LIBS="`pwd`/libs"
+        ZLIB="`echo zlib-*`"
+        tar xfz "$ZLIB"
+        pushd "${ZLIB%.tar.gz}"
+        CROSS_PREFIX=x86_64-w64-mingw32- ./configure --prefix="$LIBS" --static --64
+        make install
+    - name: Build openssl
+      if: steps.cache-libs.outputs.cache-hit != 'true'
+      run: |
+        LIBS="`pwd`/libs"
+        OPENSSL="`echo openssl-*`"
+        tar xfz "$OPENSSL"
+        pushd "${OPENSSL%.tar.gz}"
+        ./Configure --prefix="$LIBS" --cross-compile-prefix=x86_64-w64-mingw32- \
+                    no-shared zlib threads \
+                    mingw64
+        make CPPFLAGS="-I$LIBS/include" LDFLAGS="-L$LIBS/lib" build_libs
+        make -j 2 install_dev
+    - name: Build curl
+      if: steps.cache-libs.outputs.cache-hit != 'true'
+      run: |
+        LIBS="`pwd`/libs"
+        CURL="`echo curl-*`"
+        tar xfj "$CURL"
+        pushd "${CURL%.tar.bz2}"
+        sed -i 's=-lgdi32=-lcrypt32 \0='  configure
+        PKG_CONFIG_PATH="$LIBS/lib/pkgconfig" ./configure --host=x86_64-w64-mingw32 \
+                                                          --prefix="$LIBS" \
+                                                          --disable-shared \
+                                                          --disable-tftpf \
+                                                          --disable-ldap \
+                                                          --with-zlib \
+                                                          --without-ssl --with-winssl \
+                                                          --disable-tftp \
+                                                          --disable-ldap
+        make -j 2 install
+    - name: Build boost
+      if: steps.cache-libs.outputs.cache-hit != 'true'
+      run: |
+        LIBS="`pwd`/libs"
+        BOOST="`echo boost_*`"
+        tar xfj "$BOOST"
+        pushd "${BOOST%.tar.bz2}"
+        # See https://github.com/boostorg/context/issues/101
+        sed -i '/os.\(name\|platform\)/d;/local tmp = /s=elf=pe=;/local tmp = /s=sysv=ms=' libs/context/build/Jamfile.v2
+        ./bootstrap.sh --prefix=$LIBS
+        echo "using gcc : mingw32 : x86_64-w64-mingw32-g++ ;" > user-config.jam
+        ./b2 --user-config=user-config.jam \
+             --without-python \
+             toolset=gcc-mingw32 \
+             target-os=windows \
+             variant=release \
+             link=static \
+             threading=multi \
+             runtime-link=static \
+             address-model=64 \
+             abi=ms \
+             install
+  build-mingw64:
+    name: Cross-build for windows using mingw
+    runs-on: ubuntu-latest
+    needs: prepare-mingw64-libs
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+                     ccache \
+                     g++-mingw-w64-x86-64 \
+                     mingw-w64-tools
+        sudo apt-get auto-remove -y
+        sudo apt-get clean -y
+        df -h
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+    - name: Load external libraries
+      uses: actions/cache@v1
+      with:
+        path: libs
+        key: mingw64-libs-${{ env.BOOST_VERSION }}_${{ env.CURL_VERSION }}_${{ env.OPENSSL_VERSION }}_${{ env.ZLIB_VERSION }}
+    - name: Configure
+      run: |
+        LIBS="`pwd`/libs"
+        mkdir -p _build
+        pushd _build
+        cmake -D CMAKE_BUILD_TYPE=Release \
+              -D CMAKE_C_COMPILER=/usr/bin/x86_64-w64-mingw32-gcc-posix \
+              -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              -D CMAKE_CXX_COMPILER=/usr/bin/x86_64-w64-mingw32-g++-posix \
+              -D CMAKE_CXX_FLAGS=-Wa,-mbig-obj \
+              -D CMAKE_SYSTEM_NAME=Windows \
+              -D CURL_STATICLIB=ON \
+              -D CMAKE_EXE_LINKER_FLAGS=--static \
+              -D CMAKE_FIND_ROOT_PATH="/usr/lib/gcc/x86_64-w64-mingw32/7.3-win32/;$LIBS" \
+              -D CMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+              -D CMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+              -D CMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+              -D GRAPHENE_DISABLE_UNITY_BUILD=ON \
+              ..
+    - name: Load Cache
+      uses: actions/cache@v1
+      with:
+        path: ccache
+        key: ccache-mingw64-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          ccache-mingw64-${{ github.ref }}-
+          ccache-mingw64-
+    - name: Build
+      run: |
+        export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
+        mkdir -p "$CCACHE_DIR"
+        make -j 2 -C _build witness_node cli_wallet

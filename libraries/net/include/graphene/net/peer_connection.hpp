@@ -339,4 +339,4 @@ FC_REFLECT_ENUM(graphene::net::peer_connection::connection_negotiation_status, (
                                                                           (closing)
                                                                           (closed) )
 
-FC_REFLECT( graphene::net::peer_connection::timestamped_item_id, (item)(timestamp));
+FC_REFLECT( graphene::net::peer_connection::timestamped_item_id, (item)(timestamp) )

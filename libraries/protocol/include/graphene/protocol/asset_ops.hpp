@@ -174,10 +174,9 @@ namespace graphene { namespace protocol {
       /// ID is not known at the time this operation is created, create this price as though the new asset has instance
       /// ID 1, and the chain will overwrite it with the new asset's ID.
       asset_options              common_options;
-      /// Options only available for BitAssets. MUST be non-null if and only if the @ref market_issued flag is set in
-      /// common_options.flags
+      /// Options only available for BitAssets. MUST be non-null if and only if the asset is market-issued.
       optional<bitasset_options> bitasset_opts;
-      /// For BitAssets, set this to true if the asset implements a @ref prediction_market; false otherwise
+      /// For BitAssets, set this to true if the asset implements a prediction market; false otherwise
       bool is_prediction_market = false;
       extensions_type extensions;
 
@@ -201,7 +200,7 @@ namespace graphene { namespace protocol {
       struct fee_parameters_type { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee;
-      account_id_type issuer; ///< must equal @ref asset_to_settle->issuer
+      account_id_type issuer; ///< must equal issuer of @ref asset_to_settle
       asset_id_type   asset_to_settle;
       price           settle_price;
       extensions_type extensions;
@@ -345,7 +344,8 @@ namespace graphene { namespace protocol {
     * options an an existing BitAsset.
     *
     * @pre @ref issuer MUST be an existing account and MUST match asset_object::issuer on @ref asset_to_update
-    * @pre @ref asset_to_update MUST be a BitAsset, i.e. @ref asset_object::is_market_issued() returns true
+    * @pre @ref asset_to_update MUST be a BitAsset, i.e. @ref graphene::chain::asset_object::is_market_issued()
+    *                           returns true
     * @pre @ref fee MUST be nonnegative, and @ref issuer MUST have a sufficient balance to pay it
     * @pre @ref new_options SHALL be internally consistent, as verified by @ref validate()
     * @post @ref asset_to_update will have BitAsset-specific options matching those of new_options
@@ -374,7 +374,8 @@ namespace graphene { namespace protocol {
     *
     * @pre @ref issuer MUST be an existing account, and MUST match asset_object::issuer on @ref asset_to_update
     * @pre @ref issuer MUST NOT be the committee account
-    * @pre @ref asset_to_update MUST be a BitAsset, i.e. @ref asset_object::is_market_issued() returns true
+    * @pre @ref asset_to_update MUST be a BitAsset, i.e. @ref graphene::chain::asset_object::is_market_issued()
+    *                           returns true
     * @pre @ref fee MUST be nonnegative, and @ref issuer MUST have a sufficient balance to pay it
     * @pre Cardinality of @ref new_feed_producers MUST NOT exceed @ref chain_parameters::maximum_asset_feed_publishers
     * @post @ref asset_to_update will have a set of feed producers matching @ref new_feed_producers
@@ -676,7 +677,7 @@ FC_REFLECT( graphene::protocol::asset_issue_operation,
 FC_REFLECT( graphene::protocol::asset_reserve_operation,
             (fee)(payer)(amount_to_reserve)(extensions) )
 
-FC_REFLECT( graphene::protocol::asset_fund_fee_pool_operation, (fee)(from_account)(asset_id)(amount)(extensions) );
+FC_REFLECT( graphene::protocol::asset_fund_fee_pool_operation, (fee)(from_account)(asset_id)(amount)(extensions) )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_options )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::bitasset_options::ext )

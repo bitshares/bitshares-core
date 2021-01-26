@@ -7,19 +7,19 @@ programs/build_helpers/buildstep Prepare 1 "sed -i '/tests/d' libraries/fc/CMake
 programs/build_helpers/buildstep cmake 5 "cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage -DBoost_USE_STATIC_LIBS=OFF -DCMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON ."
 programs/build_helpers/buildstep make.programs 1800 "programs/build_helpers/make_with_sonar bw-output -j 2 witness_node cli_wallet js_operation_serializer get_dev_key network_mapper app_test chain_test cli_test"
 set -o pipefail
-programs/build_helpers/buildstep run.chain_test 600 "libraries/fc/tests/run-parallel-tests.sh tests/chain_test"
-programs/build_helpers/buildstep run.cli_test 180 "libraries/fc/tests/run-parallel-tests.sh tests/cli_test"
-programs/build_helpers/buildstep run.app_test 180 "tests/app_test"
+programs/build_helpers/buildstep run.chain_test 300 "libraries/fc/tests/run-parallel-tests.sh tests/chain_test -l message"
+programs/build_helpers/buildstep run.cli_test 120 "libraries/fc/tests/run-parallel-tests.sh tests/cli_test -l message"
+programs/build_helpers/buildstep run.app_test 120 "tests/app_test -l message"
 programs/build_helpers/buildstep prepare.sonar 20 "find libraries/[acdenptuw]*/CMakeFiles/*.dir programs/[cdgjsw]*/CMakeFiles/*.dir -type d -print | while read d; do gcov -o \"\$d\" \"\${d/CMakeFiles*.dir//}\"/*.cpp; done >/dev/null; programs/build_helpers/set_sonar_branch sonar-project.properties"
 du -hs sonar_cache
-# The first pass is skipped here
-# The second pass, skip fewer files than the first pass. This will remove the skipped files from the cache, but is an acceptable trade-off
+# The first pass is skipped here.
+# The second pass, scan some files.
 programs/build_helpers/buildstep prepare.sonar.part2 1 "cp sonar-project.properties sonar-project.properties.bak; sed -i '/sonar\.exclusions=/d;s/#sonar\.exclusions.part2/sonar.exclusions/' sonar-project.properties"
-programs/build_helpers/buildstep run.sonar.part2 1500 "which sonar-scanner && sonar-scanner"
-programs/build_helpers/buildstep prepare.sonar.full 1 "cp sonar-project.properties.bak sonar-project.properties"
+programs/build_helpers/buildstep run.sonar.part2 1200 "which sonar-scanner && sonar-scanner"
+programs/build_helpers/buildstep post.sonar.part2 1 "cp sonar-project.properties.bak sonar-project.properties"
 du -hs sonar_cache
 # The third pass, scan all files
-programs/build_helpers/buildstep run.sonar.full 1500 "which sonar-scanner && sonar-scanner"
+programs/build_helpers/buildstep run.sonar.full 1200 "which sonar-scanner && sonar-scanner"
 du -hs sonar_cache
 programs/build_helpers/buildstep end 0
 ccache -s

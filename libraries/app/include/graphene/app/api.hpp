@@ -127,14 +127,14 @@ namespace graphene { namespace app {
 
          /**
           * @brief Get operations relevant to the specificed account
-          * @param account_id_or_name The account ID or name whose history should be queried
+          * @param account_name_or_id The account name or ID whose history should be queried
           * @param stop ID of the earliest operation to retrieve
           * @param limit Maximum number of operations to retrieve (must not exceed 100)
           * @param start ID of the most recent operation to retrieve
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
          vector<operation_history_object> get_account_history(
-            const std::string account_id_or_name,
+            const std::string account_name_or_id,
             operation_history_id_type stop = operation_history_id_type(),
             unsigned limit = 100,
             operation_history_id_type start = operation_history_id_type()
@@ -142,7 +142,7 @@ namespace graphene { namespace app {
 
          /**
           * @brief Get operations relevant to the specified account filtering by operation type
-          * @param account_id_or_name The account ID or name whose history should be queried
+          * @param account_name_or_id The account name or ID whose history should be queried
           * @param operation_types The IDs of the operation we want to get operations in the account
           * ( 0 = transfer , 1 = limit order create, ...)
           * @param start the sequence number where to start looping back throw the history
@@ -150,7 +150,7 @@ namespace graphene { namespace app {
           * @return history_operation_detail
           */
          history_operation_detail get_account_history_by_operations(
-            const std::string account_id_or_name,
+            const std::string account_name_or_id,
             flat_set<uint16_t> operation_types,
             uint32_t start,
             unsigned limit
@@ -158,7 +158,7 @@ namespace graphene { namespace app {
 
          /**
           * @brief Get only asked operations relevant to the specified account
-          * @param account_id_or_name The account ID or name whose history should be queried
+          * @param account_name_or_id The account name or ID whose history should be queried
           * @param operation_type The type of the operation we want to get operations in the account
           * ( 0 = transfer , 1 = limit order create, ...)
           * @param stop ID of the earliest operation to retrieve
@@ -167,7 +167,7 @@ namespace graphene { namespace app {
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
          vector<operation_history_object> get_account_history_operations(
-            const std::string account_id_or_name,
+            const std::string account_name_or_id,
             int operation_type,
             operation_history_id_type start = operation_history_id_type(),
             operation_history_id_type stop = operation_history_id_type(),
@@ -178,7 +178,7 @@ namespace graphene { namespace app {
           * @brief Get operations relevant to the specified account referenced
           * by an event numbering specific to the account. The current number of operations
           * for the account can be found in the account statistics (or use 0 for start).
-          * @param account_id_or_name The account ID or name whose history should be queried
+          * @param account_name_or_id The account name or ID whose history should be queried
           * @param stop Sequence number of earliest operation. 0 is default and will
           * query 'limit' number of operations.
           * @param limit Maximum number of operations to retrieve (must not exceed 100)
@@ -186,7 +186,7 @@ namespace graphene { namespace app {
           * 0 is default, which will start querying from the most recent operation.
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
-         vector<operation_history_object> get_relative_account_history( const std::string account_id_or_name,
+         vector<operation_history_object> get_relative_account_history( const std::string account_name_or_id,
                                                                         uint64_t stop = 0,
                                                                         unsigned limit = 100,
                                                                         uint64_t start = 0) const;
@@ -220,6 +220,65 @@ namespace graphene { namespace app {
           * it means this API server supports OHLCV data aggregated in 5-minute buckets.
           */
          flat_set<uint32_t> get_market_history_buckets()const;
+
+         /**
+          * @brief Get history of a liquidity pool
+          * @param pool_id ID of the liquidity pool to query
+          * @param start A UNIX timestamp. Optional.
+          *              If specified, only the operations occurred not later than this time will be returned.
+          * @param stop  A UNIX timestamp. Optional.
+          *              If specified, only the operations occurred later than this time will be returned.
+          * @param limit Maximum quantity of operations in the history to retrieve.
+          *              Optional. If not specified, at most 101 records will be returned.
+          * @param operation_type Optional. If specified, only the operations whose type is the specified type
+          *                       will be returned. Otherwise all operations will be returned.
+          * @return operation history of the liquidity pool, ordered by time, most recent first.
+          *
+          * @note
+          * 1. The time must be UTC. The range is (stop, start].
+          * 2. In case when there are more than 100 operations occurred in the same second, this API only returns
+          *    the most recent records, the rest records can be retrieved with the
+          *    @ref get_liquidity_pool_history_by_sequence API.
+          * 3. List of operation type code: 59-creation, 60-deletion, 61-deposit, 62-withdrawal, 63-exchange.
+          * 4. Can only omit one or more arguments in the end of the list, but not one or more in the middle.
+          *    If need to not specify an individual argument, can specify \c null in the place.
+          */
+         vector<liquidity_pool_history_object> get_liquidity_pool_history(
+               liquidity_pool_id_type pool_id,
+               optional<fc::time_point_sec> start = optional<fc::time_point_sec>(),
+               optional<fc::time_point_sec> stop = optional<fc::time_point_sec>(),
+               optional<uint32_t> limit = 101,
+               optional<int64_t> operation_type = optional<int64_t>() )const;
+
+         /**
+          * @brief Get history of a liquidity pool
+          * @param pool_id ID of the liquidity pool to query
+          * @param start An Integer. Optional.
+          *              If specified, only the operations whose sequences are not greater than this will be returned.
+          * @param stop  A UNIX timestamp. Optional.
+          *              If specified, only operations occurred later than this time will be returned.
+          * @param limit Maximum quantity of operations in the history to retrieve.
+          *              Optional. If not specified, at most 101 records will be returned.
+          * @param operation_type Optional. If specified, only the operations whose type is the specified type
+          *                       will be returned. Otherwise all operations will be returned.
+          * @return operation history of the liquidity pool, ordered by time, most recent first.
+          *
+          * @note
+          * 1. The time must be UTC. The range is (stop, start].
+          * 2. In case when there are more than 100 operations occurred in the same second, this API only returns
+          *    the most recent records, the rest records can be retrieved with the
+          *    @ref get_liquidity_pool_history_by_sequence API.
+          * 3. List of operation type code: 59-creation, 60-deletion, 61-deposit, 62-withdrawal, 63-exchange.
+          * 4. Can only omit one or more arguments in the end of the list, but not one or more in the middle.
+          *    If need to not specify an individual argument, can specify \c null in the place.
+          */
+         vector<liquidity_pool_history_object> get_liquidity_pool_history_by_sequence(
+               liquidity_pool_id_type pool_id,
+               optional<uint64_t> start = optional<uint64_t>(),
+               optional<fc::time_point_sec> stop = optional<fc::time_point_sec>(),
+               optional<uint32_t> limit = 101,
+               optional<int64_t> operation_type = optional<int64_t>() )const;
+
       private:
            application& _app;
            graphene::app::database_api database_api;
@@ -503,8 +562,8 @@ namespace graphene { namespace app {
          /**
           * @brief Get grouped limit orders in given market.
           *
-          * @param base_asset ID or symbol of asset being sold
-          * @param quote_asset ID or symbol of asset being purchased
+          * @param base_asset symbol or ID of asset being sold
+          * @param quote_asset symbol or ID of asset being purchased
           * @param group Maximum price diff within each order group, have to be one of configured values
           * @param start Optional price to indicate the first order group to retrieve
           * @param limit Maximum number of order groups to retrieve (must not exceed 101)
@@ -534,12 +593,12 @@ namespace graphene { namespace app {
          /**
           * @brief Get all stored objects of an account in a particular catalog
           *
-          * @param account The account ID or name to get info from
+          * @param account_name_or_id The account name or ID to get info from
           * @param catalog Category classification. Each account can store multiple catalogs.
           *
           * @return The vector of objects of the account or empty
           */
-         vector<account_storage_object> get_storage_info(std::string account_id_or_name, std::string catalog)const;
+         vector<account_storage_object> get_storage_info(std::string account_name_or_id, std::string catalog)const;
 
    private:
          application& _app;
@@ -645,6 +704,8 @@ FC_API(graphene::app::history_api,
        (get_fill_order_history)
        (get_market_history)
        (get_market_history_buckets)
+       (get_liquidity_pool_history)
+       (get_liquidity_pool_history_by_sequence)
      )
 FC_API(graphene::app::block_api,
        (get_blocks)

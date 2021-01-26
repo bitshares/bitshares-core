@@ -109,6 +109,7 @@ namespace graphene { namespace chain {
 
          /**
           * @brief Rebuild object graph from block history and open detabase
+          * @param data_dir the path to store the database
           *
           * This method may be called after or instead of @ref database::open, and will rebuild the object graph by
           * replaying blockchain history. When this method exits successfully, the database will be open.
@@ -117,6 +118,7 @@ namespace graphene { namespace chain {
 
          /**
           * @brief wipe Delete database from disk, and potentially the raw chain as well.
+          * @param data_dir the path to store the database
           * @param include_blocks If true, delete the raw chain as well as the database.
           *
           * Will close the database before wiping. Database will be closed when this function returns.
@@ -330,7 +332,7 @@ namespace graphene { namespace chain {
          void deposit_market_fee_vesting_balance(const account_id_type &account_id, const asset &delta);
         /**
           * @brief Retrieve a particular account's market fee vesting balance in a given asset
-          * @param owner Account whose balance should be retrieved
+          * @param account_id Account whose balance should be retrieved
           * @param asset_id ID of the asset to get balance in
           * @return owner's balance in asset
           */
@@ -370,7 +372,8 @@ namespace graphene { namespace chain {
 
          //////////////////// db_market.cpp ////////////////////
 
-         /// @{ @group Market Helpers
+         /// @ingroup Market Helpers
+         /// @{
          void globally_settle_asset( const asset_object& bitasset, const price& settle_price );
          void cancel_settle_order(const force_settlement_object& order, bool create_virtual_op = true);
          void cancel_limit_order(const limit_order_object& order, bool create_virtual_op = true, bool skip_cancel_fee = false);
@@ -387,7 +390,8 @@ namespace graphene { namespace chain {
       public:
          /**
           * @brief Process a new limit order through the markets
-          * @param order The new order to process
+          * @param new_order_object The new order to process
+          * @param allow_black_swan whether to allow a black swan event
           * @return true if order was completely filled; false otherwise
           *
           * This function takes a new limit order, and runs the markets attempting to match it with existing orders
@@ -685,24 +689,5 @@ namespace graphene { namespace chain {
          const witness_schedule_object*         _p_witness_schedule_obj    = nullptr;
          ///@}
    };
-
-   namespace detail
-   {
-       template<int... Is>
-       struct seq { };
-
-       template<int N, int... Is>
-       struct gen_seq : gen_seq<N - 1, N - 1, Is...> { };
-
-       template<int... Is>
-       struct gen_seq<0, Is...> : seq<Is...> { };
-
-       template<typename T, int... Is>
-       void for_each(T&& t, const account_object& a, seq<Is...>)
-       {
-           auto l = { (std::get<Is>(t)(a), 0)... };
-           (void)l;
-       }
-   }
 
 } }

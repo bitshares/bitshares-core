@@ -68,10 +68,10 @@ string operation_printer::print_memo( const fc::optional<graphene::protocol::mem
          out << " -- Unlock wallet to see memo.";
       } else {
          try {
-            FC_ASSERT( wallet._keys.count(memo->to) || wallet._keys.count(memo->from),
+            FC_ASSERT( wallet._keys.count(memo->to) > 0 || wallet._keys.count(memo->from) > 0,
                        "Memo is encrypted to a key ${to} or ${from} not in this wallet.",
                        ("to", memo->to)("from",memo->from) );
-            if( wallet._keys.count(memo->to) ) {
+            if( wallet._keys.count(memo->to) > 0 ) {
                auto my_key = wif_to_key(wallet._keys.at(memo->to));
                FC_ASSERT(my_key, "Unable to recover private key to decrypt memo. Wallet may be corrupted.");
                outstr = memo->get_message(*my_key, memo->from);

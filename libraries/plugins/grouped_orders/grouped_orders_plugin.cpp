@@ -270,7 +270,7 @@ void grouped_orders_plugin::plugin_set_program_options(
 void grouped_orders_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 { try {
 
-   if( options.count( "tracked-groups" ) )
+   if( options.count( "tracked-groups" ) > 0 )
    {
       const std::string& groups = options["tracked-groups"].as<string>();
       my->_tracked_groups = fc::json::from_string(groups).as<flat_set<uint16_t>>( 2 );
