@@ -35,6 +35,7 @@
 #include <graphene/chain/confidential_object.hpp>
 #include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
+#include <graphene/chain/ticket_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 
@@ -119,6 +120,7 @@ class database_api
        * - lookup_accounts
        * - get_full_accounts
        * - get_htlc
+       * - get_liquidity_pools
        * - get_liquidity_pools_by_share_asset
        *
        * Note: auto-subscription is enabled by default
@@ -597,30 +599,31 @@ class database_api
       vector<market_ticker> get_top_markets(uint32_t limit)const;
 
       /**
-       * @brief Returns recent trades for the market base:quote, ordered by time, most recent first.
-       * Note: Currently, timezone offsets are not supported. The time must be UTC. The range is [stop, start).
-       *       In case when there are more than 100 trades occurred in the same second, this API only returns
-       *       the first 100 records, can use another API @ref get_trade_history_by_sequence to query for the rest.
+       * @brief Get market transactions occurred in the market base:quote, ordered by time, most recent first.
        * @param base symbol or ID of the base asset
        * @param quote symbol or ID of the quote asset
-       * @param start Start time as a UNIX timestamp, the latest trade to retrieve
-       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
-       * @param limit Number of trasactions to retrieve, capped at 100.
-       * @return Recent transactions in the market
+       * @param start Start time as a UNIX timestamp, the latest transactions to retrieve
+       * @param stop Stop time as a UNIX timestamp, the earliest transactions to retrieve
+       * @param limit Maximum quantity of transactions to retrieve, capped at 100.
+       * @return Transactions in the market
+       * @note The time must be UTC, timezone offsets are not supported. The range is [stop, start].
+       *       In case when there are more than 100 transactions occurred in the same second,
+       *       this API only returns the most recent 100 records, the rest records can be retrieved
+       *       with the @ref get_trade_history_by_sequence API.
        */
       vector<market_trade> get_trade_history( const string& base, const string& quote,
                                               fc::time_point_sec start, fc::time_point_sec stop,
                                               unsigned limit = 100 )const;
 
       /**
-       * @brief Returns trades for the market base:quote, ordered by time, most recent first.
-       * Note: Currently, timezone offsets are not supported. The time must be UTC. The range is [stop, start).
+       * @brief Get market transactions occurred in the market base:quote, ordered by time, most recent first.
        * @param base symbol or ID of the base asset
        * @param quote symbol or ID of the quote asset
-       * @param start Start sequence as an Integer, the latest trade to retrieve
-       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
-       * @param limit Number of trasactions to retrieve, capped at 100
+       * @param start Start sequence as an Integer, the latest transaction to retrieve
+       * @param stop Stop time as a UNIX timestamp, the earliest transactions to retrieve
+       * @param limit Maximum quantity of transactions to retrieve, capped at 100
        * @return Transactions in the market
+       * @note The time must be UTC, timezone offsets are not supported. The range is [stop, start].
        */
       vector<market_trade> get_trade_history_by_sequence( const string& base, const string& quote,
                                                           int64_t start, fc::time_point_sec stop,
@@ -632,10 +635,28 @@ class database_api
       /////////////////////
 
       /**
+       * @brief Get a list of liquidity pools
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start liquidity pool id, fetch pools whose IDs are greater than or equal to this ID
+       * @param with_statistics Whether to return statistics
+       * @return The liquidity pools
+       *
+       * @note
+       * 1. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 2. @p start_id can be omitted or be null, if so the api will return the "first page" of pools
+       * 3. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<extended_liquidity_pool_object> list_liquidity_pools(
+            optional<uint32_t> limit = 101,
+            optional<liquidity_pool_id_type> start_id = optional<liquidity_pool_id_type>(),
+            optional<bool> with_statistics = false )const;
+
+      /**
        * @brief Get a list of liquidity pools by the symbol or ID of the first asset in the pool
        * @param asset_symbol_or_id symbol name or ID of the asset
        * @param limit  The limitation of items each query can fetch, not greater than a configured value
        * @param start_id  Start liquidity pool id, fetch pools whose IDs are greater than or equal to this ID
+       * @param with_statistics Whether to return statistics
        * @return The liquidity pools
        *
        * @note
@@ -644,16 +665,18 @@ class database_api
        * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of pools
        * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
        */
-      vector<liquidity_pool_object> get_liquidity_pools_by_asset_a(
+      vector<extended_liquidity_pool_object> get_liquidity_pools_by_asset_a(
             std::string asset_symbol_or_id,
             optional<uint32_t> limit = 101,
-            optional<liquidity_pool_id_type> start_id = optional<liquidity_pool_id_type>() )const;
+            optional<liquidity_pool_id_type> start_id = optional<liquidity_pool_id_type>(),
+            optional<bool> with_statistics = false )const;
 
       /**
        * @brief Get a list of liquidity pools by the symbol or ID of the second asset in the pool
        * @param asset_symbol_or_id symbol name or ID of the asset
        * @param limit  The limitation of items each query can fetch, not greater than a configured value
        * @param start_id  Start liquidity pool id, fetch pools whose IDs are greater than or equal to this ID
+       * @param with_statistics Whether to return statistics
        * @return The liquidity pools
        *
        * @note
@@ -662,10 +685,11 @@ class database_api
        * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of pools
        * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
        */
-      vector<liquidity_pool_object> get_liquidity_pools_by_asset_b(
+      vector<extended_liquidity_pool_object> get_liquidity_pools_by_asset_b(
             std::string asset_symbol_or_id,
             optional<uint32_t> limit = 101,
-            optional<liquidity_pool_id_type> start_id = optional<liquidity_pool_id_type>() )const;
+            optional<liquidity_pool_id_type> start_id = optional<liquidity_pool_id_type>(),
+            optional<bool> with_statistics = false )const;
 
       /**
        * @brief Get a list of liquidity pools by the symbols or IDs of the two assets in the pool
@@ -673,6 +697,7 @@ class database_api
        * @param asset_symbol_or_id_b symbol name or ID of the other asset
        * @param limit  The limitation of items each query can fetch, not greater than a configured value
        * @param start_id  Start liquidity pool id, fetch pools whose IDs are greater than or equal to this ID
+       * @param with_statistics Whether to return statistics
        * @return The liquidity pools
        *
        * @note
@@ -682,11 +707,29 @@ class database_api
        * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of pools
        * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
        */
-      vector<liquidity_pool_object> get_liquidity_pools_by_both_assets(
+      vector<extended_liquidity_pool_object> get_liquidity_pools_by_both_assets(
             std::string asset_symbol_or_id_a,
             std::string asset_symbol_or_id_b,
             optional<uint32_t> limit = 101,
-            optional<liquidity_pool_id_type> start_id = optional<liquidity_pool_id_type>() )const;
+            optional<liquidity_pool_id_type> start_id = optional<liquidity_pool_id_type>(),
+            optional<bool> with_statistics = false )const;
+
+      /**
+       * @brief Get a list of liquidity pools by their IDs
+       * @param ids IDs of the liquidity pools
+       * @param subscribe @a true to subscribe to the queried objects; @a false to not subscribe;
+       *                  @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                  (see @ref set_auto_subscription)
+       * @param with_statistics Whether to return statistics
+       * @return The liquidity pools
+       *
+       * @note if an ID in the list can not be found,
+       *       the corresponding data in the returned list is null.
+       */
+      vector<optional<extended_liquidity_pool_object>> get_liquidity_pools(
+            const vector<liquidity_pool_id_type>& ids,
+            optional<bool> subscribe = optional<bool>(),
+            optional<bool> with_statistics = false )const;
 
       /**
        * @brief Get a list of liquidity pools by their share asset symbols or IDs
@@ -694,14 +737,36 @@ class database_api
        * @param subscribe @a true to subscribe to the queried objects; @a false to not subscribe;
        *                  @a null to subscribe or not subscribe according to current auto-subscription setting
        *                  (see @ref set_auto_subscription)
+       * @param with_statistics Whether to return statistics
        * @return The liquidity pools that the assets are for
        *
        * @note if an asset in the list can not be found or is not a share asset of any liquidity pool,
        *       the corresponding data in the returned list is null.
        */
-      vector<optional<liquidity_pool_object>> get_liquidity_pools_by_share_asset(
+      vector<optional<extended_liquidity_pool_object>> get_liquidity_pools_by_share_asset(
             const vector<std::string>& asset_symbols_or_ids,
-            optional<bool> subscribe = optional<bool>() )const;
+            optional<bool> subscribe = optional<bool>(),
+            optional<bool> with_statistics = false )const;
+
+      /**
+       * @brief Get a list of liquidity pools by the name or ID of the owner account
+       * @param account_name_or_id name or ID of the owner account
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start share asset id, fetch pools whose share asset IDs are greater than or equal to this ID
+       * @param with_statistics Whether to return statistics
+       * @return The liquidity pools
+       *
+       * @note
+       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of pools
+       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<extended_liquidity_pool_object> get_liquidity_pools_by_owner(
+            std::string account_name_or_id,
+            optional<uint32_t> limit = 101,
+            optional<asset_id_type> start_id = optional<asset_id_type>(),
+            optional<bool> with_statistics = false )const;
 
       ///////////////
       // Witnesses //
@@ -991,6 +1056,43 @@ class database_api
       vector<htlc_object> list_htlcs(const htlc_id_type start, uint32_t limit) const;
 
 
+      /////////////
+      // Tickets //
+      /////////////
+
+      /**
+       * @brief Get a list of tickets
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start ticket id, fetch tickets whose IDs are greater than or equal to this ID
+       * @return The tickets
+       *
+       * @note
+       * 1. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 2. @p start_id can be omitted or be null, if so the api will return the "first page" of tickets
+       * 3. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<ticket_object> list_tickets(
+            optional<uint32_t> limit = 101,
+            optional<ticket_id_type> start_id = optional<ticket_id_type>() )const;
+
+      /**
+       * @brief Get a list of tickets by the name or ID of the owner account
+       * @param account_name_or_id name or ID of the owner account
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start ticket id, fetch tickets whose IDs are greater than or equal to this ID
+       * @return The tickets
+       *
+       * @note
+       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of tickets
+       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<ticket_object> get_tickets_by_account(
+            std::string account_name_or_id,
+            optional<uint32_t> limit = 101,
+            optional<ticket_id_type> start_id = optional<ticket_id_type>() )const;
+
 private:
       std::shared_ptr< database_api_impl > my;
 };
@@ -1074,10 +1176,13 @@ FC_API(graphene::app::database_api,
    (get_trade_history_by_sequence)
 
    // Liquidity pools
+   (list_liquidity_pools)
    (get_liquidity_pools_by_asset_a)
    (get_liquidity_pools_by_asset_b)
    (get_liquidity_pools_by_both_assets)
+   (get_liquidity_pools)
    (get_liquidity_pools_by_share_asset)
+   (get_liquidity_pools_by_owner)
 
    // Witnesses
    (get_witnesses)
@@ -1125,4 +1230,8 @@ FC_API(graphene::app::database_api,
    (get_htlc_by_from)
    (get_htlc_by_to)
    (list_htlcs)
+
+   // Tickets
+   (list_tickets)
+   (get_tickets_by_account)
 )

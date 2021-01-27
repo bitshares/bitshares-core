@@ -140,7 +140,7 @@ void custom_operations_plugin::plugin_initialize(const boost::program_options::v
 {
    database().add_index< primary_index< account_storage_index  > >();
 
-   if (options.count("custom-operations-start-block")) {
+   if (options.count("custom-operations-start-block") > 0) {
       my->_start_block = options["custom-operations-start-block"].as<uint32_t>();
    }
 

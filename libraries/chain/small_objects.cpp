@@ -63,6 +63,8 @@ FC_REFLECT_DERIVED_NO_TYPENAME(
    (worker_budget)
    (leftover_worker_funds)
    (supply_delta)
+   (max_supply)
+   (current_supply)
 )
 
 FC_REFLECT_DERIVED_NO_TYPENAME(
@@ -197,17 +199,6 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::worker_object, (graphene::db::o
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::custom_authority_object, (graphene::db::object),
                                (account)(enabled)(valid_from)(valid_to)(operation_type)
                                (auth)(restrictions)(restriction_counter) )
-
-FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::liquidity_pool_object, (graphene::db::object),
-                    (asset_a)
-                    (asset_b)
-                    (balance_a)
-                    (balance_b)
-                    (share_asset)
-                    (taker_fee_percent)
-                    (withdrawal_fee_percent)
-                    (virtual_value)
-                  )
 
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::balance_object )

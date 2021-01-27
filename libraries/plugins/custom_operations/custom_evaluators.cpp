@@ -77,7 +77,7 @@ vector<object_id_type> custom_generic_evaluator::do_apply(const account_storage_
          else
          {
             try {
-               _db->modify(*itr, [&op, this, &row](account_storage_object &aso) {
+               _db->modify(*itr, [&row](account_storage_object &aso) {
                   if(row.second.valid())
                      aso.value = fc::json::from_string(*row.second);
                   else
