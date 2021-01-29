@@ -6,7 +6,7 @@ The web browser based wallet is [BitShares UI](https://github.com/bitshares/bits
 
 Visit [BitShares.org](https://bitshares.org/) to learn about BitShares and join the community at [BitSharesTalk.org](https://bitsharestalk.org/).
 
-Information for developers can be found in the [BitShares Developer Portal](https://dev.bitshares.works/). Users interested in how BitShares works can go to the [BitShares Documentation](https://how.bitshares.works/) site.
+Information for developers can be found in the [Wiki](https://github.com/bitshares/bitshares-core/wiki) and the [BitShares Developer Portal](https://dev.bitshares.works/). Users interested in how BitShares works can go to the [BitShares Documentation](https://how.bitshares.works/) site.
 
 Visit [Awesome BitShares](https://github.com/bitshares/awesome-bitshares) to find more resources and links.
 
@@ -30,9 +30,11 @@ Getting Started
 Build instructions and additional documentation are available in the
 [Wiki](https://github.com/bitshares/bitshares-core/wiki).
 
+Prebuilt binaries can be found in the [releases page](https://github.com/bitshares/bitshares-core/releases) for download.
+
 ### Build
 
-We recommend building on Ubuntu 16.04 LTS (64-bit)
+We recommend building on Ubuntu 20.04 LTS (64-bit)
 
 **Build Dependencies:**
 
@@ -63,12 +65,12 @@ We recommend building on Ubuntu 16.04 LTS (64-bit)
 **NOTE:**
 
 * BitShares requires a 64-bit operating system to build, and will not build on a 32-bit OS. Tested operating systems:
-  * Linux (heavily tested with Ubuntu 18.04 LTS and Ubuntu 16.04 LTS)
+  * Linux (heavily tested with Ubuntu LTS releases)
   * macOS (various versions)
   * Windows (various versions, Visual Studio and MinGW)
   * OpenBSD (various versions)
 
-* BitShares requires [Boost](https://www.boost.org/) libraries to build, supports version `1.58` to `1.69`.
+* BitShares requires [Boost](https://www.boost.org/) libraries to build, supports version `1.58` to `1.71`.
 Newer versions may work, but have not been tested.
 If your system came pre-installed with a version of Boost libraries that you do not wish to use, you may
 manually build your preferred version and use it with BitShares by specifying it on the CMake command line.
