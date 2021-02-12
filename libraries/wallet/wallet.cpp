@@ -103,7 +103,6 @@ namespace graphene { namespace wallet {
 
       // Create as many derived owner keys as requested
       vector<brain_key_info> results;
-      brain_key = graphene::wallet::detail::normalize_brain_key(brain_key);
       for (int i = 0; i < number_of_desired_keys; ++i) {
         fc::ecc::private_key priv_key = graphene::wallet::detail::derive_private_key( brain_key, i );
 
