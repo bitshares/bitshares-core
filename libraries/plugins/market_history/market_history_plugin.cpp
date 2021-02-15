@@ -780,7 +780,7 @@ void market_history_plugin::plugin_initialize(const boost::program_options::vari
 
    database().add_index< primary_index< bucket_index  > >();
    database().add_index< primary_index< history_index  > >();
-   database().add_index< primary_index< market_ticker_index  > >();
+   database().add_index< primary_index< market_ticker_index, 8 > >(); // 256 markets per chunk
    database().add_index< primary_index< simple_index< market_ticker_meta_object > > >();
 
    database().add_index< primary_index< liquidity_pool_history_index > >();
