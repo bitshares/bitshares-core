@@ -393,7 +393,9 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(
     while (limit > 0 && start <= stats.total_ops) {
         uint32_t min_limit = std::min<uint32_t> (100, limit);
         auto current = my->_remote_hist->get_account_history_by_operations(name, operation_types, start, min_limit);
-        for (auto& obj : current.operation_history_objs) {
+        for( auto it = current.operation_history_objs.rbegin(); it != current.operation_history_objs.rend(); ++it )
+        {
+            auto& obj = *it;
             std::stringstream ss;
             auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj));
 
