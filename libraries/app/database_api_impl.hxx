@@ -153,6 +153,11 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             optional<uint32_t> limit = 101,
             optional<liquidity_pool_id_type> start_id = optional<liquidity_pool_id_type>(),
             optional<bool> with_statistics = false )const;
+      vector<extended_liquidity_pool_object> get_liquidity_pools_by_one_asset(
+            std::string asset_symbol_or_id,
+            optional<uint32_t> limit = 101,
+            optional<liquidity_pool_id_type> start_id = optional<liquidity_pool_id_type>(),
+            optional<bool> with_statistics = false )const;
       vector<extended_liquidity_pool_object> get_liquidity_pools_by_both_assets(
             std::string asset_symbol_or_id_a,
             std::string asset_symbol_or_id_b,
@@ -465,6 +470,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       const application_options* _app_options = nullptr;
 
       const graphene::api_helper_indexes::amount_in_collateral_index* amount_in_collateral_index;
+      const graphene::api_helper_indexes::asset_in_liquidity_pools_index* asset_in_liquidity_pools_index;
 };
 
 } } // graphene::app
