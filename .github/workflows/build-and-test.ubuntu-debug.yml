@@ -71,13 +71,13 @@ jobs:
               ..
         popd
     - name: Load Cache
-      uses: actions/cache@v1
+      uses: actions/cache@v2
       with:
         path: ccache
-        key: ccache-debug-${{ github.ref }}-${{ github.sha }}
+        key: ccache-debug-${{ matrix.os }}-${{ github.ref }}-${{ github.sha }}
         restore-keys: |
-          ccache-debug-${{ github.ref }}-
-          ccache-debug-
+          ccache-debug-${{ matrix.os }}-${{ github.ref }}-
+          ccache-debug-${{ matrix.os }}-
     - name: Build
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
