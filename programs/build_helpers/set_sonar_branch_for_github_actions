@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# Relevant variables set by Github Actions:
+# GITHUB_HEAD_REF: Only set for pull request events.
+#                  The name of the head branch.
+# GITHUB_BASE_REF: Only set for pull request events.
+#                  The name of the base branch.
+# GITHUB_REF: The branch or tag ref that triggered the workflow.
+#             For example, refs/heads/feature-branch-1.
+#             If neither a branch or tag is available for the event type,
+#             the variable will not exist.
+
+if [ "$#" != 1 ]; then
+    echo "Usage: $0 <sonar-properties-file>" 1>&2
+    exit 1
+fi
+
+clear_branch () {
+    sed -i '/sonar\.branch/d' "$1"
+}
+
+if [ -n "$GITHUB_HEAD_REF" ]; then
+    # PRs work per default, remove sonar.branch.* and add sonar.pullrequest.*
+    echo "Detected PR '$GITHUB_REF' from '$GITHUB_HEAD_REF' to '$GITHUB_BASE_REF'"
+    PULLREF=${GITHUB_REF#refs/pull/}
+    PULLKEY=${PULLREF%/merge}
+    clear_branch "$1"
+    echo "sonar.pullrequest.key=$PULLKEY" >>"$1"
+    echo "sonar.pullrequest.base=$GITHUB_BASE_REF" >>"$1"
+    echo "sonar.pullrequest.branch=$GITHUB_HEAD_REF" >>"$1"
+else
+    ORIGINAL_TARGET="$( grep 'sonar\.branch\.target' "$1" | sed 's=^.*[:=] *==' )"
+    TARGET="$ORIGINAL_TARGET"
+
+    if [[ ${GITHUB_REF} == "refs/tags/"* ]]; then
+        # Tag build is either master or testnet
+        echo "Detected tag '${GITHUB_REF}'"
+        BRANCH="${GITHUB_REF#refs/}"
+        case "$BRANCH" in
+	    *test*) TARGET=testnet; ;;
+	    *)	TARGET=master; ;;
+        esac
+    else
+        BRANCH="${GITHUB_REF#refs/heads/}"
+        case "$BRANCH" in
+	    master|develop|testnet|hardfork)
+	        # Long-lived branches stand for themselves, no target
+	        echo "Detected long-lived branch '$BRANCH'"
+	        TARGET=
+	        ;;
+	    *test*release*)
+	        # Testnet release branch will be merged into testnet
+	        echo "Detected testnet release branch '$BRANCH'"
+	        TARGET=testnet
+	        ;;
+	    *release*)
+	        # Release branch will be merged into default (master)
+	        echo "Detected release branch '$BRANCH'"
+	        TARGET=master
+	        ;;
+	    *)
+	        # All other branches should have sonar.branch.target in their
+	        # sonar.properties, leave it unchanged
+	        echo "Detected normal branch '$BRANCH'"
+        esac
+    fi
+
+    echo "Branch '$BRANCH', target '$TARGET'"
+
+    if [ "x$TARGET" != "x$ORIGINAL_TARGET" ]; then
+        clear_branch "$1"
+        if [ -n "$TARGET" ]; then
+            echo "sonar.branch.target=$TARGET" >>"$1"
+        fi
+    fi
+    if [ -n "$BRANCH" ]; then
+        echo "sonar.branch.name=$BRANCH" >>"$1"
+    fi
+
+fi
+
+exit 0
