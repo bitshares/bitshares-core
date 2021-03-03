@@ -32,6 +32,8 @@ using namespace chain;
 /**
  *  @brief This secondary index tracks how much of each asset is locked up as collateral for MPAs, and how much
  *         collateral is backing an MPA in total.
+ *  @note This is implemented with \c flat_map considering there aren't too many MPAs and PMs in the system thus
+ *        the performance would be acceptable.
  */
 class amount_in_collateral_index : public secondary_index
 {
@@ -47,6 +49,26 @@ class amount_in_collateral_index : public secondary_index
    private:
       flat_map<asset_id_type, share_type> in_collateral;
       flat_map<asset_id_type, share_type> backing_collateral;
+};
+
+/**
+ *  @brief This secondary index maintains a map to make it easier to find liquidity pools by any asset in the pool.
+ *  @note This is implemented with \c flat_map and \c flat_set considering there aren't too many liquidity pools
+ *        in the system thus the performance would be acceptable.
+ */
+class asset_in_liquidity_pools_index: public secondary_index
+{
+   public:
+      virtual void object_inserted( const object& obj ) override;
+      virtual void object_removed( const object& obj ) override;
+      virtual void about_to_modify( const object& before ) override;
+      virtual void object_modified( const object& after ) override;
+
+      const flat_set<liquidity_pool_id_type>& get_liquidity_pools_by_asset( const asset_id_type& a )const;
+
+   private:
+      flat_set<liquidity_pool_id_type> empty_set;
+      flat_map<asset_id_type, flat_set<liquidity_pool_id_type>> asset_in_pools_map;
 };
 
 namespace detail
@@ -72,7 +94,8 @@ class api_helper_indexes : public graphene::app::plugin
       std::unique_ptr<detail::api_helper_indexes_impl> my;
 
    private:
-      amount_in_collateral_index* amount_in_collateral = nullptr;
+      amount_in_collateral_index* amount_in_collateral_idx = nullptr;
+      asset_in_liquidity_pools_index* asset_in_liquidity_pools_idx = nullptr;
 };
 
 } } //graphene::template
