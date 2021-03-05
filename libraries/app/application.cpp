@@ -571,7 +571,7 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
            ("w",witness_account.name)
            ("i",last_irr)("d",blk_msg.block.block_num()-last_irr) );
    }
-   GRAPHENE_ASSERT( latency.count()/1000 > -5000,
+   GRAPHENE_ASSERT( latency.count()/1000 > -2500, // 2.5 seconds
                     graphene::net::block_timestamp_in_future_exception,
                     "Rejecting block with timestamp in the future", );
 
