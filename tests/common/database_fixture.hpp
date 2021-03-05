@@ -211,6 +211,9 @@ struct database_fixture {
    bool hf1270 = false;
    bool bsip77 = false;
 
+   string es_index_prefix; ///< Index prefix for elasticsearch plugin
+   string es_obj_index_prefix; ///< Index prefix for es_objects plugin
+
    database_fixture(const fc::time_point_sec &initial_timestamp =
                         fc::time_point_sec(GRAPHENE_TESTING_GENESIS_TIMESTAMP));
    ~database_fixture();
