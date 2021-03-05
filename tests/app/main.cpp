@@ -336,6 +336,11 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Generating block on db2" );
       fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
 
+      // the other node will reject the block if its timestamp is in the future, so we wait
+      fc::wait_for( BROADCAST_WAIT_TIME, [db2] () {
+         return db2->get_slot_time(1) <= fc::time_point::now();
+      });
+
       auto block_1 = db2->generate_block(
          db2->get_slot_time(1),
          db2->get_scheduled_witness(1),
