@@ -51,6 +51,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
 
       CURL *curl; // curl handler
       curl = curl_easy_init();
+      curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 
       graphene::utilities::ES es;
       es.curl = curl;
@@ -140,6 +141,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
 
       CURL *curl; // curl handler
       curl = curl_easy_init();
+      curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 
       graphene::utilities::ES es;
       es.curl = curl;
@@ -195,6 +197,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_suite) {
 
       CURL *curl; // curl handler
       curl = curl_easy_init();
+      curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 
       graphene::utilities::ES es;
       es.curl = curl;
@@ -221,6 +224,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
    try {
       CURL *curl; // curl handler
       curl = curl_easy_init();
+      curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 
       graphene::utilities::ES es;
       es.curl = curl;

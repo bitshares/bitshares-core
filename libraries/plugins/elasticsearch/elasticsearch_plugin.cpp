@@ -38,7 +38,10 @@ class elasticsearch_plugin_impl
    public:
       elasticsearch_plugin_impl(elasticsearch_plugin& _plugin)
          : _self( _plugin )
-      {  curl = curl_easy_init(); }
+      {
+         curl = curl_easy_init();
+         curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
+      }
       virtual ~elasticsearch_plugin_impl();
 
       bool update_account_histories( const signed_block& b );
@@ -650,6 +653,7 @@ graphene::utilities::ES elasticsearch_plugin::prepareHistoryQuery(string query)
 {
    CURL *curl;
    curl = curl_easy_init();
+   curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 
    graphene::utilities::ES es;
    es.curl = curl;
