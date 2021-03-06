@@ -21,4 +21,20 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include "../common/init_unit_test_suite.hpp"
+
+#include <fc/thread/thread.hpp>
+#include <boost/test/included/unit_test.hpp>
+
+namespace fc {
+
+   /** Waits for F() to return true before max_duration has passed.
+    */
+   template<typename Functor>
+   static void wait_for( const fc::microseconds max_duration, const Functor&& f )
+   {
+      const auto start = fc::time_point::now();
+      while( !f() && fc::time_point::now() < start + max_duration )
+         fc::usleep(fc::milliseconds(100));
+      BOOST_REQUIRE( f() );
+   }
+}

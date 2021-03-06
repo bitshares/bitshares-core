@@ -54,7 +54,8 @@
 
 using namespace graphene::chain::test;
 
-uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP = 1431700000;
+extern uint32_t    GRAPHENE_TESTING_GENESIS_TIMESTAMP;
+extern std::string GRAPHENE_TESTING_ES_URL;
 
 namespace graphene { namespace chain {
 
@@ -292,14 +293,22 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
          current_test_name == "elasticsearch_history_api") {
       auto esplugin = app.register_plugin<graphene::elasticsearch::elasticsearch_plugin>(true);
 
-      options.insert(std::make_pair("elasticsearch-node-url", boost::program_options::variable_value(string("http://localhost:9200/"), false)));
-      options.insert(std::make_pair("elasticsearch-bulk-replay", boost::program_options::variable_value(uint32_t(2), false)));
-      options.insert(std::make_pair("elasticsearch-bulk-sync", boost::program_options::variable_value(uint32_t(2), false)));
-      options.insert(std::make_pair("elasticsearch-start-es-after-block", boost::program_options::variable_value(uint32_t(0), false)));
-      options.insert(std::make_pair("elasticsearch-visitor", boost::program_options::variable_value(false, false)));
-      options.insert(std::make_pair("elasticsearch-operation-object", boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("elasticsearch-operation-string", boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("elasticsearch-mode", boost::program_options::variable_value(uint16_t(2), false)));
+      options.insert(std::make_pair("elasticsearch-node-url",
+            boost::program_options::variable_value(GRAPHENE_TESTING_ES_URL, false)));
+      options.insert(std::make_pair("elasticsearch-bulk-replay",
+            boost::program_options::variable_value(uint32_t(2), false)));
+      options.insert(std::make_pair("elasticsearch-bulk-sync",
+            boost::program_options::variable_value(uint32_t(2), false)));
+      options.insert(std::make_pair("elasticsearch-start-es-after-block",
+            boost::program_options::variable_value(uint32_t(0), false)));
+      options.insert(std::make_pair("elasticsearch-visitor",
+            boost::program_options::variable_value(false, false)));
+      options.insert(std::make_pair("elasticsearch-operation-object",
+            boost::program_options::variable_value(true, false)));
+      options.insert(std::make_pair("elasticsearch-operation-string",
+            boost::program_options::variable_value(true, false)));
+      options.insert(std::make_pair("elasticsearch-mode",
+            boost::program_options::variable_value(uint16_t(2), false)));
 
       es_index_prefix = string("bitshares-") + fc::to_string(uint64_t(rand())) + "-";
       BOOST_TEST_MESSAGE( string("ES index prefix is ") + es_index_prefix );
@@ -319,15 +328,24 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    if(current_test_name == "elasticsearch_objects" || current_test_name == "elasticsearch_suite") {
       auto esobjects_plugin = app.register_plugin<graphene::es_objects::es_objects_plugin>(true);
 
-      options.insert(std::make_pair("es-objects-elasticsearch-url", boost::program_options::variable_value(string("http://localhost:9200/"), false)));
-      options.insert(std::make_pair("es-objects-bulk-replay", boost::program_options::variable_value(uint32_t(2), false)));
-      options.insert(std::make_pair("es-objects-bulk-sync", boost::program_options::variable_value(uint32_t(2), false)));
-      options.insert(std::make_pair("es-objects-proposals", boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("es-objects-accounts", boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("es-objects-assets", boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("es-objects-balances", boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("es-objects-limit-orders", boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("es-objects-asset-bitasset", boost::program_options::variable_value(true, false)));
+      options.insert(std::make_pair("es-objects-elasticsearch-url",
+            boost::program_options::variable_value(GRAPHENE_TESTING_ES_URL, false)));
+      options.insert(std::make_pair("es-objects-bulk-replay",
+            boost::program_options::variable_value(uint32_t(2), false)));
+      options.insert(std::make_pair("es-objects-bulk-sync",
+            boost::program_options::variable_value(uint32_t(2), false)));
+      options.insert(std::make_pair("es-objects-proposals",
+            boost::program_options::variable_value(true, false)));
+      options.insert(std::make_pair("es-objects-accounts",
+            boost::program_options::variable_value(true, false)));
+      options.insert(std::make_pair("es-objects-assets",
+            boost::program_options::variable_value(true, false)));
+      options.insert(std::make_pair("es-objects-balances",
+            boost::program_options::variable_value(true, false)));
+      options.insert(std::make_pair("es-objects-limit-orders",
+            boost::program_options::variable_value(true, false)));
+      options.insert(std::make_pair("es-objects-asset-bitasset",
+            boost::program_options::variable_value(true, false)));
 
       es_obj_index_prefix = string("objects-") + fc::to_string(uint64_t(rand())) + "-";
       BOOST_TEST_MESSAGE( string("ES_OBJ index prefix is ") + es_obj_index_prefix );
@@ -401,6 +419,41 @@ database_fixture::~database_fixture()
    } catch (...) {
       BOOST_FAIL( "Uncaught exception in ~database_fixture" );
    }
+
+   // cleanup data in ES
+   if( !es_index_prefix.empty() || !es_obj_index_prefix.empty() )
+   {
+      CURL *curl; // curl handler
+      curl = curl_easy_init();
+      curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
+
+      graphene::utilities::ES es;
+      es.curl = curl;
+      es.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
+
+      if( !es_index_prefix.empty() )
+      {
+         es.index_prefix = es_index_prefix;
+         // delete all
+         try {
+            graphene::utilities::deleteAll(es);
+         } catch (...) {
+            // nothing to do
+         }
+      }
+
+      if( !es_obj_index_prefix.empty() )
+      {
+         es.index_prefix = es_obj_index_prefix;
+         // delete all
+         try {
+            graphene::utilities::deleteAll(es);
+         } catch (...) {
+            // nothing to do
+         }
+      }
+   }
+
 } 
 
 void database_fixture::vote_for_committee_and_witnesses(uint16_t num_committee, uint16_t num_witness)

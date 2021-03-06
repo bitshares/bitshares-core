@@ -42,10 +42,9 @@
 
 #include "../../libraries/app/application_impl.hxx"
 
-#define BOOST_TEST_MODULE Test Application
-#include <boost/test/included/unit_test.hpp>
-
+#include "../common/init_unit_test_suite.hpp"
 #include "../common/genesis_file_util.hpp"
+#include "../common/utils.hpp"
 
 using namespace graphene;
 namespace bpo = boost::program_options;
@@ -53,17 +52,6 @@ namespace bpo = boost::program_options;
 namespace fc {
    extern std::unordered_map<std::string, logger> &get_logger_map();
    extern std::unordered_map<std::string, appender::ptr> &get_appender_map();
-
-   /** Waits for F() to return true before max_duration has passed.
-    */
-   template<typename Functor>
-   static void wait_for( const fc::microseconds max_duration, const Functor&& f )
-   {
-      const auto start = fc::time_point::now();
-      while( !f() && fc::time_point::now() < start + max_duration )
-         fc::usleep(fc::milliseconds(100));
-      BOOST_REQUIRE( f() );
-   }
 }
 
 BOOST_AUTO_TEST_CASE(load_configuration_options_test_config_logging_files_created)

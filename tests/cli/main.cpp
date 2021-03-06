@@ -60,8 +60,7 @@
 
 #include <boost/filesystem/path.hpp>
 
-#define BOOST_TEST_MODULE Test Application
-#include <boost/test/included/unit_test.hpp>
+#include "../common/init_unit_test_suite.hpp"
 
 /*****
  * Global Initialization for Windows
