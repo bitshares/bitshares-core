@@ -915,7 +915,7 @@ class database_api
        * @param trx a transaction to get hexdump from
        * @return the hexdump of the transaction without the signatures
        */
-      std::string get_transaction_hex_without_sig( const signed_transaction &trx ) const;
+      std::string get_transaction_hex_without_sig( const transaction &trx ) const;
 
       /**
        *  This API will take a partially signed transaction and a set of public keys that the owner
