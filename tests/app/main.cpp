@@ -42,10 +42,11 @@
 
 #include "../../libraries/app/application_impl.hxx"
 
-#define BOOST_TEST_MODULE Test Application
-#include <boost/test/included/unit_test.hpp>
+#include "../common/init_unit_test_suite.hpp"
 
 #include "../common/genesis_file_util.hpp"
+
+uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP = 1431700000; // needed for compiling, not used
 
 using namespace graphene;
 namespace bpo = boost::program_options;

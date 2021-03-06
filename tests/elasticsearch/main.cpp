@@ -31,8 +31,7 @@
 
 #include "../common/database_fixture.hpp"
 
-#define BOOST_TEST_MODULE Elastic Search Database Tests
-#include <boost/test/included/unit_test.hpp>
+#include "../common/init_unit_test_suite.hpp"
 
 #ifdef NDEBUG
   #define ES_WAIT_TIME (fc::milliseconds(1000))
