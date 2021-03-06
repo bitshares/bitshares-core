@@ -95,12 +95,12 @@ namespace graphene { namespace net {
       static const core_message_type_enum type;
 
       graphene::protocol::precomputable_transaction trx;
-      trx_message() {}
-      trx_message(const graphene::protocol::signed_transaction& signed_trx) :
+      trx_message() = default;
+      explicit trx_message(const graphene::protocol::signed_transaction& signed_trx) :
         trx(signed_trx)
       {}
-      trx_message(graphene::protocol::signed_transaction&& signed_trx) :
-        trx(std::move(signed_trx))
+      explicit trx_message(graphene::protocol::signed_transaction&& signed_trx) :
+        trx(signed_trx)
       {}
    };
 
