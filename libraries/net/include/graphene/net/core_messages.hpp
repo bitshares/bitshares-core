@@ -99,9 +99,6 @@ namespace graphene { namespace net {
       explicit trx_message(const graphene::protocol::signed_transaction& signed_trx) :
         trx(signed_trx)
       {}
-      explicit trx_message(graphene::protocol::signed_transaction&& signed_trx) :
-        trx(signed_trx)
-      {}
    };
 
    struct block_message
