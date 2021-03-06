@@ -34,9 +34,9 @@
 #include "../common/init_unit_test_suite.hpp"
 
 #ifdef NDEBUG
-  #define ES_WAIT_TIME (fc::milliseconds(1000))
+  #define ES_WAIT_TIME (fc::milliseconds(2000))
 #else
-  #define ES_WAIT_TIME (fc::milliseconds(3000))
+  #define ES_WAIT_TIME (fc::milliseconds(5000))
 #endif
 
 using namespace graphene::chain;
@@ -250,7 +250,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
          // f(A, 0, 4, 9) = { 5, 3, 1, 0 }
          auto histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 4, operation_history_id_type(9));
 
-         BOOST_CHECK_EQUAL(histories.size(), 4u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 4u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 1u);
@@ -258,7 +258,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          // f(A, 0, 4, 6) = { 5, 3, 1, 0 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 4, operation_history_id_type(6));
-         BOOST_CHECK_EQUAL(histories.size(), 4u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 4u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 1u);
@@ -266,7 +266,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          // f(A, 0, 4, 5) = { 5, 3, 1, 0 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 4, operation_history_id_type(5));
-         BOOST_CHECK_EQUAL(histories.size(), 4u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 4u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 1u);
@@ -274,33 +274,33 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          // f(A, 0, 4, 4) = { 3, 1, 0 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 4, operation_history_id_type(4));
-         BOOST_CHECK_EQUAL(histories.size(), 3u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 3u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 1u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 0u);
 
          // f(A, 0, 4, 3) = { 3, 1, 0 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 4, operation_history_id_type(3));
-         BOOST_CHECK_EQUAL(histories.size(), 3u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 3u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 1u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 0u);
 
          // f(A, 0, 4, 2) = { 1, 0 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 4, operation_history_id_type(2));
-         BOOST_CHECK_EQUAL(histories.size(), 2u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 2u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 1u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 0u);
 
          // f(A, 0, 4, 1) = { 1, 0 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 4, operation_history_id_type(1));
-         BOOST_CHECK_EQUAL(histories.size(), 2u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 2u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 1u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 0u);
 
          // f(A, 0, 4, 0) = { 5, 3, 1, 0 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 4, operation_history_id_type());
-         BOOST_CHECK_EQUAL(histories.size(), 4u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 4u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 1u);
@@ -308,30 +308,30 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          // f(A, 1, 5, 9) = { 5, 3 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5, operation_history_id_type(9));
-         BOOST_CHECK_EQUAL(histories.size(), 2u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 2u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
 
          // f(A, 1, 5, 6) = { 5, 3 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5, operation_history_id_type(6));
-         BOOST_CHECK_EQUAL(histories.size(), 2u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 2u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
 
          // f(A, 1, 5, 5) = { 5, 3 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5, operation_history_id_type(5));
-         BOOST_CHECK_EQUAL(histories.size(), 2u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 2u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
 
          // f(A, 1, 5, 4) = { 3 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5, operation_history_id_type(4));
-         BOOST_CHECK_EQUAL(histories.size(), 1u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 1u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 3u);
 
          // f(A, 1, 5, 3) = { 3 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5, operation_history_id_type(3));
-         BOOST_CHECK_EQUAL(histories.size(), 1u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 1u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 3u);
 
          // f(A, 1, 5, 2) = { }
@@ -344,67 +344,67 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          // f(A, 1, 5, 0) = { 5, 3 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 5, operation_history_id_type(0));
-         BOOST_CHECK_EQUAL(histories.size(), 2u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 2u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
 
          // f(A, 0, 3, 9) = { 5, 3, 1 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 3, operation_history_id_type(9));
-         BOOST_CHECK_EQUAL(histories.size(), 3u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 3u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 1u);
 
          // f(A, 0, 3, 6) = { 5, 3, 1 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 3, operation_history_id_type(6));
-         BOOST_CHECK_EQUAL(histories.size(), 3u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 3u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 1u);
 
          // f(A, 0, 3, 5) = { 5, 3, 1 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 3, operation_history_id_type(5));
-         BOOST_CHECK_EQUAL(histories.size(), 3u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 3u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 1u);
 
          // f(A, 0, 3, 4) = { 3, 1, 0 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 3, operation_history_id_type(4));
-         BOOST_CHECK_EQUAL(histories.size(), 3u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 3u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 1u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 0u);
 
          // f(A, 0, 3, 3) = { 3, 1, 0 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 3, operation_history_id_type(3));
-         BOOST_CHECK_EQUAL(histories.size(), 3u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 3u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 1u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 0u);
 
          // f(A, 0, 3, 2) = { 1, 0 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 3, operation_history_id_type(2));
-         BOOST_CHECK_EQUAL(histories.size(), 2u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 2u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 1u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 0u);
 
          // f(A, 0, 3, 1) = { 1, 0 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 3, operation_history_id_type(1));
-         BOOST_CHECK_EQUAL(histories.size(), 2u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 2u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 1u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 0u);
 
          // f(A, 0, 3, 0) = { 5, 3, 1 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 3, operation_history_id_type());
-         BOOST_CHECK_EQUAL(histories.size(), 3u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 3u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 1u);
 
          // f(B, 0, 4, 9) = { 6, 4, 2, 1 }
          histories = hist_api.get_account_history("dan", operation_history_id_type(), 4, operation_history_id_type(9));
-         BOOST_CHECK_EQUAL(histories.size(), 4u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 4u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 6u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 4u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 2u);
@@ -412,7 +412,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          // f(B, 0, 4, 6) = { 6, 4, 2, 1 }
          histories = hist_api.get_account_history("dan", operation_history_id_type(), 4, operation_history_id_type(6));
-         BOOST_CHECK_EQUAL(histories.size(), 4u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 4u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 6u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 4u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 2u);
@@ -420,38 +420,38 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          // f(B, 0, 4, 5) = { 4, 2, 1 }
          histories = hist_api.get_account_history("dan", operation_history_id_type(), 4, operation_history_id_type(5));
-         BOOST_CHECK_EQUAL(histories.size(), 3u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 3u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 4u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 2u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 1u);
 
          // f(B, 0, 4, 4) = { 4, 2, 1 }
          histories = hist_api.get_account_history("dan", operation_history_id_type(), 4, operation_history_id_type(4));
-         BOOST_CHECK_EQUAL(histories.size(), 3u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 3u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 4u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 2u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 1u);
 
          // f(B, 0, 4, 3) = { 2, 1 }
          histories = hist_api.get_account_history("dan", operation_history_id_type(), 4, operation_history_id_type(3));
-         BOOST_CHECK_EQUAL(histories.size(), 2u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 2u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 2u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 1u);
 
          // f(B, 0, 4, 2) = { 2, 1 }
          histories = hist_api.get_account_history("dan", operation_history_id_type(), 4, operation_history_id_type(2));
-         BOOST_CHECK_EQUAL(histories.size(), 2u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 2u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 2u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 1u);
 
          // f(B, 0, 4, 1) = { 1 }
          histories = hist_api.get_account_history("dan", operation_history_id_type(), 4, operation_history_id_type(1));
-         BOOST_CHECK_EQUAL(histories.size(), 1u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 1u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 1u);
 
          // f(B, 0, 4, 0) = { 6, 4, 2, 1 }
          histories = hist_api.get_account_history("dan", operation_history_id_type(), 4, operation_history_id_type());
-         BOOST_CHECK_EQUAL(histories.size(), 4u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 4u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 6u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 4u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 2u);
@@ -459,24 +459,24 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          // f(B, 2, 4, 9) = { 6, 4 }
          histories = hist_api.get_account_history("dan", operation_history_id_type(2), 4, operation_history_id_type(9));
-         BOOST_CHECK_EQUAL(histories.size(), 2u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 2u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 6u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 4u);
 
          // f(B, 2, 4, 6) = { 6, 4 }
          histories = hist_api.get_account_history("dan", operation_history_id_type(2), 4, operation_history_id_type(6));
-         BOOST_CHECK_EQUAL(histories.size(), 2u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 2u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 6u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 4u);
 
          // f(B, 2, 4, 5) = { 4 }
          histories = hist_api.get_account_history("dan", operation_history_id_type(2), 4, operation_history_id_type(5));
-         BOOST_CHECK_EQUAL(histories.size(), 1u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 1u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 4u);
 
          // f(B, 2, 4, 4) = { 4 }
          histories = hist_api.get_account_history("dan", operation_history_id_type(2), 4, operation_history_id_type(4));
-         BOOST_CHECK_EQUAL(histories.size(), 1u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 1u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 4u);
 
          // f(B, 2, 4, 3) = { }
@@ -493,7 +493,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          // f(B, 2, 4, 0) = { 6, 4 }
          histories = hist_api.get_account_history("dan", operation_history_id_type(2), 4, operation_history_id_type(0));
-         BOOST_CHECK_EQUAL(histories.size(), 2u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 2u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 6u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 4u);
 
@@ -524,7 +524,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
          // f(A, 0, 10, 0) = { 7, 5, 3, 1, 0 }
          histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10, operation_history_id_type(0));
-         BOOST_CHECK_EQUAL(histories.size(), 5u);
+         BOOST_REQUIRE_EQUAL(histories.size(), 5u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 7u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 5u);
          BOOST_CHECK_EQUAL(histories[2].id.instance(), 3u);
