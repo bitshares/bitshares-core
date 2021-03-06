@@ -96,8 +96,11 @@ namespace graphene { namespace net {
 
       graphene::protocol::precomputable_transaction trx;
       trx_message() {}
-      trx_message(graphene::protocol::signed_transaction transaction) :
-        trx(std::move(transaction))
+      trx_message(const graphene::protocol::signed_transaction& signed_trx) :
+        trx(signed_trx)
+      {}
+      trx_message(graphene::protocol::signed_transaction&& signed_trx) :
+        trx(std::move(signed_trx))
       {}
    };
 
