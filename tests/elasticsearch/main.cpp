@@ -32,14 +32,9 @@
 #include "../common/database_fixture.hpp"
 
 #include "../common/init_unit_test_suite.hpp"
+#include "../common/utils.hpp"
 
-#ifdef NDEBUG
-  #define ES_FIRST_WAIT_TIME (fc::milliseconds(3000))
-  #define ES_WAIT_TIME (fc::milliseconds(1000))
-#else
-  #define ES_FIRST_WAIT_TIME (fc::milliseconds(6000))
-  #define ES_WAIT_TIME (fc::milliseconds(3000))
-#endif
+#define ES_WAIT_TIME (fc::milliseconds(10000))
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
@@ -72,16 +67,21 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          auto bob = create_account("bob");
 
          generate_block();
-         fc::usleep(ES_FIRST_WAIT_TIME); // this is because index.refresh_interval, nothing to worry
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
          es.endpoint = es.index_prefix + "*/data/_count";
          es.query = query;
 
-         auto res = graphene::utilities::simpleQuery(es);
-         variant j = fc::json::from_string(res);
-         auto total = j["count"].as_string();
-         BOOST_CHECK_EQUAL(total, "5");
+         string res;
+         variant j;
+         string total;
+
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            res = graphene::utilities::simpleQuery(es);
+            j = fc::json::from_string(res);
+            total = j["count"].as_string();
+            return (total == "5");
+         });
 
          es.endpoint = es.index_prefix + "*/data/_search";
          res = graphene::utilities::simpleQuery(es);
@@ -93,14 +93,14 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          auto willie = create_account("willie");
          generate_block();
 
-         fc::usleep(ES_WAIT_TIME); // index.refresh_interval
-
          es.endpoint = es.index_prefix + "*/data/_count";
-         res = graphene::utilities::simpleQuery(es);
-         j = fc::json::from_string(res);
 
-         total = j["count"].as_string();
-         BOOST_CHECK_EQUAL(total, "7");
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            res = graphene::utilities::simpleQuery(es);
+            j = fc::json::from_string(res);
+            total = j["count"].as_string();
+            return (total == "7");
+         });
 
          // do some transfers in 1 block
          transfer(account_id_type()(db), bob, asset(100));
@@ -108,13 +108,13 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          transfer(account_id_type()(db), bob, asset(300));
 
          generate_block();
-         fc::usleep(ES_WAIT_TIME); // index.refresh_interval
 
-         res = graphene::utilities::simpleQuery(es);
-         j = fc::json::from_string(res);
-
-         total = j["count"].as_string();
-         BOOST_CHECK_EQUAL(total, "13");
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            res = graphene::utilities::simpleQuery(es);
+            j = fc::json::from_string(res);
+            total = j["count"].as_string();
+            return (total == "13");
+         });
 
          // check the visitor data
          auto block_date = db.head_block_time();
@@ -146,25 +146,30 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
 
       // delete all first
       auto delete_objects = graphene::utilities::deleteAll(es);
+      BOOST_REQUIRE(delete_objects); // require successful deletion
 
       generate_block();
 
-      BOOST_REQUIRE(delete_objects); // require successful deletion
       if(delete_objects) { // all records deleted
 
          // asset and bitasset
          create_bitasset("USD", account_id_type());
          generate_block();
-         fc::usleep(ES_FIRST_WAIT_TIME);
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
          es.endpoint = es.index_prefix + "*/data/_count";
          es.query = query;
 
-         auto res = graphene::utilities::simpleQuery(es);
-         variant j = fc::json::from_string(res);
-         auto total = j["count"].as_string();
-         BOOST_CHECK_EQUAL(total, "2");
+         string res;
+         variant j;
+         string total;
+
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            res = graphene::utilities::simpleQuery(es);
+            j = fc::json::from_string(res);
+            total = j["count"].as_string();
+            return (total == "2");
+         });
 
          es.endpoint = es.index_prefix + "asset/data/_search";
          res = graphene::utilities::simpleQuery(es);
@@ -244,14 +249,19 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
          create_bitasset("OIL", dan.id); // create op 6
 
          generate_block();
-         fc::usleep(ES_FIRST_WAIT_TIME);
 
          graphene::app::history_api hist_api(app);
          app.enable_plugin("elasticsearch");
 
          // f(A, 0, 4, 9) = { 5, 3, 1, 0 }
-         auto histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 4, operation_history_id_type(9));
+         auto histories = hist_api.get_account_history(
+               "1.2.0", operation_history_id_type(), 4, operation_history_id_type(9));
 
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            histories = hist_api.get_account_history(
+                  "1.2.0", operation_history_id_type(), 4, operation_history_id_type(9));
+            return (histories.size() == 4u);
+         });
          BOOST_REQUIRE_EQUAL(histories.size(), 4u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 5u);
          BOOST_CHECK_EQUAL(histories[1].id.instance(), 3u);
@@ -513,11 +523,14 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
          create_account("alice");
 
          generate_block();
-         fc::usleep(ES_WAIT_TIME);
 
          // f(C, 0, 4, 10) = { 7 }
-         histories = hist_api.get_account_history("alice", operation_history_id_type(0), 4, operation_history_id_type(10));
-         BOOST_CHECK_EQUAL(histories.size(), 1u);
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            histories = hist_api.get_account_history(
+                  "alice", operation_history_id_type(0), 4, operation_history_id_type(10));
+            return (histories.size() == 1u);
+         });
+         BOOST_REQUIRE_EQUAL(histories.size(), 1u);
          BOOST_CHECK_EQUAL(histories[0].id.instance(), 7u);
 
          // f(C, 8, 4, 10) = { }
