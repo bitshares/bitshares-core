@@ -419,6 +419,41 @@ database_fixture::~database_fixture()
    } catch (...) {
       BOOST_FAIL( "Uncaught exception in ~database_fixture" );
    }
+
+   // cleanup data in ES
+   if( !es_index_prefix.empty() || !es_obj_index_prefix.empty() )
+   {
+      CURL *curl; // curl handler
+      curl = curl_easy_init();
+      curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
+
+      graphene::utilities::ES es;
+      es.curl = curl;
+      es.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
+
+      if( !es_index_prefix.empty() )
+      {
+         es.index_prefix = es_index_prefix;
+         // delete all
+         try {
+            graphene::utilities::deleteAll(es);
+         } catch (...) {
+            // nothing to do
+         }
+      }
+
+      if( !es_obj_index_prefix.empty() )
+      {
+         es.index_prefix = es_obj_index_prefix;
+         // delete all
+         try {
+            graphene::utilities::deleteAll(es);
+         } catch (...) {
+            // nothing to do
+         }
+      }
+   }
+
 } 
 
 void database_fixture::vote_for_committee_and_witnesses(uint16_t num_committee, uint16_t num_witness)
