@@ -301,6 +301,11 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       options.insert(std::make_pair("elasticsearch-operation-string", boost::program_options::variable_value(true, false)));
       options.insert(std::make_pair("elasticsearch-mode", boost::program_options::variable_value(uint16_t(2), false)));
 
+      es_index_prefix = string("bitshares-") + fc::to_string(uint64_t(rand())) + "-";
+      BOOST_TEST_MESSAGE( string("ES index prefix is ") + es_index_prefix );
+      options.insert(std::make_pair("elasticsearch-index-prefix",
+            boost::program_options::variable_value(es_index_prefix, false)));
+
       esplugin->plugin_initialize(options);
       esplugin->plugin_startup();
    }
@@ -323,6 +328,11 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
       options.insert(std::make_pair("es-objects-balances", boost::program_options::variable_value(true, false)));
       options.insert(std::make_pair("es-objects-limit-orders", boost::program_options::variable_value(true, false)));
       options.insert(std::make_pair("es-objects-asset-bitasset", boost::program_options::variable_value(true, false)));
+
+      es_obj_index_prefix = string("objects-") + fc::to_string(uint64_t(rand())) + "-";
+      BOOST_TEST_MESSAGE( string("ES_OBJ index prefix is ") + es_obj_index_prefix );
+      options.insert(std::make_pair("es-objects-index-prefix",
+            boost::program_options::variable_value(es_obj_index_prefix, false)));
 
       esobjects_plugin->plugin_initialize(options);
       esobjects_plugin->plugin_startup();
