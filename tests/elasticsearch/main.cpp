@@ -34,9 +34,11 @@
 #include "../common/init_unit_test_suite.hpp"
 
 #ifdef NDEBUG
-  #define ES_WAIT_TIME (fc::milliseconds(2000))
+  #define ES_FIRST_WAIT_TIME (fc::milliseconds(3000))
+  #define ES_WAIT_TIME (fc::milliseconds(1000))
 #else
-  #define ES_WAIT_TIME (fc::milliseconds(5000))
+  #define ES_FIRST_WAIT_TIME (fc::milliseconds(6000))
+  #define ES_WAIT_TIME (fc::milliseconds(3000))
 #endif
 
 using namespace graphene::chain;
@@ -55,11 +57,9 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
       es.curl = curl;
       es.elasticsearch_url = "http://localhost:9200/";
       es.index_prefix = es_index_prefix;
-      //es.auth = "elastic:changeme";
 
       // delete all first
       auto delete_account_history = graphene::utilities::deleteAll(es);
-      fc::usleep(ES_WAIT_TIME); // this is because index.refresh_interval, nothing to worry
 
       BOOST_REQUIRE(delete_account_history); // require successful deletion
       if(delete_account_history) { // all records deleted
@@ -70,11 +70,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          auto bob = create_account("bob");
 
          generate_block();
-         fc::usleep(ES_WAIT_TIME);
-
-         // for later use
-         //int asset_create_op_id = operation::tag<asset_create_operation>::value;
-         //int account_create_op_id = operation::tag<account_create_operation>::value;
+         fc::usleep(ES_FIRST_WAIT_TIME); // this is because index.refresh_interval, nothing to worry
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
          es.endpoint = es.index_prefix + "*/data/_count";
@@ -145,13 +141,11 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
       es.curl = curl;
       es.elasticsearch_url = "http://localhost:9200/";
       es.index_prefix = es_obj_index_prefix;
-      //es.auth = "elastic:changeme";
 
       // delete all first
       auto delete_objects = graphene::utilities::deleteAll(es);
 
       generate_block();
-      fc::usleep(ES_WAIT_TIME);
 
       BOOST_REQUIRE(delete_objects); // require successful deletion
       if(delete_objects) { // all records deleted
@@ -159,7 +153,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
          // asset and bitasset
          create_bitasset("USD", account_id_type());
          generate_block();
-         fc::usleep(ES_WAIT_TIME);
+         fc::usleep(ES_FIRST_WAIT_TIME);
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
          es.endpoint = es.index_prefix + "*/data/_count";
@@ -203,11 +197,13 @@ BOOST_AUTO_TEST_CASE(elasticsearch_suite) {
       es.index_prefix = es_index_prefix;
       auto delete_account_history = graphene::utilities::deleteAll(es);
       BOOST_REQUIRE(delete_account_history); // require successful deletion
-      fc::usleep(ES_WAIT_TIME);
-      es.index_prefix = es_obj_index_prefix;
-      auto delete_objects = graphene::utilities::deleteAll(es);
+
+      graphene::utilities::ES es_obj;
+      es_obj.curl = curl;
+      es_obj.elasticsearch_url = "http://localhost:9200/";
+      es_obj.index_prefix = es_obj_index_prefix;
+      auto delete_objects = graphene::utilities::deleteAll(es_obj);
       BOOST_REQUIRE(delete_objects); // require successful deletion
-      fc::usleep(ES_WAIT_TIME);
 
       if(delete_account_history && delete_objects) { // all records deleted
 
@@ -234,7 +230,6 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
       BOOST_REQUIRE(delete_account_history); // require successful deletion
 
       generate_block();
-      fc::usleep(ES_WAIT_TIME);
 
       if(delete_account_history) {
 
@@ -247,7 +242,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
          create_bitasset("OIL", dan.id); // create op 6
 
          generate_block();
-         fc::usleep(ES_WAIT_TIME);
+         fc::usleep(ES_FIRST_WAIT_TIME);
 
          graphene::app::history_api hist_api(app);
          app.enable_plugin("elasticsearch");
