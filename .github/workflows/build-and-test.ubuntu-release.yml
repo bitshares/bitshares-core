@@ -75,8 +75,6 @@ jobs:
         _build/tests/app_test -l test_suite
         curl -XPUT -H "Content-Type: application/json" http://localhost:9200/_cluster/settings \
           -d '{ "transient": { "cluster.routing.allocation.disk.threshold_enabled": false } }'
-        curl -XPUT -H "Content-Type: application/json" http://localhost:9200/_all/_settings \
-          -d '{"index.blocks.read_only_allow_delete": null}'
         _build/tests/es_test -l test_suite
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
         _build/tests/cli_test -l test_suite

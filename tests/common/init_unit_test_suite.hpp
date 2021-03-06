@@ -28,7 +28,7 @@
 #include <string>
 
 uint32_t    GRAPHENE_TESTING_GENESIS_TIMESTAMP = 1431700000;
-std::string GRAPHENE_TESTING_ES_URL            = "http://127.0.0.1:9200";
+std::string GRAPHENE_TESTING_ES_URL            = "http://127.0.0.1:9200/";
 
 boost::unit_test::test_suite* init_unit_test_suite(int argc, char* argv[]) {
    const auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
