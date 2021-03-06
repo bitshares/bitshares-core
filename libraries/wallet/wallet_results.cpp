@@ -138,7 +138,7 @@ std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_a
          ss << "\n";
          for( const auto& out : r.outputs )
          {
-            asset_object a = get_asset( out.decrypted_memo.amount.asset_id );
+            auto a = get_asset( out.decrypted_memo.amount.asset_id );
             ss << a.amount_to_pretty_string( out.decrypted_memo.amount ) << " to  " << out.label
                << "\n\t  receipt: " << out.confirmation_receipt << "\n\n";
          }
@@ -152,7 +152,7 @@ std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_a
          ss << "\n";
          for( const auto& out : r.outputs )
          {
-            asset_object a = get_asset( out.decrypted_memo.amount.asset_id );
+            auto a = get_asset( out.decrypted_memo.amount.asset_id );
             ss << a.amount_to_pretty_string( out.decrypted_memo.amount ) << " to  " << out.label
                << "\n\t  receipt: " << out.confirmation_receipt << "\n\n";
          }
@@ -162,7 +162,7 @@ std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_a
       {
          auto r = result.as<blind_receipt>( GRAPHENE_MAX_NESTED_OBJECTS );
          std::stringstream ss;
-         asset_object as = get_asset( r.amount.asset_id );
+         auto as = get_asset( r.amount.asset_id );
          ss << as.amount_to_pretty_string( r.amount ) << "  " << r.from_label << "  =>  "
             << r.to_label  << "  " << r.memo <<"\n";
          return ss.str();
@@ -176,7 +176,7 @@ std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_a
          ss << "====================================================================================\n";
          for( auto& r : records )
          {
-            asset_object as = get_asset( r.amount.asset_id );
+            auto as = get_asset( r.amount.asset_id );
             ss << fc::get_approximate_relative_time_string( r.date )
                << "  " << as.amount_to_pretty_string( r.amount ) << "  " << r.from_label << "  =>  " << r.to_label
                << "  " << r.memo <<"\n";

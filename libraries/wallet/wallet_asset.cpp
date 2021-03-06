@@ -225,7 +225,7 @@ namespace graphene { namespace wallet { namespace detail {
       optional<asset_object> asset_to_fund = find_asset(symbol);
       if (!asset_to_fund)
         FC_THROW("No asset with that symbol exists!");
-      asset_object core_asset = get_asset(asset_id_type());
+      auto core_asset = get_asset(asset_id_type());
 
       asset_fund_fee_pool_operation fund_op;
       fund_op.from_account = from_account.id;
@@ -246,7 +246,7 @@ namespace graphene { namespace wallet { namespace detail {
       optional<asset_object> asset_pool_to_claim = find_asset(symbol);
       if (!asset_pool_to_claim)
         FC_THROW("No asset with that symbol exists!");
-      asset_object core_asset = get_asset(asset_id_type());
+      auto core_asset = get_asset(asset_id_type());
 
       asset_claim_pool_operation claim_op;
       claim_op.issuer = asset_pool_to_claim->issuer;
