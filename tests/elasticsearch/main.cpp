@@ -61,6 +61,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
       auto delete_account_history = graphene::utilities::deleteAll(es);
       fc::usleep(ES_WAIT_TIME); // this is because index.refresh_interval, nothing to worry
 
+      BOOST_REQUIRE(delete_account_history); // require successful deletion
       if(delete_account_history) { // all records deleted
 
          //account_id_type() do 3 ops
@@ -152,6 +153,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
       generate_block();
       fc::usleep(ES_WAIT_TIME);
 
+      BOOST_REQUIRE(delete_objects); // require successful deletion
       if(delete_objects) { // all records deleted
 
          // asset and bitasset
@@ -200,9 +202,11 @@ BOOST_AUTO_TEST_CASE(elasticsearch_suite) {
       es.elasticsearch_url = "http://localhost:9200/";
       es.index_prefix = es_index_prefix;
       auto delete_account_history = graphene::utilities::deleteAll(es);
+      BOOST_REQUIRE(delete_account_history); // require successful deletion
       fc::usleep(ES_WAIT_TIME);
       es.index_prefix = es_obj_index_prefix;
       auto delete_objects = graphene::utilities::deleteAll(es);
+      BOOST_REQUIRE(delete_objects); // require successful deletion
       fc::usleep(ES_WAIT_TIME);
 
       if(delete_account_history && delete_objects) { // all records deleted
@@ -227,6 +231,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
       es.index_prefix = es_index_prefix;
 
       auto delete_account_history = graphene::utilities::deleteAll(es);
+      BOOST_REQUIRE(delete_account_history); // require successful deletion
 
       generate_block();
       fc::usleep(ES_WAIT_TIME);
