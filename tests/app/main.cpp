@@ -46,8 +46,6 @@
 #include "../common/genesis_file_util.hpp"
 #include "../common/utils.hpp"
 
-uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP = 1431700000; // needed for compiling, not used
-
 using namespace graphene;
 namespace bpo = boost::program_options;
 

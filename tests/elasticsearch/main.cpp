@@ -45,6 +45,8 @@ using namespace graphene::chain;
 using namespace graphene::chain::test;
 using namespace graphene::app;
 
+extern std::string GRAPHENE_TESTING_ES_URL;
+
 BOOST_FIXTURE_TEST_SUITE( elasticsearch_tests, database_fixture )
 
 BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
@@ -55,7 +57,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
 
       graphene::utilities::ES es;
       es.curl = curl;
-      es.elasticsearch_url = "http://localhost:9200/";
+      es.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
       es.index_prefix = es_index_prefix;
 
       // delete all first
@@ -139,7 +141,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
 
       graphene::utilities::ES es;
       es.curl = curl;
-      es.elasticsearch_url = "http://localhost:9200/";
+      es.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
       es.index_prefix = es_obj_index_prefix;
 
       // delete all first
@@ -193,14 +195,14 @@ BOOST_AUTO_TEST_CASE(elasticsearch_suite) {
 
       graphene::utilities::ES es;
       es.curl = curl;
-      es.elasticsearch_url = "http://localhost:9200/";
+      es.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
       es.index_prefix = es_index_prefix;
       auto delete_account_history = graphene::utilities::deleteAll(es);
       BOOST_REQUIRE(delete_account_history); // require successful deletion
 
       graphene::utilities::ES es_obj;
       es_obj.curl = curl;
-      es_obj.elasticsearch_url = "http://localhost:9200/";
+      es_obj.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
       es_obj.index_prefix = es_obj_index_prefix;
       auto delete_objects = graphene::utilities::deleteAll(es_obj);
       BOOST_REQUIRE(delete_objects); // require successful deletion
@@ -223,7 +225,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_history_api) {
 
       graphene::utilities::ES es;
       es.curl = curl;
-      es.elasticsearch_url = "http://localhost:9200/";
+      es.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
       es.index_prefix = es_index_prefix;
 
       auto delete_account_history = graphene::utilities::deleteAll(es);

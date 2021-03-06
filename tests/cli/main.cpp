@@ -62,8 +62,6 @@
 
 #include "../common/init_unit_test_suite.hpp"
 
-uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP = 1431700000; // needed for compiling, not used
-
 /*****
  * Global Initialization for Windows
  * ( sets up Winsock stuf )
