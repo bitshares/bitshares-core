@@ -372,6 +372,30 @@ BOOST_FIXTURE_TEST_CASE( cli_quit, cli_fixture )
    BOOST_CHECK_THROW( con.wallet_api_ptr->quit(), fc::canceled_exception );
 }
 
+BOOST_FIXTURE_TEST_CASE( cli_help_gethelp, cli_fixture )
+{
+   BOOST_TEST_MESSAGE("Testing help and gethelp commands.");
+   auto formatters = con.wallet_api_ptr->get_result_formatters();
+
+   string result = con.wallet_api_ptr->help();
+   BOOST_CHECK( result.find("gethelp") != string::npos );
+   if( formatters.find("help") != formatters.end() )
+   {
+      BOOST_TEST_MESSAGE("Testing formatter of help");
+      string output = formatters["help"](fc::variant(result), fc::variants());
+      BOOST_CHECK( output.find("gethelp") != string::npos );
+   }
+
+   result = con.wallet_api_ptr->gethelp( "transfer" );
+   BOOST_CHECK( result.find("usage") != string::npos );
+   if( formatters.find("gethelp") != formatters.end() )
+   {
+      BOOST_TEST_MESSAGE("Testing formatter of gethelp");
+      string output = formatters["gethelp"](fc::variant(result), fc::variants());
+      BOOST_CHECK( output.find("usage") != string::npos );
+   }
+}
+
 BOOST_FIXTURE_TEST_CASE( upgrade_nathan_account, cli_fixture )
 {
    try
@@ -441,6 +465,8 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
 
       account_object nathan_acct = con.wallet_api_ptr->get_account("nathan");
 
+      auto formatters = con.wallet_api_ptr->get_result_formatters();
+
       // Create new asset called BOBCOIN backed by CORE
       try
       {
@@ -451,7 +477,14 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
          asset_ops.max_supply = 1000000;
          asset_ops.core_exchange_rate = price(asset(2),asset(1,asset_id_type(1)));
          graphene::chain::bitasset_options bit_opts;
-         con.wallet_api_ptr->create_asset("nathan", "BOBCOIN", 4, asset_ops, bit_opts, true);
+         auto result = con.wallet_api_ptr->create_asset("nathan", "BOBCOIN", 4, asset_ops, bit_opts, true);
+         if( formatters.find("create_asset") != formatters.end() )
+         {
+            BOOST_TEST_MESSAGE("Testing formatter of create_asset");
+            string output = formatters["create_asset"](
+                  fc::variant(result, FC_PACK_MAX_DEPTH), fc::variants());
+            BOOST_CHECK( output.find("BOBCOIN") != string::npos );
+         }
       }
       catch(exception& e)
       {
@@ -543,6 +576,15 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
             }
          }
          BOOST_CHECK_EQUAL(count, 1u);
+
+         // Testing result formatter
+         if( formatters.find("list_account_balances") != formatters.end() )
+         {
+            BOOST_TEST_MESSAGE("Testing formatter of list_account_balances");
+            string output = formatters["list_account_balances"](
+                  fc::variant(nathan_balances, FC_PACK_MAX_DEPTH ), fc::variants());
+            BOOST_CHECK( output.find("BOBCOIN") != string::npos );
+         }
       }
 
    } catch( fc::exception& e ) {
@@ -891,6 +933,8 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
       unsigned int head_block = 0;
       auto & W = *con.wallet_api_ptr; // Wallet alias
 
+      auto formatters = con.wallet_api_ptr->get_result_formatters();
+
       BOOST_TEST_MESSAGE("Creating blind accounts");
       graphene::wallet::brain_key_info bki_nathan = W.suggest_brain_key();
       graphene::wallet::brain_key_info bki_alice = W.suggest_brain_key();
@@ -909,7 +953,17 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
 
       // ** Block 2: Nathan will blind 100M CORE token:
       BOOST_TEST_MESSAGE("Blinding a large balance");
-      W.transfer_to_blind("nathan", GRAPHENE_SYMBOL, {{"nathan","100000000"}}, true);
+      {
+         auto result = W.transfer_to_blind("nathan", GRAPHENE_SYMBOL, {{"nathan","100000000"}}, true);
+         // Testing result formatter
+         if( formatters.find("transfer_to_blind") != formatters.end() )
+         {
+            BOOST_TEST_MESSAGE("Testing formatter of transfer_to_blind");
+            string output = formatters["transfer_to_blind"](
+                  fc::variant(result, FC_PACK_MAX_DEPTH), fc::variants());
+            BOOST_CHECK( output.find("receipt") != string::npos );
+         }
+      }
       BOOST_CHECK( W.get_blind_balances("nathan")[0].amount == 10000000000000 );
       generate_block(app1); head_block++;
 
@@ -953,6 +1007,35 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
       BOOST_TEST_MESSAGE("Check that all expected blocks have processed");
       dynamic_global_property_object dgp = W.get_dynamic_global_properties();
       BOOST_CHECK(dgp.head_block_number == head_block);
+
+      // Receive blind transfer
+      {
+         auto result = W.receive_blind_transfer(bconfs[1].outputs[1].confirmation_receipt, "", "bob_receive");
+         BOOST_CHECK_EQUAL( result.amount.amount.value, 1000000000 );
+         // Testing result formatter
+         if( formatters.find("receive_blind_transfer") != formatters.end() )
+         {
+            BOOST_TEST_MESSAGE("Testing formatter of receive_blind_transfer");
+            string output = formatters["receive_blind_transfer"](
+                  fc::variant(result, FC_PACK_MAX_DEPTH), fc::variants());
+            BOOST_CHECK( output.find("bob_receive") != string::npos );
+         }
+      }
+
+      // Check blind history
+      {
+         auto result = W.blind_history("nathan");
+         BOOST_CHECK_EQUAL( result.size(), 5u ); // 1 transfer_to_blind + 2 outputs * 2 blind_transfers
+         // Testing result formatter
+         if( formatters.find("blind_history") != formatters.end() )
+         {
+            BOOST_TEST_MESSAGE("Testing formatter of blind_history");
+            string output = formatters["blind_history"](
+                  fc::variant(result, FC_PACK_MAX_DEPTH), fc::variants());
+            BOOST_CHECK( output.find("WHEN") != string::npos );
+            BOOST_TEST_MESSAGE( output );
+         }
+      }
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
@@ -991,6 +1074,16 @@ BOOST_FIXTURE_TEST_CASE( account_history_pagination, cli_fixture )
             BOOST_FAIL("Duplicate found");
          }
          operation_ids.insert(op.op.id);
+      }
+
+      // Testing result formatter
+      auto formatters = con.wallet_api_ptr->get_result_formatters();
+      if( formatters.find("get_account_history") != formatters.end() )
+      {
+         BOOST_TEST_MESSAGE("Testing formatter of get_account_history");
+         string output = formatters["get_account_history"](
+               fc::variant(history, FC_PACK_MAX_DEPTH), fc::variants());
+         BOOST_CHECK( output.find("Here are some") != string::npos );
       }
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
