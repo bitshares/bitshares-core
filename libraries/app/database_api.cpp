@@ -2409,15 +2409,15 @@ std::string database_api_impl::get_transaction_hex(const signed_transaction& trx
 }
 
 std::string database_api::get_transaction_hex_without_sig(
-   const signed_transaction &trx) const
+   const transaction &trx) const
 {
    return my->get_transaction_hex_without_sig(trx);
 }
 
 std::string database_api_impl::get_transaction_hex_without_sig(
-   const signed_transaction &trx) const
+   const transaction &trx) const
 {
-   return fc::to_hex(fc::raw::pack(static_cast<transaction>(trx)));
+   return fc::to_hex(fc::raw::pack(trx));
 }
 
 set<public_key_type> database_api::get_required_signatures( const signed_transaction& trx,

@@ -598,9 +598,9 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
          // during sync, it is unlikely that we'll see any old
          contained_transaction_message_ids.reserve( contained_transaction_message_ids.size()
                                                     + blk_msg.block.transactions.size() );
-         for (const processed_transaction& transaction : blk_msg.block.transactions)
+         for (const processed_transaction& ptrx : blk_msg.block.transactions)
          {
-            graphene::net::trx_message transaction_message(transaction);
+            graphene::net::trx_message transaction_message(ptrx);
             contained_transaction_message_ids.emplace_back(graphene::net::message(transaction_message).id());
          }
       }

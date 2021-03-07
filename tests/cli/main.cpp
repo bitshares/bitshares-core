@@ -159,7 +159,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 /// @param returned_block the signed block
 /// @returns true on success
 ///////////
-bool generate_block(std::shared_ptr<graphene::app::application> app, graphene::chain::signed_block& returned_block) 
+bool generate_block(std::shared_ptr<graphene::app::application> app, graphene::chain::signed_block& returned_block)
 {
    try {
       fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
@@ -372,6 +372,30 @@ BOOST_FIXTURE_TEST_CASE( cli_quit, cli_fixture )
    BOOST_CHECK_THROW( con.wallet_api_ptr->quit(), fc::canceled_exception );
 }
 
+BOOST_FIXTURE_TEST_CASE( cli_help_gethelp, cli_fixture )
+{
+   BOOST_TEST_MESSAGE("Testing help and gethelp commands.");
+   auto formatters = con.wallet_api_ptr->get_result_formatters();
+
+   string result = con.wallet_api_ptr->help();
+   BOOST_CHECK( result.find("gethelp") != string::npos );
+   if( formatters.find("help") != formatters.end() )
+   {
+      BOOST_TEST_MESSAGE("Testing formatter of help");
+      string output = formatters["help"](fc::variant(result), fc::variants());
+      BOOST_CHECK( output.find("gethelp") != string::npos );
+   }
+
+   result = con.wallet_api_ptr->gethelp( "transfer" );
+   BOOST_CHECK( result.find("usage") != string::npos );
+   if( formatters.find("gethelp") != formatters.end() )
+   {
+      BOOST_TEST_MESSAGE("Testing formatter of gethelp");
+      string output = formatters["gethelp"](fc::variant(result), fc::variants());
+      BOOST_CHECK( output.find("usage") != string::npos );
+   }
+}
+
 BOOST_FIXTURE_TEST_CASE( upgrade_nathan_account, cli_fixture )
 {
    try
@@ -425,6 +449,144 @@ BOOST_FIXTURE_TEST_CASE( create_new_account, cli_fixture )
       signed_transaction transfer_tx = con.wallet_api_ptr->transfer(
          "nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true
       );
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
+{
+   try
+   {
+      BOOST_TEST_MESSAGE("Cli MPA Tests");
+
+      INVOKE(upgrade_nathan_account);
+
+      account_object nathan_acct = con.wallet_api_ptr->get_account("nathan");
+
+      auto formatters = con.wallet_api_ptr->get_result_formatters();
+
+      // Create new asset called BOBCOIN backed by CORE
+      try
+      {
+         BOOST_TEST_MESSAGE("Create MPA 'BOBCOIN'");
+         graphene::chain::asset_options asset_ops;
+         asset_ops.issuer_permissions = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK;
+         asset_ops.flags = charge_market_fee;
+         asset_ops.max_supply = 1000000;
+         asset_ops.core_exchange_rate = price(asset(2),asset(1,asset_id_type(1)));
+         graphene::chain::bitasset_options bit_opts;
+         auto result = con.wallet_api_ptr->create_asset("nathan", "BOBCOIN", 4, asset_ops, bit_opts, true);
+         if( formatters.find("create_asset") != formatters.end() )
+         {
+            BOOST_TEST_MESSAGE("Testing formatter of create_asset");
+            string output = formatters["create_asset"](
+                  fc::variant(result, FC_PACK_MAX_DEPTH), fc::variants());
+            BOOST_CHECK( output.find("BOBCOIN") != string::npos );
+         }
+      }
+      catch(exception& e)
+      {
+         BOOST_FAIL(e.what());
+      }
+      catch(...)
+      {
+         BOOST_FAIL("Unknown exception creating BOBCOIN");
+      }
+
+      auto bobcoin = con.wallet_api_ptr->get_asset("BOBCOIN");
+      {
+         // Play with asset fee pool
+         auto objs = con.wallet_api_ptr->get_object( bobcoin.dynamic_asset_data_id )
+                        .as<vector<asset_dynamic_data_object>>( FC_PACK_MAX_DEPTH );
+         idump( (objs) );
+         BOOST_REQUIRE_EQUAL( objs.size(), 1u );
+         asset_dynamic_data_object bobcoin_dyn = objs[0];
+         idump( (bobcoin_dyn) );
+         share_type old_pool = bobcoin_dyn.fee_pool;
+
+         BOOST_TEST_MESSAGE("Fund fee pool");
+         con.wallet_api_ptr->fund_asset_fee_pool("nathan", "BOBCOIN", "2", true);
+         objs = con.wallet_api_ptr->get_object( bobcoin.dynamic_asset_data_id )
+                   .as<vector<asset_dynamic_data_object>>( FC_PACK_MAX_DEPTH );
+         BOOST_REQUIRE_EQUAL( objs.size(), 1u );
+         bobcoin_dyn = objs[0];
+         share_type funded_pool = bobcoin_dyn.fee_pool;
+         BOOST_CHECK_EQUAL( funded_pool.value, old_pool.value + GRAPHENE_BLOCKCHAIN_PRECISION * 2 );
+
+         BOOST_TEST_MESSAGE("Claim fee pool");
+         con.wallet_api_ptr->claim_asset_fee_pool("BOBCOIN", "1", true);
+         objs = con.wallet_api_ptr->get_object( bobcoin.dynamic_asset_data_id )
+                   .as<vector<asset_dynamic_data_object>>( FC_PACK_MAX_DEPTH );
+         BOOST_REQUIRE_EQUAL( objs.size(), 1u );
+         bobcoin_dyn = objs[0];
+         share_type claimed_pool = bobcoin_dyn.fee_pool;
+         BOOST_CHECK_EQUAL( claimed_pool.value, old_pool.value + GRAPHENE_BLOCKCHAIN_PRECISION );
+      }
+
+      {
+         // Set price feed producer
+         BOOST_TEST_MESSAGE("Set price feed producer");
+         asset_bitasset_data_object bob_bitasset = con.wallet_api_ptr->get_bitasset_data( "BOBCOIN" );
+         BOOST_CHECK_EQUAL( bob_bitasset.feeds.size(), 0u );
+
+         auto handle = con.wallet_api_ptr->begin_builder_transaction();
+         asset_update_feed_producers_operation aufp_op;
+         aufp_op.issuer = nathan_acct.id;
+         aufp_op.asset_to_update = bobcoin.id;
+         aufp_op.new_feed_producers = { nathan_acct.id };
+         con.wallet_api_ptr->add_operation_to_builder_transaction( handle, aufp_op );
+         con.wallet_api_ptr->set_fees_on_builder_transaction( handle, "1.3.0" );
+         con.wallet_api_ptr->sign_builder_transaction( handle, true );
+
+         bob_bitasset = con.wallet_api_ptr->get_bitasset_data( "BOBCOIN" );
+         BOOST_CHECK_EQUAL( bob_bitasset.feeds.size(), 1u );
+         BOOST_CHECK( bob_bitasset.current_feed.settlement_price.is_null() );
+      }
+
+      {
+         // Publish price feed
+         BOOST_TEST_MESSAGE("Publish price feed");
+         price_feed feed;
+         feed.settlement_price = price( asset(1,bobcoin.id), asset(2) );
+         feed.core_exchange_rate = price( asset(1,bobcoin.id), asset(1) );
+         con.wallet_api_ptr->publish_asset_feed( "nathan", "BOBCOIN", feed, true );
+         asset_bitasset_data_object bob_bitasset = con.wallet_api_ptr->get_bitasset_data( "BOBCOIN" );
+         BOOST_CHECK( bob_bitasset.current_feed.settlement_price == feed.settlement_price );
+      }
+
+      {
+         // Borrow
+         BOOST_TEST_MESSAGE("Borrow BOBCOIN");
+         auto calls = con.wallet_api_ptr->get_call_orders( "BOBCOIN", 10 );
+         BOOST_CHECK_EQUAL( calls.size(), 0u );
+         con.wallet_api_ptr->borrow_asset( "nathan", "1", "BOBCOIN", "10", true );
+         calls = con.wallet_api_ptr->get_call_orders( "BOBCOIN", 10 );
+         BOOST_CHECK_EQUAL( calls.size(), 1u );
+
+         auto nathan_balances = con.wallet_api_ptr->list_account_balances( "nathan" );
+         size_t count = 0;
+         for( auto& bal : nathan_balances )
+         {
+            if( bal.asset_id == bobcoin.id )
+            {
+               ++count;
+               BOOST_CHECK_EQUAL( bal.amount.value, 10000 );
+            }
+         }
+         BOOST_CHECK_EQUAL(count, 1u);
+
+         // Testing result formatter
+         if( formatters.find("list_account_balances") != formatters.end() )
+         {
+            BOOST_TEST_MESSAGE("Testing formatter of list_account_balances");
+            string output = formatters["list_account_balances"](
+                  fc::variant(nathan_balances, FC_PACK_MAX_DEPTH ), fc::variants());
+            BOOST_CHECK( output.find("BOBCOIN") != string::npos );
+         }
+      }
+
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
@@ -667,8 +829,8 @@ BOOST_FIXTURE_TEST_CASE( cli_get_available_transaction_signers, cli_fixture )
       trx.sign( privkey_2, con.wallet_data.chain_id );
 
       // verify expected result
-      flat_set<public_key_type> expected_signers = {test_bki.pub_key, 
-                                                    privkey_1.get_public_key(), 
+      flat_set<public_key_type> expected_signers = {test_bki.pub_key,
+                                                    privkey_1.get_public_key(),
                                                     privkey_2.get_public_key()};
 
       auto signers = con.wallet_api_ptr->get_transaction_signers(trx);
@@ -716,7 +878,7 @@ BOOST_FIXTURE_TEST_CASE( cli_cant_get_signers_from_modified_transaction, cli_fix
       // modify transaction (MITM-attack)
       trx.operations.clear();
 
-      // verify if transaction has no valid signature of test account 
+      // verify if transaction has no valid signature of test account
       flat_set<public_key_type> expected_signers_of_valid_transaction = {test_bki.pub_key};
       auto signers = con.wallet_api_ptr->get_transaction_signers(trx);
       BOOST_CHECK(signers != expected_signers_of_valid_transaction);
@@ -759,10 +921,10 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
    try {
       // we need to increase the default max transaction size to run this test.
       this->app1->chain_database()->modify(
-         this->app1->chain_database()->get_global_properties(), 
+         this->app1->chain_database()->get_global_properties(),
          []( global_property_object& p) {
             p.parameters.maximum_transaction_size = 8192;
-      });      
+      });
       std::vector<signed_transaction> import_txs;
 
       BOOST_TEST_MESSAGE("Importing nathan's balance");
@@ -770,6 +932,8 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
 
       unsigned int head_block = 0;
       auto & W = *con.wallet_api_ptr; // Wallet alias
+
+      auto formatters = con.wallet_api_ptr->get_result_formatters();
 
       BOOST_TEST_MESSAGE("Creating blind accounts");
       graphene::wallet::brain_key_info bki_nathan = W.suggest_brain_key();
@@ -789,7 +953,17 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
 
       // ** Block 2: Nathan will blind 100M CORE token:
       BOOST_TEST_MESSAGE("Blinding a large balance");
-      W.transfer_to_blind("nathan", GRAPHENE_SYMBOL, {{"nathan","100000000"}}, true);
+      {
+         auto result = W.transfer_to_blind("nathan", GRAPHENE_SYMBOL, {{"nathan","100000000"}}, true);
+         // Testing result formatter
+         if( formatters.find("transfer_to_blind") != formatters.end() )
+         {
+            BOOST_TEST_MESSAGE("Testing formatter of transfer_to_blind");
+            string output = formatters["transfer_to_blind"](
+                  fc::variant(result, FC_PACK_MAX_DEPTH), fc::variants());
+            BOOST_CHECK( output.find("receipt") != string::npos );
+         }
+      }
       BOOST_CHECK( W.get_blind_balances("nathan")[0].amount == 10000000000000 );
       generate_block(app1); head_block++;
 
@@ -800,7 +974,7 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
       std::map<std::string, share_type> to_list = {{"alice",100000000000},
                                                    {"bob",    1000000000}};
       vector<blind_confirmation> bconfs;
-      asset_object core_asset = W.get_asset("1.3.0");
+      auto core_asset = W.get_asset("1.3.0");
       BOOST_TEST_MESSAGE("Sending blind transactions to alice and bob");
       for (auto to : to_list) {
          string amount = core_asset.amount_to_string(to.second);
@@ -833,6 +1007,35 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
       BOOST_TEST_MESSAGE("Check that all expected blocks have processed");
       dynamic_global_property_object dgp = W.get_dynamic_global_properties();
       BOOST_CHECK(dgp.head_block_number == head_block);
+
+      // Receive blind transfer
+      {
+         auto result = W.receive_blind_transfer(bconfs[1].outputs[1].confirmation_receipt, "", "bob_receive");
+         BOOST_CHECK_EQUAL( result.amount.amount.value, 1000000000 );
+         // Testing result formatter
+         if( formatters.find("receive_blind_transfer") != formatters.end() )
+         {
+            BOOST_TEST_MESSAGE("Testing formatter of receive_blind_transfer");
+            string output = formatters["receive_blind_transfer"](
+                  fc::variant(result, FC_PACK_MAX_DEPTH), fc::variants());
+            BOOST_CHECK( output.find("bob_receive") != string::npos );
+         }
+      }
+
+      // Check blind history
+      {
+         auto result = W.blind_history("nathan");
+         BOOST_CHECK_EQUAL( result.size(), 5u ); // 1 transfer_to_blind + 2 outputs * 2 blind_transfers
+         // Testing result formatter
+         if( formatters.find("blind_history") != formatters.end() )
+         {
+            BOOST_TEST_MESSAGE("Testing formatter of blind_history");
+            string output = formatters["blind_history"](
+                  fc::variant(result, FC_PACK_MAX_DEPTH), fc::variants());
+            BOOST_CHECK( output.find("WHEN") != string::npos );
+            BOOST_TEST_MESSAGE( output );
+         }
+      }
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
@@ -871,6 +1074,16 @@ BOOST_FIXTURE_TEST_CASE( account_history_pagination, cli_fixture )
             BOOST_FAIL("Duplicate found");
          }
          operation_ids.insert(op.op.id);
+      }
+
+      // Testing result formatter
+      auto formatters = con.wallet_api_ptr->get_result_formatters();
+      if( formatters.find("get_account_history") != formatters.end() )
+      {
+         BOOST_TEST_MESSAGE("Testing formatter of get_account_history");
+         string output = formatters["get_account_history"](
+               fc::variant(history, FC_PACK_MAX_DEPTH), fc::variants());
+         BOOST_CHECK( output.find("Here are some") != string::npos );
       }
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
@@ -1099,7 +1312,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
 
       // Create new asset called BOBCOIN
-      try 
+      try
       {
          graphene::chain::asset_options asset_ops;
          asset_ops.max_supply = 1000000;
@@ -1120,12 +1333,12 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       {
          graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
          BOOST_CHECK(!bki.brain_priv_key.empty());
-         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "alice", 
-               "nathan", "nathan", true);
+         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key,
+               "alice", "nathan", "nathan", true);
          con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
          // attempt to give alice some bitshares
          BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to alice");
-         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "alice", "10000", "1.3.0", 
+         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "alice", "10000", "1.3.0",
                "Here are some CORE token for your new account", true);
       }
 
@@ -1133,13 +1346,13 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       {
          graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
          BOOST_CHECK(!bki.brain_priv_key.empty());
-         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "bob", 
-               "nathan", "nathan", true);
+         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key,
+               "bob", "nathan", "nathan", true);
          // this should cause resync which will import the keys of alice and bob
          generate_block(app1);
          // attempt to give bob some bitshares
          BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to Bob");
-         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "bob", "10000", "1.3.0", 
+         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "bob", "10000", "1.3.0",
                "Here are some CORE token for your new account", true);
          con.wallet_api_ptr->issue_asset("bob", "5", "BOBCOIN", "Here are your BOBCOINs", true);
       }
@@ -1158,8 +1371,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       std::string hash_str = ss.str();
       BOOST_TEST_MESSAGE("Secret is " + preimage_string + " and hash is " + hash_str);
       uint32_t timelock = fc::days(1).to_seconds();
-      graphene::chain::signed_transaction result_tx 
-            = con.wallet_api_ptr->htlc_create("alice", "bob", 
+      graphene::chain::signed_transaction result_tx
+            = con.wallet_api_ptr->htlc_create("alice", "bob",
             "3", "1.3.0", "SHA256", hash_str, preimage_string.size(), timelock, "", true);
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
@@ -1626,13 +1839,13 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
       account_object nathan_acct_after_upgrade = con.wallet_api_ptr->get_account("nathan");
 
       // verify that the upgrade was successful
-      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), 
+      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(),
             (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())
             (nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
       BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
 
       // Create new asset called BOBCOIN
-      try 
+      try
       {
          graphene::chain::asset_options asset_ops;
          asset_ops.max_supply = 1000000;
@@ -1658,7 +1871,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
          // attempt to give alice some bitshares
          BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to alice");
-         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "alice", "10000", "1.3.0", 
+         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "alice", "10000", "1.3.0",
                "Here are some CORE token for your new account", true);
       }
 
@@ -1672,7 +1885,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          generate_block(app1);
          // attempt to give bob some bitshares
          BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to Bob");
-         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "bob", "10000", "1.3.0", 
+         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "bob", "10000", "1.3.0",
                "Here are some CORE token for your new account", true);
          con.wallet_api_ptr->issue_asset("bob", "5", "BOBCOIN", "Here are your BOBCOINs", true);
       }
@@ -1691,8 +1904,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
       std::string hash_str = ss.str();
       BOOST_TEST_MESSAGE("Secret is " + preimage_string + " and hash is " + hash_str);
       uint32_t timelock = fc::days(1).to_seconds();
-      graphene::chain::signed_transaction result_tx 
-            = con.wallet_api_ptr->htlc_create("alice", "bob", 
+      graphene::chain::signed_transaction result_tx
+            = con.wallet_api_ptr->htlc_create("alice", "bob",
             "3", "1.3.0", "HASH160", hash_str, preimage_string.size(), timelock, "Alice to Bob", true);
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
@@ -1752,7 +1965,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          std::vector<graphene::wallet::operation_detail> hist = con.wallet_api_ptr->get_account_history("alice", 1);
          BOOST_CHECK( hist[0].description.find("with preimage \"4d792") != hist[0].description.npos);
       }
-      
+
       // Bob can also look at his own history to see Alice's preimage
       {
          BOOST_TEST_MESSAGE("Bob can look at his own history to see the preimage");
@@ -1795,8 +2008,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          {
             BOOST_CHECK( str.find("HASH160 620e4d5ba") != std::string::npos );
          }
-      } 
-      con.wallet_api_ptr->unlock("supersecret");        
+      }
+      con.wallet_api_ptr->unlock("supersecret");
 
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
