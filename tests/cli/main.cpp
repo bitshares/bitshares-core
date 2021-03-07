@@ -159,7 +159,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 /// @param returned_block the signed block
 /// @returns true on success
 ///////////
-bool generate_block(std::shared_ptr<graphene::app::application> app, graphene::chain::signed_block& returned_block) 
+bool generate_block(std::shared_ptr<graphene::app::application> app, graphene::chain::signed_block& returned_block)
 {
    try {
       fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
@@ -787,8 +787,8 @@ BOOST_FIXTURE_TEST_CASE( cli_get_available_transaction_signers, cli_fixture )
       trx.sign( privkey_2, con.wallet_data.chain_id );
 
       // verify expected result
-      flat_set<public_key_type> expected_signers = {test_bki.pub_key, 
-                                                    privkey_1.get_public_key(), 
+      flat_set<public_key_type> expected_signers = {test_bki.pub_key,
+                                                    privkey_1.get_public_key(),
                                                     privkey_2.get_public_key()};
 
       auto signers = con.wallet_api_ptr->get_transaction_signers(trx);
@@ -836,7 +836,7 @@ BOOST_FIXTURE_TEST_CASE( cli_cant_get_signers_from_modified_transaction, cli_fix
       // modify transaction (MITM-attack)
       trx.operations.clear();
 
-      // verify if transaction has no valid signature of test account 
+      // verify if transaction has no valid signature of test account
       flat_set<public_key_type> expected_signers_of_valid_transaction = {test_bki.pub_key};
       auto signers = con.wallet_api_ptr->get_transaction_signers(trx);
       BOOST_CHECK(signers != expected_signers_of_valid_transaction);
@@ -879,10 +879,10 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
    try {
       // we need to increase the default max transaction size to run this test.
       this->app1->chain_database()->modify(
-         this->app1->chain_database()->get_global_properties(), 
+         this->app1->chain_database()->get_global_properties(),
          []( global_property_object& p) {
             p.parameters.maximum_transaction_size = 8192;
-      });      
+      });
       std::vector<signed_transaction> import_txs;
 
       BOOST_TEST_MESSAGE("Importing nathan's balance");
@@ -1219,7 +1219,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
 
       // Create new asset called BOBCOIN
-      try 
+      try
       {
          graphene::chain::asset_options asset_ops;
          asset_ops.max_supply = 1000000;
@@ -1240,12 +1240,12 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       {
          graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
          BOOST_CHECK(!bki.brain_priv_key.empty());
-         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "alice", 
+         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "alice",
                "nathan", "nathan", true);
          con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
          // attempt to give alice some bitshares
          BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to alice");
-         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "alice", "10000", "1.3.0", 
+         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "alice", "10000", "1.3.0",
                "Here are some CORE token for your new account", true);
       }
 
@@ -1253,13 +1253,13 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       {
          graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
          BOOST_CHECK(!bki.brain_priv_key.empty());
-         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "bob", 
+         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "bob",
                "nathan", "nathan", true);
          // this should cause resync which will import the keys of alice and bob
          generate_block(app1);
          // attempt to give bob some bitshares
          BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to Bob");
-         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "bob", "10000", "1.3.0", 
+         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "bob", "10000", "1.3.0",
                "Here are some CORE token for your new account", true);
          con.wallet_api_ptr->issue_asset("bob", "5", "BOBCOIN", "Here are your BOBCOINs", true);
       }
@@ -1278,8 +1278,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       std::string hash_str = ss.str();
       BOOST_TEST_MESSAGE("Secret is " + preimage_string + " and hash is " + hash_str);
       uint32_t timelock = fc::days(1).to_seconds();
-      graphene::chain::signed_transaction result_tx 
-            = con.wallet_api_ptr->htlc_create("alice", "bob", 
+      graphene::chain::signed_transaction result_tx
+            = con.wallet_api_ptr->htlc_create("alice", "bob",
             "3", "1.3.0", "SHA256", hash_str, preimage_string.size(), timelock, "", true);
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
@@ -1746,13 +1746,13 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
       account_object nathan_acct_after_upgrade = con.wallet_api_ptr->get_account("nathan");
 
       // verify that the upgrade was successful
-      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), 
+      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(),
             (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())
             (nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
       BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
 
       // Create new asset called BOBCOIN
-      try 
+      try
       {
          graphene::chain::asset_options asset_ops;
          asset_ops.max_supply = 1000000;
@@ -1778,7 +1778,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
          // attempt to give alice some bitshares
          BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to alice");
-         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "alice", "10000", "1.3.0", 
+         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "alice", "10000", "1.3.0",
                "Here are some CORE token for your new account", true);
       }
 
@@ -1792,7 +1792,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          generate_block(app1);
          // attempt to give bob some bitshares
          BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to Bob");
-         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "bob", "10000", "1.3.0", 
+         signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "bob", "10000", "1.3.0",
                "Here are some CORE token for your new account", true);
          con.wallet_api_ptr->issue_asset("bob", "5", "BOBCOIN", "Here are your BOBCOINs", true);
       }
@@ -1811,8 +1811,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
       std::string hash_str = ss.str();
       BOOST_TEST_MESSAGE("Secret is " + preimage_string + " and hash is " + hash_str);
       uint32_t timelock = fc::days(1).to_seconds();
-      graphene::chain::signed_transaction result_tx 
-            = con.wallet_api_ptr->htlc_create("alice", "bob", 
+      graphene::chain::signed_transaction result_tx
+            = con.wallet_api_ptr->htlc_create("alice", "bob",
             "3", "1.3.0", "HASH160", hash_str, preimage_string.size(), timelock, "Alice to Bob", true);
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
@@ -1872,7 +1872,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          std::vector<graphene::wallet::operation_detail> hist = con.wallet_api_ptr->get_account_history("alice", 1);
          BOOST_CHECK( hist[0].description.find("with preimage \"4d792") != hist[0].description.npos);
       }
-      
+
       // Bob can also look at his own history to see Alice's preimage
       {
          BOOST_TEST_MESSAGE("Bob can look at his own history to see the preimage");
@@ -1915,8 +1915,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          {
             BOOST_CHECK( str.find("HASH160 620e4d5ba") != std::string::npos );
          }
-      } 
-      con.wallet_api_ptr->unlock("supersecret");        
+      }
+      con.wallet_api_ptr->unlock("supersecret");
 
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
