@@ -431,6 +431,126 @@ BOOST_FIXTURE_TEST_CASE( create_new_account, cli_fixture )
    }
 }
 
+BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
+{
+   try
+   {
+      BOOST_TEST_MESSAGE("Cli MPA Tests");
+
+      INVOKE(upgrade_nathan_account);
+
+      account_object nathan_acct = con.wallet_api_ptr->get_account("nathan");
+
+      // Create new asset called BOBCOIN backed by CORE
+      try
+      {
+         BOOST_TEST_MESSAGE("Create MPA 'BOBCOIN'");
+         graphene::chain::asset_options asset_ops;
+         asset_ops.issuer_permissions = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK;
+         asset_ops.flags = charge_market_fee;
+         asset_ops.max_supply = 1000000;
+         asset_ops.core_exchange_rate = price(asset(2),asset(1,asset_id_type(1)));
+         graphene::chain::bitasset_options bit_opts;
+         con.wallet_api_ptr->create_asset("nathan", "BOBCOIN", 4, asset_ops, bit_opts, true);
+      }
+      catch(exception& e)
+      {
+         BOOST_FAIL(e.what());
+      }
+      catch(...)
+      {
+         BOOST_FAIL("Unknown exception creating BOBCOIN");
+      }
+
+      auto bobcoin = con.wallet_api_ptr->get_asset("BOBCOIN");
+      {
+         // Play with asset fee pool
+         auto objs = con.wallet_api_ptr->get_object( bobcoin.dynamic_asset_data_id )
+                        .as<vector<asset_dynamic_data_object>>( FC_PACK_MAX_DEPTH );
+         idump( (objs) );
+         BOOST_REQUIRE_EQUAL( objs.size(), 1u );
+         asset_dynamic_data_object bobcoin_dyn = objs[0];
+         idump( (bobcoin_dyn) );
+         share_type old_pool = bobcoin_dyn.fee_pool;
+
+         BOOST_TEST_MESSAGE("Fund fee pool");
+         con.wallet_api_ptr->fund_asset_fee_pool("nathan", "BOBCOIN", "2", true);
+         objs = con.wallet_api_ptr->get_object( bobcoin.dynamic_asset_data_id )
+                   .as<vector<asset_dynamic_data_object>>( FC_PACK_MAX_DEPTH );
+         BOOST_REQUIRE_EQUAL( objs.size(), 1u );
+         bobcoin_dyn = objs[0];
+         share_type funded_pool = bobcoin_dyn.fee_pool;
+         BOOST_CHECK_EQUAL( funded_pool.value, old_pool.value + GRAPHENE_BLOCKCHAIN_PRECISION * 2 );
+
+         BOOST_TEST_MESSAGE("Claim fee pool");
+         con.wallet_api_ptr->claim_asset_fee_pool("BOBCOIN", "1", true);
+         objs = con.wallet_api_ptr->get_object( bobcoin.dynamic_asset_data_id )
+                   .as<vector<asset_dynamic_data_object>>( FC_PACK_MAX_DEPTH );
+         BOOST_REQUIRE_EQUAL( objs.size(), 1u );
+         bobcoin_dyn = objs[0];
+         share_type claimed_pool = bobcoin_dyn.fee_pool;
+         BOOST_CHECK_EQUAL( claimed_pool.value, old_pool.value + GRAPHENE_BLOCKCHAIN_PRECISION );
+      }
+
+      {
+         // Set price feed producer
+         BOOST_TEST_MESSAGE("Set price feed producer");
+         asset_bitasset_data_object bob_bitasset = con.wallet_api_ptr->get_bitasset_data( "BOBCOIN" );
+         BOOST_CHECK_EQUAL( bob_bitasset.feeds.size(), 0u );
+
+         auto handle = con.wallet_api_ptr->begin_builder_transaction();
+         asset_update_feed_producers_operation aufp_op;
+         aufp_op.issuer = nathan_acct.id;
+         aufp_op.asset_to_update = bobcoin.id;
+         aufp_op.new_feed_producers = { nathan_acct.id };
+         con.wallet_api_ptr->add_operation_to_builder_transaction( handle, aufp_op );
+         con.wallet_api_ptr->set_fees_on_builder_transaction( handle, "1.3.0" );
+         con.wallet_api_ptr->sign_builder_transaction( handle, true );
+
+         bob_bitasset = con.wallet_api_ptr->get_bitasset_data( "BOBCOIN" );
+         BOOST_CHECK_EQUAL( bob_bitasset.feeds.size(), 1u );
+         BOOST_CHECK( bob_bitasset.current_feed.settlement_price.is_null() );
+      }
+
+      {
+         // Publish price feed
+         BOOST_TEST_MESSAGE("Publish price feed");
+         price_feed feed;
+         feed.settlement_price = price( asset(1,bobcoin.id), asset(2) );
+         feed.core_exchange_rate = price( asset(1,bobcoin.id), asset(1) );
+         con.wallet_api_ptr->publish_asset_feed( "nathan", "BOBCOIN", feed, true );
+         asset_bitasset_data_object bob_bitasset = con.wallet_api_ptr->get_bitasset_data( "BOBCOIN" );
+         BOOST_CHECK( bob_bitasset.current_feed.settlement_price == feed.settlement_price );
+      }
+
+      {
+         // Borrow
+         BOOST_TEST_MESSAGE("Borrow BOBCOIN");
+         auto calls = con.wallet_api_ptr->get_call_orders( "BOBCOIN", 10 );
+         BOOST_CHECK_EQUAL( calls.size(), 0u );
+         con.wallet_api_ptr->borrow_asset( "nathan", "1", "BOBCOIN", "10", true );
+         calls = con.wallet_api_ptr->get_call_orders( "BOBCOIN", 10 );
+         BOOST_CHECK_EQUAL( calls.size(), 1u );
+
+         auto nathan_balances = con.wallet_api_ptr->list_account_balances( "nathan" );
+         size_t count = 0;
+         for( auto& bal : nathan_balances )
+         {
+            if( bal.asset_id == bobcoin.id )
+            {
+               ++count;
+               BOOST_CHECK_EQUAL( bal.amount.value, 10000 );
+            }
+         }
+         BOOST_CHECK_EQUAL(count, 1u);
+      }
+
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 ///////////////////////
 // Start a server and connect using the same calls as the CLI
 // Vote for two witnesses, and make sure they both stay there
@@ -800,7 +920,7 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
       std::map<std::string, share_type> to_list = {{"alice",100000000000},
                                                    {"bob",    1000000000}};
       vector<blind_confirmation> bconfs;
-      asset_object core_asset = W.get_asset("1.3.0");
+      auto core_asset = W.get_asset("1.3.0");
       BOOST_TEST_MESSAGE("Sending blind transactions to alice and bob");
       for (auto to : to_list) {
          string amount = core_asset.amount_to_string(to.second);
