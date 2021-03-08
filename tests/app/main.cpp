@@ -36,7 +36,9 @@
 
 #include <fc/thread/thread.hpp>
 #include <fc/log/appender.hpp>
+#include <fc/log/console_appender.hpp>
 #include <fc/log/logger.hpp>
+#include <fc/log/logger_config.hpp>
 
 #include <boost/filesystem/path.hpp>
 
@@ -216,6 +218,20 @@ BOOST_AUTO_TEST_CASE( two_node_network )
    using namespace graphene::chain;
    using namespace graphene::app;
    try {
+      // Configure logging
+      fc::logging_config logging_config;
+      logging_config.appenders.push_back( fc::appender_config( "stderr", "console",
+            fc::variant( fc::console_appender::config(), GRAPHENE_MAX_NESTED_OBJECTS ) ) );
+
+      fc::logger_config logger_config("p2p");
+      logger_config.level = fc::log_level::debug;
+      logger_config.appenders.push_back("stderr");
+
+      logging_config.loggers.push_back(logger_config);
+
+      fc::configure_logging(logging_config);
+
+      // Start app1
       BOOST_TEST_MESSAGE( "Creating and initializing app1" );
 
       fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
@@ -243,6 +259,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
          return status["listening_on"].as<fc::ip::endpoint>( 5 ).port() == 3939;
       });
 
+      // Start app2
       BOOST_TEST_MESSAGE( "Creating and initializing app2" );
 
       fc::temp_directory app2_dir( graphene::utilities::temp_directory_path() );
@@ -273,6 +290,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_CHECK_EQUAL( db1->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 0 );
       BOOST_CHECK_EQUAL( db2->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 0 );
 
+      // Transaction test
       BOOST_TEST_MESSAGE( "Creating transfer tx" );
       graphene::chain::precomputable_transaction trx;
       {
@@ -321,6 +339,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_CHECK_EQUAL( db1->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
       BOOST_CHECK_EQUAL( db2->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
 
+      // Block test
       BOOST_TEST_MESSAGE( "Generating block on db2" );
       fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
 
