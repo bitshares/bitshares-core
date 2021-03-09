@@ -254,12 +254,10 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app1.initialize(app_dir.path(), cfg);
       BOOST_TEST_MESSAGE( "Starting app1 and waiting 500 ms" );
       app1.startup();
-      #ifdef NDEBUG
-        #define NODE_STARTUP_WAIT_TIME (fc::milliseconds(30000))
-      #else
-        #define NODE_STARTUP_WAIT_TIME (fc::milliseconds(120000))
-      #endif
-      fc::wait_for( NODE_STARTUP_WAIT_TIME, [&app1,port] () {
+
+      auto node_startup_wait_time = fc::seconds(15);
+
+      fc::wait_for( node_startup_wait_time, [&app1,port] () {
          const auto status = app1.p2p_node()->network_get_info();
          return status["listening_on"].as<fc::ip::endpoint>( 5 ).port() == port;
       });
@@ -282,7 +280,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Starting app2 and waiting for connection" );
       app2.startup();
 
-      fc::wait_for( NODE_STARTUP_WAIT_TIME, [&app1] () { return app1.p2p_node()->get_connection_count() > 0; } );
+      fc::wait_for( node_startup_wait_time, [&app1] () { return app1.p2p_node()->get_connection_count() > 0; } );
 
       BOOST_REQUIRE_EQUAL(app1.p2p_node()->get_connection_count(), 1u);
       BOOST_CHECK_EQUAL(std::string(app1.p2p_node()->get_connected_peers().front().host.get_address()), "127.0.0.1");
@@ -331,12 +329,9 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Broadcasting tx" );
       app1.p2p_node()->broadcast(graphene::net::trx_message(trx));
 
-      #ifdef NDEBUG
-        #define BROADCAST_WAIT_TIME (fc::milliseconds(15000))
-      #else
-        #define BROADCAST_WAIT_TIME (fc::milliseconds(60000))
-      #endif
-      fc::wait_for( BROADCAST_WAIT_TIME, [db2] () {
+      auto broadcast_wait_time = fc::seconds(15);
+
+      fc::wait_for( broadcast_wait_time, [db2] () {
          return db2->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value == 1000000;
       });
 
@@ -348,7 +343,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
 
       // the other node will reject the block if its timestamp is in the future, so we wait
-      fc::wait_for( BROADCAST_WAIT_TIME, [db2] () {
+      fc::wait_for( broadcast_wait_time, [db2] () {
          return db2->get_slot_time(1) <= fc::time_point::now();
       });
 
@@ -365,7 +360,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Broadcasting block" );
       app2.p2p_node()->broadcast(graphene::net::block_message( block_1 ));
 
-      fc::wait_for( BROADCAST_WAIT_TIME, [db1] () {
+      fc::wait_for( broadcast_wait_time, [db1] () {
          return db1->head_block_num() == 1;
       });
 
