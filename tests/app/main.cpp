@@ -231,12 +231,12 @@ BOOST_AUTO_TEST_CASE( two_node_network )
 
       fc::configure_logging(logging_config);
 
+      // Start app1
+      BOOST_TEST_MESSAGE( "Creating and initializing app1" );
+
       auto port = fc::network::get_available_port();
       auto app1_p2p_endpoint_str = string("127.0.0.1:") + std::to_string(port);
       auto app2_seed_nodes_str = string("[\"") + app1_p2p_endpoint_str + "\"]";
-
-      // Start app1
-      BOOST_TEST_MESSAGE( "Creating and initializing app1" );
 
       fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
       auto genesis_file = create_genesis_file(app_dir);
@@ -252,7 +252,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       cfg.emplace("genesis-json", boost::program_options::variable_value(genesis_file, false));
       cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
       app1.initialize(app_dir.path(), cfg);
-      BOOST_TEST_MESSAGE( "Starting app1 and waiting 500 ms" );
+      BOOST_TEST_MESSAGE( "Starting app1 and waiting" );
       app1.startup();
 
       auto node_startup_wait_time = fc::seconds(15);
