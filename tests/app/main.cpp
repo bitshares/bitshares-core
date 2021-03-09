@@ -231,6 +231,10 @@ BOOST_AUTO_TEST_CASE( two_node_network )
 
       fc::configure_logging(logging_config);
 
+      auto port = fc::network::get_available_port();
+      auto app1_p2p_endpoint_str = string("127.0.0.1:") + std::to_string(port);
+      auto app2_seed_nodes_str = string("[\"") + app1_p2p_endpoint_str + "\"]";
+
       // Start app1
       BOOST_TEST_MESSAGE( "Creating and initializing app1" );
 
@@ -244,7 +248,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app1.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
       app1.startup_plugins();
       boost::program_options::variables_map cfg;
-      cfg.emplace("p2p-endpoint", boost::program_options::variable_value(string("127.0.0.1:3939"), false));
+      cfg.emplace("p2p-endpoint", boost::program_options::variable_value(app1_p2p_endpoint_str, false));
       cfg.emplace("genesis-json", boost::program_options::variable_value(genesis_file, false));
       cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
       app1.initialize(app_dir.path(), cfg);
@@ -255,9 +259,9 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       #else
         #define NODE_STARTUP_WAIT_TIME (fc::milliseconds(120000))
       #endif
-      fc::wait_for( NODE_STARTUP_WAIT_TIME, [&app1] () {
+      fc::wait_for( NODE_STARTUP_WAIT_TIME, [&app1,port] () {
          const auto status = app1.p2p_node()->network_get_info();
-         return status["listening_on"].as<fc::ip::endpoint>( 5 ).port() == 3939;
+         return status["listening_on"].as<fc::ip::endpoint>( 5 ).port() == port;
       });
 
       // Start app2
@@ -271,9 +275,8 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app2.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
       app2.startup_plugins();
       boost::program_options::variables_map cfg2;
-      cfg2.emplace("p2p-endpoint", boost::program_options::variable_value(string("127.0.0.1:4040"), false));
       cfg2.emplace("genesis-json", boost::program_options::variable_value(genesis_file, false));
-      cfg2.emplace("seed-nodes", boost::program_options::variable_value(string("[\"127.0.0.1:3939\"]"), false));
+      cfg2.emplace("seed-nodes", boost::program_options::variable_value(app2_seed_nodes_str, false));
       app2.initialize(app2_dir.path(), cfg2);
 
       BOOST_TEST_MESSAGE( "Starting app2 and waiting for connection" );
