@@ -4653,6 +4653,9 @@ namespace graphene { namespace net { namespace detail {
         peer_details["current_head_block_number"] = _delegate->get_block_number(peer->last_block_delegate_has_seen);
         peer_details["current_head_block_time"] = peer->last_block_time_delegate_has_seen;
 
+        peer_details["peer_needs_sync_items_from_us"] = peer->peer_needs_sync_items_from_us;
+        peer_details["we_need_sync_items_from_peer"] = peer->we_need_sync_items_from_peer;
+
         this_peer_status.info = peer_details;
         statuses.push_back(this_peer_status);
       }
