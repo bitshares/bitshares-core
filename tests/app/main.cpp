@@ -280,7 +280,19 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_TEST_MESSAGE( "Starting app2 and waiting for connection" );
       app2.startup();
 
-      fc::wait_for( node_startup_wait_time, [&app1] () { return app1.p2p_node()->get_connection_count() > 0; } );
+      fc::wait_for( node_startup_wait_time, [&app1] () {
+         if( app1.p2p_node()->get_connection_count() > 0 )
+         {
+            auto peers = app1.p2p_node()->get_connected_peers();
+            BOOST_REQUIRE_EQUAL( peers.size(), 1u );
+            const auto& peer_info = peers.front().info;
+            auto itr = peer_info.find( "peer_needs_sync_items_from_us" );
+            if( itr == peer_info.end() )
+               return false;
+            return !itr->value().as<bool>(1);
+         }
+         return false;
+      });
 
       BOOST_REQUIRE_EQUAL(app1.p2p_node()->get_connection_count(), 1u);
       BOOST_CHECK_EQUAL(std::string(app1.p2p_node()->get_connected_peers().front().host.get_address()), "127.0.0.1");
