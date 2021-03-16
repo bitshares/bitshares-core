@@ -65,7 +65,7 @@ public:
       return std::unordered_set<Key, Hash, Pred>::erase( key ); 
    }
    // swap
-   void swap( typename std::unordered_set<Key, Hash, Pred>& other )
+   void swap( typename std::unordered_set<Key, Hash, Pred>& other ) noexcept
    {
       fc::scoped_lock<fc::mutex> lock(mux);
       std::unordered_set<Key, Hash, Pred>::swap( other );
