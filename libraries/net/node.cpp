@@ -780,7 +780,7 @@ namespace graphene { namespace net { namespace detail {
         dlog("beginning an iteration of advertise inventory");
         // swap inventory into local variable, clearing the node's copy
         std::unordered_set<item_id> inventory_to_advertise;
-        inventory_to_advertise.swap(_new_inventory);
+        _new_inventory.swap( inventory_to_advertise );
 
         // process all inventory to advertise and construct the inventory messages we'll send
         // first, then send them all in a batch (to avoid any fiber interruption points while
