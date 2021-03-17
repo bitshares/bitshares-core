@@ -64,6 +64,12 @@ public:
       fc::scoped_lock<fc::mutex> lock(mux);
       return std::unordered_set<Key, Hash, Pred>::erase( key ); 
    }
+   // swap
+   void swap( typename std::unordered_set<Key, Hash, Pred>& other ) noexcept
+   {
+      fc::scoped_lock<fc::mutex> lock(mux);
+      std::unordered_set<Key, Hash, Pred>::swap( other );
+   }
    // iteration
    typename std::unordered_set<Key, Hash, Pred>::iterator begin() noexcept 
    { 
@@ -335,11 +341,12 @@ class node_impl : public peer_connection_delegate
       // @}
 
       /// used by the task that advertises inventory during normal operation
-      // @{
+      /// @{
       fc::promise<void>::ptr        _retrigger_advertise_inventory_loop_promise;
       fc::future<void>              _advertise_inventory_loop_done;
-      std::unordered_set<item_id>   _new_inventory; /// list of items we have received but not yet advertised to our peers
-      // @}
+      /// list of items we have received but not yet advertised to our peers
+      concurrent_unordered_set<item_id>   _new_inventory;
+      /// @}
 
       fc::future<void>     _terminate_inactive_connections_loop_done;
       uint8_t _recent_block_interval_in_seconds; // a cached copy of the block interval, to avoid a thread hop to the blockchain to get the current value
