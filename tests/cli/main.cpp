@@ -582,10 +582,10 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
       }
 
       bool balance_formatter_tested = false;
-      auto check_nathan_bobcoin_balance = [&](int64_t amount) {
-         auto nathan_balances = con.wallet_api_ptr->list_account_balances( "nathan" );
+      auto check_bobcoin_balance = [&](string account, int64_t amount) {
+         auto balances = con.wallet_api_ptr->list_account_balances( account );
          size_t count = 0;
-         for( auto& bal : nathan_balances )
+         for( auto& bal : balances )
          {
             if( bal.asset_id == bobcoin.id )
             {
@@ -600,10 +600,13 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
          {
             BOOST_TEST_MESSAGE("Testing formatter of list_account_balances");
             string output = formatters["list_account_balances"](
-                  fc::variant(nathan_balances, FC_PACK_MAX_DEPTH ), fc::variants());
+                  fc::variant(balances, FC_PACK_MAX_DEPTH ), fc::variants());
             BOOST_CHECK( output.find("BOBCOIN") != string::npos );
             balance_formatter_tested = true;
          }
+      };
+      auto check_nathan_bobcoin_balance = [&](int64_t amount) {
+         check_bobcoin_balance( "nathan", amount );
       };
 
       {
@@ -643,6 +646,7 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
          con.wallet_api_ptr->transfer( "nathan", "init0", "10000", "1.3.0", "" );
 
          BOOST_CHECK(generate_block(app1));
+         check_bobcoin_balance( "init0", 5000 );
          check_nathan_bobcoin_balance( 3000 );
          check_nathan_last_history( "Transfer" );
 
@@ -671,12 +675,15 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
          BOOST_CHECK_EQUAL( orders.front().for_sale.value, 90 * GRAPHENE_BLOCKCHAIN_PRECISION );
 
          BOOST_CHECK(generate_block(app1));
+         check_bobcoin_balance( "init0", 4000 );
          check_nathan_bobcoin_balance( 4000 );
          check_nathan_last_history( "as maker" );
 
          // Nathan cancel order
          BOOST_TEST_MESSAGE("Nathan cancel order");
          con.wallet_api_ptr->cancel_order( nathan_order_id, true );
+         orders = con.wallet_api_ptr->get_limit_orders( "BOBCOIN", "1.3.0", 10 );
+         BOOST_CHECK_EQUAL( orders.size(), 0u );
 
          BOOST_CHECK(generate_block(app1));
          check_nathan_bobcoin_balance( 4000 );
