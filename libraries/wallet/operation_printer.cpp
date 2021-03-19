@@ -238,6 +238,50 @@ std::string operation_printer::operator()(const asset_settle_operation& op) cons
    return "";
 }
 
+std::string operation_printer::operator()(const asset_fund_fee_pool_operation& op) const
+{
+   out << "Fund " << format_asset(op.amount) << " into asset fee pool of "
+       << wallet.get_asset(op.asset_id).symbol;
+   print_fee(op.fee);
+   print_result();
+   return "";
+}
+
+std::string operation_printer::operator()(const asset_claim_pool_operation& op) const
+{
+   out << "Claim " << format_asset(op.amount_to_claim) << " from asset fee pool of "
+       << wallet.get_asset(op.asset_id).symbol;
+   print_fee(op.fee);
+   print_result();
+   return "";
+}
+
+std::string operation_printer::operator()(const asset_update_feed_producers_operation& op) const
+{
+   out << "Update price feed producers of asset " << wallet.get_asset(op.asset_to_update).symbol
+       << " to ";
+   vector<string> accounts;
+   accounts.reserve( op.new_feed_producers.size() );
+   for( const auto& account_id : op.new_feed_producers )
+   {
+      accounts.push_back( wallet.get_account( account_id ).name );
+   }
+   out << fc::json::to_string(accounts);
+   print_fee(op.fee);
+   print_result();
+   return "";
+}
+
+std::string operation_printer::operator()(const asset_publish_feed_operation& op) const
+{
+   // TODO prettify the price
+   out << "Publish price feed " << format_asset(op.feed.settlement_price.base)
+       << " / " << format_asset(op.feed.settlement_price.quote);
+   print_fee(op.fee);
+   print_result();
+   return "";
+}
+
 std::string operation_printer::operator()(const call_order_update_operation& op) const
 {
    out << "Adjust debt position with delta debt amount " << format_asset(op.delta_debt)

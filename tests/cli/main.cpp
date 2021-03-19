@@ -468,8 +468,47 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
       {
          BOOST_FAIL("Unknown exception creating BOBCOIN");
       }
+      BOOST_CHECK(generate_block(app1));
+
+      auto check_nathan_last_history = [&]( string keyword ) {
+         auto history = con.wallet_api_ptr->get_relative_account_history("nathan", 0, 1, 0);
+         BOOST_REQUIRE_GT( history.size(), 0 );
+         BOOST_CHECK( history[0].description.find( keyword ) != string::npos );
+      };
+
+      check_nathan_last_history( "Create BitAsset" );
+      check_nathan_last_history( "BOBCOIN" );
 
       auto bobcoin = con.wallet_api_ptr->get_asset("BOBCOIN");
+      {
+         // Update asset
+         BOOST_TEST_MESSAGE("Update asset");
+         auto options = bobcoin.options;
+         BOOST_CHECK_EQUAL( options.max_supply.value, 1000000 );
+         options.max_supply = 2000000;
+         con.wallet_api_ptr->update_asset("BOBCOIN", {}, options, true);
+         // Check
+         bobcoin = con.wallet_api_ptr->get_asset("BOBCOIN");
+         BOOST_CHECK_EQUAL( bobcoin.options.max_supply.value, 2000000 );
+      }
+      BOOST_CHECK(generate_block(app1));
+      check_nathan_last_history( "Update asset" );
+
+      auto bitbobcoin = con.wallet_api_ptr->get_bitasset_data("BOBCOIN");
+      {
+         // Update bitasset
+         BOOST_TEST_MESSAGE("Update bitasset");
+         auto bitoptions = bitbobcoin.options;
+         BOOST_CHECK_EQUAL( bitoptions.feed_lifetime_sec, uint32_t(GRAPHENE_DEFAULT_PRICE_FEED_LIFETIME) );
+         bitoptions.feed_lifetime_sec = 3600u;
+         con.wallet_api_ptr->update_bitasset("BOBCOIN", bitoptions, true);
+         // Check
+         bitbobcoin = con.wallet_api_ptr->get_bitasset_data("BOBCOIN");
+         BOOST_CHECK_EQUAL( bitbobcoin.options.feed_lifetime_sec, 3600u );
+      }
+      BOOST_CHECK(generate_block(app1));
+      check_nathan_last_history( "Update bitasset" );
+
       {
          // Play with asset fee pool
          auto objs = con.wallet_api_ptr->get_object( bobcoin.dynamic_asset_data_id )
@@ -489,6 +528,9 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
          share_type funded_pool = bobcoin_dyn.fee_pool;
          BOOST_CHECK_EQUAL( funded_pool.value, old_pool.value + GRAPHENE_BLOCKCHAIN_PRECISION * 2 );
 
+         BOOST_CHECK(generate_block(app1));
+         check_nathan_last_history( "Fund" );
+
          BOOST_TEST_MESSAGE("Claim fee pool");
          con.wallet_api_ptr->claim_asset_fee_pool("BOBCOIN", "1", true);
          objs = con.wallet_api_ptr->get_object( bobcoin.dynamic_asset_data_id )
@@ -497,6 +539,9 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
          bobcoin_dyn = objs[0];
          share_type claimed_pool = bobcoin_dyn.fee_pool;
          BOOST_CHECK_EQUAL( claimed_pool.value, old_pool.value + GRAPHENE_BLOCKCHAIN_PRECISION );
+
+         BOOST_CHECK(generate_block(app1));
+         check_nathan_last_history( "Claim" );
       }
 
       {
@@ -517,6 +562,9 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
          bob_bitasset = con.wallet_api_ptr->get_bitasset_data( "BOBCOIN" );
          BOOST_CHECK_EQUAL( bob_bitasset.feeds.size(), 1u );
          BOOST_CHECK( bob_bitasset.current_feed.settlement_price.is_null() );
+
+         BOOST_CHECK(generate_block(app1));
+         check_nathan_last_history( "Update price feed producers" );
       }
 
       {
@@ -528,7 +576,38 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
          con.wallet_api_ptr->publish_asset_feed( "nathan", "BOBCOIN", feed, true );
          asset_bitasset_data_object bob_bitasset = con.wallet_api_ptr->get_bitasset_data( "BOBCOIN" );
          BOOST_CHECK( bob_bitasset.current_feed.settlement_price == feed.settlement_price );
+
+         BOOST_CHECK(generate_block(app1));
+         check_nathan_last_history( "Publish price feed" );
       }
+
+      bool balance_formatter_tested = false;
+      auto check_bobcoin_balance = [&](string account, int64_t amount) {
+         auto balances = con.wallet_api_ptr->list_account_balances( account );
+         size_t count = 0;
+         for( auto& bal : balances )
+         {
+            if( bal.asset_id == bobcoin.id )
+            {
+               ++count;
+               BOOST_CHECK_EQUAL( bal.amount.value, amount );
+            }
+         }
+         BOOST_CHECK_EQUAL(count, 1u);
+
+         // Testing result formatter
+         if( !balance_formatter_tested && formatters.find("list_account_balances") != formatters.end() )
+         {
+            BOOST_TEST_MESSAGE("Testing formatter of list_account_balances");
+            string output = formatters["list_account_balances"](
+                  fc::variant(balances, FC_PACK_MAX_DEPTH ), fc::variants());
+            BOOST_CHECK( output.find("BOBCOIN") != string::npos );
+            balance_formatter_tested = true;
+         }
+      };
+      auto check_nathan_bobcoin_balance = [&](int64_t amount) {
+         check_bobcoin_balance( "nathan", amount );
+      };
 
       {
          // Borrow
@@ -537,28 +616,78 @@ BOOST_FIXTURE_TEST_CASE( mpa_tests, cli_fixture )
          BOOST_CHECK_EQUAL( calls.size(), 0u );
          con.wallet_api_ptr->borrow_asset( "nathan", "1", "BOBCOIN", "10", true );
          calls = con.wallet_api_ptr->get_call_orders( "BOBCOIN", 10 );
-         BOOST_CHECK_EQUAL( calls.size(), 1u );
+         BOOST_REQUIRE_EQUAL( calls.size(), 1u );
+         BOOST_CHECK_EQUAL( calls.front().debt.value, 10000 );
 
-         auto nathan_balances = con.wallet_api_ptr->list_account_balances( "nathan" );
-         size_t count = 0;
-         for( auto& bal : nathan_balances )
-         {
-            if( bal.asset_id == bobcoin.id )
-            {
-               ++count;
-               BOOST_CHECK_EQUAL( bal.amount.value, 10000 );
-            }
-         }
-         BOOST_CHECK_EQUAL(count, 1u);
+         BOOST_CHECK(generate_block(app1));
+         check_nathan_bobcoin_balance( 10000 );
+         check_nathan_last_history( "Adjust debt position" );
+      }
 
-         // Testing result formatter
-         if( formatters.find("list_account_balances") != formatters.end() )
-         {
-            BOOST_TEST_MESSAGE("Testing formatter of list_account_balances");
-            string output = formatters["list_account_balances"](
-                  fc::variant(nathan_balances, FC_PACK_MAX_DEPTH ), fc::variants());
-            BOOST_CHECK( output.find("BOBCOIN") != string::npos );
-         }
+      {
+         // Settle
+         BOOST_TEST_MESSAGE("Settle BOBCOIN");
+         auto settles = con.wallet_api_ptr->get_settle_orders( "BOBCOIN", 10 );
+         BOOST_CHECK_EQUAL( settles.size(), 0u );
+         con.wallet_api_ptr->settle_asset( "nathan", "0.2", "BOBCOIN", true );
+         settles = con.wallet_api_ptr->get_settle_orders( "BOBCOIN", 10 );
+         BOOST_REQUIRE_EQUAL( settles.size(), 1u );
+         BOOST_CHECK_EQUAL( settles.front().balance.amount.value, 2000 );
+
+         BOOST_CHECK(generate_block(app1));
+         check_nathan_bobcoin_balance( 8000 );
+         check_nathan_last_history( "Force-settle" );
+      }
+
+      {
+         // Transfer
+         BOOST_TEST_MESSAGE("Transfer some BOBCOIN to init0");
+         con.wallet_api_ptr->transfer2( "nathan", "init0", "0.5", "BOBCOIN", "" );
+         con.wallet_api_ptr->transfer( "nathan", "init0", "10000", "1.3.0", "" );
+
+         BOOST_CHECK(generate_block(app1));
+         check_bobcoin_balance( "init0", 5000 );
+         check_nathan_bobcoin_balance( 3000 );
+         check_nathan_last_history( "Transfer" );
+
+      }
+
+      {
+         // Nathan places an order
+         BOOST_TEST_MESSAGE("Nathan place an order to buy BOBCOIN");
+         auto orders = con.wallet_api_ptr->get_limit_orders( "BOBCOIN", "1.3.0", 10 );
+         BOOST_CHECK_EQUAL( orders.size(), 0u );
+         con.wallet_api_ptr->sell_asset( "nathan", "100", "1.3.0", "1", "BOBCOIN", 300, false, true );
+         orders = con.wallet_api_ptr->get_limit_orders( "BOBCOIN", "1.3.0", 10 );
+         BOOST_REQUIRE_EQUAL( orders.size(), 1u );
+         BOOST_CHECK_EQUAL( orders.front().for_sale.value, 100 * GRAPHENE_BLOCKCHAIN_PRECISION );
+         limit_order_id_type nathan_order_id = orders.front().id;
+
+         BOOST_CHECK(generate_block(app1));
+         check_nathan_bobcoin_balance( 3000 );
+         check_nathan_last_history( "Create limit order" );
+
+         // init0 place an order to partially fill Nathan's order
+         BOOST_TEST_MESSAGE("init0 place an order to sell BOBCOIN");
+         con.wallet_api_ptr->sell_asset( "init0", "0.1", "BOBCOIN", "1", "1.3.0", 200, true, true );
+         orders = con.wallet_api_ptr->get_limit_orders( "BOBCOIN", "1.3.0", 10 );
+         BOOST_REQUIRE_EQUAL( orders.size(), 1u );
+         BOOST_CHECK_EQUAL( orders.front().for_sale.value, 90 * GRAPHENE_BLOCKCHAIN_PRECISION );
+
+         BOOST_CHECK(generate_block(app1));
+         check_bobcoin_balance( "init0", 4000 );
+         check_nathan_bobcoin_balance( 4000 );
+         check_nathan_last_history( "as maker" );
+
+         // Nathan cancel order
+         BOOST_TEST_MESSAGE("Nathan cancel order");
+         con.wallet_api_ptr->cancel_order( nathan_order_id, true );
+         orders = con.wallet_api_ptr->get_limit_orders( "BOBCOIN", "1.3.0", 10 );
+         BOOST_CHECK_EQUAL( orders.size(), 0u );
+
+         BOOST_CHECK(generate_block(app1));
+         check_nathan_bobcoin_balance( 4000 );
+         check_nathan_last_history( "Cancel limit order" );
       }
 
    } catch( fc::exception& e ) {

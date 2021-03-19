@@ -99,6 +99,10 @@ public:
    std::string operator()(const graphene::protocol::asset_create_operation& op)const;
    std::string operator()(const graphene::protocol::asset_update_operation& op)const;
    std::string operator()(const graphene::protocol::asset_update_bitasset_operation& op)const;
+   std::string operator()(const graphene::protocol::asset_update_feed_producers_operation& op)const;
+   std::string operator()(const graphene::protocol::asset_publish_feed_operation& op)const;
+   std::string operator()(const graphene::protocol::asset_fund_fee_pool_operation& op)const;
+   std::string operator()(const graphene::protocol::asset_claim_pool_operation& op)const;
    std::string operator()(const graphene::protocol::asset_issue_operation& op)const;
    std::string operator()(const graphene::protocol::asset_reserve_operation& op)const;
    std::string operator()(const graphene::protocol::asset_settle_operation& op)const;
