@@ -126,6 +126,9 @@ jobs:
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
         _build/tests/cli_test -l test_suite
         df -h
+        echo "Cleanup"
+        rm -rf /tmp/graphene*
+        df -h
     - name: Prepare for scanning with SonarScanner
       run: |
         mkdir -p sonar_cache
