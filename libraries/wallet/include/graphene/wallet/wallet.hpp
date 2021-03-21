@@ -811,7 +811,7 @@ class wallet_api
 
       /** Read a memo.
        *
-       * @param memo JSON-enconded memo.
+       * @param memo JSON-encoded memo.
        * @returns string with decrypted message.
        */
       string read_memo(const memo_data& memo);

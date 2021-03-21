@@ -162,7 +162,7 @@ string operation_printer::operator()(const transfer_operation& op) const
 string operation_printer::operator()(const override_transfer_operation& op) const
 {
    out << wallet.get_account(op.issuer).name
-       << " transfer " << format_asset(op.amount)
+       << " force-transfer " << format_asset(op.amount)
        << " from " << wallet.get_account(op.from).name << " to " << wallet.get_account(op.to).name;
    std::string memo = print_memo( op.memo );
    print_fee(op.fee);
