@@ -358,6 +358,7 @@ database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
 
    if( current_test_name == "asset_in_collateral"
             || current_test_name == "htlc_database_api"
+            || current_test_name == "liquidity_pool_apis_test"
             || current_suite_name == "database_api_tests"
             || current_suite_name == "api_limit_tests" )
    {
