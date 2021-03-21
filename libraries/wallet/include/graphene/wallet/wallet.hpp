@@ -802,8 +802,8 @@ class wallet_api
 
       /** Sign a memo message.
        *
-       * @param from the name or id of signing account; or a public key
-       * @param to the name or id of receiving account; or a public key
+       * @param from the name or id of signing account, or a public key, or a label of a public key
+       * @param to the name or id of receiving account, or a public key, or a label of a public key
        * @param memo text to sign
        * @return the signed memo data
        */

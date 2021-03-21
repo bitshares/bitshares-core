@@ -139,17 +139,34 @@ namespace graphene { namespace wallet { namespace detail {
          account_object from_account = get_account(from);
          md.from = from_account.options.memo_key;
       } catch (const fc::exception& e) {
-         md.from =  self.get_public_key( from );
+         // check if the string itself is a pubkey, if not, consider it as a label
+         try {
+            md.from = public_key_type( from );
+         } catch (const fc::exception& e) {
+            md.from = self.get_public_key( from );
+         }
       }
       // same as above, for destination key
       try {
          account_object to_account = get_account(to);
          md.to = to_account.options.memo_key;
       } catch (const fc::exception& e) {
-         md.to = self.get_public_key( to );
+         // check if the string itself is a pubkey, if not, consider it as a label
+         try {
+            md.to = public_key_type( to );
+         } catch (const fc::exception& e) {
+            md.to = self.get_public_key( to );
+         }
       }
 
-      md.set_message(get_private_key(md.from), md.to, memo);
+      // try to get private key of from and sign, if that fails, try to sign with to
+      try {
+         md.set_message(get_private_key(md.from), md.to, memo);
+      } catch (const fc::exception& e) {
+         std::swap( md.from, md.to );
+         md.set_message(get_private_key(md.from), md.to, memo);
+         std::swap( md.from, md.to );
+      }
       return md;
    }
 
