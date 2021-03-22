@@ -911,6 +911,16 @@ BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
                               "jmjatlanta", {6}, 0, 1); // 6 - account_update_operation
          BOOST_REQUIRE_GT( history.details.size(), 0 );
          BOOST_CHECK( history.details[0].description.find( "Update Account 'jmjatlanta'" ) != string::npos );
+
+         // Testing result formatter
+         auto formatters = con.wallet_api_ptr->get_result_formatters();
+         if( formatters.find("get_account_history_by_operations") != formatters.end() )
+         {
+            BOOST_TEST_MESSAGE("Testing formatter of get_account_history_by_operations");
+            string output = formatters["get_account_history_by_operations"](
+                  fc::variant(history, FC_PACK_MAX_DEPTH), fc::variants());
+            BOOST_CHECK( output.find("Update Account 'jmjatlanta'") != string::npos );
+         }
       }
 
    } catch( fc::exception& e ) {
