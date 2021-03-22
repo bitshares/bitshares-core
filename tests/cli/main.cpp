@@ -470,6 +470,14 @@ BOOST_FIXTURE_TEST_CASE( uia_tests, cli_fixture )
                   fc::variant(result, FC_PACK_MAX_DEPTH), fc::variants());
             BOOST_CHECK( output.find("BOBCOIN") != string::npos );
          }
+
+         BOOST_CHECK_THROW( con.wallet_api_ptr->get_asset_name("BOBCOI"), fc::exception );
+         BOOST_CHECK_EQUAL( con.wallet_api_ptr->get_asset_name("BOBCOIN"), "BOBCOIN" );
+         BOOST_CHECK_EQUAL( con.wallet_api_ptr->get_asset_symbol("BOBCOIN"), "BOBCOIN" );
+
+         BOOST_CHECK_THROW( con.wallet_api_ptr->get_account_name("nath"), fc::exception );
+         BOOST_CHECK_EQUAL( con.wallet_api_ptr->get_account_name("nathan"), "nathan" );
+         BOOST_CHECK( con.wallet_api_ptr->get_account_id("nathan") == con.wallet_api_ptr->get_account("nathan").id );
       }
       BOOST_CHECK(generate_block(app1));
 
@@ -477,6 +485,8 @@ BOOST_FIXTURE_TEST_CASE( uia_tests, cli_fixture )
       check_nathan_last_history( "BOBCOIN" );
 
       auto bobcoin = con.wallet_api_ptr->get_asset("BOBCOIN");
+
+      BOOST_CHECK( con.wallet_api_ptr->get_asset_id("BOBCOIN") == bobcoin.id );
 
       bool balance_formatter_tested = false;
       auto check_bobcoin_balance = [&](string account, int64_t amount) {
@@ -896,13 +906,12 @@ BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
       if( !is_hf2262_passed(app1) )
          BOOST_CHECK(init1_last_votes > init1_start_votes);
 
-      auto check_account_last_history = [&]( string account, string keyword ) {
-         auto history = con.wallet_api_ptr->get_relative_account_history(account, 0, 1, 0);
-         BOOST_REQUIRE_GT( history.size(), 0 );
-         BOOST_CHECK( history[0].description.find( keyword ) != string::npos );
-      };
-
-      check_account_last_history( "jmjatlanta", "Update Account 'jmjatlanta'" );
+      {
+         auto history = con.wallet_api_ptr->get_account_history_by_operations(
+                              "jmjatlanta", {6}, 0, 1); // 6 - account_update_operation
+         BOOST_REQUIRE_GT( history.details.size(), 0 );
+         BOOST_CHECK( history.details[0].description.find( "Update Account 'jmjatlanta'" ) != string::npos );
+      }
 
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
