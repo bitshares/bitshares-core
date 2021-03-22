@@ -437,6 +437,8 @@ BOOST_FIXTURE_TEST_CASE( uia_tests, cli_fixture )
 
       INVOKE(upgrade_nathan_account);
 
+      BOOST_CHECK(generate_block(app1));
+
       account_object nathan_acct = con.wallet_api_ptr->get_account("nathan");
 
       auto formatters = con.wallet_api_ptr->get_result_formatters();
@@ -449,6 +451,8 @@ BOOST_FIXTURE_TEST_CASE( uia_tests, cli_fixture )
       auto check_nathan_last_history = [&]( string keyword ) {
          check_account_last_history( "nathan", keyword );
       };
+
+      check_nathan_last_history( "account_upgrade_operation" );
 
       // Create new asset called BOBCOIN
       {
