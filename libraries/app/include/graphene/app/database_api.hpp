@@ -706,10 +706,10 @@ class database_api
        * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
        */
       vector<extended_liquidity_pool_object> get_liquidity_pools_by_one_asset(
-            std::string asset_symbol_or_id,
-            optional<uint32_t> limit = 101,
-            optional<liquidity_pool_id_type> start_id = optional<liquidity_pool_id_type>(),
-            optional<bool> with_statistics = false )const;
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit = 101,
+            const optional<liquidity_pool_id_type>& start_id = optional<liquidity_pool_id_type>(),
+            const optional<bool>& with_statistics = false )const;
 
       /**
        * @brief Get a list of liquidity pools by the symbols or IDs of the two assets in the pool

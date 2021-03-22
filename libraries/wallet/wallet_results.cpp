@@ -66,12 +66,8 @@ std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_a
       m["get_account_history_by_operations"] = [this](variant result, const fc::variants&) {
           auto r = result.as<account_history_operation_detail>( GRAPHENE_MAX_NESTED_OBJECTS );
           std::stringstream ss;
-          ss << "total_count : ";
-          ss << r.total_count;
-          ss << " \n";
-          ss << "result_count : ";
-          ss << r.result_count;
-          ss << " \n";
+          ss << "total_count : " << r.total_count << " \n";
+          ss << "result_count : " << r.result_count << " \n";
           for (operation_detail_ex& d : r.details) {
               operation_history_object& i = d.op;
               auto b = _remote_db->get_block_header(i.block_num);

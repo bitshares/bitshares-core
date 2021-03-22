@@ -126,7 +126,7 @@ class wallet_api
        * @param limit the number of entries to return (starting from the most recent)
        * @returns a list of \c operation_history_objects
        */
-      vector<operation_detail>  get_account_history(string account_name_or_id, int limit)const;
+      vector<operation_detail>  get_account_history(string account_name_or_id, uint32_t limit)const;
 
       /** Returns the relative operations on the named account from start number.
        *
@@ -137,7 +137,7 @@ class wallet_api
        * @returns a list of \c operation_history_objects
        */
      vector<operation_detail>  get_relative_account_history( string account_name_or_id, uint32_t stop,
-                                                             int limit, uint32_t start )const;
+                                                             uint32_t limit, uint32_t start )const;
 
       /**
        * @brief Fetch all objects relevant to the specified account
@@ -243,7 +243,7 @@ class wallet_api
        */
       account_history_operation_detail get_account_history_by_operations( string account_name_or_id,
                                                                           flat_set<uint16_t> operation_types,
-                                                                          uint32_t start, int limit);
+                                                                          uint32_t start, uint32_t limit);
 
       /** Returns the block chain's rapidly-changing properties.
        * The returned object contains information that changes every block interval
@@ -291,7 +291,7 @@ class wallet_api
        * @param account_name_or_id the name or ID of the account to look up
        * @returns the name of the account
        */
-      string                            get_account_name(string account_name_or_id) const
+      string                            get_account_name(const string& account_name_or_id) const
       { return get_account( account_name_or_id ).name; }
 
       /**
@@ -299,14 +299,14 @@ class wallet_api
        * @param asset_symbol_or_id the symbol or ID of an asset to look up
        * @returns the id of the given asset
        */
-      asset_id_type                     get_asset_id(string asset_symbol_or_id) const;
+      asset_id_type                     get_asset_id(const string& asset_symbol_or_id) const;
 
       /**
        * Lookup the symbol of an asset.
        * @param asset_symbol_or_id the symbol or ID of an asset to look up
        * @returns the symbol of the given asset
        */
-      string                            get_asset_symbol(string asset_symbol_or_id) const
+      string                            get_asset_symbol(const string& asset_symbol_or_id) const
       { return get_asset( asset_symbol_or_id ).symbol; }
 
       /**
@@ -314,7 +314,7 @@ class wallet_api
        * @param asset_symbol_or_id the symbol or ID of an asset to look up
        * @returns the symbol of the given asset
        */
-      string                            get_asset_name(string asset_symbol_or_id) const
+      string                            get_asset_name(const string& asset_symbol_or_id) const
       { return get_asset_symbol( asset_symbol_or_id ); }
 
       /**
@@ -734,8 +734,8 @@ class wallet_api
        * @param brain_key the brain key used for generating the account's private keys
        * @param account_name the name of the account, must be unique on the blockchain.
        *                     Names with only latin letters and at least one vowel are
-       *                     premium names and expensive to register;
-       *                     names with only consonants, or at least with a digit, a dot or
+       *                     premium names and expensive to register.
+       *                     Names with only consonants, or at least with a digit, a dot or
        *                     a minus sign are cheap.
        * @param registrar_account the account which will pay the fee to register the user
        * @param referrer_account the account who is acting as a referrer, and may receive a
@@ -782,11 +782,11 @@ class wallet_api
        *             increase with transaction size
        * @returns the transaction ID (hash) along with the signed transaction transferring funds
        */
-      pair<transaction_id_type,signed_transaction> transfer2(string from,
-                                                             string to,
-                                                             string amount,
-                                                             string asset_symbol_or_id,
-                                                             string memo ) {
+      pair<transaction_id_type,signed_transaction> transfer2(const string& from,
+                                                             const string& to,
+                                                             const string& amount,
+                                                             const string& asset_symbol_or_id,
+                                                             const string& memo ) {
          auto trx = transfer( from, to, amount, asset_symbol_or_id, memo, true );
          return std::make_pair(trx.id(),trx);
       }
