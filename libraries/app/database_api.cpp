@@ -1869,10 +1869,10 @@ vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by
    vector<extended_liquidity_pool_object> results;
 
    results.reserve( limit );
-   auto pools_end = pools.end();
-   for ( ; itr != pools_end && results.size() < limit; ++itr )
+   while( itr != pools.end() && results.size() < limit )
    {
       results.emplace_back( extend_liquidity_pool( (*itr)(_db), with_stats ) );
+      ++itr;
    }
 
    return results;
