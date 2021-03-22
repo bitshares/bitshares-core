@@ -134,9 +134,20 @@ jobs:
         mkdir -p sonar_cache
         find _build/libraries/[acdenptuw]*/CMakeFiles/*.dir \
              _build/libraries/plugins/*/CMakeFiles/*.dir \
-             _build/programs/[cdgjsw]*/CMakeFiles/*.dir \
              -type d -print \
-          | while read d; do srcd="${d:7}"; gcov -o "$d" "${srcd/CMakeFiles*.dir/.}"/*.cpp; done >/dev/null
+          | while read d; do \
+              tmpd="${d:7}"; \
+              srcd="${tmpd/CMakeFiles*.dir/.}"; \
+              gcov -o "$d" "${srcd}"/*.[ch][px][px] \
+                           "${srcd}"/include/graphene/*/*.[ch][px][px] ; \
+            done >/dev/null
+        find _build/programs/[cdgjsw]*/CMakeFiles/*.dir \
+             -type d -print \
+          | while read d; do \
+              tmpd="${d:7}"; \
+              srcd="${tmpd/CMakeFiles*.dir/.}"; \
+              gcov -o "$d" "${srcd}"/*.[ch][px][px] ; \
+            done >/dev/null
         programs/build_helpers/set_sonar_branch_for_github_actions sonar-project.properties
     - name: Scan with SonarScanner
       env:
