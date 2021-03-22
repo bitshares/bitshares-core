@@ -534,7 +534,7 @@ BOOST_FIXTURE_TEST_CASE( uia_tests, cli_fixture )
          auto test_pubkey = fc::json::to_string( test_bki.pub_key );
          test_pubkey = test_pubkey.substr( 1, test_pubkey.size() - 2 );
          idump( (test_pubkey) );
-         op.memo = con.wallet_api_ptr->sign_memo( test_pubkey, "nathan", "get back some coin" );
+         op.memo = con.wallet_api_ptr->sign_memo( "nathan", test_pubkey, "get back some coin" );
          idump( (op.memo) );
          con.wallet_api_ptr->add_operation_to_builder_transaction( handle, op );
          con.wallet_api_ptr->set_fees_on_builder_transaction( handle, "1.3.0" );
@@ -543,7 +543,7 @@ BOOST_FIXTURE_TEST_CASE( uia_tests, cli_fixture )
          auto memo = con.wallet_api_ptr->read_memo( *op.memo );
          BOOST_CHECK_EQUAL( memo, "get back some coin" );
 
-         op.memo = con.wallet_api_ptr->sign_memo( "nathan", test_pubkey, "another test" );
+         op.memo = con.wallet_api_ptr->sign_memo( test_pubkey, "nathan", "another test" );
          idump( (op.memo) );
          memo = con.wallet_api_ptr->read_memo( *op.memo );
          BOOST_CHECK_EQUAL( memo, "another test" );
