@@ -106,7 +106,7 @@ custom_operations_plugin_impl::~custom_operations_plugin_impl()
 } // end namespace detail
 
 custom_operations_plugin::custom_operations_plugin() :
-   my( new detail::custom_operations_plugin_impl(*this) )
+   my( std::make_unique<detail::custom_operations_plugin_impl>(*this) )
 {
 }
 

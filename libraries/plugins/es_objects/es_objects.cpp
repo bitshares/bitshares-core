@@ -275,7 +275,7 @@ es_objects_plugin_impl::~es_objects_plugin_impl()
 } // end namespace detail
 
 es_objects_plugin::es_objects_plugin() :
-   my( new detail::es_objects_plugin_impl(*this) )
+   my( std::make_unique<detail::es_objects_plugin_impl>(*this) )
 {
 }
 

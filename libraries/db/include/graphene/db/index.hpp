@@ -169,7 +169,7 @@ namespace graphene { namespace db {
          template<typename T, typename... Args>
          T* add_secondary_index(Args... args)
          {
-            _sindex.emplace_back( new T(args...) );
+            _sindex.emplace_back( std::make_unique<T>(args...) );
             return static_cast<T*>(_sindex.back().get());
          }
 

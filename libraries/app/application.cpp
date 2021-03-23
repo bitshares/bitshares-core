@@ -975,7 +975,7 @@ uint8_t application_impl::get_current_block_interval_in_seconds() const
 namespace graphene { namespace app {
 
 application::application()
-   : my(new detail::application_impl(this))
+   : my(std::make_unique<detail::application_impl>(this))
 {}
 
 application::~application()

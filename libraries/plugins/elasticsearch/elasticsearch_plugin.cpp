@@ -434,7 +434,7 @@ void elasticsearch_plugin_impl::populateESstruct()
 } // end namespace detail
 
 elasticsearch_plugin::elasticsearch_plugin() :
-   my( new detail::elasticsearch_plugin_impl(*this) )
+   my( std::make_unique<detail::elasticsearch_plugin_impl>(*this) )
 {
 }
 

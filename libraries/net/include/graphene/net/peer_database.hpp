@@ -79,7 +79,7 @@ namespace graphene { namespace net {
     public:
       peer_database_iterator();
       ~peer_database_iterator();
-      explicit peer_database_iterator(peer_database_iterator_impl* impl);
+      explicit peer_database_iterator( std::unique_ptr<peer_database_iterator_impl>&& impl );
       peer_database_iterator( const peer_database_iterator& c );
 
     private:

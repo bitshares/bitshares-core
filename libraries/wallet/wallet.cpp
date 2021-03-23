@@ -151,7 +151,7 @@ namespace graphene { namespace wallet {
 namespace graphene { namespace wallet {
 
 wallet_api::wallet_api(const wallet_data& initial_data, fc::api<login_api> rapi)
-   : my(new detail::wallet_api_impl(*this, initial_data, rapi))
+   : my( std::make_unique<detail::wallet_api_impl>(*this, initial_data, rapi) )
 {
 }
 

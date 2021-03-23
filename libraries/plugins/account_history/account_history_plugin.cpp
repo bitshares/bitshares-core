@@ -283,7 +283,7 @@ void account_history_plugin_impl::add_account_history( const account_id_type acc
 
 
 account_history_plugin::account_history_plugin() :
-   my( new detail::account_history_plugin_impl(*this) )
+   my( std::make_unique<detail::account_history_plugin_impl>(*this) )
 {
 }
 
