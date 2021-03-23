@@ -340,7 +340,7 @@ namespace graphene { namespace app {
 
     vector<operation_history_object> history_api::get_account_history( const std::string account_id_or_name,
                                                                        operation_history_id_type stop,
-                                                                       unsigned limit,
+                                                                       uint32_t limit,
                                                                        operation_history_id_type start ) const
     {
        FC_ASSERT( _app.chain_database() );
@@ -391,10 +391,10 @@ namespace graphene { namespace app {
     }
 
     vector<operation_history_object> history_api::get_account_history_operations( const std::string account_id_or_name,
-                                                                       int operation_type,
+                                                                       int64_t operation_type,
                                                                        operation_history_id_type start,
                                                                        operation_history_id_type stop,
-                                                                       unsigned limit ) const
+                                                                       uint32_t limit ) const
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
@@ -437,7 +437,7 @@ namespace graphene { namespace app {
 
     vector<operation_history_object> history_api::get_relative_account_history( const std::string account_id_or_name,
                                                                                 uint64_t stop,
-                                                                                unsigned limit,
+                                                                                uint32_t limit,
                                                                                 uint64_t start ) const
     {
        FC_ASSERT( _app.chain_database() );
@@ -486,7 +486,7 @@ namespace graphene { namespace app {
 
     history_operation_detail history_api::get_account_history_by_operations( const std::string account_id_or_name,
                                                                              flat_set<uint16_t> operation_types,
-                                                                             uint32_t start, unsigned limit )const
+                                                                             uint32_t start, uint32_t limit )const
     {
        const auto configured_limit = _app.get_options().api_limit_get_account_history_by_operations;
        FC_ASSERT( limit <= configured_limit,

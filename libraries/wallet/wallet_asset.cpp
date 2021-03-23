@@ -74,7 +74,7 @@ namespace graphene { namespace wallet { namespace detail {
       return *opt;
    }
 
-   asset_id_type wallet_api_impl::get_asset_id(string asset_symbol_or_id) const
+   asset_id_type wallet_api_impl::get_asset_id(const string& asset_symbol_or_id) const
    {
       FC_ASSERT( asset_symbol_or_id.size() > 0 );
       vector<optional<extended_asset_object>> opt_asset;

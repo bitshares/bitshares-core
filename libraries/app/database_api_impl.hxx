@@ -154,10 +154,10 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             optional<liquidity_pool_id_type> start_id = optional<liquidity_pool_id_type>(),
             optional<bool> with_statistics = false )const;
       vector<extended_liquidity_pool_object> get_liquidity_pools_by_one_asset(
-            std::string asset_symbol_or_id,
-            optional<uint32_t> limit = 101,
-            optional<liquidity_pool_id_type> start_id = optional<liquidity_pool_id_type>(),
-            optional<bool> with_statistics = false )const;
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit = 101,
+            const optional<liquidity_pool_id_type>& start_id = optional<liquidity_pool_id_type>(),
+            const optional<bool>& with_statistics = false )const;
       vector<extended_liquidity_pool_object> get_liquidity_pools_by_both_assets(
             std::string asset_symbol_or_id_a,
             std::string asset_symbol_or_id_b,

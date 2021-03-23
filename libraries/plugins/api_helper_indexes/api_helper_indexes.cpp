@@ -49,7 +49,7 @@ void amount_in_collateral_index::object_inserted( const object& objct )
          itr->second += o.collateral;
    }
 
-} FC_CAPTURE_AND_RETHROW( (objct) ); }
+} FC_CAPTURE_AND_RETHROW( (objct) ) }
 
 void amount_in_collateral_index::object_removed( const object& objct )
 { try {
@@ -67,53 +67,55 @@ void amount_in_collateral_index::object_removed( const object& objct )
          itr->second -= o.collateral;
    }
 
-} FC_CAPTURE_AND_RETHROW( (objct) ); }
+} FC_CAPTURE_AND_RETHROW( (objct) ) }
 
 void amount_in_collateral_index::about_to_modify( const object& objct )
 { try {
    object_removed( objct );
-} FC_CAPTURE_AND_RETHROW( (objct) ); }
+} FC_CAPTURE_AND_RETHROW( (objct) ) }
 
 void amount_in_collateral_index::object_modified( const object& objct )
 { try {
    object_inserted( objct );
-} FC_CAPTURE_AND_RETHROW( (objct) ); }
+} FC_CAPTURE_AND_RETHROW( (objct) ) }
 
 share_type amount_in_collateral_index::get_amount_in_collateral( const asset_id_type& asst )const
 { try {
    auto itr = in_collateral.find( asst );
    if( itr == in_collateral.end() ) return 0;
    return itr->second;
-} FC_CAPTURE_AND_RETHROW( (asst) ); }
+} FC_CAPTURE_AND_RETHROW( (asst) ) }
 
 share_type amount_in_collateral_index::get_backing_collateral( const asset_id_type& asst )const
 { try {
    auto itr = backing_collateral.find( asst );
    if( itr == backing_collateral.end() ) return 0;
    return itr->second;
-} FC_CAPTURE_AND_RETHROW( (asst) ); }
+} FC_CAPTURE_AND_RETHROW( (asst) ) }
 
 void asset_in_liquidity_pools_index::object_inserted( const object& objct )
 { try {
-   const liquidity_pool_object& o = static_cast<const liquidity_pool_object&>( objct );
+   const auto& o = static_cast<const liquidity_pool_object&>( objct );
    asset_in_pools_map[ o.asset_a ].insert( o.id ); // Note: [] operator will create an entry if not found
    asset_in_pools_map[ o.asset_b ].insert( o.id );
-} FC_CAPTURE_AND_RETHROW( (objct) ); }
+} FC_CAPTURE_AND_RETHROW( (objct) ) }
 
 void asset_in_liquidity_pools_index::object_removed( const object& objct )
 { try {
-   const liquidity_pool_object& o = static_cast<const liquidity_pool_object&>( objct );
+   const auto& o = static_cast<const liquidity_pool_object&>( objct );
    asset_in_pools_map[ o.asset_a ].erase( o.id );
    asset_in_pools_map[ o.asset_b ].erase( o.id );
    // Note: do not erase entries with an empty set from the map in order to avoid read/write race conditions
-} FC_CAPTURE_AND_RETHROW( (objct) ); }
+} FC_CAPTURE_AND_RETHROW( (objct) ) }
 
 void asset_in_liquidity_pools_index::about_to_modify( const object& objct )
 {
+   // this secondary index has no interest in the modifications, nothing to do here
 }
 
 void asset_in_liquidity_pools_index::object_modified( const object& objct )
 {
+   // this secondary index has no interest in the modifications, nothing to do here
 }
 
 const flat_set<liquidity_pool_id_type>& asset_in_liquidity_pools_index::get_liquidity_pools_by_asset(

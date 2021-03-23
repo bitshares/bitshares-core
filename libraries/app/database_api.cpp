@@ -90,7 +90,7 @@ database_api_impl::database_api_impl( graphene::chain::database& db, const appli
       asset_in_liquidity_pools_index = &_db.get_index_type< primary_index< liquidity_pool_index > >()
             .get_secondary_index<graphene::api_helper_indexes::asset_in_liquidity_pools_index>();
    }
-   catch( fc::assert_exception& e )
+   catch( const fc::assert_exception& )
    {
       asset_in_liquidity_pools_index = nullptr;
    }
@@ -1827,10 +1827,10 @@ vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by
 }
 
 vector<extended_liquidity_pool_object> database_api::get_liquidity_pools_by_one_asset(
-            std::string asset_symbol_or_id,
-            optional<uint32_t> limit,
-            optional<liquidity_pool_id_type> start_id,
-            optional<bool> with_statistics )const
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit,
+            const optional<liquidity_pool_id_type>& start_id,
+            const optional<bool>& with_statistics )const
 {
    return my->get_liquidity_pools_by_one_asset(
             asset_symbol_or_id,
@@ -1840,10 +1840,10 @@ vector<extended_liquidity_pool_object> database_api::get_liquidity_pools_by_one_
 }
 
 vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by_one_asset(
-            std::string asset_symbol_or_id,
-            optional<uint32_t> olimit,
-            optional<liquidity_pool_id_type> ostart_id,
-            optional<bool> with_statistics )const
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& olimit,
+            const optional<liquidity_pool_id_type>& ostart_id,
+            const optional<bool>& with_statistics )const
 {
    // api_helper_indexes plugin is required for accessing the secondary index
    FC_ASSERT( _app_options && _app_options->has_api_helper_indexes_plugin,
@@ -1869,9 +1869,10 @@ vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by
    vector<extended_liquidity_pool_object> results;
 
    results.reserve( limit );
-   for ( ; itr != pools.end() && results.size() < limit; ++itr )
+   while( itr != pools.end() && results.size() < limit )
    {
       results.emplace_back( extend_liquidity_pool( (*itr)(_db), with_stats ) );
+      ++itr;
    }
 
    return results;

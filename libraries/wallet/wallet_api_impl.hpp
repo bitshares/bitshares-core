@@ -169,7 +169,7 @@ public:
 
    fc::optional<htlc_object> get_htlc(string htlc_id) const;
 
-   asset_id_type get_asset_id(string asset_symbol_or_id) const;
+   asset_id_type get_asset_id(const string& asset_symbol_or_id) const;
 
    string get_wallet_filename() const;
 
