@@ -173,7 +173,7 @@ int main(int argc, char** argv)
 
   if ( argc < 3 ) {
      std::cerr << "Usage: " << argv[0] << " <chain-id> <seed-addr> [<seed-addr> ...]\n";
-     exit(1);
+     return 1;
   }
 
   const graphene::chain::chain_id_type chain_id( argv[1] );
