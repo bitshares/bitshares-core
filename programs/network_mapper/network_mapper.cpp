@@ -211,7 +211,7 @@ int main(int argc, char** argv)
 
        try
        {
-          std::shared_ptr<peer_probe> probe = std::make_shared<peer_probe>();
+          auto probe = std::make_shared<peer_probe>();
           probe->start(remote, my_node_id, chain_id);
           probes.emplace_back( std::move( probe ) );
        }
