@@ -62,7 +62,7 @@ namespace bpo = boost::program_options;
 
 int main(int argc, char** argv) {
    fc::print_stacktrace_on_segfault();
-   app::application* node = new app::application();
+   auto node = std::make_unique<app::application>();
    fc::oexception unhandled_exception;
    try {
       bpo::options_description app_options("BitShares Witness Node");
@@ -158,7 +158,7 @@ int main(int argc, char** argv) {
          return 1;
       }
 
-      std::for_each(plugins.begin(), plugins.end(), [node](const std::string& plug) mutable {
+      std::for_each(plugins.begin(), plugins.end(), [&node](const std::string& plug) mutable {
          if (!plug.empty()) {
             node->enable_plugin(plug);
          }
@@ -191,7 +191,7 @@ int main(int argc, char** argv) {
       ilog("Exiting from signal ${n}", ("n", signal));
       node->shutdown_plugins();
       node->shutdown();
-      delete node;
+      node.reset();
       return EXIT_SUCCESS;
    } catch( const fc::exception& e ) {
       // deleting the node can yield, so do this outside the exception handler
@@ -202,7 +202,7 @@ int main(int argc, char** argv) {
    {
       elog("Exiting with error:\n${e}", ("e", unhandled_exception->to_detail_string()));
       node->shutdown();
-      delete node;
+      node.reset();
       return EXIT_FAILURE;
    }
 }

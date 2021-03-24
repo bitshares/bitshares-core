@@ -48,7 +48,7 @@ namespace graphene { namespace app {
 //////////////////////////////////////////////////////////////////////
 
 database_api::database_api( graphene::chain::database& db, const application_options* app_options )
-   : my( new database_api_impl( db, app_options ) ) {}
+   : my( std::make_unique<database_api_impl>( db, app_options ) ) {}
 
 database_api::~database_api() {}
 

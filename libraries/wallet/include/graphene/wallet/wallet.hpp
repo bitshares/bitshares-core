@@ -126,7 +126,7 @@ class wallet_api
        * @param limit the number of entries to return (starting from the most recent)
        * @returns a list of \c operation_history_objects
        */
-      vector<operation_detail>  get_account_history(string account_name_or_id, uint32_t limit)const;
+      vector<operation_detail>  get_account_history(const string& account_name_or_id, uint32_t limit)const;
 
       /** Returns the relative operations on the named account from start number.
        *
@@ -136,7 +136,7 @@ class wallet_api
        * @param start  the sequence number where to start looping back throw the history
        * @returns a list of \c operation_history_objects
        */
-     vector<operation_detail>  get_relative_account_history( string account_name_or_id, uint32_t stop,
+     vector<operation_detail>  get_relative_account_history( const string& account_name_or_id, uint32_t stop,
                                                              uint32_t limit, uint32_t start )const;
 
       /**
@@ -241,8 +241,8 @@ class wallet_api
        * @param limit the max number of entries to return (from start number)
        * @returns account_history_operation_detail
        */
-      account_history_operation_detail get_account_history_by_operations( string account_name_or_id,
-                                                                          flat_set<uint16_t> operation_types,
+      account_history_operation_detail get_account_history_by_operations( const string& account_name_or_id,
+                                                                          const flat_set<uint16_t>& operation_types,
                                                                           uint32_t start, uint32_t limit);
 
       /** Returns the block chain's rapidly-changing properties.

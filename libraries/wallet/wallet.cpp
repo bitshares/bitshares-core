@@ -151,7 +151,7 @@ namespace graphene { namespace wallet {
 namespace graphene { namespace wallet {
 
 wallet_api::wallet_api(const wallet_data& initial_data, fc::api<login_api> rapi)
-   : my(new detail::wallet_api_impl(*this, initial_data, rapi))
+   : my( std::make_unique<detail::wallet_api_impl>(*this, initial_data, rapi) )
 {
 }
 
@@ -276,7 +276,7 @@ signed_transaction wallet_api::htlc_extend ( std::string htlc_id, std::string is
    return my->htlc_extend(htlc_id, issuer, seconds_to_add, broadcast);
 }
 
-vector<operation_detail> wallet_api::get_account_history(string name, uint32_t limit)const
+vector<operation_detail> wallet_api::get_account_history(const string& name, uint32_t limit)const
 {
    vector<operation_detail> result;
 
@@ -335,7 +335,7 @@ vector<operation_detail> wallet_api::get_account_history(string name, uint32_t l
 }
 
 vector<operation_detail> wallet_api::get_relative_account_history(
-      string name,
+      const string& name,
       uint32_t stop,
       uint32_t limit,
       uint32_t start)const
@@ -375,15 +375,14 @@ vector<operation_detail> wallet_api::get_relative_account_history(
 }
 
 account_history_operation_detail wallet_api::get_account_history_by_operations(
-      string name,
-      flat_set<uint16_t> operation_types,
+      const string& name,
+      const flat_set<uint16_t>& operation_types,
       uint32_t start,
       uint32_t limit)
 {
     account_history_operation_detail result;
-    auto account_id = get_account(name).get_id();
 
-    const auto& account = my->get_account(account_id);
+    const auto& account = my->get_account(name);
     const auto& stats = my->get_object(account.statistics);
 
     // sequence of account_transaction_history_object start with 1

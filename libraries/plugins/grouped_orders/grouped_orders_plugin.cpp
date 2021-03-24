@@ -242,7 +242,7 @@ grouped_orders_plugin_impl::~grouped_orders_plugin_impl()
 
 
 grouped_orders_plugin::grouped_orders_plugin() :
-   my( new detail::grouped_orders_plugin_impl(*this) )
+   my( std::make_unique<detail::grouped_orders_plugin_impl>(*this) )
 {
 }
 
