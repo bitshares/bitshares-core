@@ -62,7 +62,7 @@ namespace bpo = boost::program_options;
 
 int main(int argc, char** argv) {
    fc::print_stacktrace_on_segfault();
-   std::unique_ptr<app::application> node = std::make_unique<app::application>();
+   auto node = std::make_unique<app::application>();
    fc::oexception unhandled_exception;
    try {
       bpo::options_description app_options("BitShares Witness Node");
