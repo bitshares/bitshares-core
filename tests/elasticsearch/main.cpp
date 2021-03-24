@@ -22,6 +22,9 @@
  * THE SOFTWARE.
  */
 
+#define BOOST_TEST_MODULE Elastic Search Database Tests
+#include <boost/test/included/unit_test.hpp>
+
 #include <graphene/app/api.hpp>
 #include <graphene/utilities/tempdir.hpp>
 #include <fc/crypto/digest.hpp>
@@ -30,9 +33,6 @@
 #include <graphene/elasticsearch/elasticsearch_plugin.hpp>
 
 #include "../common/database_fixture.hpp"
-
-#define BOOST_TEST_MODULE Elastic Search Database Tests
-#include <boost/test/included/unit_test.hpp>
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;

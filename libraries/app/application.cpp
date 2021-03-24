@@ -537,7 +537,8 @@ void application_impl::startup()
       _apiaccess.permission_map["*"] = wild_access;
    }
 
-   reset_p2p_node(_data_dir);
+   if( _active_plugins.find( "delayed_node" ) == _active_plugins.end() )
+      reset_p2p_node(_data_dir);
    reset_websocket_server();
    reset_websocket_tls_server();
 } FC_LOG_AND_RETHROW() }

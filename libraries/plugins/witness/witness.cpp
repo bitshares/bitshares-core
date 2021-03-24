@@ -300,6 +300,9 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
       case block_production_condition::shutdown:
          ilog( "shutdown producing block" );
          return result;
+      case block_production_condition::no_network:
+         ilog( "not connected to P2P network" );
+         return result;
       default:
          elog( "unknown condition ${result} while producing block", ("result", (unsigned char)result) );
          break;
@@ -374,6 +377,9 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
       return block_production_condition::lag;
    }
 
+   if( p2p_node() == nullptr )
+      return block_production_condition::no_network;
+
    auto block = db.generate_block(
       scheduled_time,
       scheduled_witness,
@@ -381,7 +387,7 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
       _production_skip_flags
       );
    capture("n", block.block_num())("t", block.timestamp)("c", now)("x", block.transactions.size());
-   fc::async( [this,block](){ p2p_node().broadcast(net::block_message(block)); } );
+   fc::async( [this,block](){ p2p_node()->broadcast(net::block_message(block)); } );
 
    return block_production_condition::produced;
 }
