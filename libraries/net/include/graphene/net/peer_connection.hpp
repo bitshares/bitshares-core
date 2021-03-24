@@ -69,8 +69,7 @@ namespace graphene { namespace net
       virtual message get_message_for_item(const item_id& item) = 0;
     };
 
-    class peer_connection;
-    typedef std::shared_ptr<peer_connection> peer_connection_ptr;
+    using peer_connection_ptr = std::shared_ptr<peer_connection>;
     class peer_connection : public message_oriented_connection_delegate,
                             public std::enable_shared_from_this<peer_connection>
     {
@@ -117,7 +116,7 @@ namespace graphene { namespace net
         fc::time_point transmission_start_time;
         fc::time_point transmission_finish_time;
 
-        queued_message(fc::time_point enqueue_time = fc::time_point::now()) :
+        explicit queued_message(fc::time_point enqueue_time = fc::time_point::now()) :
           enqueue_time(enqueue_time)
         {}
 
@@ -126,7 +125,7 @@ namespace graphene { namespace net
          * it is sitting on the queue
          */
         virtual size_t get_size_in_queue() = 0;
-        virtual ~queued_message() {}
+        virtual ~queued_message() = default;
       };
 
       /* when you queue up a 'real_queued_message', a full copy of the message is
@@ -155,8 +154,8 @@ namespace graphene { namespace net
       {
         item_id item_to_send;
 
-        virtual_queued_message(item_id item_to_send) :
-          item_to_send(std::move(item_to_send))
+        explicit virtual_queued_message(item_id the_item_to_send) :
+          item_to_send(std::move(the_item_to_send))
         {}
 
         message get_message(peer_connection_delegate* node) override;
