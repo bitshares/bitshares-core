@@ -29,20 +29,24 @@ namespace graphene { namespace protocol {
 
 /**
  * Names must comply with the following grammar (RFC 1035):
+ * @code
  * <domain> ::= <subdomain> | " "
  * <subdomain> ::= <label> | <subdomain> "." <label>
  * <label> ::= <letter> [ [ <ldh-str> ] <let-dig> ]
  * <ldh-str> ::= <let-dig-hyp> | <let-dig-hyp> <ldh-str>
  * <let-dig-hyp> ::= <let-dig> | "-"
  * <let-dig> ::= <letter> | <digit>
+ * @endcode
  *
  * Which is equivalent to the following:
  *
+ * @code
  * <domain> ::= <subdomain> | " "
  * <subdomain> ::= <label> ("." <label>)*
  * <label> ::= <letter> [ [ <let-dig-hyp>+ ] <let-dig> ]
  * <let-dig-hyp> ::= <let-dig> | "-"
  * <let-dig> ::= <letter> | <digit>
+ * @endcode
  *
  * I.e. a valid name consists of a dot-separated sequence
  * of one or more labels consisting of the following rules:
@@ -202,7 +206,7 @@ void account_create_operation::validate()const
       FC_ASSERT( active == authority::null_authority() );
       size_t n_markets = extensions.value.buyback_options->markets.size();
       FC_ASSERT( n_markets > 0 );
-      for( const asset_id_type m : extensions.value.buyback_options->markets )
+      for( const asset_id_type& m : extensions.value.buyback_options->markets )
       {
          FC_ASSERT( m != extensions.value.buyback_options->asset_to_buy );
       }

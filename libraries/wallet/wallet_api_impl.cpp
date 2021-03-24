@@ -56,9 +56,15 @@ namespace graphene { namespace wallet { namespace detail {
         _remote_api(rapi),
         _remote_db(rapi->database()),
         _remote_net_broadcast(rapi->network_broadcast()),
-        _remote_hist(rapi->history()),
-        _custom_operations(rapi->custom())
+        _remote_hist(rapi->history())
    {
+      try {
+         _custom_operations = rapi->custom_operations();
+      }
+      catch(const fc::exception& e)
+      {
+         wlog("Custom operations API is not active on server.");
+      }
       chain_id_type remote_chain_id = _remote_db->get_chain_id();
       if( remote_chain_id != _chain_id )
       {
@@ -199,7 +205,8 @@ namespace graphene { namespace wallet { namespace detail {
    void wallet_api_impl::init_prototype_ops()
    {
       operation op;
-      for( int t=0; t<op.count(); t++ )
+      int64_t op_count = op.count();
+      for( int64_t t=0; t<op_count; t++ )
       {
          op.set_which( t );
          op.visit( op_prototype_visitor(t, _prototype_ops) );

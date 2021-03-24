@@ -1,0 +1,4 @@
+// bitshares-core issue #1692 validation check of bid_collateral
+#ifndef HARDFORK_CORE_1692_TIME
+#define HARDFORK_CORE_1692_TIME (fc::time_point_sec( 1596117300 )) // Thursday, July 30, 2020 13:55:00 UTC
+#endif

@@ -36,10 +36,12 @@
 #include <graphene/chain/confidential_object.hpp>
 #include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
+#include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/special_authority_object.hpp>
+#include <graphene/chain/ticket_object.hpp>
 #include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
@@ -47,6 +49,7 @@
 #include <graphene/chain/witness_schedule_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
+#include <graphene/chain/custom_authority_object.hpp>
 
 #include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/asset_evaluator.hpp>
@@ -55,78 +58,23 @@
 #include <graphene/chain/committee_member_evaluator.hpp>
 #include <graphene/chain/confidential_evaluator.hpp>
 #include <graphene/chain/custom_evaluator.hpp>
+#include <graphene/chain/liquidity_pool_evaluator.hpp>
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/proposal_evaluator.hpp>
+#include <graphene/chain/ticket_evaluator.hpp>
 #include <graphene/chain/transfer_evaluator.hpp>
 #include <graphene/chain/vesting_balance_evaluator.hpp>
 #include <graphene/chain/withdraw_permission_evaluator.hpp>
 #include <graphene/chain/witness_evaluator.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
 #include <graphene/chain/htlc_evaluator.hpp>
+#include <graphene/chain/custom_authority_evaluator.hpp>
 
 #include <fc/crypto/digest.hpp>
 
 #include <boost/algorithm/string.hpp>
 
 namespace graphene { namespace chain {
-
-// C++ requires that static class variables declared and initialized
-// in headers must also have a definition in a single source file,
-// else linker errors will occur [1].
-//
-// The purpose of this source file is to collect such definitions in
-// a single place.
-//
-// [1] http://stackoverflow.com/questions/8016780/undefined-reference-to-static-constexpr-char
-
-const uint8_t account_object::space_id;
-const uint8_t account_object::type_id;
-
-const uint8_t asset_object::space_id;
-const uint8_t asset_object::type_id;
-
-const uint8_t block_summary_object::space_id;
-const uint8_t block_summary_object::type_id;
-
-const uint8_t call_order_object::space_id;
-const uint8_t call_order_object::type_id;
-
-const uint8_t committee_member_object::space_id;
-const uint8_t committee_member_object::type_id;
-
-const uint8_t force_settlement_object::space_id;
-const uint8_t force_settlement_object::type_id;
-
-const uint8_t global_property_object::space_id;
-const uint8_t global_property_object::type_id;
-
-const uint8_t limit_order_object::space_id;
-const uint8_t limit_order_object::type_id;
-
-const uint8_t operation_history_object::space_id;
-const uint8_t operation_history_object::type_id;
-
-const uint8_t proposal_object::space_id;
-const uint8_t proposal_object::type_id;
-
-const uint8_t transaction_history_object::space_id;
-const uint8_t transaction_history_object::type_id;
-
-const uint8_t vesting_balance_object::space_id;
-const uint8_t vesting_balance_object::type_id;
-
-const uint8_t withdraw_permission_object::space_id;
-const uint8_t withdraw_permission_object::type_id;
-
-const uint8_t witness_object::space_id;
-const uint8_t witness_object::type_id;
-
-const uint8_t worker_object::space_id;
-const uint8_t worker_object::type_id;
-
-const uint8_t htlc_object::space_id;
-const uint8_t htlc_object::type_id;
-
 
 void database::initialize_evaluators()
 {
@@ -178,6 +126,16 @@ void database::initialize_evaluators()
    register_evaluator<htlc_create_evaluator>();
    register_evaluator<htlc_redeem_evaluator>();
    register_evaluator<htlc_extend_evaluator>();
+   register_evaluator<custom_authority_create_evaluator>();
+   register_evaluator<custom_authority_update_evaluator>();
+   register_evaluator<custom_authority_delete_evaluator>();
+   register_evaluator<ticket_create_evaluator>();
+   register_evaluator<ticket_update_evaluator>();
+   register_evaluator<liquidity_pool_create_evaluator>();
+   register_evaluator<liquidity_pool_delete_evaluator>();
+   register_evaluator<liquidity_pool_deposit_evaluator>();
+   register_evaluator<liquidity_pool_withdraw_evaluator>();
+   register_evaluator<liquidity_pool_exchange_evaluator>();
 }
 
 void database::initialize_indexes()
@@ -201,6 +159,9 @@ void database::initialize_indexes()
    add_index< primary_index<balance_index> >();
    add_index< primary_index<blinded_balance_index> >();
    add_index< primary_index< htlc_index> >();
+   add_index< primary_index< custom_authority_index> >();
+   add_index< primary_index<ticket_index> >();
+   add_index< primary_index<liquidity_pool_index> >();
 
    //Implementation object indexes
    add_index< primary_index<transaction_index                             > >();

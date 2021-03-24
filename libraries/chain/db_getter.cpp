@@ -27,6 +27,7 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
+#include <graphene/chain/custom_authority_object.hpp>
 
 namespace graphene { namespace chain {
 
@@ -95,6 +96,34 @@ node_property_object& database::node_properties()
    return _node_property_object;
 }
 
+vector<authority> database::get_viable_custom_authorities(
+      account_id_type account, const operation &op,
+      rejected_predicate_map* rejected_authorities) const
+{
+   const auto& index = get_index_type<custom_authority_index>().indices().get<by_account_custom>();
+   auto range = index.equal_range(boost::make_tuple(account, unsigned_int(op.which()), true));
+
+   auto is_valid = [now=head_block_time()](const custom_authority_object& auth) { return auth.is_valid(now); };
+   vector<std::reference_wrapper<const custom_authority_object>> valid_auths;
+   std::copy_if(range.first, range.second, std::back_inserter(valid_auths), is_valid);
+
+   vector<authority> results;
+   for (const auto& cust_auth : valid_auths) {
+      try {
+         auto result = cust_auth.get().get_predicate()(op);
+         if (result.success)
+            results.emplace_back(cust_auth.get().auth);
+         else if (rejected_authorities != nullptr)
+            rejected_authorities->insert(std::make_pair(cust_auth.get().id, std::move(result)));
+      } catch (fc::exception& e) {
+         if (rejected_authorities != nullptr)
+            rejected_authorities->insert(std::make_pair(cust_auth.get().id, std::move(e)));
+      }
+   }
+
+   return results;
+}
+
 uint32_t database::last_non_undoable_block_num() const
 {
    //see https://github.com/bitshares/bitshares-core/issues/377
@@ -109,10 +138,7 @@ uint32_t database::last_non_undoable_block_num() const
 
 const account_statistics_object& database::get_account_stats_by_owner( account_id_type owner )const
 {
-   auto& idx = get_index_type<account_stats_index>().indices().get<by_owner>();
-   auto itr = idx.find( owner );
-   FC_ASSERT( itr != idx.end(), "Can not find account statistics object for owner ${a}", ("a",owner) );
-   return *itr;
+   return account_statistics_id_type(owner.instance)(*this);
 }
 
 const witness_schedule_object& database::get_witness_schedule_object()const

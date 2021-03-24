@@ -173,7 +173,7 @@ int main(int argc, char** argv)
 
   if ( argc < 3 ) {
      std::cerr << "Usage: " << argv[0] << " <chain-id> <seed-addr> [<seed-addr> ...]\n";
-     exit(1);
+     return 1;
   }
 
   const graphene::chain::chain_id_type chain_id( argv[1] );
@@ -211,7 +211,7 @@ int main(int argc, char** argv)
 
        try
        {
-          std::shared_ptr<peer_probe> probe(new peer_probe());
+          auto probe = std::make_shared<peer_probe>();
           probe->start(remote, my_node_id, chain_id);
           probes.emplace_back( std::move( probe ) );
        }

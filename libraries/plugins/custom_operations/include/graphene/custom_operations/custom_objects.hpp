@@ -42,8 +42,8 @@ enum types {
 
 struct account_storage_object : public abstract_object<account_storage_object>
 {
-   static const uint8_t space_id = CUSTOM_OPERATIONS_SPACE_ID;
-   static const uint8_t type_id  = account_map;
+   static constexpr uint8_t space_id = CUSTOM_OPERATIONS_SPACE_ID;
+   static constexpr uint8_t type_id  = account_map;
 
    account_id_type account;
    string catalog;
@@ -51,24 +51,13 @@ struct account_storage_object : public abstract_object<account_storage_object>
    optional<variant> value;
 };
 
-struct by_custom_id;
-struct by_custom_account;
-struct by_account_catalog;
 struct by_account_catalog_key;
 
 typedef multi_index_container<
       account_storage_object,
       indexed_by<
-            ordered_non_unique< tag<by_custom_id>, member< object, object_id_type, &object::id > >,
-            ordered_non_unique< tag<by_custom_account>,
-                  member< account_storage_object, account_id_type, &account_storage_object::account > >,
-            ordered_non_unique< tag<by_account_catalog>,
-                  composite_key< account_storage_object,
-                        member< account_storage_object, account_id_type, &account_storage_object::account >,
-                        member< account_storage_object, string, &account_storage_object::catalog >
-                  >
-            >,
-            ordered_non_unique< tag<by_account_catalog_key>,
+            ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+            ordered_unique< tag<by_account_catalog_key>,
                   composite_key< account_storage_object,
                         member< account_storage_object, account_id_type, &account_storage_object::account >,
                         member< account_storage_object, string, &account_storage_object::catalog >,

@@ -189,6 +189,8 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    FC_ASSERT( _debt_asset->is_market_issued(), "Unable to cover ${sym} as it is not a collateralized asset.",
               ("sym", _debt_asset->symbol) );
 
+   FC_ASSERT( o.delta_debt.amount <= 0 || _debt_asset->can_create_new_supply(), "Can not create new supply" );
+
    _dynamic_data_obj = &_debt_asset->dynamic_asset_data_id(d);
 
    /***
@@ -354,7 +356,8 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
                ("a", ~call_obj->call_price )("b", _bitasset_data->current_feed.settlement_price)
                );
          }
-         else // after hard fork, always allow call order to be updated if collateral ratio is increased and debt is not increased
+         else // after hard fork core-583, always allow call order to be updated if collateral ratio
+              // is increased and debt is not increased
          {
             // We didn't fill any call orders.  This may be because we
             // aren't in margin call territory, or it may be because there
@@ -362,13 +365,21 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
             // if collateral ratio is not increased or debt is increased, we throw.
             // be here, we know no margin call was executed,
             // so call_obj's collateral ratio should be set only by op
-            FC_ASSERT( ( !before_core_hardfork_1270
-                            && call_obj->collateralization() > _bitasset_data->current_maintenance_collateralization )
-                       || ( before_core_hardfork_1270 && ~call_obj->call_price < _bitasset_data->current_feed.settlement_price )
+            // ------
+            // Before BSIP77, CR of the new/updated position is required to be above MCR;
+            // after BSIP77, CR of the new/updated position is required to be above max(ICR,MCR).
+            // The `current_initial_collateralization` variable has been initialized according to the logic,
+            // so we directly use it here.
+            bool check = ( !before_core_hardfork_1270
+                            && call_obj->collateralization() > _bitasset_data->current_initial_collateralization )
+                       || ( before_core_hardfork_1270
+                            && ~call_obj->call_price < _bitasset_data->current_feed.settlement_price )
                        || ( old_collateralization.valid() && call_obj->debt <= *old_debt
-                                                          && call_obj->collateralization() > *old_collateralization ),
-               "Can only increase collateral ratio without increasing debt if would trigger a margin call that "
-               "cannot be fully filled",
+                                                          && call_obj->collateralization() > *old_collateralization );
+            FC_ASSERT( check,
+               "Can only increase collateral ratio without increasing debt when the debt position's "
+               "collateral ratio is lower than required initial collateral ratio (ICR), "
+               "if not to trigger a margin call that be fully filled immediately",
                ("old_debt", old_debt)
                ("new_debt", call_obj->debt)
                ("old_collateralization", old_collateralization)
@@ -400,13 +411,6 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
 
    FC_ASSERT( !_bitasset_data->is_prediction_market, "Cannot bid on a prediction market!" );
 
-   if( o.additional_collateral.amount > 0 )
-   {
-      FC_ASSERT( d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)) >= o.additional_collateral,
-                 "Cannot bid ${c} collateral when payer only has ${b}", ("c", o.additional_collateral.amount)
-                 ("b", d.get_balance(*_paying_account, o.additional_collateral.asset_id(d)).amount) );
-   }
-
    const collateral_bid_index& bids = d.get_index_type<collateral_bid_index>();
    const auto& index = bids.indices().get<by_account>();
    const auto& bid = index.find( boost::make_tuple( o.debt_covered.asset_id, o.bidder ) );
@@ -414,6 +418,22 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
       _bid = &(*bid);
    else
        FC_ASSERT( o.debt_covered.amount > 0, "Can't find bid to cancel?!");
+
+   if( o.additional_collateral.amount > 0 )
+   {
+      if( _bid && d.head_block_time() >= HARDFORK_CORE_1692_TIME ) // TODO: see if HF check can be removed after HF
+      {
+         asset delta = o.additional_collateral - _bid->get_additional_collateral();
+         FC_ASSERT( d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)) >= delta,
+                    "Cannot increase bid from ${oc} to ${nc} collateral when payer only has ${b}",
+                    ("oc", _bid->get_additional_collateral().amount)("nc", o.additional_collateral.amount)
+                    ("b", d.get_balance(*_paying_account, o.additional_collateral.asset_id(d)).amount) );
+      } else
+         FC_ASSERT( d.get_balance( *_paying_account,
+                                   _bitasset_data->options.short_backing_asset(d) ) >= o.additional_collateral,
+                    "Cannot bid ${c} collateral when payer only has ${b}", ("c", o.additional_collateral.amount)
+                    ("b", d.get_balance(*_paying_account, o.additional_collateral.asset_id(d)).amount) );
+   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

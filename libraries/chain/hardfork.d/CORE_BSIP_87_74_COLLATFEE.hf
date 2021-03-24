@@ -1,0 +1,7 @@
+// This hardfork enables the extension to asset_claim_fees_operation to claim collateral-denominated fees.
+// These fees are collected by BSIPs 87 and 74.  This should be set to match the earlier of either
+// HARDFORK_CORE_BSIP87_TIME or HARDFORK_CORE_BSIP74_TIME.
+// This hardfork check should be removable after the hardfork date passes.
+#ifndef HARDFORK_CORE_BSIP_87_74_COLLATFEE_TIME
+#define HARDFORK_CORE_BSIP_87_74_COLLATFEE_TIME (fc::time_point_sec( 1596117300 )) // Thu, July 30, 2020 13:55:00 UTC
+#endif

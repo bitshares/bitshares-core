@@ -62,18 +62,19 @@ namespace bpo = boost::program_options;
 
 int main(int argc, char** argv) {
    fc::print_stacktrace_on_segfault();
-   app::application* node = new app::application();
+   auto node = std::make_unique<app::application>();
    fc::oexception unhandled_exception;
    try {
       bpo::options_description app_options("BitShares Witness Node");
       bpo::options_description cfg_options("BitShares Witness Node");
+      std::string default_plugins = "witness account_history market_history grouped_orders "
+                                    "api_helper_indexes custom_operations";
       app_options.add_options()
             ("help,h", "Print this help message and exit.")
             ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("witness_node_data_dir"),
                     "Directory containing databases, configuration file, etc.")
             ("version,v", "Display version information")
-            ("plugins", bpo::value<std::string>()
-                            ->default_value("witness account_history market_history grouped_orders api_helper_indexes"),
+            ("plugins", bpo::value<std::string>()->default_value(default_plugins),
                     "Space-separated list of plugins to activate")
             ("ignore-api-helper-indexes-warning", "Do not exit if api_helper_indexes plugin is not enabled.");
 
@@ -84,9 +85,8 @@ int main(int argc, char** argv) {
       cfg_options.add(cfg);
 
       cfg_options.add_options()
-              ("plugins", bpo::value<std::string>()
-	                      ->default_value("witness account_history market_history grouped_orders api_helper_indexes"),
-               "Space-separated list of plugins to activate")
+            ("plugins", bpo::value<std::string>()->default_value(default_plugins),
+                    "Space-separated list of plugins to activate")
             ("ignore-api-helper-indexes-warning", "Do not exit if api_helper_indexes plugin is not enabled.");
 
       auto witness_plug = node->register_plugin<witness_plugin::witness_plugin>();
@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
          return 1;
       }
 
-      if( options.count("version") )
+      if( options.count("version") > 0 )
       {
          std::cout << "Version: " << graphene::utilities::git_revision_description << "\n";
          std::cout << "SHA: " << graphene::utilities::git_revision_sha << "\n";
@@ -126,14 +126,14 @@ int main(int argc, char** argv) {
          std::cout << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version << "\n";
          return 0;
       }
-      if( options.count("help") )
+      if( options.count("help") > 0 )
       {
          std::cout << app_options << "\n";
          return 0;
       }
 
       fc::path data_dir;
-      if( options.count("data-dir") )
+      if( options.count("data-dir") > 0 )
       {
          data_dir = options["data-dir"].as<boost::filesystem::path>();
          if( data_dir.is_relative() )
@@ -144,13 +144,13 @@ int main(int argc, char** argv) {
       std::set<std::string> plugins;
       boost::split(plugins, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
 
-      if(plugins.count("account_history") && plugins.count("elasticsearch")) {
+      if( plugins.count("account_history") > 0 && plugins.count("elasticsearch") > 0 ) {
          std::cerr << "Plugin conflict: Cannot load both account_history plugin and elasticsearch plugin\n";
          return 1;
       }
 
-      if( !plugins.count("api_helper_indexes") && !options.count("ignore-api-helper-indexes-warning")
-          && ( options.count("rpc-endpoint") || options.count("rpc-tls-endpoint") ) )
+      if( plugins.count("api_helper_indexes") == 0 && options.count("ignore-api-helper-indexes-warning") == 0
+          && ( options.count("rpc-endpoint") > 0 || options.count("rpc-tls-endpoint") > 0 ) )
       {
          std::cerr << "\nIf this is an API node, please enable api_helper_indexes plugin."
                       "\nIf this is not an API node, please start with \"--ignore-api-helper-indexes-warning\""
@@ -158,7 +158,7 @@ int main(int argc, char** argv) {
          return 1;
       }
 
-      std::for_each(plugins.begin(), plugins.end(), [node](const std::string& plug) mutable {
+      std::for_each(plugins.begin(), plugins.end(), [&node](const std::string& plug) mutable {
          if (!plug.empty()) {
             node->enable_plugin(plug);
          }
@@ -191,7 +191,7 @@ int main(int argc, char** argv) {
       ilog("Exiting from signal ${n}", ("n", signal));
       node->shutdown_plugins();
       node->shutdown();
-      delete node;
+      node.reset();
       return EXIT_SUCCESS;
    } catch( const fc::exception& e ) {
       // deleting the node can yield, so do this outside the exception handler
@@ -202,7 +202,7 @@ int main(int argc, char** argv) {
    {
       elog("Exiting with error:\n${e}", ("e", unhandled_exception->to_detail_string()));
       node->shutdown();
-      delete node;
+      node.reset();
       return EXIT_FAILURE;
    }
 }

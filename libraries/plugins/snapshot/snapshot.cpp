@@ -63,20 +63,22 @@ void snapshot_plugin::plugin_initialize(const boost::program_options::variables_
 { try {
    ilog("snapshot plugin: plugin_initialize() begin");
 
-   if( options.count(OPT_BLOCK_NUM) || options.count(OPT_BLOCK_TIME) )
+   if( options.count(OPT_BLOCK_NUM) > 0 || options.count(OPT_BLOCK_TIME) > 0 )
    {
-      FC_ASSERT( options.count(OPT_DEST), "Must specify snapshot-to in addition to snapshot-at-block or snapshot-at-time!" );
+      FC_ASSERT( options.count(OPT_DEST) > 0,
+                 "Must specify snapshot-to in addition to snapshot-at-block or snapshot-at-time!" );
       dest = options[OPT_DEST].as<std::string>();
-      if( options.count(OPT_BLOCK_NUM) )
+      if( options.count(OPT_BLOCK_NUM) > 0 )
          snapshot_block = options[OPT_BLOCK_NUM].as<uint32_t>();
-      if( options.count(OPT_BLOCK_TIME) )
+      if( options.count(OPT_BLOCK_TIME) > 0 )
          snapshot_time = fc::time_point_sec::from_iso_string( options[OPT_BLOCK_TIME].as<std::string>() );
       database().applied_block.connect( [&]( const graphene::chain::signed_block& b ) {
          check_snapshot( b );
       });
    }
    else
-      FC_ASSERT( !options.count("snapshot-to"), "Must specify snapshot-at-block or snapshot-at-time in addition to snapshot-to!" );
+      ilog("snapshot plugin is not enabled because neither snapshot-at-block nor snapshot-at-time is specified");
+
    ilog("snapshot plugin: plugin_initialize() end");
 } FC_LOG_AND_RETHROW() }
 

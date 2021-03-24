@@ -626,6 +626,8 @@ void database::_apply_block( const signed_block& next_block )
    update_signing_witness(signing_witness, next_block);
    update_last_irreversible_block();
 
+   process_tickets();
+
    // Are we at the maintenance interval?
    if( maint_needed )
       perform_chain_maintenance(next_block, global_props);
@@ -690,13 +692,15 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    if( !(skip & skip_transaction_signatures) )
    {
       bool allow_non_immediate_owner = ( head_block_time() >= HARDFORK_CORE_584_TIME );
-      auto get_active = [&]( account_id_type id ) { return &id(*this).active; };
-      auto get_owner  = [&]( account_id_type id ) { return &id(*this).owner;  };
-      trx.verify_authority( chain_id,
-                            get_active,
-                            get_owner,
-                            allow_non_immediate_owner,
-                            get_global_properties().parameters.max_authority_depth );
+      auto get_active = [this]( account_id_type id ) { return &id(*this).active; };
+      auto get_owner  = [this]( account_id_type id ) { return &id(*this).owner;  };
+      auto get_custom = [this]( account_id_type id, const operation& op, rejected_predicate_map* rejects ) {
+         return get_viable_custom_authorities(id, op, rejects);
+      };
+
+      trx.verify_authority(chain_id, get_active, get_owner, get_custom, allow_non_immediate_owner,
+                           MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(head_block_time()),
+                           get_global_properties().parameters.max_authority_depth);
    }
 
    //Skip all manner of expiration and TaPoS checking if we're on block 1; It's impossible that the transaction is

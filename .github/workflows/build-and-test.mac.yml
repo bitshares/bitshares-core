@@ -1,0 +1,57 @@
+name: macOS
+on: [ push, pull_request ]
+env:
+  CCACHE_COMPRESS: exists means true
+  CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
+jobs:
+  build-osx:
+    name: Build and test in macOS
+    strategy:
+      matrix:
+        os: [macos-10.15, macos-11.0]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Install dependencies
+      run: |
+        brew install autoconf automake libtool
+        brew install ccache
+        brew install parallel
+        brew install bitshares/boost/boost@1.69
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+    - name: Configure
+      run: |
+        mkdir -p _build
+        pushd _build
+        cmake -D CMAKE_BUILD_TYPE=Release \
+              -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+              -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              -D BOOST_ROOT=/usr/local/opt/boost@1.69 \
+              -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
+              ..
+    - name: Load Cache
+      uses: actions/cache@v2
+      with:
+        path: ccache
+        key: ccache-${{ matrix.os }}-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          ccache-${{ matrix.os }}-${{ github.ref }}-
+          ccache-${{ matrix.os }}-
+    - name: Build
+      run: |
+        export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
+        mkdir -p "$CCACHE_DIR"
+        make -j 2 -C _build witness_node cli_wallet app_test cli_test chain_test
+        df -h
+    - name: Unit-Tests
+      run: |
+        _build/tests/app_test -l test_suite
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
+        _build/tests/cli_test -l test_suite
+        df -h
+    - name: Node-Test
+      run: |
+        df -h
+        pushd _build
+        ../programs/build_helpers/run-node-test

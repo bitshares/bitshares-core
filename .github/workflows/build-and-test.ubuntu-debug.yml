@@ -1,0 +1,112 @@
+name: Ubuntu Debug
+on: [ push, pull_request ]
+env:
+  CCACHE_COMPRESS: exists means true
+  CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
+jobs:
+  test-debug:
+    name: Build and test in Debug mode
+    strategy:
+      matrix:
+        os: [ ubuntu-16.04, ubuntu-18.04, ubuntu-20.04 ]
+    runs-on: ${{ matrix.os }}
+    services:
+      elasticsearch:
+        image: docker://elasticsearch:7.10.1
+        options: --env discovery.type=single-node --publish 9200:9200 --publish 9300:9300
+    steps:
+    - name: Install dependencies
+      run: |
+        df -h
+        sudo apt-get update
+        openssl_ver=`sudo apt-cache madison openssl | grep xenial-updates | awk '{print $3}'`
+        libssl_ver=`sudo apt-cache madison libssl-dev | grep xenial-updates | awk '{print $3}'`
+        [ -n "${openssl_ver}" ] && [ -n "${libssl_ver}" ] && \
+          sudo apt-get install -y --allow-downgrades openssl=${openssl_ver} libssl-dev=${libssl_ver}
+        sudo apt-get install -y \
+                     ccache \
+                     parallel \
+                     libboost-thread-dev \
+                     libboost-iostreams-dev \
+                     libboost-date-time-dev \
+                     libboost-system-dev \
+                     libboost-filesystem-dev \
+                     libboost-program-options-dev \
+                     libboost-chrono-dev \
+                     libboost-test-dev \
+                     libboost-context-dev \
+                     libboost-regex-dev \
+                     libboost-coroutine-dev \
+                     libcurl4-openssl-dev
+        sudo apt-get auto-remove -y
+        sudo apt-get clean -y
+        df -h
+        sudo du -hs /mnt/*
+        sudo ls -alr /mnt/
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+    - name: Configure
+      run: |
+        pwd
+        df -h .
+        mkdir -p _build
+        sudo mkdir -p /_build/libraries /_build/programs /mnt/_build/tests
+        sudo chmod a+rwx /_build/libraries /_build/programs /mnt/_build/tests
+        ln -s /_build/libraries _build/libraries
+        ln -s /_build/programs _build/programs
+        ln -s /mnt/_build/tests _build/tests
+        sudo ln -s /_build/libraries /mnt/_build/libraries
+        sudo ln -s /_build/programs /mnt/_build/programs
+        sudo ln -s /mnt/_build/tests /_build/tests
+        ls -al _build
+        pushd _build
+        export -n BOOST_ROOT BOOST_INCLUDEDIR BOOST_LIBRARYDIR
+        cmake -D CMAKE_BUILD_TYPE=Debug \
+              -D CMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON \
+              -D CMAKE_C_COMPILER=gcc \
+              -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+              -D CMAKE_CXX_COMPILER=g++ \
+              -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              ..
+        popd
+    - name: Load Cache
+      uses: actions/cache@v2
+      with:
+        path: ccache
+        key: ccache-debug-${{ matrix.os }}-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          ccache-debug-${{ matrix.os }}-${{ github.ref }}-
+          ccache-debug-${{ matrix.os }}-
+    - name: Build
+      run: |
+        export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
+        mkdir -p "$CCACHE_DIR"
+        df -h
+        make -j 2 -C _build chain_test
+        make -j 2 -C _build cli_test
+        make -j 2 -C _build cli_wallet
+        make -j 2 -C _build witness_node
+        make -j 2 -C _build
+        df -h
+        du -hs _build/libraries/* _build/programs/* _build/tests/*
+        du -hs _build/*
+        du -hs /_build/*
+    - name: Unit-Tests
+      run: |
+        _build/tests/app_test -l test_suite
+        df -h
+        curl -XPUT -H "Content-Type: application/json" http://localhost:9200/_cluster/settings \
+          -d '{ "transient": { "cluster.routing.allocation.disk.threshold_enabled": false } }'
+        echo
+        _build/tests/es_test -l test_suite
+        df -h
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
+        _build/tests/cli_test -l test_suite
+        df -h
+    - name: Node-Test
+      run: |
+        df -h
+        pushd _build
+        ../programs/build_helpers/run-node-test
+        df -h

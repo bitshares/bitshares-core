@@ -1,0 +1,4 @@
+// #1774 Too restrictive check in market fee sharing
+#ifndef HARDFORK_1774_TIME
+#define HARDFORK_1774_TIME (fc::time_point_sec( 1596117300 )) // Thursday, July 30, 2020 13:55:00 UTC
+#endif

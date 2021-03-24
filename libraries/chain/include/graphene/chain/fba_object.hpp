@@ -37,8 +37,8 @@ class database;
 class fba_accumulator_object : public graphene::db::abstract_object< fba_accumulator_object >
 {
    public:
-      static const uint8_t space_id = implementation_ids;
-      static const uint8_t type_id = impl_fba_accumulator_object_type;
+      static constexpr uint8_t space_id = implementation_ids;
+      static constexpr uint8_t type_id = impl_fba_accumulator_object_type;
 
       share_type accumulated_fba_fees;
       optional< asset_id_type > designated_asset;

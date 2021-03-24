@@ -1,0 +1,82 @@
+Contributors to this repository, in descending order by number of commits. Update with
+  head -5 CONTRIBUTORS.txt >contrib.tmp && git shortlog -s -e -n | cut -f 2 >>contrib.tmp && mv contrib.tmp CONTRIBUTORS.txt
+
+==============================================================================
+
+abitmore <abitmore@users.noreply.github.com>
+Alfredo Garcia <oxarbitrage@gmail.com>
+theoreticalbts <theoreticalbts@users.noreply.github.com>
+John M. Jones <jmjatlanta@gmail.com>
+Peter Conrad <conrad@quisquis.de>
+Daniel Larimer <bytemaster@users.noreply.github.com>
+Nathan Hourt <themodprobe@protonmail.com>
+Vikram Rajkumar <vikramrajkumar@users.noreply.github.com>
+Eric Frias <efrias@syncad.com>
+Valera Cogut <info@valeracogut.com>
+Michel Santos <MichelSantos@users.noreply.github.com>
+Xiaodong Li <mantianyu@gmail.com>
+Fabian Schuh <Fabian@chainsquad.com>
+manikey123 <mansiimohan@gmail.com>
+Christopher Sanborn <23085117+christophersanborn@users.noreply.github.com>
+crypto-ape <43807588+crypto-ape@users.noreply.github.com>
+lubos.ilcik <lubos.ilcik@touch4it.com>
+Matias Romeo <matias.romeo@gmail.com>
+OpenLedger <service.github@openledger.info>
+Sigve Kvalsvik <bitsharesblocks@gmail.com>
+albert <393259066@qq.com>
+Ryan R. Fox <ryan@ryanrfox.com>
+Valentine Zavgorodnev <i@valzav.com>
+Michael Vandeberg <mvandeberg@users.noreply.github.com>
+James Calfee <james@jcalfee.info>
+Alexey Frolov <alexey.frolov@aetsoft.by>
+syalon <hanomirin@foxmail.com>
+takaaki7 <nakama67006700@gmail.com>
+Nicolas Wack <wackou@gmail.com>
+Taconator <TheTaconator@users.noreply.github.com>
+Qi Xing <cwyyprog@163.com>
+Anton Autushka <antoninus.liberalis@gmail.com>
+Chronos <chronos.crypto@gmail.com>
+Wei Yang <richard.weiyang@gmail.com>
+Zapata <marco.tessari@gmail.com>
+btcinshares <btcinshares@protonmail.com>
+crazybits <crazybit.github@gmail.com>
+Anzhy Cherrnyavski <a.chernyavski@pixelplex.io>
+Tengfei Niu <spartucus@users.noreply.github.com>
+Tiago Peralta <tperalta82@gmail.com>
+ioBanker <37595908+ioBanker@users.noreply.github.com>
+Karl Semich <0xloem@gmail.com>
+SahkanDesertHawk <panasiuki@gmail.com>
+Scott Howard <showard314@gmail.com>
+Tydus <Tydus@Tydus.org>
+William <tmfc@homtail.com>
+bangzi1001 <36911788+bangzi1001@users.noreply.github.com>
+d.yakovitsky <d.yakovitsky@aetsoft.by>
+ddylko <ddylko@ddylkoPC>
+iHashFury <iPerky@users.noreply.github.com>
+necklace <necklace@163.com>
+xuquan316 <xuquan316@vip.qq.com>
+Bartek Wrona <wrona@syncad.com>
+BhuzOr <giaquinta.adriano@gmail.com>
+Blockchain Projects BV <info@blockchainprojectsbv.com>
+Bruce Steedman <MatzFan@users.noreply.github.com>
+Charles Cooper <cooper.charles.m@gmail.com>
+Erkan Yilmaz <erkan77@gmail.com>
+Haruka Ma <mrx@hcc.im>
+Jaewoo Cho <clayop@gmail.com>
+Jose Marcial Vieira Bisneto <marcial.vieirab@gmail.com>
+Jozef Knaperek <jknaperek@gmail.com>
+Ken Code <ken@BitShares-Munich.de>
+Krzysztof Szumny <krzysztof.szumny@stxnext.pl>
+Paul Brossier <piem@piem.org>
+Roelandp <dnaleor@gmail.com>
+Semen Martynov <semen.martynov@gmail.com>
+Thomas Freedman <thom@ozarkholler.com>
+Troglodactyl <troglodactyl@gmail.com>
+VoR0220 <catalanor0220@gmail.com>
+alt <pch957@163.com>
+bitcube <root@seed.cubeconnex.com>
+lafona <lafona@protonmail.com>
+liondani <liondani@gmx.com>
+lososeg <ya.lososeg@gmail.com>
+sinetek <pitwuu@gmail.com>
+xiao93 <42384581+xiao93@users.noreply.github.com>

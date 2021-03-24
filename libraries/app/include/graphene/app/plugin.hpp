@@ -42,7 +42,7 @@ class abstract_plugin
        *
        * Plugins MUST supply a method initialize() which will be called early in the application startup. This method
        * should contain early setup code such as initializing variables, adding indexes to the database, registering
-       * callback methods from the database, adding APIs, etc., as well as applying any options in the @ref options map
+       * callback methods from the database, adding APIs, etc., as well as applying any options in the @p options map
        *
        * This method is called BEFORE the database is open, therefore any routines which require any chain state MUST
        * NOT be called by this method. These routines should be performed in startup() instead.
@@ -120,7 +120,7 @@ class plugin : public abstract_plugin
       application* _app = nullptr;
 };
 
-/// @group Some useful tools for boost::program_options arguments using vectors of JSON strings
+/// @ingroup Some useful tools for boost::program_options arguments using vectors of JSON strings
 /// @{
 template<typename T>
 T dejsonify(const string& s, uint32_t max_depth)
@@ -138,7 +138,7 @@ namespace impl {
 
 #define DEFAULT_VALUE_VECTOR(value) default_value({fc::json::to_string(value)}, fc::json::to_string(value))
 #define LOAD_VALUE_SET(options, name, container, type) \
-if( options.count(name) ) { \
+if( options.count(name) > 0 ) { \
       const std::vector<std::string>& ops = options[name].as<std::vector<std::string>>(); \
       std::transform(ops.begin(), ops.end(), std::inserter(container, container.end()), &graphene::app::impl::dejsonify<type>); \
 }
