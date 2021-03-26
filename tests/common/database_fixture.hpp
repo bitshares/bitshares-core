@@ -224,7 +224,7 @@ struct database_fixture_base {
    const std::string current_suite_name;
 
    database_fixture_base();
-   ~database_fixture_base();
+   virtual ~database_fixture_base();
 
    template<typename T>
    static void set_option( boost::program_options::variables_map& options, const std::string& name, const T& value )

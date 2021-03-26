@@ -89,23 +89,6 @@ database_fixture_base::database_fixture_base()
 
 database_fixture_base::~database_fixture_base()
 {
-   try {
-      // If we're unwinding due to an exception, don't do any more checks.
-      // This way, boost test's last checkpoint tells us approximately where the error was.
-      if( !std::uncaught_exception() )
-      {
-         verify_asset_supplies(db);
-         BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
-      }
-      return;
-   } catch (fc::exception& ex) {
-      BOOST_FAIL( std::string("fc::exception in ~database_fixture: ") + ex.to_detail_string() );
-   } catch (std::exception& e) {
-      BOOST_FAIL( std::string("std::exception in ~database_fixture:") + e.what() );
-   } catch (...) {
-      BOOST_FAIL( "Uncaught exception in ~database_fixture" );
-   }
-
    // cleanup data in ES
    if( !es_index_prefix.empty() || !es_obj_index_prefix.empty() )
    {
@@ -138,6 +121,22 @@ database_fixture_base::~database_fixture_base()
             // nothing to do
          }
       }
+   }
+
+   try {
+      // If we're unwinding due to an exception, don't do any more checks.
+      // This way, boost test's last checkpoint tells us approximately where the error was.
+      if( !std::uncaught_exception() )
+      {
+         verify_asset_supplies(db);
+         BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
+      }
+   } catch (fc::exception& ex) {
+      BOOST_FAIL( std::string("fc::exception in ~database_fixture: ") + ex.to_detail_string() );
+   } catch (std::exception& e) {
+      BOOST_FAIL( std::string("std::exception in ~database_fixture:") + e.what() );
+   } catch (...) {
+      BOOST_FAIL( "Uncaught exception in ~database_fixture" );
    }
 
 }
