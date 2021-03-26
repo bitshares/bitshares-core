@@ -207,8 +207,8 @@ struct database_fixture_base {
    signed_transaction trx;
    public_key_type committee_key;
    account_id_type committee_account;
-   const fc::ecc::private_key private_key = fc::ecc::private_key::generate();
-   const fc::ecc::private_key init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
+   const fc::ecc::private_key private_key;
+   const fc::ecc::private_key init_account_priv_key;
    const public_key_type init_account_pub_key;
 
    fc::temp_directory data_dir;

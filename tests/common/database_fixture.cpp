@@ -70,6 +70,8 @@ void clearable_block::clear()
 
 database_fixture_base::database_fixture_base()
    : app(), db( *app.chain_database() ),
+     private_key( fc::ecc::private_key::generate() ),
+     init_account_priv_key( fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) ) ),
      init_account_pub_key( init_account_priv_key.get_public_key() ),
      current_test_name( buf::current_test_case().p_name.value ),
      current_suite_name( buf::get<boost::unit_test::test_suite>(buf::current_test_case().p_parent_id).p_name
