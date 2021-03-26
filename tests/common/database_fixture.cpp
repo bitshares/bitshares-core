@@ -427,9 +427,6 @@ boost::program_options::variables_map database_fixture_base::init_options( datab
 
    options.insert(std::make_pair("bucket-size", boost::program_options::variable_value(string("[15]"),false)));
 
-   // apply api limits, initialize the "has_market_history_plugin" variable and etc in app_options
-   fixture.app.initialize(graphene::utilities::temp_directory_path(), options);
-
    auto mhplugin = fixture.app.register_plugin<graphene::market_history::market_history_plugin>(true);
    auto goplugin = fixture.app.register_plugin<graphene::grouped_orders::grouped_orders_plugin>(true);
 
