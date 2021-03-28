@@ -178,9 +178,11 @@ void database_fixture_base::init_genesis( database_fixture_base& fixture )
    // TODO add initial UIA's; add initial short positions; test non-zero accumulated_fees
 }
 
-boost::program_options::variables_map database_fixture_base::init_options( database_fixture_base& fixture )
+std::shared_ptr<boost::program_options::variables_map> database_fixture_base::init_options(
+      database_fixture_base& fixture )
 {
-   boost::program_options::variables_map options;
+   auto sharable_options = std::make_shared<boost::program_options::variables_map>();
+   auto& options = *sharable_options;
    set_option( options, "seed-nodes", std::string("[]") );
    /**
     * Test specific settings
@@ -340,7 +342,7 @@ boost::program_options::variables_map database_fixture_base::init_options( datab
    if(fixture.current_test_name == "elasticsearch_account_history" ||
          fixture.current_test_name == "elasticsearch_suite" ||
          fixture.current_test_name == "elasticsearch_history_api") {
-      auto esplugin = fixture.app.register_plugin<graphene::elasticsearch::elasticsearch_plugin>(true);
+      fixture.app.register_plugin<graphene::elasticsearch::elasticsearch_plugin>(true);
 
       options.insert(std::make_pair("elasticsearch-node-url",
             boost::program_options::variable_value(GRAPHENE_TESTING_ES_URL, false)));
@@ -363,19 +365,14 @@ boost::program_options::variables_map database_fixture_base::init_options( datab
       BOOST_TEST_MESSAGE( string("ES index prefix is ") + fixture.es_index_prefix );
       options.insert(std::make_pair("elasticsearch-index-prefix",
             boost::program_options::variable_value(fixture.es_index_prefix, false)));
-
-      esplugin->plugin_initialize(options);
-      esplugin->plugin_startup();
    }
    else if( fixture.current_suite_name != "performance_tests" )
    {
-      auto ahplugin = fixture.app.register_plugin<graphene::account_history::account_history_plugin>(true);
-      ahplugin->plugin_initialize(options);
-      ahplugin->plugin_startup();
+      fixture.app.register_plugin<graphene::account_history::account_history_plugin>(true);
    }
 
    if(fixture.current_test_name == "elasticsearch_objects" || fixture.current_test_name == "elasticsearch_suite") {
-      auto esobjects_plugin = fixture.app.register_plugin<graphene::es_objects::es_objects_plugin>(true);
+      fixture.app.register_plugin<graphene::es_objects::es_objects_plugin>(true);
 
       options.insert(std::make_pair("es-objects-elasticsearch-url",
             boost::program_options::variable_value(GRAPHENE_TESTING_ES_URL, false)));
@@ -400,9 +397,6 @@ boost::program_options::variables_map database_fixture_base::init_options( datab
       BOOST_TEST_MESSAGE( string("ES_OBJ index prefix is ") + fixture.es_obj_index_prefix );
       options.insert(std::make_pair("es-objects-index-prefix",
             boost::program_options::variable_value(fixture.es_obj_index_prefix, false)));
-
-      esobjects_plugin->plugin_initialize(options);
-      esobjects_plugin->plugin_startup();
    }
 
    if( fixture.current_test_name == "asset_in_collateral"
@@ -411,32 +405,22 @@ boost::program_options::variables_map database_fixture_base::init_options( datab
             || fixture.current_suite_name == "database_api_tests"
             || fixture.current_suite_name == "api_limit_tests" )
    {
-      auto ahiplugin = fixture.app.register_plugin<graphene::api_helper_indexes::api_helper_indexes>(true);
-      ahiplugin->plugin_initialize(options);
-      ahiplugin->plugin_startup();
+      fixture.app.register_plugin<graphene::api_helper_indexes::api_helper_indexes>(true);
    }
 
    if(fixture.current_test_name == "custom_operations_account_storage_map_test" ||
       fixture.current_test_name == "custom_operations_account_storage_list_test") {
-      auto custom_operations_plugin =
-            fixture.app.register_plugin<graphene::custom_operations::custom_operations_plugin>(true);
-      options.insert(std::make_pair("custom-operations-start-block", boost::program_options::variable_value(uint32_t(1), false)));
-      custom_operations_plugin->plugin_initialize(options);
-      custom_operations_plugin->plugin_startup();
+      fixture.app.register_plugin<graphene::custom_operations::custom_operations_plugin>(true);
+      options.insert(std::make_pair("custom-operations-start-block",
+            boost::program_options::variable_value(uint32_t(1), false)));
    }
 
    options.insert(std::make_pair("bucket-size", boost::program_options::variable_value(string("[15]"),false)));
 
-   auto mhplugin = fixture.app.register_plugin<graphene::market_history::market_history_plugin>(true);
-   auto goplugin = fixture.app.register_plugin<graphene::grouped_orders::grouped_orders_plugin>(true);
+   fixture.app.register_plugin<graphene::market_history::market_history_plugin>(true);
+   fixture.app.register_plugin<graphene::grouped_orders::grouped_orders_plugin>(true);
 
-   mhplugin->plugin_initialize(options);
-   goplugin->plugin_initialize(options);
-
-   mhplugin->plugin_startup();
-   goplugin->plugin_startup();
-
-   return options;
+   return sharable_options;
 }
 
 void database_fixture_base::vote_for_committee_and_witnesses(uint16_t num_committee, uint16_t num_witness)

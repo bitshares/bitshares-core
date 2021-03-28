@@ -96,7 +96,7 @@ using std::cerr;
 /// @returns the application object
 //////////
 std::shared_ptr<graphene::app::application> start_application(fc::temp_directory& app_dir, int& server_port_number) {
-   std::shared_ptr<graphene::app::application> app1(new graphene::app::application{});
+   auto app1 = std::make_shared<graphene::app::application>();
 
    app1->register_plugin<graphene::account_history::account_history_plugin>(true);
    app1->register_plugin< graphene::market_history::market_history_plugin >(true);
@@ -104,8 +104,8 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    app1->register_plugin< graphene::api_helper_indexes::api_helper_indexes>(true);
    app1->register_plugin<graphene::custom_operations::custom_operations_plugin>(true);
 
-   app1->startup_plugins();
-   boost::program_options::variables_map cfg;
+   auto sharable_cfg = std::make_shared<boost::program_options::variables_map>();
+   auto& cfg = *sharable_cfg;
 #ifdef _WIN32
    sockInit();
 #endif
@@ -117,10 +117,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
    cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
    cfg.emplace("custom-operations-start-block", boost::program_options::variable_value(uint32_t(1), false));
-   app1->initialize(app_dir.path(), cfg);
-
-   app1->initialize_plugins(cfg);
-   app1->startup_plugins();
+   app1->initialize(app_dir.path(), sharable_cfg);
 
    app1->startup();
 

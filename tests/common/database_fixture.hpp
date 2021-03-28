@@ -233,7 +233,7 @@ struct database_fixture_base {
    }
 
    static void init_genesis( database_fixture_base& fixture );
-   static boost::program_options::variables_map init_options( database_fixture_base& fixture );
+   static std::shared_ptr<boost::program_options::variables_map> init_options( database_fixture_base& fixture );
 
    static fc::ecc::private_key generate_private_key(string seed);
    string generate_anon_acct_name();
@@ -516,8 +516,8 @@ struct database_fixture_init : database_fixture_base {
       fc::create_directories( fixture.data_dir.path() );
       F::init_genesis( fixture );
       fc::json::save_to_file( fixture.genesis_state, fixture.data_dir.path() / "genesis.json" );
-      boost::program_options::variables_map options = F::init_options( fixture );
-      set_option( options, "genesis-json", boost::filesystem::path(fixture.data_dir.path() / "genesis.json") );
+      auto options = F::init_options( fixture );
+      set_option( *options, "genesis-json", boost::filesystem::path(fixture.data_dir.path() / "genesis.json") );
       fixture.app.initialize( fixture.data_dir.path(), options );
       fixture.app.startup();
 
