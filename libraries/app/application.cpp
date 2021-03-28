@@ -114,6 +114,11 @@ namespace detail {
 
 namespace graphene { namespace app { namespace detail {
 
+application_impl::~application_impl()
+{
+   this->shutdown();
+}
+
 void application_impl::reset_p2p_node(const fc::path& data_dir)
 { try {
    _p2p_network = std::make_shared<net::node>("BitShares Reference Implementation");
@@ -158,7 +163,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
 void application_impl::new_connection( const fc::http::websocket_connection_ptr& c )
 {
    auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(c, GRAPHENE_NET_MAX_NESTED_OBJECTS);
-   auto login = std::make_shared<graphene::app::login_api>( std::ref(*_self) );
+   auto login = std::make_shared<graphene::app::login_api>( _self );
    login->enable_api("database_api");
 
    wsc->register_api(login->database());
@@ -236,8 +241,17 @@ void application_impl::set_dbg_init_key( graphene::chain::genesis_state_type& ge
       genesis.initial_witness_candidates[i].block_signing_key = init_pubkey;
 }
 
-void application_impl::initialize()
+void application_impl::initialize(const fc::path& data_dir, shared_ptr<boost::program_options::variables_map> options)
 {
+   _data_dir = data_dir;
+   _options = options;
+
+   if ( _options->count("io-threads") > 0 )
+   {
+      const uint16_t num_threads = _options->at("io-threads").as<uint16_t>();
+      fc::asio::default_io_service_scope::set_num_threads(num_threads);
+   }
+
    if( _options->count("force-validate") > 0 )
    {
       ilog( "All transaction signatures will be validated" );
@@ -287,6 +301,7 @@ void application_impl::initialize()
       _apiaccess.permission_map["*"] = wild_access;
    }
 
+   initialize_plugins();
 }
 
 void application_impl::set_api_limit() {
@@ -501,8 +516,11 @@ void application_impl::startup()
       throw;
    }
 
+   startup_plugins();
+
    if( _active_plugins.find( "delayed_node" ) == _active_plugins.end() )
       reset_p2p_node(_data_dir);
+
    reset_websocket_server();
    reset_websocket_tls_server();
 } FC_LOG_AND_RETHROW() }
@@ -621,7 +639,7 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
    if( !_is_finished_syncing && !sync_mode )
    {
       _is_finished_syncing = true;
-      _self->syncing_finished();
+      _self.syncing_finished();
    }
 } FC_CAPTURE_AND_RETHROW( (blk_msg)(sync_mode) ) return false; }
 
@@ -969,27 +987,90 @@ uint8_t application_impl::get_current_block_interval_in_seconds() const
    return _chain_db->get_global_properties().parameters.block_interval;
 }
 
+void application_impl::shutdown()
+{
+   if( _websocket_tls_server )
+      _websocket_tls_server.reset();
+   if( _websocket_server )
+      _websocket_server.reset();
+   // TODO wait until all connections are closed and messages handled?
 
+   // plugins E.G. witness_plugin may send data to p2p network, so shutdown them first
+   shutdown_plugins();
+
+   if( _p2p_network )
+   {
+      _p2p_network->close();
+      _p2p_network.reset();
+      // TODO wait until all connections are closed and messages handled?
+   }
+
+   if( _chain_db )
+   {
+      _chain_db->close();
+      _chain_db.reset();
+   }
+}
+
+void application_impl::enable_plugin( const string& name )
+{
+   FC_ASSERT(_available_plugins[name], "Unknown plugin '" + name + "'");
+   _active_plugins[name] = _available_plugins[name];
+}
+
+void application_impl::initialize_plugins()
+{
+   for( auto& entry : _active_plugins )
+   {
+      ilog( "Initializing plugin ${name}", ( "name", entry.second->plugin_name() ) );
+      entry.second->plugin_initialize( *_options );
+      ilog( "Initialized plugin ${name}", ( "name", entry.second->plugin_name() ) );
+   }
+}
+
+void application_impl::startup_plugins()
+{
+   for( auto& entry : _active_plugins )
+   {
+      ilog( "Starting plugin ${name}", ( "name", entry.second->plugin_name() ) );
+      entry.second->plugin_startup();
+      ilog( "Started plugin ${name}", ( "name", entry.second->plugin_name() ) );
+   }
+}
+
+void application_impl::shutdown_plugins()
+{
+   for( auto& entry : _active_plugins )
+   {
+      ilog( "Stopping plugin ${name}", ( "name", entry.second->plugin_name() ) );
+      entry.second->plugin_shutdown();
+      ilog( "Stopped plugin ${name}", ( "name", entry.second->plugin_name() ) );
+   }
+}
+
+void application_impl::add_available_plugin(std::shared_ptr<graphene::app::abstract_plugin> p)
+{
+   _available_plugins[p->plugin_name()] = p;
+}
+
+void application_impl::set_block_production(bool producing_blocks)
+{
+   _is_block_producer = producing_blocks;
+}
 
 } } } // namespace graphene namespace app namespace detail
 
 namespace graphene { namespace app {
 
 application::application()
-   : my(std::make_unique<detail::application_impl>(this))
-{}
+   : my(std::make_unique<detail::application_impl>(*this))
+{
+   //nothing else to do
+}
 
 application::~application()
 {
-   if( my->_p2p_network )
-   {
-      my->_p2p_network->close();
-      my->_p2p_network.reset();
-   }
-   if( my->_chain_db )
-   {
-      my->_chain_db->close();
-   }
+   //nothing to do
 }
 
 void application::set_program_options(boost::program_options::options_description& command_line_options,
@@ -1097,18 +1178,9 @@ void application::set_program_options(boost::program_options::options_descriptio
    configuration_file_options.add(_cfg_options);
 }
 
-void application::initialize(const fc::path& data_dir, const boost::program_options::variables_map& options)
+void application::initialize(const fc::path& data_dir, std::shared_ptr<boost::program_options::variables_map> options)
 {
-   my->_data_dir = data_dir;
-   my->_options = &options;
-
-   if ( options.count("io-threads") > 0 )
-   {
-      const uint16_t num_threads = options["io-threads"].as<uint16_t>();
-      fc::asio::default_io_service_scope::set_num_threads(num_threads);
-   }
-
-   my->initialize();
+   my->initialize( data_dir, options );
 }
 
 void application::startup()
@@ -1158,7 +1230,7 @@ std::shared_ptr<chain::database> application::chain_database() const
 
 void application::set_block_production(bool producing_blocks)
 {
-   my->_is_block_producer = producing_blocks;
+   my->set_block_production(producing_blocks);
 }
 
 optional< api_access_info > application::get_api_access_info( const string& username )const
@@ -1176,56 +1248,19 @@ bool application::is_finished_syncing() const
    return my->_is_finished_syncing;
 }
 
-void graphene::app::application::enable_plugin(const string& name)
+void application::enable_plugin(const string& name)
 {
-   FC_ASSERT(my->_available_plugins[name], "Unknown plugin '" + name + "'");
-   my->_active_plugins[name] = my->_available_plugins[name];
-   my->_active_plugins[name]->plugin_set_app(this);
+   my->enable_plugin(name);
 }
 
-void graphene::app::application::add_available_plugin(std::shared_ptr<graphene::app::abstract_plugin> p)
+void application::add_available_plugin(std::shared_ptr<graphene::app::abstract_plugin> p)
 {
-   my->_available_plugins[p->plugin_name()] = p;
+   my->add_available_plugin(p);
 }
 
-void application::shutdown_plugins()
-{
-   for( auto& entry : my->_active_plugins )
-   {
-      ilog( "Stopping plugin ${name}", ( "name", entry.second->plugin_name() ) );
-      entry.second->plugin_shutdown();
-      ilog( "Stopped plugin ${name}", ( "name", entry.second->plugin_name() ) );
-   }
-}
 void application::shutdown()
 {
-   if( my->_p2p_network )
-      my->_p2p_network->close();
-   if( my->_chain_db )
-   {
-      my->_chain_db->close();
-      my->_chain_db = nullptr;
-   }
-}
-
-void application::initialize_plugins( const boost::program_options::variables_map& options )
-{
-   for( auto& entry : my->_active_plugins )
-   {
-      ilog( "Initializing plugin ${name}", ( "name", entry.second->plugin_name() ) );
-      entry.second->plugin_initialize( options );
-      ilog( "Initialized plugin ${name}", ( "name", entry.second->plugin_name() ) );
-   }
-}
-
-void application::startup_plugins()
-{
-   for( auto& entry : my->_active_plugins )
-   {
-      ilog( "Starting plugin ${name}", ( "name", entry.second->plugin_name() ) );
-      entry.second->plugin_startup();
-      ilog( "Started plugin ${name}", ( "name", entry.second->plugin_name() ) );
-   }
+   my->shutdown();
 }
 
 const application_options& application::get_options()

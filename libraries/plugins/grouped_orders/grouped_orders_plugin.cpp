@@ -241,7 +241,8 @@ grouped_orders_plugin_impl::~grouped_orders_plugin_impl()
 } // end namespace detail
 
 
-grouped_orders_plugin::grouped_orders_plugin() :
+grouped_orders_plugin::grouped_orders_plugin(graphene::app::application& app) :
+   plugin(app),
    my( std::make_unique<detail::grouped_orders_plugin_impl>(*this) )
 {
 }

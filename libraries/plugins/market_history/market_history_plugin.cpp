@@ -735,7 +735,8 @@ void market_history_plugin_impl::update_liquidity_pool_histories(
 
 
 
-market_history_plugin::market_history_plugin() :
+market_history_plugin::market_history_plugin(graphene::app::application& app) :
+   plugin(app),
    my( std::make_unique<detail::market_history_plugin_impl>(*this) )
 {
 }

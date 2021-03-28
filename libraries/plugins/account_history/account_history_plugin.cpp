@@ -49,8 +49,6 @@ class account_history_plugin_impl
       account_history_plugin_impl(account_history_plugin& _plugin)
          : _self( _plugin )
       { }
-      virtual ~account_history_plugin_impl();
-
 
       /** this method is called as a callback after a block is applied
        * and will process/index all operations that were applied in the block.
@@ -75,11 +73,6 @@ class account_history_plugin_impl
       void add_account_history( const account_id_type account_id, const operation_history_id_type op_id );
 
 };
-
-account_history_plugin_impl::~account_history_plugin_impl()
-{
-   return;
-}
 
 void account_history_plugin_impl::update_account_histories( const signed_block& b )
 {
@@ -282,7 +275,8 @@ void account_history_plugin_impl::add_account_history( const account_id_type acc
 
 
 
-account_history_plugin::account_history_plugin() :
+account_history_plugin::account_history_plugin(graphene::app::application& app) :
+   plugin(app),
    my( std::make_unique<detail::account_history_plugin_impl>(*this) )
 {
 }

@@ -380,16 +380,16 @@ namespace detail
 class market_history_plugin : public graphene::app::plugin
 {
    public:
-      market_history_plugin();
-      virtual ~market_history_plugin();
+      market_history_plugin(graphene::app::application& app);
+      ~market_history_plugin() override;
 
       std::string plugin_name()const override;
-      virtual void plugin_set_program_options(
+      void plugin_set_program_options(
          boost::program_options::options_description& cli,
          boost::program_options::options_description& cfg) override;
-      virtual void plugin_initialize(
+      void plugin_initialize(
          const boost::program_options::variables_map& options) override;
-      virtual void plugin_startup() override;
+      void plugin_startup() override;
 
       uint32_t                    max_history()const;
       const flat_set<uint32_t>&   tracked_buckets()const;

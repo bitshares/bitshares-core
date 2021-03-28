@@ -195,11 +195,6 @@ void witness_plugin::plugin_startup()
    ilog("witness plugin:  plugin_startup() end");
 } FC_CAPTURE_AND_RETHROW() }
 
-void witness_plugin::plugin_shutdown()
-{
-   stop_block_production();
-}
-
 void witness_plugin::stop_block_production()
 {
    _shutting_down = true;

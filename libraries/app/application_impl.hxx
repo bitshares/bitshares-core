@@ -28,21 +28,22 @@ class application_impl : public net::node_delegate
 
       void reset_websocket_tls_server();
 
-      explicit application_impl(application* self)
+      explicit application_impl(application& self)
          : _self(self),
            _chain_db(std::make_shared<chain::database>())
       {
       }
 
-      virtual ~application_impl()
-      {
-      }
+      virtual ~application_impl();
+
+      void set_block_production(bool producing_blocks);
 
       void set_dbg_init_key( graphene::chain::genesis_state_type& genesis, const std::string& init_key );
       void set_api_limit();
 
-      void initialize();
+      void initialize(const fc::path& data_dir, std::shared_ptr<boost::program_options::variables_map> options);
       void startup();
+      void shutdown();
 
       fc::optional< api_access_info > get_api_access_info(const string& username)const;
 
@@ -183,13 +184,19 @@ class application_impl : public net::node_delegate
 
       uint8_t get_current_block_interval_in_seconds() const override;
 
+      /// Add an available plugin
+      void add_available_plugin( std::shared_ptr<abstract_plugin> p );
+
+      /// Enables a plugin
+      void enable_plugin(const string& name);
+
       /// Returns whether a plugin is enabled
       bool is_plugin_enabled(const string& name) const;
 
-      application* _self;
+      application& _self;
 
       fc::path _data_dir;
-      const boost::program_options::variables_map* _options = nullptr;
+      std::shared_ptr<boost::program_options::variables_map> _options;
       api_access _apiaccess;
 
       std::shared_ptr<graphene::chain::database>            _chain_db;
@@ -202,6 +209,10 @@ class application_impl : public net::node_delegate
 
       bool _is_finished_syncing = false;
    private:
+      void initialize_plugins();
+      void startup_plugins();
+      void shutdown_plugins();
+
       fc::serial_valve valve;
    };
 

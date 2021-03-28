@@ -100,12 +100,13 @@ void custom_operations_plugin_impl::onBlock()
 
 custom_operations_plugin_impl::~custom_operations_plugin_impl()
 {
-   return;
+   // nothing to do
 }
 
 } // end namespace detail
 
-custom_operations_plugin::custom_operations_plugin() :
+custom_operations_plugin::custom_operations_plugin(graphene::app::application& app) :
+   plugin(app),
    my( std::make_unique<detail::custom_operations_plugin_impl>(*this) )
 {
 }

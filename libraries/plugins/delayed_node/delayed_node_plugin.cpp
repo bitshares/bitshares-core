@@ -46,8 +46,9 @@ struct delayed_node_plugin_impl {
 };
 }
 
-delayed_node_plugin::delayed_node_plugin()
-   : my(nullptr)
+delayed_node_plugin::delayed_node_plugin(graphene::app::application& app) :
+   plugin(app),
+   my(nullptr)
 {}
 
 delayed_node_plugin::~delayed_node_plugin()

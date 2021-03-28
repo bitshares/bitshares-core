@@ -274,7 +274,8 @@ es_objects_plugin_impl::~es_objects_plugin_impl()
 
 } // end namespace detail
 
-es_objects_plugin::es_objects_plugin() :
+es_objects_plugin::es_objects_plugin(graphene::app::application& app) :
+   plugin(app),
    my( std::make_unique<detail::es_objects_plugin_impl>(*this) )
 {
 }

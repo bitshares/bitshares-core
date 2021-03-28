@@ -433,7 +433,8 @@ void elasticsearch_plugin_impl::populateESstruct()
 
 } // end namespace detail
 
-elasticsearch_plugin::elasticsearch_plugin() :
+elasticsearch_plugin::elasticsearch_plugin(graphene::app::application& app) :
+   plugin(app),
    my( std::make_unique<detail::elasticsearch_plugin_impl>(*this) )
 {
 }

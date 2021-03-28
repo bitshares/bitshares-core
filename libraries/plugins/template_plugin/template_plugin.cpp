@@ -37,7 +37,7 @@ class template_plugin_impl
       {  }
       virtual ~template_plugin_impl();
 
-      void onBlock( const signed_block& b );
+      void on_block( const signed_block& b );
 
       graphene::chain::database& database()
       {
@@ -52,25 +52,28 @@ class template_plugin_impl
 
 };
 
-void template_plugin_impl::onBlock( const signed_block& b )
+void template_plugin_impl::on_block( const signed_block& b )
 {
    wdump((b.block_num()));
 }
 
 template_plugin_impl::~template_plugin_impl()
 {
-   return;
+   // Put the real code here
 }
 
 } // end namespace detail
 
-template_plugin::template_plugin() :
-   my( new detail::template_plugin_impl(*this) )
+template_plugin::template_plugin(graphene::app::application& app) :
+   plugin(app),
+   my( std::make_unique<detail::template_plugin_impl>(*this) )
 {
+   // Add needed code here
 }
 
 template_plugin::~template_plugin()
 {
+   cleanup();
 }
 
 std::string template_plugin::plugin_name()const
@@ -96,7 +99,7 @@ void template_plugin::plugin_set_program_options(
 void template_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
    database().applied_block.connect( [&]( const signed_block& b) {
-      my->onBlock(b);
+      my->on_block(b);
    } );
 
    if (options.count("template_plugin") > 0) {
@@ -107,6 +110,17 @@ void template_plugin::plugin_initialize(const boost::program_options::variables_
 void template_plugin::plugin_startup()
 {
    ilog("template_plugin: plugin_startup() begin");
+}
+
+void template_plugin::plugin_shutdown()
+{
+   ilog("template_plugin: plugin_shutdown() begin");
+   cleanup();
+}
+
+void template_plugin::cleanup()
+{
+   // Add cleanup code here
 }
 
 } }

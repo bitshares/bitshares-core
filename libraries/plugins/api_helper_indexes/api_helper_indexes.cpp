@@ -150,7 +150,8 @@ class api_helper_indexes_impl
 
 } // end namespace detail
 
-api_helper_indexes::api_helper_indexes() :
+api_helper_indexes::api_helper_indexes(graphene::app::application& app) :
+   plugin(app),
    my( std::make_unique<detail::api_helper_indexes_impl>(*this) )
 {
 }
