@@ -12,7 +12,7 @@
 namespace graphene { namespace app { namespace detail {
 
 
-class application_impl : public net::node_delegate
+class application_impl : public net::node_delegate, public std::enable_shared_from_this<application_impl>
    {
    public:
       fc::optional<fc::temp_file> _lock_file;
@@ -63,7 +63,7 @@ class application_impl : public net::node_delegate
        * @throws exception if error validating the item, otherwise the item is safe to broadcast on.
        */
       bool handle_block(const graphene::net::block_message& blk_msg, bool sync_mode,
-                                std::vector<fc::uint160_t>& contained_transaction_message_ids) override;
+                        std::vector<graphene::net::message_hash_type>& contained_transaction_message_ids) override;
 
       void handle_transaction(const graphene::net::trx_message& transaction_message) override;
 

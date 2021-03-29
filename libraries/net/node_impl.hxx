@@ -144,15 +144,16 @@ struct prioritized_item_id
 
 class statistics_gathering_node_delegate_wrapper : public node_delegate
 {
-private:
-  node_delegate *_node_delegate;
-  fc::thread *_thread;
+   private:
+      std::shared_ptr<node_delegate> _node_delegate;
+      fc::thread *_thread;
 
-  typedef boost::accumulators::accumulator_set<int64_t, boost::accumulators::stats<boost::accumulators::tag::min,
-                                                                                   boost::accumulators::tag::rolling_mean,
-                                                                                   boost::accumulators::tag::max,
-                                                                                   boost::accumulators::tag::sum,
-                                                                                   boost::accumulators::tag::count> > call_stats_accumulator;
+      using call_stats_accumulator = boost::accumulators::accumulator_set< int64_t,
+                                        boost::accumulators::stats< boost::accumulators::tag::min,
+                                                                    boost::accumulators::tag::rolling_mean,
+                                                                    boost::accumulators::tag::max,
+                                                                    boost::accumulators::tag::sum,
+                                                                    boost::accumulators::tag::count> >;
 #define NODE_DELEGATE_METHOD_NAMES (has_item) \
                                (handle_message) \
                                (handle_block) \
@@ -194,7 +195,7 @@ private:
         {
           std::shared_ptr<call_statistics_collector> _collector;
         public:
-          actual_execution_measurement_helper(std::shared_ptr<call_statistics_collector> collector) :
+          explicit actual_execution_measurement_helper(std::shared_ptr<call_statistics_collector> collector) :
             _collector(collector)
           {
             _collector->starting_execution();
@@ -245,14 +246,16 @@ private:
           _execution_completed_time = fc::time_point::now();
         }
       };
-    public:
-      statistics_gathering_node_delegate_wrapper(node_delegate* delegate, fc::thread* thread_for_delegate_calls);
+   public:
+      statistics_gathering_node_delegate_wrapper(std::shared_ptr<node_delegate> delegate,
+                                                 fc::thread* thread_for_delegate_calls);
 
       fc::variant_object get_call_statistics();
 
       bool has_item( const graphene::net::item_id& id ) override;
       void handle_message( const message& ) override;
-      bool handle_block( const graphene::net::block_message& block_message, bool sync_mode, std::vector<fc::uint160_t>& contained_transaction_message_ids ) override;
+      bool handle_block( const graphene::net::block_message& block_message, bool sync_mode,
+                         std::vector<message_hash_type>& contained_transaction_message_ids ) override;
       void handle_transaction( const graphene::net::trx_message& transaction_message ) override;
       std::vector<item_hash_t> get_block_ids(const std::vector<item_hash_t>& blockchain_synopsis,
                                              uint32_t& remaining_item_count,
@@ -269,7 +272,7 @@ private:
       uint32_t estimate_last_known_fork_from_git_revision_timestamp(uint32_t unix_timestamp) const override;
       void error_encountered(const std::string& message, const fc::oexception& error) override;
       uint8_t get_current_block_interval_in_seconds() const override;
-    };
+};
 
 class node_impl : public peer_connection_delegate
 {
@@ -558,11 +561,23 @@ class node_impl : public peer_connection_delegate
       void send_sync_block_to_node_delegate(const graphene::net::block_message& block_message_to_send);
       void process_backlog_of_sync_blocks();
       void trigger_process_backlog_of_sync_blocks();
-      void process_block_during_sync(peer_connection* originating_peer, const graphene::net::block_message& block_message, const message_hash_type& message_hash);
-      void process_block_during_normal_operation(peer_connection* originating_peer, const graphene::net::block_message& block_message, const message_hash_type& message_hash);
-      void process_block_message(peer_connection* originating_peer, const message& message_to_process, const message_hash_type& message_hash);
+      void process_block_during_sync(
+                  peer_connection* originating_peer,
+                  const graphene::net::block_message& block_message,
+                  const message_hash_type& message_hash);
+      void process_block_during_normal_operation(
+                  peer_connection* originating_peer,
+                  const graphene::net::block_message& block_message,
+                  const message_hash_type& message_hash);
+      void process_block_message(
+                  peer_connection* originating_peer,
+                  const message& message_to_process,
+                  const message_hash_type& message_hash);
 
-      void process_ordinary_message(peer_connection* originating_peer, const message& message_to_process, const message_hash_type& message_hash);
+      void process_ordinary_message(
+                  peer_connection* originating_peer,
+                  const message& message_to_process,
+                  const message_hash_type& message_hash);
 
       void start_synchronizing();
       void start_synchronizing_with_peer(const peer_connection_ptr& peer);
@@ -594,7 +609,7 @@ class node_impl : public peer_connection_delegate
                                const fc::oexception& additional_data = fc::oexception() );
 
       // methods implementing node's public interface
-      void set_node_delegate(node_delegate* del, fc::thread* thread_for_delegate_calls);
+      void set_node_delegate(std::shared_ptr<node_delegate> del, fc::thread* thread_for_delegate_calls);
       void load_configuration( const fc::path& configuration_directory );
       void listen_to_p2p_network();
       void connect_to_p2p_network();

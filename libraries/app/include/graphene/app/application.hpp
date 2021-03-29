@@ -149,7 +149,7 @@ namespace graphene { namespace app {
          /// Add an available plugin
          void add_available_plugin( std::shared_ptr<abstract_plugin> p );
 
-         std::unique_ptr<detail::application_impl> my;
+         std::shared_ptr<detail::application_impl> my;
 
          boost::program_options::options_description _cli_options;
          boost::program_options::options_description _cfg_options;

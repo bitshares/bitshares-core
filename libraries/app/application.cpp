@@ -124,7 +124,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    _p2p_network = std::make_shared<net::node>("BitShares Reference Implementation");
 
    _p2p_network->load_configuration(data_dir / "p2p");
-   _p2p_network->set_node_delegate(this);
+   _p2p_network->set_node_delegate(shared_from_this());
 
    if( _options->count("seed-node") )
    {
@@ -578,7 +578,7 @@ bool application_impl::has_item(const net::item_id& id)
  * @throws exception if error validating the item, otherwise the item is safe to broadcast on.
  */
 bool application_impl::handle_block(const graphene::net::block_message& blk_msg, bool sync_mode,
-                          std::vector<fc::uint160_t>& contained_transaction_message_ids)
+                          std::vector<graphene::net::message_hash_type>& contained_transaction_message_ids)
 { try {
 
    auto latency = fc::time_point::now() - blk_msg.block.timestamp;
@@ -587,7 +587,8 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
       const auto& witness = blk_msg.block.witness(*_chain_db);
       const auto& witness_account = witness.witness_account(*_chain_db);
       auto last_irr = _chain_db->get_dynamic_global_properties().last_irreversible_block_num;
-      ilog("Got block: #${n} ${bid} time: ${t} transaction(s): ${x} latency: ${l} ms from: ${w}  irreversible: ${i} (-${d})",
+      ilog("Got block: #${n} ${bid} time: ${t} transaction(s): ${x} "
+           "latency: ${l} ms from: ${w}  irreversible: ${i} (-${d})",
            ("t",blk_msg.block.timestamp)
            ("n", blk_msg.block.block_num())
            ("bid", blk_msg.block.id())
@@ -1069,7 +1070,7 @@ void application_impl::set_block_production(bool producing_blocks)
 namespace graphene { namespace app {
 
 application::application()
-   : my(std::make_unique<detail::application_impl>(*this))
+   : my(std::make_shared<detail::application_impl>(*this))
 {
    //nothing else to do
 }
