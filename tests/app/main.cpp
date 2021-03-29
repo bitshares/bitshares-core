@@ -390,18 +390,18 @@ BOOST_AUTO_TEST_CASE( two_node_network )
    }
 }
 
-// a contrived example to test the breaking out of application_impl to a header file
-
+/// a contrived example to test the breaking out of application_impl to a header file
 BOOST_AUTO_TEST_CASE(application_impl_breakout) {
+
+   static graphene::app::application my_app;
+
    class test_impl : public graphene::app::detail::application_impl {
       // override the constructor, just to test that we can
    public:
-      test_impl() : my_app(),application_impl(my_app) {}
+      test_impl() : application_impl(my_app) {}
       bool has_item(const net::item_id& id) override {
          return true;
       }
-   private:
-      graphene::app::application my_app;
    };
 
    test_impl impl;
