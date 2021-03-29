@@ -314,7 +314,6 @@ struct cli_fixture
    ~cli_fixture()
    {
       BOOST_TEST_MESSAGE("Cleanup cli_wallet::boost_fixture_test_case");
-      app1->shutdown();
 #ifdef _WIN32
       sockQuit();
 #endif
@@ -1497,8 +1496,6 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
       edump((e.to_detail_string()));
       throw;
    }
-   app1->shutdown();
-   app1.reset();
 }
 
 graphene::wallet::plain_keys decrypt_keys( const std::string& password, const vector<char>& cipher_keys )
@@ -1731,8 +1728,6 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       edump((e.to_detail_string()));
       throw;
    }
-   app1->shutdown();
-   app1.reset();
 }
 
 static string encapsulate( const graphene::wallet::signed_message& msg )
@@ -2308,6 +2303,4 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
       edump((e.to_detail_string()));
       throw;
    }
-   app1->shutdown();
-   app1.reset();
 }

@@ -1258,11 +1258,6 @@ void application::add_available_plugin(std::shared_ptr<graphene::app::abstract_p
    my->add_available_plugin(p);
 }
 
-void application::shutdown()
-{
-   my->shutdown();
-}
-
 const application_options& application::get_options()
 {
    return my->_app_options;

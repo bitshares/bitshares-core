@@ -43,7 +43,6 @@ class application_impl : public net::node_delegate
 
       void initialize(const fc::path& data_dir, std::shared_ptr<boost::program_options::variables_map> options);
       void startup();
-      void shutdown();
 
       fc::optional< api_access_info > get_api_access_info(const string& username)const;
 
@@ -209,6 +208,7 @@ class application_impl : public net::node_delegate
 
       bool _is_finished_syncing = false;
    private:
+      void shutdown();
       void initialize_plugins();
       void startup_plugins();
       void shutdown_plugins();

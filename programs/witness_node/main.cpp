@@ -198,8 +198,6 @@ int main(int argc, char** argv) {
 
       auto caught_signal = exit_promise->wait();
       ilog("Exiting from signal ${n}", ("n", caught_signal));
-      node->shutdown();
-      node.reset();
       return EXIT_SUCCESS;
    } catch( const fc::exception& e ) {
       // deleting the node can yield, so do this outside the exception handler
@@ -209,8 +207,6 @@ int main(int argc, char** argv) {
    if (unhandled_exception)
    {
       elog("Exiting with error:\n${e}", ("e", unhandled_exception->to_detail_string()));
-      node->shutdown();
-      node.reset();
       return EXIT_FAILURE;
    }
 }
