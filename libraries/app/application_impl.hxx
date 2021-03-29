@@ -50,7 +50,7 @@ class application_impl : public net::node_delegate
       /**
        * If delegate has the item, the network has no need to fetch it.
        */
-      virtual bool has_item(const net::item_id& id) override;
+      bool has_item(const net::item_id& id) override;
 
       /**
        * @brief allows the application to validate an item prior to broadcasting to peers.
@@ -62,10 +62,10 @@ class application_impl : public net::node_delegate
        *
        * @throws exception if error validating the item, otherwise the item is safe to broadcast on.
        */
-      virtual bool handle_block(const graphene::net::block_message& blk_msg, bool sync_mode,
+      bool handle_block(const graphene::net::block_message& blk_msg, bool sync_mode,
                                 std::vector<fc::uint160_t>& contained_transaction_message_ids) override;
 
-      virtual void handle_transaction(const graphene::net::trx_message& transaction_message) override;
+      void handle_transaction(const graphene::net::trx_message& transaction_message) override;
 
       void handle_message(const graphene::net::message& message_to_process) override;
 
@@ -80,16 +80,17 @@ class application_impl : public net::node_delegate
        * in our blockchain after the last item returned in the result,
        * or 0 if the result contains the last item in the blockchain
        */
-      virtual std::vector<graphene::net::item_hash_t> get_block_ids(const std::vector<graphene::net::item_hash_t>& blockchain_synopsis,
-                                                     uint32_t& remaining_item_count,
-                                                     uint32_t limit) override;
+      std::vector<graphene::net::item_hash_t> get_block_ids(
+            const std::vector<graphene::net::item_hash_t>& blockchain_synopsis,
+            uint32_t& remaining_item_count,
+            uint32_t limit) override;
 
       /**
        * Given the hash of the requested data, fetch the body.
        */
-      virtual graphene::net::message get_item(const graphene::net::item_id& id) override;
+      graphene::net::message get_item(const graphene::net::item_id& id) override;
 
-      virtual graphene::chain::chain_id_type get_chain_id()const override;
+      graphene::chain::chain_id_type get_chain_id()const override;
 
       /**
        * Returns a synopsis of the blockchain used for syncing.  This consists of a list of
@@ -149,36 +150,38 @@ class application_impl : public net::node_delegate
        * successfully pushed to the blockchain, so that tells us whether the peer is on a fork or on
        * the main chain.
        */
-      virtual std::vector<graphene::net::item_hash_t> get_blockchain_synopsis(const graphene::net::item_hash_t& reference_point,
-                                                               uint32_t number_of_blocks_after_reference_point) override;
+      std::vector<graphene::net::item_hash_t> get_blockchain_synopsis(
+            const graphene::net::item_hash_t& reference_point,
+            uint32_t number_of_blocks_after_reference_point) override;
 
       /**
        * Call this after the call to handle_message succeeds.
        *
-       * @param item_type the type of the item we're synchronizing, will be the same as item passed to the sync_from() call
+       * @param item_type the type of the item we're synchronizing,
+       *                  will be the same as item passed to the sync_from() call
        * @param item_count the number of items known to the node that haven't been sent to handle_item() yet.
        *                   After `item_count` more calls to handle_item(), the node will be in sync
        */
-      virtual void sync_status(uint32_t item_type, uint32_t item_count) override;
+      void sync_status(uint32_t item_type, uint32_t item_count) override;
 
       /**
        * Call any time the number of connected peers changes.
        */
-      virtual void connection_count_changed(uint32_t c) override;
+      void connection_count_changed(uint32_t c) override;
 
-      virtual uint32_t get_block_number(const graphene::net::item_hash_t& block_id) override;
+      uint32_t get_block_number(const graphene::net::item_hash_t& block_id) override;
 
       /**
        * Returns the time a block was produced (if block_id = 0, returns genesis time).
        * If we don't know about the block, returns time_point_sec::min()
        */
-      virtual fc::time_point_sec get_block_time(const graphene::net::item_hash_t& block_id) override;
+      fc::time_point_sec get_block_time(const graphene::net::item_hash_t& block_id) override;
 
-      virtual graphene::net::item_hash_t get_head_block_id() const override;
+      graphene::net::item_hash_t get_head_block_id() const override;
 
-      virtual uint32_t estimate_last_known_fork_from_git_revision_timestamp(uint32_t unix_timestamp) const override;
+      uint32_t estimate_last_known_fork_from_git_revision_timestamp(uint32_t unix_timestamp) const override;
 
-      virtual void error_encountered(const std::string& message, const fc::oexception& error) override;
+      void error_encountered(const std::string& message, const fc::oexception& error) override;
 
       uint8_t get_current_block_interval_in_seconds() const override;
 
