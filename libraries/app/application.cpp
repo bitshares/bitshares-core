@@ -410,13 +410,13 @@ void application_impl::startup()
 
    auto initial_state = [this] {
       ilog("Initializing database...");
-      if( _options->count("genesis-json") )
+      if( _options->count("genesis-json") > 0 )
       {
          std::string genesis_str;
          fc::read_file_contents( _options->at("genesis-json").as<boost::filesystem::path>(), genesis_str );
          graphene::chain::genesis_state_type genesis = fc::json::from_string( genesis_str ).as<graphene::chain::genesis_state_type>( 20 );
          bool modified_genesis = false;
-         if( _options->count("genesis-timestamp") )
+         if( _options->count("genesis-timestamp") > 0 )
          {
             genesis.initial_timestamp = fc::time_point_sec( fc::time_point::now() )
                                       + genesis.initial_parameters.block_interval
@@ -430,7 +430,7 @@ void application_impl::startup()
                ("timestamp", genesis.initial_timestamp.to_iso_string())
             );
          }
-         if( _options->count("dbg-init-key") )
+         if( _options->count("dbg-init-key") > 0 )
          {
             std::string init_key = _options->at( "dbg-init-key" ).as<string>();
             FC_ASSERT( genesis.initial_witness_candidates.size() >= genesis.initial_active_witnesses );
@@ -460,11 +460,11 @@ void application_impl::startup()
       }
    };
 
-   if( _options->count("resync-blockchain") )
+   if( _options->count("resync-blockchain") > 0 )
       _chain_db->wipe(_data_dir / "blockchain", true);
 
    flat_map<uint32_t,block_id_type> loaded_checkpoints;
-   if( _options->count("checkpoint") )
+   if( _options->count("checkpoint") > 0 )
    {
       auto cps = _options->at("checkpoint").as<vector<string>>();
       loaded_checkpoints.reserve( cps.size() );
@@ -476,23 +476,23 @@ void application_impl::startup()
    }
    _chain_db->add_checkpoints( loaded_checkpoints );
 
-   if( _options->count("enable-standby-votes-tracking") )
+   if( _options->count("enable-standby-votes-tracking") > 0 )
    {
       _chain_db->enable_standby_votes_tracking( _options->at("enable-standby-votes-tracking").as<bool>() );
    }
 
-   if( _options->count("replay-blockchain") || _options->count("revalidate-blockchain") )
+   if( _options->count("replay-blockchain") > 0 || _options->count("revalidate-blockchain") > 0 )
       _chain_db->wipe( _data_dir / "blockchain", false );
 
    try
    {
       // these flags are used in open() only, i. e. during replay
       uint32_t skip;
-      if( _options->count("revalidate-blockchain") ) // see also handle_block()
+      if( _options->count("revalidate-blockchain") > 0 ) // see also handle_block()
       {
          if( !loaded_checkpoints.empty() )
             wlog( "Warning - revalidate will not validate before last checkpoint" );
-         if( _options->count("force-validate") )
+         if( _options->count("force-validate") > 0 )
             skip = graphene::chain::database::skip_nothing;
          else
             skip = graphene::chain::database::skip_transaction_signatures;
@@ -518,7 +518,10 @@ void application_impl::startup()
 
    startup_plugins();
 
-   if( _active_plugins.find( "delayed_node" ) == _active_plugins.end() )
+   bool enable_p2p_network = true;
+   if( _options->count("enable-p2p-network") > 0 )
+      enable_p2p_network = _options->at("enable-p2p-network").as<bool>();
+   if( enable_p2p_network && _active_plugins.find( "delayed_node" ) == _active_plugins.end() )
       reset_p2p_node(_data_dir);
 
    reset_websocket_server();
@@ -1077,6 +1080,9 @@ void application::set_program_options(boost::program_options::options_descriptio
                                       boost::program_options::options_description& configuration_file_options) const
 {
    configuration_file_options.add_options()
+         ("enable-p2p-network", bpo::value<bool>()->implicit_value(true),
+          "Whether to enable P2P network. Note: if delayed_node plugin is enabled, "
+          "this option will be ignored and P2P network will always be disabled.")
          ("p2p-endpoint", bpo::value<string>(), "Endpoint for P2P node to listen on")
          ("seed-node,s", bpo::value<vector<string>>()->composing(),
           "P2P nodes to connect to on startup (may specify multiple times)")
@@ -1088,15 +1094,18 @@ void application::set_program_options(boost::program_options::options_descriptio
           "Endpoint for websocket RPC to listen on")
          ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"),
           "Endpoint for TLS websocket RPC to listen on")
-         ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"), "The TLS certificate file for this server")
+         ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"),
+          "The TLS certificate file for this server")
          ("server-pem-password,P", bpo::value<string>()->implicit_value(""), "Password for this certificate")
          ("proxy-forwarded-for-header", bpo::value<string>()->implicit_value("X-Forwarded-For-Client"),
           "A HTTP header similar to X-Forwarded-For (XFF), used by the RPC server to extract clients' address info, "
           "usually added by a trusted reverse proxy")
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
-         ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
+         ("dbg-init-key", bpo::value<string>(),
+          "Block signing key to use for init witnesses, overrides genesis file, for debug")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
-         ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads, default to 0 for auto-configuration")
+         ("io-threads", bpo::value<uint16_t>()->implicit_value(0),
+          "Number of IO threads, default to 0 for auto-configuration")
          ("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(true),
           "Whether allow API clients to subscribe to universal object creation and removal events")
          ("enable-standby-votes-tracking", bpo::value<bool>()->implicit_value(true),
@@ -1156,7 +1165,8 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::get_trade_history_by_sequence to set max limit value")
          ("api-limit-get-withdraw-permissions-by-giver",boost::program_options::value<uint64_t>()->default_value(101),
           "For database_api_impl::get_withdraw_permissions_by_giver to set max limit value")
-         ("api-limit-get-withdraw-permissions-by-recipient",boost::program_options::value<uint64_t>()->default_value(101),
+         ("api-limit-get-withdraw-permissions-by-recipient",
+          boost::program_options::value<uint64_t>()->default_value(101),
           "For database_api_impl::get_withdraw_permissions_by_recipient to set max limit value")
          ("api-limit-get-tickets", boost::program_options::value<uint64_t>()->default_value(101),
           "Set maximum limit value for database APIs which query for tickets")
