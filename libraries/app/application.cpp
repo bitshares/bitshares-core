@@ -233,14 +233,6 @@ void application_impl::reset_websocket_tls_server()
    _websocket_tls_server->start_accept();
 } FC_CAPTURE_AND_RETHROW() }
 
-void application_impl::set_dbg_init_key( graphene::chain::genesis_state_type& genesis, const std::string& init_key )
-{
-   flat_set< std::string > initial_witness_names;
-   public_key_type init_pubkey( init_key );
-   for( uint64_t i=0; i<genesis.initial_active_witnesses; i++ )
-      genesis.initial_witness_candidates[i].block_signing_key = init_pubkey;
-}
-
 void application_impl::initialize(const fc::path& data_dir, shared_ptr<boost::program_options::variables_map> options)
 {
    _data_dir = data_dir;
@@ -404,17 +396,15 @@ void application_impl::set_api_limit() {
    }
 }
 
-void application_impl::startup()
-{ try {
-   fc::create_directories(_data_dir / "blockchain");
-
-   auto initial_state = [this] {
+graphene::chain::genesis_state_type application_impl::initialize_genesis_state() const
+{
+   try {
       ilog("Initializing database...");
       if( _options->count("genesis-json") > 0 )
       {
          std::string genesis_str;
          fc::read_file_contents( _options->at("genesis-json").as<boost::filesystem::path>(), genesis_str );
-         graphene::chain::genesis_state_type genesis = fc::json::from_string( genesis_str ).as<graphene::chain::genesis_state_type>( 20 );
+         auto genesis = fc::json::from_string( genesis_str ).as<graphene::chain::genesis_state_type>( 20 );
          bool modified_genesis = false;
          if( _options->count("genesis-timestamp") > 0 )
          {
@@ -434,7 +424,7 @@ void application_impl::startup()
          {
             std::string init_key = _options->at( "dbg-init-key" ).as<string>();
             FC_ASSERT( genesis.initial_witness_candidates.size() >= genesis.initial_active_witnesses );
-            set_dbg_init_key( genesis, init_key );
+            genesis.override_witness_signing_keys( init_key );
             modified_genesis = true;
             ilog("Set init witness key to ${init_key}", ("init_key", init_key));
          }
@@ -442,10 +432,8 @@ void application_impl::startup()
          {
             wlog("WARNING:  GENESIS WAS MODIFIED, YOUR CHAIN ID MAY BE DIFFERENT");
             genesis_str += "BOGUS";
-            genesis.initial_chain_id = fc::sha256::hash( genesis_str );
          }
-         else
-            genesis.initial_chain_id = fc::sha256::hash( genesis_str );
+         genesis.initial_chain_id = fc::sha256::hash( genesis_str );
          return genesis;
       }
       else
@@ -458,7 +446,12 @@ void application_impl::startup()
          genesis.initial_chain_id = fc::sha256::hash( egenesis_json );
          return genesis;
       }
-   };
+   } FC_CAPTURE_AND_RETHROW()
+}
+
+void application_impl::open_chain_database()
+{ try {
+   fc::create_directories(_data_dir / "blockchain");
 
    if( _options->count("resync-blockchain") > 0 )
       _chain_db->wipe(_data_dir / "blockchain", true);
@@ -506,8 +499,12 @@ void application_impl::startup()
                 graphene::chain::database::skip_tapos_check |
                 graphene::chain::database::skip_witness_schedule_check;
 
-      graphene::chain::detail::with_skip_flags( *_chain_db, skip, [this,&initial_state] () {
-         _chain_db->open( _data_dir / "blockchain", initial_state, GRAPHENE_CURRENT_DB_VERSION );
+      auto genesis_loader = [this](){
+         return initialize_genesis_state();
+      };
+
+      graphene::chain::detail::with_skip_flags( *_chain_db, skip, [this, &genesis_loader] () {
+         _chain_db->open( _data_dir / "blockchain", genesis_loader, GRAPHENE_CURRENT_DB_VERSION );
       });
    }
    catch( const fc::exception& e )
@@ -515,12 +512,18 @@ void application_impl::startup()
       elog( "Caught exception ${e} in open(), you might want to force a replay", ("e", e.to_detail_string()) );
       throw;
    }
+} FC_LOG_AND_RETHROW() }
 
-   startup_plugins();
-
+void application_impl::startup()
+{ try {
    bool enable_p2p_network = true;
    if( _options->count("enable-p2p-network") > 0 )
       enable_p2p_network = _options->at("enable-p2p-network").as<bool>();
+
+   open_chain_database();
+
+   startup_plugins();
+
    if( enable_p2p_network && _active_plugins.find( "delayed_node" ) == _active_plugins.end() )
       reset_p2p_node(_data_dir);
 

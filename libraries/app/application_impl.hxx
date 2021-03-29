@@ -38,7 +38,6 @@ class application_impl : public net::node_delegate
 
       void set_block_production(bool producing_blocks);
 
-      void set_dbg_init_key( graphene::chain::genesis_state_type& genesis, const std::string& init_key );
       void set_api_limit();
 
       void initialize(const fc::path& data_dir, std::shared_ptr<boost::program_options::variables_map> options);
@@ -192,6 +191,20 @@ class application_impl : public net::node_delegate
       /// Returns whether a plugin is enabled
       bool is_plugin_enabled(const string& name) const;
 
+   private:
+      void shutdown();
+
+      void initialize_plugins();
+      void startup_plugins();
+      void shutdown_plugins();
+
+      /// Initialize genesis state. Called by @ref open_chain_database.
+      graphene::chain::genesis_state_type initialize_genesis_state() const;
+      /// Open the chain database. Called by @ref startup.
+      void open_chain_database();
+
+      friend graphene::app::application;
+
       application& _self;
 
       fc::path _data_dir;
@@ -207,11 +220,6 @@ class application_impl : public net::node_delegate
       std::map<string, std::shared_ptr<abstract_plugin>> _available_plugins;
 
       bool _is_finished_syncing = false;
-   private:
-      void shutdown();
-      void initialize_plugins();
-      void startup_plugins();
-      void shutdown_plugins();
 
       fc::serial_valve valve;
    };
