@@ -106,9 +106,6 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 
    auto sharable_cfg = std::make_shared<boost::program_options::variables_map>();
    auto& cfg = *sharable_cfg;
-#ifdef _WIN32
-   sockInit();
-#endif
    server_port_number = fc::network::get_available_port();
    cfg.emplace(
       "rpc-endpoint",
@@ -277,6 +274,16 @@ public:
 
 struct cli_fixture
 {
+#ifdef _WIN32
+   struct socket_maintainer {
+      socket_maintainer() {
+         sockInit();
+      }
+      ~socket_maintainer() {
+         sockQuit();
+      }
+   } sock_maintainer;
+#endif
    int server_port_number;
    fc::temp_directory app_dir;
    std::shared_ptr<graphene::app::application> app1;
@@ -314,9 +321,6 @@ struct cli_fixture
    ~cli_fixture()
    {
       BOOST_TEST_MESSAGE("Cleanup cli_wallet::boost_fixture_test_case");
-#ifdef _WIN32
-      sockQuit();
-#endif
    }
 };
 
