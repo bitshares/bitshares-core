@@ -183,10 +183,19 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
 {
    auto sharable_options = std::make_shared<boost::program_options::variables_map>();
    auto& options = *sharable_options;
-   set_option( options, "seed-nodes", std::string("[]") );
+   set_option( options, "seed-nodes", std::string("[]") ); // Do not connect to default seed nodes
    /**
     * Test specific settings
     */
+   if (fixture.current_test_name == "broadcast_transaction_with_callback_test")
+      set_option( options, "enable-p2p-network", true );
+   else if (fixture.current_test_name == "broadcast_transaction_disabled_p2p_test")
+      set_option( options, "enable-p2p-network", false );
+   else if( rand() % 100 >= 50 ) // Disable P2P network randomly for test cases
+      set_option( options, "enable-p2p-network", false );
+   else if( rand() % 100 >= 50 ) // this should lead to no change
+      set_option( options, "enable-p2p-network", true );
+
    if (fixture.current_test_name == "get_account_history_operations")
    {
       options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)75, false)));
