@@ -991,6 +991,7 @@ void application_impl::error_encountered(const std::string& message, const fc::o
 
 uint8_t application_impl::get_current_block_interval_in_seconds() const
 {
+   FC_ASSERT( _chain_db, "Chain database is not operational" );
    return _chain_db->get_global_properties().parameters.block_interval;
 }
 

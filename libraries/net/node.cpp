@@ -867,6 +867,9 @@ namespace graphene { namespace net { namespace detail {
       std::list<peer_connection_ptr> peers_to_send_keep_alive;
       std::list<peer_connection_ptr> peers_to_terminate;
 
+     try {
+      // Note: if the node is shutting down, it's possible that _delegate is already unusable,
+      //       in this case, we'll get an exception
       _recent_block_interval_in_seconds = _delegate->get_current_block_interval_in_seconds();
 
       // Disconnect peers that haven't sent us any data recently
@@ -1075,6 +1078,14 @@ namespace graphene { namespace net { namespace detail {
         peer->send_message(current_time_request_message(),
                            offsetof(current_time_request_message, request_sent_time));
       peers_to_send_keep_alive.clear();
+
+     } catch( const fc::exception& e ) {
+         wlog( "Exception caught in terminate_inactive_connections_loop: ${e}", ("e",e.to_detail_string()) );
+         // If the node is shutting down, we just quit, no need to throw.
+         // If the node is not shutting down, the old code will throw, which means we won't schedule a new loop,
+         // likely it's unexpected behavior.
+         // Thus we don't throw here.
+     }
 
       if (!_node_is_shutting_down && !_terminate_inactive_connections_loop_done.canceled())
       {
