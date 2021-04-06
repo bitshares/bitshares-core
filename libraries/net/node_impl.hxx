@@ -274,7 +274,7 @@ class statistics_gathering_node_delegate_wrapper : public node_delegate
       uint8_t get_current_block_interval_in_seconds() const override;
 };
 
-class node_impl : public peer_connection_delegate
+class node_impl : public peer_connection_delegate, public std::enable_shared_from_this<node_impl>
 {
     public:
 #ifdef P2P_IN_DEDICATED_THREAD
@@ -478,7 +478,7 @@ class node_impl : public peer_connection_delegate
       void advertise_inventory_loop();
       void trigger_advertise_inventory_loop();
 
-      void terminate_inactive_connections_loop();
+      void terminate_inactive_connections_loop(node_impl_ptr self);
 
       void fetch_updated_peer_lists_loop();
       void update_bandwidth_data(uint32_t bytes_read_this_second, uint32_t bytes_written_this_second);
@@ -612,7 +612,7 @@ class node_impl : public peer_connection_delegate
       void set_node_delegate(std::shared_ptr<node_delegate> del, fc::thread* thread_for_delegate_calls);
       void load_configuration( const fc::path& configuration_directory );
       void listen_to_p2p_network();
-      void connect_to_p2p_network();
+      void connect_to_p2p_network(node_impl_ptr self);
       void add_node( const fc::ip::endpoint& ep );
       void add_seed_node( const std::string& seed_string );
       void resolve_seed_node_and_add( const std::string& seed_string );
@@ -651,5 +651,10 @@ class node_impl : public peer_connection_delegate
       bool is_hard_fork_block(uint32_t block_number) const;
       uint32_t get_next_known_hard_fork_block_number(uint32_t block_number) const;
     }; // end class node_impl
+
+    struct node_impl_deleter
+    {
+      void operator()(node_impl*);
+    };
 
 }}} // end of namespace graphene::net::detail

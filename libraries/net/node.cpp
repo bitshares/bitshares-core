@@ -859,7 +859,7 @@ namespace graphene { namespace net { namespace detail {
         _retrigger_advertise_inventory_loop_promise->set_value();
     }
 
-    void node_impl::terminate_inactive_connections_loop()
+    void node_impl::terminate_inactive_connections_loop(node_impl_ptr self)
     {
       VERIFY_CORRECT_THREAD();
       std::list<peer_connection_ptr> peers_to_disconnect_gently;
@@ -1077,9 +1077,12 @@ namespace graphene { namespace net { namespace detail {
       peers_to_send_keep_alive.clear();
 
       if (!_node_is_shutting_down && !_terminate_inactive_connections_loop_done.canceled())
-         _terminate_inactive_connections_loop_done = fc::schedule( [this](){ terminate_inactive_connections_loop(); },
-                                                                   fc::time_point::now() + fc::seconds(GRAPHENE_NET_PEER_HANDSHAKE_INACTIVITY_TIMEOUT / 2),
-                                                                   "terminate_inactive_connections_loop" );
+      {
+         _terminate_inactive_connections_loop_done = fc::schedule(
+               [this,self](){ terminate_inactive_connections_loop(self); },
+               fc::time_point::now() + fc::seconds(GRAPHENE_NET_PEER_HANDSHAKE_INACTIVITY_TIMEOUT / 2),
+               "terminate_inactive_connections_loop" );
+      }
     }
 
     void node_impl::fetch_updated_peer_lists_loop()
@@ -4307,7 +4310,7 @@ namespace graphene { namespace net { namespace detail {
       }
     }
 
-    void node_impl::connect_to_p2p_network()
+    void node_impl::connect_to_p2p_network(node_impl_ptr self)
     {
       VERIFY_CORRECT_THREAD();
       assert(_node_public_key != fc::ecc::public_key_data());
@@ -4324,12 +4327,15 @@ namespace graphene { namespace net { namespace detail {
              !_dump_node_status_task_done.valid());
       if (_node_configuration.accept_incoming_connections)
         _accept_loop_complete = fc::async( [=](){ accept_loop(); }, "accept_loop");
+
       _p2p_network_connect_loop_done = fc::async( [=]() { p2p_network_connect_loop(); }, "p2p_network_connect_loop" );
       _fetch_sync_items_loop_done = fc::async( [=]() { fetch_sync_items_loop(); }, "fetch_sync_items_loop" );
       _fetch_item_loop_done = fc::async( [=]() { fetch_items_loop(); }, "fetch_items_loop" );
       _advertise_inventory_loop_done = fc::async( [=]() { advertise_inventory_loop(); }, "advertise_inventory_loop" );
-      _terminate_inactive_connections_loop_done = fc::async( [=]() { terminate_inactive_connections_loop(); }, "terminate_inactive_connections_loop" );
-      _fetch_updated_peer_lists_loop_done = fc::async([=](){ fetch_updated_peer_lists_loop(); }, "fetch_updated_peer_lists_loop");
+      _terminate_inactive_connections_loop_done = fc::async( [=]() { terminate_inactive_connections_loop(self); },
+                                                                     "terminate_inactive_connections_loop" );
+      _fetch_updated_peer_lists_loop_done = fc::async([=](){ fetch_updated_peer_lists_loop(); },
+                                                             "fetch_updated_peer_lists_loop");
       _bandwidth_monitor_loop_done = fc::async([=](){ bandwidth_monitor_loop(); }, "bandwidth_monitor_loop");
       _dump_node_status_task_done = fc::async([=](){ dump_node_status_task(); }, "dump_node_status_task");
       schedule_next_update_seed_nodes_task();
@@ -4898,12 +4904,14 @@ namespace graphene { namespace net { namespace detail {
 #endif // P2P_IN_DEDICATED_THREAD
 
   node::node(const std::string& user_agent) :
-    my(new detail::node_impl(user_agent))
+    my(new detail::node_impl(user_agent), detail::node_impl_deleter())
   {
+    // nothing else to do
   }
 
   node::~node()
   {
+    // nothing to do
   }
 
   void node::set_node_delegate( std::shared_ptr<node_delegate> del )
@@ -4924,7 +4932,7 @@ namespace graphene { namespace net { namespace detail {
 
   void node::connect_to_p2p_network()
   {
-    INVOKE_IN_IMPL(connect_to_p2p_network);
+    INVOKE_IN_IMPL(connect_to_p2p_network, my);
   }
 
   void node::add_node( const fc::ip::endpoint& ep )

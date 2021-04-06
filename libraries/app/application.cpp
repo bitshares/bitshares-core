@@ -996,6 +996,7 @@ uint8_t application_impl::get_current_block_interval_in_seconds() const
 
 void application_impl::shutdown()
 {
+   ilog( "Shutting down application" );
    if( _websocket_tls_server )
       _websocket_tls_server.reset();
    if( _websocket_server )
@@ -1003,20 +1004,27 @@ void application_impl::shutdown()
    // TODO wait until all connections are closed and messages handled?
 
    // plugins E.G. witness_plugin may send data to p2p network, so shutdown them first
+   ilog( "Shutting down plugins" );
    shutdown_plugins();
 
    if( _p2p_network )
    {
+      ilog( "Disconnecting from P2P network" );
+      // FIXME wait() is called in close() but it doesn't block this thread
       _p2p_network->close();
       _p2p_network.reset();
-      // TODO wait until all connections are closed and messages handled?
    }
+   else
+      ilog( "P2P network is disabled" );
 
    if( _chain_db )
    {
+      ilog( "Closing chain database" );
       _chain_db->close();
       _chain_db.reset();
    }
+   else
+      ilog( "Chain database is not open" );
 }
 
 void application_impl::enable_plugin( const string& name )
@@ -1077,7 +1085,8 @@ application::application()
 
 application::~application()
 {
-   //nothing to do
+   ilog("Application quitting");
+   my->shutdown();
 }
 
 void application::set_program_options(boost::program_options::options_description& command_line_options,
@@ -1194,13 +1203,17 @@ void application::set_program_options(boost::program_options::options_descriptio
 
 void application::initialize(const fc::path& data_dir, std::shared_ptr<boost::program_options::variables_map> options)
 {
+   ilog( "Initializing application" );
    my->initialize( data_dir, options );
+   ilog( "Done initializing application" );
 }
 
 void application::startup()
 {
    try {
+      ilog( "Starting up application" );
       my->startup();
+      ilog( "Done starting up application" );
    } catch ( const fc::exception& e ) {
       elog( "${e}", ("e",e.to_detail_string()) );
       throw;

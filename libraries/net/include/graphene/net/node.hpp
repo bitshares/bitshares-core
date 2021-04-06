@@ -37,11 +37,8 @@ namespace graphene { namespace net {
   namespace detail
   {
     class node_impl;
-    struct node_impl_deleter
-    {
-      void operator()(node_impl*);
-    };
   }
+  using node_impl_ptr = std::shared_ptr<detail::node_impl>;
 
   // during network development, we need to track message propagation across the network
   // using a structure like this:
@@ -316,7 +313,7 @@ namespace graphene { namespace net {
         void disable_peer_advertising();
         fc::variant_object get_call_statistics() const;
       private:
-        std::unique_ptr<detail::node_impl, detail::node_impl_deleter> my;
+        node_impl_ptr my;
    };
 
    using node_ptr = std::shared_ptr<node>;
