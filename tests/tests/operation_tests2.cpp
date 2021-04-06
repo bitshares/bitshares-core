@@ -994,6 +994,8 @@ BOOST_AUTO_TEST_CASE( witness_create )
          produced++;
    }
    BOOST_CHECK_GE( produced, 1 );
+
+   wtplugin->plugin_shutdown();
 } FC_LOG_AND_RETHROW() }
 
 /**
