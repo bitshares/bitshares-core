@@ -2677,8 +2677,8 @@ namespace graphene { namespace net { namespace detail {
 
       try
       {
-        std::vector<message_hash_type> contained_transaction_message_ids;
-        _delegate->handle_block(block_message_to_send, true, contained_transaction_message_ids);
+        std::vector<message_hash_type> contained_transaction_msg_ids;
+        _delegate->handle_block(block_message_to_send, true, contained_transaction_msg_ids);
         ilog("Successfully pushed sync block ${num} (id:${id})",
              ("num", block_message_to_send.block.block_num())
              ("id", block_message_to_send.block_id));
@@ -3041,8 +3041,8 @@ namespace graphene { namespace net { namespace detail {
         if (std::find(_most_recent_blocks_accepted.begin(), _most_recent_blocks_accepted.end(),
                       block_message_to_process.block_id) == _most_recent_blocks_accepted.end())
         {
-          std::vector<message_hash_type> contained_transaction_message_ids;
-          _delegate->handle_block(block_message_to_process, false, contained_transaction_message_ids);
+          std::vector<message_hash_type> contained_transaction_msg_ids;
+          _delegate->handle_block(block_message_to_process, false, contained_transaction_msg_ids);
           message_validated_time = fc::time_point::now();
           ilog("Successfully pushed block ${num} (id:${id})",
                 ("num", block_message_to_process.block.block_num())
@@ -3050,7 +3050,7 @@ namespace graphene { namespace net { namespace detail {
           _most_recent_blocks_accepted.push_back(block_message_to_process.block_id);
 
           bool new_transaction_discovered = false;
-          for (const item_hash_t& transaction_message_hash : contained_transaction_message_ids)
+          for (const item_hash_t& transaction_message_hash : contained_transaction_msg_ids)
           {
             /*size_t items_erased =*/ _items_to_fetch.get<item_id_index>().erase(item_id(trx_message_type, transaction_message_hash));
             // there are two ways we could behave here: we could either act as if we received
@@ -5186,9 +5186,9 @@ namespace graphene { namespace net { namespace detail {
     }
 
     bool statistics_gathering_node_delegate_wrapper::handle_block( const graphene::net::block_message& block_message,
-             bool sync_mode, std::vector<message_hash_type>& contained_transaction_message_ids)
+             bool sync_mode, std::vector<message_hash_type>& contained_transaction_msg_ids)
     {
-      INVOKE_AND_COLLECT_STATISTICS(handle_block, block_message, sync_mode, contained_transaction_message_ids);
+      INVOKE_AND_COLLECT_STATISTICS(handle_block, block_message, sync_mode, contained_transaction_msg_ids);
     }
 
     void statistics_gathering_node_delegate_wrapper::handle_transaction( const graphene::net::trx_message& transaction_message )

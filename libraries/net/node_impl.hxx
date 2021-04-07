@@ -255,7 +255,7 @@ class statistics_gathering_node_delegate_wrapper : public node_delegate
       bool has_item( const graphene::net::item_id& id ) override;
       void handle_message( const message& ) override;
       bool handle_block( const graphene::net::block_message& block_message, bool sync_mode,
-                         std::vector<message_hash_type>& contained_transaction_message_ids ) override;
+                         std::vector<message_hash_type>& contained_transaction_msg_ids ) override;
       void handle_transaction( const graphene::net::trx_message& transaction_message ) override;
       std::vector<item_hash_t> get_block_ids(const std::vector<item_hash_t>& blockchain_synopsis,
                                              uint32_t& remaining_item_count,

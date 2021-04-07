@@ -59,9 +59,9 @@ namespace graphene { namespace net {
           destination_node->delegate->handle_transaction(message_to_deliver.as<trx_message>());
         else if (message_to_deliver.msg_type.value() == block_message_type)
         {
-          std::vector<message_hash_type> contained_transaction_message_ids;
+          std::vector<message_hash_type> contained_transaction_msg_ids;
           destination_node->delegate->handle_block(message_to_deliver.as<block_message>(), false,
-                                                   contained_transaction_message_ids);
+                                                   contained_transaction_msg_ids);
         }
         else
           destination_node->delegate->handle_message(message_to_deliver);
