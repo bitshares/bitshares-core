@@ -197,14 +197,14 @@ class application_impl : public net::node_delegate, public std::enable_shared_fr
    private:
       void shutdown();
 
-      void initialize_plugins();
-      void startup_plugins();
-      void shutdown_plugins();
+      void initialize_plugins() const;
+      void startup_plugins() const;
+      void shutdown_plugins() const;
 
       /// Initialize genesis state. Called by @ref open_chain_database.
       graphene::chain::genesis_state_type initialize_genesis_state() const;
       /// Open the chain database. Called by @ref startup.
-      void open_chain_database();
+      void open_chain_database() const;
 
       friend graphene::app::application;
 

@@ -114,7 +114,7 @@ class plugin : public abstract_plugin
 
       chain::database& database() { return *app().chain_database(); }
    protected:
-      net::node_ptr p2p_node() { return app().p2p_node(); }
+      net::node_ptr p2p_node() const { return app().p2p_node(); }
 };
 
 /// @ingroup Some useful tools for boost::program_options arguments using vectors of JSON strings

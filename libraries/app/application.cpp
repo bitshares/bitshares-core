@@ -449,7 +449,7 @@ graphene::chain::genesis_state_type application_impl::initialize_genesis_state()
    } FC_CAPTURE_AND_RETHROW()
 }
 
-void application_impl::open_chain_database()
+void application_impl::open_chain_database() const
 { try {
    fc::create_directories(_data_dir / "blockchain");
 
@@ -1034,9 +1034,9 @@ void application_impl::enable_plugin( const string& name )
    _active_plugins[name] = _available_plugins[name];
 }
 
-void application_impl::initialize_plugins()
+void application_impl::initialize_plugins() const
 {
-   for( auto& entry : _active_plugins )
+   for( const auto& entry : _active_plugins )
    {
       ilog( "Initializing plugin ${name}", ( "name", entry.second->plugin_name() ) );
       entry.second->plugin_initialize( *_options );
@@ -1044,9 +1044,9 @@ void application_impl::initialize_plugins()
    }
 }
 
-void application_impl::startup_plugins()
+void application_impl::startup_plugins() const
 {
-   for( auto& entry : _active_plugins )
+   for( const auto& entry : _active_plugins )
    {
       ilog( "Starting plugin ${name}", ( "name", entry.second->plugin_name() ) );
       entry.second->plugin_startup();
@@ -1054,9 +1054,9 @@ void application_impl::startup_plugins()
    }
 }
 
-void application_impl::shutdown_plugins()
+void application_impl::shutdown_plugins() const
 {
-   for( auto& entry : _active_plugins )
+   for( const auto& entry : _active_plugins )
    {
       ilog( "Stopping plugin ${name}", ( "name", entry.second->plugin_name() ) );
       entry.second->plugin_shutdown();
@@ -1202,7 +1202,8 @@ void application::set_program_options(boost::program_options::options_descriptio
    configuration_file_options.add(_cfg_options);
 }
 
-void application::initialize(const fc::path& data_dir, std::shared_ptr<boost::program_options::variables_map> options)
+void application::initialize(const fc::path& data_dir,
+                             std::shared_ptr<boost::program_options::variables_map> options) const
 {
    ilog( "Initializing application" );
    my->initialize( data_dir, options );
@@ -1276,12 +1277,12 @@ bool application::is_finished_syncing() const
    return my->_is_finished_syncing;
 }
 
-void application::enable_plugin(const string& name)
+void application::enable_plugin(const string& name) const
 {
    my->enable_plugin(name);
 }
 
-void application::add_available_plugin(std::shared_ptr<graphene::app::abstract_plugin> p)
+void application::add_available_plugin(std::shared_ptr<graphene::app::abstract_plugin> p) const
 {
    my->add_available_plugin(p);
 }
