@@ -561,11 +561,11 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       void send_sync_block_to_node_delegate(const graphene::net::block_message& block_message_to_send);
       void process_backlog_of_sync_blocks();
       void trigger_process_backlog_of_sync_blocks();
-      void process_block_during_sync(
+      void process_block_during_syncing(
                   peer_connection* originating_peer,
                   const graphene::net::block_message& block_message,
                   const message_hash_type& message_hash);
-      void process_block_during_normal_operation(
+      void process_block_when_in_sync(
                   peer_connection* originating_peer,
                   const graphene::net::block_message& block_message,
                   const message_hash_type& message_hash);

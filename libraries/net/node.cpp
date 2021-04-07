@@ -3004,7 +3004,7 @@ namespace graphene { namespace net { namespace detail {
                                                           "process_backlog_of_sync_blocks" );
     }
 
-    void node_impl::process_block_during_sync( peer_connection* originating_peer,
+    void node_impl::process_block_during_syncing( peer_connection* originating_peer,
                                                const graphene::net::block_message& block_message_to_process,
                                                const message_hash_type& message_hash )
     {
@@ -3017,7 +3017,7 @@ namespace graphene { namespace net { namespace detail {
       trigger_process_backlog_of_sync_blocks();
     }
 
-    void node_impl::process_block_during_normal_operation( peer_connection* originating_peer,
+    void node_impl::process_block_when_in_sync( peer_connection* originating_peer,
                                                const graphene::net::block_message& block_message_to_process,
                                                const message_hash_type& message_hash )
     {
@@ -3191,7 +3191,7 @@ namespace graphene { namespace net { namespace detail {
       if (item_iter != originating_peer->items_requested_from_peer.end())
       {
         originating_peer->items_requested_from_peer.erase(item_iter);
-        process_block_during_normal_operation(originating_peer, block_message_to_process, message_hash);
+        process_block_when_in_sync(originating_peer, block_message_to_process, message_hash);
         if (originating_peer->idle())
           trigger_fetch_items_loop();
         return;
@@ -3210,7 +3210,7 @@ namespace graphene { namespace net { namespace detail {
           {
             originating_peer->last_sync_item_received_time = fc::time_point::now();
             _active_sync_requests.erase(block_message_to_process.block_id);
-            process_block_during_sync(originating_peer, block_message_to_process, message_hash);
+            process_block_during_syncing(originating_peer, block_message_to_process, message_hash);
             if (originating_peer->idle())
             {
               // we have finished fetching a batch of items, so we either need to grab another batch of items
