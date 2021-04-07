@@ -194,7 +194,7 @@ namespace graphene { namespace net {
 
         void close();
 
-        void      set_node_delegate( std::shared_ptr<node_delegate> del );
+        void      set_node_delegate( std::shared_ptr<node_delegate> del ) const;
 
         void      load_configuration( const fc::path& configuration_directory );
 
