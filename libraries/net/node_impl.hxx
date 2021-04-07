@@ -351,7 +351,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       concurrent_unordered_set<item_id>   _new_inventory;
       /// @}
 
-      fc::future<void>     _terminate_inactive_connections_loop_done;
+      fc::future<void>     _kill_inactive_conns_loop_done;
       uint8_t _recent_block_interval_in_seconds; // a cached copy of the block interval, to avoid a thread hop to the blockchain to get the current value
 
       std::string          _user_agent_string;
@@ -478,7 +478,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       void advertise_inventory_loop();
       void trigger_advertise_inventory_loop();
 
-      void terminate_inactive_connections_loop(node_impl_ptr self);
+      void kill_inactive_conns_loop(node_impl_ptr self);
 
       void fetch_updated_peer_lists_loop();
       void update_bandwidth_data(uint32_t bytes_read_this_second, uint32_t bytes_written_this_second);

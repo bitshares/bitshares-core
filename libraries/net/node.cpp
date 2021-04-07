@@ -859,7 +859,7 @@ namespace graphene { namespace net { namespace detail {
         _retrigger_advertise_inventory_loop_promise->set_value();
     }
 
-    void node_impl::terminate_inactive_connections_loop(node_impl_ptr self)
+    void node_impl::kill_inactive_conns_loop(node_impl_ptr self)
     {
       VERIFY_CORRECT_THREAD();
       std::list<peer_connection_ptr> peers_to_disconnect_gently;
@@ -1080,19 +1080,19 @@ namespace graphene { namespace net { namespace detail {
       peers_to_send_keep_alive.clear();
 
      } catch( const fc::exception& e ) {
-         wlog( "Exception caught in terminate_inactive_connections_loop: ${e}", ("e",e.to_detail_string()) );
+         wlog( "Exception caught in kill_inactive_conns_loop: ${e}", ("e",e.to_detail_string()) );
          // If the node is shutting down, we just quit, no need to throw.
          // If the node is not shutting down, the old code will throw, which means we won't schedule a new loop,
          // likely it's unexpected behavior.
          // Thus we don't throw here.
      }
 
-      if (!_node_is_shutting_down && !_terminate_inactive_connections_loop_done.canceled())
+      if (!_node_is_shutting_down && !_kill_inactive_conns_loop_done.canceled())
       {
-         _terminate_inactive_connections_loop_done = fc::schedule(
-               [this,self](){ terminate_inactive_connections_loop(self); },
+         _kill_inactive_conns_loop_done = fc::schedule(
+               [this,self](){ kill_inactive_conns_loop(self); },
                fc::time_point::now() + fc::seconds(GRAPHENE_NET_PEER_HANDSHAKE_INACTIVITY_TIMEOUT / 2),
-               "terminate_inactive_connections_loop" );
+               "kill_inactive_conns_loop" );
       }
     }
 
@@ -3884,8 +3884,8 @@ namespace graphene { namespace net { namespace detail {
       // our loops now
       try
       {
-        _terminate_inactive_connections_loop_done.cancel_and_wait("node_impl::close()");
-        dlog("Terminate inactive connections loop terminated");
+        _kill_inactive_conns_loop_done.cancel_and_wait("node_impl::close()");
+        dlog("Kill inactive connections loop terminated");
       }
       catch ( const fc::exception& e )
       {
@@ -4332,7 +4332,7 @@ namespace graphene { namespace net { namespace detail {
              !_fetch_sync_items_loop_done.valid() &&
              !_fetch_item_loop_done.valid() &&
              !_advertise_inventory_loop_done.valid() &&
-             !_terminate_inactive_connections_loop_done.valid() &&
+             !_kill_inactive_conns_loop_done.valid() &&
              !_fetch_updated_peer_lists_loop_done.valid() &&
              !_bandwidth_monitor_loop_done.valid() &&
              !_dump_node_status_task_done.valid());
@@ -4343,8 +4343,8 @@ namespace graphene { namespace net { namespace detail {
       _fetch_sync_items_loop_done = fc::async( [=]() { fetch_sync_items_loop(); }, "fetch_sync_items_loop" );
       _fetch_item_loop_done = fc::async( [=]() { fetch_items_loop(); }, "fetch_items_loop" );
       _advertise_inventory_loop_done = fc::async( [=]() { advertise_inventory_loop(); }, "advertise_inventory_loop" );
-      _terminate_inactive_connections_loop_done = fc::async( [=]() { terminate_inactive_connections_loop(self); },
-                                                                     "terminate_inactive_connections_loop" );
+      _kill_inactive_conns_loop_done = fc::async( [=]() { kill_inactive_conns_loop(self); },
+                                                          "kill_inactive_conns_loop" );
       _fetch_updated_peer_lists_loop_done = fc::async([=](){ fetch_updated_peer_lists_loop(); },
                                                              "fetch_updated_peer_lists_loop");
       _bandwidth_monitor_loop_done = fc::async([=](){ bandwidth_monitor_loop(); }, "bandwidth_monitor_loop");
