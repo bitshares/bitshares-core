@@ -100,8 +100,7 @@ class abstract_plugin
 class plugin : public abstract_plugin
 {
    public:
-      explicit plugin(application& a) : abstract_plugin(a) {}
-      ~plugin() override = default;
+      using abstract_plugin::abstract_plugin;
 
       std::string plugin_name()const override;
       std::string plugin_description()const override;

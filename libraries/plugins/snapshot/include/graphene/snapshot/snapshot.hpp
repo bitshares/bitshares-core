@@ -32,7 +32,7 @@ namespace graphene { namespace snapshot_plugin {
 
 class snapshot_plugin : public graphene::app::plugin {
    public:
-      snapshot_plugin(graphene::app::application& app) : graphene::app::plugin(app) {}
+      using graphene::app::plugin::plugin;
 
       std::string plugin_name()const override;
       std::string plugin_description()const override;

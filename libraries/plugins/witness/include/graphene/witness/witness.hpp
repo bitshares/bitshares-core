@@ -49,7 +49,7 @@ namespace block_production_condition
 
 class witness_plugin : public graphene::app::plugin {
 public:
-   witness_plugin(graphene::app::application& app) : graphene::app::plugin(app) {}
+   using graphene::app::plugin::plugin;
    ~witness_plugin() override { cleanup(); }
 
    std::string plugin_name()const override;
