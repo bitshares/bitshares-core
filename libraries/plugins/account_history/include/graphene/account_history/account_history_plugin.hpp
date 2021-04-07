@@ -64,7 +64,7 @@ namespace detail
 class account_history_plugin : public graphene::app::plugin
 {
    public:
-      account_history_plugin(graphene::app::application& app);
+      explicit account_history_plugin(graphene::app::application& app);
       ~account_history_plugin() override;
 
       std::string plugin_name()const override;
@@ -76,7 +76,7 @@ class account_history_plugin : public graphene::app::plugin
 
       flat_set<account_id_type> tracked_accounts()const;
 
-      friend class detail::account_history_plugin_impl;
+   private:
       std::unique_ptr<detail::account_history_plugin_impl> my;
 };
 

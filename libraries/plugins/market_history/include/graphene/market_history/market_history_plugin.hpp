@@ -380,7 +380,7 @@ namespace detail
 class market_history_plugin : public graphene::app::plugin
 {
    public:
-      market_history_plugin(graphene::app::application& app);
+      explicit market_history_plugin(graphene::app::application& app);
       ~market_history_plugin() override;
 
       std::string plugin_name()const override;
@@ -397,7 +397,6 @@ class market_history_plugin : public graphene::app::plugin
       uint32_t                    max_order_his_seconds_per_market()const;
 
    private:
-      friend class detail::market_history_plugin_impl;
       std::unique_ptr<detail::market_history_plugin_impl> my;
 };
 

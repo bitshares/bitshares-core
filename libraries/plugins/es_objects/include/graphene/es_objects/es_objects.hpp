@@ -38,8 +38,8 @@ namespace detail
 class es_objects_plugin : public graphene::app::plugin
 {
    public:
-      es_objects_plugin(graphene::app::application& app);
-      ~es_objects_plugin();
+      explicit es_objects_plugin(graphene::app::application& app);
+      ~es_objects_plugin() override;
 
       std::string plugin_name()const override;
       std::string plugin_description()const override;
@@ -49,7 +49,7 @@ class es_objects_plugin : public graphene::app::plugin
       void plugin_initialize(const boost::program_options::variables_map& options) override;
       void plugin_startup() override;
 
-      friend class detail::es_objects_plugin_impl;
+   private:
       std::unique_ptr<detail::es_objects_plugin_impl> my;
 };
 

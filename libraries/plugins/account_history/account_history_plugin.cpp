@@ -46,7 +46,7 @@ namespace detail
 class account_history_plugin_impl
 {
    public:
-      account_history_plugin_impl(account_history_plugin& _plugin)
+      explicit account_history_plugin_impl(account_history_plugin& _plugin)
          : _self( _plugin )
       { }
 
@@ -60,6 +60,9 @@ class account_history_plugin_impl
          return _self.database();
       }
 
+      friend class graphene::account_history::account_history_plugin;
+
+   private:
       account_history_plugin& _self;
       flat_set<account_id_type> _tracked_accounts;
       flat_set<account_id_type> _extended_history_accounts;
@@ -68,7 +71,7 @@ class account_history_plugin_impl
       primary_index< operation_history_index >* _oho_index;
       uint64_t _max_ops_per_account = -1;
       uint64_t _extended_max_ops_per_account = -1;
-   private:
+
       /** add one history record, then check and remove the earliest history record */
       void add_account_history( const account_id_type account_id, const operation_history_id_type op_id );
 
@@ -279,11 +282,10 @@ account_history_plugin::account_history_plugin(graphene::app::application& app) 
    plugin(app),
    my( std::make_unique<detail::account_history_plugin_impl>(*this) )
 {
+   // Nothing else to do
 }
 
-account_history_plugin::~account_history_plugin()
-{
-}
+account_history_plugin::~account_history_plugin() = default;
 
 std::string account_history_plugin::plugin_name()const
 {

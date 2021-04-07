@@ -55,7 +55,7 @@ enum mode { only_save = 0 , only_query = 1, all = 2 };
 class elasticsearch_plugin : public graphene::app::plugin
 {
    public:
-      elasticsearch_plugin(graphene::app::application& app);
+      explicit elasticsearch_plugin(graphene::app::application& app);
       ~elasticsearch_plugin() override;
 
       std::string plugin_name()const override;

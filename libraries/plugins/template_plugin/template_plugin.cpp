@@ -32,9 +32,7 @@ namespace detail
 class template_plugin_impl
 {
    public:
-      template_plugin_impl(template_plugin& _plugin)
-         : _self( _plugin )
-      {  }
+      explicit template_plugin_impl( template_plugin& _plugin );
       virtual ~template_plugin_impl();
 
       void on_block( const signed_block& b );
@@ -44,11 +42,12 @@ class template_plugin_impl
          return _self.database();
       }
 
+      friend class graphene::template_plugin::template_plugin;
+
+   private:
       template_plugin& _self;
 
       std::string _plugin_option = "";
-
-   private:
 
 };
 
@@ -57,9 +56,15 @@ void template_plugin_impl::on_block( const signed_block& b )
    wdump((b.block_num()));
 }
 
+template_plugin_impl::template_plugin_impl( template_plugin& _plugin ) :
+   _self( _plugin )
+{
+   // Put other code here
+}
+
 template_plugin_impl::~template_plugin_impl()
 {
-   // Put the real code here
+   // Put the real code here. If none, remove the destructor.
 }
 
 } // end namespace detail

@@ -52,7 +52,7 @@ namespace detail
 class template_plugin : public graphene::app::plugin
 {
    public:
-      template_plugin(graphene::app::application& app);
+      explicit template_plugin(graphene::app::application& app);
       ~template_plugin() override;
 
       std::string plugin_name()const override;
@@ -64,7 +64,6 @@ class template_plugin : public graphene::app::plugin
       void plugin_startup() override;
       void plugin_shutdown() override;
 
-      friend class detail::template_plugin_impl;
    private:
       void cleanup();
       std::unique_ptr<detail::template_plugin_impl> my;

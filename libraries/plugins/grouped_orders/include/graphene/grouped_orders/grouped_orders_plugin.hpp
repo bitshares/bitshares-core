@@ -69,7 +69,7 @@ namespace detail
 class grouped_orders_plugin : public graphene::app::plugin
 {
    public:
-      grouped_orders_plugin(graphene::app::application& app);
+      explicit grouped_orders_plugin(graphene::app::application& app);
       ~grouped_orders_plugin() override;
 
       std::string plugin_name()const override;
@@ -85,7 +85,6 @@ class grouped_orders_plugin : public graphene::app::plugin
       const map< limit_order_group_key, limit_order_group_data >& limit_order_groups();
 
    private:
-      friend class detail::grouped_orders_plugin_impl;
       std::unique_ptr<detail::grouped_orders_plugin_impl> my;
 };
 
