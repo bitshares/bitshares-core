@@ -104,6 +104,33 @@ jobs:
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
         _build/tests/cli_test -l test_suite
         df -h
+    - name: Quick test for program arguments
+      run: |
+        _build/programs/witness_node/witness_node --version
+        _build/programs/witness_node/witness_node --help
+        if _build/programs/witness_node/witness_node --bad-arg ; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
+        if _build/programs/witness_node/witness_node --plugins "account_history elasticsearch" ; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
+        if _build/programs/witness_node/witness_node --rpc-endpoint --plugins "witness"; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
+        _build/programs/cli_wallet/cli_wallet --version
+        _build/programs/cli_wallet/cli_wallet --help
+        _build/programs/cli_wallet/cli_wallet --suggest-brain-key
+        if _build/programs/cli_wallet/cli_wallet --bad-arg ; then \
+          echo "Fail: did not get expected error."; false; \
+        else \
+          echo "Pass: got expected error."; \
+        fi
     - name: Node-Test
       run: |
         df -h
