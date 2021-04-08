@@ -79,8 +79,8 @@ namespace detail
 class api_helper_indexes : public graphene::app::plugin
 {
    public:
-      api_helper_indexes();
-      virtual ~api_helper_indexes();
+      explicit api_helper_indexes(graphene::app::application& app);
+      ~api_helper_indexes() override;
 
       std::string plugin_name()const override;
       std::string plugin_description()const override;

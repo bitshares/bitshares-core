@@ -46,17 +46,19 @@ struct delayed_node_plugin_impl {
 };
 }
 
-delayed_node_plugin::delayed_node_plugin()
-   : my(nullptr)
-{}
+delayed_node_plugin::delayed_node_plugin(graphene::app::application& app) :
+   plugin(app)
+{
+   // Nothing else to do
+}
 
-delayed_node_plugin::~delayed_node_plugin()
-{}
+delayed_node_plugin::~delayed_node_plugin() = default;
 
 void delayed_node_plugin::plugin_set_program_options(bpo::options_description& cli, bpo::options_description& cfg)
 {
    cli.add_options()
-         ("trusted-node", boost::program_options::value<std::string>(), "RPC endpoint of a trusted validating node (required for delayed_node)")
+         ("trusted-node", boost::program_options::value<std::string>(),
+          "RPC endpoint of a trusted validating node (required for delayed_node)")
          ;
    cfg.add(cli);
 }

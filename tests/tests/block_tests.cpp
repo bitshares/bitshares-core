@@ -39,6 +39,7 @@
 #include <graphene/utilities/tempdir.hpp>
 
 #include <fc/crypto/digest.hpp>
+#include <fc/io/fstream.hpp>
 
 #include "../common/database_fixture.hpp"
 
@@ -1246,7 +1247,13 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       fc::temp_directory data_dir2( graphene::utilities::temp_directory_path() );
 
       database db2;
-      db2.open(data_dir2.path(), make_genesis, "TEST");
+      {
+         std::string genesis_json;
+         fc::read_file_contents( data_dir.path() / "genesis.json", genesis_json );
+         genesis_state_type genesis = fc::json::from_string( genesis_json ).as<genesis_state_type>( 50 );
+         genesis.initial_chain_id = fc::sha256::hash( genesis_json );
+         db2.open(data_dir2.path(), [&genesis] () { return genesis; }, "TEST");
+      }
       BOOST_CHECK( db.get_chain_id() == db2.get_chain_id() );
 
       while( db2.head_block_num() < db.head_block_num() )

@@ -33,9 +33,17 @@ namespace graphene { namespace app {
 class abstract_plugin
 {
    public:
-      virtual ~abstract_plugin(){}
+      explicit abstract_plugin(application& a) : _app(a) {}
+      virtual ~abstract_plugin() = default;
+
+      /// Get the name of the plugin
       virtual std::string plugin_name()const = 0;
+
+      /// Get the description of the plugin
       virtual std::string plugin_description()const = 0;
+
+      /// Get a reference of the application bound to the plugin
+      application& app()const { return _app; }
 
       /**
        * @brief Perform early startup routines and register plugin indexes, callbacks, etc.
@@ -67,13 +75,6 @@ class abstract_plugin
       virtual void plugin_shutdown() = 0;
 
       /**
-       * @brief Register the application instance with the plugin.
-       *
-       * This is called by the framework to set the application.
-       */
-      virtual void plugin_set_app( application* a ) = 0;
-
-      /**
        * @brief Fill in command line parameters used by the plugin.
        *
        * @param command_line_options All options this plugin supports taking on the command-line
@@ -88,6 +89,8 @@ class abstract_plugin
          boost::program_options::options_description& command_line_options,
          boost::program_options::options_description& config_file_options
          ) = 0;
+   protected:
+      application& _app;
 };
 
 /**
@@ -97,27 +100,21 @@ class abstract_plugin
 class plugin : public abstract_plugin
 {
    public:
-      plugin();
-      virtual ~plugin() override;
+      using abstract_plugin::abstract_plugin;
 
-      virtual std::string plugin_name()const override;
-      virtual std::string plugin_description()const override;
-      virtual void plugin_initialize( const boost::program_options::variables_map& options ) override;
-      virtual void plugin_startup() override;
-      virtual void plugin_shutdown() override;
-      virtual void plugin_set_app( application* app ) override;
-      virtual void plugin_set_program_options(
+      std::string plugin_name()const override;
+      std::string plugin_description()const override;
+      void plugin_initialize( const boost::program_options::variables_map& options ) override;
+      void plugin_startup() override;
+      void plugin_shutdown() override;
+      void plugin_set_program_options(
          boost::program_options::options_description& command_line_options,
          boost::program_options::options_description& config_file_options
          ) override;
 
       chain::database& database() { return *app().chain_database(); }
-      application& app()const { assert(_app); return *_app; }
    protected:
-      net::node& p2p_node() { return *app().p2p_node(); }
-
-   private:
-      application* _app = nullptr;
+      net::node_ptr p2p_node() const { return app().p2p_node(); }
 };
 
 /// @ingroup Some useful tools for boost::program_options arguments using vectors of JSON strings

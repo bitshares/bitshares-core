@@ -114,12 +114,17 @@ namespace detail {
 
 namespace graphene { namespace app { namespace detail {
 
+application_impl::~application_impl()
+{
+   this->shutdown();
+}
+
 void application_impl::reset_p2p_node(const fc::path& data_dir)
 { try {
    _p2p_network = std::make_shared<net::node>("BitShares Reference Implementation");
 
    _p2p_network->load_configuration(data_dir / "p2p");
-   _p2p_network->set_node_delegate(this);
+   _p2p_network->set_node_delegate(shared_from_this());
 
    if( _options->count("seed-node") )
    {
@@ -158,7 +163,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
 void application_impl::new_connection( const fc::http::websocket_connection_ptr& c )
 {
    auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(c, GRAPHENE_NET_MAX_NESTED_OBJECTS);
-   auto login = std::make_shared<graphene::app::login_api>( std::ref(*_self) );
+   auto login = std::make_shared<graphene::app::login_api>( _self );
    login->enable_api("database_api");
 
    wsc->register_api(login->database());
@@ -228,16 +233,17 @@ void application_impl::reset_websocket_tls_server()
    _websocket_tls_server->start_accept();
 } FC_CAPTURE_AND_RETHROW() }
 
-void application_impl::set_dbg_init_key( graphene::chain::genesis_state_type& genesis, const std::string& init_key )
+void application_impl::initialize(const fc::path& data_dir, shared_ptr<boost::program_options::variables_map> options)
 {
-   flat_set< std::string > initial_witness_names;
-   public_key_type init_pubkey( init_key );
-   for( uint64_t i=0; i<genesis.initial_active_witnesses; i++ )
-      genesis.initial_witness_candidates[i].block_signing_key = init_pubkey;
-}
+   _data_dir = data_dir;
+   _options = options;
 
-void application_impl::initialize()
-{
+   if ( _options->count("io-threads") > 0 )
+   {
+      const uint16_t num_threads = _options->at("io-threads").as<uint16_t>();
+      fc::asio::default_io_service_scope::set_num_threads(num_threads);
+   }
+
    if( _options->count("force-validate") > 0 )
    {
       ilog( "All transaction signatures will be validated" );
@@ -287,6 +293,7 @@ void application_impl::initialize()
       _apiaccess.permission_map["*"] = wild_access;
    }
 
+   initialize_plugins();
 }
 
 void application_impl::set_api_limit() {
@@ -389,19 +396,17 @@ void application_impl::set_api_limit() {
    }
 }
 
-void application_impl::startup()
-{ try {
-   fc::create_directories(_data_dir / "blockchain");
-
-   auto initial_state = [this] {
+graphene::chain::genesis_state_type application_impl::initialize_genesis_state() const
+{
+   try {
       ilog("Initializing database...");
-      if( _options->count("genesis-json") )
+      if( _options->count("genesis-json") > 0 )
       {
          std::string genesis_str;
          fc::read_file_contents( _options->at("genesis-json").as<boost::filesystem::path>(), genesis_str );
-         graphene::chain::genesis_state_type genesis = fc::json::from_string( genesis_str ).as<graphene::chain::genesis_state_type>( 20 );
+         auto genesis = fc::json::from_string( genesis_str ).as<graphene::chain::genesis_state_type>( 20 );
          bool modified_genesis = false;
-         if( _options->count("genesis-timestamp") )
+         if( _options->count("genesis-timestamp") > 0 )
          {
             genesis.initial_timestamp = fc::time_point_sec( fc::time_point::now() )
                                       + genesis.initial_parameters.block_interval
@@ -415,11 +420,11 @@ void application_impl::startup()
                ("timestamp", genesis.initial_timestamp.to_iso_string())
             );
          }
-         if( _options->count("dbg-init-key") )
+         if( _options->count("dbg-init-key") > 0 )
          {
             std::string init_key = _options->at( "dbg-init-key" ).as<string>();
             FC_ASSERT( genesis.initial_witness_candidates.size() >= genesis.initial_active_witnesses );
-            set_dbg_init_key( genesis, init_key );
+            genesis.override_witness_signing_keys( init_key );
             modified_genesis = true;
             ilog("Set init witness key to ${init_key}", ("init_key", init_key));
          }
@@ -427,10 +432,8 @@ void application_impl::startup()
          {
             wlog("WARNING:  GENESIS WAS MODIFIED, YOUR CHAIN ID MAY BE DIFFERENT");
             genesis_str += "BOGUS";
-            genesis.initial_chain_id = fc::sha256::hash( genesis_str );
          }
-         else
-            genesis.initial_chain_id = fc::sha256::hash( genesis_str );
+         genesis.initial_chain_id = fc::sha256::hash( genesis_str );
          return genesis;
       }
       else
@@ -443,13 +446,18 @@ void application_impl::startup()
          genesis.initial_chain_id = fc::sha256::hash( egenesis_json );
          return genesis;
       }
-   };
+   } FC_CAPTURE_AND_RETHROW()
+}
 
-   if( _options->count("resync-blockchain") )
+void application_impl::open_chain_database() const
+{ try {
+   fc::create_directories(_data_dir / "blockchain");
+
+   if( _options->count("resync-blockchain") > 0 )
       _chain_db->wipe(_data_dir / "blockchain", true);
 
    flat_map<uint32_t,block_id_type> loaded_checkpoints;
-   if( _options->count("checkpoint") )
+   if( _options->count("checkpoint") > 0 )
    {
       auto cps = _options->at("checkpoint").as<vector<string>>();
       loaded_checkpoints.reserve( cps.size() );
@@ -461,23 +469,23 @@ void application_impl::startup()
    }
    _chain_db->add_checkpoints( loaded_checkpoints );
 
-   if( _options->count("enable-standby-votes-tracking") )
+   if( _options->count("enable-standby-votes-tracking") > 0 )
    {
       _chain_db->enable_standby_votes_tracking( _options->at("enable-standby-votes-tracking").as<bool>() );
    }
 
-   if( _options->count("replay-blockchain") || _options->count("revalidate-blockchain") )
+   if( _options->count("replay-blockchain") > 0 || _options->count("revalidate-blockchain") > 0 )
       _chain_db->wipe( _data_dir / "blockchain", false );
 
    try
    {
       // these flags are used in open() only, i. e. during replay
       uint32_t skip;
-      if( _options->count("revalidate-blockchain") ) // see also handle_block()
+      if( _options->count("revalidate-blockchain") > 0 ) // see also handle_block()
       {
          if( !loaded_checkpoints.empty() )
             wlog( "Warning - revalidate will not validate before last checkpoint" );
-         if( _options->count("force-validate") )
+         if( _options->count("force-validate") > 0 )
             skip = graphene::chain::database::skip_nothing;
          else
             skip = graphene::chain::database::skip_transaction_signatures;
@@ -491,8 +499,12 @@ void application_impl::startup()
                 graphene::chain::database::skip_tapos_check |
                 graphene::chain::database::skip_witness_schedule_check;
 
-      graphene::chain::detail::with_skip_flags( *_chain_db, skip, [this,&initial_state] () {
-         _chain_db->open( _data_dir / "blockchain", initial_state, GRAPHENE_CURRENT_DB_VERSION );
+      auto genesis_loader = [this](){
+         return initialize_genesis_state();
+      };
+
+      graphene::chain::detail::with_skip_flags( *_chain_db, skip, [this, &genesis_loader] () {
+         _chain_db->open( _data_dir / "blockchain", genesis_loader, GRAPHENE_CURRENT_DB_VERSION );
       });
    }
    catch( const fc::exception& e )
@@ -500,8 +512,21 @@ void application_impl::startup()
       elog( "Caught exception ${e} in open(), you might want to force a replay", ("e", e.to_detail_string()) );
       throw;
    }
+} FC_LOG_AND_RETHROW() }
 
-   reset_p2p_node(_data_dir);
+void application_impl::startup()
+{ try {
+   bool enable_p2p_network = true;
+   if( _options->count("enable-p2p-network") > 0 )
+      enable_p2p_network = _options->at("enable-p2p-network").as<bool>();
+
+   open_chain_database();
+
+   startup_plugins();
+
+   if( enable_p2p_network && _active_plugins.find( "delayed_node" ) == _active_plugins.end() )
+      reset_p2p_node(_data_dir);
+
    reset_websocket_server();
    reset_websocket_tls_server();
 } FC_LOG_AND_RETHROW() }
@@ -553,7 +578,7 @@ bool application_impl::has_item(const net::item_id& id)
  * @throws exception if error validating the item, otherwise the item is safe to broadcast on.
  */
 bool application_impl::handle_block(const graphene::net::block_message& blk_msg, bool sync_mode,
-                          std::vector<fc::uint160_t>& contained_transaction_message_ids)
+                          std::vector<graphene::net::message_hash_type>& contained_transaction_msg_ids)
 { try {
 
    auto latency = fc::time_point::now() - blk_msg.block.timestamp;
@@ -562,7 +587,8 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
       const auto& witness = blk_msg.block.witness(*_chain_db);
       const auto& witness_account = witness.witness_account(*_chain_db);
       auto last_irr = _chain_db->get_dynamic_global_properties().last_irreversible_block_num;
-      ilog("Got block: #${n} ${bid} time: ${t} transaction(s): ${x} latency: ${l} ms from: ${w}  irreversible: ${i} (-${d})",
+      ilog("Got block: #${n} ${bid} time: ${t} transaction(s): ${x} "
+           "latency: ${l} ms from: ${w}  irreversible: ${i} (-${d})",
            ("t",blk_msg.block.timestamp)
            ("n", blk_msg.block.block_num())
            ("bid", blk_msg.block.id())
@@ -596,12 +622,12 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
          // happens, there's no reason to fetch the transactions, so  construct a list of the
          // transaction message ids we no longer need.
          // during sync, it is unlikely that we'll see any old
-         contained_transaction_message_ids.reserve( contained_transaction_message_ids.size()
+         contained_transaction_msg_ids.reserve( contained_transaction_msg_ids.size()
                                                     + blk_msg.block.transactions.size() );
          for (const processed_transaction& ptrx : blk_msg.block.transactions)
          {
             graphene::net::trx_message transaction_message(ptrx);
-            contained_transaction_message_ids.emplace_back(graphene::net::message(transaction_message).id());
+            contained_transaction_msg_ids.emplace_back(graphene::net::message(transaction_message).id());
          }
       }
 
@@ -620,7 +646,7 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
    if( !_is_finished_syncing && !sync_mode )
    {
       _is_finished_syncing = true;
-      _self->syncing_finished();
+      _self.syncing_finished();
    }
 } FC_CAPTURE_AND_RETHROW( (blk_msg)(sync_mode) ) return false; }
 
@@ -965,36 +991,112 @@ void application_impl::error_encountered(const std::string& message, const fc::o
 
 uint8_t application_impl::get_current_block_interval_in_seconds() const
 {
+   FC_ASSERT( _chain_db, "Chain database is not operational" );
    return _chain_db->get_global_properties().parameters.block_interval;
 }
 
+void application_impl::shutdown()
+{
+   ilog( "Shutting down application" );
+   if( _websocket_tls_server )
+      _websocket_tls_server.reset();
+   if( _websocket_server )
+      _websocket_server.reset();
+   // TODO wait until all connections are closed and messages handled?
 
+   // plugins E.G. witness_plugin may send data to p2p network, so shutdown them first
+   ilog( "Shutting down plugins" );
+   shutdown_plugins();
+
+   if( _p2p_network )
+   {
+      ilog( "Disconnecting from P2P network" );
+      // FIXME wait() is called in close() but it doesn't block this thread
+      _p2p_network->close();
+      _p2p_network.reset();
+   }
+   else
+      ilog( "P2P network is disabled" );
+
+   if( _chain_db )
+   {
+      ilog( "Closing chain database" );
+      _chain_db->close();
+      _chain_db.reset();
+   }
+   else
+      ilog( "Chain database is not open" );
+}
+
+void application_impl::enable_plugin( const string& name )
+{
+   FC_ASSERT(_available_plugins[name], "Unknown plugin '" + name + "'");
+   _active_plugins[name] = _available_plugins[name];
+}
+
+void application_impl::initialize_plugins() const
+{
+   for( const auto& entry : _active_plugins )
+   {
+      ilog( "Initializing plugin ${name}", ( "name", entry.second->plugin_name() ) );
+      entry.second->plugin_initialize( *_options );
+      ilog( "Initialized plugin ${name}", ( "name", entry.second->plugin_name() ) );
+   }
+}
+
+void application_impl::startup_plugins() const
+{
+   for( const auto& entry : _active_plugins )
+   {
+      ilog( "Starting plugin ${name}", ( "name", entry.second->plugin_name() ) );
+      entry.second->plugin_startup();
+      ilog( "Started plugin ${name}", ( "name", entry.second->plugin_name() ) );
+   }
+}
+
+void application_impl::shutdown_plugins() const
+{
+   for( const auto& entry : _active_plugins )
+   {
+      ilog( "Stopping plugin ${name}", ( "name", entry.second->plugin_name() ) );
+      entry.second->plugin_shutdown();
+      ilog( "Stopped plugin ${name}", ( "name", entry.second->plugin_name() ) );
+   }
+}
+
+void application_impl::add_available_plugin(std::shared_ptr<graphene::app::abstract_plugin> p)
+{
+   _available_plugins[p->plugin_name()] = p;
+}
+
+void application_impl::set_block_production(bool producing_blocks)
+{
+   _is_block_producer = producing_blocks;
+}
 
 } } } // namespace graphene namespace app namespace detail
 
 namespace graphene { namespace app {
 
 application::application()
-   : my(std::make_unique<detail::application_impl>(this))
-{}
+   : my(std::make_shared<detail::application_impl>(*this))
+{
+   //nothing else to do
+}
 
 application::~application()
 {
-   if( my->_p2p_network )
-   {
-      my->_p2p_network->close();
-      my->_p2p_network.reset();
-   }
-   if( my->_chain_db )
-   {
-      my->_chain_db->close();
-   }
+   ilog("Application quitting");
+   my->shutdown();
 }
 
 void application::set_program_options(boost::program_options::options_description& command_line_options,
                                       boost::program_options::options_description& configuration_file_options) const
 {
    configuration_file_options.add_options()
+         ("enable-p2p-network", bpo::value<bool>()->implicit_value(true),
+          "Whether to enable P2P network. Note: if delayed_node plugin is enabled, "
+          "this option will be ignored and P2P network will always be disabled.")
          ("p2p-endpoint", bpo::value<string>(), "Endpoint for P2P node to listen on")
          ("seed-node,s", bpo::value<vector<string>>()->composing(),
           "P2P nodes to connect to on startup (may specify multiple times)")
@@ -1006,15 +1108,18 @@ void application::set_program_options(boost::program_options::options_descriptio
           "Endpoint for websocket RPC to listen on")
          ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"),
           "Endpoint for TLS websocket RPC to listen on")
-         ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"), "The TLS certificate file for this server")
+         ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"),
+          "The TLS certificate file for this server")
          ("server-pem-password,P", bpo::value<string>()->implicit_value(""), "Password for this certificate")
          ("proxy-forwarded-for-header", bpo::value<string>()->implicit_value("X-Forwarded-For-Client"),
           "A HTTP header similar to X-Forwarded-For (XFF), used by the RPC server to extract clients' address info, "
           "usually added by a trusted reverse proxy")
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
-         ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
+         ("dbg-init-key", bpo::value<string>(),
+          "Block signing key to use for init witnesses, overrides genesis file, for debug")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
-         ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads, default to 0 for auto-configuration")
+         ("io-threads", bpo::value<uint16_t>()->implicit_value(0),
+          "Number of IO threads, default to 0 for auto-configuration")
          ("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(true),
           "Whether allow API clients to subscribe to universal object creation and removal events")
          ("enable-standby-votes-tracking", bpo::value<bool>()->implicit_value(true),
@@ -1074,7 +1179,8 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For database_api_impl::get_trade_history_by_sequence to set max limit value")
          ("api-limit-get-withdraw-permissions-by-giver",boost::program_options::value<uint64_t>()->default_value(101),
           "For database_api_impl::get_withdraw_permissions_by_giver to set max limit value")
-         ("api-limit-get-withdraw-permissions-by-recipient",boost::program_options::value<uint64_t>()->default_value(101),
+         ("api-limit-get-withdraw-permissions-by-recipient",
+          boost::program_options::value<uint64_t>()->default_value(101),
           "For database_api_impl::get_withdraw_permissions_by_recipient to set max limit value")
          ("api-limit-get-tickets", boost::program_options::value<uint64_t>()->default_value(101),
           "Set maximum limit value for database APIs which query for tickets")
@@ -1096,24 +1202,20 @@ void application::set_program_options(boost::program_options::options_descriptio
    configuration_file_options.add(_cfg_options);
 }
 
-void application::initialize(const fc::path& data_dir, const boost::program_options::variables_map& options)
+void application::initialize(const fc::path& data_dir,
+                             std::shared_ptr<boost::program_options::variables_map> options) const
 {
-   my->_data_dir = data_dir;
-   my->_options = &options;
-
-   if ( options.count("io-threads") > 0 )
-   {
-      const uint16_t num_threads = options["io-threads"].as<uint16_t>();
-      fc::asio::default_io_service_scope::set_num_threads(num_threads);
-   }
-
-   my->initialize();
+   ilog( "Initializing application" );
+   my->initialize( data_dir, options );
+   ilog( "Done initializing application" );
 }
 
 void application::startup()
 {
    try {
+      ilog( "Starting up application" );
       my->startup();
+      ilog( "Done starting up application" );
    } catch ( const fc::exception& e ) {
       elog( "${e}", ("e",e.to_detail_string()) );
       throw;
@@ -1157,7 +1259,7 @@ std::shared_ptr<chain::database> application::chain_database() const
 
 void application::set_block_production(bool producing_blocks)
 {
-   my->_is_block_producer = producing_blocks;
+   my->set_block_production(producing_blocks);
 }
 
 optional< api_access_info > application::get_api_access_info( const string& username )const
@@ -1175,56 +1277,14 @@ bool application::is_finished_syncing() const
    return my->_is_finished_syncing;
 }
 
-void graphene::app::application::enable_plugin(const string& name)
+void application::enable_plugin(const string& name) const
 {
-   FC_ASSERT(my->_available_plugins[name], "Unknown plugin '" + name + "'");
-   my->_active_plugins[name] = my->_available_plugins[name];
-   my->_active_plugins[name]->plugin_set_app(this);
+   my->enable_plugin(name);
 }
 
-void graphene::app::application::add_available_plugin(std::shared_ptr<graphene::app::abstract_plugin> p)
+void application::add_available_plugin(std::shared_ptr<graphene::app::abstract_plugin> p) const
 {
-   my->_available_plugins[p->plugin_name()] = p;
-}
-
-void application::shutdown_plugins()
-{
-   for( auto& entry : my->_active_plugins )
-   {
-      ilog( "Stopping plugin ${name}", ( "name", entry.second->plugin_name() ) );
-      entry.second->plugin_shutdown();
-      ilog( "Stopped plugin ${name}", ( "name", entry.second->plugin_name() ) );
-   }
-}
-void application::shutdown()
-{
-   if( my->_p2p_network )
-      my->_p2p_network->close();
-   if( my->_chain_db )
-   {
-      my->_chain_db->close();
-      my->_chain_db = nullptr;
-   }
-}
-
-void application::initialize_plugins( const boost::program_options::variables_map& options )
-{
-   for( auto& entry : my->_active_plugins )
-   {
-      ilog( "Initializing plugin ${name}", ( "name", entry.second->plugin_name() ) );
-      entry.second->plugin_initialize( options );
-      ilog( "Initialized plugin ${name}", ( "name", entry.second->plugin_name() ) );
-   }
-}
-
-void application::startup_plugins()
-{
-   for( auto& entry : my->_active_plugins )
-   {
-      ilog( "Starting plugin ${name}", ( "name", entry.second->plugin_name() ) );
-      entry.second->plugin_startup();
-      ilog( "Started plugin ${name}", ( "name", entry.second->plugin_name() ) );
-   }
+   my->add_available_plugin(p);
 }
 
 const application_options& application::get_options()

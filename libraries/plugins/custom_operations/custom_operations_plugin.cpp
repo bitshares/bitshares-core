@@ -35,10 +35,9 @@ namespace detail
 class custom_operations_plugin_impl
 {
    public:
-   custom_operations_plugin_impl(custom_operations_plugin& _plugin)
+      explicit custom_operations_plugin_impl(custom_operations_plugin& _plugin)
          : _self( _plugin )
       {  }
-      virtual ~custom_operations_plugin_impl();
 
       void onBlock();
 
@@ -47,12 +46,12 @@ class custom_operations_plugin_impl
          return _self.database();
       }
 
+      friend class graphene::custom_operations::custom_operations_plugin;
+
+   private:
       custom_operations_plugin& _self;
 
       uint32_t _start_block = 45000000;
-
-   private:
-
 };
 
 struct custom_op_visitor
@@ -98,21 +97,16 @@ void custom_operations_plugin_impl::onBlock()
    }
 }
 
-custom_operations_plugin_impl::~custom_operations_plugin_impl()
-{
-   return;
-}
-
 } // end namespace detail
 
-custom_operations_plugin::custom_operations_plugin() :
+custom_operations_plugin::custom_operations_plugin(graphene::app::application& app) :
+   plugin(app),
    my( std::make_unique<detail::custom_operations_plugin_impl>(*this) )
 {
+   // Nothing to do
 }
 
-custom_operations_plugin::~custom_operations_plugin()
-{
-}
+custom_operations_plugin::~custom_operations_plugin() = default;
 
 std::string custom_operations_plugin::plugin_name()const
 {

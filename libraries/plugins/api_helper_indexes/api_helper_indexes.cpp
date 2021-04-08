@@ -133,7 +133,7 @@ namespace detail
 class api_helper_indexes_impl
 {
    public:
-      api_helper_indexes_impl(api_helper_indexes& _plugin)
+      explicit api_helper_indexes_impl(api_helper_indexes& _plugin)
          : _self( _plugin )
       {  }
 
@@ -142,22 +142,20 @@ class api_helper_indexes_impl
          return _self.database();
       }
 
-      api_helper_indexes& _self;
-
    private:
-
+      api_helper_indexes& _self;
 };
 
 } // end namespace detail
 
-api_helper_indexes::api_helper_indexes() :
+api_helper_indexes::api_helper_indexes(graphene::app::application& app) :
+   plugin(app),
    my( std::make_unique<detail::api_helper_indexes_impl>(*this) )
 {
+   // Nothing else to do
 }
 
-api_helper_indexes::~api_helper_indexes()
-{
-}
+api_helper_indexes::~api_helper_indexes() = default;
 
 std::string api_helper_indexes::plugin_name()const
 {

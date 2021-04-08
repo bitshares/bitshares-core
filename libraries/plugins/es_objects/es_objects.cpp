@@ -41,7 +41,7 @@ namespace detail
 class es_objects_plugin_impl
 {
    public:
-      es_objects_plugin_impl(es_objects_plugin& _plugin)
+      explicit es_objects_plugin_impl(es_objects_plugin& _plugin)
          : _self( _plugin )
       {
          curl = curl_easy_init();
@@ -269,19 +269,18 @@ es_objects_plugin_impl::~es_objects_plugin_impl()
       curl_easy_cleanup(curl);
       curl = nullptr;
    }
-   return;
 }
 
 } // end namespace detail
 
-es_objects_plugin::es_objects_plugin() :
+es_objects_plugin::es_objects_plugin(graphene::app::application& app) :
+   plugin(app),
    my( std::make_unique<detail::es_objects_plugin_impl>(*this) )
 {
+   // Nothing else to do
 }
 
-es_objects_plugin::~es_objects_plugin()
-{
-}
+es_objects_plugin::~es_objects_plugin() = default;
 
 std::string es_objects_plugin::plugin_name()const
 {

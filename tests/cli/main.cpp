@@ -96,7 +96,7 @@ using std::cerr;
 /// @returns the application object
 //////////
 std::shared_ptr<graphene::app::application> start_application(fc::temp_directory& app_dir, int& server_port_number) {
-   std::shared_ptr<graphene::app::application> app1(new graphene::app::application{});
+   auto app1 = std::make_shared<graphene::app::application>();
 
    app1->register_plugin<graphene::account_history::account_history_plugin>(true);
    app1->register_plugin< graphene::market_history::market_history_plugin >(true);
@@ -104,11 +104,8 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    app1->register_plugin< graphene::api_helper_indexes::api_helper_indexes>(true);
    app1->register_plugin<graphene::custom_operations::custom_operations_plugin>(true);
 
-   app1->startup_plugins();
-   boost::program_options::variables_map cfg;
-#ifdef _WIN32
-   sockInit();
-#endif
+   auto sharable_cfg = std::make_shared<boost::program_options::variables_map>();
+   auto& cfg = *sharable_cfg;
    server_port_number = fc::network::get_available_port();
    cfg.emplace(
       "rpc-endpoint",
@@ -117,10 +114,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
    cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
    cfg.emplace("custom-operations-start-block", boost::program_options::variable_value(uint32_t(1), false));
-   app1->initialize(app_dir.path(), cfg);
-
-   app1->initialize_plugins(cfg);
-   app1->startup_plugins();
+   app1->initialize(app_dir.path(), sharable_cfg);
 
    app1->startup();
 
@@ -280,6 +274,16 @@ public:
 
 struct cli_fixture
 {
+#ifdef _WIN32
+   struct socket_maintainer {
+      socket_maintainer() {
+         sockInit();
+      }
+      ~socket_maintainer() {
+         sockQuit();
+      }
+   } sock_maintainer;
+#endif
    int server_port_number;
    fc::temp_directory app_dir;
    std::shared_ptr<graphene::app::application> app1;
@@ -317,10 +321,6 @@ struct cli_fixture
    ~cli_fixture()
    {
       BOOST_TEST_MESSAGE("Cleanup cli_wallet::boost_fixture_test_case");
-      app1->shutdown();
-#ifdef _WIN32
-      sockQuit();
-#endif
    }
 };
 
@@ -1500,8 +1500,6 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
       edump((e.to_detail_string()));
       throw;
    }
-   app1->shutdown();
-   app1.reset();
 }
 
 graphene::wallet::plain_keys decrypt_keys( const std::string& password, const vector<char>& cipher_keys )
@@ -1734,8 +1732,6 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       edump((e.to_detail_string()));
       throw;
    }
-   app1->shutdown();
-   app1.reset();
 }
 
 static string encapsulate( const graphene::wallet::signed_message& msg )
@@ -2311,6 +2307,4 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
       edump((e.to_detail_string()));
       throw;
    }
-   app1->shutdown();
-   app1.reset();
 }

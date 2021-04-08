@@ -179,10 +179,10 @@ namespace graphene { namespace app {
 
     void network_broadcast_api::broadcast_transaction(const precomputable_transaction& trx)
     {
+       FC_ASSERT( _app.p2p_node() != nullptr, "Not connected to P2P network, can't broadcast!" );
        _app.chain_database()->precompute_parallel( trx ).wait();
        _app.chain_database()->push_transaction(trx);
-       if( _app.p2p_node() != nullptr )
-          _app.p2p_node()->broadcast_transaction(trx);
+       _app.p2p_node()->broadcast_transaction(trx);
     }
 
     fc::variant network_broadcast_api::broadcast_transaction_synchronous(const precomputable_transaction& trx)
@@ -197,19 +197,19 @@ namespace graphene { namespace app {
 
     void network_broadcast_api::broadcast_block( const signed_block& b )
     {
+       FC_ASSERT( _app.p2p_node() != nullptr, "Not connected to P2P network, can't broadcast!" );
        _app.chain_database()->precompute_parallel( b ).wait();
        _app.chain_database()->push_block(b);
-       if( _app.p2p_node() != nullptr )
-          _app.p2p_node()->broadcast( net::block_message( b ));
+       _app.p2p_node()->broadcast( net::block_message( b ));
     }
 
     void network_broadcast_api::broadcast_transaction_with_callback(confirmation_callback cb, const precomputable_transaction& trx)
     {
+       FC_ASSERT( _app.p2p_node() != nullptr, "Not connected to P2P network, can't broadcast!" );
        _app.chain_database()->precompute_parallel( trx ).wait();
        _callbacks[trx.id()] = cb;
        _app.chain_database()->push_transaction(trx);
-       if( _app.p2p_node() != nullptr )
-          _app.p2p_node()->broadcast_transaction(trx);
+       _app.p2p_node()->broadcast_transaction(trx);
     }
 
     network_node_api::network_node_api( application& a ) : _app( a )
@@ -218,6 +218,7 @@ namespace graphene { namespace app {
 
     fc::variant_object network_node_api::get_info() const
     {
+       FC_ASSERT( _app.p2p_node() != nullptr, "No P2P network!" );
        fc::mutable_variant_object result = _app.p2p_node()->network_get_info();
        result["connection_count"] = _app.p2p_node()->get_connection_count();
        return result;
@@ -225,26 +226,33 @@ namespace graphene { namespace app {
 
     void network_node_api::add_node(const fc::ip::endpoint& ep)
     {
-       _app.p2p_node()->add_node(ep);
+       if( _app.p2p_node() != nullptr )
+          _app.p2p_node()->add_node(ep);
     }
 
     std::vector<net::peer_status> network_node_api::get_connected_peers() const
     {
-       return _app.p2p_node()->get_connected_peers();
+       if( _app.p2p_node() != nullptr )
+          return _app.p2p_node()->get_connected_peers();
+       return {};
     }
 
     std::vector<net::potential_peer_record> network_node_api::get_potential_peers() const
     {
-       return _app.p2p_node()->get_potential_peers();
+       if( _app.p2p_node() != nullptr )
+          return _app.p2p_node()->get_potential_peers();
+       return {};
     }
 
     fc::variant_object network_node_api::get_advanced_node_parameters() const
     {
+       FC_ASSERT( _app.p2p_node() != nullptr, "No P2P network!" );
        return _app.p2p_node()->get_advanced_node_parameters();
     }
 
     void network_node_api::set_advanced_node_parameters(const fc::variant_object& params)
     {
+       FC_ASSERT( _app.p2p_node() != nullptr, "No P2P network!" );
        return _app.p2p_node()->set_advanced_node_parameters(params);
     }
 

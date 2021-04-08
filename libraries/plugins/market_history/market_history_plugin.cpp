@@ -43,9 +43,8 @@ namespace detail
 class market_history_plugin_impl
 {
    public:
-      market_history_plugin_impl(market_history_plugin& _plugin)
+      explicit market_history_plugin_impl(market_history_plugin& _plugin)
       :_self( _plugin ) {}
-      virtual ~market_history_plugin_impl();
 
       /** this method is called as a callback after a block is applied
        * and will process/index all operations that were applied in the block.
@@ -293,9 +292,6 @@ struct operation_process_fill_order
       }
    }
 };
-
-market_history_plugin_impl::~market_history_plugin_impl()
-{}
 
 void market_history_plugin_impl::update_market_histories( const signed_block& b )
 {
@@ -731,18 +727,14 @@ void market_history_plugin_impl::update_liquidity_pool_histories(
 } // end namespace detail
 
 
-
-
-
-
-market_history_plugin::market_history_plugin() :
+market_history_plugin::market_history_plugin(graphene::app::application& app) :
+   plugin(app),
    my( std::make_unique<detail::market_history_plugin_impl>(*this) )
 {
+   // Nothing else to do
 }
 
-market_history_plugin::~market_history_plugin()
-{
-}
+market_history_plugin::~market_history_plugin() = default;
 
 std::string market_history_plugin::plugin_name()const
 {

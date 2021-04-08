@@ -25,6 +25,11 @@
 
 #include <fc/io/json.hpp>
 
+#include <boost/filesystem/path.hpp>
+#include <boost/program_options.hpp>
+
+#include <boost/test/unit_test.hpp>
+
 #include <graphene/protocol/types.hpp>
 #include <graphene/protocol/market.hpp>
 
@@ -36,6 +41,7 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/app/application.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
+#include <graphene/utilities/tempdir.hpp>
 
 #include <iostream>
 
@@ -192,7 +198,7 @@ bool _push_block( database& db, const signed_block& b, uint32_t skip_flags = 0 )
 processed_transaction _push_transaction( database& db, const signed_transaction& tx, uint32_t skip_flags = 0 );
 } // namespace test
 
-struct database_fixture {
+struct database_fixture_base {
    // the reason we use an app is to exercise the indexes of built-in
    //   plugins
    graphene::app::application app;
@@ -201,11 +207,11 @@ struct database_fixture {
    signed_transaction trx;
    public_key_type committee_key;
    account_id_type committee_account;
-   fc::ecc::private_key private_key = fc::ecc::private_key::generate();
-   fc::ecc::private_key init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
-   public_key_type init_account_pub_key;
+   const fc::ecc::private_key private_key;
+   const fc::ecc::private_key init_account_priv_key;
+   const public_key_type init_account_pub_key;
 
-   optional<fc::temp_directory> data_dir;
+   fc::temp_directory data_dir;
    bool skip_key_index_test = false;
    uint32_t anon_acct_count;
    bool hf1270 = false;
@@ -214,14 +220,24 @@ struct database_fixture {
    string es_index_prefix; ///< Index prefix for elasticsearch plugin
    string es_obj_index_prefix; ///< Index prefix for es_objects plugin
 
-   database_fixture(const fc::time_point_sec &initial_timestamp =
-                        fc::time_point_sec(GRAPHENE_TESTING_GENESIS_TIMESTAMP));
-   ~database_fixture();
+   const std::string current_test_name;
+   const std::string current_suite_name;
+
+   database_fixture_base();
+   virtual ~database_fixture_base();
+
+   template<typename T>
+   static void set_option( boost::program_options::variables_map& options, const std::string& name, const T& value )
+   {
+      options.insert( std::make_pair( name, boost::program_options::variable_value( value, false ) ) );
+   }
+
+   static void init_genesis( database_fixture_base& fixture );
+   static std::shared_ptr<boost::program_options::variables_map> init_options( database_fixture_base& fixture );
 
    static fc::ecc::private_key generate_private_key(string seed);
    string generate_anon_acct_name();
    static void verify_asset_supplies( const database& db );
-   void open_database();
    void vote_for_committee_and_witnesses(uint16_t num_committee, uint16_t num_witness);
    signed_block generate_block(uint32_t skip = ~0,
                                const fc::ecc::private_key& key = generate_private_key("null_key"),
@@ -481,6 +497,38 @@ struct database_fixture {
       return H::hash( (char*)preimage.data(), preimage.size() );
    }
 
+};
+
+template<typename F>
+struct database_fixture_init : database_fixture_base {
+   database_fixture_init()
+   {
+      F::init( *this );
+
+      asset_id_type mpa1_id(1);
+      BOOST_REQUIRE( mpa1_id(db).is_market_issued() );
+      BOOST_CHECK( mpa1_id(db).bitasset_data(db).asset_id == mpa1_id );
+   }
+
+   static void init( database_fixture_init<F>& fixture )
+   { try {
+      fixture.data_dir = fc::temp_directory( graphene::utilities::temp_directory_path() );
+      fc::create_directories( fixture.data_dir.path() );
+      F::init_genesis( fixture );
+      fc::json::save_to_file( fixture.genesis_state, fixture.data_dir.path() / "genesis.json" );
+      auto options = F::init_options( fixture );
+      set_option( *options, "genesis-json", boost::filesystem::path(fixture.data_dir.path() / "genesis.json") );
+      fixture.app.initialize( fixture.data_dir.path(), options );
+      fixture.app.startup();
+
+      fixture.generate_block();
+
+      test::set_expiration( fixture.db, fixture.trx );
+   } FC_LOG_AND_RETHROW() }
+};
+
+struct database_fixture : database_fixture_init<database_fixture>
+{
 };
 
 } }

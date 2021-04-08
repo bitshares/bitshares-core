@@ -246,12 +246,12 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app1.register_plugin< graphene::market_history::market_history_plugin >();
       app1.register_plugin< graphene::witness_plugin::witness_plugin >();
       app1.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
-      app1.startup_plugins();
-      boost::program_options::variables_map cfg;
+      auto sharable_cfg = std::make_shared<boost::program_options::variables_map>();
+      auto& cfg = *sharable_cfg;
       cfg.emplace("p2p-endpoint", boost::program_options::variable_value(app1_p2p_endpoint_str, false));
       cfg.emplace("genesis-json", boost::program_options::variable_value(genesis_file, false));
       cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
-      app1.initialize(app_dir.path(), cfg);
+      app1.initialize(app_dir.path(), sharable_cfg);
       BOOST_TEST_MESSAGE( "Starting app1 and waiting" );
       app1.startup();
 
@@ -271,11 +271,11 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app2.register_plugin< graphene::market_history::market_history_plugin >();
       app2.register_plugin< graphene::witness_plugin::witness_plugin >();
       app2.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
-      app2.startup_plugins();
-      boost::program_options::variables_map cfg2;
+      auto sharable_cfg2 = std::make_shared<boost::program_options::variables_map>();
+      auto& cfg2 = *sharable_cfg2;
       cfg2.emplace("genesis-json", boost::program_options::variable_value(genesis_file, false));
       cfg2.emplace("seed-nodes", boost::program_options::variable_value(app2_seed_nodes_str, false));
-      app2.initialize(app2_dir.path(), cfg2);
+      app2.initialize(app2_dir.path(), sharable_cfg2);
 
       BOOST_TEST_MESSAGE( "Starting app2 and waiting for connection" );
       app2.startup();
@@ -390,13 +390,15 @@ BOOST_AUTO_TEST_CASE( two_node_network )
    }
 }
 
-// a contrived example to test the breaking out of application_impl to a header file
-
+/// a contrived example to test the breaking out of application_impl to a header file
 BOOST_AUTO_TEST_CASE(application_impl_breakout) {
+
+   static graphene::app::application my_app;
+
    class test_impl : public graphene::app::detail::application_impl {
       // override the constructor, just to test that we can
    public:
-      test_impl() : application_impl(nullptr) {}
+      test_impl() : application_impl(my_app) {}
       bool has_item(const net::item_id& id) override {
          return true;
       }

@@ -34,9 +34,8 @@ namespace detail
 class grouped_orders_plugin_impl
 {
    public:
-      grouped_orders_plugin_impl(grouped_orders_plugin& _plugin)
+      explicit grouped_orders_plugin_impl(grouped_orders_plugin& _plugin)
       :_self( _plugin ) {}
-      virtual ~grouped_orders_plugin_impl();
 
       graphene::chain::database& database()
       {
@@ -235,20 +234,17 @@ void limit_order_group_index::remove_order( const limit_order_object& o, bool re
    }
 }
 
-grouped_orders_plugin_impl::~grouped_orders_plugin_impl()
-{}
-
 } // end namespace detail
 
 
-grouped_orders_plugin::grouped_orders_plugin() :
+grouped_orders_plugin::grouped_orders_plugin(graphene::app::application& app) :
+   plugin(app),
    my( std::make_unique<detail::grouped_orders_plugin_impl>(*this) )
 {
+   // Nothing else to do
 }
 
-grouped_orders_plugin::~grouped_orders_plugin()
-{
-}
+grouped_orders_plugin::~grouped_orders_plugin() = default;
 
 std::string grouped_orders_plugin::plugin_name()const
 {

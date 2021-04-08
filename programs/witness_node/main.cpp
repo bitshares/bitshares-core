@@ -39,6 +39,8 @@
 #include <fc/thread/thread.hpp>
 #include <fc/interprocess/signals.hpp>
 #include <fc/stacktrace.hpp>
+#include <fc/log/console_appender.hpp>
+#include <fc/log/logger_config.hpp>
 
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -49,20 +51,36 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <websocketpp/version.hpp>
 
-#include <iostream>
+#include <sstream>
 
 #ifdef WIN32
-# include <signal.h> 
+# include <signal.h>
 #else
 # include <csignal>
 #endif
 
-using namespace graphene;
 namespace bpo = boost::program_options;
 
+/// Disable default logging
+void disable_default_logging()
+{
+   fc::configure_logging( fc::logging_config() );
+}
+
+/// Hack to log messages to console with default color and no format via fc::console_appender
+// TODO fix console_appender and use ilog() or etc instead: 1) stream is always stderr, 2) format can not change
+void my_log( const std::string& s )
+{
+   static fc::console_appender::config my_console_config;
+   static fc::console_appender my_appender( my_console_config );
+   my_appender.print(s);
+   my_appender.print("\n"); // This is needed, otherwise the next message will cover it
+}
+
+/// The main program
 int main(int argc, char** argv) {
    fc::print_stacktrace_on_segfault();
-   auto node = std::make_unique<app::application>();
+   auto node = std::make_unique<graphene::app::application>();
    fc::oexception unhandled_exception;
    try {
       bpo::options_description app_options("BitShares Witness Node");
@@ -78,9 +96,11 @@ int main(int argc, char** argv) {
                     "Space-separated list of plugins to activate")
             ("ignore-api-helper-indexes-warning", "Do not exit if api_helper_indexes plugin is not enabled.");
 
-      bpo::variables_map options;
+      auto sharable_options = std::make_shared<bpo::variables_map>();
+      auto& options = *sharable_options;
 
-      bpo::options_description cli, cfg;
+      bpo::options_description cli;
+      bpo::options_description cfg;
       node->set_program_options(cli, cfg);
       cfg_options.add(cfg);
 
@@ -89,47 +109,59 @@ int main(int argc, char** argv) {
                     "Space-separated list of plugins to activate")
             ("ignore-api-helper-indexes-warning", "Do not exit if api_helper_indexes plugin is not enabled.");
 
-      auto witness_plug = node->register_plugin<witness_plugin::witness_plugin>();
-      auto debug_witness_plug = node->register_plugin<debug_witness_plugin::debug_witness_plugin>();
-      auto history_plug = node->register_plugin<account_history::account_history_plugin>();
-      auto elasticsearch_plug = node->register_plugin<elasticsearch::elasticsearch_plugin>();
-      auto market_history_plug = node->register_plugin<market_history::market_history_plugin>();
-      auto delayed_plug = node->register_plugin<delayed_node::delayed_node_plugin>();
-      auto snapshot_plug = node->register_plugin<snapshot_plugin::snapshot_plugin>();
-      auto es_objects_plug = node->register_plugin<es_objects::es_objects_plugin>();
-      auto grouped_orders_plug = node->register_plugin<grouped_orders::grouped_orders_plugin>();
-      auto api_helper_indexes_plug = node->register_plugin<api_helper_indexes::api_helper_indexes>();
-      auto custom_operations_plug = node->register_plugin<custom_operations::custom_operations_plugin>();
+      node->register_plugin<graphene::witness_plugin::witness_plugin>();
+      node->register_plugin<graphene::debug_witness_plugin::debug_witness_plugin>();
+      node->register_plugin<graphene::account_history::account_history_plugin>();
+      node->register_plugin<graphene::elasticsearch::elasticsearch_plugin>();
+      node->register_plugin<graphene::market_history::market_history_plugin>();
+      node->register_plugin<graphene::delayed_node::delayed_node_plugin>();
+      node->register_plugin<graphene::snapshot_plugin::snapshot_plugin>();
+      node->register_plugin<graphene::es_objects::es_objects_plugin>();
+      node->register_plugin<graphene::grouped_orders::grouped_orders_plugin>();
+      node->register_plugin<graphene::api_helper_indexes::api_helper_indexes>();
+      node->register_plugin<graphene::custom_operations::custom_operations_plugin>();
 
       // add plugin options to config
       try
       {
-         bpo::options_description cli, cfg;
-         node->set_program_options(cli, cfg);
-         app_options.add(cli);
-         cfg_options.add(cfg);
+         bpo::options_description tmp_cli;
+         bpo::options_description tmp_cfg;
+         node->set_program_options(tmp_cli, tmp_cfg);
+         app_options.add(tmp_cli);
+         cfg_options.add(tmp_cfg);
          bpo::store(bpo::parse_command_line(argc, argv, app_options), options);
       }
       catch (const boost::program_options::error& e)
       {
-         std::cerr << "Error parsing command line: " << e.what() << "\n";
-         return 1;
+         disable_default_logging();
+         std::stringstream ss;
+         ss << "Error parsing command line: " << e.what();
+         my_log( ss.str() );
+         return EXIT_FAILURE;
       }
 
       if( options.count("version") > 0 )
       {
-         std::cout << "Version: " << graphene::utilities::git_revision_description << "\n";
-         std::cout << "SHA: " << graphene::utilities::git_revision_sha << "\n";
-         std::cout << "Timestamp: " << fc::get_approximate_relative_time_string(fc::time_point_sec(graphene::utilities::git_revision_unix_timestamp)) << "\n";
-         std::cout << "SSL: " << OPENSSL_VERSION_TEXT << "\n";
-         std::cout << "Boost: " << boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".") << "\n";
-         std::cout << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version << "\n";
-         return 0;
+         disable_default_logging();
+         std::stringstream ss;
+         ss << "Version: " << graphene::utilities::git_revision_description << "\n";
+         ss << "SHA: " << graphene::utilities::git_revision_sha << "\n";
+         ss << "Timestamp: " << fc::get_approximate_relative_time_string(fc::time_point_sec(
+                                             graphene::utilities::git_revision_unix_timestamp)) << "\n";
+         ss << "SSL: " << OPENSSL_VERSION_TEXT << "\n";
+         ss << "Boost: " << boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".") << "\n";
+         ss << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version
+                                      << "." << websocketpp::patch_version; // No end of line in the end
+         my_log( ss.str() );
+         return EXIT_SUCCESS;
       }
       if( options.count("help") > 0 )
       {
-         std::cout << app_options << "\n";
-         return 0;
+         disable_default_logging();
+         std::stringstream ss;
+         ss << app_options << "\n";
+         my_log( ss.str() );
+         return EXIT_SUCCESS;
       }
 
       fc::path data_dir;
@@ -139,23 +171,29 @@ int main(int argc, char** argv) {
          if( data_dir.is_relative() )
             data_dir = fc::current_path() / data_dir;
       }
-      app::load_configuration_options(data_dir, cfg_options, options);
+      graphene::app::load_configuration_options(data_dir, cfg_options, options);
 
       std::set<std::string> plugins;
       boost::split(plugins, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
 
       if( plugins.count("account_history") > 0 && plugins.count("elasticsearch") > 0 ) {
-         std::cerr << "Plugin conflict: Cannot load both account_history plugin and elasticsearch plugin\n";
-         return 1;
+         disable_default_logging();
+         std::stringstream ss;
+         ss << "Plugin conflict: Cannot load both account_history plugin and elasticsearch plugin";
+         my_log( ss.str() );
+         return EXIT_FAILURE;
       }
 
       if( plugins.count("api_helper_indexes") == 0 && options.count("ignore-api-helper-indexes-warning") == 0
           && ( options.count("rpc-endpoint") > 0 || options.count("rpc-tls-endpoint") > 0 ) )
       {
-         std::cerr << "\nIf this is an API node, please enable api_helper_indexes plugin."
-                      "\nIf this is not an API node, please start with \"--ignore-api-helper-indexes-warning\""
-                      " or enable it in config.ini file.\n\n";
-         return 1;
+         disable_default_logging();
+         std::stringstream ss;
+         ss << "\nIf this is an API node, please enable api_helper_indexes plugin."
+               "\nIf this is not an API node, please start with \"--ignore-api-helper-indexes-warning\""
+               " or enable it in config.ini file.\n";
+         my_log( ss.str() );
+         return EXIT_FAILURE;
       }
 
       std::for_each(plugins.begin(), plugins.end(), [&node](const std::string& plug) mutable {
@@ -166,32 +204,34 @@ int main(int argc, char** argv) {
 
       bpo::notify(options);
 
-      node->initialize(data_dir, options);
-      node->initialize_plugins( options );
+      node->initialize(data_dir, sharable_options);
 
       node->startup();
-      node->startup_plugins();
 
       fc::promise<int>::ptr exit_promise = fc::promise<int>::create("UNIX Signal Handler");
 
-      fc::set_signal_handler([&exit_promise](int signal) {
-         elog( "Caught SIGINT attempting to exit cleanly" );
-         exit_promise->set_value(signal);
+      fc::set_signal_handler([&exit_promise](int the_signal) {
+         wlog( "Caught SIGINT, attempting to exit cleanly" );
+         exit_promise->set_value(the_signal);
       }, SIGINT);
 
-      fc::set_signal_handler([&exit_promise](int signal) {
-         elog( "Caught SIGTERM attempting to exit cleanly" );
-         exit_promise->set_value(signal);
+      fc::set_signal_handler([&exit_promise](int the_signal) {
+         wlog( "Caught SIGTERM, attempting to exit cleanly" );
+         exit_promise->set_value(the_signal);
       }, SIGTERM);
+
+#ifdef SIGQUIT
+      fc::set_signal_handler( [&exit_promise](int the_signal) {
+         wlog( "Caught SIGQUIT, attempting to exit cleanly" );
+         exit_promise->set_value(the_signal);
+      }, SIGQUIT );
+#endif
 
       ilog("Started BitShares node on a chain with ${h} blocks.", ("h", node->chain_database()->head_block_num()));
       ilog("Chain ID is ${id}", ("id", node->chain_database()->get_chain_id()) );
 
-      int signal = exit_promise->wait();
-      ilog("Exiting from signal ${n}", ("n", signal));
-      node->shutdown_plugins();
-      node->shutdown();
-      node.reset();
+      auto caught_signal = exit_promise->wait();
+      ilog("Exiting from signal ${n}", ("n", caught_signal));
       return EXIT_SUCCESS;
    } catch( const fc::exception& e ) {
       // deleting the node can yield, so do this outside the exception handler
@@ -201,8 +241,6 @@ int main(int argc, char** argv) {
    if (unhandled_exception)
    {
       elog("Exiting with error:\n${e}", ("e", unhandled_exception->to_detail_string()));
-      node->shutdown();
-      node.reset();
       return EXIT_FAILURE;
    }
 }

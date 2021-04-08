@@ -23,30 +23,34 @@
  */
 #pragma once
 
-#include <graphene/app/plugin.hpp>
+#include <graphene/net/node.hpp>
 
-namespace graphene { namespace delayed_node {
-namespace detail { struct delayed_node_plugin_impl; }
+#include <list>
 
-class delayed_node_plugin : public graphene::app::plugin
+namespace graphene { namespace net {
+
+class simulated_network : public node
 {
-   std::unique_ptr<detail::delayed_node_plugin_impl> my;
 public:
-   explicit delayed_node_plugin(graphene::app::application& app);
-   ~delayed_node_plugin() override;
+   ~simulated_network() override;
+   explicit simulated_network(const std::string& user_agent) : node(user_agent) {}
+   void      listen_to_p2p_network() override {}
+   void      connect_to_p2p_network() override {}
+   void      connect_to_endpoint(const fc::ip::endpoint& ep) override {}
 
-   std::string plugin_name()const override { return "delayed_node"; }
-   void plugin_set_program_options(boost::program_options::options_description&,
-                                   boost::program_options::options_description& cfg) override;
-   void plugin_initialize(const boost::program_options::variables_map& options) override;
-   void plugin_startup() override;
-   void mainloop();
+   fc::ip::endpoint get_actual_listening_endpoint() const override { return fc::ip::endpoint(); }
 
-protected:
-   void connection_failed();
-   void connect();
-   void sync_with_trusted_node();
+   void      sync_from(const item_id& current_head_block, const std::vector<uint32_t>& hard_fork_block_numbers) override {}
+   void      broadcast(const message& item_to_broadcast) override;
+   void      add_node_delegate(std::shared_ptr<node_delegate> node_delegate_to_add);
+
+   uint32_t get_connection_count() const override { return 8; }
+private:
+   struct node_info;
+   void message_sender(std::shared_ptr<node_info> destination_node);
+   std::list<std::shared_ptr<node_info>> network_nodes;
 };
 
-} } //graphene::account_history
+using simulated_network_ptr = std::shared_ptr<simulated_network>;
 
+} } // graphene::net
