@@ -39,6 +39,8 @@
 #include <fc/thread/thread.hpp>
 #include <fc/interprocess/signals.hpp>
 #include <fc/stacktrace.hpp>
+#include <fc/log/console_appender.hpp>
+#include <fc/log/logger_config.hpp>
 
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -49,7 +51,7 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <websocketpp/version.hpp>
 
-#include <iostream>
+#include <sstream>
 
 #ifdef WIN32
 # include <signal.h>
@@ -59,6 +61,23 @@
 
 namespace bpo = boost::program_options;
 
+/// Disable default logging
+void disable_default_logging()
+{
+   fc::configure_logging( fc::logging_config() );
+}
+
+/// Hack to log messages to console with default color and no format via fc::console_appender
+// TODO fix console_appender and use ilog() or etc instead: 1) stream is always stderr, 2) format can not change
+void my_log( const std::string& s )
+{
+   static fc::console_appender::config my_console_config;
+   static fc::console_appender my_appender( my_console_config );
+   my_appender.print(s);
+   my_appender.print("\n"); // This is needed, otherwise the next message will cover it
+}
+
+/// The main program
 int main(int argc, char** argv) {
    fc::print_stacktrace_on_segfault();
    auto node = std::make_unique<graphene::app::application>();
@@ -114,25 +133,34 @@ int main(int argc, char** argv) {
       }
       catch (const boost::program_options::error& e)
       {
-         std::cerr << "Error parsing command line: " << e.what() << "\n";
+         disable_default_logging();
+         std::stringstream ss;
+         ss << "Error parsing command line: " << e.what();
+         my_log( ss.str() );
          return EXIT_FAILURE;
       }
 
       if( options.count("version") > 0 )
       {
-         std::cout << "Version: " << graphene::utilities::git_revision_description << "\n";
-         std::cout << "SHA: " << graphene::utilities::git_revision_sha << "\n";
-         std::cout << "Timestamp: " << fc::get_approximate_relative_time_string(fc::time_point_sec(
+         disable_default_logging();
+         std::stringstream ss;
+         ss << "Version: " << graphene::utilities::git_revision_description << "\n";
+         ss << "SHA: " << graphene::utilities::git_revision_sha << "\n";
+         ss << "Timestamp: " << fc::get_approximate_relative_time_string(fc::time_point_sec(
                                              graphene::utilities::git_revision_unix_timestamp)) << "\n";
-         std::cout << "SSL: " << OPENSSL_VERSION_TEXT << "\n";
-         std::cout << "Boost: " << boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".") << "\n";
-         std::cout << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version
-                                      << "." << websocketpp::patch_version << "\n";
+         ss << "SSL: " << OPENSSL_VERSION_TEXT << "\n";
+         ss << "Boost: " << boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".") << "\n";
+         ss << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version
+                                      << "." << websocketpp::patch_version; // No end of line in the end
+         my_log( ss.str() );
          return EXIT_SUCCESS;
       }
       if( options.count("help") > 0 )
       {
-         std::cout << app_options << "\n";
+         disable_default_logging();
+         std::stringstream ss;
+         ss << app_options << "\n";
+         my_log( ss.str() );
          return EXIT_SUCCESS;
       }
 
@@ -149,16 +177,22 @@ int main(int argc, char** argv) {
       boost::split(plugins, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
 
       if( plugins.count("account_history") > 0 && plugins.count("elasticsearch") > 0 ) {
-         std::cerr << "Plugin conflict: Cannot load both account_history plugin and elasticsearch plugin\n";
+         disable_default_logging();
+         std::stringstream ss;
+         ss << "Plugin conflict: Cannot load both account_history plugin and elasticsearch plugin";
+         my_log( ss.str() );
          return EXIT_FAILURE;
       }
 
       if( plugins.count("api_helper_indexes") == 0 && options.count("ignore-api-helper-indexes-warning") == 0
           && ( options.count("rpc-endpoint") > 0 || options.count("rpc-tls-endpoint") > 0 ) )
       {
-         std::cerr << "\nIf this is an API node, please enable api_helper_indexes plugin."
-                      "\nIf this is not an API node, please start with \"--ignore-api-helper-indexes-warning\""
-                      " or enable it in config.ini file.\n\n";
+         disable_default_logging();
+         std::stringstream ss;
+         ss << "\nIf this is an API node, please enable api_helper_indexes plugin."
+               "\nIf this is not an API node, please start with \"--ignore-api-helper-indexes-warning\""
+               " or enable it in config.ini file.\n";
+         my_log( ss.str() );
          return EXIT_FAILURE;
       }
 
@@ -177,18 +211,18 @@ int main(int argc, char** argv) {
       fc::promise<int>::ptr exit_promise = fc::promise<int>::create("UNIX Signal Handler");
 
       fc::set_signal_handler([&exit_promise](int the_signal) {
-         elog( "Caught SIGINT, attempting to exit cleanly" );
+         wlog( "Caught SIGINT, attempting to exit cleanly" );
          exit_promise->set_value(the_signal);
       }, SIGINT);
 
       fc::set_signal_handler([&exit_promise](int the_signal) {
-         elog( "Caught SIGTERM, attempting to exit cleanly" );
+         wlog( "Caught SIGTERM, attempting to exit cleanly" );
          exit_promise->set_value(the_signal);
       }, SIGTERM);
 
 #ifdef SIGQUIT
       fc::set_signal_handler( [&exit_promise](int the_signal) {
-         elog( "Caught SIGQUIT, attempting to exit cleanly" );
+         wlog( "Caught SIGQUIT, attempting to exit cleanly" );
          exit_promise->set_value(the_signal);
       }, SIGQUIT );
 #endif
