@@ -26,6 +26,8 @@
 #include <graphene/protocol/asset.hpp>
 #include <graphene/db/generic_index.hpp>
 
+#include <boost/multi_index/composite_key.hpp>
+
 namespace graphene { namespace chain {
    using namespace graphene::db;
 
@@ -44,6 +46,7 @@ namespace graphene { namespace chain {
          string           url;
          int64_t          total_missed = 0;
          uint32_t         last_confirmed_block_num = 0;
+         bool             is_active = false;
 
          witness_object() : vote_id(vote_id_type::witness) {}
    };
@@ -62,6 +65,12 @@ namespace graphene { namespace chain {
          >,
          ordered_unique< tag<by_vote_id>,
             member<witness_object, vote_id_type, &witness_object::vote_id>
+         >,
+         ordered_non_unique< tag<by_last_block>, // non-unique because multiple can have last == 0
+            composite_key<witness_object,
+               member<witness_object, bool, &witness_object::is_active>,
+               member<witness_object, uint32_t, &witness_object::last_confirmed_block_num>
+            >
          >
       >
    >;
