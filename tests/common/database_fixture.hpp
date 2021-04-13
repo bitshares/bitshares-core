@@ -45,6 +45,8 @@
 
 #include <iostream>
 
+#include "program_options_util.hpp"
+
 using namespace graphene::db;
 
 extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;
@@ -225,12 +227,6 @@ struct database_fixture_base {
 
    database_fixture_base();
    virtual ~database_fixture_base();
-
-   template<typename T>
-   static void set_option( boost::program_options::variables_map& options, const std::string& name, const T& value )
-   {
-      options.insert( std::make_pair( name, boost::program_options::variable_value( value, false ) ) );
-   }
 
    static void init_genesis( database_fixture_base& fixture );
    static std::shared_ptr<boost::program_options::variables_map> init_options( database_fixture_base& fixture );
@@ -517,7 +513,7 @@ struct database_fixture_init : database_fixture_base {
       F::init_genesis( fixture );
       fc::json::save_to_file( fixture.genesis_state, fixture.data_dir.path() / "genesis.json" );
       auto options = F::init_options( fixture );
-      set_option( *options, "genesis-json", boost::filesystem::path(fixture.data_dir.path() / "genesis.json") );
+      fc::set_option( *options, "genesis-json", boost::filesystem::path(fixture.data_dir.path() / "genesis.json") );
       fixture.app.initialize( fixture.data_dir.path(), options );
       fixture.app.startup();
 

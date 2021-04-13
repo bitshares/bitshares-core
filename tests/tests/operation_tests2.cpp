@@ -843,7 +843,7 @@ BOOST_AUTO_TEST_CASE( witness_create )
       if( !db.find(wid) )
          break;
    }
-   options.insert( std::make_pair( "witness-id", boost::program_options::variable_value( witness_ids, false ) ) );
+   fc::set_option( options, "witness-id", witness_ids );
    wtplugin->plugin_initialize(options);
    wtplugin->plugin_startup();
 
