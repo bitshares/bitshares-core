@@ -46,6 +46,7 @@
 
 #include "../common/init_unit_test_suite.hpp"
 #include "../common/genesis_file_util.hpp"
+#include "../common/program_options_util.hpp"
 #include "../common/utils.hpp"
 
 using namespace graphene;
@@ -248,9 +249,9 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app1.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
       auto sharable_cfg = std::make_shared<boost::program_options::variables_map>();
       auto& cfg = *sharable_cfg;
-      cfg.emplace("p2p-endpoint", boost::program_options::variable_value(app1_p2p_endpoint_str, false));
-      cfg.emplace("genesis-json", boost::program_options::variable_value(genesis_file, false));
-      cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
+      fc::set_option( cfg, "p2p-endpoint", app1_p2p_endpoint_str );
+      fc::set_option( cfg, "genesis-json", genesis_file );
+      fc::set_option( cfg, "seed-nodes", string("[]") );
       app1.initialize(app_dir.path(), sharable_cfg);
       BOOST_TEST_MESSAGE( "Starting app1 and waiting" );
       app1.startup();
@@ -273,8 +274,8 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app2.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
       auto sharable_cfg2 = std::make_shared<boost::program_options::variables_map>();
       auto& cfg2 = *sharable_cfg2;
-      cfg2.emplace("genesis-json", boost::program_options::variable_value(genesis_file, false));
-      cfg2.emplace("seed-nodes", boost::program_options::variable_value(app2_seed_nodes_str, false));
+      fc::set_option( cfg2, "genesis-json", genesis_file );
+      fc::set_option( cfg2, "seed-nodes", app2_seed_nodes_str );
       app2.initialize(app2_dir.path(), sharable_cfg2);
 
       BOOST_TEST_MESSAGE( "Starting app2 and waiting for connection" );

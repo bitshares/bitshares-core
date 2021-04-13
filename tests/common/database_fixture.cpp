@@ -183,146 +183,127 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
 {
    auto sharable_options = std::make_shared<boost::program_options::variables_map>();
    auto& options = *sharable_options;
-   set_option( options, "seed-nodes", std::string("[]") ); // Do not connect to default seed nodes
+   fc::set_option( options, "seed-nodes", std::string("[]") ); // Do not connect to default seed nodes
    /**
     * Test specific settings
     */
    if (fixture.current_test_name == "broadcast_transaction_with_callback_test")
-      set_option( options, "enable-p2p-network", true );
+      fc::set_option( options, "enable-p2p-network", true );
    else if (fixture.current_test_name == "broadcast_transaction_disabled_p2p_test")
-      set_option( options, "enable-p2p-network", false );
+      fc::set_option( options, "enable-p2p-network", false );
    else if( rand() % 100 >= 50 ) // Disable P2P network randomly for test cases
-      set_option( options, "enable-p2p-network", false );
+      fc::set_option( options, "enable-p2p-network", false );
    else if( rand() % 100 >= 50 ) // this should lead to no change
-      set_option( options, "enable-p2p-network", true );
+      fc::set_option( options, "enable-p2p-network", true );
 
    if (fixture.current_test_name == "get_account_history_operations")
    {
-      options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)75, false)));
+      fc::set_option( options, "max-ops-per-account", (uint64_t)75 );
    }
    if (fixture.current_test_name == "api_limit_get_account_history_operations")
    {
-    options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
-    options.insert(std::make_pair("api-limit-get-account-history-operations", boost::program_options::variable_value((uint64_t)300, false)));
+      fc::set_option( options, "max-ops-per-account", (uint64_t)125 );
+      fc::set_option( options, "api-limit-get-account-history-operations", (uint64_t)300 );
    }
    if(fixture.current_test_name =="api_limit_get_account_history")
    {
-    options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
-    options.insert(std::make_pair("api-limit-get-account-history", boost::program_options::variable_value((uint64_t)250, false)));
+      fc::set_option( options, "max-ops-per-account", (uint64_t)125 );
+      fc::set_option( options, "api-limit-get-account-history", (uint64_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_grouped_limit_orders")
    {
-    options.insert(std::make_pair("api-limit-get-grouped-limit-orders", boost::program_options::variable_value((uint64_t)250, false)));
+      fc::set_option( options, "api-limit-get-grouped-limit-orders", (uint64_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_relative_account_history")
    {
-    options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
-    options.insert(std::make_pair("api-limit-get-relative-account-history", boost::program_options::variable_value((uint64_t)250, false)));
+      fc::set_option( options, "max-ops-per-account", (uint64_t)125 );
+      fc::set_option( options, "api-limit-get-relative-account-history", (uint64_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_account_history_by_operations")
    {
-    options.insert(std::make_pair("api-limit-get-account-history-by-operations", boost::program_options::variable_value((uint64_t)250, false)));
-    options.insert(std::make_pair("api-limit-get-relative-account-history", boost::program_options::variable_value((uint64_t)250, false)));
+      fc::set_option( options, "api-limit-get-account-history-by-operations", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-relative-account-history", (uint64_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_asset_holders")
    {
-    options.insert(std::make_pair("api-limit-get-asset-holders", boost::program_options::variable_value((uint64_t)250, false)));
+      fc::set_option( options, "api-limit-get-asset-holders", (uint64_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_key_references")
    {
-    options.insert(std::make_pair("api-limit-get-key-references", boost::program_options::variable_value((uint64_t)200, false)));
+      fc::set_option( options, "api-limit-get-key-references", (uint64_t)200 );
    }
    if(fixture.current_test_name =="api_limit_get_limit_orders")
    {
-    options.insert(std::make_pair("api-limit-get-limit-orders", boost::program_options::variable_value(
-       (uint64_t)350, false)));
+      fc::set_option( options, "api-limit-get-limit-orders", (uint64_t)350 );
    }
    if(fixture.current_test_name =="api_limit_get_limit_orders_by_account")
    {
-    options.insert(std::make_pair("api-limit-get-limit-orders-by-account", boost::program_options::variable_value(
-       (uint64_t)150, false)));
+      fc::set_option( options, "api-limit-get-limit-orders-by-account", (uint64_t)150 );
    }
    if(fixture.current_test_name =="api_limit_get_call_orders")
    {
-    options.insert(std::make_pair("api-limit-get-call-orders", boost::program_options::variable_value(
-       (uint64_t)350, false)));
+      fc::set_option( options, "api-limit-get-call-orders", (uint64_t)350 );
    }
    if(fixture.current_test_name =="api_limit_get_settle_orders")
    {
-    options.insert(std::make_pair("api-limit-get-settle-orders", boost::program_options::variable_value(
-       (uint64_t)350, false)));
+      fc::set_option( options, "api-limit-get-settle-orders", (uint64_t)350 );
    }
    if(fixture.current_test_name =="api_limit_get_order_book")
    {
-    options.insert(std::make_pair("api-limit-get-order-book", boost::program_options::variable_value(
-       (uint64_t)80, false)));
+      fc::set_option( options, "api-limit-get-order-book", (uint64_t)80 );
    }
    if(fixture.current_test_name =="api_limit_lookup_accounts")
    {
-      options.insert(std::make_pair("api-limit-lookup-accounts", boost::program_options::variable_value
-         ((uint64_t)200, false)));
+      fc::set_option( options, "api-limit-lookup-accounts", (uint64_t)200 );
    }
    if(fixture.current_test_name =="api_limit_lookup_witness_accounts")
    {
-      options.insert(std::make_pair("api-limit-lookup-witness-accounts", boost::program_options::variable_value
-         ((uint64_t)200, false)));
+      fc::set_option( options, "api-limit-lookup-witness-accounts", (uint64_t)200 );
    }
    if(fixture.current_test_name =="api_limit_lookup_committee_member_accounts")
    {
-      options.insert(std::make_pair("api-limit-lookup-committee-member-accounts", boost::program_options::variable_value
-         ((uint64_t)200, false)));
+      fc::set_option( options, "api-limit-lookup-committee-member-accounts", (uint64_t)200 );
    }
    if(fixture.current_test_name =="api_limit_lookup_committee_member_accounts")
    {
-      options.insert(std::make_pair("api-limit-lookup-committee-member-accounts", boost::program_options::variable_value
-         ((uint64_t)200, false)));
+      fc::set_option( options, "api-limit-lookup-committee-member-accounts", (uint64_t)200 );
    }
    if(fixture.current_test_name =="api_limit_lookup_vote_ids")
    {
-      options.insert(std::make_pair("api-limit-lookup-vote-ids", boost::program_options::variable_value
-         ((uint64_t)2, false)));
+      fc::set_option( options, "api-limit-lookup-vote-ids", (uint64_t)2 );
    }
    if(fixture.current_test_name =="api_limit_get_account_limit_orders")
    {
-      options.insert(std::make_pair("api-limit-get-account-limit-orders", boost::program_options::variable_value
-         ((uint64_t)250, false)));
+      fc::set_option( options, "api-limit-get-account-limit-orders", (uint64_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_collateral_bids")
    {
-      options.insert(std::make_pair("api-limit-get-collateral-bids", boost::program_options::variable_value
-         ((uint64_t)250, false)));
+      fc::set_option( options, "api-limit-get-collateral-bids", (uint64_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_top_markets")
    {
-      options.insert(std::make_pair("api-limit-get-top-markets", boost::program_options::variable_value
-         ((uint64_t)250, false)));
+      fc::set_option( options, "api-limit-get-top-markets", (uint64_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_trade_history")
    {
-      options.insert(std::make_pair("api-limit-get-trade-history", boost::program_options::variable_value
-         ((uint64_t)250, false)));
+      fc::set_option( options, "api-limit-get-trade-history", (uint64_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_trade_history_by_sequence")
    {
-      options.insert(std::make_pair("api-limit-get-trade-history-by-sequence", boost::program_options::variable_value
-         ((uint64_t)250, false)));
+      fc::set_option( options, "api-limit-get-trade-history-by-sequence", (uint64_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_withdraw_permissions_by_giver")
    {
-      options.insert(std::make_pair("api-limit-get-withdraw-permissions-by-giver", boost::program_options::variable_value
-         ((uint64_t)250, false)));
+      fc::set_option( options, "api-limit-get-withdraw-permissions-by-giver", (uint64_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_withdraw_permissions_by_recipient")
    {
-      options.insert(std::make_pair("api-limit-get-withdraw-permissions-by-recipient", boost::program_options::variable_value
-         ((uint64_t)250, false)));
+      fc::set_option( options, "api-limit-get-withdraw-permissions-by-recipient", (uint64_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_full_accounts2")
    {
-      options.insert(std::make_pair("api-limit-get-full-accounts", boost::program_options::variable_value
-         ((uint64_t)200, false)));
-      options.insert(std::make_pair("api-limit-get-full-accounts-lists", boost::program_options::variable_value
-         ((uint64_t)120, false)));
+      fc::set_option( options, "api-limit-get-full-accounts", (uint64_t)200 );
+      fc::set_option( options, "api-limit-get-full-accounts-lists", (uint64_t)120 );
    }
 
    // add account tracking for ahplugin for special test case with track-account enabled
@@ -330,8 +311,8 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
       std::vector<std::string> track_account;
       std::string track = "\"1.2.17\"";
       track_account.push_back(track);
-      options.insert(std::make_pair("track-account", boost::program_options::variable_value(track_account, false)));
-      options.insert(std::make_pair("partial-operations", boost::program_options::variable_value(true, false)));
+      fc::set_option( options, "track-account", track_account );
+      fc::set_option( options, "partial-operations", true );
    }
    // account tracking 2 accounts
    if( !options.count("track-account") && fixture.current_test_name == "track_account2") {
@@ -340,7 +321,7 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
       track_account.push_back(track);
       track = "\"1.2.16\"";
       track_account.push_back(track);
-      options.insert(std::make_pair("track-account", boost::program_options::variable_value(track_account, false)));
+      fc::set_option( options, "track-account", track_account );
    }
    // standby votes tracking
    if( fixture.current_test_name == "track_votes_witnesses_disabled"
@@ -353,27 +334,18 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
          fixture.current_test_name == "elasticsearch_history_api") {
       fixture.app.register_plugin<graphene::elasticsearch::elasticsearch_plugin>(true);
 
-      options.insert(std::make_pair("elasticsearch-node-url",
-            boost::program_options::variable_value(GRAPHENE_TESTING_ES_URL, false)));
-      options.insert(std::make_pair("elasticsearch-bulk-replay",
-            boost::program_options::variable_value(uint32_t(2), false)));
-      options.insert(std::make_pair("elasticsearch-bulk-sync",
-            boost::program_options::variable_value(uint32_t(2), false)));
-      options.insert(std::make_pair("elasticsearch-start-es-after-block",
-            boost::program_options::variable_value(uint32_t(0), false)));
-      options.insert(std::make_pair("elasticsearch-visitor",
-            boost::program_options::variable_value(false, false)));
-      options.insert(std::make_pair("elasticsearch-operation-object",
-            boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("elasticsearch-operation-string",
-            boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("elasticsearch-mode",
-            boost::program_options::variable_value(uint16_t(2), false)));
+      fc::set_option( options, "elasticsearch-node-url", GRAPHENE_TESTING_ES_URL );
+      fc::set_option( options, "elasticsearch-bulk-replay", uint32_t(2) );
+      fc::set_option( options, "elasticsearch-bulk-sync", uint32_t(2) );
+      fc::set_option( options, "elasticsearch-start-es-after-block", uint32_t(0) );
+      fc::set_option( options, "elasticsearch-visitor", false );
+      fc::set_option( options, "elasticsearch-operation-object", true );
+      fc::set_option( options, "elasticsearch-operation-string", true );
+      fc::set_option( options, "elasticsearch-mode", uint16_t(2) );
 
       fixture.es_index_prefix = string("bitshares-") + fc::to_string(uint64_t(rand())) + "-";
       BOOST_TEST_MESSAGE( string("ES index prefix is ") + fixture.es_index_prefix );
-      options.insert(std::make_pair("elasticsearch-index-prefix",
-            boost::program_options::variable_value(fixture.es_index_prefix, false)));
+      fc::set_option( options, "elasticsearch-index-prefix", fixture.es_index_prefix );
    }
    else if( fixture.current_suite_name != "performance_tests" )
    {
@@ -383,29 +355,19 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
    if(fixture.current_test_name == "elasticsearch_objects" || fixture.current_test_name == "elasticsearch_suite") {
       fixture.app.register_plugin<graphene::es_objects::es_objects_plugin>(true);
 
-      options.insert(std::make_pair("es-objects-elasticsearch-url",
-            boost::program_options::variable_value(GRAPHENE_TESTING_ES_URL, false)));
-      options.insert(std::make_pair("es-objects-bulk-replay",
-            boost::program_options::variable_value(uint32_t(2), false)));
-      options.insert(std::make_pair("es-objects-bulk-sync",
-            boost::program_options::variable_value(uint32_t(2), false)));
-      options.insert(std::make_pair("es-objects-proposals",
-            boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("es-objects-accounts",
-            boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("es-objects-assets",
-            boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("es-objects-balances",
-            boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("es-objects-limit-orders",
-            boost::program_options::variable_value(true, false)));
-      options.insert(std::make_pair("es-objects-asset-bitasset",
-            boost::program_options::variable_value(true, false)));
+      fc::set_option( options, "es-objects-elasticsearch-url", GRAPHENE_TESTING_ES_URL );
+      fc::set_option( options, "es-objects-bulk-replay", uint32_t(2) );
+      fc::set_option( options, "es-objects-bulk-sync", uint32_t(2) );
+      fc::set_option( options, "es-objects-proposals", true );
+      fc::set_option( options, "es-objects-accounts", true );
+      fc::set_option( options, "es-objects-assets", true );
+      fc::set_option( options, "es-objects-balances", true );
+      fc::set_option( options, "es-objects-limit-orders", true );
+      fc::set_option( options, "es-objects-asset-bitasset", true );
 
       fixture.es_obj_index_prefix = string("objects-") + fc::to_string(uint64_t(rand())) + "-";
       BOOST_TEST_MESSAGE( string("ES_OBJ index prefix is ") + fixture.es_obj_index_prefix );
-      options.insert(std::make_pair("es-objects-index-prefix",
-            boost::program_options::variable_value(fixture.es_obj_index_prefix, false)));
+      fc::set_option( options, "es-objects-index-prefix", fixture.es_obj_index_prefix );
    }
 
    if( fixture.current_test_name == "asset_in_collateral"
@@ -420,11 +382,10 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
    if(fixture.current_test_name == "custom_operations_account_storage_map_test" ||
       fixture.current_test_name == "custom_operations_account_storage_list_test") {
       fixture.app.register_plugin<graphene::custom_operations::custom_operations_plugin>(true);
-      options.insert(std::make_pair("custom-operations-start-block",
-            boost::program_options::variable_value(uint32_t(1), false)));
+      fc::set_option( options, "custom-operations-start-block", uint32_t(1) );
    }
 
-   options.insert(std::make_pair("bucket-size", boost::program_options::variable_value(string("[15]"),false)));
+   fc::set_option( options, "bucket-size", string("[15]") );
 
    fixture.app.register_plugin<graphene::market_history::market_history_plugin>(true);
    fixture.app.register_plugin<graphene::grouped_orders::grouped_orders_plugin>(true);

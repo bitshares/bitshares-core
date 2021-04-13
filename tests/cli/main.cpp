@@ -62,6 +62,7 @@
 
 #include "../common/init_unit_test_suite.hpp"
 #include "../common/genesis_file_util.hpp"
+#include "../common/program_options_util.hpp"
 #include "../common/utils.hpp"
 
 #ifdef _WIN32
@@ -107,13 +108,10 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    auto sharable_cfg = std::make_shared<boost::program_options::variables_map>();
    auto& cfg = *sharable_cfg;
    server_port_number = fc::network::get_available_port();
-   cfg.emplace(
-      "rpc-endpoint",
-      boost::program_options::variable_value(string("127.0.0.1:" + std::to_string(server_port_number)), false)
-   );
-   cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
-   cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
-   cfg.emplace("custom-operations-start-block", boost::program_options::variable_value(uint32_t(1), false));
+   fc::set_option( cfg, "rpc-endpoint", string("127.0.0.1:") + std::to_string(server_port_number) );
+   fc::set_option( cfg, "genesis-json", create_genesis_file(app_dir) );
+   fc::set_option( cfg, "seed-nodes", string("[]") );
+   fc::set_option( cfg, "custom-operations-start-block", uint32_t(1) );
    app1->initialize(app_dir.path(), sharable_cfg);
 
    app1->startup();
