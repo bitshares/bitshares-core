@@ -22,10 +22,11 @@ private:
    mutable fc::mutex mux;
 
 public:
-   // iterations require a lock. This exposes the mutex. Use with care (i.e. lock_guard)
+   /// Iterations require a lock. This exposes the mutex. Use with care (i.e. lock_guard)
    fc::mutex& get_mutex()const { return mux; }
 
-   // insertion
+   /// Insertion
+   /// @{
    std::pair< typename std::unordered_set<Key, Hash, Pred>::iterator, bool> emplace( Key key)
    {
       fc::scoped_lock<fc::mutex> lock(mux);
@@ -36,7 +37,9 @@ public:
       fc::scoped_lock<fc::mutex> lock(mux);
       return std::unordered_set<Key, Hash, Pred>::insert( val ); 
    }
-   // size
+   /// @}
+   /// Size
+   /// @{
    size_t size() const 
    { 
       fc::scoped_lock<fc::mutex> lock(mux);
@@ -47,7 +50,9 @@ public:
       fc::scoped_lock<fc::mutex> lock(mux);
       return std::unordered_set<Key, Hash, Pred>::empty();
    }
-   // removal
+   /// @}
+   /// Removal
+   /// @{
    void clear() noexcept
    {
       fc::scoped_lock<fc::mutex> lock(mux);
@@ -64,13 +69,17 @@ public:
       fc::scoped_lock<fc::mutex> lock(mux);
       return std::unordered_set<Key, Hash, Pred>::erase( key ); 
    }
-   // swap
+   /// @}
+   /// Swap
+   /// @{
    void swap( typename std::unordered_set<Key, Hash, Pred>& other ) noexcept
    {
       fc::scoped_lock<fc::mutex> lock(mux);
       std::unordered_set<Key, Hash, Pred>::swap( other );
    }
-   // iteration
+   /// @}
+   /// Iteration
+   /// @{
    typename std::unordered_set<Key, Hash, Pred>::iterator begin() noexcept 
    { 
       fc::scoped_lock<fc::mutex> lock(mux);
@@ -111,7 +120,8 @@ public:
       fc::scoped_lock<fc::mutex> lock(mux);
       return std::unordered_set<Key, Hash, Pred>::end(n); 
    }
-   // search
+   /// @}
+   /// Search
    typename std::unordered_set<Key, Hash, Pred>::const_iterator find(Key key)
    {
       fc::scoped_lock<fc::mutex> lock(mux);
@@ -119,13 +129,13 @@ public:
    }
 };   
 
-// when requesting items from peers, we want to prioritize any blocks before
-// transactions, but otherwise request items in the order we heard about them
+/// When requesting items from peers, we want to prioritize any blocks before
+/// transactions, but otherwise request items in the order we heard about them
 struct prioritized_item_id
 {
   item_id  item;
   unsigned sequence_number;
-  fc::time_point timestamp; // the time we last heard about this item in an inventory message
+  fc::time_point timestamp; ///< the time we last heard about this item in an inventory message
 
   prioritized_item_id(const item_id& item, unsigned sequence_number) :
     item(item),
@@ -288,80 +298,94 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       fc::path             _node_configuration_directory;
       node_configuration   _node_configuration;
 
-      /// stores the endpoint we're listening on.  This will be the same as
-      // _node_configuration.listen_endpoint, unless that endpoint was already
-      // in use.
+      /// Stores the endpoint we're listening on.  This will be the same as
+      /// _node_configuration.listen_endpoint, unless that endpoint was already
+      /// in use.
       fc::ip::endpoint     _actual_listening_endpoint;
 
-      /// we determine whether we're firewalled by asking other nodes.  Store the result here:
+      /// We determine whether we're firewalled by asking other nodes.  Store the result here.
       firewalled_state     _is_firewalled;
-      /// if we're behind NAT, our listening endpoint address will appear different to the rest of the world.  store it here.
+      /// If we're behind NAT, our listening endpoint address will appear different to the rest of the world.
+      /// Store it here.
       fc::optional<fc::ip::endpoint> _publicly_visible_listening_endpoint;
       fc::time_point       _last_firewall_check_message_sent;
 
-      /// used by the task that manages connecting to peers
-      // @{
-      std::list<potential_peer_record> _add_once_node_list; /// list of peers we want to connect to as soon as possible
+      /// Used by the task that manages connecting to peers
+      /// @{
+      /// List of peers we want to connect to as soon as possible
+      std::list<potential_peer_record> _add_once_node_list;
 
       peer_database             _potential_peer_db;
       fc::promise<void>::ptr    _retrigger_connect_loop_promise;
       bool                      _potential_peer_database_updated;
       fc::future<void>          _p2p_network_connect_loop_done;
-      // @}
+      /// @}
 
-      /// used by the task that fetches sync items during synchronization
-      // @{
+      /// Used by the task that fetches sync items during synchronization
+      /// @{
       fc::promise<void>::ptr    _retrigger_fetch_sync_items_loop_promise;
       bool                      _sync_items_to_fetch_updated;
       fc::future<void>          _fetch_sync_items_loop_done;
 
       typedef std::unordered_map<graphene::net::block_id_type, fc::time_point> active_sync_requests_map;
 
-      active_sync_requests_map              _active_sync_requests; /// list of sync blocks we've asked for from peers but have not yet received
-      std::list<graphene::net::block_message> _new_received_sync_items; /// list of sync blocks we've just received but haven't yet tried to process
-      std::list<graphene::net::block_message> _received_sync_items; /// list of sync blocks we've received, but can't yet process because we are still missing blocks that come earlier in the chain
-      // @}
+      /// List of sync blocks we've asked for from peers but have not yet received
+      active_sync_requests_map              _active_sync_requests;
+      /// List of sync blocks we've just received but haven't yet tried to process
+      std::list<graphene::net::block_message> _new_received_sync_items;
+      /// List of sync blocks we've received, but can't yet process because we are still missing blocks
+      /// that come earlier in the chain
+      std::list<graphene::net::block_message> _received_sync_items;
+      /// @}
 
       fc::future<void> _process_backlog_of_sync_blocks_done;
       bool _suspend_fetching_sync_blocks;
 
-      /// used by the task that fetches items during normal operation
-      // @{
+      /// Used by the task that fetches items during normal operation
+      /// @{
       fc::promise<void>::ptr _retrigger_fetch_item_loop_promise;
       bool                   _items_to_fetch_updated;
       fc::future<void>       _fetch_item_loop_done;
 
       struct item_id_index{};
-      typedef boost::multi_index_container<prioritized_item_id,
-                                           boost::multi_index::indexed_by<boost::multi_index::ordered_unique<boost::multi_index::identity<prioritized_item_id> >,
-                                                                          boost::multi_index::hashed_unique<boost::multi_index::tag<item_id_index>,
-                                                                                                            boost::multi_index::member<prioritized_item_id, item_id, &prioritized_item_id::item>,
-                                                                                                            std::hash<item_id> > >
-                                           > items_to_fetch_set_type;
+      using items_to_fetch_set_type = boost::multi_index_container< prioritized_item_id,
+               boost::multi_index::indexed_by<
+                  boost::multi_index::ordered_unique< boost::multi_index::identity<prioritized_item_id> >,
+                  boost::multi_index::hashed_unique<
+                     boost::multi_index::tag<item_id_index>,
+                     boost::multi_index::member<prioritized_item_id, item_id, &prioritized_item_id::item>,
+                     std::hash<item_id>
+                  >
+               >
+            >;
       unsigned _items_to_fetch_sequence_counter;
-      items_to_fetch_set_type _items_to_fetch; /// list of items we know another peer has and we want
-      peer_connection::timestamped_items_set_type _recently_failed_items; /// list of transactions we've recently pushed and had rejected by the delegate
-      // @}
+      /// List of items we know another peer has and we want
+      items_to_fetch_set_type _items_to_fetch;
+      /// List of transactions we've recently pushed and had rejected by the delegate
+      peer_connection::timestamped_items_set_type _recently_failed_items;
+      /// @}
 
-      /// used by the task that advertises inventory during normal operation
+      /// Used by the task that advertises inventory during normal operation
       /// @{
       fc::promise<void>::ptr        _retrigger_advertise_inventory_loop_promise;
       fc::future<void>              _advertise_inventory_loop_done;
-      /// list of items we have received but not yet advertised to our peers
+      /// List of items we have received but not yet advertised to our peers
       concurrent_unordered_set<item_id>   _new_inventory;
       /// @}
 
       fc::future<void>     _kill_inactive_conns_loop_done;
-      uint8_t _recent_block_interval_in_seconds; // a cached copy of the block interval, to avoid a thread hop to the blockchain to get the current value
+      /// A cached copy of the block interval, to avoid a thread hop to the blockchain to get the current value
+      uint8_t _recent_block_interval_in_seconds;
 
       std::string          _user_agent_string;
-      /** _node_public_key is a key automatically generated when the client is first run, stored in
+      /**
+       * A key automatically generated when the client is first run, stored in
        * node_config.json.  It doesn't really have much of a purpose yet, there was just some thought
        * that we might someday have a use for nodes having a private key (sent in hello messages)
        */
       node_id_t            _node_public_key;
       /**
-       * _node_id is a random number generated each time the client is launched, used to prevent us
+       * A random number generated each time the client is launched, used to prevent us
        * from connecting to the same client multiple times (sent in hello messages).
        * Since this was introduced after the hello_message was finalized, this is sent in the
        * user_data field.
@@ -370,39 +394,46 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
        */
       node_id_t            _node_id;
 
-      /** if we have less than `_desired_number_of_connections`, we will try to connect with more nodes */
+      /** If we have less than `_desired_number_of_connections`, we will try to connect with more nodes */
       uint32_t             _desired_number_of_connections;
-      /** if we have _maximum_number_of_connections or more, we will refuse any inbound connections */
+      /** If we have _maximum_number_of_connections or more, we will refuse any inbound connections */
       uint32_t             _maximum_number_of_connections;
-      /** retry connections to peers that have failed or rejected us this often, in seconds */
+      /** Retry connections to peers that have failed or rejected us this often, in seconds */
       uint32_t              _peer_connection_retry_timeout;
-      /** how many seconds of inactivity are permitted before disconnecting a peer */
+      /** How many seconds of inactivity are permitted before disconnecting a peer */
       uint32_t              _peer_inactivity_timeout;
 
       fc::tcp_server       _tcp_server;
       fc::future<void>     _accept_loop_complete;
 
-      /** Stores all connections which have not yet finished key exchange or are still sending initial handshaking messages
-       * back and forth (not yet ready to initiate syncing) */
+      /// Stores all connections which have not yet finished key exchange or are still sending
+      /// initial handshaking messages back and forth (not yet ready to initiate syncing)
       concurrent_unordered_set<graphene::net::peer_connection_ptr>               _handshaking_connections;
-      /** stores fully established connections we're either syncing with or in normal operation with */
+      /** Stores fully established connections we're either syncing with or in normal operation with */
       concurrent_unordered_set<graphene::net::peer_connection_ptr>               _active_connections;
-      /** stores connections we've closed (sent closing message, not actually closed), but are still waiting for the remote end to close before we delete them */
+      /// Stores connections we've closed (sent closing message, not actually closed),
+      /// but are still waiting for the remote end to close before we delete them
       concurrent_unordered_set<graphene::net::peer_connection_ptr>               _closing_connections;
-      /** stores connections we've closed, but are still waiting for the OS to notify us that the socket is really closed */
+      /// Stores connections we've closed, but are still waiting for the OS to notify us that the socket
+      /// is really closed
       concurrent_unordered_set<graphene::net::peer_connection_ptr>               _terminating_connections;
 
-      boost::circular_buffer<item_hash_t> _most_recent_blocks_accepted; // the /n/ most recent blocks we've accepted (currently tuned to the max number of connections)
+      /// The /n/ most recent blocks we've accepted (currently tuned to the max number of connections)
+      boost::circular_buffer<item_hash_t> _most_recent_blocks_accepted;
 
       uint32_t _sync_item_type;
-      uint32_t _total_number_of_unfetched_items; /// the number of items we still need to fetch while syncing
-      std::vector<uint32_t> _hard_fork_block_numbers; /// list of all block numbers where there are hard forks
+      /// The number of items we still need to fetch while syncing
+      uint32_t _total_number_of_unfetched_items;
+      /// List of all block numbers where there are hard forks
+      std::vector<uint32_t> _hard_fork_block_numbers;
 
-      blockchain_tied_message_cache _message_cache; /// cache message we have received and might be required to provide to other peers via inventory requests
+      /// Cache message we have received and might be required to provide to other peers via inventory requests
+      blockchain_tied_message_cache _message_cache;
 
       fc::rate_limiting_group _rate_limiter;
 
-      uint32_t _last_reported_number_of_connections; // number of connections last reported to the client (to avoid sending duplicate messages)
+      /// Number of connections last reported to the client (to avoid sending duplicate messages)
+      uint32_t _last_reported_number_of_connections;
 
       bool _peer_advertising_disabled;
 
@@ -422,7 +453,8 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
 
       fc::future<void> _dump_node_status_task_done;
 
-      /* We have two alternate paths through the schedule_peer_for_deletion code -- one that
+      /**
+       * We have two alternate paths through the schedule_peer_for_deletion code -- one that
        * uses a mutex to prevent one fiber from adding items to the queue while another is deleting
        * items from it, and one that doesn't.  The one that doesn't is simpler and more efficient
        * code, but we're keeping around the version that uses the mutex because it crashes, and
@@ -430,18 +462,22 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
        * fixing.  To produce the bug, define USE_PEERS_TO_DELETE_MUTEX and then connect up
        * to the network and set your desired/max connection counts high
        */
+      /// @{
 //#define USE_PEERS_TO_DELETE_MUTEX 1
 #ifdef USE_PEERS_TO_DELETE_MUTEX
       fc::mutex _peers_to_delete_mutex;
 #endif
       std::list<peer_connection_ptr> _peers_to_delete;
       fc::future<void> _delayed_peer_deletion_task_done;
+      /// @}
 
 #ifdef ENABLE_P2P_DEBUGGING_API
       std::set<node_id_t> _allowed_peers;
 #endif // ENABLE_P2P_DEBUGGING_API
 
-      bool _node_is_shutting_down; // set to true when we begin our destructor, used to prevent us from starting new tasks while we're shutting down
+      /// Set to true when we begin our destructor,
+      /// used to prevent us from starting new tasks while we're shutting down
+      bool _node_is_shutting_down;
 
       unsigned _maximum_number_of_blocks_to_handle_at_one_time;
       unsigned _maximum_number_of_sync_blocks_to_prefetch;
@@ -449,13 +485,13 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
 
       std::list<fc::future<void> > _handle_message_calls_in_progress;
 
-      /// used by the task that checks whether addresses of seed nodes have been updated
-      // @{
+      /// Used by the task that checks whether addresses of seed nodes have been updated
+      /// @{
       boost::container::flat_set<std::string> _seed_nodes;
       fc::future<void> _update_seed_nodes_loop_done;
       void update_seed_nodes_task();
       void schedule_next_update_seed_nodes_task();
-      // @}
+      /// @}
 
       node_impl(const std::string& user_agent);
       virtual ~node_impl();
@@ -582,7 +618,8 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       void start_synchronizing();
       void start_synchronizing_with_peer(const peer_connection_ptr& peer);
 
-      void new_peer_just_added(const peer_connection_ptr& peer); /// called after a peer finishes handshaking, kicks off syncing
+      /// Called after a peer finishes handshaking, kicks off syncing
+      void new_peer_just_added(const peer_connection_ptr& peer);
 
       void close();
 
