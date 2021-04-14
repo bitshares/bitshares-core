@@ -375,7 +375,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
 
       fc::future<void>     _kill_inactive_conns_loop_done;
       /// A cached copy of the block interval, to avoid a thread hop to the blockchain to get the current value
-      uint8_t _recent_block_interval_in_seconds;
+      uint8_t _recent_block_interval_seconds;
 
       std::string          _user_agent_string;
       /**
@@ -423,7 +423,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
 
       uint32_t _sync_item_type;
       /// The number of items we still need to fetch while syncing
-      uint32_t _total_number_of_unfetched_items;
+      uint32_t _total_num_of_unfetched_items;
       /// List of all block numbers where there are hard forks
       std::vector<uint32_t> _hard_fork_block_numbers;
 
@@ -433,7 +433,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       fc::rate_limiting_group _rate_limiter;
 
       /// Number of connections last reported to the client (to avoid sending duplicate messages)
-      uint32_t _last_reported_number_of_connections;
+      uint32_t _last_reported_number_of_conns;
 
       bool _peer_advertising_disabled;
 

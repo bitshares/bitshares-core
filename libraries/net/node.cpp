@@ -303,16 +303,16 @@ namespace graphene { namespace net { namespace detail {
       _suspend_fetching_sync_blocks(false),
       _items_to_fetch_updated(false),
       _items_to_fetch_sequence_counter(0),
-      _recent_block_interval_in_seconds(GRAPHENE_MAX_BLOCK_INTERVAL),
+      _recent_block_interval_seconds(GRAPHENE_MAX_BLOCK_INTERVAL),
       _user_agent_string(user_agent),
       _desired_number_of_connections(GRAPHENE_NET_DEFAULT_DESIRED_CONNECTIONS),
       _maximum_number_of_connections(GRAPHENE_NET_DEFAULT_MAX_CONNECTIONS),
       _peer_connection_retry_timeout(GRAPHENE_NET_DEFAULT_PEER_CONNECTION_RETRY_TIME),
       _peer_inactivity_timeout(GRAPHENE_NET_PEER_HANDSHAKE_INACTIVITY_TIMEOUT),
       _most_recent_blocks_accepted(_maximum_number_of_connections),
-      _total_number_of_unfetched_items(0),
+      _total_num_of_unfetched_items(0),
       _rate_limiter(0, 0),
-      _last_reported_number_of_connections(0),
+      _last_reported_number_of_conns(0),
       _peer_advertising_disabled(false),
       _average_network_read_speed_seconds(60),
       _average_network_write_speed_seconds(60),
@@ -656,7 +656,8 @@ namespace graphene { namespace net { namespace detail {
         dlog("beginning an iteration of fetch items (${count} items to fetch)",
              ("count", _items_to_fetch.size()));
 
-        fc::time_point oldest_timestamp_to_fetch = fc::time_point::now() - fc::seconds(_recent_block_interval_in_seconds * GRAPHENE_NET_MESSAGE_CACHE_DURATION_IN_BLOCKS);
+        fc::time_point oldest_timestamp_to_fetch = fc::time_point::now()
+              - fc::seconds(_recent_block_interval_seconds * GRAPHENE_NET_MESSAGE_CACHE_DURATION_IN_BLOCKS);
         fc::time_point next_peer_unblocked_time = fc::time_point::maximum();
 
         // we need to construct a list of items to request from each peer first,
@@ -870,7 +871,7 @@ namespace graphene { namespace net { namespace detail {
      try {
       // Note: if the node is shutting down, it's possible that _delegate is already unusable,
       //       in this case, we'll get an exception
-      _recent_block_interval_in_seconds = _delegate->get_current_block_interval_in_seconds();
+      _recent_block_interval_seconds = _delegate->get_current_block_interval_in_seconds();
 
       // Disconnect peers that haven't sent us any data recently
       // These numbers are just guesses and we need to think through how this works better.
@@ -912,7 +913,7 @@ namespace graphene { namespace net { namespace detail {
          } // for
       } // scoped_lock
       // timeout for any active peers is two block intervals
-      uint32_t active_disconnect_timeout = 10 * _recent_block_interval_in_seconds;
+      uint32_t active_disconnect_timeout = 10 * _recent_block_interval_seconds;
       uint32_t active_send_keepalive_timeout = active_disconnect_timeout / 2;
 
       // set the ignored request time out to 6 second.  When we request a block
@@ -2171,7 +2172,7 @@ namespace graphene { namespace net { namespace detail {
             originating_peer->we_need_sync_items_from_peer = false;
 
             uint32_t new_number_of_unfetched_items = calculate_unsynced_block_count_from_all_peers();
-            _total_number_of_unfetched_items = new_number_of_unfetched_items;
+            _total_num_of_unfetched_items = new_number_of_unfetched_items;
             if( new_number_of_unfetched_items == 0 )
               _delegate->sync_status( blockchain_item_ids_inventory_message_received.item_type, 0 );
 
@@ -2291,10 +2292,10 @@ namespace graphene { namespace net { namespace detail {
           boost::push_back(originating_peer->ids_of_items_to_get, item_hashes_received);
           
           uint32_t new_number_of_unfetched_items = calculate_unsynced_block_count_from_all_peers();
-          if (new_number_of_unfetched_items != _total_number_of_unfetched_items)
+          if (new_number_of_unfetched_items != _total_num_of_unfetched_items)
             _delegate->sync_status(blockchain_item_ids_inventory_message_received.item_type,
                                    new_number_of_unfetched_items);
-          _total_number_of_unfetched_items = new_number_of_unfetched_items;
+          _total_num_of_unfetched_items = new_number_of_unfetched_items;
 
           if (blockchain_item_ids_inventory_message_received.total_remaining_item_count != 0)
           {
@@ -2621,10 +2622,10 @@ namespace graphene { namespace net { namespace detail {
       trigger_p2p_network_connect_loop();
 
       // notify the node delegate so it can update the display
-      if( _active_connections.size() != _last_reported_number_of_connections )
+      if( _active_connections.size() != _last_reported_number_of_conns )
       {
-        _last_reported_number_of_connections = (uint32_t)_active_connections.size();
-        _delegate->connection_count_changed( _last_reported_number_of_connections );
+        _last_reported_number_of_conns = (uint32_t)_active_connections.size();
+        _delegate->connection_count_changed( _last_reported_number_of_conns );
       }
 
       // if we had delegated a firewall check to this peer, send it to another peer
@@ -2726,9 +2727,9 @@ namespace graphene { namespace net { namespace detail {
 
       if( client_accepted_block )
       {
-         --_total_number_of_unfetched_items;
+         --_total_num_of_unfetched_items;
          dlog("sync: client accpted the block, we now have only ${count} items left to fetch before we're in sync",
-               ("count", _total_number_of_unfetched_items));
+               ("count", _total_num_of_unfetched_items));
          bool is_fork_block = is_hard_fork_block(block_message_to_send.block.block_num());
          {
             fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
@@ -3629,10 +3630,10 @@ namespace graphene { namespace net { namespace detail {
       peer->send_message(current_time_request_message(),
                          offsetof(current_time_request_message, request_sent_time));
       start_synchronizing_with_peer( peer );
-      if( _active_connections.size() != _last_reported_number_of_connections )
+      if( _active_connections.size() != _last_reported_number_of_conns )
       {
-        _last_reported_number_of_connections = (uint32_t)_active_connections.size();
-        _delegate->connection_count_changed( _last_reported_number_of_connections );
+        _last_reported_number_of_conns = (uint32_t)_active_connections.size();
+        _delegate->connection_count_changed( _last_reported_number_of_conns );
       }
     }
 
