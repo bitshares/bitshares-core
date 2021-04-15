@@ -288,7 +288,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
 {
     public:
 #ifdef P2P_IN_DEDICATED_THREAD
-      std::shared_ptr<fc::thread> _thread;
+      std::shared_ptr<fc::thread> _thread = std::make_shared<fc::thread>("p2p");
 #endif // P2P_IN_DEDICATED_THREAD
       std::unique_ptr<statistics_gathering_node_delegate_wrapper> _delegate;
       fc::sha256           _chain_id;
@@ -304,7 +304,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       fc::ip::endpoint     _actual_listening_endpoint;
 
       /// We determine whether we're firewalled by asking other nodes.  Store the result here.
-      firewalled_state     _is_firewalled;
+      firewalled_state     _is_firewalled = firewalled_state::unknown;
       /// If we're behind NAT, our listening endpoint address will appear different to the rest of the world.
       /// Store it here.
       fc::optional<fc::ip::endpoint> _publicly_visible_listening_endpoint;
@@ -317,14 +317,14 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
 
       peer_database             _potential_peer_db;
       fc::promise<void>::ptr    _retrigger_connect_loop_promise;
-      bool                      _potential_peer_database_updated;
+      bool                      _potential_peer_database_updated = false;
       fc::future<void>          _p2p_network_connect_loop_done;
       /// @}
 
       /// Used by the task that fetches sync items during synchronization
       /// @{
       fc::promise<void>::ptr    _retrigger_fetch_sync_items_loop_promise;
-      bool                      _sync_items_to_fetch_updated;
+      bool                      _sync_items_to_fetch_updated = false;
       fc::future<void>          _fetch_sync_items_loop_done;
 
       typedef std::unordered_map<graphene::net::block_id_type, fc::time_point> active_sync_requests_map;
@@ -339,12 +339,12 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       /// @}
 
       fc::future<void> _process_backlog_of_sync_blocks_done;
-      bool _suspend_fetching_sync_blocks;
+      bool _suspend_fetching_sync_blocks = false;
 
       /// Used by the task that fetches items during normal operation
       /// @{
       fc::promise<void>::ptr _retrigger_fetch_item_loop_promise;
-      bool                   _items_to_fetch_updated;
+      bool                   _items_to_fetch_updated = false;
       fc::future<void>       _fetch_item_loop_done;
 
       struct item_id_index{};
@@ -358,7 +358,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
                   >
                >
             >;
-      unsigned _items_to_fetch_sequence_counter;
+      size_t  _items_to_fetch_sequence_counter = 0;
       /// List of items we know another peer has and we want
       items_to_fetch_set_type _items_to_fetch;
       /// List of transactions we've recently pushed and had rejected by the delegate
@@ -375,7 +375,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
 
       fc::future<void>     _kill_inactive_conns_loop_done;
       /// A cached copy of the block interval, to avoid a thread hop to the blockchain to get the current value
-      uint8_t _recent_block_interval_seconds;
+      uint8_t _recent_block_interval_seconds = GRAPHENE_MAX_BLOCK_INTERVAL;
 
       std::string          _user_agent_string;
       /**
@@ -395,13 +395,13 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       node_id_t            _node_id;
 
       /** If we have less than `_desired_number_of_connections`, we will try to connect with more nodes */
-      uint32_t             _desired_number_of_connections;
+      uint32_t             _desired_number_of_connections = GRAPHENE_NET_DEFAULT_DESIRED_CONNECTIONS;
       /** If we have _maximum_number_of_connections or more, we will refuse any inbound connections */
-      uint32_t             _maximum_number_of_connections;
+      uint32_t             _maximum_number_of_connections = GRAPHENE_NET_DEFAULT_MAX_CONNECTIONS;
       /** Retry connections to peers that have failed or rejected us this often, in seconds */
-      uint32_t              _peer_connection_retry_timeout;
+      uint32_t             _peer_connection_retry_timeout = GRAPHENE_NET_DEFAULT_PEER_CONNECTION_RETRY_TIME;
       /** How many seconds of inactivity are permitted before disconnecting a peer */
-      uint32_t              _peer_inactivity_timeout;
+      uint32_t             _peer_inactivity_timeout = GRAPHENE_NET_PEER_HANDSHAKE_INACTIVITY_TIMEOUT;
 
       fc::tcp_server       _tcp_server;
       fc::future<void>     _accept_loop_complete;
@@ -419,34 +419,42 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       concurrent_unordered_set<graphene::net::peer_connection_ptr>               _terminating_connections;
 
       /// The /n/ most recent blocks we've accepted (currently tuned to the max number of connections)
-      boost::circular_buffer<item_hash_t> _most_recent_blocks_accepted;
+      boost::circular_buffer<item_hash_t> _most_recent_blocks_accepted { _maximum_number_of_connections };
 
       uint32_t _sync_item_type;
       /// The number of items we still need to fetch while syncing
-      uint32_t _total_num_of_unfetched_items;
+      uint32_t _total_num_of_unfetched_items = 0;
       /// List of all block numbers where there are hard forks
       std::vector<uint32_t> _hard_fork_block_numbers;
 
       /// Cache message we have received and might be required to provide to other peers via inventory requests
       blockchain_tied_message_cache _message_cache;
 
-      fc::rate_limiting_group _rate_limiter;
+      fc::rate_limiting_group _rate_limiter { 0, 0 };
 
       /// Number of connections last reported to the client (to avoid sending duplicate messages)
-      uint32_t _last_reported_number_of_conns;
+      uint32_t _last_reported_number_of_conns = 0;
 
-      bool _peer_advertising_disabled;
+      bool _peer_advertising_disabled = false;
 
       fc::future<void> _fetch_updated_peer_lists_loop_done;
 
-      boost::circular_buffer<uint32_t> _average_network_read_speed_seconds;
-      boost::circular_buffer<uint32_t> _average_network_write_speed_seconds;
-      boost::circular_buffer<uint32_t> _average_network_read_speed_minutes;
-      boost::circular_buffer<uint32_t> _average_network_write_speed_minutes;
-      boost::circular_buffer<uint32_t> _average_network_read_speed_hours;
-      boost::circular_buffer<uint32_t> _average_network_write_speed_hours;
-      unsigned _average_network_usage_second_counter;
-      unsigned _average_network_usage_minute_counter;
+      /// Average network read speed in the past seconds
+      boost::circular_buffer<uint32_t> _avg_net_read_speed_seconds { 60 };
+      /// Average network write speed in the past seconds
+      boost::circular_buffer<uint32_t> _avg_net_write_speed_seconds { 60 };
+      /// Average network read speed in the past minutes
+      boost::circular_buffer<uint32_t> _avg_net_read_speed_minutes { 60 };
+      /// Average network write speed in the past minutes
+      boost::circular_buffer<uint32_t> _avg_net_write_speed_minutes { 60 };
+      /// Average network read speed in the past hours
+      boost::circular_buffer<uint32_t> _avg_net_read_speed_hours { 72 };
+      /// Average network write speed in the past hours
+      boost::circular_buffer<uint32_t> _avg_net_write_speed_hours { 72 };
+      /// Average network usage second counter
+      size_t _avg_net_usage_second_counter = 0;
+      /// Average network usage minute counter
+      size_t _avg_net_usage_minute_counter = 0;
 
       fc::time_point_sec _bandwidth_monitor_last_update_time;
       fc::future<void> _bandwidth_monitor_loop_done;
@@ -477,11 +485,14 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
 
       /// Set to true when we begin our destructor,
       /// used to prevent us from starting new tasks while we're shutting down
-      bool _node_is_shutting_down;
+      bool _node_is_shutting_down = false;
 
-      unsigned _maximum_number_of_blocks_to_handle_at_one_time;
-      unsigned _maximum_number_of_sync_blocks_to_prefetch;
-      unsigned _maximum_blocks_per_peer_during_syncing;
+      /// Maximum number of blocks to handle at one time
+      size_t _max_blocks_to_handle_at_once = MAXIMUM_NUMBER_OF_BLOCKS_TO_HANDLE_AT_ONE_TIME;
+      /// Maximum number of sync blocks to prefetch
+      size_t _max_sync_blocks_to_prefetch = MAXIMUM_NUMBER_OF_BLOCKS_TO_PREFETCH;
+      /// Maximum number of blocks per peer during syncing
+      size_t _max_sync_blocks_per_peer = GRAPHENE_NET_MAX_BLOCKS_PER_PEER_DURING_SYNCING;
 
       std::list<fc::future<void> > _handle_message_calls_in_progress;
 

@@ -289,43 +289,8 @@ namespace graphene { namespace net { namespace detail {
 # define VERIFY_CORRECT_THREAD() do {} while (0)
 #endif
 
-#define MAXIMUM_NUMBER_OF_BLOCKS_TO_HANDLE_AT_ONE_TIME 200
-#define MAXIMUM_NUMBER_OF_BLOCKS_TO_PREFETCH (10 * MAXIMUM_NUMBER_OF_BLOCKS_TO_HANDLE_AT_ONE_TIME)
-
     node_impl::node_impl(const std::string& user_agent) :
-#ifdef P2P_IN_DEDICATED_THREAD
-      _thread(std::make_shared<fc::thread>("p2p")),
-#endif // P2P_IN_DEDICATED_THREAD
-      _delegate(nullptr),
-      _is_firewalled(firewalled_state::unknown),
-      _potential_peer_database_updated(false),
-      _sync_items_to_fetch_updated(false),
-      _suspend_fetching_sync_blocks(false),
-      _items_to_fetch_updated(false),
-      _items_to_fetch_sequence_counter(0),
-      _recent_block_interval_seconds(GRAPHENE_MAX_BLOCK_INTERVAL),
-      _user_agent_string(user_agent),
-      _desired_number_of_connections(GRAPHENE_NET_DEFAULT_DESIRED_CONNECTIONS),
-      _maximum_number_of_connections(GRAPHENE_NET_DEFAULT_MAX_CONNECTIONS),
-      _peer_connection_retry_timeout(GRAPHENE_NET_DEFAULT_PEER_CONNECTION_RETRY_TIME),
-      _peer_inactivity_timeout(GRAPHENE_NET_PEER_HANDSHAKE_INACTIVITY_TIMEOUT),
-      _most_recent_blocks_accepted(_maximum_number_of_connections),
-      _total_num_of_unfetched_items(0),
-      _rate_limiter(0, 0),
-      _last_reported_number_of_conns(0),
-      _peer_advertising_disabled(false),
-      _average_network_read_speed_seconds(60),
-      _average_network_write_speed_seconds(60),
-      _average_network_read_speed_minutes(60),
-      _average_network_write_speed_minutes(60),
-      _average_network_read_speed_hours(72),
-      _average_network_write_speed_hours(72),
-      _average_network_usage_second_counter(0),
-      _average_network_usage_minute_counter(0),
-      _node_is_shutting_down(false),
-      _maximum_number_of_blocks_to_handle_at_one_time(MAXIMUM_NUMBER_OF_BLOCKS_TO_HANDLE_AT_ONE_TIME),
-      _maximum_number_of_sync_blocks_to_prefetch(MAXIMUM_NUMBER_OF_BLOCKS_TO_PREFETCH),
-      _maximum_blocks_per_peer_during_syncing(GRAPHENE_NET_MAX_BLOCKS_PER_PEER_DURING_SYNCING)
+      _user_agent_string(user_agent)
     {
       _rate_limiter.set_actual_rate_time_constant(fc::seconds(2));
       fc::rand_bytes((char*) _node_id.data(), (int)_node_id.size());
@@ -600,7 +565,7 @@ namespace graphene { namespace net { namespace detail {
                       // then schedule a request from this peer
                       sync_item_requests_to_send[peer].push_back(item_to_potentially_request);
                       sync_items_to_request.insert( item_to_potentially_request );
-                      if (sync_item_requests_to_send[peer].size() >= _maximum_blocks_per_peer_during_syncing)
+                      if (sync_item_requests_to_send[peer].size() >= _max_sync_blocks_per_peer)
                         break;
                     }
                   }
@@ -1138,24 +1103,28 @@ namespace graphene { namespace net { namespace detail {
     void node_impl::update_bandwidth_data(uint32_t bytes_read_this_second, uint32_t bytes_written_this_second)
     {
       VERIFY_CORRECT_THREAD();
-      _average_network_read_speed_seconds.push_back(bytes_read_this_second);
-      _average_network_write_speed_seconds.push_back(bytes_written_this_second);
-      ++_average_network_usage_second_counter;
-      if (_average_network_usage_second_counter >= 60)
+      _avg_net_read_speed_seconds.push_back(bytes_read_this_second);
+      _avg_net_write_speed_seconds.push_back(bytes_written_this_second);
+      ++_avg_net_usage_second_counter;
+      if (_avg_net_usage_second_counter >= 60)
       {
-        _average_network_usage_second_counter = 0;
-        ++_average_network_usage_minute_counter;
-        uint32_t average_read_this_minute = (uint32_t)boost::accumulate(_average_network_read_speed_seconds, uint64_t(0)) / (uint32_t)_average_network_read_speed_seconds.size();
-        _average_network_read_speed_minutes.push_back(average_read_this_minute);
-        uint32_t average_written_this_minute = (uint32_t)boost::accumulate(_average_network_write_speed_seconds, uint64_t(0)) / (uint32_t)_average_network_write_speed_seconds.size();
-        _average_network_write_speed_minutes.push_back(average_written_this_minute);
-        if (_average_network_usage_minute_counter >= 60)
+        _avg_net_usage_second_counter = 0;
+        ++_avg_net_usage_minute_counter;
+        uint32_t average_read_this_minute = (uint32_t)boost::accumulate(_avg_net_read_speed_seconds, uint64_t(0))
+                                          / (uint32_t)_avg_net_read_speed_seconds.size();
+        _avg_net_read_speed_minutes.push_back(average_read_this_minute);
+        uint32_t average_written_this_minute = (uint32_t)boost::accumulate(_avg_net_write_speed_seconds, uint64_t(0))
+                                             / (uint32_t)_avg_net_write_speed_seconds.size();
+        _avg_net_write_speed_minutes.push_back(average_written_this_minute);
+        if (_avg_net_usage_minute_counter >= 60)
         {
-          _average_network_usage_minute_counter = 0;
-          uint32_t average_read_this_hour = (uint32_t)boost::accumulate(_average_network_read_speed_minutes, uint64_t(0)) / (uint32_t)_average_network_read_speed_minutes.size();
-          _average_network_read_speed_hours.push_back(average_read_this_hour);
-          uint32_t average_written_this_hour = (uint32_t)boost::accumulate(_average_network_write_speed_minutes, uint64_t(0)) / (uint32_t)_average_network_write_speed_minutes.size();
-          _average_network_write_speed_hours.push_back(average_written_this_hour);
+          _avg_net_usage_minute_counter = 0;
+          uint32_t average_read_this_hour = (uint32_t)boost::accumulate(_avg_net_read_speed_minutes, uint64_t(0))
+                                          / (uint32_t)_avg_net_read_speed_minutes.size();
+          _avg_net_read_speed_hours.push_back(average_read_this_hour);
+          uint32_t average_written_this_hour = (uint32_t)boost::accumulate(_avg_net_write_speed_minutes, uint64_t(0))
+                                             / (uint32_t)_avg_net_write_speed_minutes.size();
+          _avg_net_write_speed_hours.push_back(average_written_this_hour);
         }
       }
     }
@@ -2845,7 +2814,8 @@ namespace graphene { namespace net { namespace detail {
 
       dlog("Leaving send_sync_block_to_node_delegate");
 
-      if (// _suspend_fetching_sync_blocks && <-- you can use this if "maximum_number_of_blocks_to_handle_at_one_time" == "maximum_number_of_sync_blocks_to_prefetch"
+      if (// _suspend_fetching_sync_blocks && <-- you can use this if
+                                               // "max_blocks_to_handle_at_once" == "max_sync_blocks_to_prefetch"
           !_node_is_shutting_down &&
           (!_process_backlog_of_sync_blocks_done.valid() || _process_backlog_of_sync_blocks_done.ready()))
         _process_backlog_of_sync_blocks_done = fc::async([=](){ process_backlog_of_sync_blocks(); },
@@ -2866,7 +2836,7 @@ namespace graphene { namespace net { namespace detail {
       }
 
       dlog("in process_backlog_of_sync_blocks");
-      if (_handle_message_calls_in_progress.size() >= _maximum_number_of_blocks_to_handle_at_one_time)
+      if (_handle_message_calls_in_progress.size() >= _max_blocks_to_handle_at_once)
       {
         dlog("leaving process_backlog_of_sync_blocks because we're already processing too many blocks");
         return; // we will be rescheduled when the next block finishes its processing
@@ -2979,13 +2949,13 @@ namespace graphene { namespace net { namespace detail {
           } // end if potential_first_block
         } // end for each block in _received_sync_items
 
-        if (_handle_message_calls_in_progress.size() >= _maximum_number_of_blocks_to_handle_at_one_time)
+        if (_handle_message_calls_in_progress.size() >= _max_blocks_to_handle_at_once)
         {
           dlog("stopping processing sync block backlog because we have ${count} blocks in progress",
                ("count", _handle_message_calls_in_progress.size()));
           //ulog("stopping processing sync block backlog because we have ${count} blocks in progress, total on hand: ${received}",
           //     ("count", _handle_message_calls_in_progress.size())("received", _received_sync_items.size()));
-          if (_received_sync_items.size() >= _maximum_number_of_sync_blocks_to_prefetch)
+          if (_received_sync_items.size() >= _max_sync_blocks_to_prefetch)
             _suspend_fetching_sync_blocks = true;
           break;
         }
@@ -3456,22 +3426,27 @@ namespace graphene { namespace net { namespace detail {
       VERIFY_CORRECT_THREAD();
       get_current_connections_reply_message reply;
 
-      if (!_average_network_read_speed_minutes.empty())
+      if (!_avg_net_read_speed_minutes.empty())
       {
-        reply.upload_rate_one_minute = _average_network_write_speed_minutes.back();
-        reply.download_rate_one_minute = _average_network_read_speed_minutes.back();
+        reply.upload_rate_one_minute = _avg_net_write_speed_minutes.back();
+        reply.download_rate_one_minute = _avg_net_read_speed_minutes.back();
 
-        size_t minutes_to_average = std::min(_average_network_write_speed_minutes.size(), (size_t)15);
-        boost::circular_buffer<uint32_t>::iterator start_iter = _average_network_write_speed_minutes.end() - minutes_to_average;
-        reply.upload_rate_fifteen_minutes = std::accumulate(start_iter, _average_network_write_speed_minutes.end(), 0) / (uint32_t)minutes_to_average;
-        start_iter = _average_network_read_speed_minutes.end() - minutes_to_average;
-        reply.download_rate_fifteen_minutes = std::accumulate(start_iter, _average_network_read_speed_minutes.end(), 0) / (uint32_t)minutes_to_average;
+        size_t minutes_to_average = std::min(_avg_net_write_speed_minutes.size(), (size_t)15);
+        boost::circular_buffer<uint32_t>::iterator start_iter = _avg_net_write_speed_minutes.end()
+                                                              - minutes_to_average;
+        reply.upload_rate_fifteen_minutes = std::accumulate(start_iter, _avg_net_write_speed_minutes.end(), 0)
+                                          / (uint32_t)minutes_to_average;
+        start_iter = _avg_net_read_speed_minutes.end() - minutes_to_average;
+        reply.download_rate_fifteen_minutes = std::accumulate(start_iter, _avg_net_read_speed_minutes.end(), 0)
+                                            / (uint32_t)minutes_to_average;
 
-        minutes_to_average = std::min(_average_network_write_speed_minutes.size(), (size_t)60);
-        start_iter = _average_network_write_speed_minutes.end() - minutes_to_average;
-        reply.upload_rate_one_hour = std::accumulate(start_iter, _average_network_write_speed_minutes.end(), 0) / (uint32_t)minutes_to_average;
-        start_iter = _average_network_read_speed_minutes.end() - minutes_to_average;
-        reply.download_rate_one_hour = std::accumulate(start_iter, _average_network_read_speed_minutes.end(), 0) / (uint32_t)minutes_to_average;
+        minutes_to_average = std::min(_avg_net_write_speed_minutes.size(), (size_t)60);
+        start_iter = _avg_net_write_speed_minutes.end() - minutes_to_average;
+        reply.upload_rate_one_hour = std::accumulate(start_iter, _avg_net_write_speed_minutes.end(), 0)
+                                   / (uint32_t)minutes_to_average;
+        start_iter = _avg_net_read_speed_minutes.end() - minutes_to_average;
+        reply.download_rate_one_hour = std::accumulate(start_iter, _avg_net_read_speed_minutes.end(), 0)
+                                     / (uint32_t)minutes_to_average;
       }
 
       fc::time_point now = fc::time_point::now();
@@ -3479,7 +3454,8 @@ namespace graphene { namespace net { namespace detail {
       for (const peer_connection_ptr& peer : _active_connections)
       {
         current_connection_data data_for_this_peer;
-        data_for_this_peer.connection_duration = now.sec_since_epoch() - peer->connection_initiation_time.sec_since_epoch();
+        data_for_this_peer.connection_duration = now.sec_since_epoch()
+                                               - peer->connection_initiation_time.sec_since_epoch();
         if (peer->get_remote_endpoint()) // should always be set for anyone we're actively connected to
           data_for_this_peer.remote_endpoint = *peer->get_remote_endpoint();
         data_for_this_peer.clock_offset = peer->clock_offset;
@@ -4762,12 +4738,12 @@ namespace graphene { namespace net { namespace detail {
         _desired_number_of_connections = params["desired_number_of_connections"].as<uint32_t>(1);
       if (params.contains("maximum_number_of_connections"))
         _maximum_number_of_connections = params["maximum_number_of_connections"].as<uint32_t>(1);
-      if (params.contains("maximum_number_of_blocks_to_handle_at_one_time"))
-        _maximum_number_of_blocks_to_handle_at_one_time = params["maximum_number_of_blocks_to_handle_at_one_time"].as<uint32_t>(1);
-      if (params.contains("maximum_number_of_sync_blocks_to_prefetch"))
-        _maximum_number_of_sync_blocks_to_prefetch = params["maximum_number_of_sync_blocks_to_prefetch"].as<uint32_t>(1);
-      if (params.contains("maximum_blocks_per_peer_during_syncing"))
-        _maximum_blocks_per_peer_during_syncing = params["maximum_blocks_per_peer_during_syncing"].as<uint32_t>(1);
+      if (params.contains("max_blocks_to_handle_at_once"))
+        _max_blocks_to_handle_at_once = params["max_blocks_to_handle_at_once"].as<uint32_t>(1);
+      if (params.contains("max_sync_blocks_to_prefetch"))
+        _max_sync_blocks_to_prefetch = params["max_sync_blocks_to_prefetch"].as<uint32_t>(1);
+      if (params.contains("max_sync_blocks_per_peer"))
+        _max_sync_blocks_per_peer = params["max_sync_blocks_per_peer"].as<uint32_t>(1);
 
       _desired_number_of_connections = std::min(_desired_number_of_connections, _maximum_number_of_connections);
 
@@ -4784,9 +4760,9 @@ namespace graphene { namespace net { namespace detail {
       result["peer_connection_retry_timeout"] = _peer_connection_retry_timeout;
       result["desired_number_of_connections"] = _desired_number_of_connections;
       result["maximum_number_of_connections"] = _maximum_number_of_connections;
-      result["maximum_number_of_blocks_to_handle_at_one_time"] = _maximum_number_of_blocks_to_handle_at_one_time;
-      result["maximum_number_of_sync_blocks_to_prefetch"] = _maximum_number_of_sync_blocks_to_prefetch;
-      result["maximum_blocks_per_peer_during_syncing"] = _maximum_blocks_per_peer_during_syncing;
+      result["max_blocks_to_handle_at_once"] = _max_blocks_to_handle_at_once;
+      result["max_sync_blocks_to_prefetch"] = _max_sync_blocks_to_prefetch;
+      result["max_sync_blocks_per_peer"] = _max_sync_blocks_per_peer;
       return result;
     }
 
@@ -4864,23 +4840,23 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       std::vector<uint32_t> network_usage_by_second;
-      network_usage_by_second.reserve(_average_network_read_speed_seconds.size());
-      std::transform(_average_network_read_speed_seconds.begin(), _average_network_read_speed_seconds.end(),
-                     _average_network_write_speed_seconds.begin(),
+      network_usage_by_second.reserve(_avg_net_read_speed_seconds.size());
+      std::transform(_avg_net_read_speed_seconds.begin(), _avg_net_read_speed_seconds.end(),
+                     _avg_net_write_speed_seconds.begin(),
                      std::back_inserter(network_usage_by_second),
                      std::plus<uint32_t>());
 
       std::vector<uint32_t> network_usage_by_minute;
-      network_usage_by_minute.reserve(_average_network_read_speed_minutes.size());
-      std::transform(_average_network_read_speed_minutes.begin(), _average_network_read_speed_minutes.end(),
-                     _average_network_write_speed_minutes.begin(),
+      network_usage_by_minute.reserve(_avg_net_read_speed_minutes.size());
+      std::transform(_avg_net_read_speed_minutes.begin(), _avg_net_read_speed_minutes.end(),
+                     _avg_net_write_speed_minutes.begin(),
                      std::back_inserter(network_usage_by_minute),
                      std::plus<uint32_t>());
 
       std::vector<uint32_t> network_usage_by_hour;
-      network_usage_by_hour.reserve(_average_network_read_speed_hours.size());
-      std::transform(_average_network_read_speed_hours.begin(), _average_network_read_speed_hours.end(),
-                     _average_network_write_speed_hours.begin(),
+      network_usage_by_hour.reserve(_avg_net_read_speed_hours.size());
+      std::transform(_avg_net_read_speed_hours.begin(), _avg_net_read_speed_hours.end(),
+                     _avg_net_write_speed_hours.begin(),
                      std::back_inserter(network_usage_by_hour),
                      std::plus<uint32_t>());
 
