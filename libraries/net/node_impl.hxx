@@ -134,10 +134,10 @@ public:
 struct prioritized_item_id
 {
   item_id  item;
-  unsigned sequence_number;
+  size_t sequence_number;
   fc::time_point timestamp; ///< the time we last heard about this item in an inventory message
 
-  prioritized_item_id(const item_id& item, unsigned sequence_number) :
+  prioritized_item_id(const item_id& item, size_t sequence_number) :
     item(item),
     sequence_number(sequence_number),
     timestamp(fc::time_point::now())
@@ -148,7 +148,7 @@ struct prioritized_item_id
                   "block_message_type must be greater than trx_message_type for prioritized_item_ids to sort correctly");
     if (item.item_type != rhs.item.item_type)
       return item.item_type > rhs.item.item_type;
-    return (signed)(rhs.sequence_number - sequence_number) > 0;
+    return rhs.sequence_number > sequence_number;
   }
 };
 
@@ -317,7 +317,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
 
       peer_database             _potential_peer_db;
       fc::promise<void>::ptr    _retrigger_connect_loop_promise;
-      bool                      _potential_peer_database_updated = false;
+      bool                      _potential_peer_db_updated = false;
       fc::future<void>          _p2p_network_connect_loop_done;
       /// @}
 
@@ -358,7 +358,8 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
                   >
                >
             >;
-      size_t  _items_to_fetch_sequence_counter = 0;
+      /// Items to fetch sequence counter
+      size_t  _items_to_fetch_seq_counter = 0;
       /// List of items we know another peer has and we want
       items_to_fetch_set_type _items_to_fetch;
       /// List of transactions we've recently pushed and had rejected by the delegate
@@ -488,9 +489,9 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       bool _node_is_shutting_down = false;
 
       /// Maximum number of blocks to handle at one time
-      size_t _max_blocks_to_handle_at_once = MAXIMUM_NUMBER_OF_BLOCKS_TO_HANDLE_AT_ONE_TIME;
+      size_t _max_blocks_to_handle_at_once = MAX_BLOCKS_TO_HANDLE_AT_ONCE;
       /// Maximum number of sync blocks to prefetch
-      size_t _max_sync_blocks_to_prefetch = MAXIMUM_NUMBER_OF_BLOCKS_TO_PREFETCH;
+      size_t _max_sync_blocks_to_prefetch = MAX_SYNC_BLOCKS_TO_PREFETCH;
       /// Maximum number of blocks per peer during syncing
       size_t _max_sync_blocks_per_peer = GRAPHENE_NET_MAX_BLOCKS_PER_PEER_DURING_SYNCING;
 

@@ -99,12 +99,12 @@
 #define P2P_IN_DEDICATED_THREAD 1
 
 #define INVOCATION_COUNTER(name) \
-    static unsigned total_ ## name ## _counter = 0; \
-    static unsigned active_ ## name ## _counter = 0; \
+    static size_t total_ ## name ## _counter = 0; \
+    static size_t active_ ## name ## _counter = 0; \
     struct name ## _invocation_logger { \
-      unsigned *total; \
-      unsigned *active; \
-      name ## _invocation_logger(unsigned *total, unsigned *active) : \
+      size_t *total; \
+      size_t *active; \
+      name ## _invocation_logger(size_t *total, size_t *active) : \
         total(total), active(active) \
       { \
         ++*total; \
@@ -388,7 +388,7 @@ namespace graphene { namespace net { namespace detail {
           while (is_wanting_new_connections())
           {
             bool initiated_connection_this_pass = false;
-            _potential_peer_database_updated = false;
+            _potential_peer_db_updated = false;
 
             for (peer_database::iterator iter = _potential_peer_db.begin();
                  iter != _potential_peer_db.end() && is_wanting_new_connections();
@@ -407,7 +407,7 @@ namespace graphene { namespace net { namespace detail {
               }
             }
 
-            if (!initiated_connection_this_pass && !_potential_peer_database_updated)
+            if (!initiated_connection_this_pass && !_potential_peer_db_updated)
               break;
           }
 
@@ -452,7 +452,7 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       dlog( "Triggering connect loop now" );
-      _potential_peer_database_updated = true;
+      _potential_peer_db_updated = true;
       //if( _retrigger_connect_loop_promise )
       //  _retrigger_connect_loop_promise->set_value();
     }
@@ -554,7 +554,7 @@ namespace graphene { namespace net { namespace detail {
                 if (!peer->inhibit_fetching_sync_blocks)
                 {
                   // loop through the items it has that we don't yet have on our blockchain
-                  for( unsigned i = 0; i < peer->ids_of_items_to_get.size(); ++i )
+                  for( size_t i = 0; i < peer->ids_of_items_to_get.size(); ++i )
                   {
                     item_hash_t item_to_potentially_request = peer->ids_of_items_to_get[i];
                     // if we don't already have this item in our temporary storage and we haven't requested from another syncing peer
@@ -769,7 +769,7 @@ namespace graphene { namespace net { namespace detail {
             // don't send the peer anything we've already advertised to it
             // or anything it has advertised to us
             // group the items we need to send by type, because we'll need to send one inventory message per type
-            unsigned total_items_to_send_to_this_peer = 0;
+            size_t total_items_to_send_to_this_peer = 0;
             idump((inventory_to_advertise));
             for (const item_id& item_to_advertise : inventory_to_advertise)
             {
@@ -1106,7 +1106,9 @@ namespace graphene { namespace net { namespace detail {
       _avg_net_read_speed_seconds.push_back(bytes_read_this_second);
       _avg_net_write_speed_seconds.push_back(bytes_written_this_second);
       ++_avg_net_usage_second_counter;
-      if (_avg_net_usage_second_counter >= 60)
+      constexpr uint8_t seconds_per_minute = 60;
+      constexpr uint8_t minutes_per_hour = 60;
+      if (_avg_net_usage_second_counter >= seconds_per_minute)
       {
         _avg_net_usage_second_counter = 0;
         ++_avg_net_usage_minute_counter;
@@ -1116,7 +1118,7 @@ namespace graphene { namespace net { namespace detail {
         uint32_t average_written_this_minute = (uint32_t)boost::accumulate(_avg_net_write_speed_seconds, uint64_t(0))
                                              / (uint32_t)_avg_net_write_speed_seconds.size();
         _avg_net_write_speed_minutes.push_back(average_written_this_minute);
-        if (_avg_net_usage_minute_counter >= 60)
+        if (_avg_net_usage_minute_counter >= minutes_per_hour)
         {
           _avg_net_usage_minute_counter = 0;
           uint32_t average_read_this_hour = (uint32_t)boost::accumulate(_avg_net_read_speed_minutes, uint64_t(0))
@@ -1192,7 +1194,7 @@ namespace graphene { namespace net { namespace detail {
 #ifdef USE_PEERS_TO_DELETE_MUTEX
       dlog("scheduling peer for deletion: ${peer} (may block on a mutex here)", ("peer", peer_to_delete->get_remote_endpoint()));
 
-      unsigned number_of_peers_to_delete;
+      size_t number_of_peers_to_delete;
       {
         fc::scoped_lock<fc::mutex> lock(_peers_to_delete_mutex);
         _peers_to_delete.emplace_back(peer_to_delete);
@@ -2044,10 +2046,12 @@ namespace graphene { namespace net { namespace detail {
         if (!blockchain_item_ids_inventory_message_received.item_hashes_available.empty())
         {
           // what's more, it should be a sequential list of blocks, verify that first
-          uint32_t first_block_number_in_reponse = _delegate->get_block_number(blockchain_item_ids_inventory_message_received.item_hashes_available.front());
-          for (unsigned i = 1; i < blockchain_item_ids_inventory_message_received.item_hashes_available.size(); ++i)
+          uint32_t first_block_number_in_reponse = _delegate->get_block_number(
+                         blockchain_item_ids_inventory_message_received.item_hashes_available.front());
+          for (size_t i = 1; i < blockchain_item_ids_inventory_message_received.item_hashes_available.size(); ++i)
           {
-            uint32_t actual_num = _delegate->get_block_number(blockchain_item_ids_inventory_message_received.item_hashes_available[i]);
+            uint32_t actual_num = _delegate->get_block_number(
+                                        blockchain_item_ids_inventory_message_received.item_hashes_available[i]);
             uint32_t expected_num = first_block_number_in_reponse + i;
             if (actual_num != expected_num)
             {
@@ -2419,7 +2423,7 @@ namespace graphene { namespace net { namespace detail {
         originating_peer->items_requested_from_peer.erase( regular_item_iter );
         originating_peer->inventory_peer_advertised_to_us.erase( requested_item );
         if (is_item_in_any_peers_inventory(requested_item))
-          _items_to_fetch.insert(prioritized_item_id(requested_item, _items_to_fetch_sequence_counter++));
+          _items_to_fetch.insert(prioritized_item_id(requested_item, _items_to_fetch_seq_counter++));
         wlog("Peer doesn't have the requested item.");
         trigger_fetch_items_loop();
         return;
@@ -2496,7 +2500,7 @@ namespace graphene { namespace net { namespace detail {
               if (items_to_fetch_iter == _items_to_fetch.get<item_id_index>().end())
               {
                 // it's new to us
-                _items_to_fetch.insert(prioritized_item_id(advertised_item_id, _items_to_fetch_sequence_counter++));
+                _items_to_fetch.insert(prioritized_item_id(advertised_item_id, _items_to_fetch_seq_counter++));
                 dlog("adding item ${item_hash} from inventory message to our list of items to fetch",
                      ("item_hash", item_hash));
                 trigger_fetch_items_loop();
@@ -2629,7 +2633,7 @@ namespace graphene { namespace net { namespace detail {
         for (auto item_and_time : originating_peer->items_requested_from_peer)
         {
           if (is_item_in_any_peers_inventory(item_and_time.first))
-            _items_to_fetch.insert(prioritized_item_id(item_and_time.first, _items_to_fetch_sequence_counter++));
+            _items_to_fetch.insert(prioritized_item_id(item_and_time.first, _items_to_fetch_seq_counter++));
         }
         trigger_fetch_items_loop();
       }
@@ -2859,7 +2863,7 @@ namespace graphene { namespace net { namespace detail {
       //fc::time_point when_we_should_yield = start_time + fc::seconds(1);
 
       bool block_processed_this_iteration;
-      unsigned blocks_processed = 0;
+      size_t blocks_processed = 0;
 
       std::set<peer_connection_ptr> peers_with_newly_empty_item_lists;
       std::set<peer_connection_ptr> peers_we_need_to_sync_to;
@@ -3431,7 +3435,9 @@ namespace graphene { namespace net { namespace detail {
         reply.upload_rate_one_minute = _avg_net_write_speed_minutes.back();
         reply.download_rate_one_minute = _avg_net_read_speed_minutes.back();
 
-        size_t minutes_to_average = std::min(_avg_net_write_speed_minutes.size(), (size_t)15);
+        constexpr size_t fifteen_minutes = 15;
+        constexpr size_t minutes_per_hour = 60;
+        size_t minutes_to_average = std::min(_avg_net_write_speed_minutes.size(), fifteen_minutes);
         boost::circular_buffer<uint32_t>::iterator start_iter = _avg_net_write_speed_minutes.end()
                                                               - minutes_to_average;
         reply.upload_rate_fifteen_minutes = std::accumulate(start_iter, _avg_net_write_speed_minutes.end(), 0)
@@ -3440,7 +3446,7 @@ namespace graphene { namespace net { namespace detail {
         reply.download_rate_fifteen_minutes = std::accumulate(start_iter, _avg_net_read_speed_minutes.end(), 0)
                                             / (uint32_t)minutes_to_average;
 
-        minutes_to_average = std::min(_avg_net_write_speed_minutes.size(), (size_t)60);
+        minutes_to_average = std::min(_avg_net_write_speed_minutes.size(), minutes_per_hour);
         start_iter = _avg_net_write_speed_minutes.end() - minutes_to_average;
         reply.upload_rate_one_hour = std::accumulate(start_iter, _avg_net_write_speed_minutes.end(), 0)
                                    / (uint32_t)minutes_to_average;
@@ -3699,7 +3705,7 @@ namespace graphene { namespace net { namespace detail {
         wlog( "Exception thrown while terminating Process backlog of sync items task, ignoring" );
       }
 
-      unsigned handle_message_call_count = 0;
+      size_t handle_message_call_count = 0;
       while( true )
       {
         auto it = _handle_message_calls_in_progress.begin();
