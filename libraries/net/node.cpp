@@ -3443,71 +3443,7 @@ namespace graphene { namespace net { namespace detail {
     void node_impl::on_get_current_connections_request_message(peer_connection* originating_peer,
                                                                const get_current_connections_request_message& get_current_connections_request_message_received)
     {
-      VERIFY_CORRECT_THREAD();
-      get_current_connections_reply_message reply;
-
-      if (!_avg_net_read_speed_minutes.empty())
-      {
-        reply.upload_rate_one_minute = _avg_net_write_speed_minutes.back();
-        reply.download_rate_one_minute = _avg_net_read_speed_minutes.back();
-
-        constexpr size_t fifteen_minutes = 15;
-        constexpr size_t minutes_per_hour = 60;
-        size_t minutes_to_average = std::min(_avg_net_write_speed_minutes.size(), fifteen_minutes);
-        boost::circular_buffer<uint32_t>::iterator start_iter = _avg_net_write_speed_minutes.end()
-                                                              - minutes_to_average;
-        reply.upload_rate_fifteen_minutes = std::accumulate(start_iter, _avg_net_write_speed_minutes.end(), 0)
-                                          / (uint32_t)minutes_to_average;
-        start_iter = _avg_net_read_speed_minutes.end() - minutes_to_average;
-        reply.download_rate_fifteen_minutes = std::accumulate(start_iter, _avg_net_read_speed_minutes.end(), 0)
-                                            / (uint32_t)minutes_to_average;
-
-        minutes_to_average = std::min(_avg_net_write_speed_minutes.size(), minutes_per_hour);
-        start_iter = _avg_net_write_speed_minutes.end() - minutes_to_average;
-        reply.upload_rate_one_hour = std::accumulate(start_iter, _avg_net_write_speed_minutes.end(), 0)
-                                   / (uint32_t)minutes_to_average;
-        start_iter = _avg_net_read_speed_minutes.end() - minutes_to_average;
-        reply.download_rate_one_hour = std::accumulate(start_iter, _avg_net_read_speed_minutes.end(), 0)
-                                     / (uint32_t)minutes_to_average;
-      }
-
-      fc::time_point now = fc::time_point::now();
-      fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
-      for (const peer_connection_ptr& peer : _active_connections)
-      {
-        current_connection_data data_for_this_peer;
-        data_for_this_peer.connection_duration = now.sec_since_epoch()
-                                               - peer->connection_initiation_time.sec_since_epoch();
-        if (peer->get_remote_endpoint()) // should always be set for anyone we're actively connected to
-          data_for_this_peer.remote_endpoint = *peer->get_remote_endpoint();
-        data_for_this_peer.clock_offset = peer->clock_offset;
-        data_for_this_peer.round_trip_delay = peer->round_trip_delay;
-        data_for_this_peer.node_id = peer->node_id;
-        data_for_this_peer.connection_direction = peer->direction;
-        data_for_this_peer.firewalled = peer->is_firewalled;
-        fc::mutable_variant_object user_data;
-        if (peer->graphene_git_revision_sha)
-          user_data["graphene_git_revision_sha"] = *peer->graphene_git_revision_sha;
-        if (peer->graphene_git_revision_unix_timestamp)
-          user_data["graphene_git_revision_unix_timestamp"] = *peer->graphene_git_revision_unix_timestamp;
-        if (peer->fc_git_revision_sha)
-          user_data["fc_git_revision_sha"] = *peer->fc_git_revision_sha;
-        if (peer->fc_git_revision_unix_timestamp)
-          user_data["fc_git_revision_unix_timestamp"] = *peer->fc_git_revision_unix_timestamp;
-        if (peer->platform)
-          user_data["platform"] = *peer->platform;
-        if (peer->bitness)
-          user_data["bitness"] = *peer->bitness;
-        user_data["user_agent"] = peer->user_agent;
-
-        user_data["last_known_block_hash"] = fc::variant( peer->last_block_delegate_has_seen, 1 );
-        user_data["last_known_block_number"] = _delegate->get_block_number(peer->last_block_delegate_has_seen);
-        user_data["last_known_block_time"] = peer->last_block_time_delegate_has_seen;
-
-        data_for_this_peer.user_data = user_data;
-        reply.current_connections.emplace_back(data_for_this_peer);
-      }
-      originating_peer->send_message(reply);
+       /* This is unused. TODO: When we are sure no one will call this, remove it and its associated structures */
     }
 
     void node_impl::on_get_current_connections_reply_message(peer_connection* originating_peer,
