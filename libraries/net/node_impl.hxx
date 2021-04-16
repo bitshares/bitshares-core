@@ -14,7 +14,7 @@ namespace graphene { namespace net { namespace detail {
 
 namespace bmi = boost::multi_index;
 
-#define P2P_IN_DEDICATED_THREAD 1
+#define P2P_IN_DEDICATED_THREAD
 
 /*******
  * A class to wrap std::unordered_set for multithreading
@@ -651,7 +651,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
                                                      const blockchain_item_ids_inventory_message& blockchain_item_ids_inventory_message_received );
 
       void on_fetch_items_message( peer_connection* originating_peer,
-                                   const fetch_items_message& fetch_items_message_received );
+                                   const fetch_items_message& fetch_items_message_received ) const;
 
       void on_item_not_available_message( peer_connection* originating_peer,
                                           const item_not_available_message& item_not_available_message_received );
@@ -676,8 +676,8 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       void on_check_firewall_reply_message(peer_connection* originating_peer,
                                            const check_firewall_reply_message& check_firewall_reply_message_received);
 
-      void on_get_current_connections_request_message(peer_connection* originating_peer,
-                                                      const get_current_connections_request_message& get_current_connections_request_message_received);
+      void on_get_current_connections_request_message(const peer_connection*,
+                                                      const get_current_connections_request_message&) const;
 
       void on_get_current_connections_reply_message(peer_connection* originating_peer,
                                                     const get_current_connections_reply_message& get_current_connections_reply_message_received);

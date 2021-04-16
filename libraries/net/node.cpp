@@ -302,7 +302,8 @@ namespace graphene { namespace net { namespace detail {
                  iter != _potential_peer_db.end() && is_wanting_new_connections();
                  ++iter)
             {
-              fc::microseconds delay_until_retry = fc::seconds((iter->number_of_failed_connection_attempts + 1) * _peer_connection_retry_timeout);
+              fc::microseconds delay_until_retry = fc::seconds( (iter->number_of_failed_connection_attempts + 1)
+                                                                * _peer_connection_retry_timeout );
 
               if (!is_connection_to_endpoint_in_progress(iter->endpoint) &&
                   ((iter->last_connection_disposition != last_connection_failed &&
@@ -350,10 +351,11 @@ namespace graphene { namespace net { namespace detail {
         }
         catch (const fc::canceled_exception&)
         {
+          ilog( "p2p_network_connect_loop canceled" );
           throw;
         }
         FC_CAPTURE_AND_LOG( (0) )
-      }// while(!canceled)
+      }// while !canceled
     }
 
     void node_impl::trigger_p2p_network_connect_loop()
@@ -380,7 +382,8 @@ namespace graphene { namespace net { namespace detail {
       }
       catch (const fc::canceled_exception&)
       {
-        throw;
+         ilog( "update_seed_nodes_task canceled" );
+         throw;
       }
       FC_CAPTURE_AND_LOG( (_seed_nodes) )
 
@@ -549,10 +552,12 @@ namespace graphene { namespace net { namespace detail {
           bool operator<(const peer_and_items_to_fetch& rhs) const { return peer < rhs.peer; }
           size_t number_of_items() const { return item_ids.size(); }
         };
-        typedef boost::multi_index_container<peer_and_items_to_fetch,
-                                             boost::multi_index::indexed_by<boost::multi_index::ordered_unique<boost::multi_index::member<peer_and_items_to_fetch, peer_connection_ptr, &peer_and_items_to_fetch::peer> >,
-                                                                            boost::multi_index::ordered_non_unique<boost::multi_index::tag<requested_item_count_index>,
-                                                                                                                   boost::multi_index::const_mem_fun<peer_and_items_to_fetch, size_t, &peer_and_items_to_fetch::number_of_items> > > > fetch_messages_to_send_set;
+        using fetch_messages_to_send_set = boost::multi_index_container< peer_and_items_to_fetch, bmi::indexed_by<
+                 bmi::ordered_unique<
+                    bmi::member<peer_and_items_to_fetch, peer_connection_ptr, &peer_and_items_to_fetch::peer> >,
+                 bmi::ordered_non_unique< bmi::tag<requested_item_count_index>,
+                    bmi::const_mem_fun<peer_and_items_to_fetch, size_t, &peer_and_items_to_fetch::number_of_items> >
+                 > >;
         fetch_messages_to_send_set items_by_peer;
 
         // initialize the fetch_messages_to_send with an empty set of items for all idle peers
@@ -571,7 +576,9 @@ namespace graphene { namespace net { namespace detail {
             // this item has probably already fallen out of our peers' caches, we'll just ignore it.
             // this can happen during flooding, and the _items_to_fetch could otherwise get clogged
             // with a bunch of items that we'll never be able to request from any peer
-            wlog("Unable to fetch item ${item} before its likely expiration time, removing it from our list of items to fetch", ("item", item_iter->item));
+            wlog("Unable to fetch item ${item} before its likely expiration time, "
+                 "removing it from our list of items to fetch",
+                 ("item", item_iter->item));
             item_iter = _items_to_fetch.erase(item_iter);
           }
           else
@@ -644,7 +651,7 @@ namespace graphene { namespace net { namespace detail {
           }
           _retrigger_fetch_item_loop_promise.reset();
         }
-      } // while (!canceled)
+      } // while !canceled
     }
 
     void node_impl::trigger_fetch_items_loop()
@@ -2263,7 +2270,8 @@ namespace graphene { namespace net { namespace detail {
       return item_not_available_message(item);
     }
 
-    void node_impl::on_fetch_items_message(peer_connection* originating_peer, const fetch_items_message& fetch_items_message_received)
+    void node_impl::on_fetch_items_message(peer_connection* originating_peer,
+                                           const fetch_items_message& fetch_items_message_received) const
     {
       VERIFY_CORRECT_THREAD();
       dlog("received items request for ids ${ids} of type ${type} from peer ${endpoint}",
@@ -3348,8 +3356,8 @@ namespace graphene { namespace net { namespace detail {
 
     }
 
-    void node_impl::on_get_current_connections_request_message(peer_connection* originating_peer,
-                                                               const get_current_connections_request_message& get_current_connections_request_message_received)
+    void node_impl::on_get_current_connections_request_message(const peer_connection*,
+                                                               const get_current_connections_request_message&) const
     {
        /* This is unused. TODO: When we are sure no one will call this, remove it and its associated structures */
     }
