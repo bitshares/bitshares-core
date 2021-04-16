@@ -2056,8 +2056,8 @@ namespace graphene { namespace net { namespace detail {
           uint32_t first_block_number_in_reponse = _delegate->get_block_number(
                          blockchain_item_ids_inventory_message_received.item_hashes_available.front());
           // explicitly convert the size into 32 bit, should be OK
-          uint32_t items_received = blockchain_item_ids_inventory_message_received.item_hashes_available.size();
-          for (uint32_t i = 1; i < items_received; ++i)
+          auto total_items = uint32_t( blockchain_item_ids_inventory_message_received.item_hashes_available.size() );
+          for (uint32_t i = 1; i < total_items; ++i)
           {
             uint32_t actual_num = _delegate->get_block_number(
                                         blockchain_item_ids_inventory_message_received.item_hashes_available[i]);
