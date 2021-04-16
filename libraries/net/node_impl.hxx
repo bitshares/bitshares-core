@@ -12,6 +12,10 @@
 
 namespace graphene { namespace net { namespace detail {
 
+namespace bmi = boost::multi_index;
+
+#define P2P_IN_DEDICATED_THREAD 1
+
 /*******
  * A class to wrap std::unordered_set for multithreading
  */
@@ -128,6 +132,64 @@ public:
       return std::unordered_set<Key, Hash, Pred>::find(key); 
    }
 };   
+
+class blockchain_tied_message_cache
+{
+private:
+   static const uint32_t cache_duration_in_blocks = GRAPHENE_NET_MESSAGE_CACHE_DURATION_IN_BLOCKS;
+
+   struct message_hash_index{};
+   struct message_contents_hash_index{};
+   struct block_clock_index{};
+   struct message_info
+   {
+      message_hash_type message_hash;
+      message           message_body;
+      uint32_t          block_clock_when_received;
+
+      /// for network performance stats
+      message_propagation_data propagation_data;
+      /// hash of whatever the message contains
+      /// (if it's a transaction, this is the transaction id, if it's a block, it's the block_id)
+      message_hash_type message_contents_hash;
+
+      message_info( const message_hash_type& message_hash,
+                    const message&           message_body,
+                    uint32_t                 block_clock_when_received,
+                    const message_propagation_data& propagation_data,
+                    message_hash_type        message_contents_hash ) :
+            message_hash( message_hash ),
+            message_body( message_body ),
+            block_clock_when_received( block_clock_when_received ),
+            propagation_data( propagation_data ),
+            message_contents_hash( message_contents_hash )
+      {}
+   };
+
+   using message_cache_container = boost::multi_index_container < message_info,
+               bmi::indexed_by<
+                  bmi::ordered_unique< bmi::tag<message_hash_index>,
+                     bmi::member<message_info, message_hash_type, &message_info::message_hash> >,
+                  bmi::ordered_non_unique< bmi::tag<message_contents_hash_index>,
+                     bmi::member<message_info, message_hash_type, &message_info::message_contents_hash> >,
+                  bmi::ordered_non_unique< bmi::tag<block_clock_index>,
+                     bmi::member<message_info, uint32_t, &message_info::block_clock_when_received> > > >;
+
+   message_cache_container _message_cache;
+
+   uint32_t block_clock = 0;
+
+public:
+   void block_accepted();
+   void cache_message( const message& message_to_cache,
+                       const message_hash_type& hash_of_message_to_cache,
+                       const message_propagation_data& propagation_data,
+                       const message_hash_type& message_content_hash );
+   message get_message( const message_hash_type& hash_of_message_to_lookup ) const;
+   message_propagation_data get_message_propagation_data(
+         const message_hash_type& hash_of_msg_contents_to_lookup ) const;
+   size_t size() const { return _message_cache.size(); }
+};
 
 /// When requesting items from peers, we want to prioritize any blocks before
 /// transactions, but otherwise request items in the order we heard about them
@@ -282,6 +344,22 @@ class statistics_gathering_node_delegate_wrapper : public node_delegate
       uint32_t estimate_last_known_fork_from_git_revision_timestamp(uint32_t unix_timestamp) const override;
       void error_encountered(const std::string& message, const fc::oexception& error) override;
       uint8_t get_current_block_interval_in_seconds() const override;
+};
+
+/// This specifies configuration info for the local node.  It's stored as JSON
+/// in the configuration directory (application data directory)
+struct node_configuration
+{
+   fc::ip::endpoint listen_endpoint;
+   bool accept_incoming_connections = true;
+   bool wait_if_endpoint_is_busy = true;
+   /**
+    * Originally, our p2p code just had a 'node-id' that was a random number identifying this node
+    * on the network.  This is now a private key/public key pair, where the public key is used
+    * in place of the old random node-id.  The private part is unused, but might be used in
+    * the future to support some notion of trusted peers.
+    */
+   fc::ecc::private_key private_key;
 };
 
 class node_impl : public peer_connection_delegate, public std::enable_shared_from_this<node_impl>
@@ -707,3 +785,8 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
     };
 
 }}} // end of namespace graphene::net::detail
+
+FC_REFLECT(graphene::net::detail::node_configuration, (listen_endpoint)
+                                                 (accept_incoming_connections)
+                                                 (wait_if_endpoint_is_busy)
+                                                 (private_key))

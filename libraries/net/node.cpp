@@ -89,14 +89,14 @@
 
 #include <fc/git_revision.hpp>
 
+#include "node_impl.hxx"
+
 //#define ENABLE_DEBUG_ULOGS
 
 #ifdef DEFAULT_LOGGER
 # undef DEFAULT_LOGGER
 #endif
 #define DEFAULT_LOGGER "p2p"
-
-#define P2P_IN_DEDICATED_THREAD 1
 
 #define INVOCATION_COUNTER(name) \
     static size_t total_ ## name ## _counter = 0; \
@@ -125,99 +125,36 @@
 #define testnetlog(...) do {} while (0)
 #endif
 
-namespace graphene { namespace net {
+namespace graphene { namespace net { namespace detail {
 
-  namespace detail
-  {
-    namespace bmi = boost::multi_index;
-    class blockchain_tied_message_cache
-    {
-    private:
-      static const uint32_t cache_duration_in_blocks = GRAPHENE_NET_MESSAGE_CACHE_DURATION_IN_BLOCKS;
-
-      struct message_hash_index{};
-      struct message_contents_hash_index{};
-      struct block_clock_index{};
-      struct message_info
-      {
-        message_hash_type message_hash;
-        message           message_body;
-        uint32_t          block_clock_when_received;
-
-        // for network performance stats
-        message_propagation_data propagation_data;
-        /// hash of whatever the message contains
-        /// (if it's a transaction, this is the transaction id, if it's a block, it's the block_id)
-        message_hash_type message_contents_hash;
-
-        message_info( const message_hash_type& message_hash,
-                      const message&           message_body,
-                      uint32_t                 block_clock_when_received,
-                      const message_propagation_data& propagation_data,
-                      message_hash_type        message_contents_hash ) :
-          message_hash( message_hash ),
-          message_body( message_body ),
-          block_clock_when_received( block_clock_when_received ),
-          propagation_data( propagation_data ),
-          message_contents_hash( message_contents_hash )
-        {}
-      };
-      using message_cache_container = boost::multi_index_container < message_info,
-              bmi::indexed_by<
-                 bmi::ordered_unique< bmi::tag<message_hash_index>,
-                    bmi::member<message_info, message_hash_type, &message_info::message_hash> >,
-                 bmi::ordered_non_unique< bmi::tag<message_contents_hash_index>,
-                    bmi::member<message_info, message_hash_type, &message_info::message_contents_hash> >,
-                 bmi::ordered_non_unique< bmi::tag<block_clock_index>,
-                    bmi::member<message_info, uint32_t, &message_info::block_clock_when_received> > > >;
-
-      message_cache_container _message_cache;
-
-      uint32_t block_clock;
-
-    public:
-      blockchain_tied_message_cache() :
-        block_clock( 0 )
-      {}
-      void block_accepted();
-      void cache_message( const message& message_to_cache,
-                          const message_hash_type& hash_of_message_to_cache,
-                          const message_propagation_data& propagation_data,
-                          const message_hash_type& message_content_hash );
-      message get_message( const message_hash_type& hash_of_message_to_lookup );
-      message_propagation_data get_message_propagation_data(
-               const message_hash_type& hash_of_msg_contents_to_lookup ) const;
-      size_t size() const { return _message_cache.size(); }
-    };
-
-    void blockchain_tied_message_cache::block_accepted()
-    {
+   void blockchain_tied_message_cache::block_accepted()
+   {
       ++block_clock;
       if( block_clock > cache_duration_in_blocks )
          _message_cache.get<block_clock_index>().erase(_message_cache.get<block_clock_index>().begin(),
                _message_cache.get<block_clock_index>().lower_bound(block_clock - cache_duration_in_blocks ) );
-    }
+   }
 
-    void blockchain_tied_message_cache::cache_message( const message& message_to_cache,
-                                                       const message_hash_type& hash_of_message_to_cache,
-                                                       const message_propagation_data& propagation_data,
-                                                       const message_hash_type& message_content_hash )
-    {
+   void blockchain_tied_message_cache::cache_message( const message& message_to_cache,
+                                                      const message_hash_type& hash_of_message_to_cache,
+                                                      const message_propagation_data& propagation_data,
+                                                      const message_hash_type& message_content_hash )
+   {
       _message_cache.insert( message_info(hash_of_message_to_cache,
                                          message_to_cache,
                                          block_clock,
                                          propagation_data,
                                          message_content_hash ) );
-    }
+   }
 
-    message blockchain_tied_message_cache::get_message( const message_hash_type& hash_of_message_to_lookup )
-    {
+   message blockchain_tied_message_cache::get_message( const message_hash_type& hash_of_message_to_lookup ) const
+   {
       message_cache_container::index<message_hash_index>::type::const_iterator iter =
          _message_cache.get<message_hash_index>().find(hash_of_message_to_lookup );
       if( iter != _message_cache.get<message_hash_index>().end() )
-        return iter->message_body;
+         return iter->message_body;
       FC_THROW_EXCEPTION(  fc::key_not_found_exception, "Requested message not in cache" );
-    }
+   }
 
     message_propagation_data blockchain_tied_message_cache::get_message_propagation_data(
              const message_hash_type& hash_of_msg_contents_to_lookup ) const
@@ -231,37 +168,6 @@ namespace graphene { namespace net {
       }
       FC_THROW_EXCEPTION(  fc::key_not_found_exception, "Requested message not in cache" );
     }
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    // This specifies configuration info for the local node.  It's stored as JSON
-    // in the configuration directory (application data directory)
-    struct node_configuration
-    {
-      node_configuration() : accept_incoming_connections(true), wait_if_endpoint_is_busy(true) {}
-
-      fc::ip::endpoint listen_endpoint;
-      bool accept_incoming_connections;
-      bool wait_if_endpoint_is_busy;
-      /**
-       * Originally, our p2p code just had a 'node-id' that was a random number identifying this node
-       * on the network.  This is now a private key/public key pair, where the public key is used
-       * in place of the old random node-id.  The private part is unused, but might be used in
-       * the future to support some notion of trusted peers.
-       */
-      fc::ecc::private_key private_key;
-    };
-
-
-} } } // end namespace graphene::net::detail
-FC_REFLECT(graphene::net::detail::node_configuration, (listen_endpoint)
-                                                 (accept_incoming_connections)
-                                                 (wait_if_endpoint_is_busy)
-                                                 (private_key));
-
-#include "node_impl.hxx"
-
-namespace graphene { namespace net { namespace detail {
 
     void node_impl_deleter::operator()(node_impl* impl_to_delete)
     {
@@ -364,12 +270,14 @@ namespace graphene { namespace net { namespace detail {
           dlog("Starting an iteration of p2p_network_connect_loop().");
           display_current_connections();
 
-          // add-once peers bypass our checks on the maximum/desired number of connections (but they will still be counted against the totals once they're connected)
+          // add-once peers bypass our checks on the maximum/desired number of connections
+          // (but they will still be counted against the totals once they're connected)
           if (!_add_once_node_list.empty())
           {
             std::list<potential_peer_record> add_once_node_list;
             add_once_node_list.swap(_add_once_node_list);
-            dlog("Processing \"add once\" node list containing ${count} peers:", ("count", add_once_node_list.size()));
+            dlog("Processing \"add once\" node list containing ${count} peers:",
+                 ("count", add_once_node_list.size()));
             for (const potential_peer_record& add_once_peer : add_once_node_list)
             {
               dlog("    ${peer}", ("peer", add_once_peer.endpoint));
@@ -4297,8 +4205,9 @@ namespace graphene { namespace net { namespace detail {
 
       // if we've recently connected to this peer, reset the last_connection_attempt_time to allow
       // us to immediately retry this peer
-      updated_peer_record.last_connection_attempt_time = std::min<fc::time_point_sec>(updated_peer_record.last_connection_attempt_time,
-                                                                                      fc::time_point::now() - fc::seconds(_peer_connection_retry_timeout));
+      updated_peer_record.last_connection_attempt_time
+            = std::min<fc::time_point_sec>( updated_peer_record.last_connection_attempt_time,
+                                            fc::time_point::now() - fc::seconds(_peer_connection_retry_timeout) );
       _add_once_node_list.push_back(updated_peer_record);
       _potential_peer_db.update_entry(updated_peer_record);
       trigger_p2p_network_connect_loop();
