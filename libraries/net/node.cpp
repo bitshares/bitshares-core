@@ -548,19 +548,23 @@ namespace graphene { namespace net { namespace detail {
             for( const peer_connection_ptr& peer : _active_connections )
             {
               if( peer->we_need_sync_items_from_peer &&
-                  sync_item_requests_to_send.find(peer) == sync_item_requests_to_send.end() && // if we've already scheduled a request for this peer, don't consider scheduling another
+                  // if we've already scheduled a request for this peer, don't consider scheduling another
+                  sync_item_requests_to_send.find(peer) == sync_item_requests_to_send.end() &&
                   peer->idle() )
               {
                 if (!peer->inhibit_fetching_sync_blocks)
                 {
                   // loop through the items it has that we don't yet have on our blockchain
-                  for( size_t i = 0; i < peer->ids_of_items_to_get.size(); ++i )
+                  for( const auto& item_to_potentially_request : peer->ids_of_items_to_get )
                   {
-                    item_hash_t item_to_potentially_request = peer->ids_of_items_to_get[i];
-                    // if we don't already have this item in our temporary storage and we haven't requested from another syncing peer
-                    if( !have_already_received_sync_item(item_to_potentially_request) && // already got it, but for some reson it's still in our list of items to fetch
-                        sync_items_to_request.find(item_to_potentially_request) == sync_items_to_request.end() &&  // we have already decided to request it from another peer during this iteration
-                        _active_sync_requests.find(item_to_potentially_request) == _active_sync_requests.end() ) // we've requested it in a previous iteration and we're still waiting for it to arrive
+                    // if we don't already have this item in our temporary storage
+                    // and we haven't requested from another syncing peer
+                    if( // already got it, but for some reson it's still in our list of items to fetch
+                        !have_already_received_sync_item(item_to_potentially_request) &&
+                        // we have already decided to request it from another peer during this iteration
+                        sync_items_to_request.find(item_to_potentially_request) == sync_items_to_request.end() &&
+                        // we've requested it in a previous iteration and we're still waiting for it to arrive
+                        _active_sync_requests.find(item_to_potentially_request) == _active_sync_requests.end() )
                     {
                       // then schedule a request from this peer
                       sync_item_requests_to_send[peer].push_back(item_to_potentially_request);
@@ -769,7 +773,7 @@ namespace graphene { namespace net { namespace detail {
             // don't send the peer anything we've already advertised to it
             // or anything it has advertised to us
             // group the items we need to send by type, because we'll need to send one inventory message per type
-            size_t total_items_to_send_to_this_peer = 0;
+            size_t total_items_to_send = 0;
             idump((inventory_to_advertise));
             for (const item_id& item_to_advertise : inventory_to_advertise)
             {
@@ -780,11 +784,14 @@ namespace graphene { namespace net { namespace detail {
                   adv_to_us == peer->inventory_peer_advertised_to_us.end())
               {
                 items_to_advertise_by_type[item_to_advertise.item_type].push_back(item_to_advertise.item_hash);
-                peer->inventory_advertised_to_peer.insert(peer_connection::timestamped_item_id(item_to_advertise, fc::time_point::now()));
-                ++total_items_to_send_to_this_peer;
+                peer->inventory_advertised_to_peer.insert(
+                         peer_connection::timestamped_item_id(item_to_advertise, fc::time_point::now()));
+                ++total_items_to_send;
                 if (item_to_advertise.item_type == trx_message_type)
-                  testnetlog("advertising transaction ${id} to peer ${endpoint}", ("id", item_to_advertise.item_hash)("endpoint", peer->get_remote_endpoint()));
-                dlog("advertising item ${id} to peer ${endpoint}", ("id", item_to_advertise.item_hash)("endpoint", peer->get_remote_endpoint()));
+                  testnetlog("advertising transaction ${id} to peer ${endpoint}",
+                             ("id", item_to_advertise.item_hash)("endpoint", peer->get_remote_endpoint()));
+                dlog("advertising item ${id} to peer ${endpoint}",
+                     ("id", item_to_advertise.item_hash)("endpoint", peer->get_remote_endpoint()));
               }
               else
               {
@@ -795,7 +802,7 @@ namespace graphene { namespace net { namespace detail {
               }
             }
               dlog("advertising ${count} new item(s) of ${types} type(s) to peer ${endpoint}",
-                   ("count", total_items_to_send_to_this_peer)
+                   ("count", total_items_to_send)
                    ("types", items_to_advertise_by_type.size())
                    ("endpoint", peer->get_remote_endpoint()));
             for (auto items_group : items_to_advertise_by_type)
@@ -2048,31 +2055,33 @@ namespace graphene { namespace net { namespace detail {
           // what's more, it should be a sequential list of blocks, verify that first
           uint32_t first_block_number_in_reponse = _delegate->get_block_number(
                          blockchain_item_ids_inventory_message_received.item_hashes_available.front());
-          for (size_t i = 1; i < blockchain_item_ids_inventory_message_received.item_hashes_available.size(); ++i)
+          // explicitly convert the size into 32 bit, should be OK
+          uint32_t items_received = blockchain_item_ids_inventory_message_received.item_hashes_available.size();
+          for (uint32_t i = 1; i < items_received; ++i)
           {
             uint32_t actual_num = _delegate->get_block_number(
                                         blockchain_item_ids_inventory_message_received.item_hashes_available[i]);
             uint32_t expected_num = first_block_number_in_reponse + i;
             if (actual_num != expected_num)
             {
-            wlog("Invalid response from peer ${peer_endpoint}.  The list of blocks they provided is not sequential, "
+              wlog("Invalid response from peer ${peer_endpoint}.  The list of blocks they provided is not sequential, "
                  "the ${position}th block in their reply was block number ${actual_num}, "
                  "but it should have been number ${expected_num}",
                  ("peer_endpoint", originating_peer->get_remote_endpoint())
                  ("position", i)
                  ("actual_num", actual_num)
                  ("expected_num", expected_num));
-            fc::exception error_for_peer(FC_LOG_MESSAGE(error, 
+              fc::exception error_for_peer(FC_LOG_MESSAGE(error,
                                                         "You gave an invalid response to my request for sync blocks.  The list of blocks you provided is not sequential, "
                                                         "the ${position}th block in their reply was block number ${actual_num}, "
                                                         "but it should have been number ${expected_num}",
                                                         ("position", i)
                                                         ("actual_num", actual_num)
                                                         ("expected_num", expected_num)));
-            disconnect_from_peer(originating_peer,
+              disconnect_from_peer(originating_peer,
                                  "You gave an invalid response to my request for sync blocks",
                                  true, error_for_peer);
-            return;
+              return;
             }
           }
 
@@ -2423,7 +2432,10 @@ namespace graphene { namespace net { namespace detail {
         originating_peer->items_requested_from_peer.erase( regular_item_iter );
         originating_peer->inventory_peer_advertised_to_us.erase( requested_item );
         if (is_item_in_any_peers_inventory(requested_item))
-          _items_to_fetch.insert(prioritized_item_id(requested_item, _items_to_fetch_seq_counter++));
+        {
+          _items_to_fetch.insert(prioritized_item_id(requested_item, _items_to_fetch_seq_counter));
+          ++_items_to_fetch_seq_counter;
+        }
         wlog("Peer doesn't have the requested item.");
         trigger_fetch_items_loop();
         return;
@@ -2500,7 +2512,8 @@ namespace graphene { namespace net { namespace detail {
               if (items_to_fetch_iter == _items_to_fetch.get<item_id_index>().end())
               {
                 // it's new to us
-                _items_to_fetch.insert(prioritized_item_id(advertised_item_id, _items_to_fetch_seq_counter++));
+                _items_to_fetch.insert(prioritized_item_id(advertised_item_id, _items_to_fetch_seq_counter));
+                ++_items_to_fetch_seq_counter;
                 dlog("adding item ${item_hash} from inventory message to our list of items to fetch",
                      ("item_hash", item_hash));
                 trigger_fetch_items_loop();
@@ -2633,7 +2646,10 @@ namespace graphene { namespace net { namespace detail {
         for (auto item_and_time : originating_peer->items_requested_from_peer)
         {
           if (is_item_in_any_peers_inventory(item_and_time.first))
-            _items_to_fetch.insert(prioritized_item_id(item_and_time.first, _items_to_fetch_seq_counter++));
+          {
+            _items_to_fetch.insert(prioritized_item_id(item_and_time.first, _items_to_fetch_seq_counter));
+            ++_items_to_fetch_seq_counter;
+          }
         }
         trigger_fetch_items_loop();
       }
