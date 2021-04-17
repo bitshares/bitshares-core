@@ -638,8 +638,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       void on_connection_rejected_message( peer_connection* originating_peer,
                                            const connection_rejected_message& connection_rejected_message_received );
 
-      void on_address_request_message( peer_connection* originating_peer,
-                                       const address_request_message& address_request_message_received );
+      void on_address_request_message( peer_connection* originating_peer, const address_request_message&);
 
       void on_address_message( peer_connection* originating_peer,
                                const address_message& address_message_received );
