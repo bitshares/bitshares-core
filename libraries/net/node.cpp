@@ -725,7 +725,7 @@ namespace graphene { namespace net { namespace detail {
                    ("endpoint", peer->get_remote_endpoint()));
             for (auto items_group : items_to_advertise_by_type)
             {
-               inventory_messages_to_send.push_back(std::make_pair(
+               inventory_messages_to_send.emplace_back(std::make_pair(
                      peer, item_ids_inventory_message(items_group.first, items_group.second)));
             }
           }
@@ -1778,7 +1778,8 @@ namespace graphene { namespace net { namespace detail {
       item_id peers_last_item_seen = item_id(fetch_blockchain_item_ids_message_received.item_type, item_hash_t());
       if (fetch_blockchain_item_ids_message_received.blockchain_synopsis.empty())
       {
-        dlog("sync: received a request for item ids starting at the beginning of the chain from peer ${peer_endpoint} (full request: ${synopsis})",
+        dlog("sync: received a request for item ids starting at the beginning of the chain "
+             "from peer ${peer_endpoint} (full request: ${synopsis})",
              ("peer_endpoint", originating_peer->get_remote_endpoint())
              ("synopsis", fetch_blockchain_item_ids_message_received.blockchain_synopsis));
       }
@@ -2542,7 +2543,8 @@ namespace graphene { namespace net { namespace detail {
 
         if (inbound_endpoint && originating_peer_ptr->get_remote_endpoint())
         {
-          fc::optional<potential_peer_record> updated_peer_record = _potential_peer_db.lookup_entry_for_endpoint(*inbound_endpoint);
+          fc::optional<potential_peer_record> updated_peer_record
+                = _potential_peer_db.lookup_entry_for_endpoint(*inbound_endpoint);
           if (updated_peer_record)
           {
             updated_peer_record->last_seen_time = fc::time_point::now();
@@ -2551,7 +2553,8 @@ namespace graphene { namespace net { namespace detail {
         }
       }
 
-      ilog("Remote peer ${endpoint} closed their connection to us", ("endpoint", originating_peer->get_remote_endpoint()));
+      ilog("Remote peer ${endpoint} closed their connection to us",
+           ("endpoint", originating_peer->get_remote_endpoint()));
       display_current_connections();
       trigger_p2p_network_connect_loop();
 
@@ -2991,7 +2994,8 @@ namespace graphene { namespace net { namespace detail {
           bool new_transaction_discovered = false;
           for (const item_hash_t& transaction_message_hash : contained_transaction_msg_ids)
           {
-            /*size_t items_erased =*/ _items_to_fetch.get<item_id_index>().erase(item_id(trx_message_type, transaction_message_hash));
+            /*size_t items_erased =*/
+            _items_to_fetch.get<item_id_index>().erase(item_id(trx_message_type, transaction_message_hash));
             // there are two ways we could behave here: we could either act as if we received
             // the transaction outside the block and offer it to our peers, or we could just
             // forget about it (we would still advertise this block to our peers so they should
@@ -3031,7 +3035,8 @@ namespace graphene { namespace net { namespace detail {
             peer->clear_old_inventory();
          }
         }
-        message_propagation_data propagation_data{message_receive_time, message_validated_time, originating_peer->node_id};
+        message_propagation_data propagation_data { message_receive_time, message_validated_time,
+                                                    originating_peer->node_id };
         broadcast( block_message_to_process, propagation_data );
         _message_cache.block_accepted();
 
@@ -3126,7 +3131,8 @@ namespace graphene { namespace net { namespace detail {
       // mode before we receive and process the item.  In that case, we should process the item as a normal
       // item to avoid confusing the sync code)
       graphene::net::block_message block_message_to_process(message_to_process.as<graphene::net::block_message>());
-      auto item_iter = originating_peer->items_requested_from_peer.find(item_id(graphene::net::block_message_type, message_hash));
+      auto item_iter = originating_peer->items_requested_from_peer.find(
+                             item_id(graphene::net::block_message_type, message_hash));
       if (item_iter != originating_peer->items_requested_from_peer.end())
       {
         originating_peer->items_requested_from_peer.erase(item_iter);
@@ -3211,10 +3217,14 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       fc::time_point reply_received_time = fc::time_point::now();
-      originating_peer->clock_offset = fc::microseconds(((current_time_reply_message_received.request_received_time - current_time_reply_message_received.request_sent_time) +
-                                                         (current_time_reply_message_received.reply_transmitted_time - reply_received_time)).count() / 2);
-      originating_peer->round_trip_delay = (reply_received_time - current_time_reply_message_received.request_sent_time) -
-                                           (current_time_reply_message_received.reply_transmitted_time - current_time_reply_message_received.request_received_time);
+      originating_peer->clock_offset = fc::microseconds( ( (current_time_reply_message_received.request_received_time
+                                                            - current_time_reply_message_received.request_sent_time)
+                                                         + (current_time_reply_message_received.reply_transmitted_time
+                                                            - reply_received_time) ).count() / 2 );
+      originating_peer->round_trip_delay = ( reply_received_time
+                                             - current_time_reply_message_received.request_sent_time )
+                                         - ( current_time_reply_message_received.reply_transmitted_time
+                                             - current_time_reply_message_received.request_received_time );
     }
 
     void node_impl::forward_firewall_check_to_next_available_peer(firewall_check_state_data* firewall_check_state)
@@ -3268,7 +3278,8 @@ namespace graphene { namespace net { namespace detail {
         // we're not going to try to connect back to the originating peer directly,
         // instead, we're going to coordinate requests by asking some of our peers
         // to try to connect to the originating peer, and relay the results back
-        wlog("Peer ${peer} wants us to check whether it is firewalled", ("peer", originating_peer->get_remote_endpoint()));
+        wlog("Peer ${peer} wants us to check whether it is firewalled",
+             ("peer", originating_peer->get_remote_endpoint()));
         firewall_check_state_data* firewall_check_state = new firewall_check_state_data;
         // if they are using the same inbound and outbound port, try connecting to their outbound endpoint.
         // if they are using a different inbound port, use their outbound address but the inbound port they reported
@@ -3840,7 +3851,8 @@ namespace graphene { namespace net { namespace detail {
         try
         {
           _tcp_server.accept( new_peer->get_socket() );
-          ilog( "accepted inbound connection from ${remote_endpoint}", ("remote_endpoint", new_peer->get_socket().remote_endpoint() ) );
+          ilog( "accepted inbound connection from ${remote_endpoint}",
+                ("remote_endpoint", new_peer->get_socket().remote_endpoint() ) );
           if (_node_is_shutting_down)
             return;
           new_peer->connection_initiation_time = fc::time_point::now();
@@ -3869,7 +3881,8 @@ namespace graphene { namespace net { namespace detail {
       fc::sha256::encoder shared_secret_encoder;
       fc::sha512 shared_secret = peer->get_shared_secret();
       shared_secret_encoder.write(shared_secret.data(), sizeof(shared_secret));
-      fc::ecc::compact_signature signature = _node_configuration.private_key.sign_compact(shared_secret_encoder.result());
+      fc::ecc::compact_signature signature
+            = _node_configuration.private_key.sign_compact(shared_secret_encoder.result());
 
       // in the hello messsage, we send three things:
       //  ip address
@@ -3882,7 +3895,8 @@ namespace graphene { namespace net { namespace detail {
       // detection figured it out, send those values instead.
 
       fc::ip::endpoint local_endpoint(peer->get_socket().local_endpoint());
-      uint16_t listening_port = _node_configuration.accept_incoming_connections ? _actual_listening_endpoint.port() : 0;
+      uint16_t listening_port = _node_configuration.accept_incoming_connections ?
+                                      _actual_listening_endpoint.port() : 0;
 
       if (_is_firewalled == firewalled_state::not_firewalled &&
           _publicly_visible_listening_endpoint)
@@ -3913,7 +3927,8 @@ namespace graphene { namespace net { namespace detail {
       {
         // create or find the database entry for the new peer
         // if we're connecting to them, we believe they're not firewalled
-        potential_peer_record updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(remote_endpoint);
+        potential_peer_record updated_peer_record
+              = _potential_peer_db.lookup_or_create_entry_for_endpoint(remote_endpoint);
         updated_peer_record.last_connection_disposition = last_connection_failed;
         updated_peer_record.last_connection_attempt_time = fc::time_point::now();;
         _potential_peer_db.update_entry(updated_peer_record);
@@ -3927,13 +3942,15 @@ namespace graphene { namespace net { namespace detail {
 
       try
       {
-        new_peer->connect_to(remote_endpoint, _actual_listening_endpoint);  // blocks until the connection is established and secure connection is negotiated
+        // blocks until the connection is established and secure connection is negotiated
+        new_peer->connect_to(remote_endpoint, _actual_listening_endpoint);
 
         // we connected to the peer.  guess they're not firewalled....
         new_peer->is_firewalled = firewalled_state::not_firewalled;
 
         // connection succeeded, we've started handshaking.  record that in our database
-        potential_peer_record updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(remote_endpoint);
+        potential_peer_record updated_peer_record
+              = _potential_peer_db.lookup_or_create_entry_for_endpoint(remote_endpoint);
         updated_peer_record.last_connection_disposition = last_connection_handshaking_failed;
         updated_peer_record.number_of_successful_connection_attempts++;
         updated_peer_record.last_seen_time = fc::time_point::now();
@@ -3947,7 +3964,8 @@ namespace graphene { namespace net { namespace detail {
       if (connect_failed_exception && !new_peer->performing_firewall_check())
       {
         // connection failed.  record that in our database
-        potential_peer_record updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(remote_endpoint);
+        potential_peer_record updated_peer_record
+              = _potential_peer_db.lookup_or_create_entry_for_endpoint(remote_endpoint);
         updated_peer_record.last_connection_disposition = last_connection_failed;
         updated_peer_record.number_of_failed_connection_attempts++;
         if (new_peer->connection_closed_error)
