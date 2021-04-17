@@ -676,12 +676,6 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       void on_check_firewall_reply_message(peer_connection* originating_peer,
                                            const check_firewall_reply_message& check_firewall_reply_message_received);
 
-      void on_get_current_connections_request_message(const peer_connection*,
-                                                      const get_current_connections_request_message&) const;
-
-      void on_get_current_connections_reply_message(peer_connection* originating_peer,
-                                                    const get_current_connections_reply_message& get_current_connections_reply_message_received);
-
       void on_connection_closed(peer_connection* originating_peer) override;
 
       void send_sync_block_to_node_delegate(const graphene::net::block_message& block_message_to_send);

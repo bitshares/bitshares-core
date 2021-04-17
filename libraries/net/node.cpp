@@ -1322,10 +1322,8 @@ namespace graphene { namespace net { namespace detail {
         on_check_firewall_reply_message(originating_peer, received_message.as<check_firewall_reply_message>());
         break;
       case core_message_type_enum::get_current_connections_request_message_type:
-        on_get_current_connections_request_message(originating_peer, received_message.as<get_current_connections_request_message>());
         break;
       case core_message_type_enum::get_current_connections_reply_message_type:
-        on_get_current_connections_reply_message(originating_peer, received_message.as<get_current_connections_reply_message>());
         break;
 
       default:
@@ -3355,19 +3353,6 @@ namespace graphene { namespace net { namespace detail {
       }
 
     }
-
-    void node_impl::on_get_current_connections_request_message(const peer_connection*,
-                                                               const get_current_connections_request_message&) const
-    {
-       /* This is unused. TODO: When we are sure no one will call this, remove it and its associated structures */
-    }
-
-    void node_impl::on_get_current_connections_reply_message(peer_connection* originating_peer,
-          const get_current_connections_reply_message& get_current_connections_reply_message_received)
-    {
-      VERIFY_CORRECT_THREAD();
-    }
-
 
     // this handles any message we get that doesn't require any special processing.
     // currently, this is any message other than block messages and p2p-specific
