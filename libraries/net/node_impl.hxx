@@ -584,7 +584,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       /// @}
 
       node_impl(const std::string& user_agent);
-      virtual ~node_impl();
+      ~node_impl() override;
 
       void save_node_configuration();
 
