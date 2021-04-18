@@ -3217,10 +3217,11 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       fc::time_point reply_received_time = fc::time_point::now();
+      constexpr uint8_t two = 2;
       originating_peer->clock_offset = fc::microseconds( ( (current_time_reply_message_received.request_received_time
                                                             - current_time_reply_message_received.request_sent_time)
                                                          + (current_time_reply_message_received.reply_transmitted_time
-                                                            - reply_received_time) ).count() / 2 );
+                                                            - reply_received_time) ).count() / two );
       originating_peer->round_trip_delay = ( reply_received_time
                                              - current_time_reply_message_received.request_sent_time )
                                          - ( current_time_reply_message_received.reply_transmitted_time
