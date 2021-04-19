@@ -98,10 +98,10 @@ jobs:
         path: |
           ccache
           sonar_cache
-        key: sonar-${{ github.ref }}-${{ github.sha }}
+        key: testnet-sonar-${{ github.ref }}-${{ github.sha }}
         restore-keys: |
-          sonar-${{ github.ref }}-
-          sonar-
+          testnet-sonar-${{ github.ref }}-
+          testnet-sonar-
     - name: Build
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
