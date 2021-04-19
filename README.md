@@ -70,7 +70,7 @@ We recommend building on Ubuntu 20.04 LTS (64-bit)
   * Windows (various versions, Visual Studio and MinGW)
   * OpenBSD (various versions)
 
-* BitShares requires [Boost](https://www.boost.org/) libraries to build, supports version `1.58` to `1.71`.
+* BitShares requires [Boost](https://www.boost.org/) libraries to build, supports version `1.58` to `1.74`.
 Newer versions may work, but have not been tested.
 If your system came pre-installed with a version of Boost libraries that you do not wish to use, you may
 manually build your preferred version and use it with BitShares by specifying it on the CMake command line.
