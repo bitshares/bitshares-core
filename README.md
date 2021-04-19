@@ -1,5 +1,5 @@
-BitShares Core
-==============
+BitShares Test Network
+======================
 
 BitShares Core is the BitShares blockchain implementation and command-line interface.
 The web browser based wallet is [BitShares UI](https://github.com/bitshares/bitshares-ui).
@@ -45,7 +45,7 @@ We recommend building on Ubuntu 20.04 LTS (64-bit)
 
     git clone https://github.com/bitshares/bitshares-core.git
     cd bitshares-core
-    git checkout master # may substitute "master" with current release tag
+    git checkout testnet # may substitute "testnet" with current release tag
     git submodule update --init --recursive
     mkdir build
     cd build
@@ -55,7 +55,7 @@ We recommend building on Ubuntu 20.04 LTS (64-bit)
 **Upgrade Script:** (prepend to the Build Script above if you built a prior release):
 
     git remote set-url origin https://github.com/bitshares/bitshares-core.git
-    git checkout master
+    git checkout testnet
     git remote set-head origin --auto
     git pull
     git submodule update --init --recursive # this command may fail
@@ -97,13 +97,7 @@ It may take several hours to fully synchronize the blockchain.
 You can exit the node using `Ctrl+C`. Please be aware that the node may need some time (usually a few minutes) to exit cleanly, please be patient.
 
 **IMPORTANT:** By default the node will start in reduced memory mode by using some of the commands detailed in [Memory reduction for nodes](https://github.com/bitshares/bitshares-core/wiki/Memory-reduction-for-nodes).
-In order to run a full node with all the account histories (which is usually not necessary) you need to remove `partial-operations` and `max-ops-per-account` from your config file. Please note that currently(2018-10-17) a full node will need more than 160GB of RAM to operate and required memory is growing fast. Consider the following table as **minimal requirements** before running a node:
-
-| Default | Full | Minimal  | ElasticSearch
-| --- | --- | --- | ---
-| 150G HDD, 16G RAM | 640G SSD, 64G RAM * | 120G HDD, 4G RAM | 1TB SSD, 32G RAM
-
-\* For this setup, allocate at least 500GB of SSD as swap.
+In order to run a full node with all the account histories (which is usually not necessary) you need to remove `partial-operations` and `max-ops-per-account` from your config file.
 
 To use the command-line wallet or other wallets / clients with the node, the node need to be started with RPC connection enabled, which can be done by starting the node with the `--rpc-endpoint` parameter, E.G.
 

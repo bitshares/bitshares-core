@@ -83,8 +83,8 @@ int main(int argc, char** argv) {
    auto node = std::make_unique<graphene::app::application>();
    fc::oexception unhandled_exception;
    try {
-      bpo::options_description app_options("BitShares Witness Node");
-      bpo::options_description cfg_options("BitShares Witness Node");
+      bpo::options_description app_options("BitShares Testnet Witness Node");
+      bpo::options_description cfg_options("BitShares Testnet Witness Node");
       std::string default_plugins = "witness account_history market_history grouped_orders "
                                     "api_helper_indexes custom_operations";
       app_options.add_options()
@@ -227,7 +227,7 @@ int main(int argc, char** argv) {
       }, SIGQUIT );
 #endif
 
-      ilog("Started BitShares node on a chain with ${h} blocks.", ("h", node->chain_database()->head_block_num()));
+      ilog("Started BitShares Testnet node on a chain with ${h} blocks.", ("h", node->chain_database()->head_block_num()));
       ilog("Chain ID is ${id}", ("id", node->chain_database()->get_chain_id()) );
 
       auto caught_signal = exit_promise->wait();
