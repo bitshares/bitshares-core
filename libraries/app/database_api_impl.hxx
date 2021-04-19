@@ -153,6 +153,11 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             optional<uint32_t> limit = 101,
             optional<liquidity_pool_id_type> start_id = optional<liquidity_pool_id_type>(),
             optional<bool> with_statistics = false )const;
+      vector<extended_liquidity_pool_object> get_liquidity_pools_by_one_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit = 101,
+            const optional<liquidity_pool_id_type>& start_id = optional<liquidity_pool_id_type>(),
+            const optional<bool>& with_statistics = false )const;
       vector<extended_liquidity_pool_object> get_liquidity_pools_by_both_assets(
             std::string asset_symbol_or_id_a,
             std::string asset_symbol_or_id_b,
@@ -198,7 +203,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Authority / validation
       std::string get_transaction_hex(const signed_transaction& trx)const;
-      std::string get_transaction_hex_without_sig(const signed_transaction& trx)const;
+      std::string get_transaction_hex_without_sig(const transaction& trx)const;
 
       set<public_key_type> get_required_signatures( const signed_transaction& trx,
                                                     const flat_set<public_key_type>& available_keys )const;
@@ -465,6 +470,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       const application_options* _app_options = nullptr;
 
       const graphene::api_helper_indexes::amount_in_collateral_index* amount_in_collateral_index;
+      const graphene::api_helper_indexes::asset_in_liquidity_pools_index* asset_in_liquidity_pools_index;
 };
 
 } } // graphene::app

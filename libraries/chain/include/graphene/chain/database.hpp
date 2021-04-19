@@ -306,8 +306,8 @@ namespace graphene { namespace chain {
          template<typename EvaluatorType>
          void register_evaluator()
          {
-            _operation_evaluators[
-               operation::tag<typename EvaluatorType::operation_type>::value].reset( new op_evaluator_impl<EvaluatorType>() );
+            _operation_evaluators[operation::tag<typename EvaluatorType::operation_type>::value]
+                  = std::make_unique<op_evaluator_impl<EvaluatorType>>();
          }
 
          //////////////////// db_balance.cpp ////////////////////

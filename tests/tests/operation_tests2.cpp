@@ -829,7 +829,6 @@ BOOST_AUTO_TEST_CASE( witness_create )
    generate_block(skip);
 
    auto wtplugin = app.register_plugin<graphene::witness_plugin::witness_plugin>();
-   wtplugin->plugin_set_app(&app);
    boost::program_options::variables_map options;
 
    // init witness key cahce
@@ -844,7 +843,7 @@ BOOST_AUTO_TEST_CASE( witness_create )
       if( !db.find(wid) )
          break;
    }
-   options.insert( std::make_pair( "witness-id", boost::program_options::variable_value( witness_ids, false ) ) );
+   fc::set_option( options, "witness-id", witness_ids );
    wtplugin->plugin_initialize(options);
    wtplugin->plugin_startup();
 
@@ -995,6 +994,8 @@ BOOST_AUTO_TEST_CASE( witness_create )
          produced++;
    }
    BOOST_CHECK_GE( produced, 1 );
+
+   wtplugin->plugin_shutdown();
 } FC_LOG_AND_RETHROW() }
 
 /**
