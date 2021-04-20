@@ -23,16 +23,17 @@
  */
 #pragma once
 
-#include <graphene/protocol/config.hpp>
+#include <boost/program_options.hpp>
 
-#include <string>
+namespace fc {
 
-#define GRAPHENE_MIN_UNDO_HISTORY 10
-#define GRAPHENE_MAX_UNDO_HISTORY 10000
+   /**
+    * Set value of a named variable in the program options map if the variable has not been set.
+    */
+   template<typename T>
+   static void set_option( boost::program_options::variables_map& options, const std::string& name, const T& value )
+   {
+      options.emplace( name, boost::program_options::variable_value( value, false ) );
+   }
 
-#define GRAPHENE_MAX_NESTED_OBJECTS (200)
-
-const std::string GRAPHENE_CURRENT_DB_VERSION = "20210222";
-
-#define GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT             4
-#define GRAPHENE_RECENTLY_MISSED_COUNT_DECREMENT             3
+} // namespace fc

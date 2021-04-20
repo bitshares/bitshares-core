@@ -141,10 +141,10 @@ jobs:
       uses: actions/cache@v1
       with:
         path: ccache
-        key: ccache-mingw64-${{ github.ref }}-${{ github.sha }}
+        key: testnet-ccache-mingw64-${{ github.ref }}-${{ github.sha }}
         restore-keys: |
-          ccache-mingw64-${{ github.ref }}-
-          ccache-mingw64-
+          testnet-ccache-mingw64-${{ github.ref }}-
+          testnet-ccache-mingw64-
     - name: Build
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"

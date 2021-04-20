@@ -109,6 +109,11 @@ namespace graphene { namespace protocol {
    /**
     * @brief Exchange with a liquidity pool
     * @ingroup operations
+    * @note The result of this operation is a @ref generic_exchange_operation_result.
+    *       There are 3 fees in the result, stored in this order:
+    *       * maker market fee
+    *       * taker market fee
+    *       * liquidity pool taker fee
     */
    struct liquidity_pool_exchange_operation : public base_operation
    {

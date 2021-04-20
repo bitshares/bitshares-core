@@ -29,8 +29,6 @@
 
 #include <graphene/protocol/types.hpp>
 
-#include <list>
-
 namespace graphene { namespace net {
 
   using fc::variant_object;
@@ -39,11 +37,8 @@ namespace graphene { namespace net {
   namespace detail
   {
     class node_impl;
-    struct node_impl_deleter
-    {
-      void operator()(node_impl*);
-    };
   }
+  using node_impl_ptr = std::shared_ptr<detail::node_impl>;
 
   // during network development, we need to track message propagation across the network
   // using a structure like this:
@@ -61,7 +56,7 @@ namespace graphene { namespace net {
    class node_delegate
    {
       public:
-         virtual ~node_delegate(){}
+         virtual ~node_delegate() = default;
 
          /**
           *  If delegate has the item, the network has no need to fetch it.
@@ -73,14 +68,14 @@ namespace graphene { namespace net {
           *
           *  @param blk_msg the message which contains the block
           *  @param sync_mode true if the message was fetched through the sync process, false during normal operation
-          *  @param contained_transaction_message_ids container for the transactions to write back into
+          *  @param contained_transaction_msg_ids container for the transactions to write back into
           *  @returns true if this message caused the blockchain to switch forks, false if it did not
           *
           *  @throws exception if error validating the item, otherwise the item is
           *          safe to broadcast on.
           */
          virtual bool handle_block( const graphene::net::block_message& blk_msg, bool sync_mode, 
-                                    std::vector<fc::uint160_t>& contained_transaction_message_ids ) = 0;
+                                    std::vector<message_hash_type>& contained_transaction_msg_ids ) = 0;
          
          /**
           *  @brief Called when a new transaction comes in from the network
@@ -199,7 +194,7 @@ namespace graphene { namespace net {
 
         void close();
 
-        void      set_node_delegate( node_delegate* del );
+        void      set_node_delegate( std::shared_ptr<node_delegate> del ) const;
 
         void      load_configuration( const fc::path& configuration_directory );
 
@@ -318,34 +313,10 @@ namespace graphene { namespace net {
         void disable_peer_advertising();
         fc::variant_object get_call_statistics() const;
       private:
-        std::unique_ptr<detail::node_impl, detail::node_impl_deleter> my;
+        node_impl_ptr my;
    };
 
-    class simulated_network : public node
-    {
-    public:
-      ~simulated_network();
-      simulated_network(const std::string& user_agent) : node(user_agent) {}
-      void      listen_to_p2p_network() override {}
-      void      connect_to_p2p_network() override {}
-      void      connect_to_endpoint(const fc::ip::endpoint& ep) override {}
-
-      fc::ip::endpoint get_actual_listening_endpoint() const override { return fc::ip::endpoint(); }
-
-      void      sync_from(const item_id& current_head_block, const std::vector<uint32_t>& hard_fork_block_numbers) override {}
-      void      broadcast(const message& item_to_broadcast) override;
-      void      add_node_delegate(node_delegate* node_delegate_to_add);
-
-      virtual uint32_t get_connection_count() const override { return 8; }
-    private:
-      struct node_info;
-      void message_sender(node_info* destination_node);
-      std::list<node_info*> network_nodes;
-    };
-
-
-   typedef std::shared_ptr<node> node_ptr;
-   typedef std::shared_ptr<simulated_network> simulated_network_ptr;
+   using node_ptr = std::shared_ptr<node>;
 
 } } // graphene::net
 

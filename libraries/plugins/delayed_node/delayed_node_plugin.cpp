@@ -46,17 +46,19 @@ struct delayed_node_plugin_impl {
 };
 }
 
-delayed_node_plugin::delayed_node_plugin()
-   : my(nullptr)
-{}
+delayed_node_plugin::delayed_node_plugin(graphene::app::application& app) :
+   plugin(app)
+{
+   // Nothing else to do
+}
 
-delayed_node_plugin::~delayed_node_plugin()
-{}
+delayed_node_plugin::~delayed_node_plugin() = default;
 
 void delayed_node_plugin::plugin_set_program_options(bpo::options_description& cli, bpo::options_description& cfg)
 {
    cli.add_options()
-         ("trusted-node", boost::program_options::value<std::string>(), "RPC endpoint of a trusted validating node (required for delayed_node)")
+         ("trusted-node", boost::program_options::value<std::string>(),
+          "RPC endpoint of a trusted validating node (required for delayed_node)")
          ;
    cfg.add(cli);
 }
@@ -89,7 +91,7 @@ void delayed_node_plugin::connect()
 void delayed_node_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
    FC_ASSERT(options.count("trusted-node") > 0);
-   my = std::unique_ptr<detail::delayed_node_plugin_impl>{ new detail::delayed_node_plugin_impl() };
+   my = std::make_unique<detail::delayed_node_plugin_impl>();
    my->remote_endpoint = "ws://" + options.at("trusted-node").as<std::string>();
 }
 

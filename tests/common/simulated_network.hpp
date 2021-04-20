@@ -23,16 +23,34 @@
  */
 #pragma once
 
-#include <graphene/protocol/config.hpp>
+#include <graphene/net/node.hpp>
 
-#include <string>
+#include <list>
 
-#define GRAPHENE_MIN_UNDO_HISTORY 10
-#define GRAPHENE_MAX_UNDO_HISTORY 10000
+namespace graphene { namespace net {
 
-#define GRAPHENE_MAX_NESTED_OBJECTS (200)
+class simulated_network : public node
+{
+public:
+   ~simulated_network() override;
+   explicit simulated_network(const std::string& user_agent) : node(user_agent) {}
+   void      listen_to_p2p_network() override {}
+   void      connect_to_p2p_network() override {}
+   void      connect_to_endpoint(const fc::ip::endpoint& ep) override {}
 
-const std::string GRAPHENE_CURRENT_DB_VERSION = "20210222";
+   fc::ip::endpoint get_actual_listening_endpoint() const override { return fc::ip::endpoint(); }
 
-#define GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT             4
-#define GRAPHENE_RECENTLY_MISSED_COUNT_DECREMENT             3
+   void      sync_from(const item_id& current_head_block, const std::vector<uint32_t>& hard_fork_block_numbers) override {}
+   void      broadcast(const message& item_to_broadcast) override;
+   void      add_node_delegate(std::shared_ptr<node_delegate> node_delegate_to_add);
+
+   uint32_t get_connection_count() const override { return 8; }
+private:
+   struct node_info;
+   void message_sender(std::shared_ptr<node_info> destination_node);
+   std::list<std::shared_ptr<node_info>> network_nodes;
+};
+
+using simulated_network_ptr = std::shared_ptr<simulated_network>;
+
+} } // graphene::net
