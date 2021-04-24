@@ -91,13 +91,6 @@
 
 #include "node_impl.hxx"
 
-//#define ENABLE_DEBUG_ULOGS
-
-#ifdef DEFAULT_LOGGER
-# undef DEFAULT_LOGGER
-#endif
-#define DEFAULT_LOGGER "p2p"
-
 #define INVOCATION_COUNTER(name) \
     static size_t total_ ## name ## _counter = 0; \
     static size_t active_ ## name ## _counter = 0; \
@@ -117,13 +110,6 @@
         dlog("NEWDEBUG: Leaving " #name ", now ${total} total calls, ${active} active calls", ("total", *total)("active", *active)); \
       } \
     } invocation_logger(&total_ ## name ## _counter, &active_ ## name ## _counter)
-
-//log these messages even at warn level when operating on the test network
-#ifdef GRAPHENE_TEST_NETWORK
-#define testnetlog wlog
-#else
-#define testnetlog(...) do {} while (0)
-#endif
 
 namespace graphene { namespace net { namespace detail {
 
