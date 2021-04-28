@@ -91,40 +91,6 @@
 
 #include "node_impl.hxx"
 
-//#define ENABLE_DEBUG_ULOGS
-
-#ifdef DEFAULT_LOGGER
-# undef DEFAULT_LOGGER
-#endif
-#define DEFAULT_LOGGER "p2p"
-
-#define INVOCATION_COUNTER(name) \
-    static size_t total_ ## name ## _counter = 0; \
-    static size_t active_ ## name ## _counter = 0; \
-    struct name ## _invocation_logger { \
-      size_t *total; \
-      size_t *active; \
-      name ## _invocation_logger(size_t *total, size_t *active) : \
-        total(total), active(active) \
-      { \
-        ++*total; \
-        ++*active; \
-        dlog("NEWDEBUG: Entering " #name ", now ${total} total calls, ${active} active calls", ("total", *total)("active", *active)); \
-      } \
-      ~name ## _invocation_logger() \
-      { \
-        --*active; \
-        dlog("NEWDEBUG: Leaving " #name ", now ${total} total calls, ${active} active calls", ("total", *total)("active", *active)); \
-      } \
-    } invocation_logger(&total_ ## name ## _counter, &active_ ## name ## _counter)
-
-//log these messages even at warn level when operating on the test network
-#ifdef GRAPHENE_TEST_NETWORK
-#define testnetlog wlog
-#else
-#define testnetlog(...) do {} while (0)
-#endif
-
 namespace graphene { namespace net { namespace detail {
 
    void blockchain_tied_message_cache::block_accepted()
