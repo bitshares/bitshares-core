@@ -34,23 +34,25 @@ namespace graphene { namespace debug_witness_plugin {
 
 class debug_witness_plugin : public graphene::app::plugin {
 public:
-   ~debug_witness_plugin();
+   using graphene::app::plugin::plugin;
+   ~debug_witness_plugin() override;
 
    std::string plugin_name()const override;
 
-   virtual void plugin_set_program_options(
+   void plugin_set_program_options(
       boost::program_options::options_description &command_line_options,
       boost::program_options::options_description &config_file_options
       ) override;
 
-   virtual void plugin_initialize( const boost::program_options::variables_map& options ) override;
-   virtual void plugin_startup() override;
-   virtual void plugin_shutdown() override;
+   void plugin_initialize( const boost::program_options::variables_map& options ) override;
+   void plugin_startup() override;
+   void plugin_shutdown() override;
 
    void set_json_object_stream( const std::string& filename );
    void flush_json_object_stream();
 
 private:
+   void cleanup();
 
    void on_changed_objects( const std::vector<graphene::db::object_id_type>& ids, const fc::flat_set<graphene::chain::account_id_type>& impacted_accounts );
    void on_removed_objects( const std::vector<graphene::db::object_id_type>& ids, const std::vector<const graphene::db::object*> objs, const fc::flat_set<graphene::chain::account_id_type>& impacted_accounts );

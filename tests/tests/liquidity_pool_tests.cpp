@@ -997,4 +997,142 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
    }
 }
 
+BOOST_AUTO_TEST_CASE( liquidity_pool_apis_test )
+{ try {
+
+      // Pass the hard fork time
+      generate_blocks( HARDFORK_LIQUIDITY_POOL_TIME );
+      set_expiration( db, trx );
+
+      ACTORS((sam)(ted));
+
+      const asset_object sam_eur = create_user_issued_asset( "SAMEUR", sam, charge_market_fee );
+      const asset_object sam_usd = create_user_issued_asset( "SAMUSD", sam, charge_market_fee );
+      const asset_object sam_lp1 = create_user_issued_asset( "SAMLP1", sam, charge_market_fee );
+      const asset_object sam_lp2 = create_user_issued_asset( "SAMLP2", sam, charge_market_fee );
+
+      const asset_object ted_eur = create_user_issued_asset( "TEDEUR", ted, charge_market_fee );
+      const asset_object ted_usd = create_user_issued_asset( "TEDUSD", ted, charge_market_fee );
+      const asset_object ted_lp1 = create_user_issued_asset( "TEDLP1", ted, charge_market_fee );
+      const asset_object ted_lp2 = create_user_issued_asset( "TEDLP2", ted, charge_market_fee );
+      const asset_object ted_lp3 = create_user_issued_asset( "TEDLP3", ted, charge_market_fee );
+
+      // create liquidity pools
+      const liquidity_pool_object sam_lpo1 = create_liquidity_pool( sam_id, sam_eur.id, sam_usd.id,
+                                                                     sam_lp1.id, 100, 310 );
+      const liquidity_pool_object sam_lpo2 = create_liquidity_pool( sam_id, sam_usd.id, ted_usd.id,
+                                                                     sam_lp2.id, 200, 320 );
+      const liquidity_pool_object ted_lpo1 = create_liquidity_pool( ted_id, sam_usd.id, ted_usd.id,
+                                                                     ted_lp1.id, 300, 330 );
+      const liquidity_pool_object ted_lpo2 = create_liquidity_pool( ted_id, sam_usd.id, ted_eur.id,
+                                                                     ted_lp2.id, 400, 340 );
+      const liquidity_pool_object ted_lpo3 = create_liquidity_pool( ted_id, ted_eur.id, ted_usd.id,
+                                                                     ted_lp3.id, 500, 350 );
+
+      generate_block();
+
+      // Check database API
+      graphene::app::database_api db_api( db, &( app.get_options() ) );
+
+      // list all pools
+      auto pools = db_api.list_liquidity_pools();
+      BOOST_REQUIRE_EQUAL( pools.size(), 5u );
+      BOOST_CHECK( !pools.front().statistics.valid() );
+      BOOST_CHECK( pools.front().id == sam_lpo1.id );
+      BOOST_CHECK( pools.back().id == ted_lpo3.id );
+
+      // pagination
+      pools = db_api.list_liquidity_pools( 5, sam_lpo2.id );
+      BOOST_REQUIRE_EQUAL( pools.size(), 4u );
+      BOOST_CHECK( !pools.front().statistics.valid() );
+      BOOST_CHECK( pools.front().id == sam_lpo2.id );
+      BOOST_CHECK( pools.back().id == ted_lpo3.id );
+
+      // with statistics
+      pools = db_api.list_liquidity_pools( 2, sam_lpo2.id, true );
+      BOOST_REQUIRE_EQUAL( pools.size(), 2u );
+      BOOST_CHECK( pools.front().statistics.valid() );
+      BOOST_CHECK( pools.front().id == sam_lpo2.id );
+      BOOST_CHECK( pools.back().id == ted_lpo1.id );
+
+      // get_liquidity_pools_by_asset_a
+      pools = db_api.get_liquidity_pools_by_asset_a( "SAMUSD" );
+      BOOST_REQUIRE_EQUAL( pools.size(), 3u );
+      BOOST_CHECK( !pools.front().statistics.valid() );
+      BOOST_CHECK( pools.front().id == sam_lpo2.id );
+      BOOST_CHECK( pools.back().id == ted_lpo2.id );
+
+      // pagination and with statistics
+      pools = db_api.get_liquidity_pools_by_asset_a( "SAMUSD", 2, ted_lpo2.id, true );
+      BOOST_REQUIRE_EQUAL( pools.size(), 1u );
+      BOOST_CHECK( pools.front().statistics.valid() );
+      BOOST_CHECK( pools.front().id == ted_lpo2.id );
+
+      // get_liquidity_pools_by_asset_b
+      pools = db_api.get_liquidity_pools_by_asset_b( "TEDUSD" );
+      BOOST_REQUIRE_EQUAL( pools.size(), 3u );
+      BOOST_CHECK( !pools.front().statistics.valid() );
+      BOOST_CHECK( pools.front().id == sam_lpo2.id );
+      BOOST_CHECK( pools.back().id == ted_lpo3.id );
+
+      // pagination and with statistics
+      pools = db_api.get_liquidity_pools_by_asset_b( "TEDUSD", 2, sam_lpo1.id, true );
+      BOOST_REQUIRE_EQUAL( pools.size(), 2u );
+      BOOST_CHECK( pools.front().statistics.valid() );
+      BOOST_CHECK( pools.front().id == sam_lpo2.id );
+      BOOST_CHECK( pools.back().id == ted_lpo1.id );
+
+      // get_liquidity_pools_by_one_asset
+      pools = db_api.get_liquidity_pools_by_one_asset( "SAMUSD" );
+      BOOST_REQUIRE_EQUAL( pools.size(), 4u );
+      BOOST_CHECK( !pools.front().statistics.valid() );
+      BOOST_CHECK( pools.front().id == sam_lpo1.id );
+      BOOST_CHECK( pools.back().id == ted_lpo2.id );
+
+      // pagination and with statistics
+      pools = db_api.get_liquidity_pools_by_one_asset( "SAMUSD", 3, liquidity_pool_id_type(), true );
+      BOOST_REQUIRE_EQUAL( pools.size(), 3u );
+      BOOST_CHECK( pools.front().statistics.valid() );
+      BOOST_CHECK( pools.front().id == sam_lpo1.id );
+      BOOST_CHECK( pools.back().id == ted_lpo1.id );
+
+      // get_liquidity_pools_by_both_asset
+      pools = db_api.get_liquidity_pools_by_both_assets( "SAMUSD", "TEDUSD" );
+      BOOST_REQUIRE_EQUAL( pools.size(), 2u );
+      BOOST_CHECK( !pools.front().statistics.valid() );
+      BOOST_CHECK( pools.front().id == sam_lpo2.id );
+      BOOST_CHECK( pools.back().id == ted_lpo1.id );
+
+      // pagination and with statistics
+      pools = db_api.get_liquidity_pools_by_both_assets( "SAMUSD", "TEDUSD", 3, ted_lpo2.id, true );
+      BOOST_REQUIRE_EQUAL( pools.size(), 0u );
+
+      // get_liquidity_pools_by_share_asset
+      auto opools = db_api.get_liquidity_pools_by_share_asset( { "SAMLP1", "SAMEUR" }, true, true );
+      BOOST_REQUIRE_EQUAL( opools.size(), 2u );
+      BOOST_CHECK( opools.front().valid() );
+      BOOST_CHECK( opools.front()->statistics.valid() );
+      BOOST_CHECK( opools.front()->id == sam_lpo1.id );
+      BOOST_CHECK( !opools.back().valid() );
+
+      // get_liquidity_pools_by_owner
+      pools = db_api.get_liquidity_pools_by_owner( "sam" );
+      BOOST_REQUIRE_EQUAL( pools.size(), 2u );
+      BOOST_CHECK( !pools.front().statistics.valid() );
+      BOOST_CHECK( pools.front().id == sam_lpo1.id );
+      BOOST_CHECK( pools.back().id == sam_lpo2.id );
+
+      // pagination and with statistics
+      pools = db_api.get_liquidity_pools_by_owner( "ted", 5, sam_lpo1.id, true );
+      BOOST_REQUIRE_EQUAL( pools.size(), 3u );
+      BOOST_CHECK( pools.front().statistics.valid() );
+      BOOST_CHECK( pools.front().id == ted_lpo1.id );
+      BOOST_CHECK( pools.back().id == ted_lpo3.id );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -23,6 +23,8 @@
  */
 #pragma once
 
+#include <stddef.h>
+
 #define GRAPHENE_NET_PROTOCOL_VERSION                        106
 
 /**
@@ -110,3 +112,6 @@
 #define GRAPHENE_NET_MAX_NESTED_OBJECTS                      (250)
 
 #define MAXIMUM_PEERDB_SIZE 1000
+
+constexpr size_t MAX_BLOCKS_TO_HANDLE_AT_ONCE = 200;
+constexpr size_t MAX_SYNC_BLOCKS_TO_PREFETCH = 10 * MAX_BLOCKS_TO_HANDLE_AT_ONCE;

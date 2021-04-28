@@ -42,17 +42,19 @@ namespace block_production_condition
       low_participation = 5,
       lag = 6,
       exception_producing_block = 7,
-      shutdown = 8
+      shutdown = 8,
+      no_network = 9
    };
 }
 
 class witness_plugin : public graphene::app::plugin {
 public:
-   ~witness_plugin() { stop_block_production(); }
+   using graphene::app::plugin::plugin;
+   ~witness_plugin() override { cleanup(); }
 
    std::string plugin_name()const override;
 
-   virtual void plugin_set_program_options(
+   void plugin_set_program_options(
       boost::program_options::options_description &command_line_options,
       boost::program_options::options_description &config_file_options
       ) override;
@@ -60,14 +62,16 @@ public:
    void set_block_production(bool allow) { _production_enabled = allow; }
    void stop_block_production();
 
-   virtual void plugin_initialize( const boost::program_options::variables_map& options ) override;
-   virtual void plugin_startup() override;
-   virtual void plugin_shutdown() override;
+   void plugin_initialize( const boost::program_options::variables_map& options ) override;
+   void plugin_startup() override;
+   void plugin_shutdown() override { cleanup(); }
 
    inline const fc::flat_map< chain::witness_id_type, fc::optional<chain::public_key_type> >& get_witness_key_cache()
    { return _witness_key_cache; }
 
 private:
+   void cleanup() { stop_block_production(); }
+
    void schedule_production_loop();
    block_production_condition::block_production_condition_enum block_production_loop();
    block_production_condition::block_production_condition_enum maybe_produce_block( fc::limited_mutable_variant_object& capture );

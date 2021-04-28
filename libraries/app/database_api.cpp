@@ -48,7 +48,7 @@ namespace graphene { namespace app {
 //////////////////////////////////////////////////////////////////////
 
 database_api::database_api( graphene::chain::database& db, const application_options* app_options )
-   : my( new database_api_impl( db, app_options ) ) {}
+   : my( std::make_unique<database_api_impl>( db, app_options ) ) {}
 
 database_api::~database_api() {}
 
@@ -83,6 +83,16 @@ database_api_impl::database_api_impl( graphene::chain::database& db, const appli
    catch( fc::assert_exception& e )
    {
       amount_in_collateral_index = nullptr;
+   }
+
+   try
+   {
+      asset_in_liquidity_pools_index = &_db.get_index_type< primary_index< liquidity_pool_index > >()
+            .get_secondary_index<graphene::api_helper_indexes::asset_in_liquidity_pools_index>();
+   }
+   catch( const fc::assert_exception& )
+   {
+      asset_in_liquidity_pools_index = nullptr;
    }
 }
 
@@ -1816,6 +1826,58 @@ vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by
             with_statistics );
 }
 
+vector<extended_liquidity_pool_object> database_api::get_liquidity_pools_by_one_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit,
+            const optional<liquidity_pool_id_type>& start_id,
+            const optional<bool>& with_statistics )const
+{
+   return my->get_liquidity_pools_by_one_asset(
+            asset_symbol_or_id,
+            limit,
+            start_id,
+            with_statistics );
+}
+
+vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by_one_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& olimit,
+            const optional<liquidity_pool_id_type>& ostart_id,
+            const optional<bool>& with_statistics )const
+{
+   // api_helper_indexes plugin is required for accessing the secondary index
+   FC_ASSERT( _app_options && _app_options->has_api_helper_indexes_plugin,
+              "api_helper_indexes plugin is not enabled on this server." );
+
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+   const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   asset_id_type aid = get_asset_from_string(asset_symbol_or_id)->id;
+
+   FC_ASSERT( asset_in_liquidity_pools_index, "Internal error" );
+   const auto& pools = asset_in_liquidity_pools_index->get_liquidity_pools_by_asset( aid );
+
+   liquidity_pool_id_type start_id = ostart_id.valid() ? *ostart_id : liquidity_pool_id_type();
+
+   auto itr = pools.lower_bound( start_id );
+
+   bool with_stats = ( with_statistics.valid() && *with_statistics );
+
+   vector<extended_liquidity_pool_object> results;
+
+   results.reserve( limit );
+   while( itr != pools.end() && results.size() < limit )
+   {
+      results.emplace_back( extend_liquidity_pool( (*itr)(_db), with_stats ) );
+      ++itr;
+   }
+
+   return results;
+}
+
 vector<extended_liquidity_pool_object> database_api::get_liquidity_pools_by_both_assets(
             std::string asset_symbol_or_id_a,
             std::string asset_symbol_or_id_b,
@@ -2348,15 +2410,15 @@ std::string database_api_impl::get_transaction_hex(const signed_transaction& trx
 }
 
 std::string database_api::get_transaction_hex_without_sig(
-   const signed_transaction &trx) const
+   const transaction &trx) const
 {
    return my->get_transaction_hex_without_sig(trx);
 }
 
 std::string database_api_impl::get_transaction_hex_without_sig(
-   const signed_transaction &trx) const
+   const transaction &trx) const
 {
-   return fc::to_hex(fc::raw::pack(static_cast<transaction>(trx)));
+   return fc::to_hex(fc::raw::pack(trx));
 }
 
 set<public_key_type> database_api::get_required_signatures( const signed_transaction& trx,

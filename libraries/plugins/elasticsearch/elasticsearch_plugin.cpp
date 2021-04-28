@@ -36,9 +36,12 @@ namespace detail
 class elasticsearch_plugin_impl
 {
    public:
-      elasticsearch_plugin_impl(elasticsearch_plugin& _plugin)
+      explicit elasticsearch_plugin_impl(elasticsearch_plugin& _plugin)
          : _self( _plugin )
-      {  curl = curl_easy_init(); }
+      {
+         curl = curl_easy_init();
+         curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
+      }
       virtual ~elasticsearch_plugin_impl();
 
       bool update_account_histories( const signed_block& b );
@@ -99,7 +102,6 @@ elasticsearch_plugin_impl::~elasticsearch_plugin_impl()
       curl_easy_cleanup(curl);
       curl = nullptr;
    }
-   return;
 }
 
 bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b )
@@ -430,14 +432,14 @@ void elasticsearch_plugin_impl::populateESstruct()
 
 } // end namespace detail
 
-elasticsearch_plugin::elasticsearch_plugin() :
-   my( new detail::elasticsearch_plugin_impl(*this) )
+elasticsearch_plugin::elasticsearch_plugin(graphene::app::application& app) :
+   plugin(app),
+   my( std::make_unique<detail::elasticsearch_plugin_impl>(*this) )
 {
+   // Nothing else to do
 }
 
-elasticsearch_plugin::~elasticsearch_plugin()
-{
-}
+elasticsearch_plugin::~elasticsearch_plugin() = default;
 
 std::string elasticsearch_plugin::plugin_name()const
 {
@@ -650,6 +652,7 @@ graphene::utilities::ES elasticsearch_plugin::prepareHistoryQuery(string query)
 {
    CURL *curl;
    curl = curl_easy_init();
+   curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 
    graphene::utilities::ES es;
    es.curl = curl;

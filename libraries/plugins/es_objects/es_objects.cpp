@@ -41,9 +41,12 @@ namespace detail
 class es_objects_plugin_impl
 {
    public:
-      es_objects_plugin_impl(es_objects_plugin& _plugin)
+      explicit es_objects_plugin_impl(es_objects_plugin& _plugin)
          : _self( _plugin )
-      {  curl = curl_easy_init(); }
+      {
+         curl = curl_easy_init();
+         curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
+      }
       virtual ~es_objects_plugin_impl();
 
       bool index_database(const vector<object_id_type>& ids, std::string action);
@@ -266,19 +269,18 @@ es_objects_plugin_impl::~es_objects_plugin_impl()
       curl_easy_cleanup(curl);
       curl = nullptr;
    }
-   return;
 }
 
 } // end namespace detail
 
-es_objects_plugin::es_objects_plugin() :
-   my( new detail::es_objects_plugin_impl(*this) )
+es_objects_plugin::es_objects_plugin(graphene::app::application& app) :
+   plugin(app),
+   my( std::make_unique<detail::es_objects_plugin_impl>(*this) )
 {
+   // Nothing else to do
 }
 
-es_objects_plugin::~es_objects_plugin()
-{
-}
+es_objects_plugin::~es_objects_plugin() = default;
 
 std::string es_objects_plugin::plugin_name()const
 {

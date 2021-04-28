@@ -28,8 +28,6 @@
 
 #include <fc/crypto/digest.hpp>
 
-#include <boost/test/auto_unit_test.hpp>
-
 #include <database_fixture.hpp>
 
 extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;

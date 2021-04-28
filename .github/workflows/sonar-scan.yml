@@ -1,20 +1,37 @@
-name: Ubuntu Debug
+name: Scan with SonarScanner
 on: [ push, pull_request ]
 env:
   CCACHE_COMPRESS: exists means true
   CCACHE_SLOPPINESS: include_file_ctime,include_file_mtime,time_macros
 jobs:
-  test-debug:
-    name: Build and test in Debug mode
+  sonar-scan:
+    name: Scan with SonarScanner
     strategy:
       matrix:
-        os: [ ubuntu-16.04, ubuntu-18.04, ubuntu-20.04 ]
+        os: [ ubuntu-latest ]
     runs-on: ${{ matrix.os }}
     services:
       elasticsearch:
         image: docker://elasticsearch:7.10.1
         options: --env discovery.type=single-node --publish 9200:9200 --publish 9300:9300
     steps:
+    - name: Download and install latest SonarScanner CLI tool
+      run: |
+        SONAR_SCANNER_VERSION=`curl https://github.com/SonarSource/sonar-scanner-cli/releases/latest \
+                                    2>/dev/null | cut -f2 -d'"' | cut -f8 -d'/'`
+        SONAR_DOWNLOAD_PATH=https://binaries.sonarsource.com/Distribution/sonar-scanner-cli
+        curl --create-dirs -sSLo $HOME/.sonar/sonar-scanner.zip \
+             $SONAR_DOWNLOAD_PATH/sonar-scanner-cli-$SONAR_SCANNER_VERSION-linux.zip
+        unzip -o $HOME/.sonar/sonar-scanner.zip -d $HOME/.sonar/
+        curl --create-dirs -sSLo $HOME/.sonar/build-wrapper-linux-x86.zip \
+             https://sonarcloud.io/static/cpp/build-wrapper-linux-x86.zip
+        unzip -o $HOME/.sonar/build-wrapper-linux-x86.zip -d $HOME/.sonar/
+        SONAR_SCANNER_HOME=$HOME/.sonar/sonar-scanner-$SONAR_SCANNER_VERSION-linux
+        echo "SONAR_SCANNER_VERSION=$SONAR_SCANNER_VERSION" >> $GITHUB_ENV
+        echo "SONAR_SCANNER_HOME=$SONAR_SCANNER_HOME" >> $GITHUB_ENV
+        echo "SONAR_SCANNER_OPTS=-server" >> $GITHUB_ENV
+        echo "$SONAR_SCANNER_HOME/bin" >> $GITHUB_PATH
+        echo "$HOME/.sonar/build-wrapper-linux-x86" >> $GITHUB_PATH
     - name: Install dependencies
       run: |
         df -h
@@ -45,6 +62,7 @@ jobs:
         sudo ls -alr /mnt/
     - uses: actions/checkout@v2
       with:
+        fetch-depth: 0
         submodules: recursive
     - name: Configure
       run: |
@@ -60,6 +78,7 @@ jobs:
         sudo ln -s /_build/programs /mnt/_build/programs
         sudo ln -s /mnt/_build/tests /_build/tests
         ls -al _build
+        sed -i '/tests/d' libraries/fc/CMakeLists.txt
         pushd _build
         export -n BOOST_ROOT BOOST_INCLUDEDIR BOOST_LIBRARYDIR
         cmake -D CMAKE_BUILD_TYPE=Debug \
@@ -68,26 +87,29 @@ jobs:
               -D CMAKE_C_COMPILER_LAUNCHER=ccache \
               -D CMAKE_CXX_COMPILER=g++ \
               -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              -D CMAKE_C_FLAGS=--coverage \
+              -D CMAKE_CXX_FLAGS=--coverage \
+              -D Boost_USE_STATIC_LIBS=OFF \
               ..
         popd
     - name: Load Cache
       uses: actions/cache@v2
       with:
-        path: ccache
-        key: ccache-debug-${{ matrix.os }}-${{ github.ref }}-${{ github.sha }}
+        path: |
+          ccache
+          sonar_cache
+        key: sonar-${{ github.ref }}-${{ github.sha }}
         restore-keys: |
-          ccache-debug-${{ matrix.os }}-${{ github.ref }}-
-          ccache-debug-${{ matrix.os }}-
+          sonar-${{ github.ref }}-
+          sonar-
     - name: Build
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
         df -h
-        make -j 2 -C _build chain_test
-        make -j 2 -C _build cli_test
-        make -j 2 -C _build cli_wallet
-        make -j 2 -C _build witness_node
-        make -j 2 -C _build
+        programs/build_helpers/make_with_sonar bw-output -j 2 -C _build \
+          witness_node cli_wallet js_operation_serializer get_dev_key network_mapper \
+          app_test chain_test cli_test es_test
         df -h
         du -hs _build/libraries/* _build/programs/* _build/tests/*
         du -hs _build/*
@@ -103,6 +125,9 @@ jobs:
         df -h
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
         _build/tests/cli_test -l test_suite
+        df -h
+        echo "Cleanup"
+        rm -rf /tmp/graphene*
         df -h
     - name: Quick test for program arguments
       run: |
@@ -131,9 +156,30 @@ jobs:
         else \
           echo "Pass: got expected error."; \
         fi
-    - name: Node-Test
+    - name: Prepare for scanning with SonarScanner
       run: |
-        df -h
-        pushd _build
-        ../programs/build_helpers/run-node-test
-        df -h
+        mkdir -p sonar_cache
+        find _build/libraries/[acdenptuw]*/CMakeFiles/*.dir \
+             _build/libraries/plugins/*/CMakeFiles/*.dir \
+             -type d -print \
+          | while read d; do \
+              tmpd="${d:7}"; \
+              srcd="${tmpd/CMakeFiles*.dir/.}"; \
+              gcov -o "$d" "${srcd}"/*.[ch][px][px] \
+                           "${srcd}"/include/graphene/*/*.[ch][px][px] ; \
+            done >/dev/null
+        find _build/programs/[cdgjsw]*/CMakeFiles/*.dir \
+             -type d -print \
+          | while read d; do \
+              tmpd="${d:7}"; \
+              srcd="${tmpd/CMakeFiles*.dir/.}"; \
+              gcov -o "$d" "${srcd}"/*.[ch][px][px] ; \
+            done >/dev/null
+        programs/build_helpers/set_sonar_branch_for_github_actions sonar-project.properties
+    - name: Scan with SonarScanner
+      env:
+        # to get access to secrets.SONAR_TOKEN, provide GITHUB_TOKEN
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        sonar-scanner \
+           -Dsonar.login=${{ secrets.SONAR_TOKEN }}

@@ -82,10 +82,6 @@ void snapshot_plugin::plugin_initialize(const boost::program_options::variables_
    ilog("snapshot plugin: plugin_initialize() end");
 } FC_LOG_AND_RETHROW() }
 
-void snapshot_plugin::plugin_startup() {}
-
-void snapshot_plugin::plugin_shutdown() {}
-
 static void create_snapshot( const graphene::chain::database& db, const fc::path& dest )
 {
    ilog("snapshot plugin: creating snapshot");
