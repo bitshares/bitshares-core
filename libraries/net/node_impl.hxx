@@ -1,18 +1,4 @@
 #pragma once
-#include <memory>
-#include <mutex>
-#include <fc/thread/thread.hpp>
-#include <fc/log/logger.hpp>
-#include <fc/network/tcp_socket.hpp>
-#include <graphene/chain/config.hpp>
-#include <graphene/protocol/types.hpp>
-#include <graphene/net/node.hpp>
-#include <graphene/net/core_messages.hpp>
-#include <graphene/net/peer_connection.hpp>
-
-namespace graphene { namespace net { namespace detail {
-
-namespace bmi = boost::multi_index;
 
 #define P2P_IN_DEDICATED_THREAD
 
@@ -29,6 +15,21 @@ namespace bmi = boost::multi_index;
 #else
 #define testnetlog(...) do {} while (0)
 #endif
+
+#include <memory>
+#include <mutex>
+#include <fc/thread/thread.hpp>
+#include <fc/log/logger.hpp>
+#include <fc/network/tcp_socket.hpp>
+#include <graphene/chain/config.hpp>
+#include <graphene/protocol/types.hpp>
+#include <graphene/net/node.hpp>
+#include <graphene/net/core_messages.hpp>
+#include <graphene/net/peer_connection.hpp>
+
+namespace graphene { namespace net { namespace detail {
+
+namespace bmi = boost::multi_index;
 
 /*******
  * A class to wrap std::unordered_set for multithreading
