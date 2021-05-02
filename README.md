@@ -1,7 +1,7 @@
 BitShares Core
 ==============
 
-BitShares Core is the BitShares blockchain implementation and command-line interface.
+[BitShares Core](https://github.com/bitshares/bitshares-core) is the BitShares blockchain implementation and command-line interface.
 The web browser based wallet is [BitShares UI](https://github.com/bitshares/bitshares-ui).
 
 Visit [BitShares.org](https://bitshares.org/) to learn about BitShares and join the community at [BitSharesTalk.org](https://bitsharestalk.org/).
@@ -192,6 +192,8 @@ Support
 Technical support is available in the [BitSharesTalk technical support subforum](https://bitsharestalk.org/index.php?board=45.0).
 
 BitShares Core bugs can be reported directly to the [issue tracker](https://github.com/bitshares/bitshares-core/issues).
+
+Questions can be posted in [Github Discussions](https://github.com/bitshares/bitshares-core/discussions).
 
 BitShares UI bugs should be reported to the [UI issue tracker](https://github.com/bitshares/bitshares-ui/issues).
 
