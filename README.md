@@ -8,7 +8,7 @@ Visit [BitShares.org](https://bitshares.org/) to learn about BitShares and join 
 
 Information for developers can be found in the [Wiki](https://github.com/bitshares/bitshares-core/wiki) and the [BitShares Developer Portal](https://dev.bitshares.works/). Users interested in how BitShares works can go to the [BitShares Documentation](https://how.bitshares.works/) site.
 
-Visit [Awesome BitShares](https://github.com/bitshares/awesome-bitshares) to find more resources and links.
+Visit [Awesome BitShares](https://github.com/bitshares/awesome-bitshares) to find more resources and links E.G. chat groups, client libraries and extended APIs.
 
 * [Getting Started](#getting-started)
 * [Support](#support)
