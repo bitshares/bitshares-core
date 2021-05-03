@@ -2359,6 +2359,7 @@ namespace graphene { namespace net { namespace detail {
       auto sync_item_iter = originating_peer->sync_items_requested_from_peer.find(requested_item.item_hash);
       if (sync_item_iter != originating_peer->sync_items_requested_from_peer.end())
       {
+        _active_sync_requests.erase(*sync_item_iter);
         originating_peer->sync_items_requested_from_peer.erase(sync_item_iter);
 
         if (originating_peer->peer_needs_sync_items_from_us)
