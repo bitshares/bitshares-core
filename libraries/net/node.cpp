@@ -1600,7 +1600,8 @@ namespace graphene { namespace net { namespace detail {
       }
     }
 
-    void node_impl::on_connection_accepted_message(peer_connection* originating_peer, const connection_accepted_message& connection_accepted_message_received)
+    void node_impl::on_connection_accepted_message( peer_connection* originating_peer,
+                                                    const connection_accepted_message& )
     {
       VERIFY_CORRECT_THREAD();
       dlog("Received a connection_accepted in response to my \"hello\" from ${peer}",
@@ -1939,7 +1940,8 @@ namespace graphene { namespace net { namespace detail {
         std::vector<item_hash_t> blockchain_synopsis = create_blockchain_synopsis_for_peer( peer );
       
         item_hash_t last_item_seen = blockchain_synopsis.empty() ? item_hash_t() : blockchain_synopsis.back();
-        dlog( "sync: sending a request for the next items after ${last_item_seen} to peer ${peer}, (full request is ${blockchain_synopsis})",
+        dlog( "sync: sending a request for the next items after ${last_item_seen} to peer ${peer}, "
+              "(full request is ${blockchain_synopsis})",
              ( "last_item_seen", last_item_seen )
              ( "peer", peer->get_remote_endpoint() )
              ( "blockchain_synopsis", blockchain_synopsis ) );
@@ -2380,11 +2382,13 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
 
-      // expire old inventory so we'll be making decisions our about whether to fetch blocks below based only on recent inventory
+      // expire old inventory
+      // so we'll be making our decisions about whether to fetch blocks below based only on recent inventory
       originating_peer->clear_old_inventory();
 
       dlog( "received inventory of ${count} items from peer ${endpoint}",
-           ( "count", item_ids_inventory_message_received.item_hashes_available.size() )("endpoint", originating_peer->get_remote_endpoint() ) );
+            ("count", item_ids_inventory_message_received.item_hashes_available.size())
+            ("endpoint", originating_peer->get_remote_endpoint() ) );
       for( const item_hash_t& item_hash : item_ids_inventory_message_received.item_hashes_available )
       {
         item_id advertised_item_id(item_ids_inventory_message_received.item_type, item_hash);
