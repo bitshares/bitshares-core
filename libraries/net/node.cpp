@@ -1610,7 +1610,7 @@ namespace graphene { namespace net { namespace detail {
       originating_peer->send_message(address_request_message());
       fc::time_point now = fc::time_point::now();
       if (_is_firewalled == firewalled_state::unknown &&
-          _last_firewall_check_message_sent < now - fc::minutes(5) &&
+          _last_firewall_check_message_sent < (now - fc::minutes(5)) &&
           originating_peer->core_protocol_version >= 106)
       {
         wlog("I don't know if I'm firewalled.  Sending a firewall check message to peer ${peer}",
@@ -2169,7 +2169,7 @@ namespace graphene { namespace net { namespace detail {
               originating_peer->last_block_time_delegate_has_seen + // timestamp of the block immediately before the first unfetched block
               originating_peer->number_of_unfetched_item_ids * GRAPHENE_MIN_BLOCK_INTERVAL;
           fc::time_point_sec now = fc::time_point::now();
-          if (minimum_time_of_last_offered_block > now + GRAPHENE_NET_FUTURE_SYNC_BLOCKS_GRACE_PERIOD_SEC)
+          if (minimum_time_of_last_offered_block > (now + GRAPHENE_NET_FUTURE_SYNC_BLOCKS_GRACE_PERIOD_SEC))
           {
             wlog("Disconnecting from peer ${peer} who offered us an implausible number of blocks, their last block would be in the future (${timestamp})",
                  ("peer", originating_peer->get_remote_endpoint())
