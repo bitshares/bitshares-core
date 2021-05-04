@@ -647,8 +647,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       void on_hello_message( peer_connection* originating_peer,
                              const hello_message& hello_message_received );
 
-      void on_connection_accepted_message( peer_connection* originating_peer,
-                                           const connection_accepted_message& connection_accepted_message_received );
+      void on_connection_accepted_message( peer_connection* originating_peer, const connection_accepted_message& );
 
       void on_connection_rejected_message( peer_connection* originating_peer,
                                            const connection_rejected_message& connection_rejected_message_received );
