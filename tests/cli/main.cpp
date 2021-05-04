@@ -108,7 +108,14 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    auto sharable_cfg = std::make_shared<boost::program_options::variables_map>();
    auto& cfg = *sharable_cfg;
    server_port_number = fc::network::get_available_port();
+   auto p2p_port = server_port_number;
+   for( size_t i = 0; i < 10 && p2p_port == server_port_number; ++i )
+   {
+      p2p_port = fc::network::get_available_port();
+   }
+   BOOST_REQUIRE( p2p_port != server_port_number );
    fc::set_option( cfg, "rpc-endpoint", string("127.0.0.1:") + std::to_string(server_port_number) );
+   fc::set_option( cfg, "p2p-endpoint", string("0.0.0.0:") + std::to_string(p2p_port) );
    fc::set_option( cfg, "genesis-json", create_genesis_file(app_dir) );
    fc::set_option( cfg, "seed-nodes", string("[]") );
    fc::set_option( cfg, "custom-operations-start-block", uint32_t(1) );

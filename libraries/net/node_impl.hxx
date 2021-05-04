@@ -1,4 +1,21 @@
 #pragma once
+
+#define P2P_IN_DEDICATED_THREAD
+
+//#define ENABLE_DEBUG_ULOGS
+
+#ifdef DEFAULT_LOGGER
+# undef DEFAULT_LOGGER
+#endif
+#define DEFAULT_LOGGER "p2p"
+
+//log these messages even at warn level when operating on the test network
+#ifdef GRAPHENE_TEST_NETWORK
+#define testnetlog wlog
+#else
+#define testnetlog(...) do {} while (0)
+#endif
+
 #include <memory>
 #include <mutex>
 #include <fc/thread/thread.hpp>
@@ -13,8 +30,6 @@
 namespace graphene { namespace net { namespace detail {
 
 namespace bmi = boost::multi_index;
-
-#define P2P_IN_DEDICATED_THREAD
 
 /*******
  * A class to wrap std::unordered_set for multithreading
@@ -632,8 +647,7 @@ class node_impl : public peer_connection_delegate, public std::enable_shared_fro
       void on_hello_message( peer_connection* originating_peer,
                              const hello_message& hello_message_received );
 
-      void on_connection_accepted_message( peer_connection* originating_peer,
-                                           const connection_accepted_message& connection_accepted_message_received );
+      void on_connection_accepted_message( peer_connection* originating_peer, const connection_accepted_message& );
 
       void on_connection_rejected_message( peer_connection* originating_peer,
                                            const connection_rejected_message& connection_rejected_message_received );
