@@ -40,8 +40,8 @@ namespace graphene { namespace chain {
 class proposal_object : public abstract_object<proposal_object>
 {
    public:
-      static const uint8_t space_id = protocol_ids;
-      static const uint8_t type_id = proposal_object_type;
+      static constexpr uint8_t space_id = protocol_ids;
+      static constexpr uint8_t type_id = proposal_object_type;
 
       time_point_sec                expiration_time;
       optional<time_point_sec>      review_period_time;

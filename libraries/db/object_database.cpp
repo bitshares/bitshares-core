@@ -98,7 +98,7 @@ void object_database::wipe(const fc::path& data_dir)
    close();
    ilog("Wiping object database...");
    fc::remove_all(data_dir / "object_database");
-   ilog("Done wiping object databse.");
+   ilog("Done wiping object database.");
 }
 
 void object_database::open(const fc::path& data_dir)

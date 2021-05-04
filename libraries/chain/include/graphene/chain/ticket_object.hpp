@@ -46,6 +46,13 @@ enum ticket_status
    TICKET_STATUS_COUNT
 };
 
+/// Version of a ticket
+enum ticket_version
+{
+   ticket_v1 = 1,
+   ticket_v2 = 2
+};
+
 /**
  *  @brief a ticket for governance voting
  *  @ingroup object
@@ -55,8 +62,8 @@ enum ticket_status
 class ticket_object : public abstract_object<ticket_object>
 {
    public:
-      static const uint8_t space_id = protocol_ids;
-      static const uint8_t type_id  = ticket_object_type;
+      static constexpr uint8_t space_id = protocol_ids;
+      static constexpr uint8_t type_id  = ticket_object_type;
 
       account_id_type  account;      ///< The account who owns the ticket
       ticket_type      target_type;  ///< The target type of the ticket
@@ -79,36 +86,38 @@ class ticket_object : public abstract_object<ticket_object>
          static constexpr uint32_t _seconds_to_downgrade[] = { 180 * 86400, 180 * 86400, 360 * 86400 };
          return _seconds_to_downgrade[ static_cast<uint8_t>(i) ];
       }
-      static uint8_t value_multiplier( ticket_type i ) {
-         static constexpr uint32_t _value_multiplier[] = { 1, 2, 4, 8, 8, 0 };
-         return _value_multiplier[ static_cast<uint8_t>(i) ];
+      static uint8_t value_multiplier( ticket_type i, ticket_version version ) {
+         static constexpr uint32_t _value_multiplier_v1[] = { 1, 2, 4, 8, 8, 0 };
+         static constexpr uint32_t _value_multiplier_v2[] = { 0, 2, 4, 8, 8, 0 };
+         return ( version == ticket_v1 ? _value_multiplier_v1[ static_cast<uint8_t>(i) ]
+                                       : _value_multiplier_v2[ static_cast<uint8_t>(i) ] );
       }
 
       /// Initialize member variables for a ticket newly created from account balance
       void init_new( time_point_sec now, account_id_type new_account,
-                     ticket_type new_target_type, const asset& new_amount );
+                     ticket_type new_target_type, const asset& new_amount, ticket_version version );
 
       /// Initialize member variables for a ticket split from another ticket
       void init_split( time_point_sec now, const ticket_object& old_ticket,
-                       ticket_type new_target_type, const asset& new_amount );
+                       ticket_type new_target_type, const asset& new_amount, ticket_version version );
 
       /// Set a new target type and update member variables accordingly
-      void update_target_type( time_point_sec now, ticket_type new_target_type );
+      void update_target_type( time_point_sec now, ticket_type new_target_type, ticket_version version );
 
       /// Adjust amount and update member variables accordingly
-      void adjust_amount( const asset& delta_amount );
+      void adjust_amount( const asset& delta_amount, ticket_version version );
 
       /// Update the ticket when it's time
-      void auto_update();
+      void auto_update( ticket_version version );
 
    private:
       /// Recalculate value of the ticket
-      void update_value();
+      void update_value( ticket_version version );
 
 };
 
 struct by_next_update;
-struct by_account_type;
+struct by_account;
 
 /**
 * @ingroup object_index
@@ -123,10 +132,9 @@ typedef multi_index_container<
             member< object, object_id_type, &object::id>
          >
       >,
-      ordered_unique< tag<by_account_type>,
+      ordered_unique< tag<by_account>,
          composite_key< ticket_object,
             member< ticket_object, account_id_type, &ticket_object::account>,
-            member< ticket_object, ticket_type, &ticket_object::current_type>,
             member< object, object_id_type, &object::id>
          >
       >

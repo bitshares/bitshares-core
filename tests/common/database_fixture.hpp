@@ -25,18 +25,27 @@
 
 #include <fc/io/json.hpp>
 
+#include <boost/filesystem/path.hpp>
+#include <boost/program_options.hpp>
+
+#include <boost/test/unit_test.hpp>
+
 #include <graphene/protocol/types.hpp>
 #include <graphene/protocol/market.hpp>
 
 #include <graphene/chain/committee_member_object.hpp>
+#include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/ticket_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/app/application.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
+#include <graphene/utilities/tempdir.hpp>
 
 #include <iostream>
+
+#include "program_options_util.hpp"
 
 using namespace graphene::db;
 
@@ -191,7 +200,7 @@ bool _push_block( database& db, const signed_block& b, uint32_t skip_flags = 0 )
 processed_transaction _push_transaction( database& db, const signed_transaction& tx, uint32_t skip_flags = 0 );
 } // namespace test
 
-struct database_fixture {
+struct database_fixture_base {
    // the reason we use an app is to exercise the indexes of built-in
    //   plugins
    graphene::app::application app;
@@ -200,24 +209,31 @@ struct database_fixture {
    signed_transaction trx;
    public_key_type committee_key;
    account_id_type committee_account;
-   fc::ecc::private_key private_key = fc::ecc::private_key::generate();
-   fc::ecc::private_key init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
-   public_key_type init_account_pub_key;
+   const fc::ecc::private_key private_key;
+   const fc::ecc::private_key init_account_priv_key;
+   const public_key_type init_account_pub_key;
 
-   optional<fc::temp_directory> data_dir;
+   fc::temp_directory data_dir;
    bool skip_key_index_test = false;
    uint32_t anon_acct_count;
    bool hf1270 = false;
    bool bsip77 = false;
 
-   database_fixture(const fc::time_point_sec &initial_timestamp =
-                        fc::time_point_sec(GRAPHENE_TESTING_GENESIS_TIMESTAMP));
-   ~database_fixture();
+   string es_index_prefix; ///< Index prefix for elasticsearch plugin
+   string es_obj_index_prefix; ///< Index prefix for es_objects plugin
+
+   const std::string current_test_name;
+   const std::string current_suite_name;
+
+   database_fixture_base();
+   virtual ~database_fixture_base();
+
+   static void init_genesis( database_fixture_base& fixture );
+   static std::shared_ptr<boost::program_options::variables_map> init_options( database_fixture_base& fixture );
 
    static fc::ecc::private_key generate_private_key(string seed);
    string generate_anon_acct_name();
    static void verify_asset_supplies( const database& db );
-   void open_database();
    void vote_for_committee_and_witnesses(uint16_t num_committee, uint16_t num_witness);
    signed_block generate_block(uint32_t skip = ~0,
                                const fc::ecc::private_key& key = generate_private_key("null_key"),
@@ -407,6 +423,33 @@ struct database_fixture {
                                                   const optional<asset>& amount )const;
    generic_operation_result update_ticket( const ticket_object& ticket, ticket_type type,
                                            const optional<asset>& amount );
+
+   liquidity_pool_create_operation make_liquidity_pool_create_op( account_id_type account, asset_id_type asset_a,
+                                                  asset_id_type asset_b, asset_id_type share_asset,
+                                                  uint16_t taker_fee_percent, uint16_t withdrawal_fee_percent )const;
+   const liquidity_pool_object& create_liquidity_pool( account_id_type account, asset_id_type asset_a,
+                                                  asset_id_type asset_b, asset_id_type share_asset,
+                                                  uint16_t taker_fee_percent, uint16_t withdrawal_fee_percent );
+   liquidity_pool_delete_operation make_liquidity_pool_delete_op( account_id_type account,
+                                                  liquidity_pool_id_type pool )const;
+   generic_operation_result delete_liquidity_pool( account_id_type account, liquidity_pool_id_type pool );
+   liquidity_pool_deposit_operation make_liquidity_pool_deposit_op( account_id_type account,
+                                                  liquidity_pool_id_type pool, const asset& amount_a,
+                                                  const asset& amount_b )const;
+   generic_exchange_operation_result deposit_to_liquidity_pool( account_id_type account,
+                                                  liquidity_pool_id_type pool, const asset& amount_a,
+                                                  const asset& amount_b );
+   liquidity_pool_withdraw_operation make_liquidity_pool_withdraw_op( account_id_type account,
+                                                  liquidity_pool_id_type pool, const asset& share_amount )const;
+   generic_exchange_operation_result withdraw_from_liquidity_pool( account_id_type account,
+                                                  liquidity_pool_id_type pool, const asset& share_amount );
+   liquidity_pool_exchange_operation make_liquidity_pool_exchange_op( account_id_type account,
+                                                  liquidity_pool_id_type pool, const asset& amount_to_sell,
+                                                  const asset& min_to_receive )const;
+   generic_exchange_operation_result exchange_with_liquidity_pool( account_id_type account,
+                                                  liquidity_pool_id_type pool, const asset& amount_to_sell,
+                                                  const asset& min_to_receive );
+
    /**
     * NOTE: This modifies the database directly. You will probably have to call this each time you
     * finish creating a block
@@ -430,7 +473,6 @@ struct database_fixture {
 
    vector< operation_history_object > get_operation_history( account_id_type account_id )const;
    vector< graphene::market_history::order_history_object > get_market_order_history( asset_id_type a, asset_id_type b )const;
-   bool validation_current_test_name_for_setting_api_limit( const string& current_test_name )const;
 
    /****
     * @brief return htlc fee parameters
@@ -451,6 +493,38 @@ struct database_fixture {
       return H::hash( (char*)preimage.data(), preimage.size() );
    }
 
+};
+
+template<typename F>
+struct database_fixture_init : database_fixture_base {
+   database_fixture_init()
+   {
+      F::init( *this );
+
+      asset_id_type mpa1_id(1);
+      BOOST_REQUIRE( mpa1_id(db).is_market_issued() );
+      BOOST_CHECK( mpa1_id(db).bitasset_data(db).asset_id == mpa1_id );
+   }
+
+   static void init( database_fixture_init<F>& fixture )
+   { try {
+      fixture.data_dir = fc::temp_directory( graphene::utilities::temp_directory_path() );
+      fc::create_directories( fixture.data_dir.path() );
+      F::init_genesis( fixture );
+      fc::json::save_to_file( fixture.genesis_state, fixture.data_dir.path() / "genesis.json" );
+      auto options = F::init_options( fixture );
+      fc::set_option( *options, "genesis-json", boost::filesystem::path(fixture.data_dir.path() / "genesis.json") );
+      fixture.app.initialize( fixture.data_dir.path(), options );
+      fixture.app.startup();
+
+      fixture.generate_block();
+
+      test::set_expiration( fixture.db, fixture.trx );
+   } FC_LOG_AND_RETHROW() }
+};
+
+struct database_fixture : database_fixture_init<database_fixture>
+{
 };
 
 } }

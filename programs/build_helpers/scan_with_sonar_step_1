@@ -12,7 +12,7 @@ du -hs sonar_cache
 # The first pass, skip some files. This will remove the skipped files from the cache, but is an acceptable trade-off
 programs/build_helpers/buildstep prepare.sonar.part1 1 "cp sonar-project.properties sonar-project.properties.bak; sed -i '/sonar\.exclusions=/d;s/#sonar\.exclusions.part1/sonar.exclusions/' sonar-project.properties"
 programs/build_helpers/buildstep run.sonar.part1 1500 "which sonar-scanner && sonar-scanner"
-programs/build_helpers/buildstep prepare.sonar.full 1 "cp sonar-project.properties.bak sonar-project.properties"
+programs/build_helpers/buildstep post.sonar.part1 1 "cp sonar-project.properties.bak sonar-project.properties"
 du -hs sonar_cache
 programs/build_helpers/buildstep end 0
 ccache -s

@@ -41,18 +41,18 @@ namespace detail
 class custom_operations_plugin : public graphene::app::plugin
 {
    public:
-      custom_operations_plugin();
-      virtual ~custom_operations_plugin();
+      explicit custom_operations_plugin(graphene::app::application& app);
+      ~custom_operations_plugin() override;
 
       std::string plugin_name()const override;
       std::string plugin_description()const override;
-      virtual void plugin_set_program_options(
+      void plugin_set_program_options(
          boost::program_options::options_description& cli,
          boost::program_options::options_description& cfg) override;
-      virtual void plugin_initialize(const boost::program_options::variables_map& options) override;
-      virtual void plugin_startup() override;
+      void plugin_initialize(const boost::program_options::variables_map& options) override;
+      void plugin_startup() override;
 
-      friend class detail::custom_operations_plugin_impl;
+   private:
       std::unique_ptr<detail::custom_operations_plugin_impl> my;
 };
 

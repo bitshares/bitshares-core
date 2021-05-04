@@ -290,6 +290,8 @@ void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
    FC_ASSERT( o.issuer == a.issuer );
    FC_ASSERT( !a.is_market_issued(), "Cannot manually issue a market-issued asset." );
 
+   FC_ASSERT( !a.is_liquidity_pool_share_asset(), "Cannot manually issue a liquidity pool share asset." );
+
    FC_ASSERT( a.can_create_new_supply(), "Can not create new supply" );
 
    to_account = &o.issue_to_account(d);
@@ -324,11 +326,21 @@ void_result asset_reserve_evaluator::do_evaluate( const asset_reserve_operation&
       ("sym", a.symbol)
    );
 
-   from_account = &o.payer(d);
+   from_account = fee_paying_account;
    FC_ASSERT( is_authorized_asset( d, *from_account, a ) );
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
-   FC_ASSERT( (asset_dyn_data->current_supply - o.amount_to_reserve.amount) >= 0 );
+   if( !a.is_liquidity_pool_share_asset() )
+   {
+      FC_ASSERT( asset_dyn_data->current_supply >= o.amount_to_reserve.amount,
+                 "Can not reserve an amount that is more than the current supply" );
+   }
+   else
+   {
+      FC_ASSERT( asset_dyn_data->current_supply > o.amount_to_reserve.amount,
+                 "The asset is a liquidity pool share asset thus can only reserve an amount "
+                 "that is less than the current supply" );
+   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -934,13 +946,13 @@ void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_f
       //First, remove any old publishers who are no longer publishers
       for( auto itr = a.feeds.begin(); itr != a.feeds.end(); )
       {
-         if( !o.new_feed_producers.count(itr->first) )
+         if( o.new_feed_producers.count(itr->first) == 0 )
             itr = a.feeds.erase(itr);
          else
             ++itr;
       }
       //Now, add any new publishers
-      for( const account_id_type acc : o.new_feed_producers )
+      for( const account_id_type& acc : o.new_feed_producers )
       {
          a.feeds[acc];
       }
@@ -1114,17 +1126,17 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    //Verify that the publisher is authoritative to publish a feed
    if( base.options.flags & witness_fed_asset )
    {
-      FC_ASSERT( d.get(GRAPHENE_WITNESS_ACCOUNT).active.account_auths.count(o.publisher),
+      FC_ASSERT( d.get(GRAPHENE_WITNESS_ACCOUNT).active.account_auths.count(o.publisher) > 0,
                  "Only active witnesses are allowed to publish price feeds for this asset" );
    }
    else if( base.options.flags & committee_fed_asset )
    {
-      FC_ASSERT( d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.account_auths.count(o.publisher),
+      FC_ASSERT( d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.account_auths.count(o.publisher) > 0,
                  "Only active committee members are allowed to publish price feeds for this asset" );
    }
    else
    {
-      FC_ASSERT( bitasset.feeds.count(o.publisher),
+      FC_ASSERT( bitasset.feeds.count(o.publisher) > 0,
                  "The account is not in the set of allowed price feed producers of this asset" );
    }
 

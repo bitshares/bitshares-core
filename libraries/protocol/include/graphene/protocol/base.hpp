@@ -78,7 +78,7 @@ namespace graphene { namespace protocol {
     *
     *    Each operation contains enough information to enumerate all accounts for which the
     *    operation should apear in its account history.  This principle enables us to easily
-    *    define and enforce the @balance_calculation. This is superset of the @ref defined_authority
+    *    define and enforce the @ref balance_calculation. This is superset of the @ref defined_authority
     *
     *  @{
     */
@@ -92,7 +92,20 @@ namespace graphene { namespace protocol {
       flat_set<object_id_type> removed_objects;
    };
 
-   typedef fc::static_variant<void_result,object_id_type,asset,generic_operation_result> operation_result;
+   struct generic_exchange_operation_result
+   {
+      vector<asset> paid;
+      vector<asset> received;
+      vector<asset> fees;
+   };
+
+   typedef fc::static_variant <
+         void_result,
+         object_id_type,
+         asset,
+         generic_operation_result,
+         generic_exchange_operation_result
+      > operation_result;
 
    struct base_operation
    {
@@ -135,5 +148,8 @@ FC_REFLECT_TYPENAME( graphene::protocol::operation_result )
 FC_REFLECT_TYPENAME( graphene::protocol::future_extensions )
 FC_REFLECT( graphene::protocol::void_result, )
 FC_REFLECT( graphene::protocol::generic_operation_result, (new_objects)(updated_objects)(removed_objects) )
+FC_REFLECT( graphene::protocol::generic_exchange_operation_result, (paid)(received)(fees) )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::generic_operation_result ) // impl in operations.cpp
+// impl in operations.cpp
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::generic_exchange_operation_result )

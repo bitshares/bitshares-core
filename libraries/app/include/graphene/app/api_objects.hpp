@@ -30,6 +30,7 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
+#include <graphene/chain/liquidity_pool_object.hpp>
 
 #include <graphene/api_helper_indexes/api_helper_indexes.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
@@ -108,6 +109,7 @@ namespace graphene { namespace app {
       string                     percent_change;
       string                     base_volume;
       string                     quote_volume;
+      optional<object_id_type>   mto_id;
 
       market_ticker() {}
       market_ticker(const market_ticker_object& mto,
@@ -151,6 +153,15 @@ namespace graphene { namespace app {
       optional<share_type> total_backing_collateral;
    };
 
+   struct extended_liquidity_pool_object : liquidity_pool_object
+   {
+      extended_liquidity_pool_object() {}
+      explicit extended_liquidity_pool_object( const liquidity_pool_object& o ) : liquidity_pool_object( o ) {}
+      explicit extended_liquidity_pool_object( liquidity_pool_object&& o ) : liquidity_pool_object( std::move(o) ) {}
+
+      optional<liquidity_pool_ticker_object> statistics;
+   };
+
 } }
 
 FC_REFLECT( graphene::app::more_data,
@@ -180,14 +191,18 @@ FC_REFLECT( graphene::app::full_account,
             (more_data_available)
           )
 
-FC_REFLECT( graphene::app::order, (price)(quote)(base) );
-FC_REFLECT( graphene::app::order_book, (base)(quote)(bids)(asks) );
+FC_REFLECT( graphene::app::order, (price)(quote)(base) )
+FC_REFLECT( graphene::app::order_book, (base)(quote)(bids)(asks) )
 FC_REFLECT( graphene::app::market_ticker,
             (time)(base)(quote)(latest)(lowest_ask)(lowest_ask_base_size)(lowest_ask_quote_size)
-            (highest_bid)(highest_bid_base_size)(highest_bid_quote_size)(percent_change)(base_volume)(quote_volume) );
-FC_REFLECT( graphene::app::market_volume, (time)(base)(quote)(base_volume)(quote_volume) );
+            (highest_bid)(highest_bid_base_size)(highest_bid_quote_size)(percent_change)(base_volume)(quote_volume)(mto_id) )
+FC_REFLECT( graphene::app::market_volume, (time)(base)(quote)(base_volume)(quote_volume) )
 FC_REFLECT( graphene::app::market_trade, (sequence)(date)(price)(amount)(value)(type)
-            (side1_account_id)(side2_account_id));
+            (side1_account_id)(side2_account_id) )
 
 FC_REFLECT_DERIVED( graphene::app::extended_asset_object, (graphene::chain::asset_object),
-                    (total_in_collateral)(total_backing_collateral) );
+                    (total_in_collateral)(total_backing_collateral) )
+
+FC_REFLECT_DERIVED( graphene::app::extended_liquidity_pool_object, (graphene::chain::liquidity_pool_object),
+                    (statistics) )
+

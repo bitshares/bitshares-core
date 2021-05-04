@@ -46,11 +46,9 @@ namespace detail
 class account_history_plugin_impl
 {
    public:
-      account_history_plugin_impl(account_history_plugin& _plugin)
+      explicit account_history_plugin_impl(account_history_plugin& _plugin)
          : _self( _plugin )
       { }
-      virtual ~account_history_plugin_impl();
-
 
       /** this method is called as a callback after a block is applied
        * and will process/index all operations that were applied in the block.
@@ -62,21 +60,22 @@ class account_history_plugin_impl
          return _self.database();
       }
 
+      friend class graphene::account_history::account_history_plugin;
+
+   private:
       account_history_plugin& _self;
       flat_set<account_id_type> _tracked_accounts;
+      flat_set<account_id_type> _extended_history_accounts;
+      flat_set<account_id_type> _extended_history_registrars;
       bool _partial_operations = false;
       primary_index< operation_history_index >* _oho_index;
       uint64_t _max_ops_per_account = -1;
-   private:
+      uint64_t _extended_max_ops_per_account = -1;
+
       /** add one history record, then check and remove the earliest history record */
       void add_account_history( const account_id_type account_id, const operation_history_id_type op_id );
 
 };
-
-account_history_plugin_impl::~account_history_plugin_impl()
-{
-   return;
-}
 
 void account_history_plugin_impl::update_account_histories( const signed_block& b )
 {
@@ -212,9 +211,25 @@ void account_history_plugin_impl::add_account_history( const account_id_type acc
        obj.most_recent_op = ath.id;
        obj.total_ops = ath.sequence;
    });
-   // remove the earliest account history entry if too many
-   // _max_ops_per_account is guaranteed to be non-zero outside
-   if( stats_obj.total_ops - stats_obj.removed_ops > _max_ops_per_account )
+   // Amount of history to keep depends on if account is in the "extended history" list
+   bool extended_hist = false;
+   for ( auto eh_account_id : _extended_history_accounts ) {
+      extended_hist |= (account_id == eh_account_id);
+   }
+   if ( _extended_history_registrars.size() > 0 ) {
+      const account_id_type registrar_id = account_id(db).registrar;
+      for ( auto eh_registrar_id : _extended_history_registrars ) {
+         extended_hist |= (registrar_id == eh_registrar_id);
+      }
+   }
+   // _max_ops_per_account is guaranteed to be non-zero outside; max_ops_to_keep
+   // will likewise be non-zero, and also non-negative (it is unsigned).
+   auto max_ops_to_keep = _max_ops_per_account;
+   if (extended_hist && _extended_max_ops_per_account > max_ops_to_keep) {
+      max_ops_to_keep = _extended_max_ops_per_account;
+   }
+   // Remove the earliest account history entry if too many.
+   if( stats_obj.total_ops - stats_obj.removed_ops > max_ops_to_keep )
    {
       // look for the earliest entry
       const auto& his_idx = db.get_index_type<account_transaction_history_index>();
@@ -263,14 +278,14 @@ void account_history_plugin_impl::add_account_history( const account_id_type acc
 
 
 
-account_history_plugin::account_history_plugin() :
-   my( new detail::account_history_plugin_impl(*this) )
+account_history_plugin::account_history_plugin(graphene::app::application& app) :
+   plugin(app),
+   my( std::make_unique<detail::account_history_plugin_impl>(*this) )
 {
+   // Nothing else to do
 }
 
-account_history_plugin::~account_history_plugin()
-{
-}
+account_history_plugin::~account_history_plugin() = default;
 
 std::string account_history_plugin::plugin_name()const
 {
@@ -283,9 +298,20 @@ void account_history_plugin::plugin_set_program_options(
    )
 {
    cli.add_options()
-         ("track-account", boost::program_options::value<std::vector<std::string>>()->composing()->multitoken(), "Account ID to track history for (may specify multiple times)")
-         ("partial-operations", boost::program_options::value<bool>(), "Keep only those operations in memory that are related to account history tracking")
-         ("max-ops-per-account", boost::program_options::value<uint64_t>(), "Maximum number of operations per account will be kept in memory")
+         ("track-account", boost::program_options::value<std::vector<std::string>>()->composing()->multitoken(),
+          "Account ID to track history for (may specify multiple times; if unset will track all accounts)")
+         ("partial-operations", boost::program_options::value<bool>(),
+          "Keep only those operations in memory that are related to account history tracking")
+         ("max-ops-per-account", boost::program_options::value<uint64_t>(),
+          "Maximum number of operations per account that will be kept in memory")
+         ("extended-max-ops-per-account", boost::program_options::value<uint64_t>(),
+          "Maximum number of operations to keep for accounts for which extended history is kept")
+         ("extended-history-by-account",
+          boost::program_options::value<std::vector<std::string>>()->composing()->multitoken(),
+          "Track longer history for these accounts (may specify multiple times)")
+         ("extended-history-by-registrar",
+          boost::program_options::value<std::vector<std::string>>()->composing()->multitoken(),
+          "Track longer history for accounts with this registrar (may specify multiple times)")
          ;
    cfg.add(cli);
 }
@@ -297,12 +323,20 @@ void account_history_plugin::plugin_initialize(const boost::program_options::var
    database().add_index< primary_index< account_transaction_history_index > >();
 
    LOAD_VALUE_SET(options, "track-account", my->_tracked_accounts, graphene::chain::account_id_type);
-   if (options.count("partial-operations")) {
+   if (options.count("partial-operations") > 0) {
        my->_partial_operations = options["partial-operations"].as<bool>();
    }
-   if (options.count("max-ops-per-account")) {
+   if (options.count("max-ops-per-account") > 0) {
        my->_max_ops_per_account = options["max-ops-per-account"].as<uint64_t>();
    }
+   if (options.count("extended-max-ops-per-account") > 0) {
+       auto emopa = options["extended-max-ops-per-account"].as<uint64_t>();
+       my->_extended_max_ops_per_account = (emopa > my->_max_ops_per_account) ? emopa : my->_max_ops_per_account;
+   }
+   LOAD_VALUE_SET(options, "extended-history-by-account", my->_extended_history_accounts,
+                  graphene::chain::account_id_type);
+   LOAD_VALUE_SET(options, "extended-history-by-registrar", my->_extended_history_registrars,
+                  graphene::chain::account_id_type);
 }
 
 void account_history_plugin::plugin_startup()

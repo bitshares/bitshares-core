@@ -34,7 +34,9 @@ class debug_api_impl
 };
 
 debug_api_impl::debug_api_impl( graphene::app::application& _app ) : app( _app )
-{}
+{
+   // Nothing else to do
+}
 
 
 void debug_api_impl::debug_push_blocks( const std::string& src_filename, uint32_t count )

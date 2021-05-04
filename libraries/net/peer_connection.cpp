@@ -107,8 +107,14 @@ namespace graphene { namespace net
       // current task yields.  In the (not uncommon) case where it is the task executing
       // connect_to or read_loop, this allows the task to finish before the destructor is forced
       // to cancel it.
-      return peer_connection_ptr(new peer_connection(delegate));
-      //, [](peer_connection* peer_to_delete){ fc::async([peer_to_delete](){delete peer_to_delete;}); });
+
+      // Implementation: derive peer_connection so that make_shared has access to the constructor
+      class peer_connection_subclass : public peer_connection
+      {
+      public:
+         explicit peer_connection_subclass(peer_connection_delegate* delegate) : peer_connection(delegate) {}
+      };
+      return std::make_shared<peer_connection_subclass>(delegate);
     }
 
     void peer_connection::destroy()
@@ -374,8 +380,9 @@ namespace graphene { namespace net
     {
       VERIFY_CORRECT_THREAD();
       //dlog("peer_connection::send_message() enqueueing message of type ${type} for peer ${endpoint}",
-      //     ("type", message_to_send.msg_type)("endpoint", get_remote_endpoint()));
-      std::unique_ptr<queued_message> message_to_enqueue(new real_queued_message(message_to_send, message_send_time_field_offset));
+      //     ("type", message_to_send.msg_type)("endpoint", get_remote_endpoint())); // for debug
+      auto message_to_enqueue = std::make_unique<real_queued_message>(
+                                      message_to_send, message_send_time_field_offset );
       send_queueable_message(std::move(message_to_enqueue));
     }
 
@@ -383,8 +390,8 @@ namespace graphene { namespace net
     {
       VERIFY_CORRECT_THREAD();
       //dlog("peer_connection::send_item() enqueueing message of type ${type} for peer ${endpoint}",
-      //     ("type", item_to_send.item_type)("endpoint", get_remote_endpoint()));
-      std::unique_ptr<queued_message> message_to_enqueue(new virtual_queued_message(item_to_send));
+      //     ("type", item_to_send.item_type)("endpoint", get_remote_endpoint())); // for debug
+      auto message_to_enqueue = std::make_unique<virtual_queued_message>(item_to_send);
       send_queueable_message(std::move(message_to_enqueue));
     }
 

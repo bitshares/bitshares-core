@@ -47,11 +47,14 @@ object_id_type ticket_create_evaluator::do_apply(const ticket_create_operation& 
 { try {
    database& d = db();
    const auto block_time = d.head_block_time();
+   const auto maint_time = d.get_dynamic_global_properties().next_maintenance_time;
+
+   ticket_version version = ( HARDFORK_CORE_2262_PASSED(maint_time) ? ticket_v2 : ticket_v1 );
 
    d.adjust_balance( op.account, -op.amount );
 
-   const auto& new_ticket_object = d.create<ticket_object>([&op,block_time](ticket_object& obj){
-      obj.init_new( block_time, op.account, op.target_type, op.amount );
+   const auto& new_ticket_object = d.create<ticket_object>([&op,block_time,version](ticket_object& obj){
+      obj.init_new( block_time, op.account, op.target_type, op.amount, version );
    });
 
    // Note: amount.asset_id is checked in validate(), so no check here
@@ -88,6 +91,9 @@ generic_operation_result ticket_update_evaluator::do_apply(const ticket_update_o
 { try {
    database& d = db();
    const auto block_time = d.head_block_time();
+   const auto maint_time = d.get_dynamic_global_properties().next_maintenance_time;
+
+   ticket_version version = ( HARDFORK_CORE_2262_PASSED(maint_time) ? ticket_v2 : ticket_v1 );
 
    generic_operation_result result;
 
@@ -97,21 +103,21 @@ generic_operation_result ticket_update_evaluator::do_apply(const ticket_update_o
    // To partially update the ticket, aka splitting
    if ( op.amount_for_new_target.valid() && *op.amount_for_new_target < _ticket->amount )
    {
-      const auto& new_ticket_object = d.create<ticket_object>([&op,this,block_time](ticket_object& obj){
-         obj.init_split( block_time, *_ticket, op.target_type, *op.amount_for_new_target );
+      const auto& new_ticket_object = d.create<ticket_object>([&op,this,block_time,version](ticket_object& obj){
+         obj.init_split( block_time, *_ticket, op.target_type, *op.amount_for_new_target, version );
       });
 
       result.new_objects.insert( new_ticket_object.id );
 
-      d.modify( *_ticket, [&op](ticket_object& obj){
-         obj.adjust_amount( -(*op.amount_for_new_target) );
+      d.modify( *_ticket, [&op,version](ticket_object& obj){
+         obj.adjust_amount( -(*op.amount_for_new_target), version );
       });
       delta_value = new_ticket_object.value + _ticket->value - old_value;
    }
    else // To update the whole ticket
    {
-      d.modify( *_ticket, [&op,block_time](ticket_object& obj){
-         obj.update_target_type( block_time, op.target_type );
+      d.modify( *_ticket, [&op,block_time,version](ticket_object& obj){
+         obj.update_target_type( block_time, op.target_type, version );
       });
       delta_value = _ticket->value - old_value;
    }
@@ -132,9 +138,9 @@ generic_operation_result ticket_update_evaluator::do_apply(const ticket_update_o
    generic_operation_result process_result = d.process_tickets();
    result.removed_objects.insert( process_result.removed_objects.begin(), process_result.removed_objects.end() );
    result.updated_objects.insert( process_result.updated_objects.begin(), process_result.updated_objects.end() );
-   for( const auto id : result.new_objects )
+   for( const auto& id : result.new_objects )
       result.updated_objects.erase( id );
-   for( const auto id : result.removed_objects )
+   for( const auto& id : result.removed_objects )
       result.updated_objects.erase( id );
 
    return result;

@@ -294,26 +294,29 @@ void from_variant( const fc::variant& var, std::shared_ptr<const graphene::proto
 
 } // fc::raw
 
+
+/// Object types in the Protocol Space (enum object_type (1.x.x))
 GRAPHENE_DEFINE_IDS(protocol, protocol_ids, /*protocol objects are not prefixed*/,
-                    (null)
-                    (base)
-                    (account)
-                    (asset)
-                    (force_settlement)
-                    (committee_member)
-                    (witness)
-                    (limit_order)
-                    (call_order)
-                    (custom) // unused
-                    (proposal)
-                    (operation_history)
-                    (withdraw_permission)
-                    (vesting_balance)
-                    (worker)
-                    (balance)
-                    (htlc)
-                    (custom_authority)
-                    (ticket)
+                    /* 1.0.x  */ (null) // no data
+                    /* 1.1.x  */ (base) // no data
+                    /* 1.2.x  */ (account)
+                    /* 1.3.x  */ (asset)
+                    /* 1.4.x  */ (force_settlement)
+                    /* 1.5.x  */ (committee_member)
+                    /* 1.6.x  */ (witness)
+                    /* 1.7.x  */ (limit_order)
+                    /* 1.8.x  */ (call_order)
+                    /* 1.9.x  */ (custom) // unused
+                    /* 1.10.x */ (proposal)
+                    /* 1.11.x */ (operation_history) // strictly speaking it is not in protocol
+                    /* 1.12.x */ (withdraw_permission)
+                    /* 1.13.x */ (vesting_balance)
+                    /* 1.14.x */ (worker)
+                    /* 1.15.x */ (balance)
+                    /* 1.16.x */ (htlc)
+                    /* 1.17.x */ (custom_authority)
+                    /* 1.18.x */ (ticket)
+                    /* 1.19.x */ (liquidity_pool)
                    )
 
 FC_REFLECT(graphene::protocol::public_key_type, (key_data))

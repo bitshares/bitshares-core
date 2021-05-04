@@ -32,6 +32,7 @@
 #include <graphene/protocol/confidential.hpp>
 #include <graphene/protocol/custom_authority.hpp>
 #include <graphene/protocol/fba.hpp>
+#include <graphene/protocol/liquidity_pool.hpp>
 #include <graphene/protocol/market.hpp>
 #include <graphene/protocol/proposal.hpp>
 #include <graphene/protocol/ticket.hpp>
@@ -50,65 +51,70 @@ namespace graphene { namespace protocol {
     * Defines the set of valid operations as a discriminated union type.
     */
    typedef fc::static_variant<
-            transfer_operation,
-            limit_order_create_operation,
-            limit_order_cancel_operation,
-            call_order_update_operation,
-            fill_order_operation,           // VIRTUAL
-            account_create_operation,
-            account_update_operation,
-            account_whitelist_operation,
-            account_upgrade_operation,
-            account_transfer_operation,
-            asset_create_operation,
-            asset_update_operation,
-            asset_update_bitasset_operation,
-            asset_update_feed_producers_operation,
-            asset_issue_operation,
-            asset_reserve_operation,
-            asset_fund_fee_pool_operation,
-            asset_settle_operation,
-            asset_global_settle_operation,
-            asset_publish_feed_operation,
-            witness_create_operation,
-            witness_update_operation,
-            proposal_create_operation,
-            proposal_update_operation,
-            proposal_delete_operation,
-            withdraw_permission_create_operation,
-            withdraw_permission_update_operation,
-            withdraw_permission_claim_operation,
-            withdraw_permission_delete_operation,
-            committee_member_create_operation,
-            committee_member_update_operation,
-            committee_member_update_global_parameters_operation,
-            vesting_balance_create_operation,
-            vesting_balance_withdraw_operation,
-            worker_create_operation,
-            custom_operation,
-            assert_operation,
-            balance_claim_operation,
-            override_transfer_operation,
-            transfer_to_blind_operation,
-            blind_transfer_operation,
-            transfer_from_blind_operation,
-            asset_settle_cancel_operation,  // VIRTUAL
-            asset_claim_fees_operation,
-            fba_distribute_operation,       // VIRTUAL
-            bid_collateral_operation,
-            execute_bid_operation,          // VIRTUAL
-            asset_claim_pool_operation,
-            asset_update_issuer_operation,
-            htlc_create_operation,
-            htlc_redeem_operation,
-            htlc_redeemed_operation,         // VIRTUAL
-            htlc_extend_operation,
-            htlc_refund_operation,           // VIRTUAL
-            custom_authority_create_operation,
-            custom_authority_update_operation,
-            custom_authority_delete_operation,
-            ticket_create_operation,
-            ticket_update_operation
+            /*  0 */ transfer_operation,
+            /*  1 */ limit_order_create_operation,
+            /*  2 */ limit_order_cancel_operation,
+            /*  3 */ call_order_update_operation,
+            /*  4 */ fill_order_operation,           // VIRTUAL
+            /*  5 */ account_create_operation,
+            /*  6 */ account_update_operation,
+            /*  7 */ account_whitelist_operation,
+            /*  8 */ account_upgrade_operation,
+            /*  9 */ account_transfer_operation,
+            /* 10 */ asset_create_operation,
+            /* 11 */ asset_update_operation,
+            /* 12 */ asset_update_bitasset_operation,
+            /* 13 */ asset_update_feed_producers_operation,
+            /* 14 */ asset_issue_operation,
+            /* 15 */ asset_reserve_operation,
+            /* 16 */ asset_fund_fee_pool_operation,
+            /* 17 */ asset_settle_operation,
+            /* 18 */ asset_global_settle_operation,
+            /* 19 */ asset_publish_feed_operation,
+            /* 20 */ witness_create_operation,
+            /* 21 */ witness_update_operation,
+            /* 22 */ proposal_create_operation,
+            /* 23 */ proposal_update_operation,
+            /* 24 */ proposal_delete_operation,
+            /* 25 */ withdraw_permission_create_operation,
+            /* 26 */ withdraw_permission_update_operation,
+            /* 27 */ withdraw_permission_claim_operation,
+            /* 28 */ withdraw_permission_delete_operation,
+            /* 29 */ committee_member_create_operation,
+            /* 30 */ committee_member_update_operation,
+            /* 31 */ committee_member_update_global_parameters_operation,
+            /* 32 */ vesting_balance_create_operation,
+            /* 33 */ vesting_balance_withdraw_operation,
+            /* 34 */ worker_create_operation,
+            /* 35 */ custom_operation,
+            /* 36 */ assert_operation,
+            /* 37 */ balance_claim_operation,
+            /* 38 */ override_transfer_operation,
+            /* 39 */ transfer_to_blind_operation,
+            /* 40 */ blind_transfer_operation,
+            /* 41 */ transfer_from_blind_operation,
+            /* 42 */ asset_settle_cancel_operation,  // VIRTUAL
+            /* 43 */ asset_claim_fees_operation,
+            /* 44 */ fba_distribute_operation,       // VIRTUAL
+            /* 45 */ bid_collateral_operation,
+            /* 46 */ execute_bid_operation,          // VIRTUAL
+            /* 47 */ asset_claim_pool_operation,
+            /* 48 */ asset_update_issuer_operation,
+            /* 49 */ htlc_create_operation,
+            /* 50 */ htlc_redeem_operation,
+            /* 51 */ htlc_redeemed_operation,         // VIRTUAL
+            /* 52 */ htlc_extend_operation,
+            /* 53 */ htlc_refund_operation,           // VIRTUAL
+            /* 54 */ custom_authority_create_operation,
+            /* 55 */ custom_authority_update_operation,
+            /* 56 */ custom_authority_delete_operation,
+            /* 57 */ ticket_create_operation,
+            /* 58 */ ticket_update_operation,
+            /* 59 */ liquidity_pool_create_operation,
+            /* 60 */ liquidity_pool_delete_operation,
+            /* 61 */ liquidity_pool_deposit_operation,
+            /* 62 */ liquidity_pool_withdraw_operation,
+            /* 63 */ liquidity_pool_exchange_operation
          > operation;
 
    /// @} // operations group
@@ -117,7 +123,7 @@ namespace graphene { namespace protocol {
     *  Appends required authorites to the result vector.  The authorities appended are not the
     *  same as those returned by get_required_auth 
     *
-    *  @return a set of required authorities for @ref op
+    *  @return a set of required authorities for @p op
     */
    void operation_get_required_authorities( const operation& op,
                                             flat_set<account_id_type>& active,

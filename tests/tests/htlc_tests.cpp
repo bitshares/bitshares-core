@@ -665,9 +665,7 @@ try {
 BOOST_AUTO_TEST_CASE( htlc_hardfork_test )
 { 
    try {
-      ACTORS( (alice) );
-      int64_t init_balance(10000 * GRAPHENE_BLOCKCHAIN_PRECISION);
-      transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
+
       {
          // try to set committee parameters before hardfork
          proposal_create_operation cop = proposal_create_operation::committee_proposal(

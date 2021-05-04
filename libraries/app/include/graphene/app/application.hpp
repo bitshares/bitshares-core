@@ -53,6 +53,7 @@ namespace graphene { namespace app {
          uint64_t api_limit_get_htlc_by = 100;
          uint64_t api_limit_get_full_accounts = 50;
          uint64_t api_limit_get_full_accounts_lists = 500;
+         uint64_t api_limit_get_top_voters = 200;
          uint64_t api_limit_get_call_orders = 300;
          uint64_t api_limit_get_settle_orders = 300;
          uint64_t api_limit_get_assets = 101;
@@ -71,6 +72,9 @@ namespace graphene { namespace app {
          uint64_t api_limit_get_trade_history_by_sequence = 100;
          uint64_t api_limit_get_withdraw_permissions_by_giver = 101;
          uint64_t api_limit_get_withdraw_permissions_by_recipient = 101;
+         uint64_t api_limit_get_tickets = 101;
+         uint64_t api_limit_get_liquidity_pools = 101;
+         uint64_t api_limit_get_liquidity_pool_history = 101;
    };
 
    class application
@@ -81,20 +85,17 @@ namespace graphene { namespace app {
 
          void set_program_options(boost::program_options::options_description& command_line_options,
                                   boost::program_options::options_description& configuration_file_options)const;
-         void initialize(const fc::path& data_dir, const boost::program_options::variables_map& options);
-         void initialize_plugins(const boost::program_options::variables_map& options);
+         void initialize(const fc::path& data_dir,
+                         std::shared_ptr<boost::program_options::variables_map> options) const;
          void startup();
-         void shutdown();
-         void startup_plugins();
-         void shutdown_plugins();
 
          template<typename PluginType>
          std::shared_ptr<PluginType> register_plugin(bool auto_load = false) {
-            auto plug = std::make_shared<PluginType>();
-            plug->plugin_set_app(this);
+            auto plug = std::make_shared<PluginType>(*this);
 
             string cli_plugin_desc = plug->plugin_name() + " plugin. " + plug->plugin_description() + "\nOptions";
-            boost::program_options::options_description plugin_cli_options( cli_plugin_desc ), plugin_cfg_options;
+            boost::program_options::options_description plugin_cli_options( cli_plugin_desc );
+            boost::program_options::options_description plugin_cfg_options;
             plug->plugin_set_program_options(plugin_cli_options, plugin_cfg_options);
 
             if( !plugin_cli_options.options().empty() )
@@ -139,14 +140,16 @@ namespace graphene { namespace app {
 
          const application_options& get_options();
 
-         void enable_plugin( const string& name );
+         void enable_plugin( const string& name ) const;
 
          bool is_plugin_enabled(const string& name) const;
 
          std::shared_ptr<fc::thread> elasticsearch_thread;
 
    private:
-         void add_available_plugin( std::shared_ptr<abstract_plugin> p );
+         /// Add an available plugin
+         void add_available_plugin( std::shared_ptr<abstract_plugin> p ) const;
+
          std::shared_ptr<detail::application_impl> my;
 
          boost::program_options::options_description _cli_options;

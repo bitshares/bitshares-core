@@ -56,8 +56,9 @@ namespace graphene { namespace protocol {
     * probably have a longer re-org window to ensure their transaction can still go through in the event of a momentary
     * disruption in service.
     *
-    * @note It is not recommended to set the @ref ref_block_num, @ref ref_block_prefix, and @ref expiration
-    * fields manually. Call the appropriate overload of @ref set_expiration instead.
+    * @note It is not recommended to set the @ref transaction::ref_block_num, @ref transaction::ref_block_prefix,
+    * and @ref transaction::expiration
+    * fields manually. Call the appropriate overload of @ref transaction::set_expiration instead.
     *
     * @{
     */
@@ -70,8 +71,7 @@ namespace graphene { namespace protocol {
    public:
       virtual ~transaction() = default;
       /**
-       * Least significant 16 bits from the reference block number. If @ref relative_expiration is zero, this field
-       * must be zero as well.
+       * Least significant 16 bits from the reference block number.
        */
       uint16_t           ref_block_num    = 0;
       /**
@@ -146,7 +146,7 @@ namespace graphene { namespace protocol {
 
       /**
        *  The purpose of this method is to identify some subset of
-       *  @ref available_keys that will produce sufficient signatures
+       *  @p available_keys that will produce sufficient signatures
        *  for a transaction.  The result is not always a minimal set of
        *  signatures, but any non-minimal result will still pass
        *  validation.
@@ -204,12 +204,12 @@ namespace graphene { namespace protocol {
        * @brief Extract public keys from signatures with given chain ID.
        * @param chain_id A chain ID
        * @return Public keys
-       * @note If @ref signees is empty, E.G. when it's the first time calling
+       * @note If @ref _signees is empty, E.G. when it's the first time calling
        *       this function for the signed transaction, public keys will be
        *       extracted with given chain ID, and be stored into the mutable
-       *       @ref signees field, then @ref signees will be returned;
-       *       otherwise, the @ref chain_id parameter will be ignored, and
-       *       @ref signees will be returned directly.
+       *       @ref _signees field, then @ref _signees will be returned;
+       *       otherwise, the @p chain_id parameter will be ignored, and
+       *       @ref _signees will be returned directly.
        */
       virtual const flat_set<public_key_type>& get_signature_keys( const chain_id_type& chain_id )const;
 
@@ -273,7 +273,7 @@ namespace graphene { namespace protocol {
                           bool ignore_custom_operation_required_auths,
                           uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH,
                           bool allow_committee = false,
-                          const flat_set<account_id_type>& active_aprovals = flat_set<account_id_type>(),
+                          const flat_set<account_id_type>& active_approvals = flat_set<account_id_type>(),
                           const flat_set<account_id_type>& owner_approvals = flat_set<account_id_type>() );
 
    /**
@@ -305,7 +305,7 @@ namespace graphene { namespace protocol {
 } } // graphene::protocol
 
 FC_REFLECT( graphene::protocol::transaction, (ref_block_num)(ref_block_prefix)(expiration)(operations)(extensions) )
-// Note: not reflecting signees field for backward compatibility; in addition, it should not be in p2p messages
+// Note: not reflecting _signees field for backward compatibility; in addition, it should not be in p2p messages
 FC_REFLECT_DERIVED( graphene::protocol::signed_transaction, (graphene::protocol::transaction), (signatures) )
 FC_REFLECT_DERIVED( graphene::protocol::precomputable_transaction, (graphene::protocol::signed_transaction), )
 FC_REFLECT_DERIVED( graphene::protocol::processed_transaction, (graphene::protocol::precomputable_transaction), (operation_results) )
