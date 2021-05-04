@@ -1609,9 +1609,10 @@ namespace graphene { namespace net { namespace detail {
       originating_peer->negotiation_status = peer_connection::connection_negotiation_status::peer_connection_accepted;
       originating_peer->our_state = peer_connection::our_connection_state::connection_accepted;
       originating_peer->send_message(address_request_message());
-      fc::time_point now = fc::time_point::now();
+      auto now = fc::time_point::now();
+      constexpr int64_t five = 5;
       if (_is_firewalled == firewalled_state::unknown &&
-          _last_firewall_check_message_sent < (now - fc::minutes(5)) &&
+          _last_firewall_check_message_sent < ( now - fc::minutes(five) ) &&
           originating_peer->core_protocol_version >= 106)
       {
         wlog("I don't know if I'm firewalled.  Sending a firewall check message to peer ${peer}",
