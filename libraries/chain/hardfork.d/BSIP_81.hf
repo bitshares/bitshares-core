@@ -1,0 +1,4 @@
+// BSIP 81 (Simple Maker-Taker Market Fees) hardfork check
+#ifndef HARDFORK_BSIP_81_TIME
+#define HARDFORK_BSIP_81_TIME (fc::time_point_sec( 1596117300 )) // Thursday, July 30, 2020 13:55:00 UTC
+#endif

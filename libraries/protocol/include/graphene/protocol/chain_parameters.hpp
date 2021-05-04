@@ -35,6 +35,14 @@ namespace graphene { namespace protocol {
       uint32_t max_preimage_size;
    };
 
+   struct custom_authority_options_type
+   {
+      uint32_t max_custom_authority_lifetime_seconds = GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS;
+      uint32_t max_custom_authorities_per_account = GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITIES_PER_ACCOUNT;
+      uint32_t max_custom_authorities_per_account_op = GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITIES_PER_ACCOUNT_OP;
+      uint32_t max_custom_authority_restrictions = GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_RESTRICTIONS;
+   };
+
    struct chain_parameters
    {
       /** using a shared_ptr breaks the circular dependency created between operations and the fee schedule */
@@ -57,7 +65,7 @@ namespace graphene { namespace protocol {
       uint16_t                maximum_authority_membership        = GRAPHENE_DEFAULT_MAX_AUTHORITY_MEMBERSHIP; ///< largest number of keys/accounts an authority can have
       uint16_t                reserve_percent_of_fee              = GRAPHENE_DEFAULT_BURN_PERCENT_OF_FEE; ///< the percentage of the network's allocation of a fee that is taken out of circulation
       uint16_t                network_percent_of_fee              = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE; ///< percent of transaction fees paid to network
-      uint16_t                lifetime_referrer_percent_of_fee    = GRAPHENE_DEFAULT_LIFETIME_REFERRER_PERCENT_OF_FEE; ///< percent of transaction fees paid to network
+      uint16_t                lifetime_referrer_percent_of_fee    = GRAPHENE_DEFAULT_LIFETIME_REFERRER_PERCENT_OF_FEE; ///< percent of fee which should go to lifetime referrer
       uint32_t                cashback_vesting_period_seconds     = GRAPHENE_DEFAULT_CASHBACK_VESTING_PERIOD_SEC; ///< time after cashback rewards are accrued before they become liquid
       share_type              cashback_vesting_threshold          = GRAPHENE_DEFAULT_CASHBACK_VESTING_THRESHOLD; ///< the maximum cashback that can be received without vesting
       bool                    count_non_member_votes              = true; ///< set to false to restrict voting privlegages to member accounts
@@ -74,11 +82,13 @@ namespace graphene { namespace protocol {
       struct ext
       {
          optional< htlc_options > updatable_htlc_options;
+         optional< custom_authority_options_type > custom_authority_options;
+         optional< uint16_t > market_fee_network_percent;
+         optional< uint16_t > maker_fee_discount_percent;
       };
 
       extension<ext> extensions;
 
-      /** defined in fee_schedule.cpp */
       void validate()const;
       
       chain_parameters();
@@ -86,6 +96,14 @@ namespace graphene { namespace protocol {
       chain_parameters(chain_parameters&& other);
       chain_parameters& operator=(const chain_parameters& other);
       chain_parameters& operator=(chain_parameters&& other);
+
+      /// If @c market_fee_network_percent in @ref extensions is valid, return the value it contains,
+      /// otherwise return 0
+      uint16_t get_market_fee_network_percent() const;
+
+      /// If @c maker_fee_discount_percent in @ref extensions is valid, return the value it contains,
+      /// otherwise return 0
+      uint16_t get_maker_fee_discount_percent() const;
 
       private:
       static void safe_copy(chain_parameters& to, const chain_parameters& from);
@@ -98,8 +116,18 @@ FC_REFLECT( graphene::protocol::htlc_options,
       (max_preimage_size)
 )
 
+FC_REFLECT( graphene::protocol::custom_authority_options_type,
+      (max_custom_authority_lifetime_seconds)
+      (max_custom_authorities_per_account)
+      (max_custom_authorities_per_account_op)
+      (max_custom_authority_restrictions)
+)
+
 FC_REFLECT( graphene::protocol::chain_parameters::ext,
       (updatable_htlc_options)
+      (custom_authority_options)
+      (market_fee_network_percent)
+      (maker_fee_discount_percent)
 )
 
 FC_REFLECT( graphene::protocol::chain_parameters,

@@ -16,7 +16,7 @@ if(CURL_STATICLIB)
 endif(CURL_STATICLIB)
 target_link_libraries( graphene_elasticsearch graphene_chain graphene_app ${CURL_LIBRARIES} )
 target_include_directories( graphene_elasticsearch
-                            PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" 
+                            PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
                             PUBLIC "${CURL_INCLUDE_DIR}" )
 
 

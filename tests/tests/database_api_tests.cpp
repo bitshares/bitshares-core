@@ -66,7 +66,12 @@ BOOST_AUTO_TEST_CASE(is_registered)
       /***
        * Assert
        */
-      graphene::app::database_api db_api(db);
+      graphene::app::database_api db_api1(db);
+      BOOST_CHECK_THROW( db_api1.is_public_key_registered((string) nathan_public), fc::exception );
+
+      graphene::app::application_options opt = app.get_options();
+      opt.has_api_helper_indexes_plugin = true;
+      graphene::app::database_api db_api( db, &opt );
 
       BOOST_CHECK(db_api.is_public_key_registered((string) nathan_public));
       BOOST_CHECK(db_api.is_public_key_registered((string) dan_public));
@@ -1085,8 +1090,125 @@ BOOST_AUTO_TEST_CASE( subscription_notification_test )
    } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( get_all_workers )
+{ try {
+   graphene::app::database_api db_api( db, &( app.get_options() ));
+   ACTORS( (connie)(whitney)(wolverine) );
+
+   fund(connie);
+   upgrade_to_lifetime_member(connie);
+   fund(whitney);
+   upgrade_to_lifetime_member(whitney);
+   fund(wolverine);
+   upgrade_to_lifetime_member(wolverine);
+
+   vector<worker_object> results;
+
+   const auto& worker1 = create_worker( connie_id, 1000, fc::days(10) );
+   worker_id_type worker1_id = worker1.id;
+
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers().size(), 1 );
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers(true).size(), 0 );
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers(false).size(), 1 );
+   BOOST_CHECK( db_api.get_all_workers().front().id == worker1_id );
+   BOOST_CHECK( db_api.get_all_workers(false).front().id == worker1_id );
+
+   generate_blocks( db.head_block_time() + fc::days(11) );
+   set_expiration( db, trx );
+
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers().size(), 1 );
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers(true).size(), 1 );
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers(false).size(), 0 );
+   BOOST_CHECK( db_api.get_all_workers().front().id == worker1_id );
+   BOOST_CHECK( db_api.get_all_workers(true).front().id == worker1_id );
+
+   const auto& worker2 = create_worker( whitney_id, 1000, fc::days(50) );
+   worker_id_type worker2_id = worker2.id;
+
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers().size(), 2 );
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers(true).size(), 1 );
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers(false).size(), 1 );
+   BOOST_CHECK( db_api.get_all_workers().front().id == worker1_id );
+   BOOST_CHECK( db_api.get_all_workers().back().id == worker2_id );
+   BOOST_CHECK( db_api.get_all_workers(true).front().id == worker1_id );
+   BOOST_CHECK( db_api.get_all_workers(false).front().id == worker2_id );
+
+   const auto& worker3 = create_worker( wolverine_id, 1000, fc::days(100) );
+   worker_id_type worker3_id = worker3.id;
+
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers().size(), 3 );
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers(true).size(), 1 );
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers(false).size(), 2 );
+   BOOST_CHECK( db_api.get_all_workers().front().id == worker1_id );
+   BOOST_CHECK( db_api.get_all_workers().back().id == worker3_id );
+   BOOST_CHECK( db_api.get_all_workers(true).front().id == worker1_id );
+   BOOST_CHECK( db_api.get_all_workers(false).front().id == worker2_id );
+   BOOST_CHECK( db_api.get_all_workers(false).back().id == worker3_id );
+
+   generate_blocks( db.head_block_time() + fc::days(55) );
+   set_expiration( db, trx );
+
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers().size(), 3 );
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers(true).size(), 2 );
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers(false).size(), 1 );
+   BOOST_CHECK( db_api.get_all_workers().front().id == worker1_id );
+   BOOST_CHECK( db_api.get_all_workers().back().id == worker3_id );
+   BOOST_CHECK( db_api.get_all_workers(true).front().id == worker1_id );
+   BOOST_CHECK( db_api.get_all_workers(true).back().id == worker2_id );
+   BOOST_CHECK( db_api.get_all_workers(false).front().id == worker3_id );
+
+   generate_blocks( db.head_block_time() + fc::days(55) );
+   set_expiration( db, trx );
+
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers().size(), 3 );
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers(true).size(), 3 );
+   BOOST_REQUIRE_EQUAL( db_api.get_all_workers(false).size(), 0 );
+   BOOST_CHECK( db_api.get_all_workers().front().id == worker1_id );
+   BOOST_CHECK( db_api.get_all_workers().back().id == worker3_id );
+   BOOST_CHECK( db_api.get_all_workers(true).front().id == worker1_id );
+   BOOST_CHECK( db_api.get_all_workers(true).back().id == worker3_id );
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( get_workers_by_account )
+{ try {
+   graphene::app::database_api db_api( db, &( app.get_options() ));
+   ACTORS( (connie)(whitney)(wolverine) );
+
+   fund(connie);
+   upgrade_to_lifetime_member(connie);
+   fund(whitney);
+   upgrade_to_lifetime_member(whitney);
+   fund(wolverine);
+   upgrade_to_lifetime_member(wolverine);
+
+   vector<worker_object> results;
+
+   const auto& worker1 = create_worker( connie_id );
+   worker_id_type worker1_id = worker1.id;
+
+   const auto& worker2 = create_worker( whitney_id, 1000, fc::days(50) );
+   worker_id_type worker2_id = worker2.id;
+
+   const auto& worker3 = create_worker( whitney_id, 1000, fc::days(100) );
+   worker_id_type worker3_id = worker3.id;
+
+   BOOST_REQUIRE_EQUAL( db_api.get_workers_by_account("connie").size(), 1 );
+   BOOST_CHECK( db_api.get_workers_by_account("connie").front().id == worker1_id );
+
+   BOOST_REQUIRE_EQUAL( db_api.get_workers_by_account(string(whitney.id)).size(), 2 );
+   BOOST_CHECK( db_api.get_workers_by_account(string(whitney.id)).front().id == worker2_id );
+   BOOST_CHECK( db_api.get_workers_by_account(string(whitney.id)).back().id == worker3_id );
+
+   BOOST_REQUIRE_EQUAL( db_api.get_workers_by_account("wolverine").size(), 0 );
+
+   BOOST_REQUIRE_THROW( db_api.get_workers_by_account("not-a-user"), fc::exception );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE( lookup_vote_ids )
 { try {
+   graphene::app::database_api db_api( db, &( app.get_options() ));
    ACTORS( (connie)(whitney)(wolverine) );
 
    fund(connie);
@@ -1100,8 +1222,6 @@ BOOST_AUTO_TEST_CASE( lookup_vote_ids )
    const auto& witness = create_witness( whitney );
    const auto& worker = create_worker( wolverine_id );
 
-   graphene::app::database_api db_api(db);
-
    std::vector<vote_id_type> votes;
    votes.push_back( committee.vote_id );
    votes.push_back( witness.vote_id );
@@ -1111,9 +1231,118 @@ BOOST_AUTO_TEST_CASE( lookup_vote_ids )
 
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE(get_limit_orders_by_account)
+{ try {
+   graphene::app::database_api db_api( db, &( app.get_options() ));
+   ACTORS((seller)(buyer)(watcher));
+
+   const auto& bitcny = create_user_issued_asset("CNY");
+   const auto& core   = asset_id_type()(db);
+
+   int64_t init_balance(10000000);
+   transfer( committee_account, seller_id, asset(init_balance) );
+   issue_uia( buyer_id, bitcny.amount(init_balance) );
+   BOOST_CHECK_EQUAL( 10000000, get_balance(seller, core) );
+   BOOST_CHECK_EQUAL( 10000000, get_balance(buyer, bitcny) );
+
+   std::vector<limit_order_object> results, results2;
+   limit_order_object o;
+
+   // limit too large
+   BOOST_CHECK_THROW( db_api.get_limit_orders_by_account( seller.name, 102 ), fc::exception );
+
+   // The order book is empty
+   results = db_api.get_limit_orders_by_account( seller.name );
+   BOOST_CHECK_EQUAL( results.size(), 0 );
+
+   // Seller create 50 orders
+   for (size_t i = 0 ; i < 50 ; ++i)
+   {
+      BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250)));
+   }
+
+   // Get all orders
+   results = db_api.get_limit_orders_by_account( seller.name );
+   BOOST_CHECK_EQUAL( results.size(), 50 );
+
+   // Seller create 200 orders
+   for (size_t i = 1 ; i < 101 ; ++i)
+   {
+      BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250 + i)));
+      BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250 - i)));
+   }
+
+   // Buyer create 20 orders
+   for (size_t i = 0 ; i < 70 ; ++i)
+   {
+      BOOST_CHECK(create_sell_order(buyer, bitcny.amount(100), core.amount(5000 + i)));
+   }
+
+   // Get the first 101 orders
+   results = db_api.get_limit_orders_by_account( seller.name );
+   BOOST_CHECK_EQUAL( results.size(), 101 );
+   for (size_t i = 0 ; i < results.size() - 1 ; ++i)
+   {
+      BOOST_CHECK(results[i].id < results[i+1].id);
+   }
+   BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(250)));
+   BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(276)));
+   o = results.back();
+
+   // Get the No. 101-201 orders
+   results = db_api.get_limit_orders_by_account( seller.name, {}, o.id );
+   BOOST_CHECK_EQUAL( results.size(), 101 );
+   for (size_t i = 0 ; i < results.size() - 1 ; ++i)
+   {
+      BOOST_CHECK(results[i].id < results[i+1].id);
+   }
+   BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(276)));
+   BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(326)));
+   o = results.back();
+
+   // Get the No. 201- orders
+   results = db_api.get_limit_orders_by_account( seller.name, {}, o.id );
+   BOOST_CHECK_EQUAL( results.size(), 50 );
+   for (size_t i = 0 ; i < results.size() - 1 ; ++i)
+   {
+      BOOST_CHECK(results[i].id < results[i+1].id);
+   }
+   BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(326)));
+   BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(150)));
+
+   // Get the No. 201-210 orders
+   results2 = db_api.get_limit_orders_by_account( seller.name, 10, o.id );
+   BOOST_CHECK_EQUAL( results2.size(), 10 );
+   for (size_t i = 0 ; i < results2.size() - 1 ; ++i)
+   {
+      BOOST_CHECK(results2[i].id < results2[i+1].id);
+      BOOST_CHECK(results[i].id == results2[i].id);
+   }
+   BOOST_CHECK(results2.front().sell_price == price(core.amount(100), bitcny.amount(326)));
+   BOOST_CHECK(results2.back().sell_price == price(core.amount(100), bitcny.amount(170)));
+
+   // Buyer has 70 orders, all IDs are greater than sellers
+   results = db_api.get_limit_orders_by_account( buyer.name, 90, o.id );
+   BOOST_CHECK_EQUAL( results.size(), 70 );
+   o = results.back();
+
+   // All seller's order IDs are smaller, so querying with a buyer's ID will get nothing
+   results = db_api.get_limit_orders_by_account( seller.name, 90, o.id );
+   BOOST_CHECK_EQUAL( results.size(), 0 );
+
+   // Watcher has no order
+   results = db_api.get_limit_orders_by_account( watcher.name );
+   BOOST_CHECK_EQUAL( results.size(), 0 );
+
+   // unregistered account, throws exception
+   BOOST_CHECK_THROW( db_api.get_limit_orders_by_account( "not-a-user", 10, limit_order_id_type() ),
+                      fc::exception );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE(get_account_limit_orders)
 { try {
-
+   graphene::app::database_api db_api( db, &( app.get_options() ));
    ACTORS((seller));
 
    const auto& bitcny = create_bitasset("CNY");
@@ -1135,7 +1364,6 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
       BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250 - i)));
    }
 
-   graphene::app::database_api db_api(db);
    std::vector<limit_order_object> results;
    limit_order_object o;
 
@@ -1360,87 +1588,6 @@ BOOST_AUTO_TEST_CASE( verify_authority_multiple_accounts )
       throw;
    }
 }
-BOOST_AUTO_TEST_CASE( api_limit_get_key_references ){
-   try{
-   const int num_keys = 210;
-   const int num_keys1 = 2;
-   vector< private_key_type > numbered_private_keys;
-   vector< public_key_type >  numbered_key_id;
-   numbered_private_keys.reserve( num_keys );
-   graphene::app::database_api db_api( db, &( app.get_options() ));
-   for( int i=0; i<num_keys1; i++ )
-   {
-      private_key_type privkey = generate_private_key(std::string("key_") + std::to_string(i));
-      public_key_type pubkey = privkey.get_public_key();
-      numbered_private_keys.push_back( privkey );
-      numbered_key_id.push_back( pubkey );
-   }
-   vector< flat_set<account_id_type> > final_result=db_api.get_key_references(numbered_key_id);
-   BOOST_REQUIRE_EQUAL( final_result.size(), 2u );
-   numbered_private_keys.reserve( num_keys );
-   for( int i=num_keys1; i<num_keys; i++ )
-   {
-       private_key_type privkey = generate_private_key(std::string("key_") + std::to_string(i));
-       public_key_type pubkey = privkey.get_public_key();
-       numbered_private_keys.push_back( privkey );
-       numbered_key_id.push_back( pubkey );
-   }
-   GRAPHENE_CHECK_THROW(db_api.get_key_references(numbered_key_id), fc::exception);
-   }catch (fc::exception& e) {
-   edump((e.to_detail_string()));
-   throw;
-   }
-}
-
-BOOST_AUTO_TEST_CASE( api_limit_get_full_accounts ) {
-
-   try {
-      graphene::app::database_api db_api(db, &(this->app.get_options()));
-
-      const account_object& alice = create_account("alice");
-      const account_object& bob = create_account("bob");
-      const account_object& carl = create_account("carl");
-      const account_object& dan = create_account("dan");
-      const account_object& fred = create_account("fred");
-      const account_object& henry = create_account("henry");
-      const account_object& kevin = create_account("kevin");
-      const account_object& laura = create_account("laura");
-      const account_object& lucy = create_account("lucy");
-      const account_object& martin = create_account("martin");
-      const account_object& patty = create_account("patty");
-
-      vector<string> accounts;
-      accounts.push_back(alice.name);
-      accounts.push_back(bob.name);
-      accounts.push_back(carl.name);
-      accounts.push_back(dan.name);
-      accounts.push_back(fred.name);
-      accounts.push_back(henry.name);
-      accounts.push_back(kevin.name);
-      accounts.push_back(laura.name);
-      accounts.push_back(lucy.name);
-      accounts.push_back(martin.name);
-      accounts.push_back(patty.name);
-
-      GRAPHENE_CHECK_THROW(db_api.get_full_accounts(accounts, false), fc::exception);
-
-      accounts.erase(accounts.begin());
-      auto full_accounts = db_api.get_full_accounts(accounts, false);
-      BOOST_CHECK(full_accounts.size() == 10);
-
-      // not an account
-      accounts.erase(accounts.begin());
-      accounts.push_back("nosuchaccount");
-
-      // non existing accounts will be ignored in the results
-      full_accounts = db_api.get_full_accounts(accounts, false);
-      BOOST_CHECK(full_accounts.size() == 9);
-
-   } catch (fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
 
 BOOST_AUTO_TEST_CASE( get_assets_by_issuer ) {
    try {
@@ -1555,97 +1702,6 @@ BOOST_AUTO_TEST_CASE( get_settle_orders_by_account ) {
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
-   }
-}
-
-BOOST_AUTO_TEST_CASE( api_limit_get_limit_orders ){
-   try{
-   graphene::app::database_api db_api( db, &( app.get_options() ));
-   //account_id_type() do 3 ops
-   create_bitasset("USD", account_id_type());
-   create_account("dan");
-   create_account("bob");
-   asset_id_type bit_jmj_id = create_bitasset("JMJBIT").id;
-   generate_block();
-   fc::usleep(fc::milliseconds(100));
-   GRAPHENE_CHECK_THROW(db_api.get_limit_orders(std::string(static_cast<object_id_type>(asset_id_type())),
-      std::string(static_cast<object_id_type>(bit_jmj_id)), 370), fc::exception);
-   vector<limit_order_object>  limit_orders =db_api.get_limit_orders(std::string(
-      static_cast<object_id_type>(asset_id_type())),
-      std::string(static_cast<object_id_type>(bit_jmj_id)), 340);
-   BOOST_REQUIRE_EQUAL( limit_orders.size(), 0u);
-
-   }catch (fc::exception& e) {
-   edump((e.to_detail_string()));
-   throw;
-   }
-}
-BOOST_AUTO_TEST_CASE( api_limit_get_call_orders ){
-   try{
-   graphene::app::database_api db_api( db, &( app.get_options() ));
-   //account_id_type() do 3 ops
-   auto nathan_private_key = generate_private_key("nathan");
-   account_id_type nathan_id = create_account("nathan", nathan_private_key.get_public_key()).id;
-   transfer(account_id_type(), nathan_id, asset(100));
-   asset_id_type bitusd_id = create_bitasset(
-	   "USDBIT", nathan_id, 100, disable_force_settle).id;
-   generate_block();
-   fc::usleep(fc::milliseconds(100));
-   BOOST_CHECK( bitusd_id(db).is_market_issued() );
-   GRAPHENE_CHECK_THROW(db_api.get_call_orders(std::string(static_cast<object_id_type>(bitusd_id)),
-	   370), fc::exception);
-   vector< call_order_object>  call_order =db_api.get_call_orders(std::string(
-	   static_cast<object_id_type>(bitusd_id)), 340);
-   BOOST_REQUIRE_EQUAL( call_order.size(), 0u);
-   }catch (fc::exception& e) {
-   edump((e.to_detail_string()));
-   throw;
-   }
-}
-BOOST_AUTO_TEST_CASE( api_limit_get_settle_orders ){
-   try{
-   graphene::app::database_api db_api( db, &( app.get_options() ));
-   //account_id_type() do 3 ops
-   auto nathan_private_key = generate_private_key("nathan");
-   account_id_type nathan_id = create_account("nathan", nathan_private_key.get_public_key()).id;
-   transfer(account_id_type(), nathan_id, asset(100));
-   asset_id_type bitusd_id = create_bitasset(
-	   "USDBIT", nathan_id, 100, disable_force_settle).id;
-   generate_block();
-   fc::usleep(fc::milliseconds(100));
-   GRAPHENE_CHECK_THROW(db_api.get_settle_orders(
-   	std::string(static_cast<object_id_type>(bitusd_id)), 370), fc::exception);
-   vector<force_settlement_object> result =db_api.get_settle_orders(
-   	std::string(static_cast<object_id_type>(bitusd_id)), 340);
-   BOOST_REQUIRE_EQUAL( result.size(), 0u);
-   }catch (fc::exception& e) {
-   edump((e.to_detail_string()));
-   throw;
-   }
-}
-BOOST_AUTO_TEST_CASE( api_limit_get_order_book ){
-   try{
-   graphene::app::database_api db_api( db, &( app.get_options() ));
-   auto nathan_private_key = generate_private_key("nathan");
-   auto dan_private_key = generate_private_key("dan");
-   account_id_type nathan_id = create_account("nathan", nathan_private_key.get_public_key()).id;
-   account_id_type dan_id = create_account("dan", dan_private_key.get_public_key()).id;
-   transfer(account_id_type(), nathan_id, asset(100));
-   transfer(account_id_type(), dan_id, asset(100));
-   asset_id_type bitusd_id = create_bitasset(
-	   "USDBIT", nathan_id, 100, disable_force_settle).id;
-   asset_id_type bitdan_id = create_bitasset(
-	   "DANBIT", dan_id, 100, disable_force_settle).id;
-   generate_block();
-   fc::usleep(fc::milliseconds(100));
-   GRAPHENE_CHECK_THROW(db_api.get_order_book(std::string(static_cast<object_id_type>(bitusd_id)),
-   	std::string(static_cast<object_id_type>(bitdan_id)),89), fc::exception);
-   graphene::app::order_book result =db_api.get_order_book(std::string(
-   	static_cast<object_id_type>(bitusd_id)), std::string(static_cast<object_id_type>(bitdan_id)),78);
-	BOOST_REQUIRE_EQUAL( result.bids.size(), 0u);
-   }catch (fc::exception& e) {
-   edump((e.to_detail_string()));
-   throw;
    }
 }
 
@@ -1785,5 +1841,72 @@ BOOST_AUTO_TEST_CASE( asset_in_collateral )
    BOOST_CHECK_EQUAL( 1000, assets[1].total_backing_collateral->value );
 
 } FC_LOG_AND_RETHROW() }
+
+
+BOOST_AUTO_TEST_CASE( get_trade_history )
+{ try {
+
+   app.enable_plugin("market_history");
+   graphene::app::application_options opt=app.get_options();
+   opt.has_market_history_plugin = true;
+   graphene::app::database_api db_api( db, &opt);
+
+   ACTORS((bob)(alice));
+
+   const auto& eur = create_user_issued_asset("EUR");
+   const auto& usd = create_user_issued_asset("USD");
+
+   issue_uia( bob_id, usd.amount(1000000) );
+   issue_uia( alice_id, eur.amount(1000000) );
+
+   // maker create an order
+   create_sell_order(bob, usd.amount(200), eur.amount(210));
+
+   // taker match it
+   create_sell_order(alice, eur.amount(210), usd.amount(200));
+
+   generate_block();
+
+   // taker is selling
+   auto history = db_api.get_trade_history( "EUR", "USD", db.head_block_time(), db.head_block_time() - fc::days(1) );
+   BOOST_REQUIRE_EQUAL( 1, history.size() );
+   BOOST_CHECK_EQUAL( "1.05", history[0].price );
+   BOOST_CHECK_EQUAL( "2", history[0].amount );
+   BOOST_CHECK_EQUAL( "2.10", history[0].value );
+   BOOST_CHECK_EQUAL( "sell", history[0].type );
+   BOOST_CHECK_EQUAL( bob_id.instance.value, history[0].side1_account_id.instance.value );
+   BOOST_CHECK_EQUAL( alice_id.instance.value, history[0].side2_account_id.instance.value );
+
+   // opposite side, taker is buying
+   history = db_api.get_trade_history( "USD", "EUR", db.head_block_time(), db.head_block_time() - fc::days(1) );
+   BOOST_REQUIRE_EQUAL( 1, history.size() );
+   BOOST_CHECK_EQUAL( "0.9523809523809523809", history[0].price );
+   BOOST_CHECK_EQUAL( "2.10", history[0].amount );
+   BOOST_CHECK_EQUAL( "2", history[0].value );
+   BOOST_CHECK_EQUAL( "buy", history[0].type );
+   BOOST_CHECK_EQUAL( bob_id.instance.value, history[0].side1_account_id.instance.value );
+   BOOST_CHECK_EQUAL( alice_id.instance.value, history[0].side2_account_id.instance.value );
+
+   // by sequence
+   history = db_api.get_trade_history_by_sequence( "EUR", "USD", 2, db.head_block_time() - fc::days(1) );
+   BOOST_CHECK_EQUAL( "1.05", history[0].price );
+   BOOST_CHECK_EQUAL( "2", history[0].amount );
+   BOOST_CHECK_EQUAL( "2.10", history[0].value );
+   BOOST_CHECK_EQUAL( "sell", history[0].type );
+   BOOST_CHECK_EQUAL( bob_id.instance.value, history[0].side1_account_id.instance.value );
+   BOOST_CHECK_EQUAL( alice_id.instance.value, history[0].side2_account_id.instance.value );
+
+   // opposite side
+   history = db_api.get_trade_history_by_sequence( "USD", "EUR", 2, db.head_block_time() - fc::days(1) );
+   BOOST_REQUIRE_EQUAL( 1, history.size() );
+   BOOST_CHECK_EQUAL( "0.9523809523809523809", history[0].price );
+   BOOST_CHECK_EQUAL( "2.10", history[0].amount );
+   BOOST_CHECK_EQUAL( "2", history[0].value );
+   BOOST_CHECK_EQUAL( "buy", history[0].type );
+   BOOST_CHECK_EQUAL( bob_id.instance.value, history[0].side1_account_id.instance.value );
+   BOOST_CHECK_EQUAL( alice_id.instance.value, history[0].side2_account_id.instance.value );
+
+} FC_LOG_AND_RETHROW() }
+
 
 BOOST_AUTO_TEST_SUITE_END()

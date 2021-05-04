@@ -65,10 +65,6 @@ namespace graphene { namespace db {
          object(){}
          virtual ~object(){}
 
-         static const uint8_t space_id = 0;
-         static const uint8_t type_id  = 0;
-
-
          // serialized
          object_id_type          id;
 
@@ -92,7 +88,7 @@ namespace graphene { namespace db {
       public:
          virtual unique_ptr<object> clone()const
          {
-            return unique_ptr<object>(new DerivedClass( *static_cast<const DerivedClass*>(this) ));
+            return unique_ptr<object>( std::make_unique<DerivedClass>( *static_cast<const DerivedClass*>(this) ) );
          }
 
          virtual void    move_from( object& obj )

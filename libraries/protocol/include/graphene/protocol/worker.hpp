@@ -31,9 +31,10 @@ namespace graphene { namespace protocol {
     * @defgroup workers The Blockchain Worker System
     * @ingroup operations
     *
-    * Graphene blockchains allow the creation of special "workers" which are elected positions paid by the blockchain
+    * BitShares blockchains allow the creation of special "workers" which are elected positions paid by the blockchain
     * for services they provide. There may be several types of workers, and the semantics of how and when they are paid
-    * are defined by the @ref worker_type_enum enumeration. All workers are elected by core stakeholder approval, by
+    * are defined by the @ref graphene::chain::worker_type enumeration.
+    * All workers are elected by core stakeholder approval, by
     * voting for or against them.
     *
     * Workers are paid from the blockchain's daily budget if their total approval (votes for - votes against) is

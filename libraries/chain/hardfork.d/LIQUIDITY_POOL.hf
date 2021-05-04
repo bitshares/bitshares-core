@@ -1,0 +1,5 @@
+// Liquidity pool
+#ifndef HARDFORK_LIQUIDITY_POOL_TIME
+#define HARDFORK_LIQUIDITY_POOL_TIME (fc::time_point_sec( 1601312520 )) // Monday, September 28, 2020 17:02:00 UTC
+#define HARDFORK_LIQUIDITY_POOL_PASSED(now) (now >= HARDFORK_LIQUIDITY_POOL_TIME)
+#endif

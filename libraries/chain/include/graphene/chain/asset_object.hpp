@@ -34,7 +34,7 @@
  * A prediction market is a specialized BitAsset such that total debt and total collateral are always equal amounts
  * (although asset IDs differ). No margin calls or force settlements may be performed on a prediction market asset. A
  * prediction market is globally settled by the issuer after the event being predicted resolves, thus a prediction
- * market must always have the @ref global_settle permission enabled. The maximum price for global settlement or short
+ * market must always have the @c global_settle permission enabled. The maximum price for global settlement or short
  * sale of a prediction market asset is 1-to-1.
  */
 
@@ -58,13 +58,14 @@ namespace graphene { namespace chain {
    class asset_dynamic_data_object : public abstract_object<asset_dynamic_data_object>
    {
       public:
-         static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_asset_dynamic_data_object_type;
+         static constexpr uint8_t space_id = implementation_ids;
+         static constexpr uint8_t type_id  = impl_asset_dynamic_data_object_type;
 
          /// The number of shares currently in existence
          share_type current_supply;
          share_type confidential_supply; ///< total asset held in confidential balances
          share_type accumulated_fees; ///< fees accumulate to be paid out over time
+         share_type accumulated_collateral_fees; ///< accumulated collateral-denominated fees (for bitassets)
          share_type fee_pool;         ///< in core asset
    };
 
@@ -78,8 +79,8 @@ namespace graphene { namespace chain {
    class asset_object : public graphene::db::abstract_object<asset_object>
    {
       public:
-         static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id  = asset_object_type;
+         static constexpr uint8_t space_id = protocol_ids;
+         static constexpr uint8_t type_id  = asset_object_type;
 
          /// This function does not check if any registered asset has this symbol or not; it simply checks whether the
          /// symbol would be valid.
@@ -88,6 +89,8 @@ namespace graphene { namespace chain {
 
          /// @return true if this is a market-issued asset; false otherwise.
          bool is_market_issued()const { return bitasset_data_id.valid(); }
+         /// @return true if this is a share asset of a liquidity pool; false otherwise.
+         bool is_liquidity_pool_share_asset()const { return for_liquidity_pool.valid(); }
          /// @return true if users may request force-settlement of this market-issued asset; false otherwise
          bool can_force_settle()const { return !(options.flags & disable_force_settle); }
          /// @return true if the issuer of this market-issued asset may globally settle the asset; false otherwise
@@ -98,6 +101,16 @@ namespace graphene { namespace chain {
          bool is_transfer_restricted()const { return options.flags & transfer_restricted; }
          bool can_override()const { return options.flags & override_authority; }
          bool allow_confidential()const { return !(options.flags & asset_issuer_permission_flags::disable_confidential); }
+         /// @return true if max supply of the asset can be updated
+         bool can_update_max_supply()const { return !(options.flags & lock_max_supply); }
+         /// @return true if can create new supply for the asset
+         bool can_create_new_supply()const { return !(options.flags & disable_new_supply); }
+         /// @return true if the asset owner can update MCR directly
+         bool can_owner_update_mcr()const { return !(options.issuer_permissions & disable_mcr_update); }
+         /// @return true if the asset owner can update ICR directly
+         bool can_owner_update_icr()const { return !(options.issuer_permissions & disable_icr_update); }
+         /// @return true if the asset owner can update MSSR directly
+         bool can_owner_update_mssr()const { return !(options.issuer_permissions & disable_mssr_update); }
 
          /// Helper function to get an asset object with the given amount in this asset's type
          asset amount(share_type a)const { return asset(a, id); }
@@ -133,6 +146,9 @@ namespace graphene { namespace chain {
 
          optional<account_id_type> buyback_account;
 
+         /// The ID of the liquidity pool if the asset is the share asset of a liquidity pool
+         optional<liquidity_pool_id_type> for_liquidity_pool;
+
          asset_id_type get_id()const { return id; }
 
          void validate()const
@@ -164,6 +180,69 @@ namespace graphene { namespace chain {
          template<class DB>
          share_type reserved( const DB& db )const
          { return options.max_supply - dynamic_data(db).current_supply; }
+
+         /// @return true if asset can accumulate fees in the given denomination
+         template<class DB>
+         bool can_accumulate_fee(const DB& db, const asset& fee) const {
+            return (( fee.asset_id == get_id() ) ||
+                    ( is_market_issued() && fee.asset_id == bitasset_data(db).options.short_backing_asset ));
+         }
+
+         /***
+          * @brief receive a fee asset to accrue in dynamic_data object
+          *
+          * Asset owners define various fees (market fees, force-settle fees, etc.) to be
+          * collected for the asset owners. These fees are typically denominated in the asset
+          * itself, but for bitassets some of the fees are denominated in the collateral
+          * asset. This will place the fee in the right container.
+          */
+         template<class DB>
+         void accumulate_fee(DB& db, const asset& fee) const
+         {
+            if (fee.amount == 0) return;
+            FC_ASSERT( fee.amount >= 0, "Fee amount must be non-negative." );
+            const auto& dyn_data = dynamic_asset_data_id(db);
+            if (fee.asset_id == get_id()) { // fee same as asset
+               db.modify( dyn_data, [&fee]( asset_dynamic_data_object& obj ){
+                  obj.accumulated_fees += fee.amount;
+               });
+            } else { // fee different asset; perhaps collateral-denominated fee
+               FC_ASSERT( is_market_issued(),
+                          "Asset ${a} (${id}) cannot accept fee of asset (${fid}).",
+                          ("a",this->symbol)("id",this->id)("fid",fee.asset_id) );
+               const auto & bad = bitasset_data(db);
+               FC_ASSERT( fee.asset_id == bad.options.short_backing_asset,
+                          "Asset ${a} (${id}) cannot accept fee of asset (${fid}).",
+                          ("a",this->symbol)("id",this->id)("fid",fee.asset_id) );
+               db.modify( dyn_data, [&fee]( asset_dynamic_data_object& obj ){
+                  obj.accumulated_collateral_fees += fee.amount;
+               });
+            }
+         }
+
+   };
+
+   /**
+    *  @brief defines market parameters for margin positions, extended with an initial_collateral_ratio field
+    */
+   struct price_feed_with_icr : public price_feed
+   {
+      /// After BSIP77, when creating a new debt position or updating an existing position,
+      /// the position will be checked against this parameter.
+      /// Fixed point between 1.000 and 10.000, implied fixed point denominator is GRAPHENE_COLLATERAL_RATIO_DENOM
+      uint16_t initial_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
+
+      price_feed_with_icr()
+      : price_feed(), initial_collateral_ratio( maintenance_collateral_ratio )
+      {}
+
+      price_feed_with_icr( const price_feed& pf, const optional<uint16_t>& icr = {} )
+      : price_feed( pf ), initial_collateral_ratio( icr.valid() ? *icr : pf.maintenance_collateral_ratio )
+      {}
+
+      /// The result will be used to check new debt positions and position updates.
+      /// Calculation: ~settlement_price * initial_collateral_ratio / GRAPHENE_COLLATERAL_RATIO_DENOM
+      price calculate_initial_collateralization()const;
    };
 
    /**
@@ -175,8 +254,8 @@ namespace graphene { namespace chain {
    class asset_bitasset_data_object : public abstract_object<asset_bitasset_data_object>
    {
       public:
-         static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_asset_bitasset_data_object_type;
+         static constexpr uint8_t space_id = implementation_ids;
+         static constexpr uint8_t type_id  = impl_asset_bitasset_data_object_type;
 
          /// The asset this object belong to
          asset_id_type asset_id;
@@ -187,15 +266,26 @@ namespace graphene { namespace chain {
          /// Feeds published for this asset. If issuer is not committee, the keys in this map are the feed publishing
          /// accounts; otherwise, the feed publishers are the currently active committee_members and witnesses and this map
          /// should be treated as an implementation detail. The timestamp on each feed is the time it was published.
-         flat_map<account_id_type, pair<time_point_sec,price_feed>> feeds;
+         flat_map<account_id_type, pair<time_point_sec,price_feed_with_icr>> feeds;
          /// This is the currently active price feed, calculated as the median of values from the currently active
          /// feeds.
-         price_feed current_feed;
+         price_feed_with_icr current_feed;
          /// This is the publication time of the oldest feed which was factored into current_feed.
          time_point_sec current_feed_publication_time;
-         /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call territory.
+
+         /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin
+         /// call territory.
          /// This value is derived from @ref current_feed for better performance and should be kept consistent.
          price current_maintenance_collateralization;
+         /// After BSIP77, when creating a new debt position or updating an existing position, the position
+         /// will be checked against the `initial_collateral_ratio` (ICR) parameter in the bitasset options.
+         /// This value is derived from @ref current_feed (which includes `ICR`) for better performance and
+         /// should be kept consistent.
+         price current_initial_collateralization;
+
+         /// Derive @ref current_maintenance_collateralization and @ref current_initial_collateralization from
+         /// other member variables.
+         void refresh_cache();
 
          /// True if this asset implements a @ref prediction_market
          bool is_prediction_market = false;
@@ -323,6 +413,9 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_dynamic_data_object)
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_bitasset_data_object)
 
+FC_REFLECT_DERIVED( graphene::chain::price_feed_with_icr, (graphene::protocol::price_feed),
+                    (initial_collateral_ratio) )
+
 FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (symbol)
                     (precision)
@@ -331,10 +424,13 @@ FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (dynamic_asset_data_id)
                     (bitasset_data_id)
                     (buyback_account)
+                    (for_liquidity_pool)
                   )
 
 FC_REFLECT_TYPENAME( graphene::chain::asset_bitasset_data_object )
 FC_REFLECT_TYPENAME( graphene::chain::asset_dynamic_data_object )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::price_feed_with_icr )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::asset_object )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::asset_bitasset_data_object )

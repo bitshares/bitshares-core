@@ -34,12 +34,16 @@ market_ticker::market_ticker(const market_ticker_object& mto,
                              const order_book& orders)
 {
    time = now;
+   mto_id = mto.id;
    base = asset_base.symbol;
    quote = asset_quote.symbol;
    percent_change = "0";
    lowest_ask = "0";
+   lowest_ask_base_size = "0";
+   lowest_ask_quote_size = "0";
    highest_bid = "0";
-
+   highest_bid_base_size = "0";
+   highest_bid_quote_size = "0";
    fc::uint128_t bv;
    fc::uint128_t qv;
    price latest_price = asset( mto.latest_base, mto.base ) / asset( mto.latest_quote, mto.quote );
@@ -68,9 +72,19 @@ market_ticker::market_ticker(const market_ticker_object& mto,
    quote_volume = uint128_amount_to_string( qv, asset_quote.precision );
 
    if(!orders.asks.empty())
-      lowest_ask = orders.asks[0].price;
+   {
+       lowest_ask = orders.asks[0].price;
+       lowest_ask_base_size = orders.asks[0].base;
+       lowest_ask_quote_size = orders.asks[0].quote;
+   }
+
    if(!orders.bids.empty())
-      highest_bid = orders.bids[0].price;
+   {
+       highest_bid = orders.bids[0].price;
+       highest_bid_base_size = orders.bids[0].base;
+       highest_bid_quote_size = orders.bids[0].quote;
+   }
+
 }
 
 market_ticker::market_ticker(const fc::time_point_sec& now,
@@ -82,7 +96,11 @@ market_ticker::market_ticker(const fc::time_point_sec& now,
    quote = asset_quote.symbol;
    latest = "0";
    lowest_ask = "0";
+   lowest_ask_base_size = "0";
+   lowest_ask_quote_size = "0";
    highest_bid = "0";
+   highest_bid_base_size = "0";
+   highest_bid_quote_size = "0";
    percent_change = "0";
    base_volume = "0";
    quote_volume = "0";

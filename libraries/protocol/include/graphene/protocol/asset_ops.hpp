@@ -32,6 +32,8 @@ namespace graphene { namespace protocol {
    {
       fc::optional<uint16_t>                  reward_percent;
       fc::optional<flat_set<account_id_type>> whitelist_market_fee_sharing;
+      // After BSIP81 activation, taker_fee_percent is the taker fee
+      fc::optional<uint16_t>                  taker_fee_percent;
    };
    typedef extension<additional_asset_options> additional_asset_options_t;
 
@@ -49,14 +51,19 @@ namespace graphene { namespace protocol {
       /// When this asset is traded on the markets, this percentage of the total traded will be exacted and paid
       /// to the issuer. This is a fixed point value, representing hundredths of a percent, i.e. a value of 100
       /// in this field means a 1% fee is charged on market trades of this asset.
+      // BSIP81: Asset owners may specify different market fee rate for maker orders and taker orders
+      // After BSIP81 activation, market_fee_percent is the maker fee
       uint16_t market_fee_percent = 0;
       /// Market fees calculated as @ref market_fee_percent of the traded volume are capped to this value
       share_type max_market_fee = GRAPHENE_MAX_SHARE_SUPPLY;
 
       /// The flags which the issuer has permission to update. See @ref asset_issuer_permission_flags
-      uint16_t issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK;
+      uint16_t issuer_permissions = DEFAULT_UIA_ASSET_ISSUER_PERMISSION;
       /// The currently active flags on this permission. See @ref asset_issuer_permission_flags
       uint16_t flags = 0;
+
+      /// @return the bits in @ref flags which are allowed to be updated according to data in @ref issuer_permissions
+      uint16_t get_enabled_issuer_permissions_mask() const;
 
       /// When a non-core asset is used to pay a fee, the blockchain must convert that asset to core asset in
       /// order to accept the fee. If this asset's fee pool is funded, the chain will automatically deposite fees
@@ -88,6 +95,10 @@ namespace graphene { namespace protocol {
       /// Perform internal consistency checks.
       /// @throws fc::exception if any check fails
       void validate()const;
+
+      /// Perform checks about @ref flags.
+      /// @throws fc::exception if any check fails
+      void validate_flags( bool is_market_issued )const;
    };
 
    /**
@@ -96,6 +107,21 @@ namespace graphene { namespace protocol {
     * @note Changes to this struct will break protocol compatibility
     */
    struct bitasset_options {
+
+      struct ext
+      {
+         /// After BSIP77, when creating a new debt position or updating an existing position,
+         /// the position will be checked against this parameter.
+         /// Unused for prediction markets, although we allow it to be set for simpler implementation
+         fc::optional<uint16_t> initial_collateral_ratio;  // BSIP-77
+         /// After BSIP75, the asset owner can update MCR directly
+         fc::optional<uint16_t> maintenance_collateral_ratio; // BSIP-75
+         /// After BSIP75, the asset owner can update MSSR directly
+         fc::optional<uint16_t> maximum_short_squeeze_ratio;  // BSIP-75
+         fc::optional<uint16_t> margin_call_fee_ratio; // BSIP 74
+         fc::optional<uint16_t> force_settle_fee_percent;  // BSIP-87
+      };
+
       /// Time before a price feed expires
       uint32_t feed_lifetime_sec = GRAPHENE_DEFAULT_PRICE_FEED_LIFETIME;
       /// Minimum number of unexpired feeds required to extract a median feed from
@@ -113,7 +139,8 @@ namespace graphene { namespace protocol {
       /// This speicifies which asset type is used to collateralize short sales
       /// This field may only be updated if the current supply of the asset is zero.
       asset_id_type short_backing_asset;
-      extensions_type extensions;
+
+      extension<ext> extensions;
 
       /// Perform internal consistency checks.
       /// @throws fc::exception if any check fails
@@ -147,16 +174,15 @@ namespace graphene { namespace protocol {
       /// ID is not known at the time this operation is created, create this price as though the new asset has instance
       /// ID 1, and the chain will overwrite it with the new asset's ID.
       asset_options              common_options;
-      /// Options only available for BitAssets. MUST be non-null if and only if the @ref market_issued flag is set in
-      /// common_options.flags
+      /// Options only available for BitAssets. MUST be non-null if and only if the asset is market-issued.
       optional<bitasset_options> bitasset_opts;
-      /// For BitAssets, set this to true if the asset implements a @ref prediction_market; false otherwise
+      /// For BitAssets, set this to true if the asset implements a prediction market; false otherwise
       bool is_prediction_market = false;
       extensions_type extensions;
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
-      share_type      calculate_fee( const fee_parameters_type& k )const;
+      share_type      calculate_fee( const fee_parameters_type& k, optional<uint64_t> sub_asset_creation_fee )const;
    };
 
    /**
@@ -174,7 +200,7 @@ namespace graphene { namespace protocol {
       struct fee_parameters_type { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee;
-      account_id_type issuer; ///< must equal @ref asset_to_settle->issuer
+      account_id_type issuer; ///< must equal issuer of @ref asset_to_settle
       asset_id_type   asset_to_settle;
       price           settle_price;
       extensions_type extensions;
@@ -222,7 +248,6 @@ namespace graphene { namespace protocol {
    /**
     * Virtual op generated when force settlement is cancelled.
     */
-
    struct asset_settle_cancel_operation : public base_operation
    {
       struct fee_parameters_type { };
@@ -236,9 +261,11 @@ namespace graphene { namespace protocol {
       extensions_type extensions;
 
       account_id_type fee_payer()const { return account; }
-      void            validate()const {
-         FC_ASSERT( amount.amount > 0, "Must settle at least 1 unit" );
-      }
+      /***
+       * This is a virtual operation and should never be placed in a block
+       * (i.e. in a proposal)
+       */
+      void validate() const { FC_ASSERT( !"Virtual operation"); }
 
       share_type calculate_fee(const fee_parameters_type& params)const
       { return 0; }
@@ -278,6 +305,16 @@ namespace graphene { namespace protocol {
     */
    struct asset_update_operation : public base_operation
    {
+      struct ext
+      {
+         /// After BSIP48, the precision of an asset can be updated if no supply is available
+         /// @note The parties involved still need to be careful
+         fc::optional<uint8_t> new_precision;
+         /// After BSIP48, if this option is set to true, the asset's core_exchange_rate won't be updated.
+         /// This is especially useful for committee-owned bitassets which can not be updated quickly.
+         fc::optional<bool> skip_core_exchange_rate;
+      };
+
       struct fee_parameters_type { 
          uint64_t fee            = 500 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t price_per_kbyte = 10;
@@ -292,7 +329,7 @@ namespace graphene { namespace protocol {
       /// If the asset is to be given a new issuer, specify his ID here.
       optional<account_id_type>   new_issuer;
       asset_options               new_options;
-      extensions_type             extensions;
+      extension<ext>              extensions;
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
@@ -307,7 +344,8 @@ namespace graphene { namespace protocol {
     * options an an existing BitAsset.
     *
     * @pre @ref issuer MUST be an existing account and MUST match asset_object::issuer on @ref asset_to_update
-    * @pre @ref asset_to_update MUST be a BitAsset, i.e. @ref asset_object::is_market_issued() returns true
+    * @pre @ref asset_to_update MUST be a BitAsset, i.e. @ref graphene::chain::asset_object::is_market_issued()
+    *                           returns true
     * @pre @ref fee MUST be nonnegative, and @ref issuer MUST have a sufficient balance to pay it
     * @pre @ref new_options SHALL be internally consistent, as verified by @ref validate()
     * @post @ref asset_to_update will have BitAsset-specific options matching those of new_options
@@ -336,7 +374,8 @@ namespace graphene { namespace protocol {
     *
     * @pre @ref issuer MUST be an existing account, and MUST match asset_object::issuer on @ref asset_to_update
     * @pre @ref issuer MUST NOT be the committee account
-    * @pre @ref asset_to_update MUST be a BitAsset, i.e. @ref asset_object::is_market_issued() returns true
+    * @pre @ref asset_to_update MUST be a BitAsset, i.e. @ref graphene::chain::asset_object::is_market_issued()
+    *                           returns true
     * @pre @ref fee MUST be nonnegative, and @ref issuer MUST have a sufficient balance to pay it
     * @pre Cardinality of @ref new_feed_producers MUST NOT exceed @ref chain_parameters::maximum_asset_feed_publishers
     * @post @ref asset_to_update will have a set of feed producers matching @ref new_feed_producers
@@ -376,13 +415,19 @@ namespace graphene { namespace protocol {
     */
    struct asset_publish_feed_operation : public base_operation
    {
+      struct ext
+      {
+         /// After BSIP77, price feed producers can feed ICR too
+         fc::optional<uint16_t> initial_collateral_ratio;  // BSIP-77
+      };
+
       struct fee_parameters_type { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                  fee; ///< paid for by publisher
       account_id_type        publisher;
       asset_id_type          asset_id; ///< asset for which the feed is published
       price_feed             feed;
-      extensions_type        extensions;
+      extension<ext>         extensions;
 
       account_id_type fee_payer()const { return publisher; }
       void            validate()const;
@@ -441,10 +486,21 @@ namespace graphene { namespace protocol {
          uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
       };
 
+      struct additional_options_type
+      {
+         /// Which asset to claim fees from. This is needed, e.g., to claim collateral-
+         /// denominated fees from a collateral-backed smart asset. If unset, assumed to be same
+         /// asset as amount_to_claim is denominated in, such as would be the case when claiming
+         /// market fees. If set, validation requires it to be a different asset_id than
+         /// amount_to_claim (else there would exist two ways to form the same request).
+         fc::optional<asset_id_type> claim_from_asset_id;
+      };
+
       asset           fee;
-      account_id_type issuer;
-      asset           amount_to_claim; /// amount_to_claim.asset_id->issuer must == issuer
-      extensions_type extensions;
+      account_id_type issuer; ///< must match issuer of asset from which we claim fees
+      asset           amount_to_claim;
+
+      extension<additional_options_type> extensions;
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
@@ -516,6 +572,8 @@ namespace graphene { namespace protocol {
 
 FC_REFLECT( graphene::protocol::asset_claim_fees_operation, (fee)(issuer)(amount_to_claim)(extensions) )
 FC_REFLECT( graphene::protocol::asset_claim_fees_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::protocol::asset_claim_fees_operation::additional_options_type, (claim_from_asset_id) )
+
 FC_REFLECT( graphene::protocol::asset_claim_pool_operation, (fee)(issuer)(asset_id)(amount_to_claim)(extensions) )
 FC_REFLECT( graphene::protocol::asset_claim_pool_operation::fee_parameters_type, (fee) )
 
@@ -533,6 +591,15 @@ FC_REFLECT( graphene::protocol::asset_options,
             (description)
             (extensions)
           )
+
+FC_REFLECT( graphene::protocol::bitasset_options::ext,
+            (initial_collateral_ratio)
+            (maintenance_collateral_ratio)
+            (maximum_short_squeeze_ratio)
+            (margin_call_fee_ratio)
+            (force_settle_fee_percent)
+          )
+
 FC_REFLECT( graphene::protocol::bitasset_options,
             (feed_lifetime_sec)
             (minimum_feeds)
@@ -543,8 +610,15 @@ FC_REFLECT( graphene::protocol::bitasset_options,
             (extensions)
           )
 
-FC_REFLECT( graphene::protocol::additional_asset_options, (reward_percent)(whitelist_market_fee_sharing) )
-FC_REFLECT( graphene::protocol::asset_create_operation::fee_parameters_type, (symbol3)(symbol4)(long_symbol)(price_per_kbyte) )
+FC_REFLECT( graphene::protocol::additional_asset_options,
+            (reward_percent)(whitelist_market_fee_sharing)(taker_fee_percent) )
+
+FC_REFLECT( graphene::protocol::asset_update_operation::ext, (new_precision)(skip_core_exchange_rate) )
+FC_REFLECT( graphene::protocol::asset_publish_feed_operation::ext, (initial_collateral_ratio) )
+
+FC_REFLECT( graphene::protocol::asset_create_operation::fee_parameters_type,
+            (symbol3)(symbol4)(long_symbol)(price_per_kbyte) )
+
 FC_REFLECT( graphene::protocol::asset_global_settle_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::protocol::asset_settle_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::protocol::asset_settle_cancel_operation::fee_parameters_type, )
@@ -603,17 +677,23 @@ FC_REFLECT( graphene::protocol::asset_issue_operation,
 FC_REFLECT( graphene::protocol::asset_reserve_operation,
             (fee)(payer)(amount_to_reserve)(extensions) )
 
-FC_REFLECT( graphene::protocol::asset_fund_fee_pool_operation, (fee)(from_account)(asset_id)(amount)(extensions) );
+FC_REFLECT( graphene::protocol::asset_fund_fee_pool_operation, (fee)(from_account)(asset_id)(amount)(extensions) )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_options )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::bitasset_options::ext )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::bitasset_options )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::additional_asset_options )
+
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_operation::ext )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_publish_feed_operation::ext )
+
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_create_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_global_settle_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_settle_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_fund_fee_pool_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_pool_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_fees_operation::fee_parameters_type )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_claim_fees_operation::additional_options_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_issuer_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_bitasset_operation::fee_parameters_type )
@@ -621,6 +701,7 @@ GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_update_feed_p
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_publish_feed_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_issue_operation::fee_parameters_type )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_reserve_operation::fee_parameters_type )
+
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_create_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_global_settle_operation )
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::asset_settle_operation )

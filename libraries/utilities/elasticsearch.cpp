@@ -100,18 +100,19 @@ bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer)
       fc::variant j = fc::json::from_string(CurlReadBuffer);
       bool errors = j["errors"].as_bool();
       if(errors == true) {
+         elog( "ES returned 200 but with errors: ${e}", ("e", CurlReadBuffer) );
          return false;
       }
    }
    else {
       if(http_code == 413) {
-         elog( "413 error: Can be low disk space" );
+         elog( "413 error: Can be low disk space. ${e}", ("e", CurlReadBuffer) );
       }
       else if(http_code == 401) {
-         elog( "401 error: Unauthorized" );
+         elog( "401 error: Unauthorized. ${e}", ("e", CurlReadBuffer) );
       }
       else {
-         elog( std::to_string(http_code) + " error: Unknown error" );
+         elog( "${code} error: ${e}", ("code", std::to_string(http_code)) ("e", CurlReadBuffer) );
       }
       return false;
    }
