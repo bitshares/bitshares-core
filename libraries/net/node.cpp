@@ -1600,7 +1600,8 @@ namespace graphene { namespace net { namespace detail {
       }
     }
 
-    void node_impl::on_connection_accepted_message(peer_connection* originating_peer, const connection_accepted_message& connection_accepted_message_received)
+    void node_impl::on_connection_accepted_message( peer_connection* originating_peer,
+                                                    const connection_accepted_message& )
     {
       VERIFY_CORRECT_THREAD();
       dlog("Received a connection_accepted in response to my \"hello\" from ${peer}",
@@ -1608,9 +1609,10 @@ namespace graphene { namespace net { namespace detail {
       originating_peer->negotiation_status = peer_connection::connection_negotiation_status::peer_connection_accepted;
       originating_peer->our_state = peer_connection::our_connection_state::connection_accepted;
       originating_peer->send_message(address_request_message());
-      fc::time_point now = fc::time_point::now();
+      auto now = fc::time_point::now();
+      constexpr int64_t five = 5;
       if (_is_firewalled == firewalled_state::unknown &&
-          _last_firewall_check_message_sent < now - fc::minutes(5) &&
+          _last_firewall_check_message_sent < ( now - fc::minutes(five) ) &&
           originating_peer->core_protocol_version >= 106)
       {
         wlog("I don't know if I'm firewalled.  Sending a firewall check message to peer ${peer}",
@@ -1939,7 +1941,8 @@ namespace graphene { namespace net { namespace detail {
         std::vector<item_hash_t> blockchain_synopsis = create_blockchain_synopsis_for_peer( peer );
       
         item_hash_t last_item_seen = blockchain_synopsis.empty() ? item_hash_t() : blockchain_synopsis.back();
-        dlog( "sync: sending a request for the next items after ${last_item_seen} to peer ${peer}, (full request is ${blockchain_synopsis})",
+        dlog( "sync: sending a request for the next items after ${last_item_seen} to peer ${peer}, "
+              "(full request is ${blockchain_synopsis})",
              ( "last_item_seen", last_item_seen )
              ( "peer", peer->get_remote_endpoint() )
              ( "blockchain_synopsis", blockchain_synopsis ) );
@@ -2169,7 +2172,7 @@ namespace graphene { namespace net { namespace detail {
               originating_peer->last_block_time_delegate_has_seen + // timestamp of the block immediately before the first unfetched block
               originating_peer->number_of_unfetched_item_ids * GRAPHENE_MIN_BLOCK_INTERVAL;
           fc::time_point_sec now = fc::time_point::now();
-          if (minimum_time_of_last_offered_block > now + GRAPHENE_NET_FUTURE_SYNC_BLOCKS_GRACE_PERIOD_SEC)
+          if (minimum_time_of_last_offered_block > (now + GRAPHENE_NET_FUTURE_SYNC_BLOCKS_GRACE_PERIOD_SEC))
           {
             wlog("Disconnecting from peer ${peer} who offered us an implausible number of blocks, their last block would be in the future (${timestamp})",
                  ("peer", originating_peer->get_remote_endpoint())
@@ -2359,6 +2362,7 @@ namespace graphene { namespace net { namespace detail {
       auto sync_item_iter = originating_peer->sync_items_requested_from_peer.find(requested_item.item_hash);
       if (sync_item_iter != originating_peer->sync_items_requested_from_peer.end())
       {
+        _active_sync_requests.erase(*sync_item_iter);
         originating_peer->sync_items_requested_from_peer.erase(sync_item_iter);
 
         if (originating_peer->peer_needs_sync_items_from_us)
@@ -2379,11 +2383,13 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
 
-      // expire old inventory so we'll be making decisions our about whether to fetch blocks below based only on recent inventory
+      // expire old inventory
+      // so we'll be making our decisions about whether to fetch blocks below based only on recent inventory
       originating_peer->clear_old_inventory();
 
       dlog( "received inventory of ${count} items from peer ${endpoint}",
-           ( "count", item_ids_inventory_message_received.item_hashes_available.size() )("endpoint", originating_peer->get_remote_endpoint() ) );
+            ("count", item_ids_inventory_message_received.item_hashes_available.size())
+            ("endpoint", originating_peer->get_remote_endpoint() ) );
       for( const item_hash_t& item_hash : item_ids_inventory_message_received.item_hashes_available )
       {
         item_id advertised_item_id(item_ids_inventory_message_received.item_type, item_hash);
