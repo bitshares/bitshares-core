@@ -136,7 +136,7 @@ namespace graphene { namespace app {
          vector<operation_history_object> get_account_history(
             const std::string account_name_or_id,
             operation_history_id_type stop = operation_history_id_type(),
-            unsigned limit = 100,
+            uint32_t limit = 100,
             operation_history_id_type start = operation_history_id_type()
          )const;
 
@@ -153,7 +153,7 @@ namespace graphene { namespace app {
             const std::string account_name_or_id,
             flat_set<uint16_t> operation_types,
             uint32_t start,
-            unsigned limit
+            uint32_t limit
          )const;
 
          /**
@@ -168,10 +168,10 @@ namespace graphene { namespace app {
           */
          vector<operation_history_object> get_account_history_operations(
             const std::string account_name_or_id,
-            int operation_type,
+            int64_t operation_type,
             operation_history_id_type start = operation_history_id_type(),
             operation_history_id_type stop = operation_history_id_type(),
-            unsigned limit = 100
+            uint32_t limit = 100
          )const;
 
          /**
@@ -188,7 +188,7 @@ namespace graphene { namespace app {
           */
          vector<operation_history_object> get_relative_account_history( const std::string account_name_or_id,
                                                                         uint64_t stop = 0,
-                                                                        unsigned limit = 100,
+                                                                        uint32_t limit = 100,
                                                                         uint64_t start = 0) const;
 
          /**

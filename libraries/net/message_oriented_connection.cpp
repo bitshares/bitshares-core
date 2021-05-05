@@ -273,17 +273,18 @@ namespace graphene { namespace net {
            elog("Trying to send a message larger than MAX_MESSAGE_SIZE. This probably won't work...");
         //pad the message we send to a multiple of 16 bytes
         size_t size_with_padding = 16 * ((size_of_message_and_header + 15) / 16);
-        std::unique_ptr<char[]> padded_message(new char[size_with_padding]);
+        std::vector<char> padded_message( size_with_padding );
 
-        memcpy(padded_message.get(), (char*)&message_to_send, sizeof(message_header));
-        memcpy(padded_message.get() + sizeof(message_header), message_to_send.data.data(), message_to_send.size.value() );
-        char* padding_space = padded_message.get() + sizeof(message_header) + message_to_send.size.value();
+        memcpy( padded_message.data(), (const char*)&message_to_send, sizeof(message_header) );
+        memcpy( padded_message.data() + sizeof(message_header), message_to_send.data.data(),
+                message_to_send.size.value() );
+        char* padding_space = padded_message.data() + sizeof(message_header) + message_to_send.size.value();
         memset(padding_space, 0, size_with_padding - size_of_message_and_header);
-        _sock.write(padded_message.get(), size_with_padding);
+        _sock.write( padded_message.data(), size_with_padding );
         _sock.flush();
         _bytes_sent += size_with_padding;
         _last_message_sent_time = fc::time_point::now();
-      } FC_RETHROW_EXCEPTIONS( warn, "unable to send message" );
+      } FC_RETHROW_EXCEPTIONS( warn, "unable to send message" )
     }
 
     void message_oriented_connection_impl::close_connection()
@@ -355,7 +356,7 @@ namespace graphene { namespace net {
 
 
   message_oriented_connection::message_oriented_connection(message_oriented_connection_delegate* delegate) :
-    my(new detail::message_oriented_connection_impl(this, delegate))
+    my( std::make_unique<detail::message_oriented_connection_impl>(this, delegate) )
   {
   }
 

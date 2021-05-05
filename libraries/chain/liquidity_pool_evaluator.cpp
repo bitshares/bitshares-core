@@ -374,7 +374,10 @@ generic_exchange_operation_result liquidity_pool_exchange_evaluator::do_apply(
    d.adjust_balance( op.account, -op.amount_to_sell );
    d.adjust_balance( op.account, _account_receives );
 
-   // TODO whose registrar and referrer should receive the shared maker market fee?
+   // For _pool_receives_asset, if market fee sharing is enabled,
+   // the share asset owner's registrar and referrer will get the shared maker market fee.
+   // For _pool_pays_asset, if market fee sharing is enabled,
+   // the trader's registrar and referrer will get the shared taker market fee.
    d.pay_market_fees( &_pool->share_asset(d).issuer(d), *_pool_receives_asset, op.amount_to_sell, true,
                       _maker_market_fee );
    d.pay_market_fees( fee_paying_account, *_pool_pays_asset, _pool_pays, false, _taker_market_fee );

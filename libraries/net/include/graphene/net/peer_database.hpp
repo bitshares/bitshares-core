@@ -79,7 +79,7 @@ namespace graphene { namespace net {
     public:
       peer_database_iterator();
       ~peer_database_iterator();
-      explicit peer_database_iterator(peer_database_iterator_impl* impl);
+      explicit peer_database_iterator( std::unique_ptr<peer_database_iterator_impl>&& impl );
       peer_database_iterator( const peer_database_iterator& c );
 
     private:
@@ -97,7 +97,7 @@ namespace graphene { namespace net {
   {
   public:
     peer_database();
-    ~peer_database();
+    virtual ~peer_database();
 
     void open(const fc::path& databaseFilename);
     void close();
@@ -109,7 +109,7 @@ namespace graphene { namespace net {
     potential_peer_record lookup_or_create_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup);
     fc::optional<potential_peer_record> lookup_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup);
 
-    typedef detail::peer_database_iterator iterator;
+    using iterator = detail::peer_database_iterator;
     iterator begin() const;
     iterator end() const;
     size_t size() const;

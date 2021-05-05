@@ -47,6 +47,7 @@ ioBanker <37595908+ioBanker@users.noreply.github.com>
 Karl Semich <0xloem@gmail.com>
 SahkanDesertHawk <panasiuki@gmail.com>
 Scott Howard <showard314@gmail.com>
+TechnoL0g <9394904+technologiespro@users.noreply.github.com>
 Tydus <Tydus@Tydus.org>
 William <tmfc@homtail.com>
 bangzi1001 <36911788+bangzi1001@users.noreply.github.com>
@@ -54,6 +55,7 @@ d.yakovitsky <d.yakovitsky@aetsoft.by>
 ddylko <ddylko@ddylkoPC>
 iHashFury <iPerky@users.noreply.github.com>
 necklace <necklace@163.com>
+xiao93 <42384581+xiao93@users.noreply.github.com>
 xuquan316 <xuquan316@vip.qq.com>
 Bartek Wrona <wrona@syncad.com>
 BhuzOr <giaquinta.adriano@gmail.com>
@@ -75,8 +77,8 @@ Troglodactyl <troglodactyl@gmail.com>
 VoR0220 <catalanor0220@gmail.com>
 alt <pch957@163.com>
 bitcube <root@seed.cubeconnex.com>
+hammadsherwani <83015346+hammadsherwani@users.noreply.github.com>
 lafona <lafona@protonmail.com>
 liondani <liondani@gmx.com>
 lososeg <ya.lososeg@gmail.com>
 sinetek <pitwuu@gmail.com>
-xiao93 <42384581+xiao93@users.noreply.github.com>
