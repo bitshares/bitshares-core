@@ -844,7 +844,31 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
       BOOST_CHECK_THROW( exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, eur_id ), asset( 585, usd_id ) ),
                          fc::exception );
 
+      // Setup market blacklists and whitelists
+      {
+         asset_update_operation auop;
+
+         auop.issuer = usd_id(db).issuer;
+         auop.asset_to_update = usd_id;
+         auop.new_options = usd_id(db).options;
+         auop.new_options.whitelist_markets.insert( core_id );
+         auop.new_options.blacklist_markets.insert( eur_id );
+         auop.new_options.blacklist_markets.insert( usd_id );
+         trx.operations.clear();
+         trx.operations.push_back( auop );
+
+         auop.issuer = eur_id(db).issuer;
+         auop.asset_to_update = eur_id;
+         auop.new_options = eur_id(db).options;
+         auop.new_options.whitelist_markets.insert( core_id );
+         auop.new_options.blacklist_markets.insert( eur_id );
+         auop.new_options.blacklist_markets.insert( usd_id );
+         trx.operations.push_back( auop );
+         PUSH_TX(db, trx, ~0);
+      }
+
       // Ted exchanges with the pool
+      // BTW reproduces bitshares-core issue #2350: white/blacklists not in effect
       result = exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, eur_id ), asset( 584, usd_id ) );
 
       BOOST_REQUIRE_EQUAL( result.paid.size(), 1u );
@@ -886,6 +910,7 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
                          fc::exception );
 
       // Ted exchanges with the pool
+      // BTW reproduces bitshares-core issue #2350: white/blacklists not in effect
       result = exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, usd_id ), asset( 600, eur_id ) );
 
       BOOST_REQUIRE_EQUAL( result.paid.size(), 1u );
@@ -991,11 +1016,210 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
       histories = hist_api.get_liquidity_pool_history_by_sequence( lp_id, 3, head_time - fc::days(3), {}, 63 );
       BOOST_CHECK_EQUAL( histories.size(), 1u );
 
-   } catch (fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
+      // Proceeds to the hard fork time that added white/blacklist checks for bitshares-core issue #2350
+      generate_blocks( HARDFORK_CORE_2350_TIME );
+
+      // Ted now fails to exchange due to the white/blacklists
+      BOOST_CHECK_THROW( exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, eur_id ), asset( 1, usd_id ) ),
+                         fc::exception );
+      BOOST_CHECK_THROW( exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, usd_id ), asset( 1, eur_id ) ),
+                         fc::exception );
+
+      // Remove market blacklists and whitelists
+      {
+         asset_update_operation auop;
+
+         auop.issuer = usd_id(db).issuer;
+         auop.asset_to_update = usd_id;
+         auop.new_options = usd_id(db).options;
+         auop.new_options.whitelist_markets.clear();
+         auop.new_options.blacklist_markets.clear();
+         trx.operations.clear();
+         trx.operations.push_back( auop );
+
+         auop.issuer = eur_id(db).issuer;
+         auop.asset_to_update = eur_id;
+         auop.new_options = eur_id(db).options;
+         auop.new_options.whitelist_markets.clear();
+         auop.new_options.blacklist_markets.clear();
+         trx.operations.push_back( auop );
+         PUSH_TX(db, trx, ~0);
+      }
+      // Able to exchange
+      exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, eur_id ), asset( 1, usd_id ) );
+      exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, usd_id ), asset( 1, eur_id ) );
+
+      // Setup a whitelist without EUR for USD
+      {
+         asset_update_operation auop;
+
+         auop.issuer = usd_id(db).issuer;
+         auop.asset_to_update = usd_id;
+         auop.new_options = usd_id(db).options;
+         auop.new_options.whitelist_markets.insert( core_id );
+         trx.operations.clear();
+         trx.operations.push_back( auop );
+         PUSH_TX(db, trx, ~0);
+      }
+      // Now unable to exchange
+      BOOST_CHECK_THROW( exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, eur_id ), asset( 1, usd_id ) ),
+                         fc::exception );
+      BOOST_CHECK_THROW( exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, usd_id ), asset( 1, eur_id ) ),
+                         fc::exception );
+
+      // Add the USD:EUR market to the whitelist of USD
+      {
+         asset_update_operation auop;
+
+         auop.issuer = usd_id(db).issuer;
+         auop.asset_to_update = usd_id;
+         auop.new_options = usd_id(db).options;
+         auop.new_options.whitelist_markets.insert( eur_id );
+         trx.operations.clear();
+         trx.operations.push_back( auop );
+         PUSH_TX(db, trx, ~0);
+      }
+      // Able to exchange
+      exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, eur_id ), asset( 1, usd_id ) );
+      exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, usd_id ), asset( 1, eur_id ) );
+
+      // Setup a blacklist without EUR for USD
+      {
+         asset_update_operation auop;
+
+         auop.issuer = usd_id(db).issuer;
+         auop.asset_to_update = usd_id;
+         auop.new_options = usd_id(db).options;
+         auop.new_options.blacklist_markets.insert( usd_id );
+         trx.operations.clear();
+         trx.operations.push_back( auop );
+         PUSH_TX(db, trx, ~0);
+      }
+      // Able to exchange
+      exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, eur_id ), asset( 1, usd_id ) );
+      exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, usd_id ), asset( 1, eur_id ) );
+
+      // Add EUR to blacklist of USD
+      {
+         asset_update_operation auop;
+
+         auop.issuer = usd_id(db).issuer;
+         auop.asset_to_update = usd_id;
+         auop.new_options = usd_id(db).options;
+         auop.new_options.whitelist_markets.clear();
+         auop.new_options.blacklist_markets.insert( eur_id );
+         trx.operations.clear();
+         trx.operations.push_back( auop );
+         PUSH_TX(db, trx, ~0);
+      }
+      // Now unable to exchange
+      BOOST_CHECK_THROW( exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, eur_id ), asset( 1, usd_id ) ),
+                         fc::exception );
+      BOOST_CHECK_THROW( exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, usd_id ), asset( 1, eur_id ) ),
+                         fc::exception );
+
+      // Remove the USD:EUR market from the blacklist of USD
+      {
+         asset_update_operation auop;
+
+         auop.issuer = usd_id(db).issuer;
+         auop.asset_to_update = usd_id;
+         auop.new_options = usd_id(db).options;
+         auop.new_options.blacklist_markets.erase( eur_id );
+         trx.operations.clear();
+         trx.operations.push_back( auop );
+         PUSH_TX(db, trx, ~0);
+      }
+      // Able to exchange
+      exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, eur_id ), asset( 1, usd_id ) );
+      exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, usd_id ), asset( 1, eur_id ) );
+
+      // Setup a whitelist without USD for EUR
+      {
+         asset_update_operation auop;
+
+         auop.issuer = eur_id(db).issuer;
+         auop.asset_to_update = eur_id;
+         auop.new_options = eur_id(db).options;
+         auop.new_options.whitelist_markets.insert( core_id );
+         trx.operations.clear();
+         trx.operations.push_back( auop );
+         PUSH_TX(db, trx, ~0);
+      }
+      // Now unable to exchange
+      BOOST_CHECK_THROW( exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, eur_id ), asset( 1, usd_id ) ),
+                         fc::exception );
+      BOOST_CHECK_THROW( exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, usd_id ), asset( 1, eur_id ) ),
+                         fc::exception );
+
+      // Add the USD:EUR market to the whitelist of EUR
+      {
+         asset_update_operation auop;
+
+         auop.issuer = eur_id(db).issuer;
+         auop.asset_to_update = eur_id;
+         auop.new_options = eur_id(db).options;
+         auop.new_options.whitelist_markets.insert( usd_id );
+         trx.operations.clear();
+         trx.operations.push_back( auop );
+         PUSH_TX(db, trx, ~0);
+      }
+      // Able to exchange
+      exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, eur_id ), asset( 1, usd_id ) );
+      exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, usd_id ), asset( 1, eur_id ) );
+
+      // Setup a blacklist without USD for EUR
+      {
+         asset_update_operation auop;
+
+         auop.issuer = eur_id(db).issuer;
+         auop.asset_to_update = eur_id;
+         auop.new_options = eur_id(db).options;
+         auop.new_options.blacklist_markets.insert( eur_id );
+         trx.operations.clear();
+         trx.operations.push_back( auop );
+         PUSH_TX(db, trx, ~0);
+      }
+      // Able to exchange
+      exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, eur_id ), asset( 1, usd_id ) );
+      exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, usd_id ), asset( 1, eur_id ) );
+
+      // Add EUR:USD to the blacklist of EUR
+      {
+         asset_update_operation auop;
+
+         auop.issuer = eur_id(db).issuer;
+         auop.asset_to_update = eur_id;
+         auop.new_options = eur_id(db).options;
+         auop.new_options.whitelist_markets.clear();
+         auop.new_options.blacklist_markets.insert( usd_id );
+         trx.operations.clear();
+         trx.operations.push_back( auop );
+         PUSH_TX(db, trx, ~0);
+      }
+      // Now unable to exchange
+      BOOST_CHECK_THROW( exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, eur_id ), asset( 1, usd_id ) ),
+                         fc::exception );
+      BOOST_CHECK_THROW( exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, usd_id ), asset( 1, eur_id ) ),
+                         fc::exception );
+
+      // Remove the USD:EUR market from the blacklist of EUR
+      {
+         asset_update_operation auop;
+
+         auop.issuer = eur_id(db).issuer;
+         auop.asset_to_update = eur_id;
+         auop.new_options = eur_id(db).options;
+         auop.new_options.blacklist_markets.erase( usd_id );
+         trx.operations.clear();
+         trx.operations.push_back( auop );
+         PUSH_TX(db, trx, ~0);
+      }
+      // Able to exchange
+      exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, eur_id ), asset( 1, usd_id ) );
+      exchange_with_liquidity_pool( ted_id, lp_id, asset( 1000, usd_id ), asset( 1, eur_id ) );
+
+} FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
 
 BOOST_AUTO_TEST_CASE( liquidity_pool_apis_test )
 { try {
