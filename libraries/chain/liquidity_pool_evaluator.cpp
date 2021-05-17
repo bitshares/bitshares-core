@@ -314,6 +314,7 @@ void_result liquidity_pool_exchange_evaluator::do_evaluate(const liquidity_pool_
               || ( op.amount_to_sell.asset_id == _pool->asset_b && op.min_to_receive.asset_id == _pool->asset_a ),
               "Asset type mismatch" );
 
+
    const asset_object& asset_obj_a = _pool->asset_a(d);
    FC_ASSERT( is_authorized_asset( d, *fee_paying_account, asset_obj_a ),
               "The account is unauthorized by asset A" );
@@ -321,6 +322,38 @@ void_result liquidity_pool_exchange_evaluator::do_evaluate(const liquidity_pool_
    const asset_object& asset_obj_b = _pool->asset_b(d);
    FC_ASSERT( is_authorized_asset( d, *fee_paying_account, asset_obj_b ),
               "The account is unauthorized by asset B" );
+
+   if( HARDFORK_CORE_2350_PASSED( d.head_block_time() ) )
+   {
+      if( !asset_obj_a.options.whitelist_markets.empty() )
+      {
+         FC_ASSERT(    asset_obj_a.options.whitelist_markets.find(_pool->asset_b)
+                    != asset_obj_a.options.whitelist_markets.end(),
+                    "The ${a}:${b} market has not been whitelisted by asset ${a}",
+                    ("a", asset_obj_a.symbol) ("b", asset_obj_b.symbol) );
+      }
+      if( !asset_obj_a.options.blacklist_markets.empty() )
+      {
+         FC_ASSERT(    asset_obj_a.options.blacklist_markets.find(_pool->asset_b)
+                    == asset_obj_a.options.blacklist_markets.end(),
+                    "The ${a}:${b} market has been blacklisted by asset ${a}",
+                    ("a", asset_obj_a.symbol) ("b", asset_obj_b.symbol) );
+      }
+      if( !asset_obj_b.options.whitelist_markets.empty() )
+      {
+         FC_ASSERT(    asset_obj_b.options.whitelist_markets.find(_pool->asset_a)
+                    != asset_obj_b.options.whitelist_markets.end(),
+                    "The ${a}:${b} market has not been whitelisted by asset ${b}",
+                    ("a", asset_obj_a.symbol) ("b", asset_obj_b.symbol) );
+      }
+      if( !asset_obj_b.options.blacklist_markets.empty() )
+      {
+         FC_ASSERT(    asset_obj_b.options.blacklist_markets.find(_pool->asset_a)
+                    == asset_obj_b.options.blacklist_markets.end(),
+                    "The ${a}:${b} market has been blacklisted by asset ${b}",
+                    ("a", asset_obj_a.symbol) ("b", asset_obj_b.symbol) );
+      }
+   }
 
    _pool_receives_asset = ( op.amount_to_sell.asset_id == _pool->asset_a ? &asset_obj_a : &asset_obj_b );
 
