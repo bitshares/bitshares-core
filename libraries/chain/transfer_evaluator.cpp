@@ -101,7 +101,8 @@ void_result override_transfer_evaluator::do_evaluate( const override_transfer_op
 
    FC_ASSERT( is_authorized_asset( d, to_account, asset_type ) );
    // Since hard fork core-2295, do not check asset authorization limitations on from_account for override_transfer
-   // TODO code cleanup: remove the check and the assertion below after the hard fork time, keep the comment above
+   // TODO code cleanup: if applicable (could be false due to proposals),
+   //      remove the check and the assertion below after the hard fork time, keep the comment about reasoning above
    if( !HARDFORK_CORE_2295_PASSED(d.head_block_time()) )
       FC_ASSERT( is_authorized_asset( d, from_account, asset_type ) );
 
