@@ -1,0 +1,6 @@
+// bitshares-core issue #973 check asset authorizations for operations
+#ifndef HARDFORK_CORE_973_TIME
+// Jan 1 2030, midnight; this is a dummy date until a hardfork date is scheduled
+#define HARDFORK_CORE_973_TIME (fc::time_point_sec( 1893456000 ))
+#define HARDFORK_CORE_973_PASSED(now) (now >= HARDFORK_CORE_973_TIME)
+#endif
