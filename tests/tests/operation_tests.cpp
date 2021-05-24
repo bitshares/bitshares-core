@@ -2808,6 +2808,148 @@ BOOST_AUTO_TEST_CASE( vesting_balance_create_test )
    REQUIRE_OP_EVALUATION_SUCCESS( op, owner,   bob_account.get_id() );
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE( vesting_balance_create_asset_auth_test )
+{ try {
+   INVOKE( create_uia );
+
+   generate_block();
+
+   ACTORS( (alice)(bob)(cindy) );
+
+   const asset_object& test_asset = get_asset(UIA_TEST_SYMBOL);
+
+   issue_uia( alice, test_asset.amount( 10000 ) );
+   issue_uia( bob, test_asset.amount( 10000 ) );
+
+   // Success when no whitelist configured
+   vesting_balance_create_operation op;
+   op.creator = alice_id;
+   op.owner = alice_id;
+   op.amount = test_asset.amount( 100 );
+   op.policy = cdd_vesting_policy_initializer{ 60*60*24 };
+
+   trx.operations.clear();
+   trx.operations.push_back(op);
+   PUSH_TX( db, trx, ~0 );
+
+   vesting_balance_create_operation op2 = op;
+   op2.owner = bob_id;
+   trx.operations.clear();
+   trx.operations.push_back(op2);
+   PUSH_TX( db, trx, ~0 );
+
+   vesting_balance_create_operation op3 = op;
+   op3.creator = bob_id;
+   trx.operations.clear();
+   trx.operations.push_back(op3);
+   PUSH_TX( db, trx, ~0 );
+
+   vesting_balance_create_operation op4 = op;
+   op4.creator = bob_id;
+   op4.owner = bob_id;
+   trx.operations.clear();
+   trx.operations.push_back(op4);
+   PUSH_TX( db, trx, ~0 );
+
+   generate_block();
+
+   // Make a whitelist
+   {
+      BOOST_TEST_MESSAGE( "Setting up whitelisting" );
+      asset_update_operation uop;
+      uop.issuer = test_asset.issuer;
+      uop.asset_to_update = test_asset.id;
+      uop.new_options = test_asset.options;
+
+      // Enable whitelisting
+      uop.new_options.flags = white_list | charge_market_fee;
+      trx.operations.clear();
+      trx.operations.push_back(uop);
+      PUSH_TX( db, trx, ~0 );
+
+      // The whitelist is managed by bob
+      uop.new_options.whitelist_authorities.insert(bob_id);
+      trx.operations.clear();
+      trx.operations.push_back(uop);
+      PUSH_TX( db, trx, ~0 );
+
+      // Upgrade bob so that he can manage the whitelist
+      upgrade_to_lifetime_member( bob_id );
+
+      // Add bob to the whitelist, but do not add alice
+      account_whitelist_operation wop;
+      wop.authorizing_account = bob_id;
+      wop.account_to_list = bob_id;
+      wop.new_listing = account_whitelist_operation::white_listed;
+      trx.operations.clear();
+      trx.operations.push_back(wop);
+      PUSH_TX( db, trx, ~0 );
+   }
+
+   generate_block();
+
+   // Reproduces bitshares-core issue #972: the whitelist is ignored
+   trx.operations.clear();
+   trx.operations.push_back(op);
+   trx.operations.push_back(op2);
+   trx.operations.push_back(op3);
+   trx.operations.push_back(op4);
+   PUSH_TX( db, trx, ~0 );
+
+   // Apply core-973 hardfork
+   generate_blocks( HARDFORK_CORE_973_TIME );
+   set_expiration( db, trx );
+
+   // Now asset authorization is in effect, Alice is unable to create vesting balances for herself
+   trx.operations.clear();
+   trx.operations.push_back(op);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   // Alice can not create vesting balances for Bob
+   trx.operations.clear();
+   trx.operations.push_back(op2);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   // Bob can not create vesting balances for Alice
+   trx.operations.clear();
+   trx.operations.push_back(op3);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   // Bob can still create vesting balances for himself
+   trx.operations.clear();
+   trx.operations.push_back(op4);
+   PUSH_TX( db, trx, ~0 );
+
+   {
+      // Add Alice to the whitelist
+      account_whitelist_operation wop;
+      wop.authorizing_account = bob_id;
+      wop.account_to_list = alice_id;
+      wop.new_listing = account_whitelist_operation::white_listed;
+      trx.operations.clear();
+      trx.operations.push_back(wop);
+      PUSH_TX( db, trx, ~0 );
+   }
+
+   // Success again
+   trx.operations.clear();
+   trx.operations.push_back(op);
+   trx.operations.push_back(op2);
+   trx.operations.push_back(op3);
+   trx.operations.push_back(op4);
+   PUSH_TX( db, trx, ~0 );
+
+   // And Alice still can not create vesting balances for Cindy
+   vesting_balance_create_operation op5 = op;
+   op5.owner = cindy_id;
+   trx.operations.clear();
+   trx.operations.push_back(op5);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
 { try {
    INVOKE( create_uia );
