@@ -257,7 +257,7 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
       // Adjust the total core in orders accodingly
       if( o.delta_collateral.asset_id == asset_id_type() )
       {
-         d.modify( d.get_account_stats_by_owner( o.funding_account ), [&](account_statistics_object& stats) {
+         d.modify( d.get_account_stats_by_owner( o.funding_account ), [&o](account_statistics_object& stats) {
                stats.total_core_in_orders += o.delta_collateral.amount;
          });
       }
