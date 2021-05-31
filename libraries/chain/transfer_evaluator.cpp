@@ -99,12 +99,16 @@ void_result override_transfer_evaluator::do_evaluate( const override_transfer_op
    const account_object& from_account    = op.from(d);
    const account_object& to_account      = op.to(d);
 
-   FC_ASSERT( is_authorized_asset( d, to_account, asset_type ) );
+   FC_ASSERT( is_authorized_asset( d, to_account, asset_type ),
+              "The to_account is not allowed to transact the asset" );
    // Since hard fork core-2295, do not check asset authorization limitations on from_account for override_transfer
    // TODO code cleanup: if applicable (could be false due to proposals),
    //      remove the check and the assertion below after the hard fork time, keep the comment about reasoning above
    if( !HARDFORK_CORE_2295_PASSED(d.head_block_time()) )
-      FC_ASSERT( is_authorized_asset( d, from_account, asset_type ) );
+   {
+      FC_ASSERT( is_authorized_asset( d, from_account, asset_type ),
+                 "The from_account is not allowed to transact the asset" );
+   }
 
    FC_ASSERT( d.get_balance( from_account, asset_type ).amount >= op.amount.amount,
               "", ("total_transfer",op.amount)("balance",d.get_balance(from_account, asset_type).amount) );

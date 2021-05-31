@@ -1010,6 +1010,15 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
       FC_THROW_EXCEPTION(insufficient_feeds, "Cannot force settle with no price feed.");
    FC_ASSERT( d.get_balance( op.account, op.amount.asset_id ) >= op.amount, "Insufficient balance" );
 
+   // Since hard fork core-973, check asset authorization limitations
+   if( HARDFORK_CORE_973_PASSED(d.head_block_time()) )
+   {
+      FC_ASSERT( is_authorized_asset( d, *fee_paying_account, *asset_to_settle ),
+                 "The account is not allowed to settle the asset" );
+      FC_ASSERT( is_authorized_asset( d, *fee_paying_account, bitasset.options.short_backing_asset(d) ),
+                 "The account is not allowed to receive the backing asset" );
+   }
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
@@ -1240,6 +1249,8 @@ void_result asset_claim_fees_evaluator::do_evaluate( const asset_claim_fees_oper
                  "backed by (${fid}). Asset DDO: ${ddo}. Fee claim: ${claim}.", ("a",container_asset->symbol)
                  ("id",container_asset->id)("fid",o.amount_to_claim.asset_id)("ddo",*container_ddo)
                  ("claim",o.amount_to_claim) );
+      // Note: asset authorization check on (account, collateral asset) is skipped here,
+      //       because it is fine to allow the funds to be moved to account balance
    }
 
    return void_result();

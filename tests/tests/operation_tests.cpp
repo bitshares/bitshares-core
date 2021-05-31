@@ -287,6 +287,490 @@ BOOST_AUTO_TEST_CASE( old_call_order_update_test_after_hardfork_583 )
    }
 }
 
+BOOST_AUTO_TEST_CASE( call_order_update_asset_auth_test )
+{
+   try {
+      generate_blocks( HARDFORK_CORE_973_TIME - fc::days(1) );
+      set_expiration( db, trx );
+
+      ACTORS((dan)(sam));
+
+      const auto& backasset = create_user_issued_asset("BACK", sam, white_list | charge_market_fee);
+      asset_id_type back_id = backasset.id;
+
+      const auto& bitusd = create_bitasset("USDBIT", sam.id, 10, white_list | charge_market_fee, 3, back_id);
+      asset_id_type usd_id = bitusd.id;
+
+      issue_uia( dan_id, backasset.amount(10000000) );
+      issue_uia( sam_id, backasset.amount(10000000) );
+
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed;
+      current_feed.core_exchange_rate = bitusd.amount( 100 ) / asset( 100 );
+      current_feed.settlement_price = bitusd.amount( 100 ) / backasset.amount( 100 );
+      current_feed.maintenance_collateral_ratio = 1750; // need to set explicitly, testnet has a different default
+      publish_feed( bitusd, sam, current_feed );
+
+      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      BOOST_TEST_MESSAGE( "attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      borrow( dan, bitusd.amount(5000), backasset.amount(10000) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, backasset ), 10000000 - 10000 );
+
+      // Make a whitelist
+      {
+         BOOST_TEST_MESSAGE( "Setting up whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         // The whitelist is managed by Sam
+         uop.new_options.whitelist_authorities.insert(sam_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // For BACK
+         uop.asset_to_update = back_id;
+         uop.new_options = back_id(db).options;
+         // The whitelist is managed by Sam
+         uop.new_options.whitelist_authorities.insert(sam_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Upgrade Sam so that he can manage the whitelist
+         upgrade_to_lifetime_member( sam_id );
+
+         // Add Sam to the whitelist, but do not add Dan
+         account_whitelist_operation wop;
+         wop.authorizing_account = sam_id;
+         wop.account_to_list = sam_id;
+         wop.new_listing = account_whitelist_operation::white_listed;
+         trx.operations.clear();
+         trx.operations.push_back(wop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Reproduces bitshares-core issue #973: no asset authorization check thus Dan is able to borrow
+      BOOST_TEST_MESSAGE( "Dan attempting to borrow using 2x collateral at 1:1 price again" );
+      borrow( dan_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, usd_id ), 5000 + 5000);
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, back_id ), 10000000 - 10000 - 10000 );
+
+      // Apply core-973 hardfork
+      generate_blocks( HARDFORK_CORE_973_TIME );
+      set_expiration( db, trx );
+
+      // Update price feed
+      publish_feed( usd_id(db), sam_id(db), current_feed );
+
+      // Sam should be able to borrow, but Dan should be unable to borrow
+      borrow( sam_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, usd_id ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, back_id ), 10000000 - 10000 );
+
+      GRAPHENE_REQUIRE_THROW( borrow( dan_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) ),
+                              fc::exception );
+
+      // Update USDBIT, disable remove whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Disable USDBIT whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         uop.new_options.whitelist_authorities.clear();
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Sam should be able to borrow, but Dan should be unable to borrow
+      borrow( sam_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) );
+      GRAPHENE_REQUIRE_THROW( borrow( dan_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) ),
+                              fc::exception );
+
+      // Update BACK, disable whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Disable BACK whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = back_id;
+         uop.new_options = back_id(db).options;
+         uop.new_options.whitelist_authorities.clear();
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Both Sam and Dan should be able to borrow
+      borrow( sam_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) );
+      borrow( dan_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) );
+
+      // Update USDBIT, enable whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Enable USDBIT whitelisting again" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         uop.new_options.whitelist_authorities.insert( sam_id );
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Sam should be able to borrow, but Dan should be unable to borrow
+      borrow( sam_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) );
+      GRAPHENE_REQUIRE_THROW( borrow( dan_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) ),
+                              fc::exception );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( asset_settle_operation_asset_auth_test )
+{
+   try {
+      generate_blocks( HARDFORK_CORE_973_TIME - fc::days(1) );
+      set_expiration( db, trx );
+
+      ACTORS((dan)(sam));
+
+      const auto& backasset = create_user_issued_asset("BACK", sam, white_list | charge_market_fee);
+      asset_id_type back_id = backasset.id;
+
+      const auto& bitusd = create_bitasset("USDBIT", sam.id, 10, white_list | charge_market_fee, 3, back_id);
+      asset_id_type usd_id = bitusd.id;
+
+      issue_uia( dan_id, backasset.amount(10000000) );
+      issue_uia( sam_id, backasset.amount(10000000) );
+
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed;
+      current_feed.core_exchange_rate = bitusd.amount( 100 ) / asset( 100 );
+      current_feed.settlement_price = bitusd.amount( 100 ) / backasset.amount( 100 );
+      current_feed.maintenance_collateral_ratio = 1750; // need to set explicitly, testnet has a different default
+      publish_feed( bitusd, sam, current_feed );
+
+      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      BOOST_TEST_MESSAGE( "attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      borrow( dan, bitusd.amount(5000), backasset.amount(10000) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, backasset ), 10000000 - 10000 );
+
+      transfer( dan, sam, bitusd.amount(2000) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, usd_id ), 3000 );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, usd_id ), 2000 );
+
+      // Make a whitelist
+      {
+         BOOST_TEST_MESSAGE( "Setting up whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         // The whitelist is managed by Sam
+         uop.new_options.whitelist_authorities.insert(sam_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // For BACK
+         uop.asset_to_update = back_id;
+         uop.new_options = back_id(db).options;
+         // The whitelist is managed by Sam
+         uop.new_options.whitelist_authorities.insert(sam_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Upgrade Sam so that he can manage the whitelist
+         upgrade_to_lifetime_member( sam_id );
+
+         // Add Sam to the whitelist, but do not add Dan
+         account_whitelist_operation wop;
+         wop.authorizing_account = sam_id;
+         wop.account_to_list = sam_id;
+         wop.new_listing = account_whitelist_operation::white_listed;
+         trx.operations.clear();
+         trx.operations.push_back(wop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Reproduces bitshares-core issue #973: no asset authorization check thus Dan is able to force-settle
+      BOOST_TEST_MESSAGE( "Dan and Sam attempting to force-settle" );
+      force_settle( dan_id(db), usd_id(db).amount(100) );
+      force_settle( sam_id(db), usd_id(db).amount(100) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, usd_id ), 2900 );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, usd_id ), 1900 );
+
+      // Apply core-973 hardfork
+      BOOST_TEST_MESSAGE( "Apply core-973 hardfork" );
+      generate_blocks( HARDFORK_CORE_973_TIME );
+      set_expiration( db, trx );
+
+      // Update price feed
+      publish_feed( usd_id(db), sam_id(db), current_feed );
+
+      // Sam should be able to force-settle, but Dan should be unable to force-settle
+      BOOST_TEST_MESSAGE( "Dan and Sam attempting to force-settle again" );
+      GRAPHENE_REQUIRE_THROW( force_settle( dan_id(db), usd_id(db).amount(100) ), fc::exception );
+      force_settle( sam_id(db), usd_id(db).amount(100) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, usd_id ), 2900 );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, usd_id ), 1800 );
+
+      // Update USDBIT, disable remove whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Disable USDBIT whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         uop.new_options.whitelist_authorities.clear();
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Sam should be able to force-settle, but Dan should be unable to force-settle
+      GRAPHENE_REQUIRE_THROW( force_settle( dan_id(db), usd_id(db).amount(100) ), fc::exception );
+      force_settle( sam_id(db), usd_id(db).amount(100) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, usd_id ), 2900 );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, usd_id ), 1700 );
+
+      // Update BACK, disable whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Disable BACK whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = back_id;
+         uop.new_options = back_id(db).options;
+         uop.new_options.whitelist_authorities.clear();
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Both Sam and Dan should be able to force-settle
+      force_settle( dan_id(db), usd_id(db).amount(100) );
+      force_settle( sam_id(db), usd_id(db).amount(100) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, usd_id ), 2800 );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, usd_id ), 1600 );
+
+      // Update USDBIT, enable whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Enable USDBIT whitelisting again" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         uop.new_options.whitelist_authorities.insert( sam_id );
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Sam should be able to force-settle, but Dan should be unable to force-settle
+      GRAPHENE_REQUIRE_THROW( force_settle( dan_id(db), usd_id(db).amount(100) ), fc::exception );
+      force_settle( sam_id(db), usd_id(db).amount(100) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, usd_id ), 2800 );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, usd_id ), 1500 );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( bid_collateral_operation_asset_auth_test )
+{
+   try {
+      generate_blocks( HARDFORK_CORE_973_TIME - fc::days(1) );
+      set_expiration( db, trx );
+
+      ACTORS((dan)(sam));
+
+      const auto& backasset = create_user_issued_asset("BACK", sam, white_list | charge_market_fee);
+      asset_id_type back_id = backasset.id;
+
+      const auto& bitusd = create_bitasset("USDBIT", sam.id, 10, white_list | charge_market_fee, 3, back_id);
+      asset_id_type usd_id = bitusd.id;
+
+      issue_uia( dan_id, backasset.amount(10000000) );
+      issue_uia( sam_id, backasset.amount(10000000) );
+
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed;
+      current_feed.core_exchange_rate = bitusd.amount( 100 ) / asset( 100 );
+      current_feed.settlement_price = bitusd.amount( 100 ) / backasset.amount( 100 );
+      current_feed.maintenance_collateral_ratio = 1750; // need to set explicitly, testnet has a different default
+      publish_feed( bitusd, sam, current_feed );
+
+      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      BOOST_TEST_MESSAGE( "attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      borrow( dan, bitusd.amount(5000), backasset.amount(10000) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, backasset ), 10000000 - 10000 );
+
+      // Make a whitelist
+      {
+         BOOST_TEST_MESSAGE( "Setting up whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         // The whitelist is managed by Sam
+         uop.new_options.whitelist_authorities.insert(sam_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // For BACK
+         uop.asset_to_update = back_id;
+         uop.new_options = back_id(db).options;
+         // The whitelist is managed by Sam
+         uop.new_options.whitelist_authorities.insert(sam_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Upgrade Sam so that he can manage the whitelist
+         upgrade_to_lifetime_member( sam_id );
+
+         // Add Sam to the whitelist, but do not add Dan
+         account_whitelist_operation wop;
+         wop.authorizing_account = sam_id;
+         wop.account_to_list = sam_id;
+         wop.new_listing = account_whitelist_operation::white_listed;
+         trx.operations.clear();
+         trx.operations.push_back(wop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Trigger a black swan event, globally settle USDBIT
+      BOOST_TEST_MESSAGE( "Trigger a black swan event" );
+      current_feed.settlement_price = bitusd.amount( 10 ) / backasset.amount( 100 );
+      publish_feed( bitusd, sam, current_feed );
+      BOOST_REQUIRE( bitusd.bitasset_data(db).has_settlement() );
+
+      // Reproduces bitshares-core issue #973: no asset authorization check thus Dan is able to bid collateral
+      BOOST_TEST_MESSAGE( "Dan and Sam attempting to bid collateral" );
+      bid_collateral( dan_id(db), back_id(db).amount(1), usd_id(db).amount(100) );
+      bid_collateral( sam_id(db), back_id(db).amount(1), usd_id(db).amount(100) );
+
+      // Apply core-973 hardfork
+      BOOST_TEST_MESSAGE( "Apply core-973 hardfork" );
+      generate_blocks( HARDFORK_CORE_973_TIME );
+      set_expiration( db, trx );
+
+      // Update price feed
+      publish_feed( usd_id(db), sam_id(db), current_feed );
+
+      // Sam should be able to bid collateral, but Dan should be unable to bid
+      BOOST_TEST_MESSAGE( "Dan and Sam attempting to bid collateral again" );
+      GRAPHENE_REQUIRE_THROW( bid_collateral( dan_id(db), back_id(db).amount(2), usd_id(db).amount(200) ),
+                              fc::exception );
+      bid_collateral( sam_id(db), back_id(db).amount(2), usd_id(db).amount(200) );
+
+      // Update USDBIT, disable remove whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Disable USDBIT whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         uop.new_options.whitelist_authorities.clear();
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Sam should be able to bid collateral, but Dan should be unable to bid
+      GRAPHENE_REQUIRE_THROW( bid_collateral( dan_id(db), back_id(db).amount(3), usd_id(db).amount(300) ),
+                              fc::exception );
+      bid_collateral( sam_id(db), back_id(db).amount(3), usd_id(db).amount(300) );
+
+      // Update BACK, disable whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Disable BACK whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = back_id;
+         uop.new_options = back_id(db).options;
+         uop.new_options.whitelist_authorities.clear();
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Both Sam and Dan should be able to bid collateral
+      bid_collateral( dan_id(db), back_id(db).amount(4), usd_id(db).amount(400) );
+      bid_collateral( sam_id(db), back_id(db).amount(4), usd_id(db).amount(400) );
+
+      // Update USDBIT, enable whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Enable USDBIT whitelisting again" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         uop.new_options.whitelist_authorities.insert( sam_id );
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Sam should be able to bid collateral, but Dan should be unable to bid
+      GRAPHENE_REQUIRE_THROW( bid_collateral( dan_id(db), back_id(db).amount(5), usd_id(db).amount(500) ),
+                              fc::exception );
+      bid_collateral( sam_id(db), back_id(db).amount(5), usd_id(db).amount(500) );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( asset_settle_cancel_operation_test_after_hf588 )
 {
    set_expiration( db, trx );
@@ -2806,6 +3290,148 @@ BOOST_AUTO_TEST_CASE( vesting_balance_create_test )
    op.amount = core.amount( 1000 );
    REQUIRE_OP_EVALUATION_SUCCESS( op, owner, alice_account.get_id() );
    REQUIRE_OP_EVALUATION_SUCCESS( op, owner,   bob_account.get_id() );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( vesting_balance_create_asset_auth_test )
+{ try {
+   INVOKE( create_uia );
+
+   generate_block();
+
+   ACTORS( (alice)(bob)(cindy) );
+
+   const asset_object& test_asset = get_asset(UIA_TEST_SYMBOL);
+
+   issue_uia( alice, test_asset.amount( 10000 ) );
+   issue_uia( bob, test_asset.amount( 10000 ) );
+
+   // Success when no whitelist configured
+   vesting_balance_create_operation op;
+   op.creator = alice_id;
+   op.owner = alice_id;
+   op.amount = test_asset.amount( 100 );
+   op.policy = cdd_vesting_policy_initializer{ 60*60*24 };
+
+   trx.operations.clear();
+   trx.operations.push_back(op);
+   PUSH_TX( db, trx, ~0 );
+
+   vesting_balance_create_operation op2 = op;
+   op2.owner = bob_id;
+   trx.operations.clear();
+   trx.operations.push_back(op2);
+   PUSH_TX( db, trx, ~0 );
+
+   vesting_balance_create_operation op3 = op;
+   op3.creator = bob_id;
+   trx.operations.clear();
+   trx.operations.push_back(op3);
+   PUSH_TX( db, trx, ~0 );
+
+   vesting_balance_create_operation op4 = op;
+   op4.creator = bob_id;
+   op4.owner = bob_id;
+   trx.operations.clear();
+   trx.operations.push_back(op4);
+   PUSH_TX( db, trx, ~0 );
+
+   generate_block();
+
+   // Make a whitelist
+   {
+      BOOST_TEST_MESSAGE( "Setting up whitelisting" );
+      asset_update_operation uop;
+      uop.issuer = test_asset.issuer;
+      uop.asset_to_update = test_asset.id;
+      uop.new_options = test_asset.options;
+
+      // Enable whitelisting
+      uop.new_options.flags = white_list | charge_market_fee;
+      trx.operations.clear();
+      trx.operations.push_back(uop);
+      PUSH_TX( db, trx, ~0 );
+
+      // The whitelist is managed by bob
+      uop.new_options.whitelist_authorities.insert(bob_id);
+      trx.operations.clear();
+      trx.operations.push_back(uop);
+      PUSH_TX( db, trx, ~0 );
+
+      // Upgrade bob so that he can manage the whitelist
+      upgrade_to_lifetime_member( bob_id );
+
+      // Add bob to the whitelist, but do not add alice
+      account_whitelist_operation wop;
+      wop.authorizing_account = bob_id;
+      wop.account_to_list = bob_id;
+      wop.new_listing = account_whitelist_operation::white_listed;
+      trx.operations.clear();
+      trx.operations.push_back(wop);
+      PUSH_TX( db, trx, ~0 );
+   }
+
+   generate_block();
+
+   // Reproduces bitshares-core issue #972: the whitelist is ignored
+   trx.operations.clear();
+   trx.operations.push_back(op);
+   trx.operations.push_back(op2);
+   trx.operations.push_back(op3);
+   trx.operations.push_back(op4);
+   PUSH_TX( db, trx, ~0 );
+
+   // Apply core-973 hardfork
+   generate_blocks( HARDFORK_CORE_973_TIME );
+   set_expiration( db, trx );
+
+   // Now asset authorization is in effect, Alice is unable to create vesting balances for herself
+   trx.operations.clear();
+   trx.operations.push_back(op);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   // Alice can not create vesting balances for Bob
+   trx.operations.clear();
+   trx.operations.push_back(op2);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   // Bob can not create vesting balances for Alice
+   trx.operations.clear();
+   trx.operations.push_back(op3);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   // Bob can still create vesting balances for himself
+   trx.operations.clear();
+   trx.operations.push_back(op4);
+   PUSH_TX( db, trx, ~0 );
+
+   {
+      // Add Alice to the whitelist
+      account_whitelist_operation wop;
+      wop.authorizing_account = bob_id;
+      wop.account_to_list = alice_id;
+      wop.new_listing = account_whitelist_operation::white_listed;
+      trx.operations.clear();
+      trx.operations.push_back(wop);
+      PUSH_TX( db, trx, ~0 );
+   }
+
+   // Success again
+   trx.operations.clear();
+   trx.operations.push_back(op);
+   trx.operations.push_back(op2);
+   trx.operations.push_back(op3);
+   trx.operations.push_back(op4);
+   PUSH_TX( db, trx, ~0 );
+
+   // And Alice still can not create vesting balances for Cindy
+   vesting_balance_create_operation op5 = op;
+   op5.owner = cindy_id;
+   trx.operations.clear();
+   trx.operations.push_back(op5);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   generate_block();
+
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )

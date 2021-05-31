@@ -184,7 +184,7 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 
    auto next_maintenance_time = d.get_dynamic_global_properties().next_maintenance_time;
 
-   _paying_account = &o.funding_account(d);
+   // Note: funding_account is the fee payer thus exists in the database
    _debt_asset     = &o.delta_debt.asset_id(d);
    FC_ASSERT( _debt_asset->is_market_issued(), "Unable to cover ${sym} as it is not a collateralized asset.",
               ("sym", _debt_asset->symbol) );
@@ -220,6 +220,15 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    else if( _bitasset_data->current_feed.settlement_price.is_null() )
       FC_THROW_EXCEPTION(insufficient_feeds, "Cannot borrow asset with no price feed.");
 
+   // Since hard fork core-973, check asset authorization limitations
+   if( HARDFORK_CORE_973_PASSED(d.head_block_time()) )
+   {
+      FC_ASSERT( is_authorized_asset( d, *fee_paying_account, *_debt_asset ),
+                 "The account is not allowed to transact the debt asset" );
+      FC_ASSERT( is_authorized_asset( d, *fee_paying_account, _bitasset_data->options.short_backing_asset(d) ),
+                 "The account is not allowed to transact the collateral asset" );
+   }
+
    // Note: there was code here checking whether the account has enough balance to increase delta collateral,
    //       which is now removed since the check is implicitly done later by `adjust_balance()` in `do_apply()`.
 
@@ -248,7 +257,7 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
       // Adjust the total core in orders accodingly
       if( o.delta_collateral.asset_id == asset_id_type() )
       {
-         d.modify(_paying_account->statistics(d), [&](account_statistics_object& stats) {
+         d.modify( d.get_account_stats_by_owner( o.funding_account ), [&o](account_statistics_object& stats) {
                stats.total_core_in_orders += o.delta_collateral.amount;
          });
       }
@@ -398,7 +407,7 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
 
    FC_ASSERT( d.head_block_time() > HARDFORK_CORE_216_TIME, "Not yet!" );
 
-   _paying_account = &o.bidder(d);
+   // Note: bidder is the fee payer thus exists in the database
    _debt_asset     = &o.debt_covered.asset_id(d);
    FC_ASSERT( _debt_asset->is_market_issued(), "Unable to cover ${sym} as it is not a collateralized asset.",
               ("sym", _debt_asset->symbol) );
@@ -421,18 +430,27 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
 
    if( o.additional_collateral.amount > 0 )
    {
+      auto collateral_balance = d.get_balance( o.bidder, _bitasset_data->options.short_backing_asset );
       if( _bid && d.head_block_time() >= HARDFORK_CORE_1692_TIME ) // TODO: see if HF check can be removed after HF
       {
          asset delta = o.additional_collateral - _bid->get_additional_collateral();
-         FC_ASSERT( d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)) >= delta,
+         FC_ASSERT( collateral_balance >= delta,
                     "Cannot increase bid from ${oc} to ${nc} collateral when payer only has ${b}",
                     ("oc", _bid->get_additional_collateral().amount)("nc", o.additional_collateral.amount)
-                    ("b", d.get_balance(*_paying_account, o.additional_collateral.asset_id(d)).amount) );
+                    ("b", collateral_balance.amount) );
       } else
-         FC_ASSERT( d.get_balance( *_paying_account,
-                                   _bitasset_data->options.short_backing_asset(d) ) >= o.additional_collateral,
+         FC_ASSERT( collateral_balance >= o.additional_collateral,
                     "Cannot bid ${c} collateral when payer only has ${b}", ("c", o.additional_collateral.amount)
-                    ("b", d.get_balance(*_paying_account, o.additional_collateral.asset_id(d)).amount) );
+                    ("b", collateral_balance.amount) );
+   }
+
+   // Since hard fork core-973, check asset authorization limitations
+   if( HARDFORK_CORE_973_PASSED(d.head_block_time()) )
+   {
+      FC_ASSERT( is_authorized_asset( d, *fee_paying_account, *_debt_asset ),
+                 "The account is not allowed to transact the debt asset" );
+      FC_ASSERT( is_authorized_asset( d, *fee_paying_account, _bitasset_data->options.short_backing_asset(d) ),
+                 "The account is not allowed to transact the collateral asset" );
    }
 
    return void_result();
