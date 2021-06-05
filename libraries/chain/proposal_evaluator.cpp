@@ -159,6 +159,18 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!op.new_parameters.current_fees->exists<liquidity_pool_exchange_operation>(),
                    "Unable to define fees for liquidity pool operations prior to the LP hardfork");
       }
+      if (!HARDFORK_CORE_2351_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.current_fees->exists<samet_fund_create_operation>(),
+                   "Unable to define fees for samet fund operations prior to the core-2351 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<samet_fund_delete_operation>(),
+                   "Unable to define fees for samet fund operations prior to the core-2351 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<samet_fund_update_operation>(),
+                   "Unable to define fees for samet fund operations prior to the core-2351 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<samet_fund_borrow_operation>(),
+                   "Unable to define fees for samet fund operations prior to the core-2351 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<samet_fund_repay_operation>(),
+                   "Unable to define fees for samet fund operations prior to the core-2351 hardfork");
+      }
    }
    void operator()(const graphene::chain::htlc_create_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
@@ -208,6 +220,21 @@ struct proposal_operation_hardfork_visitor
    }
    void operator()(const graphene::chain::liquidity_pool_exchange_operation &op) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
+   }
+   void operator()(const graphene::chain::samet_fund_create_operation &op) const {
+      FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
+   }
+   void operator()(const graphene::chain::samet_fund_delete_operation &op) const {
+      FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
+   }
+   void operator()(const graphene::chain::samet_fund_update_operation &op) const {
+      FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
+   }
+   void operator()(const graphene::chain::samet_fund_borrow_operation &op) const {
+      FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
+   }
+   void operator()(const graphene::chain::samet_fund_repay_operation &op) const {
+      FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
    }
 
    // loop and self visit in proposals

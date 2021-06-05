@@ -317,6 +317,7 @@ GRAPHENE_DEFINE_IDS(protocol, protocol_ids, /*protocol objects are not prefixed*
                     /* 1.17.x */ (custom_authority)
                     /* 1.18.x */ (ticket)
                     /* 1.19.x */ (liquidity_pool)
+                    /* 1.20.x */ (samet_fund)
                    )
 
 FC_REFLECT(graphene::protocol::public_key_type, (key_data))

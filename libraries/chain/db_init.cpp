@@ -40,6 +40,7 @@
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/samet_fund_object.hpp>
 #include <graphene/chain/special_authority_object.hpp>
 #include <graphene/chain/ticket_object.hpp>
 #include <graphene/chain/transaction_history_object.hpp>
@@ -61,6 +62,7 @@
 #include <graphene/chain/liquidity_pool_evaluator.hpp>
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/proposal_evaluator.hpp>
+#include <graphene/chain/samet_fund_evaluator.hpp>
 #include <graphene/chain/ticket_evaluator.hpp>
 #include <graphene/chain/transfer_evaluator.hpp>
 #include <graphene/chain/vesting_balance_evaluator.hpp>
@@ -136,6 +138,11 @@ void database::initialize_evaluators()
    register_evaluator<liquidity_pool_deposit_evaluator>();
    register_evaluator<liquidity_pool_withdraw_evaluator>();
    register_evaluator<liquidity_pool_exchange_evaluator>();
+   register_evaluator<samet_fund_create_evaluator>();
+   register_evaluator<samet_fund_delete_evaluator>();
+   register_evaluator<samet_fund_update_evaluator>();
+   register_evaluator<samet_fund_borrow_evaluator>();
+   register_evaluator<samet_fund_repay_evaluator>();
 }
 
 void database::initialize_indexes()
@@ -162,6 +169,7 @@ void database::initialize_indexes()
    add_index< primary_index< custom_authority_index> >();
    add_index< primary_index<ticket_index> >();
    add_index< primary_index<liquidity_pool_index> >();
+   add_index< primary_index<samet_fund_index> >();
 
    //Implementation object indexes
    add_index< primary_index<transaction_index                             > >();

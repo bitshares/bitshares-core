@@ -23,6 +23,7 @@ list(APPEND SOURCES account.cpp
                     custom.cpp
                     market.cpp
                     liquidity_pool.cpp
+                    samet_fund.cpp
                     ticket.cpp
                     operations.cpp
                     pts_address.cpp

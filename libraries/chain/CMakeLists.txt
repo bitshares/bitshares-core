@@ -37,6 +37,7 @@ add_library( graphene_chain
 
              evaluator.cpp
              liquidity_pool_evaluator.cpp
+             samet_fund_evaluator.cpp
              balance_evaluator.cpp
              account_evaluator.cpp
              assert_evaluator.cpp

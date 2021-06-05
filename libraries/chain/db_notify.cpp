@@ -19,6 +19,7 @@
 #include <graphene/chain/custom_authority_object.hpp>
 #include <graphene/chain/ticket_object.hpp>
 #include <graphene/chain/liquidity_pool_object.hpp>
+#include <graphene/chain/samet_fund_object.hpp>
 #include <graphene/chain/impacted.hpp>
 #include <graphene/chain/hardfork.hpp>
 
@@ -335,6 +336,26 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // account
    }
+   void operator()( const samet_fund_create_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // owner_account
+   }
+   void operator()( const samet_fund_delete_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // owner_account
+   }
+   void operator()( const samet_fund_update_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // owner_account
+   }
+   void operator()( const samet_fund_borrow_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // borrower
+   }
+   void operator()( const samet_fund_repay_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+   }
 };
 
 } // namespace detail
@@ -447,6 +468,11 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
            break;
         } case liquidity_pool_object_type:{
            // no account info in the object although it does have an owner
+           break;
+        } case samet_fund_object_type:{
+           const auto* aobj = dynamic_cast<const samet_fund_object*>( obj );
+           FC_ASSERT( aobj != nullptr );
+           accounts.insert( aobj->owner_account );
            break;
         }
       }

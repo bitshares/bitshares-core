@@ -31,6 +31,7 @@
 #include <graphene/chain/operation_history_object.hpp>
 
 #include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/samet_fund_object.hpp>
 #include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/exceptions.hpp>
@@ -342,6 +343,10 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
       auto session = _undo_db.start_undo_session(true);
       for( auto& op : proposal.proposed_transaction.operations )
          eval_state.operation_results.emplace_back(apply_operation(eval_state, op));
+      // Make sure there is no unpaid samet fund debt
+      const auto& samet_fund_idx = get_index_type<samet_fund_index>().indices().get<by_unpaid>();
+      FC_ASSERT( samet_fund_idx.empty() || samet_fund_idx.begin()->unpaid_amount == 0,
+                 "Unpaid SameT Fund debt detected" );
       remove(proposal);
       session.merge();
    } catch ( const fc::exception& e ) {
@@ -747,6 +752,11 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
       ++_current_op_in_trx;
    }
    ptrx.operation_results = std::move(eval_state.operation_results);
+
+   // Make sure there is no unpaid samet fund debt
+   const auto& samet_fund_idx = get_index_type<samet_fund_index>().indices().get<by_unpaid>();
+   FC_ASSERT( samet_fund_idx.empty() || samet_fund_idx.begin()->unpaid_amount == 0,
+              "Unpaid SameT Fund debt detected" );
 
    return ptrx;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }
