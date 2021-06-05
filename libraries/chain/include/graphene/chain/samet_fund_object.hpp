@@ -30,8 +30,6 @@
 
 namespace graphene { namespace chain {
 
-using namespace graphene::db;
-
 /**
  *  @brief A SameT Fund is a fund which can be used by a borrower and have to be repaid in the same transaction
  *  @ingroup object
