@@ -30,6 +30,8 @@ namespace graphene { namespace protocol {
    /**
     * @brief Create a new SameT Fund object
     * @ingroup operations
+    *
+    * A SameT Fund is a fund which can be used by a borrower and have to be repaid in the same transaction.
     */
    struct samet_fund_create_operation : public base_operation
    {
@@ -39,7 +41,7 @@ namespace graphene { namespace protocol {
       account_id_type owner_account;         ///< Owner of the fund
       asset_id_type   asset_type;            ///< Asset type in the fund
       share_type      balance;               ///< Usable amount in the fund
-      uint32_t        fee_rate = 0;          ///< Fee rate
+      uint32_t        fee_rate = 0;          ///< Fee rate, the demominator is GRAPHENE_SAMET_FUND_FEE_DENOM
 
       extensions_type extensions;  ///< Unused. Reserved for future use.
 
