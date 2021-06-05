@@ -37,8 +37,8 @@ namespace graphene { namespace chain {
       public:
          using operation_type = samet_fund_create_operation;
 
-         void_result do_evaluate( const samet_fund_create_operation& op );
-         object_id_type do_apply( const samet_fund_create_operation& op );
+         void_result do_evaluate( const samet_fund_create_operation& op ) const;
+         object_id_type do_apply( const samet_fund_create_operation& op ) const;
    };
 
    class samet_fund_delete_evaluator : public evaluator<samet_fund_delete_evaluator>
@@ -47,7 +47,7 @@ namespace graphene { namespace chain {
          using operation_type = samet_fund_delete_operation;
 
          void_result do_evaluate( const samet_fund_delete_operation& op );
-         void_result do_apply( const samet_fund_delete_operation& op );
+         void_result do_apply( const samet_fund_delete_operation& op ) const;
 
          const samet_fund_object* _fund = nullptr;
    };
@@ -58,7 +58,7 @@ namespace graphene { namespace chain {
          using operation_type = samet_fund_update_operation;
 
          void_result do_evaluate( const samet_fund_update_operation& op );
-         void_result do_apply( const samet_fund_update_operation& op );
+         void_result do_apply( const samet_fund_update_operation& op ) const;
 
          const samet_fund_object* _fund = nullptr;
    };
@@ -69,7 +69,7 @@ namespace graphene { namespace chain {
          using operation_type = samet_fund_borrow_operation;
 
          void_result do_evaluate( const samet_fund_borrow_operation& op );
-         void_result do_apply( const samet_fund_borrow_operation& op );
+         void_result do_apply( const samet_fund_borrow_operation& op ) const;
 
          const samet_fund_object* _fund = nullptr;
    };
@@ -80,7 +80,7 @@ namespace graphene { namespace chain {
          using operation_type = samet_fund_repay_operation;
 
          void_result do_evaluate( const samet_fund_repay_operation& op );
-         void_result do_apply( const samet_fund_repay_operation& op );
+         void_result do_apply( const samet_fund_repay_operation& op ) const;
 
          const samet_fund_object* _fund = nullptr;
    };

@@ -35,7 +35,7 @@
 
 namespace graphene { namespace chain {
 
-void_result samet_fund_create_evaluator::do_evaluate(const samet_fund_create_operation& op)
+void_result samet_fund_create_evaluator::do_evaluate(const samet_fund_create_operation& op) const
 { try {
    const database& d = db();
    const auto block_time = d.head_block_time();
@@ -48,7 +48,7 @@ void_result samet_fund_create_evaluator::do_evaluate(const samet_fund_create_ope
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
-object_id_type samet_fund_create_evaluator::do_apply(const samet_fund_create_operation& op)
+object_id_type samet_fund_create_evaluator::do_apply(const samet_fund_create_operation& op) const
 { try {
    database& d = db();
 
@@ -79,7 +79,7 @@ void_result samet_fund_delete_evaluator::do_evaluate(const samet_fund_delete_ope
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
-void_result samet_fund_delete_evaluator::do_apply(const samet_fund_delete_operation& op)
+void_result samet_fund_delete_evaluator::do_apply(const samet_fund_delete_operation& op) const
 { try {
    database& d = db();
 
@@ -125,7 +125,7 @@ void_result samet_fund_update_evaluator::do_evaluate(const samet_fund_update_ope
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
-void_result samet_fund_update_evaluator::do_apply( const samet_fund_update_operation& op)
+void_result samet_fund_update_evaluator::do_apply( const samet_fund_update_operation& op) const
 { try {
    database& d = db();
 
@@ -162,7 +162,7 @@ void_result samet_fund_borrow_evaluator::do_evaluate(const samet_fund_borrow_ope
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
-void_result samet_fund_borrow_evaluator::do_apply( const samet_fund_borrow_operation& op)
+void_result samet_fund_borrow_evaluator::do_apply( const samet_fund_borrow_operation& op) const
 { try {
    database& d = db();
 
@@ -202,7 +202,7 @@ void_result samet_fund_repay_evaluator::do_evaluate(const samet_fund_repay_opera
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
-void_result samet_fund_repay_evaluator::do_apply( const samet_fund_repay_operation& op)
+void_result samet_fund_repay_evaluator::do_apply( const samet_fund_repay_operation& op) const
 { try {
    database& d = db();
 
