@@ -29,7 +29,7 @@ namespace graphene { namespace protocol {
 
 using result_type = object_restriction_predicate<operation>;
 
-result_type get_restriction_predicate_list_2(size_t idx, vector<restriction> rs) {
+result_type get_restriction_pred_list_2(size_t idx, vector<restriction> rs) {
    return typelist::runtime::dispatch(operation_list_2::list(), idx, [&rs] (auto t) -> result_type {
       using Op = typename decltype(t)::type;
       return [p=restrictions_to_predicate<Op>(std::move(rs), true)] (const operation& op) {
