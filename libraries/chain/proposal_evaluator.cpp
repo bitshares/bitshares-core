@@ -185,10 +185,10 @@ struct proposal_operation_hardfork_visitor
                "HASH160 unavailable until after HARDFORK BSIP64" );   
       }
    }
-   void operator()(const graphene::chain::htlc_redeem_operation &op) const {
+   void operator()(const graphene::chain::htlc_redeem_operation&) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
    }
-   void operator()(const graphene::chain::htlc_extend_operation &op) const {
+   void operator()(const graphene::chain::htlc_extend_operation&) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
    }
    void operator()(const graphene::chain::custom_authority_create_operation&) const {
@@ -200,40 +200,40 @@ struct proposal_operation_hardfork_visitor
    void operator()(const graphene::chain::custom_authority_delete_operation&) const {
       FC_ASSERT( HARDFORK_BSIP_40_PASSED(block_time), "Not allowed until hardfork BSIP 40" );
    }
-   void operator()(const graphene::chain::ticket_create_operation &op) const {
+   void operator()(const graphene::chain::ticket_create_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2103_PASSED(block_time), "Not allowed until hardfork 2103" );
    }
-   void operator()(const graphene::chain::ticket_update_operation &op) const {
+   void operator()(const graphene::chain::ticket_update_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2103_PASSED(block_time), "Not allowed until hardfork 2103" );
    }
-   void operator()(const graphene::chain::liquidity_pool_create_operation &op) const {
+   void operator()(const graphene::chain::liquidity_pool_create_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
    }
-   void operator()(const graphene::chain::liquidity_pool_delete_operation &op) const {
+   void operator()(const graphene::chain::liquidity_pool_delete_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
    }
-   void operator()(const graphene::chain::liquidity_pool_deposit_operation &op) const {
+   void operator()(const graphene::chain::liquidity_pool_deposit_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
    }
-   void operator()(const graphene::chain::liquidity_pool_withdraw_operation &op) const {
+   void operator()(const graphene::chain::liquidity_pool_withdraw_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
    }
-   void operator()(const graphene::chain::liquidity_pool_exchange_operation &op) const {
+   void operator()(const graphene::chain::liquidity_pool_exchange_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
    }
-   void operator()(const graphene::chain::samet_fund_create_operation &op) const {
+   void operator()(const graphene::chain::samet_fund_create_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
    }
-   void operator()(const graphene::chain::samet_fund_delete_operation &op) const {
+   void operator()(const graphene::chain::samet_fund_delete_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
    }
-   void operator()(const graphene::chain::samet_fund_update_operation &op) const {
+   void operator()(const graphene::chain::samet_fund_update_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
    }
-   void operator()(const graphene::chain::samet_fund_borrow_operation &op) const {
+   void operator()(const graphene::chain::samet_fund_borrow_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
    }
-   void operator()(const graphene::chain::samet_fund_repay_operation &op) const {
+   void operator()(const graphene::chain::samet_fund_repay_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
    }
 

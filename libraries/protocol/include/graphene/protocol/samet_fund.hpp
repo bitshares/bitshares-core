@@ -46,7 +46,7 @@ namespace graphene { namespace protocol {
       extensions_type extensions;  ///< Unused. Reserved for future use.
 
       account_id_type fee_payer()const { return owner_account; }
-      void            validate()const;
+      void            validate()const override;
    };
 
    /**
@@ -64,7 +64,7 @@ namespace graphene { namespace protocol {
       extensions_type extensions;  ///< Unused. Reserved for future use.
 
       account_id_type fee_payer()const { return owner_account; }
-      void            validate()const;
+      void            validate()const override;
    };
 
    /**
@@ -84,7 +84,7 @@ namespace graphene { namespace protocol {
       extensions_type extensions;  ///< Unused. Reserved for future use.
 
       account_id_type fee_payer()const { return owner_account; }
-      void            validate()const;
+      void            validate()const override;
    };
 
    /**
@@ -103,7 +103,7 @@ namespace graphene { namespace protocol {
       extensions_type extensions;  ///< Unused. Reserved for future use.
 
       account_id_type fee_payer()const { return borrower; }
-      void            validate()const;
+      void            validate()const override;
    };
 
    /**
@@ -123,7 +123,7 @@ namespace graphene { namespace protocol {
       extensions_type extensions;  ///< Unused. Reserved for future use.
 
       account_id_type fee_payer()const { return account; }
-      void            validate()const;
+      void            validate()const override;
    };
 
 } } // graphene::protocol
