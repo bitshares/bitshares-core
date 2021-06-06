@@ -183,3 +183,17 @@ jobs:
       run: |
         sonar-scanner \
            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+    - name: Cleanup
+      run: |
+        df -h
+        echo "Final cleanup"
+        rm -rf _build/programs/witness_node/witness_node
+        rm -rf _build/programs/cli_wallet/cli_wallet
+        rm -rf _build/programs/network_mapper/network_mapper
+        rm -rf _build/programs/js_operation_serializer/js_operation_serializer
+        rm -rf _build/programs/genesis_util/get_dev_key
+        rm -rf _build/tests/app_test
+        rm -rf _build/tests/chain_test
+        rm -rf _build/tests/cli_test
+        rm -rf _build/tests/es_test
+        df -h
