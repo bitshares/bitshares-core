@@ -57,14 +57,16 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    _undo_db.disable();
    struct auth_inhibitor {
-      auth_inhibitor(database& db) : db(db), old_flags(db.node_properties().skip_flags)
+      explicit auth_inhibitor(database& db) : db(db), old_flags(db.node_properties().skip_flags)
       { db.node_properties().skip_flags |= skip_transaction_signatures; }
       ~auth_inhibitor()
       { db.node_properties().skip_flags = old_flags; }
+      auth_inhibitor(const auth_inhibitor&) = delete;
    private:
       database& db;
       uint32_t old_flags;
-   } inhibitor(*this);
+   };
+   auth_inhibitor inhibitor(*this);
 
    transaction_evaluation_state genesis_eval_state(this);
 
@@ -74,7 +76,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       b.balance = GRAPHENE_MAX_SHARE_SUPPLY;
    });
    const account_object& committee_account =
-      create<account_object>( [&](account_object& n) {
+      create<account_object>( [this](account_object& n) {
          n.membership_expiration_date = time_point_sec::maximum();
          n.network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
          n.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
@@ -168,7 +170,9 @@ void database::init_genesis(const genesis_state_type& genesis_state)
                          }).id;
           a.owner.weight_threshold = 1;
           a.active.weight_threshold = 1;
-          a.registrar = a.lifetime_referrer = a.referrer = account_id_type(id);
+          a.registrar = account_id_type(id);
+          a.referrer = a.registrar;
+          a.lifetime_referrer = a.registrar;
           a.membership_expiration_date = time_point_sec::maximum();
           a.network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
           a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
@@ -178,12 +182,12 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    }
 
    // Create core asset
-   const asset_dynamic_data_object& dyn_asset =
+   const asset_dynamic_data_object& core_dyn_asset =
       create<asset_dynamic_data_object>([](asset_dynamic_data_object& a) {
          a.current_supply = GRAPHENE_MAX_SHARE_SUPPLY;
       });
    const asset_object& core_asset =
-     create<asset_object>( [&genesis_state,&dyn_asset]( asset_object& a ) {
+     create<asset_object>( [&genesis_state,&core_dyn_asset]( asset_object& a ) {
          a.symbol = GRAPHENE_SYMBOL;
          a.options.max_supply = genesis_state.max_core_supply;
          a.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
@@ -194,13 +198,13 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          a.options.core_exchange_rate.base.asset_id = asset_id_type(0);
          a.options.core_exchange_rate.quote.amount = 1;
          a.options.core_exchange_rate.quote.asset_id = asset_id_type(0);
-         a.dynamic_asset_data_id = dyn_asset.id;
+         a.dynamic_asset_data_id = core_dyn_asset.id;
       });
-   FC_ASSERT( dyn_asset.id == asset_dynamic_data_id_type() );
+   FC_ASSERT( core_dyn_asset.id == asset_dynamic_data_id_type() );
    FC_ASSERT( asset_id_type(core_asset.id) == asset().asset_id );
-   FC_ASSERT( get_balance(account_id_type(), asset_id_type()) == asset(dyn_asset.current_supply) );
+   FC_ASSERT( get_balance(account_id_type(), asset_id_type()) == asset(core_dyn_asset.current_supply) );
    _p_core_asset_obj = &core_asset;
-   _p_core_dynamic_data_obj = &dyn_asset;
+   _p_core_dynamic_data_obj = &core_dyn_asset;
    // Create more special assets
    while( true )
    {
@@ -238,7 +242,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
        p.parameters.get_mutable_fees().zero_all_fees();
 
    });
-   _p_dyn_global_prop_obj = & create<dynamic_global_property_object>([&genesis_state](dynamic_global_property_object& p) {
+   _p_dyn_global_prop_obj = & create<dynamic_global_property_object>(
+                                 [&genesis_state](dynamic_global_property_object& p) {
       p.time = genesis_state.initial_timestamp;
       p.dynamic_flags = 0;
       p.witness_budget = 0;
@@ -246,15 +251,22 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    });
 
    FC_ASSERT( (genesis_state.immutable_parameters.min_witness_count & 1) == 1, "min_witness_count must be odd" );
-   FC_ASSERT( (genesis_state.immutable_parameters.min_committee_member_count & 1) == 1, "min_committee_member_count must be odd" );
+   FC_ASSERT( (genesis_state.immutable_parameters.min_committee_member_count & 1) == 1,
+              "min_committee_member_count must be odd" );
 
    _p_chain_property_obj = & create<chain_property_object>([chain_id,&genesis_state](chain_property_object& p)
    {
       p.chain_id = chain_id;
       p.immutable_parameters = genesis_state.immutable_parameters;
    } );
-   for (uint32_t i = 0; i <= 0x10000; i++)
-      create<block_summary_object>( [&]( block_summary_object&) {});
+
+   constexpr uint32_t block_summary_object_count = 0x10000;
+   for (uint32_t i = 0; i <= block_summary_object_count; ++i)
+   {
+      create<block_summary_object>( [](const block_summary_object&) {
+         // Nothing to do
+      } );
+   }
 
    // Create initial accounts
    for( const auto& account : genesis_state.initial_accounts )
@@ -308,21 +320,21 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    map<asset_id_type, share_type> total_debts;
 
    // Create initial assets
-   for( const genesis_state_type::initial_asset_type& asset : genesis_state.initial_assets )
+   for( const genesis_state_type::initial_asset_type& asst : genesis_state.initial_assets )
    {
       asset_id_type new_asset_id = get_index_type<asset_index>().get_next_id();
       total_supplies[ new_asset_id ] = 0;
 
       asset_dynamic_data_id_type dynamic_data_id;
       optional<asset_bitasset_data_id_type> bitasset_data_id;
-      if( asset.is_bitasset )
+      if( asst.is_bitasset )
       {
-         int collateral_holder_number = 0;
+         size_t collateral_holder_number = 0;
          total_debts[ new_asset_id ] = 0;
-         for( const auto& collateral_rec : asset.collateral_records )
+         for( const auto& collateral_rec : asst.collateral_records )
          {
             account_create_operation cop;
-            cop.name = asset.symbol + "-collateral-holder-" + std::to_string(collateral_holder_number);
+            cop.name = asst.symbol + "-collateral-holder-" + std::to_string(collateral_holder_number);
             boost::algorithm::to_lower(cop.name);
             cop.registrar = GRAPHENE_TEMP_ACCOUNT;
             cop.owner = authority(1, collateral_rec.owner, 1);
@@ -333,7 +345,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
                o.total_core_in_orders = collateral_rec.collateral;
             });
 
-            create<call_order_object>([&](call_order_object& c) {
+            create<call_order_object>(
+                     [&owner_account_id,&collateral_rec,&new_asset_id,&core_asset](call_order_object& c) {
                c.borrower = owner_account_id;
                c.collateral = collateral_rec.collateral;
                c.debt = collateral_rec.debt;
@@ -354,22 +367,22 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          }).id;
       }
 
-      dynamic_data_id = create<asset_dynamic_data_object>([&asset](asset_dynamic_data_object& d) {
-         d.accumulated_fees = asset.accumulated_fees;
+      dynamic_data_id = create<asset_dynamic_data_object>([&asst](asset_dynamic_data_object& d) {
+         d.accumulated_fees = asst.accumulated_fees;
       }).id;
 
-      total_supplies[ new_asset_id ] += asset.accumulated_fees;
+      total_supplies[ new_asset_id ] += asst.accumulated_fees;
 
-      create<asset_object>([&](asset_object& a) {
-         a.symbol = asset.symbol;
-         a.options.description = asset.description;
-         a.precision = asset.precision;
-         string issuer_name = asset.issuer_name;
+      create<asset_object>([&asst,&get_account_id,&dynamic_data_id,&bitasset_data_id](asset_object& a) {
+         a.symbol = asst.symbol;
+         a.options.description = asst.description;
+         a.precision = asst.precision;
+         string issuer_name = asst.issuer_name;
          a.issuer = get_account_id(issuer_name);
-         a.options.max_supply = asset.max_supply;
+         a.options.max_supply = asst.max_supply;
          a.options.flags = witness_fed_asset;
-         a.options.issuer_permissions = charge_market_fee | override_authority | white_list | transfer_restricted | disable_confidential |
-                                       ( asset.is_bitasset ? disable_force_settle | global_settle | witness_fed_asset | committee_fed_asset : 0 );
+         a.options.issuer_permissions = ( asst.is_bitasset ? ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK
+                                                           : DEFAULT_UIA_ASSET_ISSUER_PERMISSION );
          a.dynamic_asset_data_id = dynamic_data_id;
          a.bitasset_data_id = bitasset_data_id;
       });
@@ -392,7 +405,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    for( const genesis_state_type::initial_vesting_balance_type& vest : genesis_state.initial_vesting_balances )
    {
       const auto asset_id = get_asset_id(vest.asset_symbol);
-      create<balance_object>([&](balance_object& b) {
+      create<balance_object>([&vest,&asset_id](balance_object& b) {
          b.owner = vest.owner;
          b.balance = asset(vest.amount, asset_id);
 
@@ -448,41 +461,44 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    // Save tallied supplies
    for( const auto& item : total_supplies )
    {
-       const auto asset_id = item.first;
-       const auto total_supply = item.second;
+      const auto& asset_id = item.first;
+      const auto& total_supply = item.second;
 
-       modify( get( asset_id ), [ & ]( asset_object& asset ) {
-           modify( get( asset.dynamic_asset_data_id ), [ & ]( asset_dynamic_data_object& asset_data ) {
-               asset_data.current_supply = total_supply;
-           } );
-       } );
+      modify( get(get(asset_id).dynamic_asset_data_id), [&total_supply]( asset_dynamic_data_object& asset_data ) {
+         asset_data.current_supply = total_supply;
+      } );
    }
 
-   // Create special witness account
-   const witness_object& wit = create<witness_object>([&](witness_object& w) {});
+   // Create special witness account and remove it, reserve the id
+   const witness_object& wit = create<witness_object>([](const witness_object&) {
+      // Nothing to do
+   });
    FC_ASSERT( wit.id == GRAPHENE_NULL_WITNESS );
    remove(wit);
 
    // Create initial witnesses
-   std::for_each(genesis_state.initial_witness_candidates.begin(), genesis_state.initial_witness_candidates.end(),
-                 [&](const genesis_state_type::initial_witness_type& witness) {
+   std::for_each( genesis_state.initial_witness_candidates.begin(),
+                  genesis_state.initial_witness_candidates.end(),
+                  [this,&get_account_id,&genesis_eval_state](const auto& witness) {
       witness_create_operation op;
       op.witness_account = get_account_id(witness.owner_name);
       op.block_signing_key = witness.block_signing_key;
-      apply_operation(genesis_eval_state, op);
+      this->apply_operation(genesis_eval_state, op);
    });
 
    // Create initial committee members
-   std::for_each(genesis_state.initial_committee_candidates.begin(), genesis_state.initial_committee_candidates.end(),
-                 [&](const genesis_state_type::initial_committee_member_type& member) {
+   std::for_each( genesis_state.initial_committee_candidates.begin(),
+                  genesis_state.initial_committee_candidates.end(),
+                  [this,&get_account_id,&genesis_eval_state](const auto& member) {
       committee_member_create_operation op;
       op.committee_member_account = get_account_id(member.owner_name);
-      apply_operation(genesis_eval_state, op);
+      this->apply_operation(genesis_eval_state, op);
    });
 
    // Create initial workers
-   std::for_each(genesis_state.initial_worker_candidates.begin(), genesis_state.initial_worker_candidates.end(),
-                  [&](const genesis_state_type::initial_worker_type& worker)
+   std::for_each( genesis_state.initial_worker_candidates.begin(),
+                  genesis_state.initial_worker_candidates.end(),
+                  [this,&get_account_id,&genesis_state,&genesis_eval_state](const auto& worker)
    {
        worker_create_operation op;
        op.owner = get_account_id(worker.owner_name);
@@ -492,7 +508,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
        op.name = "Genesis-Worker-" + worker.owner_name;
        op.initializer = vesting_balance_worker_initializer{uint16_t(0)};
 
-       apply_operation(genesis_eval_state, std::move(op));
+       this->apply_operation(genesis_eval_state, std::move(op));
    });
 
    // Set active witnesses
@@ -516,7 +532,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    });
 
    // Create FBA counters
-   create<fba_accumulator_object>([&]( fba_accumulator_object& acc )
+   create<fba_accumulator_object>([]( fba_accumulator_object& acc )
    {
       FC_ASSERT( acc.id == fba_accumulator_id_type( fba_accumulator_id_transfer_to_blind ) );
       acc.accumulated_fba_fees = 0;
@@ -525,7 +541,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 #endif
    });
 
-   create<fba_accumulator_object>([&]( fba_accumulator_object& acc )
+   create<fba_accumulator_object>([]( fba_accumulator_object& acc )
    {
       FC_ASSERT( acc.id == fba_accumulator_id_type( fba_accumulator_id_blind_transfer ) );
       acc.accumulated_fba_fees = 0;
@@ -534,7 +550,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 #endif
    });
 
-   create<fba_accumulator_object>([&]( fba_accumulator_object& acc )
+   create<fba_accumulator_object>([]( fba_accumulator_object& acc )
    {
       FC_ASSERT( acc.id == fba_accumulator_id_type( fba_accumulator_id_transfer_from_blind ) );
       acc.accumulated_fba_fees = 0;
@@ -545,7 +561,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    FC_ASSERT( get_index<fba_accumulator_object>().get_next_id() == fba_accumulator_id_type( fba_accumulator_id_count ) );
 
-   //debug_dump();
+   //debug_dump(); // for debug
 
    _undo_db.enable();
 } FC_CAPTURE_AND_RETHROW() }
