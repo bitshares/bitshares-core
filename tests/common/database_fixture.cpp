@@ -548,6 +548,10 @@ void database_fixture_base::verify_asset_supplies( const database& db )
       total_balances[o.asset_a] += o.balance_a;
       total_balances[o.asset_b] += o.balance_b;
    }
+   for( const samet_fund_object& o : db.get_index_type<samet_fund_index>().indices() )
+   {
+      total_balances[o.asset_type] += (o.balance - o.unpaid_amount);
+   }
 
    total_balances[asset_id_type()] += db.get_dynamic_global_properties().witness_budget;
 
@@ -1500,6 +1504,142 @@ generic_exchange_operation_result database_fixture_base::exchange_with_liquidity
    return op_result.get<generic_exchange_operation_result>();
 }
 
+samet_fund_create_operation database_fixture_base::make_samet_fund_create_op(
+                                                  account_id_type account, asset_id_type asset_type,
+                                                  share_type balance, uint32_t fee_rate )const
+{
+   samet_fund_create_operation op;
+   op.owner_account = account;
+   op.asset_type = asset_type;
+   op.balance = balance,
+   op.fee_rate = fee_rate;
+   return op;
+}
+
+const samet_fund_object& database_fixture_base::create_samet_fund(
+                                                  account_id_type account, asset_id_type asset_type,
+                                                  share_type balance, uint32_t fee_rate )
+{
+   samet_fund_create_operation op = make_samet_fund_create_op( account, asset_type, balance, fee_rate );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
+   const operation_result& op_result = ptx.operation_results.front();
+   trx.operations.clear();
+   verify_asset_supplies(db);
+   return db.get<samet_fund_object>( op_result.get<object_id_type>() );
+}
+
+samet_fund_delete_operation database_fixture_base::make_samet_fund_delete_op(
+                                                  account_id_type account, samet_fund_id_type fund_id )const
+{
+   samet_fund_delete_operation op;
+   op.owner_account = account;
+   op.fund_id = fund_id;
+   return op;
+}
+
+asset database_fixture_base::delete_samet_fund( account_id_type account,  samet_fund_id_type fund_id )
+{
+   samet_fund_delete_operation op = make_samet_fund_delete_op( account, fund_id );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
+   const operation_result& op_result = ptx.operation_results.front();
+   trx.operations.clear();
+   verify_asset_supplies(db);
+   return op_result.get<asset>();
+}
+
+samet_fund_update_operation database_fixture_base::make_samet_fund_update_op(
+                                                  account_id_type account, samet_fund_id_type fund_id,
+                                                  const optional<asset>& delta_amount,
+                                                  const optional<uint32_t>& new_fee_rate )const
+{
+   samet_fund_update_operation op;
+   op.owner_account = account;
+   op.fund_id = fund_id;
+   op.delta_amount = delta_amount;
+   op.new_fee_rate = new_fee_rate;
+   return op;
+}
+
+void database_fixture_base::update_samet_fund( account_id_type account, samet_fund_id_type fund_id,
+                                                  const optional<asset>& delta_amount,
+                                                  const optional<uint32_t>& new_fee_rate )
+{
+   samet_fund_update_operation op = make_samet_fund_update_op( account, fund_id, delta_amount, new_fee_rate );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   PUSH_TX(db, trx, ~0);
+   trx.operations.clear();
+   verify_asset_supplies(db);
+}
+
+samet_fund_borrow_operation database_fixture_base::make_samet_fund_borrow_op(
+                                                  account_id_type account, samet_fund_id_type fund_id,
+                                                  const asset& borrow_amount )const
+{
+   samet_fund_borrow_operation op;
+   op.borrower = account;
+   op.fund_id = fund_id;
+   op.borrow_amount = borrow_amount;
+   return op;
+}
+
+void database_fixture_base::borrow_from_samet_fund( account_id_type account, samet_fund_id_type fund_id,
+                                                  const asset& borrow_amount )
+{
+   samet_fund_borrow_operation op = make_samet_fund_borrow_op( account, fund_id, borrow_amount );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   PUSH_TX(db, trx, ~0);
+   trx.operations.clear();
+   verify_asset_supplies(db);
+}
+
+samet_fund_repay_operation database_fixture_base::make_samet_fund_repay_op(
+                                                  account_id_type account, samet_fund_id_type fund_id,
+                                                  const asset& repay_amount, const asset& fund_fee )const
+{
+   samet_fund_repay_operation op;
+   op.account = account;
+   op.fund_id = fund_id;
+   op.repay_amount = repay_amount;
+   op.fund_fee = fund_fee;
+   return op;
+}
+
+void database_fixture_base::repay_to_samet_fund( account_id_type account, samet_fund_id_type fund_id,
+                                                  const asset& repay_amount, const asset& fund_fee )
+{
+   samet_fund_repay_operation op = make_samet_fund_repay_op( account, fund_id, repay_amount, fund_fee );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   PUSH_TX(db, trx, ~0);
+   trx.operations.clear();
+   verify_asset_supplies(db);
+}
 
 void database_fixture_base::enable_fees()
 {
