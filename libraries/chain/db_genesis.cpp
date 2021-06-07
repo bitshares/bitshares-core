@@ -98,7 +98,9 @@ void database::init_genesis(const genesis_state_type& genesis_state)
                       }).id;
        a.owner.weight_threshold = 1;
        a.active.weight_threshold = 1;
-       a.registrar = a.lifetime_referrer = a.referrer = GRAPHENE_WITNESS_ACCOUNT;
+       a.registrar = GRAPHENE_WITNESS_ACCOUNT;
+       a.referrer = a.registrar;
+       a.lifetime_referrer = a.registrar;
        a.membership_expiration_date = time_point_sec::maximum();
        a.network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
        a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
@@ -111,7 +113,9 @@ void database::init_genesis(const genesis_state_type& genesis_state)
                       }).id;
        a.owner.weight_threshold = 1;
        a.active.weight_threshold = 1;
-       a.registrar = a.lifetime_referrer = a.referrer = GRAPHENE_RELAXED_COMMITTEE_ACCOUNT;
+       a.registrar = GRAPHENE_RELAXED_COMMITTEE_ACCOUNT;
+       a.referrer = a.registrar;
+       a.lifetime_referrer = a.registrar;
        a.membership_expiration_date = time_point_sec::maximum();
        a.network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
        a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
@@ -124,7 +128,9 @@ void database::init_genesis(const genesis_state_type& genesis_state)
                       }).id;
        a.owner.weight_threshold = 1;
        a.active.weight_threshold = 1;
-       a.registrar = a.lifetime_referrer = a.referrer = GRAPHENE_NULL_ACCOUNT;
+       a.registrar = GRAPHENE_NULL_ACCOUNT;
+       a.referrer = a.registrar;
+       a.lifetime_referrer = a.registrar;
        a.membership_expiration_date = time_point_sec::maximum();
        a.network_fee_percentage = 0;
        a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT;
@@ -137,7 +143,9 @@ void database::init_genesis(const genesis_state_type& genesis_state)
                       }).id;
        a.owner.weight_threshold = 0;
        a.active.weight_threshold = 0;
-       a.registrar = a.lifetime_referrer = a.referrer = GRAPHENE_TEMP_ACCOUNT;
+       a.registrar = GRAPHENE_TEMP_ACCOUNT;
+       a.referrer = a.registrar;
+       a.lifetime_referrer = a.registrar;
        a.membership_expiration_date = time_point_sec::maximum();
        a.network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
        a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
@@ -150,13 +158,15 @@ void database::init_genesis(const genesis_state_type& genesis_state)
                       }).id;
        a.owner.weight_threshold = 1;
        a.active.weight_threshold = 1;
-       a.registrar = a.lifetime_referrer = a.referrer = GRAPHENE_NULL_ACCOUNT;
+       a.registrar = GRAPHENE_NULL_ACCOUNT;
+       a.referrer = a.registrar;
+       a.lifetime_referrer = a.registrar;
        a.membership_expiration_date = time_point_sec::maximum();
        a.network_fee_percentage = 0;
        a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT;
    }).get_id() == GRAPHENE_PROXY_TO_SELF_ACCOUNT);
 
-   // Create more special accounts
+   // Create more special accounts and remove them, reserve the IDs
    while( true )
    {
       uint64_t id = get_index<account_object>().get_next_id().instance();
@@ -179,6 +189,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       });
       FC_ASSERT( acct.get_id() == account_id_type(id) );
       remove( acct );
+      // Note: the account statistics objects are not removed
    }
 
    // Create core asset
@@ -205,7 +216,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    FC_ASSERT( get_balance(account_id_type(), asset_id_type()) == asset(core_dyn_asset.current_supply) );
    _p_core_asset_obj = &core_asset;
    _p_core_dynamic_data_obj = &core_dyn_asset;
-   // Create more special assets
+   // Create more special assets and remove them, reserve the IDs
    while( true )
    {
       uint64_t id = get_index<asset_object>().get_next_id().instance();
@@ -230,6 +241,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       });
       FC_ASSERT( asset_obj.get_id() == asset_id_type(id) );
       remove( asset_obj );
+      // Note: the asset dynamic data objects are not removed
    }
 
    chain_id_type chain_id = genesis_state.compute_chain_id();
