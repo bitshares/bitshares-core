@@ -188,8 +188,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
           a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
       });
       FC_ASSERT( acct.get_id() == account_id_type(id) );
+      remove( acct.statistics(*this) );
       remove( acct );
-      // Note: the account statistics objects are not removed
    }
 
    // Create core asset
@@ -240,8 +240,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          a.dynamic_asset_data_id = dyn_asset.id;
       });
       FC_ASSERT( asset_obj.get_id() == asset_id_type(id) );
+      remove( dyn_asset );
       remove( asset_obj );
-      // Note: the asset dynamic data objects are not removed
    }
 
    chain_id_type chain_id = genesis_state.compute_chain_id();
