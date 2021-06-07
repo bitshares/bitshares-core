@@ -79,15 +79,17 @@ void_result samet_fund_delete_evaluator::do_evaluate(const samet_fund_delete_ope
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
-void_result samet_fund_delete_evaluator::do_apply(const samet_fund_delete_operation& op) const
+asset samet_fund_delete_evaluator::do_apply(const samet_fund_delete_operation& op) const
 { try {
    database& d = db();
 
-   d.adjust_balance( op.owner_account, asset( _fund->balance, _fund->asset_type ) );
+   asset released( _fund->balance, _fund->asset_type );
+
+   d.adjust_balance( op.owner_account, released );
 
    d.remove( *_fund );
 
-   return void_result();
+   return released;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
 void_result samet_fund_update_evaluator::do_evaluate(const samet_fund_update_operation& op)
