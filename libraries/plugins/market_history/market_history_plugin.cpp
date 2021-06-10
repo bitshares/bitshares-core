@@ -415,7 +415,7 @@ void market_history_plugin_impl::update_market_histories( const signed_block& b 
                {
                   auto& op = oho.op.get< liquidity_pool_deposit_operation >();
                   auto& result = oho.result.get< generic_exchange_operation_result >();
-                  db.modify( *ticker, [&op,&result]( liquidity_pool_ticker_object& t ) {
+                  db.modify( *ticker, [&result]( liquidity_pool_ticker_object& t ) {
                      t._24h_deposit_count -= 1;
                      t._24h_deposit_amount_a -= result.paid.front().amount.value;
                      t._24h_deposit_amount_b -= result.paid.back().amount.value;
@@ -641,7 +641,7 @@ void market_history_plugin_impl::update_liquidity_pool_histories(
                auto& op = oho.op.get< liquidity_pool_deposit_operation >();
                auto& result = oho.result.get< generic_exchange_operation_result >();
 
-               db.modify( *ticker, [&op,&result]( liquidity_pool_ticker_object& t ) {
+               db.modify( *ticker, [&result]( liquidity_pool_ticker_object& t ) {
                   t._24h_deposit_count += 1;
                   t._24h_deposit_amount_a += result.paid.front().amount.value;
                   t._24h_deposit_amount_b += result.paid.back().amount.value;
