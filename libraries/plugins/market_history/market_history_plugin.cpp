@@ -413,7 +413,6 @@ void market_history_plugin_impl::update_market_histories( const signed_block& b 
                const operation_history_object& oho = history_itr->op;
                if( oho.op.is_type< liquidity_pool_deposit_operation >() )
                {
-                  auto& op = oho.op.get< liquidity_pool_deposit_operation >();
                   auto& result = oho.result.get< generic_exchange_operation_result >();
                   db.modify( *ticker, [&result]( liquidity_pool_ticker_object& t ) {
                      t._24h_deposit_count -= 1;
@@ -638,7 +637,6 @@ void market_history_plugin_impl::update_liquidity_pool_histories(
          {
             if( oho.op.is_type< liquidity_pool_deposit_operation >() )
             {
-               auto& op = oho.op.get< liquidity_pool_deposit_operation >();
                auto& result = oho.result.get< generic_exchange_operation_result >();
 
                db.modify( *ticker, [&result]( liquidity_pool_ticker_object& t ) {
