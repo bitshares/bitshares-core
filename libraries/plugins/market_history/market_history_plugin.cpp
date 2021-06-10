@@ -417,11 +417,11 @@ void market_history_plugin_impl::update_market_histories( const signed_block& b 
                   auto& result = oho.result.get< generic_exchange_operation_result >();
                   db.modify( *ticker, [&op,&result]( liquidity_pool_ticker_object& t ) {
                      t._24h_deposit_count -= 1;
-                     t._24h_deposit_amount_a -= op.amount_a.amount.value;
-                     t._24h_deposit_amount_b -= op.amount_b.amount.value;
+                     t._24h_deposit_amount_a -= result.paid.front().amount.value;
+                     t._24h_deposit_amount_b -= result.paid.back().amount.value;
                      t._24h_deposit_share_amount -= result.received.front().amount.value;
-                     t._24h_balance_delta_a -= op.amount_a.amount.value;
-                     t._24h_balance_delta_b -= op.amount_b.amount.value;
+                     t._24h_balance_delta_a -= result.paid.front().amount.value;
+                     t._24h_balance_delta_b -= result.paid.back().amount.value;
                   });
                }
                else if( oho.op.is_type< liquidity_pool_withdraw_operation >() )
@@ -643,14 +643,14 @@ void market_history_plugin_impl::update_liquidity_pool_histories(
 
                db.modify( *ticker, [&op,&result]( liquidity_pool_ticker_object& t ) {
                   t._24h_deposit_count += 1;
-                  t._24h_deposit_amount_a += op.amount_a.amount.value;
-                  t._24h_deposit_amount_b += op.amount_b.amount.value;
+                  t._24h_deposit_amount_a += result.paid.front().amount.value;
+                  t._24h_deposit_amount_b += result.paid.back().amount.value;
                   t._24h_deposit_share_amount += result.received.front().amount.value;
-                  t._24h_balance_delta_a += op.amount_a.amount.value;
-                  t._24h_balance_delta_b += op.amount_b.amount.value;
+                  t._24h_balance_delta_a += result.paid.front().amount.value;
+                  t._24h_balance_delta_b += result.paid.back().amount.value;
                   t.total_deposit_count += 1;
-                  t.total_deposit_amount_a += op.amount_a.amount.value;
-                  t.total_deposit_amount_b += op.amount_b.amount.value;
+                  t.total_deposit_amount_a += result.paid.front().amount.value;
+                  t.total_deposit_amount_b += result.paid.back().amount.value;
                   t.total_deposit_share_amount += result.received.front().amount.value;
                });
 
