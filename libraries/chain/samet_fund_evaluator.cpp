@@ -70,9 +70,9 @@ void_result samet_fund_delete_evaluator::do_evaluate(const samet_fund_delete_ope
 
    _fund = &op.fund_id(d);
 
-   FC_ASSERT( _fund->owner_account == op.owner_account, "The account is not the owner of the fund" );
+   FC_ASSERT( _fund->owner_account == op.owner_account, "The account is not the owner of the SameT Fund" );
 
-   FC_ASSERT( _fund->unpaid_amount == 0, "Can only delete a fund when the unpaid amount is zero" );
+   FC_ASSERT( _fund->unpaid_amount == 0, "Can only delete a SameT Fund when the unpaid amount is zero" );
 
    // Note: no asset authorization check here, allow funds to be moved to account balance
 
@@ -98,13 +98,13 @@ void_result samet_fund_update_evaluator::do_evaluate(const samet_fund_update_ope
 
    _fund = &op.fund_id(d);
 
-   FC_ASSERT( _fund->owner_account == op.owner_account, "The account is not the owner of the fund" );
+   FC_ASSERT( _fund->owner_account == op.owner_account, "The account is not the owner of the SameT Fund" );
 
    if( op.delta_amount.valid() )
    {
       FC_ASSERT( _fund->asset_type == op.delta_amount->asset_id, "Asset type mismatch" );
       FC_ASSERT( _fund->unpaid_amount == 0,
-                 "Can only update the balance of a fund when the unpaid amount is zero" );
+                 "Can only update the balance of a SameT Fund when the unpaid amount is zero" );
 
       if( op.delta_amount->amount > 0 )
       {
@@ -114,7 +114,7 @@ void_result samet_fund_update_evaluator::do_evaluate(const samet_fund_update_ope
       }
       else
       {
-         FC_ASSERT( _fund->balance > -op.delta_amount->amount, "Insufficient balance in the fund" );
+         FC_ASSERT( _fund->balance > -op.delta_amount->amount, "Insufficient balance in the SameT Fund" );
       }
    }
 
@@ -142,7 +142,7 @@ void_result samet_fund_update_evaluator::do_apply( const samet_fund_update_opera
    });
 
    // Defensive check
-   FC_ASSERT( _fund->balance > 0, "Balance in the fund should be positive" );
+   FC_ASSERT( _fund->balance > 0, "Balance in the SameT Fund should be positive" );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -156,7 +156,7 @@ void_result samet_fund_borrow_evaluator::do_evaluate(const samet_fund_borrow_ope
    FC_ASSERT( _fund->asset_type == op.borrow_amount.asset_id, "Asset type mismatch" );
 
    FC_ASSERT( _fund->balance >= _fund->unpaid_amount + op.borrow_amount.amount,
-              "Insufficient balance in the fund thus unable to borrow" );
+              "Insufficient balance in the SameT Fund thus unable to borrow" );
 
    FC_ASSERT( is_authorized_asset( d, *fee_paying_account, _fund->asset_type(d) ),
               "The account is unauthorized by the asset" );
