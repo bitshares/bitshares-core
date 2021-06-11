@@ -86,7 +86,7 @@ BOOST_AUTO_TEST_CASE( samet_fund_hardfork_time_test )
    }
 }
 
-BOOST_AUTO_TEST_CASE( samet_fund_create_delete_proposal_test )
+BOOST_AUTO_TEST_CASE( samet_fund_crud_and_proposal_test )
 { try {
 
       // Pass the hard fork time
@@ -204,6 +204,11 @@ BOOST_AUTO_TEST_CASE( samet_fund_create_delete_proposal_test )
 
       const samet_fund_object& sfo3 = create_samet_fund( sam_id, eur.id, 10, 1u ); // Account is whitelisted
       samet_fund_id_type sf3_id = sfo3.id;
+      BOOST_CHECK( sfo3.owner_account == sam_id );
+      BOOST_CHECK( sfo3.asset_type == eur_id );
+      BOOST_CHECK( sfo3.balance == 10 );
+      BOOST_CHECK( sfo3.fee_rate == 1u );
+      BOOST_CHECK( sfo3.unpaid_amount == 0 );
 
       expected_balance_sam_eur -= 10;
       check_balances();
@@ -221,6 +226,60 @@ BOOST_AUTO_TEST_CASE( samet_fund_create_delete_proposal_test )
 
       check_balances();
 
+      // Uable to update a fund with invalid data
+      // Changes nothing
+      BOOST_CHECK_THROW( update_samet_fund( sam_id, sf1_id, {}, {} ), fc::exception );
+      // Zero delta
+      BOOST_CHECK_THROW( update_samet_fund( sam_id, sf1_id, asset(0), 10u ), fc::exception );
+      // Specified new fee rate but no change
+      BOOST_CHECK_THROW( update_samet_fund( sam_id, sf1_id, asset(1), sf1_id(db).fee_rate ), fc::exception );
+      // Fund owner mismatch
+      BOOST_CHECK_THROW( update_samet_fund( ted_id, sf1_id, asset(1), {} ), fc::exception );
+      // Asset type mismatch
+      BOOST_CHECK_THROW( update_samet_fund( sam_id, sf1_id, asset(1, usd_id), {} ), fc::exception );
+      // Trying to withdraw too much
+      BOOST_CHECK_THROW( update_samet_fund( sam_id, sf1_id, asset(-10000), {} ), fc::exception );
+      // Insufficient account balance
+      BOOST_CHECK_THROW( update_samet_fund( sam_id, sf1_id, asset(init_amount), {} ), fc::exception );
+
+      check_balances();
+
+      // Able to update a fund with valid data
+      // Only deposit
+      update_samet_fund( sam_id, sf1_id, asset(1), {} );
+
+      BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf1_id(db).asset_type == core.id );
+      BOOST_CHECK( sf1_id(db).balance == 10001 );
+      BOOST_CHECK( sf1_id(db).fee_rate == 100u );
+      BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+
+      expected_balance_sam_core -= 1;
+      check_balances();
+
+      // Only update fee rate
+      update_samet_fund( sam_id, sf1_id, {}, 101u );
+
+      BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf1_id(db).asset_type == core.id );
+      BOOST_CHECK( sf1_id(db).balance == 10001 );
+      BOOST_CHECK( sf1_id(db).fee_rate == 101u );
+      BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+
+      check_balances();
+
+      // Withdraw and update fee rate
+      update_samet_fund( sam_id, sf1_id, asset(-9999), 10u );
+
+      BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf1_id(db).asset_type == core.id );
+      BOOST_CHECK( sf1_id(db).balance == 2 );
+      BOOST_CHECK( sf1_id(db).fee_rate == 10u );
+      BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+
+      expected_balance_sam_core += 9999;
+      check_balances();
+
       // Sam is able to delete his own fund
       asset released = delete_samet_fund( sam_id, sf1_id );
 
@@ -228,11 +287,13 @@ BOOST_AUTO_TEST_CASE( samet_fund_create_delete_proposal_test )
       BOOST_REQUIRE( db.find( sf2_id ) );
       BOOST_REQUIRE( db.find( sf3_id ) );
 
-      BOOST_CHECK( released == asset( 10000, core_id ) );
+      BOOST_CHECK( released == asset( 2, core_id ) );
 
-      expected_balance_sam_core += 10000;
+      expected_balance_sam_core += 2;
       check_balances();
 
+      // Unable to update a fund that does not exist
+      BOOST_CHECK_THROW( update_samet_fund( sam_id, sf1_id, asset(1), {} ), fc::exception );
       // Unable to delete a fund that does not exist
       BOOST_CHECK_THROW( delete_samet_fund( sam_id, sf1_id ), fc::exception );
       // Unable to delete a fund that is not owned by him
@@ -258,13 +319,45 @@ BOOST_AUTO_TEST_CASE( samet_fund_create_delete_proposal_test )
          PUSH_TX( db, trx, ~0 );
       }
 
+      // Sam is now unable to deposit to the fund
+      BOOST_CHECK_THROW( update_samet_fund( sam_id, sf3_id, asset(1, eur_id), {} ), fc::exception );
+
+      BOOST_CHECK( sf3_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf3_id(db).asset_type == eur_id );
+      BOOST_CHECK( sf3_id(db).balance == 10 );
+      BOOST_CHECK( sf3_id(db).fee_rate == 1u );
+      BOOST_CHECK( sf3_id(db).unpaid_amount == 0 );
+
+      check_balances();
+
+      // Sam is still able to withdraw from the fund
+      update_samet_fund( sam_id, sf3_id, asset(-1, eur_id), {} );
+      BOOST_CHECK( sf3_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf3_id(db).asset_type == eur_id );
+      BOOST_CHECK( sf3_id(db).balance == 9 );
+      BOOST_CHECK( sf3_id(db).fee_rate == 1u );
+      BOOST_CHECK( sf3_id(db).unpaid_amount == 0 );
+
+      expected_balance_sam_eur += 1;
+      check_balances();
+
+      // Sam is still able to update fee rate
+      update_samet_fund( sam_id, sf3_id, {}, 2u );
+      BOOST_CHECK( sf3_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf3_id(db).asset_type == eur_id );
+      BOOST_CHECK( sf3_id(db).balance == 9 );
+      BOOST_CHECK( sf3_id(db).fee_rate == 2u );
+      BOOST_CHECK( sf3_id(db).unpaid_amount == 0 );
+
+      check_balances();
+
       // Sam is still able to delete the fund
       released = delete_samet_fund( sam_id, sf3_id );
       BOOST_REQUIRE( !db.find( sf3_id ) );
 
-      BOOST_CHECK( released == asset( 10, eur_id ) );
+      BOOST_CHECK( released == asset( 9, eur_id ) );
 
-      expected_balance_sam_eur += 10;
+      expected_balance_sam_eur += 9;
       check_balances();
 
       // Same is unable to recreate the fund
