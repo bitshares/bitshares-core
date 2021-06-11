@@ -194,8 +194,8 @@ void_result samet_fund_repay_evaluator::do_evaluate(const samet_fund_repay_opera
    FC_ASSERT( op.repay_amount.amount <= _fund->unpaid_amount,
               "Repay amount should not be greater than unpaid amount" );
 
-   auto required_fee = ( ( ( fc::uint128_t( op.repay_amount.amount.value ) + GRAPHENE_SAMET_FUND_FEE_DENOM ) - 1 )
-                         * _fund->fee_rate ) / GRAPHENE_SAMET_FUND_FEE_DENOM; // Round up
+   auto required_fee = ( ( ( fc::uint128_t( op.repay_amount.amount.value ) * _fund->fee_rate )
+                         + GRAPHENE_SAMET_FUND_FEE_DENOM ) - 1 ) / GRAPHENE_SAMET_FUND_FEE_DENOM; // Round up
 
    FC_ASSERT( fc::uint128_t(op.fund_fee.amount.value) >= required_fee,
               "Insuffient fund fee, requires ${r}, offered ${p}",
