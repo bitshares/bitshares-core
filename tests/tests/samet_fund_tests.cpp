@@ -372,4 +372,658 @@ BOOST_AUTO_TEST_CASE( samet_fund_crud_and_proposal_test )
    }
 }
 
+BOOST_AUTO_TEST_CASE( samet_fund_borrow_repay_test )
+{ try {
+
+      // Pass the hard fork time
+      generate_blocks( HARDFORK_CORE_2351_TIME );
+      set_expiration( db, trx );
+
+      ACTORS((sam)(ted)(por));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( ted, asset(init_amount) );
+
+      const asset_object& core = asset_id_type()(db);
+      asset_id_type core_id;
+
+      const asset_object& usd = create_user_issued_asset( "MYUSD" );
+      asset_id_type usd_id = usd.id;
+      issue_uia( sam, usd.amount(init_amount) );
+      issue_uia( ted, usd.amount(init_amount) );
+
+      const asset_object& eur = create_user_issued_asset( "MYEUR", sam, white_list );
+      asset_id_type eur_id = eur.id;
+      issue_uia( sam, eur.amount(init_amount) );
+      issue_uia( ted, eur.amount(init_amount) );
+      // Make a whitelist
+      {
+         BOOST_TEST_MESSAGE( "Setting up whitelisting" );
+         asset_update_operation uop;
+         uop.asset_to_update = eur.id;
+         uop.issuer = sam_id;
+         uop.new_options = eur.options;
+         // The whitelist is managed by Sam
+         uop.new_options.whitelist_authorities.insert(sam_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Upgrade Sam so that he can manage the whitelist
+         upgrade_to_lifetime_member( sam_id );
+
+         // Add Sam to the whitelist, but do not add others
+         account_whitelist_operation wop;
+         wop.authorizing_account = sam_id;
+         wop.account_to_list = sam_id;
+         wop.new_listing = account_whitelist_operation::white_listed;
+         trx.operations.clear();
+         trx.operations.push_back(wop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      asset_id_type no_asset_id( core.id + 100 );
+      BOOST_REQUIRE( !db.find( no_asset_id ) );
+
+      int64_t expected_balance_sam_core = init_amount;
+      int64_t expected_balance_sam_usd = init_amount;
+      int64_t expected_balance_sam_eur = init_amount;
+      int64_t expected_balance_ted_core = init_amount;
+      int64_t expected_balance_ted_usd = init_amount;
+      int64_t expected_balance_ted_eur = init_amount;
+
+      const auto& check_balances = [&]() {
+         BOOST_CHECK_EQUAL( db.get_balance( sam_id, core_id ).amount.value, expected_balance_sam_core );
+         BOOST_CHECK_EQUAL( db.get_balance( sam_id, usd_id ).amount.value, expected_balance_sam_usd );
+         BOOST_CHECK_EQUAL( db.get_balance( sam_id, eur_id ).amount.value, expected_balance_sam_eur );
+         BOOST_CHECK_EQUAL( db.get_balance( ted_id, core_id ).amount.value, expected_balance_ted_core );
+         BOOST_CHECK_EQUAL( db.get_balance( ted_id, usd_id ).amount.value, expected_balance_ted_usd );
+         BOOST_CHECK_EQUAL( db.get_balance( ted_id, eur_id ).amount.value, expected_balance_ted_eur );
+      };
+
+      check_balances();
+
+      // create samet funds
+      const samet_fund_object& sfo1 = create_samet_fund( sam_id, core.id, 10000, 10000u ); // fee rate is 1%
+      samet_fund_id_type sf1_id = sfo1.id;
+
+      expected_balance_sam_core -= 10000;
+      check_balances();
+
+      const samet_fund_object& sfo2 = create_samet_fund( ted_id, usd.id, 1, 10000000u ); // fee rate is 1000%
+      samet_fund_id_type sf2_id = sfo2.id;
+
+      expected_balance_ted_usd -= 1;
+      check_balances();
+
+      const samet_fund_object& sfo3 = create_samet_fund( sam_id, eur.id, 10, 1u ); // Account is whitelisted
+      samet_fund_id_type sf3_id = sfo3.id;
+
+      expected_balance_sam_eur -= 10;
+      check_balances();
+
+      // Unable to borrow without repayment
+      BOOST_CHECK_THROW( borrow_from_samet_fund( sam_id, sf1_id, asset(1) ), fc::exception );
+      // Unable to repay without borrowing
+      BOOST_CHECK_THROW( repay_to_samet_fund( sam_id, sf1_id, asset(1), asset(100) ), fc::exception );
+
+      // Valid : borrow and repay
+      {
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(1) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(1), asset(1) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf1_id(db).asset_type == core.id );
+      BOOST_CHECK( sf1_id(db).balance == 10001 );
+      BOOST_CHECK( sf1_id(db).fee_rate == 10000u );
+      BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+
+      expected_balance_sam_core -= 1;
+      check_balances();
+
+      // Valid : borrow multiple times and repay at once
+      {
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(1) );
+         auto bop2 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(2) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(3), asset(1) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(bop2);
+         trx.operations.push_back(rop1);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf1_id(db).asset_type == core.id );
+      BOOST_CHECK( sf1_id(db).balance == 10002 );
+      BOOST_CHECK( sf1_id(db).fee_rate == 10000u );
+      BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+
+      expected_balance_sam_core -= 1;
+      check_balances();
+
+      // Valid : borrow with one account and repay with another account
+      {
+         auto bop1 = make_samet_fund_borrow_op( ted_id, sf1_id, asset(5) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(5), asset(1) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf1_id(db).asset_type == core.id );
+      BOOST_CHECK( sf1_id(db).balance == 10003 );
+      BOOST_CHECK( sf1_id(db).fee_rate == 10000u );
+      BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+
+      expected_balance_ted_core += 5;
+      expected_balance_sam_core -= 6;
+      check_balances();
+
+      // Valid : borrow at once, repay via multiple times
+      {
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(7) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(3), asset(1) );
+         auto rop2 = make_samet_fund_repay_op( ted_id, sf1_id, asset(4), asset(1) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         trx.operations.push_back(rop2);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf1_id(db).asset_type == core.id );
+      BOOST_CHECK( sf1_id(db).balance == 10005 );
+      BOOST_CHECK( sf1_id(db).fee_rate == 10000u );
+      BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+
+      expected_balance_sam_core += 3;
+      expected_balance_ted_core -= 5;
+      check_balances();
+
+      // Valid : borrow from multiple funds and repay
+      {
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(7) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(3), asset(1) );
+         auto bop2 = make_samet_fund_borrow_op( ted_id, sf2_id, asset(1, usd_id) );
+         auto rop2 = make_samet_fund_repay_op( ted_id, sf1_id, asset(4), asset(1) );
+         auto rop3 = make_samet_fund_repay_op( sam_id, sf2_id, asset(1, usd_id), asset(10, usd_id) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         trx.operations.push_back(bop2);
+         trx.operations.push_back(rop2);
+         trx.operations.push_back(rop3);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf1_id(db).asset_type == core.id );
+      BOOST_CHECK( sf1_id(db).balance == 10007 );
+      BOOST_CHECK( sf1_id(db).fee_rate == 10000u );
+      BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+
+      BOOST_CHECK( sf2_id(db).owner_account == ted_id );
+      BOOST_CHECK( sf2_id(db).asset_type == usd_id );
+      BOOST_CHECK( sf2_id(db).balance == 11 );
+      BOOST_CHECK( sf2_id(db).fee_rate == 10000000u );
+      BOOST_CHECK( sf2_id(db).unpaid_amount == 0 );
+
+      expected_balance_sam_core += 3;
+      expected_balance_ted_core -= 5;
+      expected_balance_sam_usd -= 11;
+      expected_balance_ted_usd += 1;
+      check_balances();
+
+      // Valid : borrow and repay with more fee than enough
+      {
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(1) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(1), asset(2) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf1_id(db).asset_type == core.id );
+      BOOST_CHECK( sf1_id(db).balance == 10009 );
+      BOOST_CHECK( sf1_id(db).fee_rate == 10000u );
+      BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+
+      expected_balance_sam_core -= 2;
+      check_balances();
+
+      // Valid: account whitelisted by asset
+      {
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf3_id, asset(1, eur_id) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf3_id, asset(1, eur_id), asset(1, eur_id) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      BOOST_CHECK( sf3_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf3_id(db).asset_type == eur_id );
+      BOOST_CHECK( sf3_id(db).balance == 11 );
+      BOOST_CHECK( sf3_id(db).fee_rate == 1u );
+      BOOST_CHECK( sf3_id(db).unpaid_amount == 0 );
+
+      expected_balance_sam_eur -= 1;
+      check_balances();
+
+      // Invalid operations
+      {
+         // Borrow 0
+         auto bop = make_samet_fund_borrow_op( sam_id, sf1_id, asset(0) );
+         BOOST_CHECK_THROW( bop.validate(), fc::exception );
+         BOOST_CHECK_THROW( propose( bop ), fc::exception );
+
+         // Borrow a negative amount
+         bop = make_samet_fund_borrow_op( sam_id, sf1_id, asset(-1) );
+         BOOST_CHECK_THROW( bop.validate(), fc::exception );
+         BOOST_CHECK_THROW( propose( bop ), fc::exception );
+
+         // Repay 0
+         auto rop = make_samet_fund_repay_op( sam_id, sf1_id, asset(0), asset(1) );
+         BOOST_CHECK_THROW( rop.validate(), fc::exception );
+         BOOST_CHECK_THROW( propose( rop ), fc::exception );
+
+         // Repay a negative amount
+         rop = make_samet_fund_repay_op( sam_id, sf1_id, asset(-1), asset(1) );
+         BOOST_CHECK_THROW( rop.validate(), fc::exception );
+         BOOST_CHECK_THROW( propose( rop ), fc::exception );
+
+         // Repay with a negative fee
+         rop = make_samet_fund_repay_op( sam_id, sf1_id, asset(1), asset(-1) );
+         BOOST_CHECK_THROW( rop.validate(), fc::exception );
+         BOOST_CHECK_THROW( propose( rop ), fc::exception );
+
+         // Repay amount and fee in different assets
+         rop = make_samet_fund_repay_op( sam_id, sf1_id, asset(1), asset(1, usd_id) );
+         BOOST_CHECK_THROW( rop.validate(), fc::exception );
+         BOOST_CHECK_THROW( propose( rop ), fc::exception );
+      }
+
+      // Valid : borrow all from a fund
+      auto expected_sf1_balance = sf1_id(db).balance;
+      {
+         auto balance = sf1_id(db).balance;
+         auto to_borrow = balance;
+         auto fund_fee = to_borrow / 100 + 1;
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(to_borrow) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(to_borrow), asset(fund_fee) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         PUSH_TX( db, trx, ~0 );
+
+         expected_sf1_balance += fund_fee;
+
+         BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+         BOOST_CHECK( sf1_id(db).asset_type == core.id );
+         BOOST_CHECK( sf1_id(db).balance == expected_sf1_balance );
+         BOOST_CHECK( sf1_id(db).fee_rate == 10000u );
+         BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+
+         expected_balance_sam_core -= fund_fee.value;
+         check_balances();
+      }
+
+      // Valid : update fund fee rate after borrowed
+      {
+         auto balance = sf1_id(db).balance;
+         auto to_borrow = balance;
+         auto fund_fee = to_borrow / 100 + 1;
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(to_borrow) );
+         auto uop1 = make_samet_fund_update_op( sam_id, sf1_id, {}, 9999u ); // new fee rate is 0.9999%
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(to_borrow), asset(fund_fee) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(uop1);
+         trx.operations.push_back(rop1);
+         PUSH_TX( db, trx, ~0 );
+
+         expected_sf1_balance += fund_fee;
+
+         BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+         BOOST_CHECK( sf1_id(db).asset_type == core.id );
+         BOOST_CHECK( sf1_id(db).balance == expected_sf1_balance );
+         BOOST_CHECK( sf1_id(db).fee_rate == 9999u );
+         BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+
+         expected_balance_sam_core -= fund_fee.value;
+         check_balances();
+
+         // Able to do the same via a proposal
+         auto cop = make_proposal_create_op( bop1, sam_id, 300, {} );
+         auto uop2 = make_samet_fund_update_op( sam_id, sf1_id, {}, 9998u ); // new fee rate is 0.9998%
+         cop.proposed_ops.emplace_back(uop2);
+         cop.proposed_ops.emplace_back(rop1);
+         trx.operations.clear();
+         trx.operations.push_back( cop );
+         processed_transaction ptx = PUSH_TX(db, trx, ~0);
+         const operation_result& op_result = ptx.operation_results.front();
+         proposal_id_type pid = op_result.get<object_id_type>();
+
+         proposal_update_operation puo;
+         puo.proposal = pid;
+         puo.fee_paying_account = sam_id;
+         puo.active_approvals_to_add.emplace( sam_id );
+         trx.operations.clear();
+         trx.operations.push_back(puo);
+         PUSH_TX(db, trx, ~0);
+
+         BOOST_CHECK( !db.find(pid) );
+
+         expected_sf1_balance += fund_fee;
+
+         BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+         BOOST_CHECK( sf1_id(db).asset_type == core.id );
+         BOOST_CHECK( sf1_id(db).balance == expected_sf1_balance );
+         BOOST_CHECK( sf1_id(db).fee_rate == 9998u );
+         BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+
+         expected_balance_sam_core -= fund_fee.value;
+         check_balances();
+      }
+
+      vector<proposal_id_type> proposals;
+      auto make_proposal_from_trx = [&]() {
+         proposal_create_operation cop;
+         cop.fee_paying_account = sam_id;
+         cop.expiration_time = db.head_block_time() + 30;
+         cop.review_period_seconds = {};
+         for( auto& op : trx.operations )
+         {
+            cop.proposed_ops.emplace_back( op );
+         }
+         for( auto& o : cop.proposed_ops ) db.current_fee_schedule().set_fee(o.op);
+
+         trx.operations.clear();
+         trx.operations.push_back( cop );
+         processed_transaction ptx = PUSH_TX(db, trx, ~0);
+         const operation_result& op_result = ptx.operation_results.front();
+         proposal_id_type pid = op_result.get<object_id_type>();
+         proposals.push_back( pid );
+      };
+
+      // Invalid : borrow more amount than available
+      {
+         auto balance = sf1_id(db).balance;
+         auto to_borrow = balance + 1;
+         auto fund_fee = to_borrow / 100 + 1;
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(to_borrow) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(to_borrow), asset(fund_fee) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+      }
+
+      // Invalid : borrow more amount than available
+      {
+         auto balance = sf1_id(db).balance;
+         auto to_borrow = balance + 1;
+         auto fund_fee = to_borrow / 100 + 1;
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(to_borrow - 2) );
+         auto bop2 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(2) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(to_borrow), asset(fund_fee) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(bop2);
+         trx.operations.push_back(rop1);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+      }
+
+      // Invalid : borrow asset type mismatch
+      {
+         auto balance = sf1_id(db).balance;
+         auto to_borrow = balance;
+         auto fund_fee = to_borrow / 100 + 1;
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(to_borrow, usd_id) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(to_borrow), asset(fund_fee) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+
+         rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(to_borrow, usd_id), asset(fund_fee, usd_id) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+      }
+
+      // Invalid : repay asset type mismatch
+      {
+         auto balance = sf1_id(db).balance;
+         auto to_borrow = balance;
+         auto fund_fee = to_borrow / 100 + 1;
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(to_borrow) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(to_borrow, usd_id), asset(fund_fee, usd_id) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+      }
+
+      // Invalid : repay less than borrowed
+      {
+         auto balance = sf1_id(db).balance;
+         auto to_borrow = balance;
+         auto fund_fee = to_borrow / 100 + 1;
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(to_borrow) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(to_borrow - 1), asset(fund_fee) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+      }
+
+      // Invalid : repay more than borrowed
+      {
+         auto balance = sf1_id(db).balance;
+         auto to_borrow = balance;
+         auto fund_fee = (to_borrow + 1) / 100 + 1;
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(to_borrow) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(to_borrow + 1), asset(fund_fee) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+
+         // Invalid too if repaid more and borrow again
+         auto bop2 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(1) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         trx.operations.push_back(bop2);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+      }
+
+      // Invalid : insufficient fund fee paid
+      {
+         auto balance = sf1_id(db).balance;
+         auto to_borrow = balance;
+         auto fund_fee = ( to_borrow - 1 ) / 100;
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(to_borrow) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(to_borrow), asset(fund_fee) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+      }
+
+      // Invalid : insufficient account balance to repay the debt
+      {
+         auto balance = sf1_id(db).balance;
+         auto to_borrow = balance;
+         auto fund_fee = to_borrow / 100 + 1;
+         auto bop1 = make_samet_fund_borrow_op( por_id, sf1_id, asset(to_borrow) );
+         auto rop1 = make_samet_fund_repay_op( por_id, sf1_id, asset(to_borrow), asset(fund_fee) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+      }
+
+      // Invalid : update fund balance after borrowed
+      {
+         auto balance = sf1_id(db).balance;
+         auto to_borrow = balance;
+         auto fund_fee = to_borrow / 100 + 1;
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(to_borrow) );
+         auto uop1 = make_samet_fund_update_op( sam_id, sf1_id, asset(1), {} );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(to_borrow), asset(fund_fee) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(uop1);
+         trx.operations.push_back(rop1);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+
+         auto uop2 = make_samet_fund_update_op( sam_id, sf1_id, asset(-1), {} );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(uop2);
+         trx.operations.push_back(rop1);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+      }
+
+      // Invalid : delete fund after borrowed
+      {
+         auto balance = sf1_id(db).balance;
+         auto to_borrow = balance;
+         auto fund_fee = to_borrow / 100 + 1;
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf1_id, asset(to_borrow) );
+         auto dop1 = make_samet_fund_delete_op( sam_id, sf1_id );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(dop1);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf1_id, asset(to_borrow), asset(fund_fee) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(dop1);
+         trx.operations.push_back(rop1);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+      }
+
+      // Invalid: borrow account is not whitelisted by asset
+      {
+         auto bop1 = make_samet_fund_borrow_op( ted_id, sf3_id, asset(1, eur_id) );
+         auto rop1 = make_samet_fund_repay_op( sam_id, sf3_id, asset(1, eur_id), asset(1, eur_id) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+      }
+
+      // Invalid: repay account is not whitelisted by asset
+      {
+         auto bop1 = make_samet_fund_borrow_op( sam_id, sf3_id, asset(1, eur_id) );
+         auto rop1 = make_samet_fund_repay_op( ted_id, sf3_id, asset(1, eur_id), asset(1, eur_id) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         BOOST_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+         make_proposal_from_trx();
+      }
+
+      generate_block();
+
+      // Nothing changed
+      BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf1_id(db).asset_type == core.id );
+      BOOST_CHECK( sf1_id(db).balance == expected_sf1_balance );
+      BOOST_CHECK( sf1_id(db).fee_rate == 9998u );
+      BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+
+      check_balances();
+
+      // Approve the proposals
+      for( auto& pid : proposals )
+      {
+         auto& p = pid(db);
+         proposal_update_operation puo;
+         puo.proposal = pid;
+         puo.fee_paying_account = sam_id;
+         for(auto& req : p.required_active_approvals)
+            puo.active_approvals_to_add.emplace( req );
+         trx.operations.clear();
+         trx.operations.push_back(puo);
+         PUSH_TX(db, trx, ~0);
+
+         // Approved but failed to execute
+         BOOST_CHECK( pid(db).is_authorized_to_execute(db) );
+         BOOST_CHECK( !pid(db).fail_reason.empty() );
+
+         // Nothing changed
+         BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+         BOOST_CHECK( sf1_id(db).asset_type == core.id );
+         BOOST_CHECK( sf1_id(db).balance == expected_sf1_balance );
+         BOOST_CHECK( sf1_id(db).fee_rate == 9998u );
+         BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+         check_balances();
+      }
+
+      // Nothing changed
+      BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf1_id(db).asset_type == core.id );
+      BOOST_CHECK( sf1_id(db).balance == expected_sf1_balance );
+      BOOST_CHECK( sf1_id(db).fee_rate == 9998u );
+      BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+
+      check_balances();
+
+      // Time goes by
+      generate_blocks( db.head_block_time() + fc::seconds(300) );
+
+      // proposals expired
+      for( auto& pid : proposals )
+      {
+         BOOST_CHECK( !db.find(pid) );
+      }
+
+      // Nothing changed
+      BOOST_CHECK( sf1_id(db).owner_account == sam_id );
+      BOOST_CHECK( sf1_id(db).asset_type == core.id );
+      BOOST_CHECK( sf1_id(db).balance == expected_sf1_balance );
+      BOOST_CHECK( sf1_id(db).fee_rate == 9998u );
+      BOOST_CHECK( sf1_id(db).unpaid_amount == 0 );
+
+      check_balances();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

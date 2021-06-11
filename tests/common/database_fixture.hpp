@@ -378,7 +378,7 @@ struct database_fixture_base {
    const worker_object& create_worker(account_id_type owner, const share_type daily_pay = 1000, const fc::microseconds& duration = fc::days(2));
    template<typename T>
    proposal_create_operation make_proposal_create_op( const T& op, account_id_type proposer = GRAPHENE_TEMP_ACCOUNT,
-                                                      uint32_t timeout = 300, uint32_t review_period = 0 ) const
+                                                      uint32_t timeout = 300, optional<uint32_t> review_period = {} ) const
    {
       proposal_create_operation cop;
       cop.fee_paying_account = proposer;
