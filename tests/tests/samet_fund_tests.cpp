@@ -1026,4 +1026,140 @@ BOOST_AUTO_TEST_CASE( samet_fund_borrow_repay_test )
    }
 }
 
+BOOST_AUTO_TEST_CASE( samet_fund_apis_test )
+{ try {
+
+      // Pass the hard fork time
+      generate_blocks( HARDFORK_CORE_2351_TIME );
+      set_expiration( db, trx );
+
+      ACTORS((sam)(ted));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( ted, asset(init_amount) );
+
+      asset_id_type core_id;
+
+      const asset_object& usd = create_user_issued_asset( "MYUSD" );
+      asset_id_type usd_id = usd.id;
+      issue_uia( sam, usd.amount(init_amount) );
+      issue_uia( ted, usd.amount(init_amount) );
+
+      const asset_object& eur = create_user_issued_asset( "MYEUR", sam, white_list );
+      asset_id_type eur_id = eur.id;
+      issue_uia( sam, eur.amount(init_amount) );
+      issue_uia( ted, eur.amount(init_amount) );
+
+      // create samet funds
+      const samet_fund_object& sfo1 = create_samet_fund( sam_id, core_id, 10000, 10000u ); // fee rate is 1%
+      samet_fund_id_type sf1_id = sfo1.id;
+
+      const samet_fund_object& sfo2 = create_samet_fund( ted_id, usd_id, 1, 10000000u ); // fee rate is 1000%
+      samet_fund_id_type sf2_id = sfo2.id;
+
+      const samet_fund_object& sfo3 = create_samet_fund( sam_id, eur_id, 10, 1u );
+      samet_fund_id_type sf3_id = sfo3.id;
+
+      const samet_fund_object& sfo4 = create_samet_fund( sam_id, eur_id, 10, 2u );
+      samet_fund_id_type sf4_id = sfo4.id;
+
+      const samet_fund_object& sfo5 = create_samet_fund( sam_id, usd_id, 100, 20u );
+      samet_fund_id_type sf5_id = sfo5.id;
+
+      const samet_fund_object& sfo6 = create_samet_fund( ted_id, usd_id, 1000, 200u );
+      samet_fund_id_type sf6_id = sfo6.id;
+
+      generate_block();
+
+      // Check database API
+      graphene::app::database_api db_api( db, &( app.get_options() ) );
+
+      // List all SameT Funds
+      auto funds = db_api.list_samet_funds();
+      BOOST_REQUIRE_EQUAL( funds.size(), 6u );
+      BOOST_CHECK( funds.front().id == sf1_id );
+      BOOST_CHECK( funds.back().id == sf6_id );
+
+      // Pagination : the first page
+      funds = db_api.list_samet_funds( 5 );
+      BOOST_REQUIRE_EQUAL( funds.size(), 5u );
+      BOOST_CHECK( funds.front().id == sf1_id );
+      BOOST_CHECK( funds.back().id == sf5_id );
+
+      // Pagination : the last page
+      funds = db_api.list_samet_funds( 5, sf3_id );
+      BOOST_REQUIRE_EQUAL( funds.size(), 4u );
+      BOOST_CHECK( funds.front().id == sf3_id );
+      BOOST_CHECK( funds.back().id == sf6_id );
+
+      // Limit too large
+      BOOST_CHECK_THROW( db_api.list_samet_funds( 102 ), fc::exception );
+
+      // Get all SameT Funds owned by Sam
+      funds = db_api.get_samet_funds_by_owner( "sam" );
+      BOOST_REQUIRE_EQUAL( funds.size(), 4u );
+      BOOST_CHECK( funds.front().id == sf1_id );
+      BOOST_CHECK( funds.back().id == sf5_id );
+
+      // Pagination : the first page
+      funds = db_api.get_samet_funds_by_owner( "sam", 3, {} );
+      BOOST_REQUIRE_EQUAL( funds.size(), 3u );
+      BOOST_CHECK( funds.front().id == sf1_id );
+      BOOST_CHECK( funds.back().id == sf4_id );
+
+      // Pagination : another page
+      funds = db_api.get_samet_funds_by_owner( "sam", 3, sf2_id );
+      BOOST_REQUIRE_EQUAL( funds.size(), 3u );
+      BOOST_CHECK( funds.front().id == sf3_id );
+      BOOST_CHECK( funds.back().id == sf5_id );
+
+      // Pagination : the first page of SameT Funds owned by Ted
+      funds = db_api.get_samet_funds_by_owner( string("1.2.")+fc::to_string(ted_id.instance.value), 3 );
+      BOOST_REQUIRE_EQUAL( funds.size(), 2u );
+      BOOST_CHECK( funds.front().id == sf2_id );
+      BOOST_CHECK( funds.back().id == sf6_id );
+
+      // Nonexistent account
+      BOOST_CHECK_THROW( db_api.get_samet_funds_by_owner( "nonexistent-account" ), fc::exception );
+
+      // Limit too large
+      BOOST_CHECK_THROW( db_api.get_samet_funds_by_owner( "ted", 102 ), fc::exception );
+
+      // Get all SameT Funds whose asset type is USD
+      funds = db_api.get_samet_funds_by_asset( "MYUSD" );
+      BOOST_REQUIRE_EQUAL( funds.size(), 3u );
+      BOOST_CHECK( funds.front().id == sf2_id );
+      BOOST_CHECK( funds.back().id == sf6_id );
+
+      // Pagination : the first page
+      funds = db_api.get_samet_funds_by_asset( "MYUSD", 2 );
+      BOOST_REQUIRE_EQUAL( funds.size(), 2u );
+      BOOST_CHECK( funds.front().id == sf2_id );
+      BOOST_CHECK( funds.back().id == sf5_id );
+
+      // Pagination : another page
+      funds = db_api.get_samet_funds_by_asset( "MYUSD", 2, sf4_id );
+      BOOST_REQUIRE_EQUAL( funds.size(), 2u );
+      BOOST_CHECK( funds.front().id == sf5_id );
+      BOOST_CHECK( funds.back().id == sf6_id );
+
+      // Pagination : the first page of SameT Funds whose asset type is CORE
+      funds = db_api.get_samet_funds_by_asset( "1.3.0", 2, {} );
+      BOOST_REQUIRE_EQUAL( funds.size(), 1u );
+      BOOST_CHECK( funds.front().id == sf1_id );
+      BOOST_CHECK( funds.back().id == sf1_id );
+
+      // Nonexistent asset
+      BOOST_CHECK_THROW( db_api.get_samet_funds_by_asset( "NOSUCHASSET" ), fc::exception );
+
+      // Limit too large
+      BOOST_CHECK_THROW( db_api.get_samet_funds_by_asset( "MYUSD", 102 ), fc::exception );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
