@@ -2077,6 +2077,129 @@ vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by
 
 //////////////////////////////////////////////////////////////////////
 //                                                                  //
+// SameT Funds                                                      //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<samet_fund_object> database_api::list_samet_funds(
+            const optional<uint32_t>& limit,
+            const optional<samet_fund_id_type>& start_id )const
+{
+   return my->list_samet_funds( limit, start_id );
+}
+
+vector<samet_fund_object> database_api_impl::list_samet_funds(
+            const optional<uint32_t>& olimit,
+            const optional<samet_fund_id_type>& ostart_id )const
+{
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_samet_funds;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   vector<samet_fund_object> results;
+
+   samet_fund_id_type start_id = ostart_id.valid() ? *ostart_id : samet_fund_id_type();
+
+   const auto& idx = _db.get_index_type<samet_fund_index>().indices().get<by_id>();
+   auto lower_itr = idx.lower_bound( start_id );
+   auto upper_itr = idx.end();
+
+   results.reserve( limit );
+   for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
+   {
+      results.emplace_back( *lower_itr );
+   }
+
+   return results;
+}
+
+vector<samet_fund_object> database_api::get_samet_funds_by_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit,
+            const optional<samet_fund_id_type>& start_id )const
+{
+   return my->get_samet_funds_by_owner( account_name_or_id, limit, start_id );
+}
+
+vector<samet_fund_object> database_api_impl::get_samet_funds_by_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& olimit,
+            const optional<samet_fund_id_type>& ostart_id )const
+{
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_samet_funds;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   account_id_type owner = get_account_from_string(account_name_or_id)->id;
+
+   vector<samet_fund_object> results;
+
+   samet_fund_id_type start_id = ostart_id.valid() ? *ostart_id : samet_fund_id_type();
+
+   const auto& idx = _db.get_index_type<samet_fund_index>().indices().get<by_owner>();
+   auto lower_itr = idx.lower_bound( std::make_tuple( owner, start_id ) );
+   auto upper_itr = idx.upper_bound( owner );
+
+   results.reserve( limit );
+   for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
+   {
+      results.emplace_back( *lower_itr );
+   }
+
+   return results;
+}
+
+vector<samet_fund_object> database_api::get_samet_funds_by_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit,
+            const optional<samet_fund_id_type>& start_id )const
+{
+   return my->get_samet_funds_by_asset( asset_symbol_or_id, limit, start_id );
+}
+
+vector<samet_fund_object> database_api_impl::get_samet_funds_by_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& olimit,
+            const optional<samet_fund_id_type>& ostart_id )const
+{
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_samet_funds;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   asset_id_type asset_type = get_asset_from_string(asset_symbol_or_id)->id;
+
+   vector<samet_fund_object> results;
+
+   samet_fund_id_type start_id = ostart_id.valid() ? *ostart_id : samet_fund_id_type();
+
+   const auto& idx = _db.get_index_type<samet_fund_index>().indices().get<by_asset_type>();
+   auto lower_itr = idx.lower_bound( std::make_tuple( asset_type, start_id ) );
+   auto upper_itr = idx.upper_bound( asset_type );
+
+   results.reserve( limit );
+   for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
+   {
+      results.emplace_back( *lower_itr );
+   }
+
+   return results;
+}
+
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
 // Witnesses                                                        //
 //                                                                  //
 //////////////////////////////////////////////////////////////////////

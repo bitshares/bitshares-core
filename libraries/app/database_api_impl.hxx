@@ -178,6 +178,19 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             optional<asset_id_type> start_id = optional<asset_id_type>(),
             optional<bool> with_statistics = false )const;
 
+      // SameT Funds
+      vector<samet_fund_object> list_samet_funds(
+            const optional<uint32_t>& limit = 101,
+            const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
+      vector<samet_fund_object> get_samet_funds_by_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit = 101,
+            const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
+      vector<samet_fund_object> get_samet_funds_by_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit = 101,
+            const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
+
       // Witnesses
       vector<optional<witness_object>> get_witnesses(const vector<witness_id_type>& witness_ids)const;
       fc::optional<witness_object> get_witness_by_account(const std::string account_id_or_name)const;

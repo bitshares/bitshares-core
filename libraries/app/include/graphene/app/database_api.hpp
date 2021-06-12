@@ -33,16 +33,14 @@
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/confidential_object.hpp>
-#include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
+#include <graphene/chain/samet_fund_object.hpp>
 #include <graphene/chain/ticket_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 
 #include <fc/api.hpp>
 #include <fc/variant_object.hpp>
-
-#include <fc/network/ip.hpp>
 
 #include <boost/container/flat_set.hpp>
 
@@ -788,6 +786,62 @@ class database_api
             optional<asset_id_type> start_id = optional<asset_id_type>(),
             optional<bool> with_statistics = false )const;
 
+      /////////////////////
+      // SameT Funds     //
+      /////////////////////
+
+      /**
+       * @brief Get a list of SameT Funds
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start SameT Fund id, fetch items whose IDs are greater than or equal to this ID
+       * @return The SameT Funds
+       *
+       * @note
+       * 1. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 2. @p start_id can be omitted or be null, if so the api will return the "first page" of data
+       * 3. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<samet_fund_object> list_samet_funds(
+            const optional<uint32_t>& limit = 101,
+            const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
+
+      /**
+       * @brief Get a list of SameT Funds by the name or ID of the owner account
+       * @param account_name_or_id name or ID of the owner account
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start Samet Fund id, fetch items whose IDs are greater than or equal to this ID
+       * @return The SameT Funds
+       *
+       * @note
+       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
+       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<samet_fund_object> get_samet_funds_by_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit = 101,
+            const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
+
+      /**
+       * @brief Get a list of SameT Funds by the symbole or ID of the asset type
+       * @param asset_symbol_or_id symbol or ID of the asset type
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start Samet Fund id, fetch items whose IDs are greater than or equal to this ID
+       * @return The SameT Funds
+       *
+       * @note
+       * 1. if @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
+       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<samet_fund_object> get_samet_funds_by_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit = 101,
+            const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
+
+
       ///////////////
       // Witnesses //
       ///////////////
@@ -1204,6 +1258,11 @@ FC_API(graphene::app::database_api,
    (get_liquidity_pools)
    (get_liquidity_pools_by_share_asset)
    (get_liquidity_pools_by_owner)
+
+   // SameT Funds
+   (list_samet_funds)
+   (get_samet_funds_by_owner)
+   (get_samet_funds_by_asset)
 
    // Witnesses
    (get_witnesses)
