@@ -114,10 +114,10 @@ namespace graphene { namespace protocol {
       {
          return params.fee;
       }
-      void get_required_authorities( vector<authority>& )const{}
-      void get_required_active_authorities( flat_set<account_id_type>& )const{}
-      void get_required_owner_authorities( flat_set<account_id_type>& )const{}
-      void validate()const{}
+      virtual void get_required_authorities( vector<authority>& )const{}
+      virtual void get_required_active_authorities( flat_set<account_id_type>& )const{}
+      virtual void get_required_owner_authorities( flat_set<account_id_type>& )const{}
+      virtual void validate()const{}
       fc::optional< fc::future<void> > validate_parallel( uint32_t skip )const;
 
       static uint64_t calculate_data_fee( uint64_t bytes, uint64_t price_per_kbyte );

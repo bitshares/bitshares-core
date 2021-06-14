@@ -35,6 +35,7 @@
 #include <graphene/protocol/liquidity_pool.hpp>
 #include <graphene/protocol/market.hpp>
 #include <graphene/protocol/proposal.hpp>
+#include <graphene/protocol/samet_fund.hpp>
 #include <graphene/protocol/ticket.hpp>
 #include <graphene/protocol/transfer.hpp>
 #include <graphene/protocol/vesting.hpp>
@@ -114,7 +115,12 @@ namespace graphene { namespace protocol {
             /* 60 */ liquidity_pool_delete_operation,
             /* 61 */ liquidity_pool_deposit_operation,
             /* 62 */ liquidity_pool_withdraw_operation,
-            /* 63 */ liquidity_pool_exchange_operation
+            /* 63 */ liquidity_pool_exchange_operation,
+            /* 64 */ samet_fund_create_operation,
+            /* 65 */ samet_fund_delete_operation,
+            /* 66 */ samet_fund_update_operation,
+            /* 67 */ samet_fund_borrow_operation,
+            /* 68 */ samet_fund_repay_operation
          > operation;
 
    /// @} // operations group

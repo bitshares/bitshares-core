@@ -96,14 +96,19 @@ jobs:
       run: |
         _build/tests/app_test -l test_suite
         df -h
+        rm -rf /tmp/graphene*
         curl -XPUT -H "Content-Type: application/json" http://localhost:9200/_cluster/settings \
           -d '{ "transient": { "cluster.routing.allocation.disk.threshold_enabled": false } }'
         echo
         _build/tests/es_test -l test_suite
         df -h
+        rm -rf /tmp/graphene*
         libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
+        df -h
+        rm -rf /tmp/graphene*
         _build/tests/cli_test -l test_suite
         df -h
+        rm -rf /tmp/graphene*
     - name: Quick test for program arguments
       run: |
         _build/programs/witness_node/witness_node --version

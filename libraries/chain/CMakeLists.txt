@@ -8,14 +8,15 @@ if( GRAPHENE_DISABLE_UNITY_BUILD )
         db_balance.cpp
         db_block.cpp
         db_debug.cpp
+        db_genesis.cpp
         db_getter.cpp
         db_init.cpp
         db_maint.cpp
         db_management.cpp
         db_market.cpp
+        db_notify.cpp
         db_update.cpp
         db_witness_schedule.cpp
-        db_notify.cpp
       )
    message( STATUS "Graphene database unity build disabled" )
 else( GRAPHENE_DISABLE_UNITY_BUILD )
@@ -37,6 +38,7 @@ add_library( graphene_chain
 
              evaluator.cpp
              liquidity_pool_evaluator.cpp
+             samet_fund_evaluator.cpp
              balance_evaluator.cpp
              account_evaluator.cpp
              assert_evaluator.cpp
@@ -80,6 +82,7 @@ target_include_directories( graphene_chain
 
 set( GRAPHENE_CHAIN_BIG_FILES
      db_init.cpp
+     db_genesis.cpp
      db_block.cpp
      db_maint.cpp
      db_market.cpp

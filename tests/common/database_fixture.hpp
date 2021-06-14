@@ -35,6 +35,7 @@
 
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/liquidity_pool_object.hpp>
+#include <graphene/chain/samet_fund_object.hpp>
 #include <graphene/chain/ticket_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
@@ -377,7 +378,7 @@ struct database_fixture_base {
    const worker_object& create_worker(account_id_type owner, const share_type daily_pay = 1000, const fc::microseconds& duration = fc::days(2));
    template<typename T>
    proposal_create_operation make_proposal_create_op( const T& op, account_id_type proposer = GRAPHENE_TEMP_ACCOUNT,
-                                                      uint32_t timeout = 300, uint32_t review_period = 0 ) const
+                                                      uint32_t timeout = 300, optional<uint32_t> review_period = {} ) const
    {
       proposal_create_operation cop;
       cop.fee_paying_account = proposer;
@@ -416,6 +417,8 @@ struct database_fixture_base {
    void transfer( account_id_type from, account_id_type to, const asset& amount, const asset& fee = asset() );
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );
    void fund_fee_pool( const account_object& from, const asset_object& asset_to_fund, const share_type amount );
+
+   // Tickets
    ticket_create_operation make_ticket_create_op( account_id_type account, ticket_type type,
                                                   const asset& amount )const;
    const ticket_object& create_ticket( account_id_type account, ticket_type type, const asset& amount );
@@ -424,6 +427,7 @@ struct database_fixture_base {
    generic_operation_result update_ticket( const ticket_object& ticket, ticket_type type,
                                            const optional<asset>& amount );
 
+   // Liquidity Pools
    liquidity_pool_create_operation make_liquidity_pool_create_op( account_id_type account, asset_id_type asset_a,
                                                   asset_id_type asset_b, asset_id_type share_asset,
                                                   uint16_t taker_fee_percent, uint16_t withdrawal_fee_percent )const;
@@ -449,6 +453,28 @@ struct database_fixture_base {
    generic_exchange_operation_result exchange_with_liquidity_pool( account_id_type account,
                                                   liquidity_pool_id_type pool, const asset& amount_to_sell,
                                                   const asset& min_to_receive );
+
+   // SameT Funds
+   samet_fund_create_operation make_samet_fund_create_op( account_id_type account, asset_id_type asset_type,
+                                                  share_type balance, uint32_t fee_rate )const;
+   const samet_fund_object& create_samet_fund( account_id_type account, asset_id_type asset_type,
+                                                  share_type balance, uint32_t fee_rate );
+   samet_fund_delete_operation make_samet_fund_delete_op( account_id_type account, samet_fund_id_type fund_id )const;
+   asset delete_samet_fund( account_id_type account,  samet_fund_id_type fund_id );
+   samet_fund_update_operation make_samet_fund_update_op( account_id_type account, samet_fund_id_type fund_id,
+                                                  const optional<asset>& delta_amount,
+                                                  const optional<uint32_t>& new_fee_rate )const;
+   void update_samet_fund( account_id_type account, samet_fund_id_type fund_id,
+                                                  const optional<asset>& delta_amount,
+                                                  const optional<uint32_t>& new_fee_rate );
+   samet_fund_borrow_operation make_samet_fund_borrow_op( account_id_type account, samet_fund_id_type fund_id,
+                                                  const asset& borrow_amount )const;
+   void borrow_from_samet_fund( account_id_type account, samet_fund_id_type fund_id,
+                                                  const asset& borrow_amount );
+   samet_fund_repay_operation make_samet_fund_repay_op( account_id_type account, samet_fund_id_type fund_id,
+                                                  const asset& repay_amount, const asset& fund_fee )const;
+   void repay_to_samet_fund( account_id_type account, samet_fund_id_type fund_id,
+                                                  const asset& repay_amount, const asset& fund_fee );
 
    /**
     * NOTE: This modifies the database directly. You will probably have to call this each time you

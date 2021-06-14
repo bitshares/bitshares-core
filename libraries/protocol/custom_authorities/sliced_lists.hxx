@@ -46,7 +46,9 @@ using operation_list_11 = static_variant<typelist::builder<>
                                                 ::add_list<typelist::slice<operation::list, 47, 51>>
                                                 ::add<htlc_extend_operation>      // 52
                                                 ::finalize>;
-using operation_list_12 = static_variant<typelist::slice<operation::list, 54>>;
+using operation_list_12 = static_variant<typelist::slice<operation::list, 54, 59>>;
+using operation_list_13 = static_variant<typelist::slice<operation::list, 59, 64>>;
+using operation_list_14 = static_variant<typelist::slice<operation::list, 64>>;
 using virtual_operations_list = static_variant<fill_order_operation,          // 4
                                                asset_settle_cancel_operation, // 42
                                                fba_distribute_operation,      // 44
@@ -55,17 +57,19 @@ using virtual_operations_list = static_variant<fill_order_operation,          //
                                                htlc_refund_operation          // 53
                                               >;
 
-object_restriction_predicate<operation> get_restriction_predicate_list_1(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_2(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_3(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_4(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_5(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_6(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_7(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_8(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_9(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_10(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_11(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_predicate_list_12(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_pred_list_1(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_pred_list_2(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_pred_list_3(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_pred_list_4(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_pred_list_5(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_pred_list_6(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_pred_list_7(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_pred_list_8(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_pred_list_9(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_pred_list_10(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_pred_list_11(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_pred_list_12(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_pred_list_13(size_t idx, vector<restriction> rs);
+object_restriction_predicate<operation> get_restriction_pred_list_14(size_t idx, vector<restriction> rs);
 
 } } // namespace graphene::protocol

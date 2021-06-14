@@ -8,6 +8,7 @@ list(APPEND SOURCES account.cpp
                     chain_parameters.cpp
                     fee_schedule.cpp
                     fee_schedule_calc.cpp
+                    fee_schedule_reflect.cpp
                     memo.cpp
                     proposal.cpp
                     transfer.cpp
@@ -23,6 +24,7 @@ list(APPEND SOURCES account.cpp
                     custom.cpp
                     market.cpp
                     liquidity_pool.cpp
+                    samet_fund.cpp
                     ticket.cpp
                     operations.cpp
                     pts_address.cpp
@@ -50,7 +52,9 @@ list(APPEND CUSTOM_AUTHS_FILES
      custom_authorities/list_9.cpp
      custom_authorities/list_10.cpp
      custom_authorities/list_11.cpp
-     custom_authorities/list_12.cpp)
+     custom_authorities/list_12.cpp
+     custom_authorities/list_13.cpp
+     custom_authorities/list_14.cpp)
 
 file(GLOB CUSTOM_AUTHS_HEADERS "custom_authorities/*.hxx")
 

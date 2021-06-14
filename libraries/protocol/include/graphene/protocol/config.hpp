@@ -117,6 +117,9 @@
 #define GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO        1500 ///< Stop calling when collateral only pays off 150% of the debt
 ///@}
 
+/// Denominator for SameT Fund fee calculation
+constexpr uint32_t GRAPHENE_SAMET_FUND_FEE_DENOM = 1000000;
+
 /**
  *  Reserved Account IDs with special meaning
  */
