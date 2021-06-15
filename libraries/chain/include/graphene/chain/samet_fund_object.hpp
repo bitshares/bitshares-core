@@ -91,12 +91,6 @@ using samet_fund_index = generic_index<samet_fund_object, samet_fund_multi_index
 
 MAP_OBJECT_ID_TO_TYPE( graphene::chain::samet_fund_object )
 
-FC_REFLECT_DERIVED( graphene::chain::samet_fund_object, (graphene::db::object),
-                    (owner_account)
-                    (asset_type)
-                    (balance)
-                    (fee_rate)
-                    (unpaid_amount)
-                  )
+FC_REFLECT_TYPENAME( graphene::chain::samet_fund_object )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::samet_fund_object )

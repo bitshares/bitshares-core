@@ -201,6 +201,13 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::custom_authority_object, (graph
                                (account)(enabled)(valid_from)(valid_to)(operation_type)
                                (auth)(restrictions)(restriction_counter) )
 
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::samet_fund_object, (graphene::db::object),
+                    (owner_account)
+                    (asset_type)
+                    (balance)
+                    (fee_rate)
+                    (unpaid_amount)
+                  )
 
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::balance_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::block_summary_object )
