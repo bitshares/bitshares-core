@@ -447,6 +447,9 @@ signed_block database::_generate_block(
       {
          auto temp_session = _undo_db.start_undo_session();
          processed_transaction ptx = _apply_transaction( tx );
+         // Clear results to save disk space and network bandwidth.
+         // This may break client applications which rely on the results.
+         ptx.operation_results.clear();
 
          // We have to recompute pack_size(ptx) because it may be different
          // than pack_size(tx) (i.e. if one or more results increased
@@ -658,8 +661,11 @@ void database::_apply_block( const signed_block& next_block )
    notify_changed_objects();
 } FC_CAPTURE_AND_RETHROW( (next_block.block_num()) )  }
 
-
-
+/**
+ * @note if a @c processed_transaction is passed in, it is cast into @c signed_transaction here.
+ *       It also means that the @c operation_results field is ignored by consensus, although it
+ *       is a part of block data.
+ */
 processed_transaction database::apply_transaction(const signed_transaction& trx, uint32_t skip)
 {
    processed_transaction result;

@@ -1668,7 +1668,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
          BOOST_CHECK(generate_block(app1, result_block));
 
          // get the ID:
-         htlc_id_type htlc_id = result_block.transactions[result_block.transactions.size()-1].operation_results[0].get<object_id_type>();
+         auto tmp_hist = con.wallet_api_ptr->get_account_history("alice", 1);
+         htlc_id_type htlc_id = tmp_hist[0].op.result.get<object_id_type>();
          alice_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
          BOOST_TEST_MESSAGE("Alice shares the HTLC ID with Bob. The HTLC ID is: " + alice_htlc_id_as_string);
       }
@@ -1690,7 +1691,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
          BOOST_CHECK(generate_block(app1, result_block));
 
          // get the ID:
-         htlc_id_type htlc_id = result_block.transactions[result_block.transactions.size()-1].operation_results[0].get<object_id_type>();
+         auto tmp_hist = con.wallet_api_ptr->get_account_history("bob", 1);
+         htlc_id_type htlc_id = tmp_hist[0].op.result.get<object_id_type>();
          bob_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
          BOOST_TEST_MESSAGE("Bob shares the HTLC ID with Alice. The HTLC ID is: " + bob_htlc_id_as_string);
       }
@@ -2213,8 +2215,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          BOOST_CHECK(generate_block(app1, result_block));
 
          // get the ID:
-         htlc_id_type htlc_id = result_block.transactions[result_block.transactions.size()-1]
-               .operation_results[0].get<object_id_type>();
+         auto tmp_hist = con.wallet_api_ptr->get_account_history("alice", 1);
+         htlc_id_type htlc_id = tmp_hist[0].op.result.get<object_id_type>();
          alice_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
          BOOST_TEST_MESSAGE("Alice shares the HTLC ID with Bob. The HTLC ID is: " + alice_htlc_id_as_string);
       }
@@ -2237,8 +2239,8 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc_bsip64 )
          BOOST_CHECK(generate_block(app1, result_block));
 
          // get the ID:
-         htlc_id_type htlc_id = result_block.transactions[result_block.transactions.size()-1]
-               .operation_results[0].get<object_id_type>();
+         auto tmp_hist = con.wallet_api_ptr->get_account_history("bob", 1);
+         htlc_id_type htlc_id = tmp_hist[0].op.result.get<object_id_type>();
          bob_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
          BOOST_TEST_MESSAGE("Bob shares the HTLC ID with Alice. The HTLC ID is: " + bob_htlc_id_as_string);
       }
