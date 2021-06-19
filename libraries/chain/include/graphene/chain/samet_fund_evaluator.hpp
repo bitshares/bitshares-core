@@ -28,8 +28,6 @@
 
 namespace graphene { namespace chain {
 
-   class asset_object;
-   class asset_dynamic_data_object;
    class samet_fund_object;
 
    class samet_fund_create_evaluator : public evaluator<samet_fund_create_evaluator>
@@ -69,7 +67,7 @@ namespace graphene { namespace chain {
          using operation_type = samet_fund_borrow_operation;
 
          void_result do_evaluate( const samet_fund_borrow_operation& op );
-         void_result do_apply( const samet_fund_borrow_operation& op ) const;
+         object_id_type do_apply( const samet_fund_borrow_operation& op ) const;
 
          const samet_fund_object* _fund = nullptr;
    };
@@ -80,7 +78,7 @@ namespace graphene { namespace chain {
          using operation_type = samet_fund_repay_operation;
 
          void_result do_evaluate( const samet_fund_repay_operation& op );
-         void_result do_apply( const samet_fund_repay_operation& op ) const;
+         object_id_type do_apply( const samet_fund_repay_operation& op ) const;
 
          const samet_fund_object* _fund = nullptr;
    };

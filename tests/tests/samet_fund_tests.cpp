@@ -1162,4 +1162,68 @@ BOOST_AUTO_TEST_CASE( samet_fund_apis_test )
    }
 }
 
+BOOST_AUTO_TEST_CASE( samet_fund_account_history_test )
+{ try {
+
+      // Pass the hard fork time
+      generate_blocks( HARDFORK_CORE_2351_TIME );
+      set_expiration( db, trx );
+
+      ACTORS((sam)(ted));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( ted, asset(init_amount) );
+
+      asset_id_type core_id;
+
+      // create samet funds
+      const samet_fund_object& sfo1 = create_samet_fund( sam_id, core_id, 10000, 10000u ); // fee rate is 1%
+      samet_fund_id_type sf1_id = sfo1.id;
+
+      generate_block();
+
+      // Check history API
+      graphene::app::history_api hist_api(app);
+
+      // Sam's last operation is fund creation
+      auto histories = hist_api.get_relative_account_history( "sam", 0, 1, 0 );
+      BOOST_REQUIRE_EQUAL( histories.size(), 1u );
+      BOOST_CHECK( histories[0].op.is_type<samet_fund_create_operation>() );
+
+      // Ted's last operation is transfer
+      histories = hist_api.get_relative_account_history( "ted", 0, 1, 0 );
+      BOOST_REQUIRE_EQUAL( histories.size(), 1u );
+      BOOST_CHECK( histories[0].op.is_type<transfer_operation>() );
+
+      // Ted borrow and repay
+      {
+         auto bop1 = make_samet_fund_borrow_op( ted_id, sf1_id, asset(1) );
+         auto rop1 = make_samet_fund_repay_op( ted_id, sf1_id, asset(1), asset(1) );
+         trx.operations.clear();
+         trx.operations.push_back(bop1);
+         trx.operations.push_back(rop1);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      generate_block();
+
+      // Sam's last 2 operations are Ted's borrowing and repayment
+      histories = hist_api.get_relative_account_history( "sam", 0, 2, 0 );
+      BOOST_REQUIRE_EQUAL( histories.size(), 2u );
+      BOOST_CHECK( histories[0].op.is_type<samet_fund_repay_operation>() );
+      BOOST_CHECK( histories[1].op.is_type<samet_fund_borrow_operation>() );
+
+      // Ted's last 2 operations are the same
+      auto histories_ted = hist_api.get_relative_account_history( "ted", 0, 2, 0 );
+      BOOST_REQUIRE_EQUAL( histories_ted.size(), 2u );
+      BOOST_CHECK( histories[0].id == histories_ted[0].id );
+      BOOST_CHECK( histories[1].id == histories_ted[1].id );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
