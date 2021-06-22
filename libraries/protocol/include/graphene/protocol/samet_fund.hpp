@@ -41,7 +41,7 @@ namespace graphene { namespace protocol {
       account_id_type owner_account;         ///< Owner of the fund
       asset_id_type   asset_type;            ///< Asset type in the fund
       share_type      balance;               ///< Usable amount in the fund
-      uint32_t        fee_rate = 0;          ///< Fee rate, the demominator is GRAPHENE_SAMET_FUND_FEE_DENOM
+      uint32_t        fee_rate = 0;          ///< Fee rate, the demominator is GRAPHENE_FEE_RATE_DENOM
 
       extensions_type extensions;  ///< Unused. Reserved for future use.
 

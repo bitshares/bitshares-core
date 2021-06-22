@@ -20,6 +20,7 @@
 #include <graphene/chain/ticket_object.hpp>
 #include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/samet_fund_object.hpp>
+#include <graphene/chain/credit_offer_object.hpp>
 #include <graphene/chain/impacted.hpp>
 #include <graphene/chain/hardfork.hpp>
 
@@ -356,6 +357,31 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // account
    }
+   void operator()( const credit_offer_create_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // owner_account
+   }
+   void operator()( const credit_offer_delete_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // owner_account
+   }
+   void operator()( const credit_offer_update_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // owner_account
+   }
+   void operator()( const credit_offer_accept_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // borrower
+   }
+   void operator()( const credit_deal_repay_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); // account
+   }
+   void operator()( const credit_deal_expired_operation& op )
+   {
+      _impacted.insert( op.offer_owner );
+      _impacted.insert( op.borrower );
+   }
 };
 
 } // namespace detail
@@ -474,6 +500,17 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
            FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->owner_account );
            break;
+         } case credit_offer_object_type:{
+           const auto* aobj = dynamic_cast<const credit_offer_object*>( obj );
+           FC_ASSERT( aobj != nullptr );
+           accounts.insert( aobj->owner_account );
+           break;
+         } case credit_deal_object_type:{
+           const auto* aobj = dynamic_cast<const credit_deal_object*>( obj );
+           FC_ASSERT( aobj != nullptr );
+           accounts.insert( aobj->offer_owner );
+           accounts.insert( aobj->borrower );
+           break;
         }
       }
    }
@@ -536,6 +573,12 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               const auto& aobj = dynamic_cast<const collateral_bid_object*>(obj);
               FC_ASSERT( aobj != nullptr );
               accounts.insert( aobj->bidder );
+              break;
+           } case impl_credit_deal_summary_object_type:{
+              const auto& aobj = dynamic_cast<const credit_deal_summary_object*>(obj);
+              FC_ASSERT( aobj != nullptr );
+              accounts.insert( aobj->offer_owner );
+              accounts.insert( aobj->borrower );
               break;
            }
       }

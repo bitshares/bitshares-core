@@ -99,13 +99,27 @@ namespace graphene { namespace protocol {
       vector<asset> fees;
    };
 
-   typedef fc::static_variant <
-         void_result,
-         object_id_type,
-         asset,
-         generic_operation_result,
-         generic_exchange_operation_result
-      > operation_result;
+   struct extendable_operation_result_dtl
+   {
+      optional<flat_set<account_id_type>> impacted_accounts;
+      optional<flat_set<object_id_type>>  new_objects;
+      optional<flat_set<object_id_type>>  updated_objects;
+      optional<flat_set<object_id_type>>  removed_objects;
+      optional<vector<asset>>             paid;
+      optional<vector<asset>>             received;
+      optional<vector<asset>>             fees;
+   };
+
+   using extendable_operation_result = extension<extendable_operation_result_dtl>;
+
+   using operation_result = fc::static_variant <
+         /* 0 */ void_result,
+         /* 1 */ object_id_type,
+         /* 2 */ asset,
+         /* 3 */ generic_operation_result,
+         /* 4 */ generic_exchange_operation_result,
+         /* 5 */ extendable_operation_result
+         >;
 
    struct base_operation
    {
@@ -129,7 +143,7 @@ namespace graphene { namespace protocol {
     *  always add new types to a static_variant without breaking backward
     *  compatibility.   
     */
-   typedef static_variant<void_t>      future_extensions;
+   using future_extensions = static_variant<void_t>;
 
    /**
     *  A flat_set is used to make sure that only one extension of
@@ -144,12 +158,18 @@ namespace graphene { namespace protocol {
 
 } } // graphene::protocol
 
+FC_REFLECT_TYPENAME( graphene::protocol::extendable_operation_result )
 FC_REFLECT_TYPENAME( graphene::protocol::operation_result )
 FC_REFLECT_TYPENAME( graphene::protocol::future_extensions )
+FC_REFLECT_TYPENAME( graphene::protocol::extensions_type )
 FC_REFLECT( graphene::protocol::void_result, )
 FC_REFLECT( graphene::protocol::generic_operation_result, (new_objects)(updated_objects)(removed_objects) )
 FC_REFLECT( graphene::protocol::generic_exchange_operation_result, (paid)(received)(fees) )
+FC_REFLECT( graphene::protocol::extendable_operation_result_dtl,
+            (impacted_accounts)(new_objects)(updated_objects)(removed_objects)(paid)(received)(fees) )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::generic_operation_result ) // impl in operations.cpp
 // impl in operations.cpp
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::generic_exchange_operation_result )
+// impl in operations.cpp
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::extendable_operation_result_dtl )

@@ -26,6 +26,7 @@
 #include <graphene/chain/db_with.hpp>
 
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/credit_offer_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/htlc_object.hpp>
@@ -695,6 +696,76 @@ generic_operation_result database::process_tickets()
    }
 
    return result;
+}
+
+void database::update_credit_offers_and_deals()
+{
+   const auto head_time = head_block_time();
+
+   // Auto-disable offers
+   const auto& offer_idx = get_index_type<credit_offer_index>().indices().get<by_auto_disable_time>();
+   auto offer_itr = offer_idx.lower_bound( true );
+   auto offer_itr_end = offer_idx.upper_bound( boost::make_tuple( true, head_time ) );
+   while( offer_itr != offer_itr_end )
+   {
+      const credit_offer_object& offer = *offer_itr;
+      ++offer_itr;
+      modify( offer, []( credit_offer_object& obj ) {
+         obj.enabled = false;
+      });
+   }
+
+   // Auto-process deals
+   const auto& deal_idx = get_index_type<credit_deal_index>().indices().get<by_latest_repay_time>();
+   const auto& deal_summary_idx = get_index_type<credit_deal_summary_index>().indices().get<by_offer_borrower>();
+   auto deal_itr_end = deal_idx.upper_bound( head_time );
+   for( auto deal_itr = deal_idx.begin(); deal_itr != deal_itr_end; deal_itr = deal_idx.begin() )
+   {
+      const credit_deal_object& deal = *deal_itr;
+
+      // Update offer
+      // Note: offer balance can be zero after updated. TODO remove zero-balance offers after a period
+      const credit_offer_object& offer = deal.offer_id(*this);
+      modify( offer, [&deal]( credit_offer_object& obj ){
+         obj.total_balance -= deal.debt_amount;
+      });
+
+      // Process deal summary
+      auto summ_itr = deal_summary_idx.find( boost::make_tuple( deal.offer_id, deal.borrower ) );
+      if( summ_itr == deal_summary_idx.end() ) // This should not happen, just be defensive here
+      {
+         // We do not do FC_ASSERT or FC_THROW here to avoid halting the chain
+         elog( "Error: unable to find the credit deal summary object for credit deal ${d}",
+               ("d", deal) );
+      }
+      else
+      {
+         const credit_deal_summary_object& summ_obj = *summ_itr;
+         if( summ_obj.total_debt_amount == deal.debt_amount )
+         {
+            remove( summ_obj );
+         }
+         else
+         {
+            modify( summ_obj, [&deal]( credit_deal_summary_object& obj ){
+               obj.total_debt_amount -= deal.debt_amount;
+            });
+         }
+      }
+
+      // Adjust balance
+      adjust_balance( deal.offer_owner, asset( deal.collateral_amount, deal.collateral_asset ) );
+
+      // Notify related parties
+      push_applied_operation( credit_deal_expired_operation (
+                                    deal.id, deal.offer_id, deal.offer_owner, deal.borrower,
+                                    asset( deal.debt_amount, deal.debt_asset ),
+                                    asset( deal.collateral_amount, deal.collateral_asset ),
+                                    deal.fee_rate ) );
+
+      // Remove the deal
+      remove( deal );
+   }
 }
 
 } }

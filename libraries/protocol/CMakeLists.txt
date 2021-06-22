@@ -8,7 +8,8 @@ list(APPEND SOURCES account.cpp
                     chain_parameters.cpp
                     fee_schedule.cpp
                     fee_schedule_calc.cpp
-                    fee_schedule_reflect.cpp
+                    fee_schedule_serialization_pack.cpp
+                    fee_schedule_serialization_variant.cpp
                     memo.cpp
                     proposal.cpp
                     transfer.cpp
@@ -23,6 +24,7 @@ list(APPEND SOURCES account.cpp
                     committee_member.cpp
                     custom.cpp
                     market.cpp
+                    credit_offer.cpp
                     liquidity_pool.cpp
                     samet_fund.cpp
                     ticket.cpp
