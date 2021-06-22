@@ -184,7 +184,7 @@ namespace graphene { namespace protocol {
       void            validate()const override { FC_ASSERT( !"virtual operation" ); }
 
       /// This is a virtual operation; there is no fee
-      share_type      calculate_fee(const fee_parameters_type& k)const { return 0; }
+      share_type      calculate_fee(const fee_parameters_type&)const { return 0; }
    };
 
 } } // graphene::protocol

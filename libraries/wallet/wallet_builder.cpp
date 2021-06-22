@@ -113,7 +113,7 @@ namespace graphene { namespace wallet { namespace detail {
       pcop.expiration_time = expiration;
       signed_transaction& trx = _builder_transactions[handle];
       std::transform(trx.operations.begin(), trx.operations.end(), std::back_inserter(pcop.proposed_ops),
-                     [](const operation& op) -> op_wrapper { return op_wrapper(op); });
+                     [](const operation& op) { return op_wrapper(op); });
       if( review_period_seconds )
          pcop.review_period_seconds = review_period_seconds;
       trx.operations = {pcop};

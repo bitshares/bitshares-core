@@ -189,9 +189,8 @@ void_result credit_offer_update_evaluator::do_apply( const credit_offer_update_o
    if( op.delta_amount.valid() )
       d.adjust_balance( op.owner_account, -(*op.delta_amount) );
 
-   d.modify( *_offer, [&op,this]( credit_offer_object& coo ){
-      if( op.delta_amount.valid() )
-      {
+   d.modify( *_offer, [&op]( credit_offer_object& coo ){
+      if( op.delta_amount.valid() ) {
          coo.total_balance += op.delta_amount->amount;
          coo.current_balance += op.delta_amount->amount;
       }

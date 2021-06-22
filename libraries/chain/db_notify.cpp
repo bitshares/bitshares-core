@@ -500,12 +500,12 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
            FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->owner_account );
            break;
-         } case credit_offer_object_type:{
+        } case credit_offer_object_type:{
            const auto* aobj = dynamic_cast<const credit_offer_object*>( obj );
            FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->owner_account );
            break;
-         } case credit_deal_object_type:{
+        } case credit_deal_object_type:{
            const auto* aobj = dynamic_cast<const credit_deal_object*>( obj );
            FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->offer_owner );
@@ -575,7 +575,7 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               accounts.insert( aobj->bidder );
               break;
            } case impl_credit_deal_summary_object_type:{
-              const auto& aobj = dynamic_cast<const credit_deal_summary_object*>(obj);
+              const auto* aobj = dynamic_cast<const credit_deal_summary_object*>(obj);
               FC_ASSERT( aobj != nullptr );
               accounts.insert( aobj->offer_owner );
               accounts.insert( aobj->borrower );
