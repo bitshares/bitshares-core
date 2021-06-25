@@ -266,21 +266,26 @@ void_result credit_offer_accept_evaluator::do_evaluate(const credit_offer_accept
               "Insufficient collateral provided, requires ${r}, provided ${p}",
               ("r", required_collateral.amount) ("p", op.collateral.amount) );
 
+   optional<share_type> max_allowed;
    if( !_offer->acceptable_borrowers.empty() )
    {
       auto itr = _offer->acceptable_borrowers.find( op.borrower );
       FC_ASSERT( itr != _offer->acceptable_borrowers.end(), "Account is not in acceptable borrowers" );
-      share_type max_allowed = itr->second;
+      max_allowed = itr->second;
+   }
 
-      share_type already_borrowed = 0;
-      const auto& deal_summary_idx = d.get_index_type<credit_deal_summary_index>().indices().get<by_offer_borrower>();
-      auto summ_itr = deal_summary_idx.find( boost::make_tuple( op.offer_id, op.borrower ) );
-      if( summ_itr != deal_summary_idx.end() )
-      {
-         _deal_summary = &(*summ_itr);
-         already_borrowed = _deal_summary->total_debt_amount;
-      }
-      FC_ASSERT( already_borrowed + op.borrow_amount.amount <= max_allowed,
+   share_type already_borrowed = 0;
+   const auto& deal_summary_idx = d.get_index_type<credit_deal_summary_index>().indices().get<by_offer_borrower>();
+   auto summ_itr = deal_summary_idx.find( boost::make_tuple( op.offer_id, op.borrower ) );
+   if( summ_itr != deal_summary_idx.end() )
+   {
+      _deal_summary = &(*summ_itr);
+      already_borrowed = _deal_summary->total_debt_amount;
+   }
+
+   if( max_allowed.valid() )
+   {
+      FC_ASSERT( already_borrowed + op.borrow_amount.amount <= *max_allowed,
                  "Unable to borrow ${b}, already borrowed ${a}, maximum allowed ${m}",
                  ("b", op.borrow_amount.amount) ("a", already_borrowed) ("m", max_allowed) );
    }
