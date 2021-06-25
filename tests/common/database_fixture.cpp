@@ -1814,7 +1814,12 @@ const credit_deal_object& database_fixture_base::borrow_from_credit_offer(
    const operation_result& op_result = ptx.operation_results.front();
    trx.operations.clear();
    verify_asset_supplies(db);
-   return db.get<credit_deal_object>( *op_result.get<extendable_operation_result>().value.new_objects->begin() );
+   const auto& result_dtl = op_result.get<extendable_operation_result>().value;
+   BOOST_REQUIRE( result_dtl.impacted_accounts.valid() );
+   BOOST_CHECK( *result_dtl.impacted_accounts == flat_set<account_id_type>({ offer_id(db).owner_account }) );
+   BOOST_REQUIRE( result_dtl.new_objects.valid() );
+   BOOST_REQUIRE_EQUAL( result_dtl.new_objects->size(), 1u );
+   return db.get<credit_deal_object>( *result_dtl.new_objects->begin() );
 }
 
 credit_deal_repay_operation database_fixture_base::make_credit_deal_repay_op(

@@ -1119,6 +1119,16 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       BOOST_CHECK( collateral_released == asset(4, usd_id) ); // round_down(499/100)
 
+      BOOST_REQUIRE( result.updated_objects.valid() );
+      BOOST_CHECK( result.updated_objects->size() == 2 );
+      BOOST_CHECK( *result.updated_objects == flat_set<object_id_type>({ co1_id, cd13_id }) );
+
+      BOOST_CHECK( !result.removed_objects.valid() );
+
+      BOOST_REQUIRE( result.impacted_accounts.valid() );
+      BOOST_CHECK( result.impacted_accounts->size() == 1 );
+      BOOST_CHECK( *result.impacted_accounts == flat_set<account_id_type>({ sam_id }) );
+
       BOOST_CHECK( cd13_id(db).borrower == ray_id );
       BOOST_CHECK( cd13_id(db).offer_id == co1_id );
       BOOST_CHECK( cd13_id(db).offer_owner == sam_id );
@@ -1166,6 +1176,16 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       BOOST_CHECK( collateral_released == asset(5, usd_id) ); // round_down(495/99)
 
+      BOOST_REQUIRE( result.updated_objects.valid() );
+      BOOST_CHECK( result.updated_objects->size() == 2 );
+      BOOST_CHECK( *result.updated_objects == flat_set<object_id_type>({ co1_id, cd13_id }) );
+
+      BOOST_CHECK( !result.removed_objects.valid() );
+
+      BOOST_REQUIRE( result.impacted_accounts.valid() );
+      BOOST_CHECK( result.impacted_accounts->size() == 1 );
+      BOOST_CHECK( *result.impacted_accounts == flat_set<account_id_type>({ sam_id }) );
+
       BOOST_CHECK( cd13_id(db).borrower == ray_id );
       BOOST_CHECK( cd13_id(db).offer_id == co1_id );
       BOOST_CHECK( cd13_id(db).offer_owner == sam_id );
@@ -1202,7 +1222,19 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       BOOST_CHECK( collateral_released == asset(200, usd_id) );
 
-      BOOST_REQUIRE( !db.find( cd12_id ) );
+      BOOST_REQUIRE( result.updated_objects.valid() );
+      BOOST_REQUIRE( result.updated_objects->size() == 1 );
+      BOOST_CHECK( *(result.updated_objects->begin()) == co1_id );
+
+      BOOST_REQUIRE( result.removed_objects.valid() );
+      BOOST_REQUIRE( result.removed_objects->size() == 1 );
+      BOOST_CHECK( *(result.removed_objects->begin()) == cd12_id );
+
+      BOOST_REQUIRE( result.impacted_accounts.valid() );
+      BOOST_CHECK( result.impacted_accounts->size() == 1 );
+      BOOST_CHECK( *result.impacted_accounts == flat_set<account_id_type>({ sam_id }) );
+
+      BOOST_CHECK( !db.find( cd12_id ) );
 
       BOOST_CHECK( co1_id(db).total_balance == 596 );
       BOOST_CHECK( co1_id(db).current_balance == 106 );
@@ -1269,6 +1301,16 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
 
       BOOST_CHECK( collateral_released == asset(120, cny_id) );
 
+      BOOST_REQUIRE( result.updated_objects.valid() );
+      BOOST_CHECK( result.updated_objects->size() == 2 );
+      BOOST_CHECK( *result.updated_objects == flat_set<object_id_type>({ co2_id, cd21_id }) );
+
+      BOOST_CHECK( !result.removed_objects.valid() );
+
+      BOOST_REQUIRE( result.impacted_accounts.valid() );
+      BOOST_CHECK( result.impacted_accounts->size() == 1 );
+      BOOST_CHECK( *result.impacted_accounts == flat_set<account_id_type>({ sam_id }) );
+
       BOOST_CHECK( cd21_id(db).borrower == ray_id );
       BOOST_CHECK( cd21_id(db).offer_id == co2_id );
       BOOST_CHECK( cd21_id(db).offer_owner == sam_id );
@@ -1312,6 +1354,16 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
       collateral_released = result.received->front();
 
       BOOST_CHECK( collateral_released == asset(5, usd_id) ); // round_down(490/98)
+
+      BOOST_REQUIRE( result.updated_objects.valid() );
+      BOOST_CHECK( result.updated_objects->size() == 2 );
+      BOOST_CHECK( *result.updated_objects == flat_set<object_id_type>({ co1_id, cd13_id }) );
+
+      BOOST_CHECK( !result.removed_objects.valid() );
+
+      BOOST_REQUIRE( result.impacted_accounts.valid() );
+      BOOST_CHECK( result.impacted_accounts->size() == 1 );
+      BOOST_CHECK( *result.impacted_accounts == flat_set<account_id_type>({ sam_id }) );
 
       BOOST_CHECK( cd13_id(db).borrower == ray_id );
       BOOST_CHECK( cd13_id(db).offer_id == co1_id );
@@ -1389,6 +1441,16 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
       collateral_released = result.received->front();
 
       BOOST_CHECK( collateral_released == asset(220, eur_id) );
+
+      BOOST_REQUIRE( result.updated_objects.valid() );
+      BOOST_CHECK( result.updated_objects->size() == 2 );
+      BOOST_CHECK( *result.updated_objects == flat_set<object_id_type>({ co2_id, cd22_id }) );
+
+      BOOST_CHECK( !result.removed_objects.valid() );
+
+      BOOST_REQUIRE( result.impacted_accounts.valid() );
+      BOOST_CHECK( result.impacted_accounts->size() == 1 );
+      BOOST_CHECK( *result.impacted_accounts == flat_set<account_id_type>({ sam_id }) );
 
       BOOST_CHECK( cd22_id(db).borrower == ted_id );
       BOOST_CHECK( cd22_id(db).offer_id == co2_id );
