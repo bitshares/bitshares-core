@@ -85,6 +85,8 @@ jobs:
         df -h
         make -j 2 -C _build chain_test
         make -j 2 -C _build cli_test
+        make -j 2 -C _build app_test
+        make -j 2 -C _build es_test
         make -j 2 -C _build cli_wallet
         make -j 2 -C _build witness_node
         make -j 2 -C _build
