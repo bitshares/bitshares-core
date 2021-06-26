@@ -344,46 +344,31 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          return results;
       }
 
-      // template function to reduce duplicate code
-      template <typename OBJ_TYPE, typename OBJ_ID_TYPE, typename INDEX_TYPE,
-                typename T, T application_options::* app_opt_member_ptr >
-      vector<OBJ_TYPE> list_objects(
-                  INDEX_TYPE idx,
-                  const optional<uint32_t>& olimit,
-                  const optional<OBJ_ID_TYPE>& ostart_id ) const
-      {
-         uint64_t limit = olimit.valid() ? *olimit : application_options::get_default().*app_opt_member_ptr;
+      /// Template functions for simple list_X and get_X_by_T APIs, to reduce duplicate code
+      /// @{
+      template <typename X>
+      X make_tuple_if_multiple(X x) const
+      { return x; }
 
-         FC_ASSERT( _app_options, "Internal error" );
-         const auto configured_limit = _app_options->*app_opt_member_ptr;
-         FC_ASSERT( limit <= configured_limit,
-                    "limit can not be greater than ${configured_limit}",
-                    ("configured_limit", configured_limit) );
+      template <typename... X>
+      typename std::tuple<X...> make_tuple_if_multiple(X... x) const
+      { return std::make_tuple( x... ); }
 
-         vector<OBJ_TYPE> results;
+      template <typename T>
+      decltype((static_cast<T*>(nullptr))->end()) call_end_or_upper_bound( const T& t ) const
+      { return t.end(); }
 
-         OBJ_ID_TYPE start_id = ostart_id.valid() ? *ostart_id : OBJ_ID_TYPE();
+      template <typename T, typename... X>
+      decltype((static_cast<T*>(nullptr))->end()) call_end_or_upper_bound( const T& t, X... x ) const
+      { return t.upper_bound( make_tuple_if_multiple( x... ) ); }
 
-         auto lower_itr = idx.lower_bound( start_id );
-         auto upper_itr = idx.end();
-
-         results.reserve( limit );
-         for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
-         {
-            results.emplace_back( *lower_itr );
-         }
-
-         return results;
-      }
-
-      // template function to reduce duplicate code
-      template <typename OBJ_TYPE, typename OBJ_ID_TYPE, typename INDEX_TYPE,
-                typename X, typename T, T application_options::* app_opt_member_ptr >
+      template <typename OBJ_TYPE, typename OBJ_ID_TYPE, typename INDEX_TYPE, typename T, typename... X >
       vector<OBJ_TYPE> get_objects_by_x(
-                  INDEX_TYPE idx,
-                  const X& x,
+                  T application_options::* app_opt_member_ptr,
+                  const INDEX_TYPE& idx,
                   const optional<uint32_t>& olimit,
-                  const optional<OBJ_ID_TYPE>& ostart_id ) const
+                  const optional<OBJ_ID_TYPE>& ostart_id,
+                  X... x ) const
       {
          uint64_t limit = olimit.valid() ? *olimit : application_options::get_default().*app_opt_member_ptr;
 
@@ -397,8 +382,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
          OBJ_ID_TYPE start_id = ostart_id.valid() ? *ostart_id : OBJ_ID_TYPE();
 
-         auto lower_itr = idx.lower_bound( std::make_tuple( x, start_id ) );
-         auto upper_itr = idx.upper_bound( x );
+         auto lower_itr = idx.lower_bound( make_tuple_if_multiple( x..., start_id ) );
+         auto upper_itr = call_end_or_upper_bound( idx, x... );
 
          results.reserve( limit );
          for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
@@ -408,6 +393,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
          return results;
       }
+      /// @}
 
       ////////////////////////////////////////////////
       // Subscription

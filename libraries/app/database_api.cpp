@@ -2086,12 +2086,10 @@ vector<samet_fund_object> database_api::list_samet_funds(
             const optional<samet_fund_id_type>& start_id )const
 {
    const auto& idx = my->_db.get_index_type<samet_fund_index>().indices().get<by_id>();
-   return my->list_objects< samet_fund_object,
-                            samet_fund_id_type,
-                            decltype(idx),
-                            decltype(static_cast<application_options*>(nullptr)->api_limit_get_samet_funds),
-                            &application_options::api_limit_get_samet_funds
-                           >( idx, limit, start_id );
+   return my->get_objects_by_x< samet_fund_object,
+                                samet_fund_id_type
+                               >( &application_options::api_limit_get_samet_funds,
+                                  idx, limit, start_id );
 }
 
 vector<samet_fund_object> database_api::get_samet_funds_by_owner(
@@ -2102,12 +2100,9 @@ vector<samet_fund_object> database_api::get_samet_funds_by_owner(
    account_id_type owner = my->get_account_from_string(account_name_or_id)->id;
    const auto& idx = my->_db.get_index_type<samet_fund_index>().indices().get<by_owner>();
    return my->get_objects_by_x< samet_fund_object,
-                                samet_fund_id_type,
-                                decltype(idx),
-                                account_id_type,
-                                decltype(static_cast<application_options*>(nullptr)->api_limit_get_samet_funds),
-                                &application_options::api_limit_get_samet_funds
-                               >( idx, owner, limit, start_id );
+                                samet_fund_id_type
+                               >( &application_options::api_limit_get_samet_funds,
+                                  idx, limit, start_id, owner );
 }
 
 vector<samet_fund_object> database_api::get_samet_funds_by_asset(
@@ -2118,12 +2113,9 @@ vector<samet_fund_object> database_api::get_samet_funds_by_asset(
    asset_id_type asset_type = my->get_asset_from_string(asset_symbol_or_id)->id;
    const auto& idx = my->_db.get_index_type<samet_fund_index>().indices().get<by_asset_type>();
    return my->get_objects_by_x< samet_fund_object,
-                                samet_fund_id_type,
-                                decltype(idx),
-                                asset_id_type,
-                                decltype(static_cast<application_options*>(nullptr)->api_limit_get_samet_funds),
-                                &application_options::api_limit_get_samet_funds
-                               >( idx, asset_type, limit, start_id );
+                                samet_fund_id_type
+                               >( &application_options::api_limit_get_samet_funds,
+                                  idx, limit, start_id, asset_type );
 }
 
 
@@ -2138,12 +2130,10 @@ vector<credit_offer_object> database_api::list_credit_offers(
             const optional<credit_offer_id_type>& start_id )const
 {
    const auto& idx = my->_db.get_index_type<credit_offer_index>().indices().get<by_id>();
-   return my->list_objects< credit_offer_object,
-                            credit_offer_id_type,
-                            decltype(idx),
-                            decltype(static_cast<application_options*>(nullptr)->api_limit_get_credit_offers),
-                            &application_options::api_limit_get_credit_offers
-                           >( idx, limit, start_id );
+   return my->get_objects_by_x< credit_offer_object,
+                                credit_offer_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id );
 }
 
 vector<credit_offer_object> database_api::get_credit_offers_by_owner(
@@ -2154,12 +2144,9 @@ vector<credit_offer_object> database_api::get_credit_offers_by_owner(
    account_id_type owner = my->get_account_from_string(account_name_or_id)->id;
    const auto& idx = my->_db.get_index_type<credit_offer_index>().indices().get<by_owner>();
    return my->get_objects_by_x< credit_offer_object,
-                                credit_offer_id_type,
-                                decltype(idx),
-                                account_id_type,
-                                decltype(static_cast<application_options*>(nullptr)->api_limit_get_credit_offers),
-                                &application_options::api_limit_get_credit_offers
-                               >( idx, owner, limit, start_id );
+                                credit_offer_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, owner );
 }
 
 vector<credit_offer_object> database_api::get_credit_offers_by_asset(
@@ -2170,12 +2157,9 @@ vector<credit_offer_object> database_api::get_credit_offers_by_asset(
    asset_id_type asset_type = my->get_asset_from_string(asset_symbol_or_id)->id;
    const auto& idx = my->_db.get_index_type<credit_offer_index>().indices().get<by_asset_type>();
    return my->get_objects_by_x< credit_offer_object,
-                                credit_offer_id_type,
-                                decltype(idx),
-                                asset_id_type,
-                                decltype(static_cast<application_options*>(nullptr)->api_limit_get_credit_offers),
-                                &application_options::api_limit_get_credit_offers
-                               >( idx, asset_type, limit, start_id );
+                                credit_offer_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, asset_type );
 }
 
 vector<credit_deal_object> database_api::list_credit_deals(
@@ -2183,12 +2167,10 @@ vector<credit_deal_object> database_api::list_credit_deals(
             const optional<credit_deal_id_type>& start_id )const
 {
    const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_id>();
-   return my->list_objects< credit_deal_object,
-                            credit_deal_id_type,
-                            decltype(idx),
-                            decltype(static_cast<application_options*>(nullptr)->api_limit_get_credit_offers),
-                            &application_options::api_limit_get_credit_offers
-                           >( idx, limit, start_id );
+   return my->get_objects_by_x< credit_deal_object,
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id );
 }
 
 vector<credit_deal_object> database_api::get_credit_deals_by_offer_id(
@@ -2198,12 +2180,9 @@ vector<credit_deal_object> database_api::get_credit_deals_by_offer_id(
 {
    const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_offer_id>();
    return my->get_objects_by_x< credit_deal_object,
-                                credit_deal_id_type,
-                                decltype(idx),
-                                credit_offer_id_type,
-                                decltype(static_cast<application_options*>(nullptr)->api_limit_get_credit_offers),
-                                &application_options::api_limit_get_credit_offers
-                               >( idx, offer_id, limit, start_id );
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, offer_id );
 }
 
 vector<credit_deal_object> database_api::get_credit_deals_by_offer_owner(
@@ -2214,12 +2193,9 @@ vector<credit_deal_object> database_api::get_credit_deals_by_offer_owner(
    account_id_type owner = my->get_account_from_string(account_name_or_id)->id;
    const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_offer_owner>();
    return my->get_objects_by_x< credit_deal_object,
-                                credit_deal_id_type,
-                                decltype(idx),
-                                account_id_type,
-                                decltype(static_cast<application_options*>(nullptr)->api_limit_get_credit_offers),
-                                &application_options::api_limit_get_credit_offers
-                               >( idx, owner, limit, start_id );
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, owner );
 }
 
 vector<credit_deal_object> database_api::get_credit_deals_by_borrower(
@@ -2230,12 +2206,9 @@ vector<credit_deal_object> database_api::get_credit_deals_by_borrower(
    account_id_type borrower = my->get_account_from_string(account_name_or_id)->id;
    const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_borrower>();
    return my->get_objects_by_x< credit_deal_object,
-                                credit_deal_id_type,
-                                decltype(idx),
-                                account_id_type,
-                                decltype(static_cast<application_options*>(nullptr)->api_limit_get_credit_offers),
-                                &application_options::api_limit_get_credit_offers
-                               >( idx, borrower, limit, start_id );
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, borrower );
 }
 
 vector<credit_deal_object> database_api::get_credit_deals_by_debt_asset(
@@ -2246,12 +2219,9 @@ vector<credit_deal_object> database_api::get_credit_deals_by_debt_asset(
    asset_id_type asset_type = my->get_asset_from_string(asset_symbol_or_id)->id;
    const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_debt_asset>();
    return my->get_objects_by_x< credit_deal_object,
-                                credit_deal_id_type,
-                                decltype(idx),
-                                asset_id_type,
-                                decltype(static_cast<application_options*>(nullptr)->api_limit_get_credit_offers),
-                                &application_options::api_limit_get_credit_offers
-                               >( idx, asset_type, limit, start_id );
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, asset_type );
 }
 
 vector<credit_deal_object> database_api::get_credit_deals_by_collateral_asset(
@@ -2262,12 +2232,9 @@ vector<credit_deal_object> database_api::get_credit_deals_by_collateral_asset(
    asset_id_type asset_type = my->get_asset_from_string(asset_symbol_or_id)->id;
    const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_collateral_asset>();
    return my->get_objects_by_x< credit_deal_object,
-                                credit_deal_id_type,
-                                decltype(idx),
-                                asset_id_type,
-                                decltype(static_cast<application_options*>(nullptr)->api_limit_get_credit_offers),
-                                &application_options::api_limit_get_credit_offers
-                               >( idx, asset_type, limit, start_id );
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, asset_type );
 }
 
 
