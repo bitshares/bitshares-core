@@ -178,19 +178,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             optional<asset_id_type> start_id = optional<asset_id_type>(),
             optional<bool> with_statistics = false )const;
 
-      // SameT Funds
-      vector<samet_fund_object> list_samet_funds(
-            const optional<uint32_t>& limit = 101,
-            const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
-      vector<samet_fund_object> get_samet_funds_by_owner(
-            const std::string& account_name_or_id,
-            const optional<uint32_t>& limit = 101,
-            const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
-      vector<samet_fund_object> get_samet_funds_by_asset(
-            const std::string& asset_symbol_or_id,
-            const optional<uint32_t>& limit = 101,
-            const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
-
       // Witnesses
       vector<optional<witness_object>> get_witnesses(const vector<witness_id_type>& witness_ids)const;
       fc::optional<witness_object> get_witness_by_account(const std::string account_id_or_name)const;
@@ -352,6 +339,71 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
          {
             results.emplace_back( extend_liquidity_pool( *lower_itr, with_stats ) );
+         }
+
+         return results;
+      }
+
+      // template function to reduce duplicate code
+      template <typename OBJ_TYPE, typename OBJ_ID_TYPE, typename INDEX_TYPE,
+                typename T, T application_options::* app_opt_member_ptr >
+      vector<OBJ_TYPE> list_objects(
+                  INDEX_TYPE idx,
+                  const optional<uint32_t>& olimit,
+                  const optional<OBJ_ID_TYPE>& ostart_id ) const
+      {
+         uint64_t limit = olimit.valid() ? *olimit : application_options::get_default().*app_opt_member_ptr;
+
+         FC_ASSERT( _app_options, "Internal error" );
+         const auto configured_limit = _app_options->*app_opt_member_ptr;
+         FC_ASSERT( limit <= configured_limit,
+                    "limit can not be greater than ${configured_limit}",
+                    ("configured_limit", configured_limit) );
+
+         vector<OBJ_TYPE> results;
+
+         OBJ_ID_TYPE start_id = ostart_id.valid() ? *ostart_id : OBJ_ID_TYPE();
+
+         auto lower_itr = idx.lower_bound( start_id );
+         auto upper_itr = idx.end();
+
+         results.reserve( limit );
+         for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
+         {
+            results.emplace_back( *lower_itr );
+         }
+
+         return results;
+      }
+
+      // template function to reduce duplicate code
+      template <typename OBJ_TYPE, typename OBJ_ID_TYPE, typename INDEX_TYPE,
+                typename X, typename T, T application_options::* app_opt_member_ptr >
+      vector<OBJ_TYPE> get_objects_by_x(
+                  INDEX_TYPE idx,
+                  const X& x,
+                  const optional<uint32_t>& olimit,
+                  const optional<OBJ_ID_TYPE>& ostart_id ) const
+      {
+         uint64_t limit = olimit.valid() ? *olimit : application_options::get_default().*app_opt_member_ptr;
+
+         FC_ASSERT( _app_options, "Internal error" );
+         const auto configured_limit = _app_options->*app_opt_member_ptr;
+         FC_ASSERT( limit <= configured_limit,
+                    "limit can not be greater than ${configured_limit}",
+                    ("configured_limit", configured_limit) );
+
+         vector<OBJ_TYPE> results;
+
+         OBJ_ID_TYPE start_id = ostart_id.valid() ? *ostart_id : OBJ_ID_TYPE();
+
+         auto lower_itr = idx.lower_bound( std::make_tuple( x, start_id ) );
+         auto upper_itr = idx.upper_bound( x );
+
+         results.reserve( limit );
+         for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
+         {
+            results.emplace_back( *lower_itr );
          }
 
          return results;

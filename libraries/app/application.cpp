@@ -397,6 +397,9 @@ void application_impl::set_api_limit() {
    if(_options->count("api-limit-get-samet-funds") > 0) {
       _app_options.api_limit_get_samet_funds = _options->at("api-limit-get-samet-funds").as<uint64_t>();
    }
+   if(_options->count("api-limit-get-credit-offers") > 0) {
+      _app_options.api_limit_get_credit_offers = _options->at("api-limit-get-credit-offers").as<uint64_t>();
+   }
 }
 
 graphene::chain::genesis_state_type application_impl::initialize_genesis_state() const
@@ -1193,6 +1196,8 @@ void application::set_program_options(boost::program_options::options_descriptio
           "Set maximum limit value for APIs which query for history of liquidity pools")
          ("api-limit-get-samet-funds", boost::program_options::value<uint64_t>()->default_value(101),
           "Set maximum limit value for database APIs which query for SameT Funds")
+         ("api-limit-get-credit-offers", boost::program_options::value<uint64_t>()->default_value(101),
+          "Set maximum limit value for database APIs which query for credit offers and credit deals")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
