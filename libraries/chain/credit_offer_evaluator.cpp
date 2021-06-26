@@ -149,10 +149,10 @@ void_result credit_offer_update_evaluator::do_evaluate(const credit_offer_update
       }
    }
 
-   bool enabled = ( op.enabled.valid() ? *op.enabled : _offer->enabled );
+   bool enabled = op.enabled.valid() ? *op.enabled : _offer->enabled;
    if( enabled )
    {
-      auto auto_disable_time = ( op.auto_disable_time.valid() ? *op.auto_disable_time : _offer->auto_disable_time );
+      auto auto_disable_time = op.auto_disable_time.valid() ? *op.auto_disable_time : _offer->auto_disable_time;
       FC_ASSERT( auto_disable_time > block_time, "Auto-disable time should be in the future" );
       FC_ASSERT( auto_disable_time - block_time <= fc::days(GRAPHENE_MAX_CREDIT_OFFER_DAYS),
                  "Auto-disable time should not be later than ${d} days in the future",
@@ -305,9 +305,9 @@ extendable_operation_result credit_offer_accept_evaluator::do_apply( const credi
    });
 
    const auto block_time = d.head_block_time();
-   auto repay_time = ( ( ( fc::time_point_sec::maximum() - block_time ) >= fc::seconds(_offer->max_duration_seconds) )
-                       ? ( block_time + _offer->max_duration_seconds )
-                       : fc::time_point_sec::maximum() );
+   auto repay_time = ( fc::time_point_sec::maximum() - block_time ) >= fc::seconds(_offer->max_duration_seconds)
+                     ? ( block_time + _offer->max_duration_seconds )
+                     : fc::time_point_sec::maximum();
 
    const auto& new_deal = d.create<credit_deal_object>([&op,this,&repay_time](credit_deal_object& obj){
       obj.borrower = op.borrower;

@@ -347,19 +347,19 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       /// Template functions for simple list_X and get_X_by_T APIs, to reduce duplicate code
       /// @{
       template <typename X>
-      X make_tuple_if_multiple(X x) const
+      auto make_tuple_if_multiple(X x) const
       { return x; }
 
       template <typename... X>
-      typename std::tuple<X...> make_tuple_if_multiple(X... x) const
+      auto make_tuple_if_multiple(X... x) const
       { return std::make_tuple( x... ); }
 
       template <typename T>
-      decltype((static_cast<T*>(nullptr))->end()) call_end_or_upper_bound( const T& t ) const
-      { return t.end(); }
+      auto call_end_or_upper_bound( const T& t ) const
+      { return std::end( t ); }
 
       template <typename T, typename... X>
-      decltype((static_cast<T*>(nullptr))->end()) call_end_or_upper_bound( const T& t, X... x ) const
+      auto call_end_or_upper_bound( const T& t, X... x ) const
       { return t.upper_bound( make_tuple_if_multiple( x... ) ); }
 
       template <typename OBJ_TYPE, typename OBJ_ID_TYPE, typename INDEX_TYPE, typename T, typename... X >
@@ -370,7 +370,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
                   const optional<OBJ_ID_TYPE>& ostart_id,
                   X... x ) const
       {
-         uint64_t limit = olimit.valid() ? *olimit : application_options::get_default().*app_opt_member_ptr;
+         uint64_t limit = olimit.valid() ? *olimit : ( application_options::get_default().*app_opt_member_ptr );
 
          FC_ASSERT( _app_options, "Internal error" );
          const auto configured_limit = _app_options->*app_opt_member_ptr;

@@ -32,8 +32,8 @@ static void validate_acceptable_collateral( const flat_map<asset_id_type, price>
 {
    FC_ASSERT( !acceptable_collateral.empty(), "Acceptable collateral list should not be empty" );
 
-   asset_id_type asset_type = ( p_asset_type != nullptr ? *p_asset_type
-                                   : acceptable_collateral.begin()->second.base.asset_id );
+   asset_id_type asset_type = ( p_asset_type != nullptr ) ? *p_asset_type
+                              : acceptable_collateral.begin()->second.base.asset_id;
 
    for( const auto& collateral : acceptable_collateral )
    {
