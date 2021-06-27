@@ -36,7 +36,7 @@ namespace graphene { namespace protocol {
    struct credit_offer_create_operation : public base_operation
    {
       struct fee_parameters_type {
-         uint64_t fee             = 5 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         uint64_t fee             = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t price_per_kbyte = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
       };
 
@@ -88,7 +88,7 @@ namespace graphene { namespace protocol {
    struct credit_offer_update_operation : public base_operation
    {
       struct fee_parameters_type {
-         uint64_t fee             = 5 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         uint64_t fee             = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t price_per_kbyte = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
       };
 

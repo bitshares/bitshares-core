@@ -35,7 +35,7 @@ namespace graphene { namespace protocol {
     */
    struct samet_fund_create_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 5 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_parameters_type { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee;                   ///< Operation fee
       account_id_type owner_account;         ///< Owner of the fund
@@ -73,7 +73,7 @@ namespace graphene { namespace protocol {
     */
    struct samet_fund_update_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 5 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_parameters_type { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                fee;                   ///< Operation fee
       account_id_type      owner_account;         ///< Owner of the fund
