@@ -1765,9 +1765,11 @@ BOOST_AUTO_TEST_CASE( credit_offer_apis_test )
       generate_blocks( HARDFORK_CORE_2362_TIME );
       set_expiration( db, trx );
 
-      ACTORS((sam)(ted));
+      ACTORS((bob)(ray)(sam)(ted));
 
       auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( bob, asset(init_amount) );
+      fund( ray, asset(init_amount) );
       fund( sam, asset(init_amount) );
       fund( ted, asset(init_amount) );
 
@@ -1775,17 +1777,22 @@ BOOST_AUTO_TEST_CASE( credit_offer_apis_test )
 
       const asset_object& usd = create_user_issued_asset( "MYUSD" );
       asset_id_type usd_id = usd.id;
+      issue_uia( bob, usd.amount(init_amount) );
+      issue_uia( ray, usd.amount(init_amount) );
       issue_uia( sam, usd.amount(init_amount) );
       issue_uia( ted, usd.amount(init_amount) );
 
       const asset_object& eur = create_user_issued_asset( "MYEUR", sam, white_list );
       asset_id_type eur_id = eur.id;
+      issue_uia( bob, eur.amount(init_amount) );
+      issue_uia( ray, eur.amount(init_amount) );
       issue_uia( sam, eur.amount(init_amount) );
       issue_uia( ted, eur.amount(init_amount) );
 
       // create credit offers
       flat_map<asset_id_type, price> collateral_map_core;
       collateral_map_core[usd_id] = price( asset(1), asset(2, usd_id) );
+      collateral_map_core[eur_id] = price( asset(1), asset(1, eur_id) );
 
       flat_map<asset_id_type, price> collateral_map_usd;
       collateral_map_usd[eur_id] = price( asset(1, usd_id), asset(1, eur_id) );
@@ -1793,28 +1800,28 @@ BOOST_AUTO_TEST_CASE( credit_offer_apis_test )
       flat_map<asset_id_type, price> collateral_map_eur;
       collateral_map_eur[core_id] = price( asset(1, eur_id), asset(3) );
 
-      const credit_offer_object& coo1 = create_credit_offer( sam_id, core_id, 10000, 30000, 3600, 0, false,
-                                              time_point_sec(), collateral_map_core, {} );
+      const credit_offer_object& coo1 = create_credit_offer( sam_id, core_id, 10000, 30000, 3600, 0, true,
+                                              db.head_block_time() + fc::days(1), collateral_map_core, {} );
       credit_offer_id_type co1_id = coo1.id;
 
-      const credit_offer_object& coo2 = create_credit_offer( ted_id, usd_id, 10000, 30000, 3600, 0, false,
-                                              time_point_sec(), collateral_map_usd, {} );
+      const credit_offer_object& coo2 = create_credit_offer( ted_id, usd_id, 10000, 30000, 3600, 0, true,
+                                              db.head_block_time() + fc::days(1), collateral_map_usd, {} );
       credit_offer_id_type co2_id = coo2.id;
 
-      const credit_offer_object& coo3 = create_credit_offer( sam_id, eur_id, 10000, 30000, 3600, 0, false,
-                                              time_point_sec(), collateral_map_eur, {} );
+      const credit_offer_object& coo3 = create_credit_offer( sam_id, eur_id, 10000, 30000, 3600, 0, true,
+                                              db.head_block_time() + fc::days(1), collateral_map_eur, {} );
       credit_offer_id_type co3_id = coo3.id;
 
-      const credit_offer_object& coo4 = create_credit_offer( sam_id, eur_id, 10000, 30000, 3600, 0, false,
-                                              time_point_sec(), collateral_map_eur, {} );
+      const credit_offer_object& coo4 = create_credit_offer( sam_id, eur_id, 10000, 30000, 3600, 0, true,
+                                              db.head_block_time() + fc::days(1), collateral_map_eur, {} );
       credit_offer_id_type co4_id = coo4.id;
 
-      const credit_offer_object& coo5 = create_credit_offer( sam_id, usd_id, 10000, 30000, 3600, 0, false,
-                                              time_point_sec(), collateral_map_usd, {} );
+      const credit_offer_object& coo5 = create_credit_offer( sam_id, usd_id, 10000, 30000, 3600, 0, true,
+                                              db.head_block_time() + fc::days(1), collateral_map_usd, {} );
       credit_offer_id_type co5_id = coo5.id;
 
-      const credit_offer_object& coo6 = create_credit_offer( ted_id, usd_id, 10000, 30000, 3600, 0, false,
-                                              time_point_sec(), collateral_map_usd, {} );
+      const credit_offer_object& coo6 = create_credit_offer( ted_id, usd_id, 10000, 30000, 3600, 0, true,
+                                              db.head_block_time() + fc::days(1), collateral_map_usd, {} );
       credit_offer_id_type co6_id = coo6.id;
 
       generate_block();
@@ -1823,49 +1830,49 @@ BOOST_AUTO_TEST_CASE( credit_offer_apis_test )
       graphene::app::database_api db_api( db, &( app.get_options() ) );
 
       // List all credit offers
-      auto funds = db_api.list_credit_offers();
-      BOOST_REQUIRE_EQUAL( funds.size(), 6u );
-      BOOST_CHECK( funds.front().id == co1_id );
-      BOOST_CHECK( funds.back().id == co6_id );
+      auto offers = db_api.list_credit_offers();
+      BOOST_REQUIRE_EQUAL( offers.size(), 6u );
+      BOOST_CHECK( offers.front().id == co1_id );
+      BOOST_CHECK( offers.back().id == co6_id );
 
       // Pagination : the first page
-      funds = db_api.list_credit_offers( 5 );
-      BOOST_REQUIRE_EQUAL( funds.size(), 5u );
-      BOOST_CHECK( funds.front().id == co1_id );
-      BOOST_CHECK( funds.back().id == co5_id );
+      offers = db_api.list_credit_offers( 5 );
+      BOOST_REQUIRE_EQUAL( offers.size(), 5u );
+      BOOST_CHECK( offers.front().id == co1_id );
+      BOOST_CHECK( offers.back().id == co5_id );
 
       // Pagination : the last page
-      funds = db_api.list_credit_offers( 5, co3_id );
-      BOOST_REQUIRE_EQUAL( funds.size(), 4u );
-      BOOST_CHECK( funds.front().id == co3_id );
-      BOOST_CHECK( funds.back().id == co6_id );
+      offers = db_api.list_credit_offers( 5, co3_id );
+      BOOST_REQUIRE_EQUAL( offers.size(), 4u );
+      BOOST_CHECK( offers.front().id == co3_id );
+      BOOST_CHECK( offers.back().id == co6_id );
 
       // Limit too large
       BOOST_CHECK_THROW( db_api.list_credit_offers( 102 ), fc::exception );
 
       // Get all credit offers owned by Sam
-      funds = db_api.get_credit_offers_by_owner( "sam" );
-      BOOST_REQUIRE_EQUAL( funds.size(), 4u );
-      BOOST_CHECK( funds.front().id == co1_id );
-      BOOST_CHECK( funds.back().id == co5_id );
+      offers = db_api.get_credit_offers_by_owner( "sam" );
+      BOOST_REQUIRE_EQUAL( offers.size(), 4u );
+      BOOST_CHECK( offers.front().id == co1_id );
+      BOOST_CHECK( offers.back().id == co5_id );
 
       // Pagination : the first page
-      funds = db_api.get_credit_offers_by_owner( "sam", 3, {} );
-      BOOST_REQUIRE_EQUAL( funds.size(), 3u );
-      BOOST_CHECK( funds.front().id == co1_id );
-      BOOST_CHECK( funds.back().id == co4_id );
+      offers = db_api.get_credit_offers_by_owner( "sam", 3, {} );
+      BOOST_REQUIRE_EQUAL( offers.size(), 3u );
+      BOOST_CHECK( offers.front().id == co1_id );
+      BOOST_CHECK( offers.back().id == co4_id );
 
       // Pagination : another page
-      funds = db_api.get_credit_offers_by_owner( "sam", 3, co2_id );
-      BOOST_REQUIRE_EQUAL( funds.size(), 3u );
-      BOOST_CHECK( funds.front().id == co3_id );
-      BOOST_CHECK( funds.back().id == co5_id );
+      offers = db_api.get_credit_offers_by_owner( "sam", 3, co2_id );
+      BOOST_REQUIRE_EQUAL( offers.size(), 3u );
+      BOOST_CHECK( offers.front().id == co3_id );
+      BOOST_CHECK( offers.back().id == co5_id );
 
       // Pagination : the first page of credit offers owned by Ted
-      funds = db_api.get_credit_offers_by_owner( string("1.2.")+fc::to_string(ted_id.instance.value), 3 );
-      BOOST_REQUIRE_EQUAL( funds.size(), 2u );
-      BOOST_CHECK( funds.front().id == co2_id );
-      BOOST_CHECK( funds.back().id == co6_id );
+      offers = db_api.get_credit_offers_by_owner( string("1.2.")+fc::to_string(ted_id.instance.value), 3 );
+      BOOST_REQUIRE_EQUAL( offers.size(), 2u );
+      BOOST_CHECK( offers.front().id == co2_id );
+      BOOST_CHECK( offers.back().id == co6_id );
 
       // Nonexistent account
       BOOST_CHECK_THROW( db_api.get_credit_offers_by_owner( "nonexistent-account" ), fc::exception );
@@ -1874,34 +1881,102 @@ BOOST_AUTO_TEST_CASE( credit_offer_apis_test )
       BOOST_CHECK_THROW( db_api.get_credit_offers_by_owner( "ted", 102 ), fc::exception );
 
       // Get all credit offers whose asset type is USD
-      funds = db_api.get_credit_offers_by_asset( "MYUSD" );
-      BOOST_REQUIRE_EQUAL( funds.size(), 3u );
-      BOOST_CHECK( funds.front().id == co2_id );
-      BOOST_CHECK( funds.back().id == co6_id );
+      offers = db_api.get_credit_offers_by_asset( "MYUSD" );
+      BOOST_REQUIRE_EQUAL( offers.size(), 3u );
+      BOOST_CHECK( offers.front().id == co2_id );
+      BOOST_CHECK( offers.back().id == co6_id );
 
       // Pagination : the first page
-      funds = db_api.get_credit_offers_by_asset( "MYUSD", 2 );
-      BOOST_REQUIRE_EQUAL( funds.size(), 2u );
-      BOOST_CHECK( funds.front().id == co2_id );
-      BOOST_CHECK( funds.back().id == co5_id );
+      offers = db_api.get_credit_offers_by_asset( "MYUSD", 2 );
+      BOOST_REQUIRE_EQUAL( offers.size(), 2u );
+      BOOST_CHECK( offers.front().id == co2_id );
+      BOOST_CHECK( offers.back().id == co5_id );
 
       // Pagination : another page
-      funds = db_api.get_credit_offers_by_asset( "MYUSD", 2, co4_id );
-      BOOST_REQUIRE_EQUAL( funds.size(), 2u );
-      BOOST_CHECK( funds.front().id == co5_id );
-      BOOST_CHECK( funds.back().id == co6_id );
+      offers = db_api.get_credit_offers_by_asset( "MYUSD", 2, co4_id );
+      BOOST_REQUIRE_EQUAL( offers.size(), 2u );
+      BOOST_CHECK( offers.front().id == co5_id );
+      BOOST_CHECK( offers.back().id == co6_id );
 
       // Pagination : the first page of credit offers whose asset type is CORE
-      funds = db_api.get_credit_offers_by_asset( "1.3.0", 2, {} );
-      BOOST_REQUIRE_EQUAL( funds.size(), 1u );
-      BOOST_CHECK( funds.front().id == co1_id );
-      BOOST_CHECK( funds.back().id == co1_id );
+      offers = db_api.get_credit_offers_by_asset( "1.3.0", 2, {} );
+      BOOST_REQUIRE_EQUAL( offers.size(), 1u );
+      BOOST_CHECK( offers.front().id == co1_id );
+      BOOST_CHECK( offers.back().id == co1_id );
 
       // Nonexistent asset
       BOOST_CHECK_THROW( db_api.get_credit_offers_by_asset( "NOSUCHASSET" ), fc::exception );
 
       // Limit too large
       BOOST_CHECK_THROW( db_api.get_credit_offers_by_asset( "MYUSD", 102 ), fc::exception );
+
+      // Create credit deals
+      // Offer owner : sam
+      const credit_deal_object& cdo11 = borrow_from_credit_offer( ray_id, co1_id, asset(100), asset(200, usd_id) );
+      credit_deal_id_type cd11_id = cdo11.id;
+
+      // Offer owner : sam
+      const credit_deal_object& cdo12 = borrow_from_credit_offer( ray_id, co1_id, asset(150), asset(400, eur_id) );
+      credit_deal_id_type cd12_id = cdo12.id;
+
+      // Offer owner : sam
+      const credit_deal_object& cdo13 = borrow_from_credit_offer( bob_id, co1_id, asset(200), asset(600, eur_id) );
+      credit_deal_id_type cd13_id = cdo13.id;
+
+      // Offer owner : ted
+      const credit_deal_object& cdo21 = borrow_from_credit_offer( bob_id, co2_id, asset(500, usd_id),
+                                                                  asset(500, eur_id) );
+      credit_deal_id_type cd21_id = cdo21.id;
+
+      // Offer owner : sam
+      const credit_deal_object& cdo31 = borrow_from_credit_offer( bob_id, co3_id, asset(500, eur_id), asset(5000) );
+      credit_deal_id_type cd31_id = cdo31.id;
+
+      // Offer owner : sam
+      const credit_deal_object& cdo51 = borrow_from_credit_offer( ray_id, co5_id, asset(400, usd_id),
+                                                                  asset(800, eur_id) );
+      credit_deal_id_type cd51_id = cdo51.id;
+
+      generate_block();
+
+      // Since all APIs are now calling the same template function,
+      // no need to to test with many cases only for pagination.
+      auto deals = db_api.list_credit_deals();
+      BOOST_REQUIRE_EQUAL( deals.size(), 6u );
+      BOOST_CHECK( deals.front().id == cd11_id );
+      BOOST_CHECK( deals.back().id == cd51_id );
+
+      deals = db_api.get_credit_deals_by_offer_id( co1_id );
+      BOOST_REQUIRE_EQUAL( deals.size(), 3u );
+      BOOST_CHECK( deals[0].id == cd11_id );
+      BOOST_CHECK( deals[1].id == cd12_id );
+      BOOST_CHECK( deals[2].id == cd13_id );
+
+      deals = db_api.get_credit_deals_by_offer_owner( "sam" );
+      BOOST_REQUIRE_EQUAL( deals.size(), 5u );
+      BOOST_CHECK( deals[0].id == cd11_id );
+      BOOST_CHECK( deals[1].id == cd12_id );
+      BOOST_CHECK( deals[2].id == cd13_id );
+      BOOST_CHECK( deals[3].id == cd31_id );
+      BOOST_CHECK( deals[4].id == cd51_id );
+
+      deals = db_api.get_credit_deals_by_borrower( "bob" );
+      BOOST_REQUIRE_EQUAL( deals.size(), 3u );
+      BOOST_CHECK( deals[0].id == cd13_id );
+      BOOST_CHECK( deals[1].id == cd21_id );
+      BOOST_CHECK( deals[2].id == cd31_id );
+
+      deals = db_api.get_credit_deals_by_debt_asset( "MYUSD" );
+      BOOST_REQUIRE_EQUAL( deals.size(), 2u );
+      BOOST_CHECK( deals[0].id == cd21_id );
+      BOOST_CHECK( deals[1].id == cd51_id );
+
+      deals = db_api.get_credit_deals_by_collateral_asset( "MYEUR" );
+      BOOST_REQUIRE_EQUAL( deals.size(), 4u );
+      BOOST_CHECK( deals[0].id == cd12_id );
+      BOOST_CHECK( deals[1].id == cd13_id );
+      BOOST_CHECK( deals[2].id == cd21_id );
+      BOOST_CHECK( deals[3].id == cd51_id );
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
