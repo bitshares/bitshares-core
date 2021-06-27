@@ -168,9 +168,6 @@ bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
       {
          operation_get_impacted_accounts( op.op, impacted,
                                           MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( db.head_block_time() ) );
-         // TODO change return type
-         if( op.op.is_type< samet_fund_borrow_operation >() || op.op.is_type< samet_fund_repay_operation >() )
-            impacted.insert( op.result.get<object_id_type>() );
       }
 
       if( op.result.is_type<extendable_operation_result>() )

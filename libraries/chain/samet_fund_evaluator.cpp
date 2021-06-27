@@ -164,7 +164,7 @@ void_result samet_fund_borrow_evaluator::do_evaluate(const samet_fund_borrow_ope
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
-object_id_type samet_fund_borrow_evaluator::do_apply( const samet_fund_borrow_operation& op) const
+extendable_operation_result samet_fund_borrow_evaluator::do_apply( const samet_fund_borrow_operation& op) const
 { try {
    database& d = db();
 
@@ -177,7 +177,10 @@ object_id_type samet_fund_borrow_evaluator::do_apply( const samet_fund_borrow_op
    // Defensive check
    FC_ASSERT( _fund->balance >= _fund->unpaid_amount, "Should not borrow more than available" );
 
-   return _fund->owner_account;
+   extendable_operation_result result;
+   result.value.impacted_accounts = flat_set<account_id_type>({ _fund->owner_account });
+
+   return result;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
 void_result samet_fund_repay_evaluator::do_evaluate(const samet_fund_repay_operation& op)
@@ -205,7 +208,7 @@ void_result samet_fund_repay_evaluator::do_evaluate(const samet_fund_repay_opera
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
-object_id_type samet_fund_repay_evaluator::do_apply( const samet_fund_repay_operation& op) const
+extendable_operation_result samet_fund_repay_evaluator::do_apply( const samet_fund_repay_operation& op) const
 { try {
    database& d = db();
 
@@ -216,7 +219,10 @@ object_id_type samet_fund_repay_evaluator::do_apply( const samet_fund_repay_oper
       sfo.unpaid_amount -= op.repay_amount.amount;
    });
 
-   return _fund->owner_account;
+   extendable_operation_result result;
+   result.value.impacted_accounts = flat_set<account_id_type>({ _fund->owner_account });
+
+   return result;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
 } } // graphene::chain

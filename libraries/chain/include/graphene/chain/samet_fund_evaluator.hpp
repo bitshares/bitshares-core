@@ -67,7 +67,7 @@ namespace graphene { namespace chain {
          using operation_type = samet_fund_borrow_operation;
 
          void_result do_evaluate( const samet_fund_borrow_operation& op );
-         object_id_type do_apply( const samet_fund_borrow_operation& op ) const;
+         extendable_operation_result do_apply( const samet_fund_borrow_operation& op ) const;
 
          const samet_fund_object* _fund = nullptr;
    };
@@ -78,7 +78,7 @@ namespace graphene { namespace chain {
          using operation_type = samet_fund_repay_operation;
 
          void_result do_evaluate( const samet_fund_repay_operation& op );
-         object_id_type do_apply( const samet_fund_repay_operation& op ) const;
+         extendable_operation_result do_apply( const samet_fund_repay_operation& op ) const;
 
          const samet_fund_object* _fund = nullptr;
    };

@@ -90,7 +90,6 @@ namespace graphene { namespace protocol {
    /**
     * @brief Borrow from a SameT Fund
     * @ingroup operations
-    * @note The result of this operation is the ID of the owner account of the SameT Fund
     */
    struct samet_fund_borrow_operation : public base_operation
    {
@@ -110,7 +109,6 @@ namespace graphene { namespace protocol {
    /**
     * @brief Repay to a SameT Fund
     * @ingroup operations
-    * @note The result of this operation is the ID of the owner account of the SameT Fund
     */
    struct samet_fund_repay_operation : public base_operation
    {

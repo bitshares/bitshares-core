@@ -1636,9 +1636,13 @@ void database_fixture_base::borrow_from_samet_fund( account_id_type account, sam
    for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
    trx.validate();
    set_expiration( db, trx );
-   PUSH_TX(db, trx, ~0);
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
+   const operation_result& op_result = ptx.operation_results.front();
    trx.operations.clear();
    verify_asset_supplies(db);
+   const auto& result_dtl = op_result.get<extendable_operation_result>().value;
+   BOOST_REQUIRE( result_dtl.impacted_accounts.valid() );
+   BOOST_CHECK( *result_dtl.impacted_accounts == flat_set<account_id_type>({ fund_id(db).owner_account }) );
 }
 
 samet_fund_repay_operation database_fixture_base::make_samet_fund_repay_op(
@@ -1663,9 +1667,13 @@ void database_fixture_base::repay_to_samet_fund( account_id_type account, samet_
    for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
    trx.validate();
    set_expiration( db, trx );
-   PUSH_TX(db, trx, ~0);
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
+   const operation_result& op_result = ptx.operation_results.front();
    trx.operations.clear();
    verify_asset_supplies(db);
+   const auto& result_dtl = op_result.get<extendable_operation_result>().value;
+   BOOST_REQUIRE( result_dtl.impacted_accounts.valid() );
+   BOOST_CHECK( *result_dtl.impacted_accounts == flat_set<account_id_type>({ fund_id(db).owner_account }) );
 }
 
 credit_offer_create_operation database_fixture_base::make_credit_offer_create_op(
