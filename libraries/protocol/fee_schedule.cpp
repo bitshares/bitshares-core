@@ -25,7 +25,7 @@
 
 namespace graphene { namespace protocol {
 
-   const fee_schedule fee_schedule::get_default_impl()
+   fee_schedule fee_schedule::get_default_impl()
    {
       fee_schedule result;
       const auto count = fee_parameters::count();

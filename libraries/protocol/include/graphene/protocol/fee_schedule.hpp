@@ -220,7 +220,7 @@ namespace graphene { namespace protocol {
       fee_parameters::flat_set_type parameters;
       uint32_t                      scale = GRAPHENE_100_PERCENT; ///< fee * scale / GRAPHENE_100_PERCENT
    private:
-      static const fee_schedule get_default_impl();
+      static fee_schedule get_default_impl();
    };
 
    using fee_schedule_type = fee_schedule;
