@@ -553,6 +553,33 @@ void database_fixture_base::verify_asset_supplies( const database& db )
       total_balances[o.asset_type] += (o.balance - o.unpaid_amount);
    }
 
+   map<asset_id_type,share_type> credit_offer_debts_in_offers;
+   map<asset_id_type,share_type> credit_offer_debts_in_deals;
+   map<asset_id_type,share_type> credit_offer_debts_in_summs;
+   for( const credit_offer_object& o : db.get_index_type<credit_offer_index>().indices() )
+   {
+      total_balances[o.asset_type] += o.current_balance;
+      if( o.total_balance != o.current_balance)
+         credit_offer_debts_in_offers[o.asset_type] += (o.total_balance - o.current_balance);
+   }
+   for( const credit_deal_object& o : db.get_index_type<credit_deal_index>().indices() )
+   {
+      total_balances[o.collateral_asset] += o.collateral_amount;
+      credit_offer_debts_in_deals[o.debt_asset] += o.debt_amount;
+   }
+   for( const credit_deal_summary_object& o : db.get_index_type<credit_deal_summary_index>().indices() )
+   {
+      credit_offer_debts_in_summs[o.debt_asset] += o.total_debt_amount;
+   }
+
+   BOOST_CHECK_EQUAL( credit_offer_debts_in_offers.size(), credit_offer_debts_in_deals.size() );
+   BOOST_CHECK_EQUAL( credit_offer_debts_in_offers.size(), credit_offer_debts_in_summs.size() );
+   for( const auto& item : credit_offer_debts_in_offers )
+   {
+      BOOST_CHECK_EQUAL( item.second.value, credit_offer_debts_in_deals[item.first].value );
+      BOOST_CHECK_EQUAL( item.second.value, credit_offer_debts_in_summs[item.first].value );
+   }
+
    total_balances[asset_id_type()] += db.get_dynamic_global_properties().witness_budget;
 
    for( const auto& item : total_debts )
@@ -1511,7 +1538,7 @@ samet_fund_create_operation database_fixture_base::make_samet_fund_create_op(
    samet_fund_create_operation op;
    op.owner_account = account;
    op.asset_type = asset_type;
-   op.balance = balance,
+   op.balance = balance;
    op.fee_rate = fee_rate;
    return op;
 }
@@ -1609,9 +1636,13 @@ void database_fixture_base::borrow_from_samet_fund( account_id_type account, sam
    for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
    trx.validate();
    set_expiration( db, trx );
-   PUSH_TX(db, trx, ~0);
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
+   const operation_result& op_result = ptx.operation_results.front();
    trx.operations.clear();
    verify_asset_supplies(db);
+   const auto& result_dtl = op_result.get<extendable_operation_result>().value;
+   BOOST_REQUIRE( result_dtl.impacted_accounts.valid() );
+   BOOST_CHECK( *result_dtl.impacted_accounts == flat_set<account_id_type>({ fund_id(db).owner_account }) );
 }
 
 samet_fund_repay_operation database_fixture_base::make_samet_fund_repay_op(
@@ -1636,10 +1667,199 @@ void database_fixture_base::repay_to_samet_fund( account_id_type account, samet_
    for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
    trx.validate();
    set_expiration( db, trx );
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
+   const operation_result& op_result = ptx.operation_results.front();
+   trx.operations.clear();
+   verify_asset_supplies(db);
+   const auto& result_dtl = op_result.get<extendable_operation_result>().value;
+   BOOST_REQUIRE( result_dtl.impacted_accounts.valid() );
+   BOOST_CHECK( *result_dtl.impacted_accounts == flat_set<account_id_type>({ fund_id(db).owner_account }) );
+}
+
+credit_offer_create_operation database_fixture_base::make_credit_offer_create_op(
+                                       account_id_type account, asset_id_type asset_type,
+                                       share_type balance, uint32_t fee_rate, uint32_t max_duration,
+                                       share_type min_amount, bool enabled, time_point_sec disable_time,
+                                       flat_map<asset_id_type, price>          acceptable_collateral,
+                                       flat_map<account_id_type, share_type>   acceptable_borrowers )const
+{
+   credit_offer_create_operation op;
+   op.owner_account = account;
+   op.asset_type = asset_type;
+   op.balance = balance;
+   op.fee_rate = fee_rate;
+   op.max_duration_seconds = max_duration;
+   op.min_deal_amount = min_amount;
+   op.enabled = enabled;
+   op.auto_disable_time = disable_time;
+   op.acceptable_collateral = acceptable_collateral;
+   op.acceptable_borrowers = acceptable_borrowers;
+   return op;
+}
+
+const credit_offer_object& database_fixture_base::create_credit_offer(
+                                       account_id_type account, asset_id_type asset_type,
+                                       share_type balance, uint32_t fee_rate, uint32_t max_duration,
+                                       share_type min_amount, bool enabled, time_point_sec disable_time,
+                                       flat_map<asset_id_type, price>          acceptable_collateral,
+                                       flat_map<account_id_type, share_type>   acceptable_borrowers )
+{
+   credit_offer_create_operation op = make_credit_offer_create_op( account, asset_type, balance, fee_rate,
+                                         max_duration, min_amount, enabled, disable_time,
+                                         acceptable_collateral, acceptable_borrowers );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
+   const operation_result& op_result = ptx.operation_results.front();
+   trx.operations.clear();
+   verify_asset_supplies(db);
+   return db.get<credit_offer_object>( op_result.get<object_id_type>() );
+}
+
+credit_offer_delete_operation database_fixture_base::make_credit_offer_delete_op( account_id_type account,
+                                                  credit_offer_id_type offer_id )const
+{
+   credit_offer_delete_operation op;
+   op.owner_account = account;
+   op.offer_id = offer_id;
+   return op;
+}
+
+asset database_fixture_base::delete_credit_offer( account_id_type account,  credit_offer_id_type offer_id )
+{
+   credit_offer_delete_operation op = make_credit_offer_delete_op( account, offer_id );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
+   const operation_result& op_result = ptx.operation_results.front();
+   trx.operations.clear();
+   verify_asset_supplies(db);
+   return op_result.get<asset>();
+}
+
+credit_offer_update_operation database_fixture_base::make_credit_offer_update_op(
+                                       account_id_type account, credit_offer_id_type offer_id,
+                                       const optional<asset>& delta_amount,
+                                       const optional<uint32_t>& new_fee_rate,
+                                       const optional<uint32_t>& max_duration_seconds,
+                                       const optional<share_type>& min_deal_amount,
+                                       const optional<bool>& enabled,
+                                       const optional<time_point_sec>& auto_disable_time,
+                                       const optional<flat_map<asset_id_type, price>>& acceptable_collateral,
+                                       const optional<flat_map<account_id_type, share_type>>& acceptable_borrowers
+                                    )const
+{
+   credit_offer_update_operation op;
+   op.owner_account = account;
+   op.offer_id = offer_id;
+   op.delta_amount = delta_amount;
+   op.fee_rate = new_fee_rate;
+   op.max_duration_seconds = max_duration_seconds;
+   op.min_deal_amount = min_deal_amount;
+   op.enabled = enabled;
+   op.auto_disable_time = auto_disable_time;
+   op.acceptable_collateral = acceptable_collateral;
+   op.acceptable_borrowers = acceptable_borrowers;
+   return op;
+}
+
+void database_fixture_base::update_credit_offer( account_id_type account, credit_offer_id_type offer_id,
+                                       const optional<asset>& delta_amount,
+                                       const optional<uint32_t>& new_fee_rate,
+                                       const optional<uint32_t>& max_duration_seconds,
+                                       const optional<share_type>& min_deal_amount,
+                                       const optional<bool>& enabled,
+                                       const optional<time_point_sec>& auto_disable_time,
+                                       const optional<flat_map<asset_id_type, price>>& acceptable_collateral,
+                                       const optional<flat_map<account_id_type, share_type>>& acceptable_borrowers )
+{
+   credit_offer_update_operation op = make_credit_offer_update_op( account, offer_id, delta_amount, new_fee_rate,
+                                         max_duration_seconds, min_deal_amount, enabled, auto_disable_time,
+                                         acceptable_collateral, acceptable_borrowers );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
    PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
 }
+
+credit_offer_accept_operation database_fixture_base::make_credit_offer_accept_op(
+                                       account_id_type account, credit_offer_id_type offer_id,
+                                       const asset& borrow_amount, const asset& collateral )const
+{
+   credit_offer_accept_operation op;
+   op.borrower = account;
+   op.offer_id = offer_id;
+   op.borrow_amount = borrow_amount;
+   op.collateral = collateral;
+   return op;
+}
+
+const credit_deal_object& database_fixture_base::borrow_from_credit_offer(
+                                       account_id_type account, credit_offer_id_type offer_id,
+                                       const asset& borrow_amount, const asset& collateral )
+{
+   credit_offer_accept_operation op = make_credit_offer_accept_op( account, offer_id, borrow_amount, collateral );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
+   const operation_result& op_result = ptx.operation_results.front();
+   trx.operations.clear();
+   verify_asset_supplies(db);
+   const auto& result_dtl = op_result.get<extendable_operation_result>().value;
+   BOOST_REQUIRE( result_dtl.impacted_accounts.valid() );
+   BOOST_CHECK( *result_dtl.impacted_accounts == flat_set<account_id_type>({ offer_id(db).owner_account }) );
+   BOOST_REQUIRE( result_dtl.new_objects.valid() );
+   BOOST_REQUIRE_EQUAL( result_dtl.new_objects->size(), 1u );
+   return db.get<credit_deal_object>( *result_dtl.new_objects->begin() );
+}
+
+credit_deal_repay_operation database_fixture_base::make_credit_deal_repay_op(
+                                       account_id_type account, credit_deal_id_type deal_id,
+                                       const asset& repay_amount, const asset& credit_fee )const
+{
+   credit_deal_repay_operation op;
+   op.account = account;
+   op.deal_id = deal_id;
+   op.repay_amount = repay_amount;
+   op.credit_fee = credit_fee;
+   return op;
+}
+
+extendable_operation_result_dtl database_fixture_base::repay_credit_deal(
+                                       account_id_type account, credit_deal_id_type deal_id,
+                                       const asset& repay_amount, const asset& credit_fee )
+{
+   credit_deal_repay_operation op = make_credit_deal_repay_op( account, deal_id, repay_amount, credit_fee );
+   trx.operations.clear();
+   trx.operations.push_back( op );
+
+   for( auto& o : trx.operations ) db.current_fee_schedule().set_fee(o);
+   trx.validate();
+   set_expiration( db, trx );
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
+   const operation_result& op_result = ptx.operation_results.front();
+   trx.operations.clear();
+   verify_asset_supplies(db);
+   return op_result.get<extendable_operation_result>().value;
+}
+
 
 void database_fixture_base::enable_fees()
 {

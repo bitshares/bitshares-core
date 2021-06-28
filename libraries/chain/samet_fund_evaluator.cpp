@@ -164,7 +164,7 @@ void_result samet_fund_borrow_evaluator::do_evaluate(const samet_fund_borrow_ope
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
-object_id_type samet_fund_borrow_evaluator::do_apply( const samet_fund_borrow_operation& op) const
+extendable_operation_result samet_fund_borrow_evaluator::do_apply( const samet_fund_borrow_operation& op) const
 { try {
    database& d = db();
 
@@ -177,7 +177,10 @@ object_id_type samet_fund_borrow_evaluator::do_apply( const samet_fund_borrow_op
    // Defensive check
    FC_ASSERT( _fund->balance >= _fund->unpaid_amount, "Should not borrow more than available" );
 
-   return _fund->owner_account;
+   extendable_operation_result result;
+   result.value.impacted_accounts = flat_set<account_id_type>({ _fund->owner_account });
+
+   return result;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
 void_result samet_fund_repay_evaluator::do_evaluate(const samet_fund_repay_operation& op)
@@ -194,8 +197,9 @@ void_result samet_fund_repay_evaluator::do_evaluate(const samet_fund_repay_opera
    FC_ASSERT( op.repay_amount.amount <= _fund->unpaid_amount,
               "Repay amount should not be greater than unpaid amount" );
 
+   // Note: the result can be larger than 64 bit, but since we don't store it, it is allowed
    auto required_fee = ( ( ( fc::uint128_t( op.repay_amount.amount.value ) * _fund->fee_rate )
-                         + GRAPHENE_SAMET_FUND_FEE_DENOM ) - 1 ) / GRAPHENE_SAMET_FUND_FEE_DENOM; // Round up
+                         + GRAPHENE_FEE_RATE_DENOM ) - 1 ) / GRAPHENE_FEE_RATE_DENOM; // Round up
 
    FC_ASSERT( fc::uint128_t(op.fund_fee.amount.value) >= required_fee,
               "Insuffient fund fee, requires ${r}, offered ${p}",
@@ -204,7 +208,7 @@ void_result samet_fund_repay_evaluator::do_evaluate(const samet_fund_repay_opera
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
-object_id_type samet_fund_repay_evaluator::do_apply( const samet_fund_repay_operation& op) const
+extendable_operation_result samet_fund_repay_evaluator::do_apply( const samet_fund_repay_operation& op) const
 { try {
    database& d = db();
 
@@ -215,7 +219,10 @@ object_id_type samet_fund_repay_evaluator::do_apply( const samet_fund_repay_oper
       sfo.unpaid_amount -= op.repay_amount.amount;
    });
 
-   return _fund->owner_account;
+   extendable_operation_result result;
+   result.value.impacted_accounts = flat_set<account_id_type>({ _fund->owner_account });
+
+   return result;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
 } } // graphene::chain

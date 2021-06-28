@@ -360,7 +360,7 @@ BOOST_AUTO_TEST_CASE( samet_fund_crud_and_proposal_test )
       expected_balance_sam_eur += 9;
       check_balances();
 
-      // Same is unable to recreate the fund
+      // Sam is unable to recreate the fund
       BOOST_CHECK_THROW( create_samet_fund( sam_id, eur.id, 10, 1u ), fc::exception );
       check_balances();
 

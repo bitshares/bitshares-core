@@ -648,6 +648,7 @@ void database::_apply_block( const signed_block& next_block )
    update_expired_feeds();       // this will update expired feeds and some core exchange rates
    update_core_exchange_rates(); // this will update remaining core exchange rates
    update_withdraw_permissions();
+   update_credit_offers_and_deals();
 
    // n.b., update_maintenance_flag() happens this late
    // because get_slot_time() / get_slot_at_time() is needed above

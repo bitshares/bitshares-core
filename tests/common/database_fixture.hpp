@@ -34,6 +34,7 @@
 #include <graphene/protocol/market.hpp>
 
 #include <graphene/chain/committee_member_object.hpp>
+#include <graphene/chain/credit_offer_object.hpp>
 #include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/samet_fund_object.hpp>
 #include <graphene/chain/ticket_object.hpp>
@@ -475,6 +476,54 @@ struct database_fixture_base {
                                                   const asset& repay_amount, const asset& fund_fee )const;
    void repay_to_samet_fund( account_id_type account, samet_fund_id_type fund_id,
                                                   const asset& repay_amount, const asset& fund_fee );
+
+   // credit offer / deal
+   credit_offer_create_operation make_credit_offer_create_op(
+                                       account_id_type account, asset_id_type asset_type,
+                                       share_type balance, uint32_t fee_rate, uint32_t max_duration,
+                                       share_type min_amount, bool enabled, time_point_sec disable_time,
+                                       flat_map<asset_id_type, price>          acceptable_collateral,
+                                       flat_map<account_id_type, share_type>   acceptable_borrowers )const;
+   const credit_offer_object& create_credit_offer(
+                                       account_id_type account, asset_id_type asset_type,
+                                       share_type balance, uint32_t fee_rate, uint32_t max_duration,
+                                       share_type min_amount, bool enabled, time_point_sec disable_time,
+                                       flat_map<asset_id_type, price>          acceptable_collateral,
+                                       flat_map<account_id_type, share_type>   acceptable_borrowers );
+   credit_offer_delete_operation make_credit_offer_delete_op( account_id_type account,
+                                                  credit_offer_id_type offer_id )const;
+   asset delete_credit_offer( account_id_type account,  credit_offer_id_type offer_id );
+   credit_offer_update_operation make_credit_offer_update_op(
+                                       account_id_type account, credit_offer_id_type offer_id,
+                                       const optional<asset>& delta_amount,
+                                       const optional<uint32_t>& new_fee_rate,
+                                       const optional<uint32_t>& max_duration_seconds,
+                                       const optional<share_type>& min_deal_amount,
+                                       const optional<bool>& enabled,
+                                       const optional<time_point_sec>& auto_disable_time,
+                                       const optional<flat_map<asset_id_type, price>>& acceptable_collateral,
+                                       const optional<flat_map<account_id_type, share_type>>& acceptable_borrowers
+                                    )const;
+   void update_credit_offer( account_id_type account, credit_offer_id_type offer_id,
+                                       const optional<asset>& delta_amount,
+                                       const optional<uint32_t>& new_fee_rate,
+                                       const optional<uint32_t>& max_duration_seconds,
+                                       const optional<share_type>& min_deal_amount,
+                                       const optional<bool>& enabled,
+                                       const optional<time_point_sec>& auto_disable_time,
+                                       const optional<flat_map<asset_id_type, price>>& acceptable_collateral,
+                                       const optional<flat_map<account_id_type, share_type>>& acceptable_borrowers );
+   credit_offer_accept_operation make_credit_offer_accept_op(
+                                       account_id_type account, credit_offer_id_type offer_id,
+                                       const asset& borrow_amount, const asset& collateral )const;
+   const credit_deal_object& borrow_from_credit_offer(
+                                       account_id_type account, credit_offer_id_type offer_id,
+                                       const asset& borrow_amount, const asset& collateral );
+   credit_deal_repay_operation make_credit_deal_repay_op(
+                                       account_id_type account, credit_deal_id_type deal_id,
+                                       const asset& repay_amount, const asset& credit_fee )const;
+   extendable_operation_result_dtl repay_credit_deal( account_id_type account, credit_deal_id_type deal_id,
+                                       const asset& repay_amount, const asset& credit_fee );
 
    /**
     * NOTE: This modifies the database directly. You will probably have to call this each time you

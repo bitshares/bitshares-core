@@ -76,6 +76,13 @@ namespace graphene { namespace app {
          uint64_t api_limit_get_liquidity_pools = 101;
          uint64_t api_limit_get_liquidity_pool_history = 101;
          uint64_t api_limit_get_samet_funds = 101;
+         uint64_t api_limit_get_credit_offers = 101;
+
+         static const application_options& get_default()
+         {
+            static const application_options default_options;
+            return default_options;
+         }
    };
 
    class application

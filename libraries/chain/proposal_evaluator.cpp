@@ -171,6 +171,20 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!op.new_parameters.current_fees->exists<samet_fund_repay_operation>(),
                    "Unable to define fees for samet fund operations prior to the core-2351 hardfork");
       }
+      if (!HARDFORK_CORE_2362_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.current_fees->exists<credit_offer_create_operation>(),
+                   "Unable to define fees for credit offer operations prior to the core-2362 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<credit_offer_delete_operation>(),
+                   "Unable to define fees for credit offer operations prior to the core-2362 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<credit_offer_update_operation>(),
+                   "Unable to define fees for credit offer operations prior to the core-2362 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<credit_offer_accept_operation>(),
+                   "Unable to define fees for credit offer operations prior to the core-2362 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<credit_deal_repay_operation>(),
+                   "Unable to define fees for credit offer operations prior to the core-2362 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<credit_deal_expired_operation>(),
+                   "Unable to define fees for credit offer operations prior to the core-2362 hardfork");
+      }
    }
    void operator()(const graphene::chain::htlc_create_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
@@ -236,6 +250,22 @@ struct proposal_operation_hardfork_visitor
    void operator()(const graphene::chain::samet_fund_repay_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
    }
+   void operator()(const graphene::chain::credit_offer_create_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
+   }
+   void operator()(const graphene::chain::credit_offer_delete_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
+   }
+   void operator()(const graphene::chain::credit_offer_update_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
+   }
+   void operator()(const graphene::chain::credit_offer_accept_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
+   }
+   void operator()(const graphene::chain::credit_deal_repay_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
+   }
+   // Note: credit_deal_expired_operation is a virtual operation thus no need to add code here
 
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {

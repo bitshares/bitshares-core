@@ -27,11 +27,13 @@
 #include <graphene/protocol/assert.hpp>
 #include <graphene/protocol/asset_ops.hpp>
 #include <graphene/protocol/balance.hpp>
-#include <graphene/protocol/custom.hpp>
 #include <graphene/protocol/committee_member.hpp>
 #include <graphene/protocol/confidential.hpp>
+#include <graphene/protocol/credit_offer.hpp>
+#include <graphene/protocol/custom.hpp>
 #include <graphene/protocol/custom_authority.hpp>
 #include <graphene/protocol/fba.hpp>
+#include <graphene/protocol/htlc.hpp>
 #include <graphene/protocol/liquidity_pool.hpp>
 #include <graphene/protocol/market.hpp>
 #include <graphene/protocol/proposal.hpp>
@@ -42,7 +44,6 @@
 #include <graphene/protocol/withdraw_permission.hpp>
 #include <graphene/protocol/witness.hpp>
 #include <graphene/protocol/worker.hpp>
-#include <graphene/protocol/htlc.hpp>
 
 namespace graphene { namespace protocol {
 
@@ -51,7 +52,7 @@ namespace graphene { namespace protocol {
     *
     * Defines the set of valid operations as a discriminated union type.
     */
-   typedef fc::static_variant<
+   using operation = fc::static_variant<
             /*  0 */ transfer_operation,
             /*  1 */ limit_order_create_operation,
             /*  2 */ limit_order_cancel_operation,
@@ -120,8 +121,14 @@ namespace graphene { namespace protocol {
             /* 65 */ samet_fund_delete_operation,
             /* 66 */ samet_fund_update_operation,
             /* 67 */ samet_fund_borrow_operation,
-            /* 68 */ samet_fund_repay_operation
-         > operation;
+            /* 68 */ samet_fund_repay_operation,
+            /* 69 */ credit_offer_create_operation,
+            /* 70 */ credit_offer_delete_operation,
+            /* 71 */ credit_offer_update_operation,
+            /* 72 */ credit_offer_accept_operation,
+            /* 73 */ credit_deal_repay_operation,
+            /* 74 */ credit_deal_expired_operation    // VIRTUAL
+         >;
 
    /// @} // operations group
 
@@ -144,8 +151,7 @@ namespace graphene { namespace protocol {
     */
    struct op_wrapper
    {
-      public:
-         op_wrapper(const operation& op = operation()):op(op){}
+         explicit op_wrapper(const operation& op = operation()):op(op){}
          operation op;
    };
 

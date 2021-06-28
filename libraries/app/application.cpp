@@ -397,6 +397,9 @@ void application_impl::set_api_limit() {
    if(_options->count("api-limit-get-samet-funds") > 0) {
       _app_options.api_limit_get_samet_funds = _options->at("api-limit-get-samet-funds").as<uint64_t>();
    }
+   if(_options->count("api-limit-get-credit-offers") > 0) {
+      _app_options.api_limit_get_credit_offers = _options->at("api-limit-get-credit-offers").as<uint64_t>();
+   }
 }
 
 graphene::chain::genesis_state_type application_impl::initialize_genesis_state() const
@@ -1096,6 +1099,7 @@ application::~application()
 void application::set_program_options(boost::program_options::options_description& command_line_options,
                                       boost::program_options::options_description& configuration_file_options) const
 {
+   const auto& default_opts = application_options::get_default();
    configuration_file_options.add_options()
          ("enable-p2p-network", bpo::value<bool>()->implicit_value(true),
           "Whether to enable P2P network. Note: if delayed_node plugin is enabled, "
@@ -1128,71 +1132,108 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("enable-standby-votes-tracking", bpo::value<bool>()->implicit_value(true),
           "Whether to enable tracking of votes of standby witnesses and committee members. "
           "Set it to true to provide accurate data to API clients, set to false for slightly better performance.")
-         ("api-limit-get-account-history-operations",boost::program_options::value<uint64_t>()->default_value(100),
+         ("api-limit-get-account-history-operations",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_account_history_operations),
           "For history_api::get_account_history_operations to set max limit value")
-         ("api-limit-get-account-history",boost::program_options::value<uint64_t>()->default_value(100),
+         ("api-limit-get-account-history",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_account_history),
           "For history_api::get_account_history to set max limit value")
-         ("api-limit-get-grouped-limit-orders",boost::program_options::value<uint64_t>()->default_value(101),
+         ("api-limit-get-grouped-limit-orders",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_grouped_limit_orders),
           "For orders_api::get_grouped_limit_orders to set max limit value")
-         ("api-limit-get-relative-account-history",boost::program_options::value<uint64_t>()->default_value(100),
+         ("api-limit-get-relative-account-history",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_relative_account_history),
           "For history_api::get_relative_account_history to set max limit value")
-         ("api-limit-get-account-history-by-operations",boost::program_options::value<uint64_t>()->default_value(100),
+         ("api-limit-get-account-history-by-operations",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_account_history_by_operations),
           "For history_api::get_account_history_by_operations to set max limit value")
-         ("api-limit-get-asset-holders",boost::program_options::value<uint64_t>()->default_value(100),
+         ("api-limit-get-asset-holders",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_asset_holders),
           "For asset_api::get_asset_holders to set max limit value")
-         ("api-limit-get-key-references",boost::program_options::value<uint64_t>()->default_value(100),
+         ("api-limit-get-key-references",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_key_references),
           "For database_api_impl::get_key_references to set max limit value")
-         ("api-limit-get-htlc-by",boost::program_options::value<uint64_t>()->default_value(100),
+         ("api-limit-get-htlc-by",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_htlc_by),
           "For database_api_impl::get_htlc_by_from and get_htlc_by_to to set max limit value")
-         ("api-limit-get-full-accounts",boost::program_options::value<uint64_t>()->default_value(50),
+         ("api-limit-get-full-accounts",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_full_accounts),
           "For database_api_impl::get_full_accounts to set max accounts to query at once")
-         ("api-limit-get-full-accounts-lists",boost::program_options::value<uint64_t>()->default_value(500),
+         ("api-limit-get-full-accounts-lists",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_full_accounts_lists),
           "For database_api_impl::get_full_accounts to set max items to return in the lists")
-         ("api-limit-get-top-voters",boost::program_options::value<uint64_t>()->default_value(200),
+         ("api-limit-get-top-voters",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_top_voters),
           "For database_api_impl::get_top_voters to set max limit value")
-         ("api-limit-get-call-orders",boost::program_options::value<uint64_t>()->default_value(300),
+         ("api-limit-get-call-orders",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_call_orders),
           "For database_api_impl::get_call_orders and get_call_orders_by_account to set max limit value")
-         ("api-limit-get-settle-orders",boost::program_options::value<uint64_t>()->default_value(300),
+         ("api-limit-get-settle-orders",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_settle_orders),
           "For database_api_impl::get_settle_orders and get_settle_orders_by_account to set max limit value")
-         ("api-limit-get-assets",boost::program_options::value<uint64_t>()->default_value(101),
+         ("api-limit-get-assets",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_assets),
           "For database_api_impl::list_assets and get_assets_by_issuer to set max limit value")
-         ("api-limit-get-limit-orders",boost::program_options::value<uint64_t>()->default_value(300),
+         ("api-limit-get-limit-orders",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_limit_orders),
           "For database_api_impl::get_limit_orders to set max limit value")
-         ("api-limit-get-limit-orders-by-account",boost::program_options::value<uint64_t>()->default_value(101),
+         ("api-limit-get-limit-orders-by-account",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_limit_orders_by_account),
           "For database_api_impl::get_limit_orders_by_account to set max limit value")
-         ("api-limit-get-order-book",boost::program_options::value<uint64_t>()->default_value(50),
+         ("api-limit-get-order-book",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_order_book),
           "For database_api_impl::get_order_book to set max limit value")
-         ("api-limit-lookup-accounts",boost::program_options::value<uint64_t>()->default_value(1000),
+         ("api-limit-list-htlcs",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_list_htlcs),
+          "For database_api_impl::list_htlcs to set max limit value")
+         ("api-limit-lookup-accounts",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_lookup_accounts),
           "For database_api_impl::lookup_accounts to set max limit value")
-         ("api-limit-lookup-witness-accounts",boost::program_options::value<uint64_t>()->default_value(1000),
+         ("api-limit-lookup-witness-accounts",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_lookup_witness_accounts),
           "For database_api_impl::lookup_witness_accounts to set max limit value")
-         ("api-limit-lookup-committee-member-accounts",boost::program_options::value<uint64_t>()->default_value(1000),
+         ("api-limit-lookup-committee-member-accounts",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_lookup_committee_member_accounts),
           "For database_api_impl::lookup_committee_member_accounts to set max limit value")
-         ("api-limit-lookup-vote-ids",boost::program_options::value<uint64_t>()->default_value(1000),
+         ("api-limit-lookup-vote-ids",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_lookup_vote_ids),
           "For database_api_impl::lookup_vote_ids to set max limit value")
-         ("api-limit-get-account-limit-orders",boost::program_options::value<uint64_t>()->default_value(101),
+         ("api-limit-get-account-limit-orders",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_account_limit_orders),
           "For database_api_impl::get_account_limit_orders to set max limit value")
-         ("api-limit-get-collateral-bids",boost::program_options::value<uint64_t>()->default_value(100),
+         ("api-limit-get-collateral-bids",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_collateral_bids),
           "For database_api_impl::get_collateral_bids to set max limit value")
-         ("api-limit-get-top-markets",boost::program_options::value<uint64_t>()->default_value(100),
+         ("api-limit-get-top-markets",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_top_markets),
           "For database_api_impl::get_top_markets to set max limit value")
-         ("api-limit-get-trade-history",boost::program_options::value<uint64_t>()->default_value(100),
+         ("api-limit-get-trade-history",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_trade_history),
           "For database_api_impl::get_trade_history to set max limit value")
-         ("api-limit-get-trade-history-by-sequence",boost::program_options::value<uint64_t>()->default_value(100),
+         ("api-limit-get-trade-history-by-sequence",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_trade_history_by_sequence),
           "For database_api_impl::get_trade_history_by_sequence to set max limit value")
-         ("api-limit-get-withdraw-permissions-by-giver",boost::program_options::value<uint64_t>()->default_value(101),
+         ("api-limit-get-withdraw-permissions-by-giver",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_withdraw_permissions_by_giver),
           "For database_api_impl::get_withdraw_permissions_by_giver to set max limit value")
          ("api-limit-get-withdraw-permissions-by-recipient",
-          boost::program_options::value<uint64_t>()->default_value(101),
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_withdraw_permissions_by_recipient),
           "For database_api_impl::get_withdraw_permissions_by_recipient to set max limit value")
-         ("api-limit-get-tickets", boost::program_options::value<uint64_t>()->default_value(101),
+         ("api-limit-get-tickets",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_tickets),
           "Set maximum limit value for database APIs which query for tickets")
-         ("api-limit-get-liquidity-pools", boost::program_options::value<uint64_t>()->default_value(101),
+         ("api-limit-get-liquidity-pools",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_liquidity_pools),
           "Set maximum limit value for database APIs which query for liquidity pools")
-         ("api-limit-get-liquidity-pool-history", boost::program_options::value<uint64_t>()->default_value(101),
+         ("api-limit-get-liquidity-pool-history",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_liquidity_pool_history),
           "Set maximum limit value for APIs which query for history of liquidity pools")
-         ("api-limit-get-samet-funds", boost::program_options::value<uint64_t>()->default_value(101),
+         ("api-limit-get-samet-funds",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_samet_funds),
           "Set maximum limit value for database APIs which query for SameT Funds")
+         ("api-limit-get-credit-offers",
+          bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_credit_offers),
+          "Set maximum limit value for database APIs which query for credit offers or credit deals")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()

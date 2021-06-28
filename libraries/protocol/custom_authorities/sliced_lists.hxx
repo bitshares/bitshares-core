@@ -48,14 +48,18 @@ using operation_list_11 = static_variant<typelist::builder<>
                                                 ::finalize>;
 using operation_list_12 = static_variant<typelist::slice<operation::list, 54, 59>>;
 using operation_list_13 = static_variant<typelist::slice<operation::list, 59, 64>>;
-using operation_list_14 = static_variant<typelist::slice<operation::list, 64>>;
-using virtual_operations_list = static_variant<fill_order_operation,          // 4
-                                               asset_settle_cancel_operation, // 42
-                                               fba_distribute_operation,      // 44
-                                               execute_bid_operation,         // 46
-                                               htlc_redeemed_operation,       // 51
-                                               htlc_refund_operation          // 53
-                                              >;
+using operation_list_14 = static_variant<typelist::slice<operation::list, 64, 65>>;
+// Note: supported list ends at 64 so far, new operations are added to virtual_operations_list
+// TODO support new operations
+using virtual_operations_list = static_variant<typelist::builder<>
+                                                ::add<fill_order_operation>          // 4
+                                                ::add<asset_settle_cancel_operation> // 42
+                                                ::add<fba_distribute_operation>      // 44
+                                                ::add<execute_bid_operation>         // 46
+                                                ::add<htlc_redeemed_operation>       // 51
+                                                ::add<htlc_refund_operation>         // 53
+                                                ::add_list<typelist::slice<operation::list, 65>> // Unsupported ops
+                                                ::finalize>;
 
 object_restriction_predicate<operation> get_restriction_pred_list_1(size_t idx, vector<restriction> rs);
 object_restriction_predicate<operation> get_restriction_pred_list_2(size_t idx, vector<restriction> rs);

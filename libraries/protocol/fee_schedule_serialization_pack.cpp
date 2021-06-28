@@ -26,4 +26,4 @@
 
 #include <fc/io/raw.hpp>
 
-GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::protocol::fee_schedule )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION_PACK( graphene::protocol::fee_schedule )

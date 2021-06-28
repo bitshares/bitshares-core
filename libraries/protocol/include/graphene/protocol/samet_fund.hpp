@@ -35,13 +35,13 @@ namespace graphene { namespace protocol {
     */
    struct samet_fund_create_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 5 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_parameters_type { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset           fee;                   ///< Operation fee
       account_id_type owner_account;         ///< Owner of the fund
       asset_id_type   asset_type;            ///< Asset type in the fund
       share_type      balance;               ///< Usable amount in the fund
-      uint32_t        fee_rate = 0;          ///< Fee rate, the demominator is GRAPHENE_SAMET_FUND_FEE_DENOM
+      uint32_t        fee_rate = 0;          ///< Fee rate, the demominator is GRAPHENE_FEE_RATE_DENOM
 
       extensions_type extensions;  ///< Unused. Reserved for future use.
 
@@ -73,7 +73,7 @@ namespace graphene { namespace protocol {
     */
    struct samet_fund_update_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee = 5 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_parameters_type { uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset                fee;                   ///< Operation fee
       account_id_type      owner_account;         ///< Owner of the fund
@@ -90,7 +90,6 @@ namespace graphene { namespace protocol {
    /**
     * @brief Borrow from a SameT Fund
     * @ingroup operations
-    * @note The result of this operation is the ID of the owner account of the SameT Fund
     */
    struct samet_fund_borrow_operation : public base_operation
    {
@@ -110,7 +109,6 @@ namespace graphene { namespace protocol {
    /**
     * @brief Repay to a SameT Fund
     * @ingroup operations
-    * @note The result of this operation is the ID of the owner account of the SameT Fund
     */
    struct samet_fund_repay_operation : public base_operation
    {

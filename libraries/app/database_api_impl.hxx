@@ -178,19 +178,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             optional<asset_id_type> start_id = optional<asset_id_type>(),
             optional<bool> with_statistics = false )const;
 
-      // SameT Funds
-      vector<samet_fund_object> list_samet_funds(
-            const optional<uint32_t>& limit = 101,
-            const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
-      vector<samet_fund_object> get_samet_funds_by_owner(
-            const std::string& account_name_or_id,
-            const optional<uint32_t>& limit = 101,
-            const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
-      vector<samet_fund_object> get_samet_funds_by_asset(
-            const std::string& asset_symbol_or_id,
-            const optional<uint32_t>& limit = 101,
-            const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
-
       // Witnesses
       vector<optional<witness_object>> get_witnesses(const vector<witness_id_type>& witness_ids)const;
       fc::optional<witness_object> get_witness_by_account(const std::string account_id_or_name)const;
@@ -356,6 +343,57 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
          return results;
       }
+
+      /// Template functions for simple list_X and get_X_by_T APIs, to reduce duplicate code
+      /// @{
+      template <typename X>
+      auto make_tuple_if_multiple(X x) const
+      { return x; }
+
+      template <typename... X>
+      auto make_tuple_if_multiple(X... x) const
+      { return std::make_tuple( x... ); }
+
+      template <typename T>
+      auto call_end_or_upper_bound( const T& t ) const
+      { return std::end( t ); }
+
+      template <typename T, typename... X>
+      auto call_end_or_upper_bound( const T& t, X... x ) const
+      { return t.upper_bound( make_tuple_if_multiple( x... ) ); }
+
+      template <typename OBJ_TYPE, typename OBJ_ID_TYPE, typename INDEX_TYPE, typename T, typename... X >
+      vector<OBJ_TYPE> get_objects_by_x(
+                  T application_options::* app_opt_member_ptr,
+                  const INDEX_TYPE& idx,
+                  const optional<uint32_t>& olimit,
+                  const optional<OBJ_ID_TYPE>& ostart_id,
+                  X... x ) const
+      {
+         uint64_t limit = olimit.valid() ? *olimit : ( application_options::get_default().*app_opt_member_ptr );
+
+         FC_ASSERT( _app_options, "Internal error" );
+         const auto configured_limit = _app_options->*app_opt_member_ptr;
+         FC_ASSERT( limit <= configured_limit,
+                    "limit can not be greater than ${configured_limit}",
+                    ("configured_limit", configured_limit) );
+
+         vector<OBJ_TYPE> results;
+
+         OBJ_ID_TYPE start_id = ostart_id.valid() ? *ostart_id : OBJ_ID_TYPE();
+
+         auto lower_itr = idx.lower_bound( make_tuple_if_multiple( x..., start_id ) );
+         auto upper_itr = call_end_or_upper_bound( idx, x... );
+
+         results.reserve( limit );
+         for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
+         {
+            results.emplace_back( *lower_itr );
+         }
+
+         return results;
+      }
+      /// @}
 
       ////////////////////////////////////////////////
       // Subscription

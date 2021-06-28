@@ -60,18 +60,35 @@
 #include <graphene/protocol/object_id.hpp>
 #include <graphene/protocol/config.hpp>
 
-#define GRAPHENE_EXTERNAL_SERIALIZATION(ext, type) \
+#define GRAPHENE_EXTERNAL_SERIALIZATION_VARIANT(ext, type) \
 namespace fc { \
    ext template void from_variant( const variant& v, type& vo, uint32_t max_depth ); \
    ext template void to_variant( const type& v, variant& vo, uint32_t max_depth ); \
-namespace raw { \
-   ext template void pack< datastream<size_t>, type >( datastream<size_t>& s, const type& tx, uint32_t _max_depth ); \
-   ext template void pack< sha256::encoder, type >( sha256::encoder& s, const type& tx, uint32_t _max_depth ); \
-   ext template void pack< datastream<char*>, type >( datastream<char*>& s, const type& tx, uint32_t _max_depth ); \
-   ext template void unpack< datastream<const char*>, type >( datastream<const char*>& s, type& tx, uint32_t _max_depth ); \
-} } // fc::raw
+}
+
+#define GRAPHENE_EXTERNAL_SERIALIZATION_PACK(ext, type) \
+namespace fc { namespace raw { \
+   ext template void pack< datastream<size_t>, type >( \
+         datastream<size_t>& s, const type& tx, uint32_t _max_depth ); \
+   ext template void pack< sha256::encoder, type >( \
+         sha256::encoder& s, const type& tx, uint32_t _max_depth ); \
+   ext template void pack< datastream<char*>, type >( \
+         datastream<char*>& s, const type& tx, uint32_t _max_depth ); \
+   ext template void unpack< datastream<const char*>, type >( \
+         datastream<const char*>& s, type& tx, uint32_t _max_depth ); \
+} }
+
+#define GRAPHENE_EXTERNAL_SERIALIZATION(ext, type) \
+   GRAPHENE_EXTERNAL_SERIALIZATION_VARIANT(ext, type) \
+   GRAPHENE_EXTERNAL_SERIALIZATION_PACK(ext, type)
+
 #define GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION(type) GRAPHENE_EXTERNAL_SERIALIZATION(extern, type)
 #define GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION(type) GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, type)
+
+#define GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION_VARIANT(type) \
+   GRAPHENE_EXTERNAL_SERIALIZATION_VARIANT(/*not extern*/, type)
+#define GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION_PACK(type) \
+   GRAPHENE_EXTERNAL_SERIALIZATION_PACK(/*not extern*/, type)
 
 #define GRAPHENE_NAME_TO_OBJECT_TYPE(x, prefix, name) BOOST_PP_CAT(prefix, BOOST_PP_CAT(name, _object_type))
 #define GRAPHENE_NAME_TO_ID_TYPE(x, y, name) BOOST_PP_CAT(name, _id_type)
@@ -318,6 +335,8 @@ GRAPHENE_DEFINE_IDS(protocol, protocol_ids, /*protocol objects are not prefixed*
                     /* 1.18.x */ (ticket)
                     /* 1.19.x */ (liquidity_pool)
                     /* 1.20.x */ (samet_fund)
+                    /* 1.21.x */ (credit_offer)
+                    /* 1.22.x */ (credit_deal)
                    )
 
 FC_REFLECT(graphene::protocol::public_key_type, (key_data))

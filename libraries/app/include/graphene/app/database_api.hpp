@@ -33,6 +33,7 @@
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/confidential_object.hpp>
+#include <graphene/chain/credit_offer_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/samet_fund_object.hpp>
 #include <graphene/chain/ticket_object.hpp>
@@ -786,9 +787,10 @@ class database_api
             optional<asset_id_type> start_id = optional<asset_id_type>(),
             optional<bool> with_statistics = false )const;
 
+
       /////////////////////
-      // SameT Funds     //
-      /////////////////////
+      /// SameT Funds
+      /// @{
 
       /**
        * @brief Get a list of SameT Funds
@@ -809,7 +811,7 @@ class database_api
        * @brief Get a list of SameT Funds by the name or ID of the owner account
        * @param account_name_or_id name or ID of the owner account
        * @param limit  The limitation of items each query can fetch, not greater than a configured value
-       * @param start_id  Start Samet Fund id, fetch items whose IDs are greater than or equal to this ID
+       * @param start_id  Start SameT Fund id, fetch items whose IDs are greater than or equal to this ID
        * @return The SameT Funds
        *
        * @note
@@ -824,10 +826,10 @@ class database_api
             const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
 
       /**
-       * @brief Get a list of SameT Funds by the symbole or ID of the asset type
+       * @brief Get a list of SameT Funds by the symbol or ID of the asset type
        * @param asset_symbol_or_id symbol or ID of the asset type
        * @param limit  The limitation of items each query can fetch, not greater than a configured value
-       * @param start_id  Start Samet Fund id, fetch items whose IDs are greater than or equal to this ID
+       * @param start_id  Start SameT Fund id, fetch items whose IDs are greater than or equal to this ID
        * @return The SameT Funds
        *
        * @note
@@ -840,6 +842,169 @@ class database_api
             const std::string& asset_symbol_or_id,
             const optional<uint32_t>& limit = 101,
             const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
+      /// @}
+
+
+      ////////////////////////////////////
+      /// Credit offers and credit deals
+      /// @{
+
+      /**
+       * @brief Get a list of credit offers
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start credit offer id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit offers
+       *
+       * @note
+       * 1. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 2. @p start_id can be omitted or be null, if so the api will return the "first page" of data
+       * 3. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<credit_offer_object> list_credit_offers(
+            const optional<uint32_t>& limit = 101,
+            const optional<credit_offer_id_type>& start_id = optional<credit_offer_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit offers by the name or ID of the owner account
+       * @param account_name_or_id name or ID of the owner account
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start credit offer id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit offers
+       *
+       * @note
+       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
+       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<credit_offer_object> get_credit_offers_by_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit = 101,
+            const optional<credit_offer_id_type>& start_id = optional<credit_offer_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit offers by the symbol or ID of the asset type
+       * @param asset_symbol_or_id symbol or ID of the asset type
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start credit offer id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit offers
+       *
+       * @note
+       * 1. if @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
+       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<credit_offer_object> get_credit_offers_by_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit = 101,
+            const optional<credit_offer_id_type>& start_id = optional<credit_offer_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit deals
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start credit deal id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit deals
+       *
+       * @note
+       * 1. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 2. @p start_id can be omitted or be null, if so the api will return the "first page" of data
+       * 3. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<credit_deal_object> list_credit_deals(
+            const optional<uint32_t>& limit = 101,
+            const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit deals by the ID of a credit offer
+       * @param offer_id ID of the credit offer
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start credit deal id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit deals
+       *
+       * @note
+       * 1. if @p offer_id cannot be tied to a credit offer, an empty list will be returned
+       * 2. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
+       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<credit_deal_object> get_credit_deals_by_offer_id(
+            const credit_offer_id_type& offer_id,
+            const optional<uint32_t>& limit = 101,
+            const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit deals by the name or ID of a credit offer owner account
+       * @param account_name_or_id name or ID of the credit offer owner account
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start credit deal id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit deals
+       *
+       * @note
+       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
+       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<credit_deal_object> get_credit_deals_by_offer_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit = 101,
+            const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit deals by the name or ID of a borrower account
+       * @param account_name_or_id name or ID of the borrower account
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start credit deal id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit deals
+       *
+       * @note
+       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
+       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<credit_deal_object> get_credit_deals_by_borrower(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit = 101,
+            const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit deals by the symbol or ID of the debt asset type
+       * @param asset_symbol_or_id symbol or ID of the debt asset type
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start credit deal id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit deals
+       *
+       * @note
+       * 1. if @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
+       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<credit_deal_object> get_credit_deals_by_debt_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit = 101,
+            const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit deals by the symbol or ID of the collateral asset type
+       * @param asset_symbol_or_id symbol or ID of the collateral asset type
+       * @param limit  The limitation of items each query can fetch, not greater than a configured value
+       * @param start_id  Start credit deal id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit deals
+       *
+       * @note
+       * 1. if @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be null, if so the default value 101 will be used
+       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
+       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       */
+      vector<credit_deal_object> get_credit_deals_by_collateral_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit = 101,
+            const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
+      /// @}
 
 
       ///////////////
@@ -1263,6 +1428,17 @@ FC_API(graphene::app::database_api,
    (list_samet_funds)
    (get_samet_funds_by_owner)
    (get_samet_funds_by_asset)
+
+   // Credit offers and credit deals
+   (list_credit_offers)
+   (get_credit_offers_by_owner)
+   (get_credit_offers_by_asset)
+   (list_credit_deals)
+   (get_credit_deals_by_offer_id)
+   (get_credit_deals_by_offer_owner)
+   (get_credit_deals_by_borrower)
+   (get_credit_deals_by_debt_asset)
+   (get_credit_deals_by_collateral_asset)
 
    // Witnesses
    (get_witnesses)
