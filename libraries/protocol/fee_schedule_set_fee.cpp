@@ -25,43 +25,39 @@
 
 namespace graphene { namespace protocol {
 
-   const fee_schedule fee_schedule::get_default_impl()
-   {
-      fee_schedule result;
-      const auto count = fee_parameters::count();
-      result.parameters.reserve(count);
-      for( size_t i = 0; i < count; ++i )
-      {
-         fee_parameters x;
-         x.set_which(i);
-         result.parameters.insert(x);
-      }
-      return result;
-   }
-
-   const fee_schedule& fee_schedule::get_default()
-   {
-      static const auto result = get_default_impl();
-      return result;
-   }
-
-   struct zero_fee_visitor
+   struct set_fee_visitor
    {
       using result_type = void;
 
-      template<typename ParamType>
-      result_type operator()(  ParamType& op )const
+      asset _fee;
+
+      set_fee_visitor( const asset& f ):_fee(f){}
+
+      template<typename OpType>
+      void operator()( OpType& op )const
       {
-         memset( (char*)&op, 0, sizeof(op) );
+         op.fee = _fee;
       }
    };
 
-   void fee_schedule::zero_all_fees()
+   asset fee_schedule::set_fee( operation& op, const price& core_exchange_rate )const
    {
-      *this = get_default();
-      for( fee_parameters& i : parameters )
-         i.visit( zero_fee_visitor() );
-      this->scale = 0;
+      auto f = calculate_fee( op, core_exchange_rate );
+      for( size_t i=0; i<MAX_FEE_STABILIZATION_ITERATION; i++ )
+      {
+         op.visit( set_fee_visitor( f ) );
+         auto f2 = calculate_fee( op, core_exchange_rate );
+         if( f >= f2 )
+            break;
+         f = f2;
+         if( i == 0 )
+         {
+            // no need for warnings on later iterations
+            wlog( "set_fee requires multiple iterations to stabilize with core_exchange_rate ${p} on operation ${op}",
+               ("p", core_exchange_rate) ("op", op) );
+         }
+      }
+      return f;
    }
 
 } } // graphene::protocol

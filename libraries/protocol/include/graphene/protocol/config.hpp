@@ -129,6 +129,9 @@ constexpr int64_t GRAPHENE_MAX_CREDIT_DEAL_DAYS = 380;
 /// How long a credit deal will be kept, in seconds
 constexpr int64_t GRAPHENE_MAX_CREDIT_DEAL_SECS = GRAPHENE_MAX_CREDIT_DEAL_DAYS * 86400;
 
+/// How many iterations to run in @c fee_schedule::set_fee()
+constexpr size_t MAX_FEE_STABILIZATION_ITERATION  = 4;
+
 /**
  *  Reserved Account IDs with special meaning
  */
