@@ -54,14 +54,8 @@ restriction_predicate_function get_restriction_predicate(vector<restriction> rs,
          return get_restriction_pred_list_10(typelist::index_of<operation_list_10::list, Op>(), std::move(rs));
       if (typelist::contains<operation_list_11::list, Op>())
          return get_restriction_pred_list_11(typelist::index_of<operation_list_11::list, Op>(), std::move(rs));
-      if (typelist::contains<operation_list_12::list, Op>())
-         return get_restriction_pred_list_12(typelist::index_of<operation_list_12::list, Op>(), std::move(rs));
-      if (typelist::contains<operation_list_13::list, Op>())
-         return get_restriction_pred_list_13(typelist::index_of<operation_list_13::list, Op>(), std::move(rs));
-      if (typelist::contains<operation_list_14::list, Op>())
-         return get_restriction_pred_list_14(typelist::index_of<operation_list_14::list, Op>(), std::move(rs));
-      if (typelist::contains<virtual_operations_list::list, Op>())
-         FC_THROW_EXCEPTION( fc::assert_exception, "Virtual operations not allowed!" );
+      if (typelist::contains<unsupported_operations_list::list, Op>())
+         FC_THROW_EXCEPTION( fc::assert_exception, "Unsupported operation detected!" );
 
       // Compile time check that we'll never get to the exception below
       static_assert(typelist::contains<typelist::concat<operation_list_1::list, operation_list_2::list,
@@ -69,9 +63,8 @@ restriction_predicate_function get_restriction_predicate(vector<restriction> rs,
                                                         operation_list_5::list, operation_list_6::list,
                                                         operation_list_7::list, operation_list_8::list,
                                                         operation_list_9::list, operation_list_10::list,
-                                                        operation_list_11::list, operation_list_12::list,
-                                                        operation_list_13::list, operation_list_14::list,
-                                                        virtual_operations_list::list>,
+                                                        operation_list_11::list,
+                                                        unsupported_operations_list::list>,
                                        Op>(), "");
       FC_THROW_EXCEPTION(fc::assert_exception,
                          "LOGIC ERROR: Operation type not handled by custom authorities implementation. "
