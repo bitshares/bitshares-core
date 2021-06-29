@@ -47,11 +47,8 @@ list(APPEND CUSTOM_AUTHS_FILES
      custom_authorities/list_1.cpp
      custom_authorities/list_2.cpp
      custom_authorities/list_3.cpp
-     custom_authorities/list_4.cpp
      custom_authorities/list_5.cpp
      custom_authorities/list_6.cpp
-     custom_authorities/list_7.cpp
-     custom_authorities/list_8.cpp
      custom_authorities/list_9.cpp
      custom_authorities/list_10.cpp
      custom_authorities/list_11.cpp)

@@ -38,16 +38,10 @@ restriction_predicate_function get_restriction_predicate(vector<restriction> rs,
          return get_restriction_pred_list_2(typelist::index_of<operation_list_2::list, Op>(), std::move(rs));
       if (typelist::contains<operation_list_3::list, Op>())
          return get_restriction_pred_list_3(typelist::index_of<operation_list_3::list, Op>(), std::move(rs));
-      if (typelist::contains<operation_list_4::list, Op>())
-         return get_restriction_pred_list_4(typelist::index_of<operation_list_4::list, Op>(), std::move(rs));
       if (typelist::contains<operation_list_5::list, Op>())
          return get_restriction_pred_list_5(typelist::index_of<operation_list_5::list, Op>(), std::move(rs));
       if (typelist::contains<operation_list_6::list, Op>())
          return get_restriction_pred_list_6(typelist::index_of<operation_list_6::list, Op>(), std::move(rs));
-      if (typelist::contains<operation_list_7::list, Op>())
-         return get_restriction_pred_list_7(typelist::index_of<operation_list_7::list, Op>(), std::move(rs));
-      if (typelist::contains<operation_list_8::list, Op>())
-         return get_restriction_pred_list_8(typelist::index_of<operation_list_8::list, Op>(), std::move(rs));
       if (typelist::contains<operation_list_9::list, Op>())
          return get_restriction_pred_list_9(typelist::index_of<operation_list_9::list, Op>(), std::move(rs));
       if (typelist::contains<operation_list_10::list, Op>())
@@ -59,9 +53,8 @@ restriction_predicate_function get_restriction_predicate(vector<restriction> rs,
 
       // Compile time check that we'll never get to the exception below
       static_assert(typelist::contains<typelist::concat<operation_list_1::list, operation_list_2::list,
-                                                        operation_list_3::list, operation_list_4::list,
+                                                        operation_list_3::list,
                                                         operation_list_5::list, operation_list_6::list,
-                                                        operation_list_7::list, operation_list_8::list,
                                                         operation_list_9::list, operation_list_10::list,
                                                         operation_list_11::list,
                                                         unsupported_operations_list::list>,

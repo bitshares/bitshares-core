@@ -31,47 +31,52 @@ namespace typelist = fc::typelist;
 
 // To make the build gentler on RAM, break the operation list into several pieces to build over several files
 using operation_list_1 = static_variant<typelist::slice<operation::list, 0, 4>>;
-using operation_list_2 = static_variant<typelist::slice<operation::list, 5, 9>>;
+using operation_list_2 = static_variant<typelist::slice<operation::list, 5, 7>>;
 using operation_list_3 = static_variant<typelist::slice<operation::list, 10, 11>>;
-using operation_list_4 = static_variant<typelist::slice<operation::list, 11, 12>>;
-using operation_list_5 = static_variant<typelist::slice<operation::list, 12, 15>>;
-using operation_list_6 = static_variant<typelist::slice<operation::list, 15, 22>>;
-using operation_list_7 = static_variant<typelist::slice<operation::list, 22, 29>>;
-using operation_list_8 = static_variant<typelist::slice<operation::list, 29, 32>>;
-using operation_list_9 = static_variant<typelist::slice<operation::list, 32, 35>>;
-using operation_list_10 = static_variant<typelist::slice<operation::list, 35, 42>>;
+using operation_list_5 = static_variant<typelist::slice<operation::list, 13, 16>>;
+using operation_list_6 = static_variant<typelist::slice<operation::list, 19, 22>>;
+using operation_list_9 = static_variant<typelist::slice<operation::list, 32, 34>>;
+using operation_list_10 = static_variant<typelist::slice<operation::list, 38, 39>>;
 using operation_list_11 = static_variant<typelist::builder<>
-                                                ::add<asset_claim_fees_operation> // 43
-                                                ::add<bid_collateral_operation>   // 45
-                                                ::add_list<typelist::slice<operation::list, 47, 51>>
+                                                ::add_list<typelist::slice<operation::list, 49, 51>>
                                                 ::add<htlc_extend_operation>      // 52
                                                 ::finalize>;
 // Note: Since BSIP-40 is not to be enabled on the BitShares Mainnet any time soon,
 //       by now, the list of supported operations ends here.
-//       New operations are added to unsupported_operations_list automatically.
+//       These operations are used in unit tests.
+//       As of writing, transfer_operation and limit_order_create_operation appeared on the public testnet
+//       between block #31808000 and #31811000.
+//       Other operations are added to the unsupported_operations_list with a comment "Unsupported".
+//       The operations in the unsupported_operations_list without the comment are virtual operations or
+//       unimplemented, so should be kept there anyway.
 //       This is to reduce the compilation time and the size of binaries.
-//       In addition, consider removing more operations from the list which did not appear in the BitShares Testnet
-//       nor in unit tests.
-// TODO support new operations when we decide to continue BSIP-40 development.
+// TODO support more operations when we decide to continue BSIP-40 development.
 using unsupported_operations_list = static_variant<typelist::builder<>
                                                 ::add<fill_order_operation>          // 4
+                                                ::add_list<typelist::slice<operation::list, 7, 9>> // Unsupported
                                                 ::add<account_transfer_operation>    // 9
+                                                ::add_list<typelist::slice<operation::list, 11, 13>> // Unsupported
+                                                ::add_list<typelist::slice<operation::list, 16, 19>> // Unsupported
+                                                ::add_list<typelist::slice<operation::list, 22, 32>> // Unsupported
+                                                ::add_list<typelist::slice<operation::list, 34, 38>> // Unsupported
+                                                ::add_list<typelist::slice<operation::list, 39, 42>> // Unsupported
                                                 ::add<asset_settle_cancel_operation> // 42
+                                                ::add_list<typelist::slice<operation::list, 43, 44>> // Unsupported
                                                 ::add<fba_distribute_operation>      // 44
+                                                ::add_list<typelist::slice<operation::list, 45, 46>> // Unsupported
                                                 ::add<execute_bid_operation>         // 46
+                                                ::add_list<typelist::slice<operation::list, 47, 49>> // Unsupported
                                                 ::add<htlc_redeemed_operation>       // 51
                                                 ::add<htlc_refund_operation>         // 53
-                                                ::add_list<typelist::slice<operation::list, 54>> // Unsupported ops
+                                                // New operations are added here
+                                                ::add_list<typelist::slice<operation::list, 54>> // Unsupported
                                                 ::finalize>;
 
 object_restriction_predicate<operation> get_restriction_pred_list_1(size_t idx, vector<restriction> rs);
 object_restriction_predicate<operation> get_restriction_pred_list_2(size_t idx, vector<restriction> rs);
 object_restriction_predicate<operation> get_restriction_pred_list_3(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_pred_list_4(size_t idx, vector<restriction> rs);
 object_restriction_predicate<operation> get_restriction_pred_list_5(size_t idx, vector<restriction> rs);
 object_restriction_predicate<operation> get_restriction_pred_list_6(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_pred_list_7(size_t idx, vector<restriction> rs);
-object_restriction_predicate<operation> get_restriction_pred_list_8(size_t idx, vector<restriction> rs);
 object_restriction_predicate<operation> get_restriction_pred_list_9(size_t idx, vector<restriction> rs);
 object_restriction_predicate<operation> get_restriction_pred_list_10(size_t idx, vector<restriction> rs);
 object_restriction_predicate<operation> get_restriction_pred_list_11(size_t idx, vector<restriction> rs);
