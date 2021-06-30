@@ -70,12 +70,13 @@ restriction_predicate_function get_restriction_predicate(vector<restriction> rs,
 }
 
 predicate_result& predicate_result::reverse_path() {
-   if (success == true)
+   if (success)
       return *this;
-   auto reverse_subpaths = [](rejection_indicator& indicator) {
+   const auto reverse_subpaths = [](rejection_indicator& indicator) {
       if (indicator.is_type<vector<predicate_result>>()) {
          auto& results = indicator.get<vector<predicate_result>>();
-         for (predicate_result& result : results) result.reverse_path();
+         for (predicate_result& result : results)
+            result.reverse_path();
       }
    };
    std::reverse(rejection_path.begin(), rejection_path.end());
