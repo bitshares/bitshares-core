@@ -105,7 +105,6 @@ jobs:
         restore-keys: |
           sonar-${{ env.OS_VERSION }}-${{ github.ref }}-
           sonar-${{ env.OS_VERSION }}-
-          sonar-
     - name: Build
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
