@@ -142,9 +142,9 @@ void database::reindex( fc::path data_dir )
          }
          if( i == undo_point )
          {
-            ilog( "Writing database to disk at block ${i}", ("i",i) );
+            ilog( "Writing object database to disk at block ${i}, please DO NOT kill the program", ("i", i) );
             flush();
-            ilog( "Done" );
+            ilog( "Done writing object database to disk" );
          }
          if( i < undo_point )
             apply_block( block, skip );
@@ -262,7 +262,10 @@ void database::close(bool rewind)
    // DB state (issue #336).
    clear_pending();
 
+   ilog( "Writing object database to disk at block ${i}, please DO NOT kill the program", ("i", head_block_num()) );
    object_database::flush();
+   ilog( "Done writing object database to disk" );
+
    object_database::close();
 
    if( _block_id_to_block.is_open() )
