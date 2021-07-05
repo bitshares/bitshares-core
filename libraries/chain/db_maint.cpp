@@ -898,12 +898,13 @@ void match_call_orders( database& db )
    wlog( "Matching call orders at block ${n}", ("n",db.head_block_num()) );
    const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
    auto itr = asset_idx.lower_bound( true /** market issued */ );
-   while( itr != asset_idx.end() )
+   auto itr_end = asset_idx.end();
+   while( itr != itr_end )
    {
       const asset_object& a = *itr;
       ++itr;
       // be here, next_maintenance_time should have been updated already
-      db.check_call_orders( a, true, false ); // allow black swan, and call orders are taker
+      db.check_call_orders( a ); // allow black swan, and call orders are taker
    }
    wlog( "Done matching call orders at block ${n}", ("n",db.head_block_num()) );
 }
@@ -1474,6 +1475,11 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    if ( dgpo.next_maintenance_time <= HARDFORK_CORE_2262_TIME && next_maintenance_time > HARDFORK_CORE_2262_TIME )
       process_hf_2262(*this);
 
+   // To check call orders and potential match them with force settlements, for hard fork core-2481
+   bool match_call_orders_for_hf_2481 = false;
+   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_2481_TIME) && (next_maintenance_time > HARDFORK_CORE_2481_TIME) )
+      match_call_orders_for_hf_2481 = true;
+
    modify(dgpo, [last_vote_tally_time, next_maintenance_time](dynamic_global_property_object& d) {
       d.next_maintenance_time = next_maintenance_time;
       d.last_vote_tally_time = last_vote_tally_time;
@@ -1492,6 +1498,12 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    {
       update_call_orders_hf_1270(*this);
       update_median_feeds(*this);
+      match_call_orders(*this);
+   }
+
+   // We need to do it after updated next_maintenance_time, to apply new rules here, for hard fork core-2481
+   if( match_call_orders_for_hf_2481 )
+   {
       match_call_orders(*this);
    }
 

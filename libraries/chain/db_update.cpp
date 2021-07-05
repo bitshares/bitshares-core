@@ -188,18 +188,29 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
 {
     if( !mia.is_market_issued() ) return false;
 
-    const asset_bitasset_data_object& bitasset = ( bitasset_ptr ? *bitasset_ptr : mia.bitasset_data(*this) );
+    const asset_bitasset_data_object& bitasset = bitasset_ptr ? *bitasset_ptr : mia.bitasset_data(*this);
     if( bitasset.has_settlement() ) return true; // already force settled
     auto settle_price = bitasset.current_feed.settlement_price;
     if( settle_price.is_null() ) return false; // no feed
 
-    const call_order_object* call_ptr = nullptr; // place holder for the call order with least collateral ratio
-
-    asset_id_type debt_asset_id = mia.id;
-    auto call_min = price::min( bitasset.options.short_backing_asset, debt_asset_id );
+    asset_id_type debt_asset_id = bitasset.asset_id;
 
     auto maint_time = get_dynamic_global_properties().next_maintenance_time;
     bool before_core_hardfork_1270 = ( maint_time <= HARDFORK_CORE_1270_TIME ); // call price caching issue
+    bool after_core_hardfork_2481 = HARDFORK_CORE_2481_PASSED( maint_time ); // Match settle orders with margin calls
+
+    // After core-2481 hard fork, if there are force-settlements, match call orders with them first
+    if( after_core_hardfork_2481 )
+    {
+      const auto& settlement_index = get_index_type<force_settlement_index>().indices().get<by_expiration>();
+      auto lower_itr = settlement_index.lower_bound( debt_asset_id );
+      if( lower_itr != settlement_index.end() && lower_itr->balance.asset_id == debt_asset_id )
+         return false;
+    }
+
+    const call_order_object* call_ptr = nullptr; // place holder for the call order with least collateral ratio
+
+    auto call_min = price::min( bitasset.options.short_backing_asset, debt_asset_id );
 
     if( before_core_hardfork_1270 ) // before core-1270 hard fork, check with call_price
     {
@@ -221,7 +232,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
        return false;
 
     price highest = settle_price;
-    if( maint_time > HARDFORK_CORE_1270_TIME )
+    if( !before_core_hardfork_1270 )
        // due to #338, we won't check for black swan on incoming limit order, so need to check with MSSP here
        highest = bitasset.current_feed.max_short_squeeze_price();
     else if( maint_time > HARDFORK_CORE_338_TIME )
@@ -232,19 +243,40 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     const auto& limit_price_index = limit_index.indices().get<by_price>();
 
     // looking for limit orders selling the most USD for the least CORE
-    auto highest_possible_bid = price::max( mia.id, bitasset.options.short_backing_asset );
+    auto highest_possible_bid = price::max( debt_asset_id, bitasset.options.short_backing_asset );
     // stop when limit orders are selling too little USD for too much CORE
-    auto lowest_possible_bid  = price::min( mia.id, bitasset.options.short_backing_asset );
+    auto lowest_possible_bid  = price::min( debt_asset_id, bitasset.options.short_backing_asset );
 
     FC_ASSERT( highest_possible_bid.base.asset_id == lowest_possible_bid.base.asset_id );
     // NOTE limit_price_index is sorted from greatest to least
     auto limit_itr = limit_price_index.lower_bound( highest_possible_bid );
     auto limit_end = limit_price_index.upper_bound( lowest_possible_bid );
 
-    if( limit_itr != limit_end ) {
+    if( limit_itr != limit_end )
+    {
        FC_ASSERT( highest.base.asset_id == limit_itr->sell_price.base.asset_id );
-       highest = std::max( limit_itr->sell_price, highest );
+       auto call_pays_price = limit_itr->sell_price;
+       if( after_core_hardfork_2481 )
+       {
+          // due to margin call fee, we check with MCPP (margin call pays price) here
+          call_pays_price = call_pays_price * bitasset.current_feed.margin_call_pays_ratio(
+                                                 bitasset.options.extensions.value.margin_call_fee_ratio );
+       }
+       highest = std::max( call_pays_price, highest );
     }
+
+    // The variable `highest` after hf_338:
+    // * if no limit order, it is expected to be the black swan price; if the call order with the least CR
+    //   has CR below or equal to the black swan price, we trigger GS;
+    // * if there exists at least one limit order and the price is higher, we use the limit order's price,
+    //   which means we will match the margin call orders with the limit order first.
+    //
+    // However, there was a bug: after hf_bsip74 and before hf_2481, margin call fee was not considered
+    // when calculating highest, which means some blackswans weren't got caught here.  Fortunately they got
+    // caught by an additional check in check_call_orders().
+    // This bug is fixed in hf_2481. Actually, after hf_2481,
+    // * if there is a force settlement, we totally rely on the additional checks in check_call_orders();
+    // * if there is no force settlement, we check here with margin call fee in consideration.
 
     auto least_collateral = call_ptr->collateralization();
     if( ~least_collateral >= highest  ) 
@@ -261,8 +293,27 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
             ("sp",settle_price.to_real())("~sp",(~settle_price).to_real())
             ("h",highest.to_real())("~h",(~highest).to_real()) );
        edump((enable_black_swan));
-       FC_ASSERT( enable_black_swan, "Black swan was detected during a margin update which is not allowed to trigger a blackswan" );
-       if( maint_time > HARDFORK_CORE_338_TIME && ~least_collateral <= settle_price )
+       FC_ASSERT( enable_black_swan,
+                  "Black swan was detected during a margin update which is not allowed to trigger a blackswan" );
+       if( after_core_hardfork_2481 )
+       {
+          // After hf_2481, when a global settlement occurs,
+          // * the margin calls (whose CR <= MCR) pay a premium (by MSSR-MCFR) and a margin call fee (by MCFR), and
+          //   they are closed at the same price;
+          // * the debt positions with CR > MCR do not pay premium or margin call fee, and they are closed at a same
+          //   price too.
+          // * The GS price would close the position with the least CR with no collateral left for the owner,
+          //   but would close other positions with some collateral left (if any) for their owners.
+          // * Both the premium and the margin call fee paid by the margin calls go to the asset owner, none will go
+          //   to the global settlement fund, because
+          //   - if a part of the premium or fees goes to the global settlement fund, it means there would be a
+          //     difference in settlement prices, so traders are incentivized to create new debt in the last minute
+          //     then settle after GS to earn free money;
+          //   - if no premium or fees goes to the global settlement fund, it means debt asset holders would only
+          //     settle for less after GS, so they are incentivized to settle before GS which helps avoid GS.
+          globally_settle_asset(mia, ~least_collateral, true );
+       }
+       else if( maint_time > HARDFORK_CORE_338_TIME && ~least_collateral <= settle_price )
           // global settle at feed price if possible
           globally_settle_asset(mia, settle_price );
        else
@@ -301,7 +352,13 @@ void database::clear_expired_orders()
             }
          }
 
-   //Process expired force settlement orders
+   // Process expired force settlement orders
+   // TODO Possible performance optimization. Looping through all assets is not ideal.
+   //      - One idea is to check time first, if any expired settlement found, check asset.
+   //        However, due to max_settlement_volume, this does not work, i.e. time meets but have to
+   //        skip due to volume limit.
+   //      - Instead, maintain some data e.g. (whether_force_settle_volome_meets, first_settle_time)
+   //        in bitasset_data object and index by them, then we could process here faster.
    auto& settlement_index = get_index_type<force_settlement_index>().indices().get<by_expiration>();
    if( !settlement_index.empty() )
    {
@@ -446,7 +503,7 @@ void database::clear_expired_orders()
                break;
             }
             try {
-               asset new_settled = match(*itr, order, settlement_price, max_settlement, settlement_fill_price);
+               asset new_settled = match(order, *itr, settlement_price, max_settlement, settlement_fill_price);
                if( !before_core_hardfork_184 && new_settled.amount == 0 ) // unable to fill this settle order
                {
                   if( find_object( order_id ) ) // the settle order hasn't been cancelled

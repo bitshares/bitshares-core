@@ -999,11 +999,14 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
 { try {
    const database& d = db();
    asset_to_settle = &op.amount.asset_id(d);
-   FC_ASSERT(asset_to_settle->is_market_issued());
+   FC_ASSERT( asset_to_settle->is_market_issued(),
+              "Can only force settle a predition market or a market issued asset" );
    const auto& bitasset = asset_to_settle->bitasset_data(d);
-   FC_ASSERT(asset_to_settle->can_force_settle() || bitasset.has_settlement() );
+   FC_ASSERT( asset_to_settle->can_force_settle() || bitasset.has_settlement(),
+              "Either the asset need to have the force_settle flag enabled, or it need to be globally settled" );
    if( bitasset.is_prediction_market )
-      FC_ASSERT( bitasset.has_settlement(), "global settlement must occur before force settling a prediction market"  );
+      FC_ASSERT( bitasset.has_settlement(),
+                 "Global settlement must occur before force settling a prediction market" );
    else if( bitasset.current_feed.settlement_price.is_null()
             && ( d.head_block_time() <= HARDFORK_CORE_216_TIME // TODO check whether the HF check can be removed
                  || !bitasset.has_settlement() ) )
@@ -1019,14 +1022,17 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
                  "The account is not allowed to receive the backing asset" );
    }
 
+   bitasset_ptr = &bitasset;
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
 operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::operation_type& op)
 { try {
    database& d = db();
+   const auto head_time = d.head_block_time();
 
-   const auto& bitasset = asset_to_settle->bitasset_data(d);
+   const auto& bitasset = *bitasset_ptr;
    if( bitasset.has_settlement() )
    {
       const auto& mia_dyn = asset_to_settle->dynamic_asset_data_id(d);
@@ -1035,7 +1041,8 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
       if( op.amount.amount == mia_dyn.current_supply )
          settled_amount.amount = bitasset.settlement_fund; // avoid rounding problems
       else
-         FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund ); // should be strictly < except for PM with zero outcome
+         // should be strictly < except for PM with zero outcome
+         FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund );
 
       if( settled_amount.amount == 0 && !bitasset.is_prediction_market )
       {
@@ -1065,7 +1072,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
          // TODO Check whether the HF check can be removed after the HF.
          //      Note: even if logically it can be removed, perhaps the removal will lead to a small
          //            performance loss. Needs testing.
-         if( d.head_block_time() >= HARDFORK_CORE_1780_TIME )
+         if( head_time >= HARDFORK_CORE_1780_TIME )
          {
             auto issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d),
                   settled_amount, false );
@@ -1085,11 +1092,18 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
    else
    {
       d.adjust_balance( op.account, -op.amount );
-      return d.create<force_settlement_object>([&](force_settlement_object& s) {
+      const auto& settle = d.create<force_settlement_object>([&op,&head_time,&bitasset](force_settlement_object& s) {
          s.owner = op.account;
          s.balance = op.amount;
-         s.settlement_date = d.head_block_time() + asset_to_settle->bitasset_data(d).options.force_settlement_delay_sec;
-      }).id;
+         s.settlement_date = head_time + bitasset.options.force_settlement_delay_sec;
+      });
+      auto id = settle.id;
+      auto maint_time = d.get_dynamic_global_properties().next_maintenance_time;
+      if( HARDFORK_CORE_2481_PASSED( maint_time ) )
+      {
+         d.apply_force_settlement( settle, bitasset );
+      }
+      return id;
    }
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 

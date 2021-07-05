@@ -374,33 +374,71 @@ namespace graphene { namespace chain {
 
          /// @ingroup Market Helpers
          /// @{
-         void globally_settle_asset( const asset_object& bitasset, const price& settle_price );
-         void cancel_settle_order(const force_settlement_object& order, bool create_virtual_op = true);
-         void cancel_limit_order(const limit_order_object& order, bool create_virtual_op = true, bool skip_cancel_fee = false);
+
+         /// Globally settle @p bitasset at @p settle_price, let margin calls pay a premium and margin call fee if
+         /// @p check_margin_calls is @c true (in this case others would be closed not at @p settle_price but at a
+         /// price better for their owners).
+         void globally_settle_asset( const asset_object& bitasset, const price& settle_price,
+                                     bool check_margin_calls = false );
+         void cancel_settle_order( const force_settlement_object& order );
+         void cancel_limit_order( const limit_order_object& order,
+                                  bool create_virtual_op = true,
+                                  bool skip_cancel_fee = false );
          void revive_bitasset( const asset_object& bitasset );
          void cancel_bid(const collateral_bid_object& bid, bool create_virtual_op = true);
-         void execute_bid( const collateral_bid_object& bid, share_type debt_covered, share_type collateral_from_fund, const price_feed& current_feed );
+         void execute_bid( const collateral_bid_object& bid, share_type debt_covered,
+                           share_type collateral_from_fund, const price_feed& current_feed );
 
       private:
          template<typename IndexType>
          void globally_settle_asset_impl( const asset_object& bitasset,
                                           const price& settle_price,
-                                          const IndexType& call_index );
+                                          const IndexType& call_index,
+                                          bool check_margin_calls = false );
+         void match_force_settlements( const asset_bitasset_data_object& bitasset );
+         /// Matches the two orders
+         /// @param settle the force-settlement order
+         /// @param call the call order
+         /// @param match_price the price to calculate how much the call order pays
+         /// @param max_settlement the maximum debt amount to be filled during this match
+         /// @param fill_price the price to be recorded in market history plugin. It is the price to calculate
+         ///        how much the settle order receives when the call order is being margin called
+         /// @param is_margin_call whether the call order is being margin called
+         /// @param settle_order_is_taker whether the settle_order is the taker
+         /// @return the amount of asset settled
+         asset match_impl( const force_settlement_object& settle,
+                           const call_order_object& call,
+                           const price& match_price,
+                           const asset& max_settlement,
+                           const price& fill_price,
+                           bool is_margin_call = false,
+                           bool settle_order_is_taker = true );
+
 
       public:
          /**
           * @brief Process a new limit order through the markets
           * @param new_order_object The new order to process
-          * @param allow_black_swan whether to allow a black swan event
           * @return true if order was completely filled; false otherwise
           *
           * This function takes a new limit order, and runs the markets attempting to match it with existing orders
           * already on the books.
           */
          ///@{
-         bool apply_order_before_hardfork_625(const limit_order_object& new_order_object, bool allow_black_swan = true);
-         bool apply_order(const limit_order_object& new_order_object, bool allow_black_swan = true);
+         bool apply_order_before_hardfork_625( const limit_order_object& new_order_object );
+         bool apply_order(                     const limit_order_object& new_order_object );
          ///@}
+
+         /**
+          * @brief Process a new force-settlement request
+          * @param new_settlment The new force-settlement request
+          * @param bitasset The bitasset data object
+          *
+          * Since the core-2481 hard fork, this function is called after a new force-settlement object is created
+          * to check if there are margin calls to be matched instantly.
+          */
+         void apply_force_settlement( const force_settlement_object& new_settlement,
+                                      const asset_bitasset_data_object& bitasset );
 
          /**
           * Matches the two orders, the first parameter is taker, the second is maker.
@@ -430,7 +468,7 @@ namespace graphene { namespace chain {
                     const price& feed_price, const uint16_t maintenance_collateral_ratio,
                     const optional<price>& maintenance_collateralization,
                     const price& call_pays_price);
-         // If separate call_pays_price not provided, assume call pays at trade_price:
+         /// If separate call_pays_price not provided, assume call pays at trade_price:
          int match( const limit_order_object& taker, const call_order_object& maker, const price& trade_price,
                     const price& feed_price, const uint16_t maintenance_collateral_ratio,
                     const optional<price>& maintenance_collateralization) {
@@ -441,12 +479,34 @@ namespace graphene { namespace chain {
          ///@}
 
          /// Matches the two orders, the first parameter is taker, the second is maker.
+         /// @param settle the force-settlement order
+         /// @param call the call order
+         /// @param match_price the price to calculate how much the call order pays
+         /// @param max_settlement the maximum debt amount to be filled during this match
+         /// @param fill_price the price to be recorded in market history plugin. It is the price to calculate
+         ///        how much the settle order receives when the call order is being margin called
+         /// @param is_margin_call whether the call order is being margin called
          /// @return the amount of asset settled
-         asset match(const call_order_object& call,
-                   const force_settlement_object& settle,
-                   const price& match_price,
-                   asset max_settlement,
-                   const price& fill_price);
+         asset match( const force_settlement_object& settle,
+                      const call_order_object& call,
+                      const price& match_price,
+                      const asset& max_settlement,
+                      const price& fill_price,
+                      bool is_margin_call = false );
+
+         /// Matches the two orders, the first parameter is taker, the second is maker.
+         /// @param call the call order being margin called
+         /// @param settle the force-settlement order
+         /// @param match_price the price to calculate how much the call order pays
+         /// @param max_settlement the maximum debt amount to be filled during this match
+         /// @param fill_price the price to be recorded in market history plugin. It is the price to calculate
+         ///        how much the settle order receives.
+         /// @return the amount of asset settled
+         asset match( const call_order_object& call,
+                      const force_settlement_object& settle,
+                      const price& match_price,
+                      const asset& max_settlement,
+                      const price& fill_price );
 
          /**
           * @brief fills limit order
@@ -481,9 +541,10 @@ namespace graphene { namespace chain {
          }
 
          bool fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
-                                 const price& fill_price, const bool is_maker );
+                                 const price& fill_price, bool is_maker, bool pay_force_settle_fee = true );
 
-         bool check_call_orders( const asset_object& mia, bool enable_black_swan = true, bool for_new_limit_order = false,
+         bool check_call_orders( const asset_object& mia, bool enable_black_swan = true,
+                                 bool for_new_limit_order = false,
                                  const asset_bitasset_data_object* bitasset_ptr = nullptr );
 
          // helpers to fill_order
@@ -570,7 +631,8 @@ namespace graphene { namespace chain {
       private:
          void                  _apply_block( const signed_block& next_block );
          processed_transaction _apply_transaction( const signed_transaction& trx );
-         void                  _cancel_bids_and_revive_mpa( const asset_object& bitasset, const asset_bitasset_data_object& bad );
+         void                  _cancel_bids_and_revive_mpa( const asset_object& bitasset,
+                                                            const asset_bitasset_data_object& bad );
 
          ///Steps involved in applying a new block
          ///@{
@@ -601,7 +663,7 @@ namespace graphene { namespace chain {
          void update_withdraw_permissions();
          void update_credit_offers_and_deals();
          bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
-                                   const asset_bitasset_data_object* bitasset_ptr = nullptr );
+                                   const asset_bitasset_data_object* bitasset_ptr = nullptr);
          void clear_expired_htlcs();
 
          ///Steps performed only at maintenance intervals
