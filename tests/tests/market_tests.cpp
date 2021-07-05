@@ -1211,6 +1211,199 @@ BOOST_AUTO_TEST_CASE(hard_fork_343_cross_test)
 } FC_LOG_AND_RETHROW() }
 
 /***
+ * Tests a scenario that GS may occur when there is no sufficient collateral to pay margin call fee,
+ * but GS won't occur if no need to pay margin call fee.
+ */
+BOOST_AUTO_TEST_CASE(mcfr_blackswan_test)
+{ try {
+   // Proceeds to the bsip-74 hard fork time
+   generate_blocks(HARDFORK_CORE_BSIP74_TIME);
+   set_expiration( db, trx );
+
+   ACTORS((seller)(borrower)(borrower2)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+   asset_id_type usd_id = bitusd.id;
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+
+   {
+      // set margin call fee ratio
+      asset_update_bitasset_operation uop;
+      uop.issuer = usd_id(db).issuer;
+      uop.asset_to_update = usd_id;
+      uop.new_options = usd_id(db).bitasset_data(db).options;
+      uop.new_options.extensions.value.margin_call_fee_ratio = 80;
+
+      trx.clear();
+      trx.operations.push_back(uop);
+      PUSH_TX(db, trx, ~0);
+   }
+
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(5);
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7
+   const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000));
+   call_order_id_type call_id = call.id;
+   // create another position with 400% collateral, call price is 20/1.75 CORE/USD = 80/7
+   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(20000));
+   call_order_id_type call2_id = call2.id;
+   transfer(borrower, seller, bitusd.amount(1000));
+   transfer(borrower2, seller, bitusd.amount(1000));
+
+   BOOST_CHECK_EQUAL( 1000, call.debt.value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
+   BOOST_CHECK_EQUAL( 20000, call2.collateral.value );
+   BOOST_CHECK_EQUAL( 2000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // No margin call at this moment
+
+   // This order is sufficient to close the first debt position and no GS if margin call fee ratio is 0
+   limit_order_id_type sell_mid = create_sell_order(seller, bitusd.amount(1000), core.amount(14900))->id;
+
+   BOOST_CHECK_EQUAL( 1000, sell_mid(db).for_sale.value );
+
+   BOOST_CHECK_EQUAL( 1000, call_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 15000, call_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 20000, call2_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // adjust price feed to get call_order into black swan territory
+   BOOST_MESSAGE( "Trying to trigger GS" );
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(18);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 1/18, mssp = 10/198
+
+   // GS occurs even when there is a good sell order
+   BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( !db.find<call_order_object>( call_id ) );
+   BOOST_CHECK( !db.find<call_order_object>( call2_id ) );
+   // GS price is 1/18, but the first call order has only 15000 thus capped
+   BOOST_CHECK_EQUAL( 15000 + 18000, usd_id(db).bitasset_data(db).settlement_fund.value );
+
+   // the sell order does not change
+   BOOST_CHECK_EQUAL( 1000, sell_mid(db).for_sale.value );
+
+   // generate a block to include operations above
+   BOOST_MESSAGE( "Generating a new block" );
+   generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
+/***
+ * Tests a scenario about rounding errors related to margin call fee
+ */
+BOOST_AUTO_TEST_CASE(mcfr_rounding_test)
+{ try {
+   // Proceeds to the bsip-74 hard fork time
+   generate_blocks(HARDFORK_CORE_BSIP74_TIME);
+   set_expiration( db, trx );
+
+   ACTORS((seller)(borrower)(borrower2)(feedproducer)(feeder2)(feeder3));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+   asset_id_type usd_id = bitusd.id;
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+
+   {
+      // set margin call fee ratio
+      asset_update_bitasset_operation uop;
+      uop.issuer = usd_id(db).issuer;
+      uop.asset_to_update = usd_id;
+      uop.new_options = usd_id(db).bitasset_data(db).options;
+      uop.new_options.extensions.value.margin_call_fee_ratio = 70;
+      uop.new_options.feed_lifetime_sec = 86400;
+      uop.new_options.minimum_feeds = 1;
+
+      trx.clear();
+      trx.operations.push_back(uop);
+      PUSH_TX(db, trx, ~0);
+   }
+
+   update_feed_producers( bitusd, {feedproducer_id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(5);
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7
+   const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000));
+   call_order_id_type call_id = call.id;
+   // create another position with 800% collateral, call price is 40/1.75 CORE/USD = 160/7
+   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(40000));
+   call_order_id_type call2_id = call2.id;
+   transfer(borrower, seller, bitusd.amount(1000));
+   transfer(borrower2, seller, bitusd.amount(1000));
+
+   BOOST_CHECK_EQUAL( 1000, call.debt.value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
+   BOOST_CHECK_EQUAL( 40000, call2.collateral.value );
+   BOOST_CHECK_EQUAL( 2000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // No margin call at this moment
+
+   // This order would be matched later
+   limit_order_id_type sell_mid = create_sell_order(seller, bitusd.amount(1100), core.amount(15451))->id;
+   // call_pays_price = (15451 / 1100) * 1100 / (1100-70) = 15451 / 1030
+   // debt * call_pays_price = 1000 * 15451 / 1030 = 15000.9
+
+   BOOST_CHECK_EQUAL( 1100, sell_mid(db).for_sale.value );
+
+   BOOST_CHECK_EQUAL( 1000, call_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 15000, call_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 40000, call2_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 900, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // Tring to adjust price feed to get call_order into margin call territory
+   BOOST_MESSAGE( "Trying to trigger a margin call" );
+   auto feed2 = current_feed;
+   feed2.settlement_price = bitusd.amount( 1 ) / core.amount(18);
+   publish_feed( bitusd, feedproducer, feed2 );
+
+   // The first call order should have been filled
+   BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( !db.find<call_order_object>( call_id ) );
+   BOOST_REQUIRE( db.find<call_order_object>( call2_id ) );
+
+   BOOST_CHECK_EQUAL( 100, sell_mid(db).for_sale.value );
+
+   BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 40000, call2_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 900, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 14047, get_balance(seller, core) );
+
+   // generate a block to include operations above
+   BOOST_MESSAGE( "Generating a new block" );
+   generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
+/***
  * BSIP38 "target_collateral_ratio" test: matching a taker limit order with multiple maker call orders
  */
 BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
