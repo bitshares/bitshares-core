@@ -1,0 +1,6 @@
+// bitshares-core issue #2362 Simple collateralized P2P funding
+#ifndef HARDFORK_CORE_2362_TIME
+// Jan 1 2030, midnight; this is a dummy date until a hardfork date is scheduled
+#define HARDFORK_CORE_2362_TIME (fc::time_point_sec( 1893456000 ))
+#define HARDFORK_CORE_2362_PASSED(now) (now >= HARDFORK_CORE_2362_TIME)
+#endif

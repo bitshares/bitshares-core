@@ -228,11 +228,20 @@ namespace graphene { namespace protocol {
          return ( base.asset_id == asset_id_type() && quote.asset_id == asset_id_type() );
       }
 
-      void price::validate() const
+      void price::validate( bool check_upper_bound /* = false */ )const
       { try {
-         FC_ASSERT( base.amount > share_type(0) );
-         FC_ASSERT( quote.amount > share_type(0) );
-         FC_ASSERT( base.asset_id != quote.asset_id );
+         FC_ASSERT( base.amount.value > 0, "Base amount should be positive" );
+         FC_ASSERT( quote.amount.value > 0, "Quote amount should be positive" );
+         FC_ASSERT( base.asset_id != quote.asset_id, "Base asset ID and quote asset ID should be different" );
+         if( check_upper_bound )
+         {
+            FC_ASSERT( base.amount.value <= GRAPHENE_MAX_SHARE_SUPPLY,
+                       "Base amount should not be greater than ${max}",
+                       ("max", GRAPHENE_MAX_SHARE_SUPPLY) );
+            FC_ASSERT( quote.amount.value <= GRAPHENE_MAX_SHARE_SUPPLY,
+                       "Quote amount should not be greater than ${max}",
+                       ("max", GRAPHENE_MAX_SHARE_SUPPLY) );
+         }
       } FC_CAPTURE_AND_RETHROW( (base)(quote) ) }
 
       void price_feed::validate() const

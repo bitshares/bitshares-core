@@ -80,7 +80,6 @@ namespace graphene { namespace chain {
 
          bool _closing_order = false;
          const asset_object* _debt_asset = nullptr;
-         const account_object* _paying_account = nullptr;
          const call_order_object* _order = nullptr;
          const asset_bitasset_data_object* _bitasset_data = nullptr;
          const asset_dynamic_data_object*  _dynamic_data_obj = nullptr;
@@ -96,7 +95,6 @@ namespace graphene { namespace chain {
 
          const asset_object* _debt_asset = nullptr;
          const asset_bitasset_data_object* _bitasset_data = nullptr;
-         const account_object* _paying_account = nullptr;
          const collateral_bid_object* _bid = nullptr;
    };
 

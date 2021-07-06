@@ -21,47 +21,33 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <algorithm>
 #include <graphene/protocol/fee_schedule.hpp>
-
-#include <fc/io/raw.hpp>
-
-#define MAX_FEE_STABILIZATION_ITERATION 4
 
 namespace graphene { namespace protocol {
 
-   fee_schedule::fee_schedule()
-   {
-   }
-
-   fee_schedule fee_schedule::get_default()
+   fee_schedule fee_schedule::get_default_impl()
    {
       fee_schedule result;
-      for( size_t i = 0; i < fee_parameters().count(); ++i )
+      const auto count = fee_parameters::count();
+      result.parameters.reserve(count);
+      for( size_t i = 0; i < count; ++i )
       {
-         fee_parameters x; x.set_which(i);
+         fee_parameters x;
+         x.set_which(i);
          result.parameters.insert(x);
       }
       return result;
    }
 
-   struct set_fee_visitor
+   const fee_schedule& fee_schedule::get_default()
    {
-      typedef void result_type;
-      asset _fee;
-
-      set_fee_visitor( asset f ):_fee(f){}
-
-      template<typename OpType>
-      void operator()( OpType& op )const
-      {
-         op.fee = _fee;
-      }
-   };
+      static const auto result = get_default_impl();
+      return result;
+   }
 
    struct zero_fee_visitor
    {
-      typedef void result_type;
+      using result_type = void;
 
       template<typename ParamType>
       result_type operator()(  ParamType& op )const
@@ -76,28 +62,6 @@ namespace graphene { namespace protocol {
       for( fee_parameters& i : parameters )
          i.visit( zero_fee_visitor() );
       this->scale = 0;
-   }
-
-   asset fee_schedule::set_fee( operation& op, const price& core_exchange_rate )const
-   {
-      auto f = calculate_fee( op, core_exchange_rate );
-      auto f_max = f;
-      for( size_t i=0; i<MAX_FEE_STABILIZATION_ITERATION; i++ )
-      {
-         op.visit( set_fee_visitor( f_max ) );
-         auto f2 = calculate_fee( op, core_exchange_rate );
-         if( f == f2 )
-            break;
-         f_max = std::max( f_max, f2 );
-         f = f2;
-         if( i == 0 )
-         {
-            // no need for warnings on later iterations
-            wlog( "set_fee requires multiple iterations to stabilize with core_exchange_rate ${p} on operation ${op}",
-               ("p", core_exchange_rate) ("op", op) );
-         }
-      }
-      return f_max;
    }
 
 } } // graphene::protocol

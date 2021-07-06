@@ -172,9 +172,7 @@ namespace graphene { namespace protocol {
     */
    struct fee_schedule
    {
-      fee_schedule();
-
-      static fee_schedule get_default();
+      static const fee_schedule& get_default();
 
       /**
        *  Finds the appropriate fee parameter struct for the operation
@@ -220,12 +218,12 @@ namespace graphene { namespace protocol {
        *  @note must be sorted by fee_parameters.which() and have no duplicates
        */
       fee_parameters::flat_set_type parameters;
-      uint32_t                 scale = GRAPHENE_100_PERCENT; ///< fee * scale / GRAPHENE_100_PERCENT
-      private:
-      static void set_fee_parameters(fee_schedule& sched);
+      uint32_t                      scale = GRAPHENE_100_PERCENT; ///< fee * scale / GRAPHENE_100_PERCENT
+   private:
+      static fee_schedule get_default_impl();
    };
 
-   typedef fee_schedule fee_schedule_type;
+   using fee_schedule_type = fee_schedule;
 
 } } // graphene::protocol
 

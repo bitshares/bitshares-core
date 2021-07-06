@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Contributors.
+ * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -22,20 +22,8 @@
  * THE SOFTWARE.
  */
 
-#include "restriction_predicate.hxx"
-#include "sliced_lists.hxx"
+#include <graphene/protocol/fee_schedule.hpp>
 
-namespace graphene { namespace protocol {
-using result_type = object_restriction_predicate<operation>;
+#include <fc/io/raw.hpp>
 
-result_type get_restriction_predicate_list_12(size_t idx, vector<restriction> rs) {
-   return typelist::runtime::dispatch(operation_list_12::list(), idx, [&rs] (auto t) -> result_type {
-      using Op = typename decltype(t)::type;
-      return [p=restrictions_to_predicate<Op>(std::move(rs), true)] (const operation& op) {
-         FC_ASSERT(op.which() == operation::tag<Op>::value,
-                   "Supplied operation is incorrect type for restriction predicate");
-         return p(op.get<Op>());
-      };
-   });
-}
-} }
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION_VARIANT( graphene::protocol::fee_schedule )

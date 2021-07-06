@@ -92,16 +92,19 @@ jobs:
               -D Boost_USE_STATIC_LIBS=OFF \
               ..
         popd
+    # Get OS version to be used in cache key - see https://github.com/actions/cache/issues/543
+    - run: |
+        echo "OS_VERSION=`lsb_release -sr`" >> $GITHUB_ENV
     - name: Load Cache
       uses: actions/cache@v2
       with:
         path: |
           ccache
           sonar_cache
-        key: sonar-${{ github.ref }}-${{ github.sha }}
+        key: sonar-${{ env.OS_VERSION }}-${{ github.ref }}-${{ github.sha }}
         restore-keys: |
-          sonar-${{ github.ref }}-
-          sonar-
+          sonar-${{ env.OS_VERSION }}-${{ github.ref }}-
+          sonar-${{ env.OS_VERSION }}-
     - name: Build
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
@@ -114,21 +117,6 @@ jobs:
         du -hs _build/libraries/* _build/programs/* _build/tests/*
         du -hs _build/*
         du -hs /_build/*
-    - name: Unit-Tests
-      run: |
-        _build/tests/app_test -l test_suite
-        df -h
-        curl -XPUT -H "Content-Type: application/json" http://localhost:9200/_cluster/settings \
-          -d '{ "transient": { "cluster.routing.allocation.disk.threshold_enabled": false } }'
-        echo
-        _build/tests/es_test -l test_suite
-        df -h
-        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
-        _build/tests/cli_test -l test_suite
-        df -h
-        echo "Cleanup"
-        rm -rf /tmp/graphene*
-        df -h
     - name: Quick test for program arguments
       run: |
         _build/programs/witness_node/witness_node --version
@@ -156,6 +144,38 @@ jobs:
         else \
           echo "Pass: got expected error."; \
         fi
+    - name: Remove binaries that we no longer need
+      run: |
+        df -h
+        echo "Cleanup"
+        rm -rf _build/programs/witness_node/witness_node
+        rm -rf _build/programs/cli_wallet/cli_wallet
+        rm -rf _build/programs/network_mapper/network_mapper
+        rm -rf _build/programs/js_operation_serializer/js_operation_serializer
+        rm -rf _build/programs/genesis_util/get_dev_key
+        df -h
+    - name: Unit-Tests
+      run: |
+        _build/tests/app_test -l test_suite
+        df -h
+        echo "Cleanup"
+        rm -rf /tmp/graphene*
+        curl -XPUT -H "Content-Type: application/json" http://localhost:9200/_cluster/settings \
+          -d '{ "transient": { "cluster.routing.allocation.disk.threshold_enabled": false } }'
+        echo
+        _build/tests/es_test -l test_suite
+        df -h
+        echo "Cleanup"
+        rm -rf /tmp/graphene*
+        libraries/fc/tests/run-parallel-tests.sh _build/tests/chain_test -l test_suite
+        df -h
+        echo "Cleanup"
+        rm -rf /tmp/graphene*
+        _build/tests/cli_test -l test_suite
+        df -h
+        echo "Cleanup"
+        rm -rf /tmp/graphene*
+        df -h
     - name: Prepare for scanning with SonarScanner
       run: |
         mkdir -p sonar_cache
@@ -183,3 +203,12 @@ jobs:
       run: |
         sonar-scanner \
            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+    - name: Cleanup
+      run: |
+        df -h
+        echo "Final cleanup"
+        rm -rf _build/tests/app_test
+        rm -rf _build/tests/chain_test
+        rm -rf _build/tests/cli_test
+        rm -rf _build/tests/es_test
+        df -h

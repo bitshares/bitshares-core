@@ -416,6 +416,7 @@ MAP_OBJECT_ID_TO_TYPE(graphene::chain::asset_bitasset_data_object)
 FC_REFLECT_DERIVED( graphene::chain::price_feed_with_icr, (graphene::protocol::price_feed),
                     (initial_collateral_ratio) )
 
+// Note: this is left here but not moved to a cpp file due to the extended_asset_object struct in API.
 FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (symbol)
                     (precision)

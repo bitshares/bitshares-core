@@ -164,9 +164,23 @@ bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
 
       if( op.op.is_type< account_create_operation >() )
          impacted.insert( op.result.get<object_id_type>() );
-      else
+
+      // https://github.com/bitshares/bitshares-core/issues/265
+      if( HARDFORK_CORE_265_PASSED(b.timestamp) || !op.op.is_type< account_create_operation >() )
+      {
          operation_get_impacted_accounts( op.op, impacted,
                                           MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( db.head_block_time() ) );
+      }
+
+      if( op.result.is_type<extendable_operation_result>() )
+      {
+         const auto& op_result = op.result.get<extendable_operation_result>();
+         if( op_result.value.impacted_accounts.valid() )
+         {
+            for( const auto& a : *op_result.value.impacted_accounts )
+               impacted.insert( a );
+         }
+      }
 
       for( auto& a : other )
          for( auto& item : a.account_auths )

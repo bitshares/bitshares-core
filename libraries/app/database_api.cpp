@@ -2077,6 +2077,169 @@ vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by
 
 //////////////////////////////////////////////////////////////////////
 //                                                                  //
+// SameT Funds                                                      //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<samet_fund_object> database_api::list_samet_funds(
+            const optional<uint32_t>& limit,
+            const optional<samet_fund_id_type>& start_id )const
+{
+   const auto& idx = my->_db.get_index_type<samet_fund_index>().indices().get<by_id>();
+   return my->get_objects_by_x< samet_fund_object,
+                                samet_fund_id_type
+                               >( &application_options::api_limit_get_samet_funds,
+                                  idx, limit, start_id );
+}
+
+vector<samet_fund_object> database_api::get_samet_funds_by_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit,
+            const optional<samet_fund_id_type>& start_id )const
+{
+   account_id_type owner = my->get_account_from_string(account_name_or_id)->id;
+   const auto& idx = my->_db.get_index_type<samet_fund_index>().indices().get<by_owner>();
+   return my->get_objects_by_x< samet_fund_object,
+                                samet_fund_id_type
+                               >( &application_options::api_limit_get_samet_funds,
+                                  idx, limit, start_id, owner );
+}
+
+vector<samet_fund_object> database_api::get_samet_funds_by_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit,
+            const optional<samet_fund_id_type>& start_id )const
+{
+   asset_id_type asset_type = my->get_asset_from_string(asset_symbol_or_id)->id;
+   const auto& idx = my->_db.get_index_type<samet_fund_index>().indices().get<by_asset_type>();
+   return my->get_objects_by_x< samet_fund_object,
+                                samet_fund_id_type
+                               >( &application_options::api_limit_get_samet_funds,
+                                  idx, limit, start_id, asset_type );
+}
+
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
+// Credit offers and credit deals                                   //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<credit_offer_object> database_api::list_credit_offers(
+            const optional<uint32_t>& limit,
+            const optional<credit_offer_id_type>& start_id )const
+{
+   const auto& idx = my->_db.get_index_type<credit_offer_index>().indices().get<by_id>();
+   return my->get_objects_by_x< credit_offer_object,
+                                credit_offer_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id );
+}
+
+vector<credit_offer_object> database_api::get_credit_offers_by_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit,
+            const optional<credit_offer_id_type>& start_id )const
+{
+   account_id_type owner = my->get_account_from_string(account_name_or_id)->id;
+   const auto& idx = my->_db.get_index_type<credit_offer_index>().indices().get<by_owner>();
+   return my->get_objects_by_x< credit_offer_object,
+                                credit_offer_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, owner );
+}
+
+vector<credit_offer_object> database_api::get_credit_offers_by_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit,
+            const optional<credit_offer_id_type>& start_id )const
+{
+   asset_id_type asset_type = my->get_asset_from_string(asset_symbol_or_id)->id;
+   const auto& idx = my->_db.get_index_type<credit_offer_index>().indices().get<by_asset_type>();
+   return my->get_objects_by_x< credit_offer_object,
+                                credit_offer_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, asset_type );
+}
+
+vector<credit_deal_object> database_api::list_credit_deals(
+            const optional<uint32_t>& limit,
+            const optional<credit_deal_id_type>& start_id )const
+{
+   const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_id>();
+   return my->get_objects_by_x< credit_deal_object,
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id );
+}
+
+vector<credit_deal_object> database_api::get_credit_deals_by_offer_id(
+            const credit_offer_id_type& offer_id,
+            const optional<uint32_t>& limit,
+            const optional<credit_deal_id_type>& start_id )const
+{
+   const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_offer_id>();
+   return my->get_objects_by_x< credit_deal_object,
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, offer_id );
+}
+
+vector<credit_deal_object> database_api::get_credit_deals_by_offer_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit,
+            const optional<credit_deal_id_type>& start_id )const
+{
+   account_id_type owner = my->get_account_from_string(account_name_or_id)->id;
+   const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_offer_owner>();
+   return my->get_objects_by_x< credit_deal_object,
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, owner );
+}
+
+vector<credit_deal_object> database_api::get_credit_deals_by_borrower(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit,
+            const optional<credit_deal_id_type>& start_id )const
+{
+   account_id_type borrower = my->get_account_from_string(account_name_or_id)->id;
+   const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_borrower>();
+   return my->get_objects_by_x< credit_deal_object,
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, borrower );
+}
+
+vector<credit_deal_object> database_api::get_credit_deals_by_debt_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit,
+            const optional<credit_deal_id_type>& start_id )const
+{
+   asset_id_type asset_type = my->get_asset_from_string(asset_symbol_or_id)->id;
+   const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_debt_asset>();
+   return my->get_objects_by_x< credit_deal_object,
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, asset_type );
+}
+
+vector<credit_deal_object> database_api::get_credit_deals_by_collateral_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit,
+            const optional<credit_deal_id_type>& start_id )const
+{
+   asset_id_type asset_type = my->get_asset_from_string(asset_symbol_or_id)->id;
+   const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_collateral_asset>();
+   return my->get_objects_by_x< credit_deal_object,
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, asset_type );
+}
+
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
 // Witnesses                                                        //
 //                                                                  //
 //////////////////////////////////////////////////////////////////////

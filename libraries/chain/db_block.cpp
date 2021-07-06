@@ -31,6 +31,7 @@
 #include <graphene/chain/operation_history_object.hpp>
 
 #include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/samet_fund_object.hpp>
 #include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/exceptions.hpp>
@@ -342,6 +343,10 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
       auto session = _undo_db.start_undo_session(true);
       for( auto& op : proposal.proposed_transaction.operations )
          eval_state.operation_results.emplace_back(apply_operation(eval_state, op));
+      // Make sure there is no unpaid samet fund debt
+      const auto& samet_fund_idx = get_index_type<samet_fund_index>().indices().get<by_unpaid>();
+      FC_ASSERT( samet_fund_idx.empty() || samet_fund_idx.begin()->unpaid_amount == 0,
+                 "Unpaid SameT Fund debt detected" );
       remove(proposal);
       session.merge();
    } catch ( const fc::exception& e ) {
@@ -447,6 +452,9 @@ signed_block database::_generate_block(
       {
          auto temp_session = _undo_db.start_undo_session();
          processed_transaction ptx = _apply_transaction( tx );
+         // Clear results to save disk space and network bandwidth.
+         // This may break client applications which rely on the results.
+         ptx.operation_results.clear();
 
          // We have to recompute pack_size(ptx) because it may be different
          // than pack_size(tx) (i.e. if one or more results increased
@@ -640,6 +648,7 @@ void database::_apply_block( const signed_block& next_block )
    update_expired_feeds();       // this will update expired feeds and some core exchange rates
    update_core_exchange_rates(); // this will update remaining core exchange rates
    update_withdraw_permissions();
+   update_credit_offers_and_deals();
 
    // n.b., update_maintenance_flag() happens this late
    // because get_slot_time() / get_slot_at_time() is needed above
@@ -658,8 +667,11 @@ void database::_apply_block( const signed_block& next_block )
    notify_changed_objects();
 } FC_CAPTURE_AND_RETHROW( (next_block.block_num()) )  }
 
-
-
+/**
+ * @note if a @c processed_transaction is passed in, it is cast into @c signed_transaction here.
+ *       It also means that the @c operation_results field is ignored by consensus, although it
+ *       is a part of block data.
+ */
 processed_transaction database::apply_transaction(const signed_transaction& trx, uint32_t skip)
 {
    processed_transaction result;
@@ -747,6 +759,11 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
       ++_current_op_in_trx;
    }
    ptrx.operation_results = std::move(eval_state.operation_results);
+
+   // Make sure there is no unpaid samet fund debt
+   const auto& samet_fund_idx = get_index_type<samet_fund_index>().indices().get<by_unpaid>();
+   FC_ASSERT( samet_fund_idx.empty() || samet_fund_idx.begin()->unpaid_amount == 0,
+              "Unpaid SameT Fund debt detected" );
 
    return ptrx;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }
