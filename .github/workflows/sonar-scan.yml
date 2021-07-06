@@ -92,16 +92,19 @@ jobs:
               -D Boost_USE_STATIC_LIBS=OFF \
               ..
         popd
+    # Get OS version to be used in cache key - see https://github.com/actions/cache/issues/543
+    - run: |
+        echo "OS_VERSION=`lsb_release -sr`" >> $GITHUB_ENV
     - name: Load Cache
       uses: actions/cache@v2
       with:
         path: |
           ccache
           sonar_cache
-        key: sonar-${{ github.ref }}-${{ github.sha }}
+        key: sonar-${{ env.OS_VERSION }}-${{ github.ref }}-${{ github.sha }}
         restore-keys: |
-          sonar-${{ github.ref }}-
-          sonar-
+          sonar-${{ env.OS_VERSION }}-${{ github.ref }}-
+          sonar-${{ env.OS_VERSION }}-
     - name: Build
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
