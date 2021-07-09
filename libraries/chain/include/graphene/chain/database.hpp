@@ -405,6 +405,7 @@ namespace graphene { namespace chain {
          ///        how much the settle order receives when the call order is being margin called
          /// @param is_margin_call whether the call order is being margin called
          /// @param settle_order_is_taker whether the settle_order is the taker
+         /// @param margin_call_pays_ratio see @ref price_feed::margin_call_pays_ratio
          /// @return the amount of asset settled
          asset match_impl( const force_settlement_object& settle,
                            const call_order_object& call,
@@ -412,7 +413,8 @@ namespace graphene { namespace chain {
                            const asset& max_settlement,
                            const price& fill_price,
                            bool is_margin_call = false,
-                           bool settle_order_is_taker = true );
+                           bool settle_order_is_taker = true,
+                           const ratio_type* margin_call_pays_ratio = nullptr );
 
 
       public:
@@ -486,13 +488,15 @@ namespace graphene { namespace chain {
          /// @param fill_price the price to be recorded in market history plugin. It is the price to calculate
          ///        how much the settle order receives when the call order is being margin called
          /// @param is_margin_call whether the call order is being margin called
+         /// @param margin_call_pays_ratio see @ref price_feed::margin_call_pays_ratio
          /// @return the amount of asset settled
          asset match( const force_settlement_object& settle,
                       const call_order_object& call,
                       const price& match_price,
                       const asset& max_settlement,
                       const price& fill_price,
-                      bool is_margin_call = false );
+                      bool is_margin_call = false,
+                      const ratio_type* margin_call_pays_ratio = nullptr );
 
          /// Matches the two orders, the first parameter is taker, the second is maker.
          /// @param call the call order being margin called
@@ -501,12 +505,14 @@ namespace graphene { namespace chain {
          /// @param max_settlement the maximum debt amount to be filled during this match
          /// @param fill_price the price to be recorded in market history plugin. It is the price to calculate
          ///        how much the settle order receives.
+         /// @param margin_call_pays_ratio see @ref price_feed::margin_call_pays_ratio
          /// @return the amount of asset settled
          asset match( const call_order_object& call,
                       const force_settlement_object& settle,
                       const price& match_price,
                       const asset& max_settlement,
-                      const price& fill_price );
+                      const price& fill_price,
+                      const ratio_type* margin_call_pays_ratio = nullptr );
 
          /**
           * @brief fills limit order
