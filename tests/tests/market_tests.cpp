@@ -235,7 +235,9 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 
    auto mi = db.get_global_properties().parameters.maintenance_interval;
 
-   if(hf1270)
+   if(hf2481)
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   else if(hf1270)
       generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    else
       generate_blocks(HARDFORK_CORE_343_TIME - mi);
@@ -332,7 +334,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 
    // call's call_price will be updated after the match, to 741/31/1.75 CORE/USD = 2964/217
    // it's above settlement price (10/1) so won't be margin called again
-   if(!hf1270) // can use call price only if we are before hf1270
+   if(!hf1270 && !hf2481) // can use call price only if we are before hf1270
       BOOST_CHECK( price(asset(2964),asset(217,usd_id)) == call.call_price );
 
    // This would match with call before, but would match with call2 after #343 fixed
@@ -350,7 +352,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
    BOOST_CHECK_EQUAL( 1000, call3.debt.value );
    BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
    // call2's call_price will be updated after the match, to 78/3/1.75 CORE/USD = 312/21
-   if(!hf1270) // can use call price only if we are before hf1270
+   if(!hf1270 && !hf2481) // can use call price only if we are before hf1270
       BOOST_CHECK( price(asset(312),asset(21,usd_id)) == call2.call_price );
    // it's above settlement price (10/1) so won't be margin called
 
@@ -362,27 +364,45 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
    force_settle( seller, bitusd.amount(10) );
 
    BOOST_CHECK_EQUAL( 1583, get_balance(seller, bitusd) );
-   BOOST_CHECK_EQUAL( 15401, get_balance(seller, core) );
+   if( hf2481 ) // force settle matches with margin calls, at mssp 1/11
+      BOOST_CHECK_EQUAL( 15511, get_balance(seller, core) ); // 15401 + 10 * 11
+   else
+      BOOST_CHECK_EQUAL( 15401, get_balance(seller, core) );
    BOOST_CHECK_EQUAL( 310, call.debt.value );
    BOOST_CHECK_EQUAL( 7410, call.collateral.value );
    BOOST_CHECK_EQUAL( 300, call2.debt.value );
    BOOST_CHECK_EQUAL( 7800, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   if( hf2481 ) // force settle matches with margin calls, at mssp 1/11
+   {
+      BOOST_CHECK_EQUAL( 990, call3.debt.value ); // 1000 - 10
+      BOOST_CHECK_EQUAL( 15890, call3.collateral.value ); // 16000 - 10 * 11
+   }
+   else
+   {
+      BOOST_CHECK_EQUAL( 1000, call3.debt.value );
+      BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   }
 
-   // generate blocks to let the settle order execute (price feed will expire after it)
+   // generate blocks to let the settle order execute (only before hf2481) (price feed will expire after it)
    generate_block();
    generate_blocks( db.head_block_time() + fc::hours(24) );
 
-   // call3 get settled, at settlement price 1/10: #343 fixed
+   // if before hf2481, call3 get settled, at settlement price 1/10: #343 fixed
+   // else matched at above step already
    BOOST_CHECK_EQUAL( 1583, get_balance(seller_id, usd_id) );
-   BOOST_CHECK_EQUAL( 15501, get_balance(seller_id, core_id) );
+   if( hf2481 )
+      BOOST_CHECK_EQUAL( 15511, get_balance(seller_id, core_id) ); // no change
+   else
+      BOOST_CHECK_EQUAL( 15501, get_balance(seller_id, core_id) ); // 15401 + 10 * 10
    BOOST_CHECK_EQUAL( 310, call_id(db).debt.value );
    BOOST_CHECK_EQUAL( 7410, call_id(db).collateral.value );
    BOOST_CHECK_EQUAL( 300, call2_id(db).debt.value );
    BOOST_CHECK_EQUAL( 7800, call2_id(db).collateral.value );
    BOOST_CHECK_EQUAL( 990, call3_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 15900, call3_id(db).collateral.value );
+   if( hf2481 )
+      BOOST_CHECK_EQUAL( 15890, call3_id(db).collateral.value );
+   else
+      BOOST_CHECK_EQUAL( 15900, call3_id(db).collateral.value ); // 16000 - 10 * 10
 
    set_expiration( db, trx );
    update_feed_producers( usd_id(db), {feedproducer_id} );
@@ -418,7 +438,9 @@ BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
 
    auto mi = db.get_global_properties().parameters.maintenance_interval;
 
-   if(hf1270)
+   if(hf2481)
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   else if(hf1270)
       generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    else
       generate_blocks(HARDFORK_CORE_343_TIME - mi);
@@ -503,7 +525,9 @@ BOOST_AUTO_TEST_CASE(hardfork_core_625_big_limit_order_test)
 
    auto mi = db.get_global_properties().parameters.maintenance_interval;
 
-   if(hf1270)
+   if(hf2481)
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   else if(hf1270)
       generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    else
       generate_blocks(HARDFORK_CORE_625_TIME - mi);
@@ -1429,8 +1453,18 @@ BOOST_AUTO_TEST_CASE(mcfr_blackswan_test_after_hf_core_2481)
  */
 BOOST_AUTO_TEST_CASE(mcfr_rounding_test)
 { try {
-   // Proceeds to the bsip-74 hard fork time
-   generate_blocks(HARDFORK_CORE_BSIP74_TIME);
+
+   if(hf2481)
+   {
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   }
+   else
+   {
+      // Proceeds to the bsip-74 hard fork time
+      generate_blocks(HARDFORK_CORE_BSIP74_TIME);
+   }
    set_expiration( db, trx );
 
    ACTORS((seller)(borrower)(borrower2)(feedproducer)(feeder2)(feeder3));
@@ -1482,6 +1516,8 @@ BOOST_AUTO_TEST_CASE(mcfr_rounding_test)
    BOOST_CHECK_EQUAL( 40000, call2.collateral.value );
    BOOST_CHECK_EQUAL( 2000, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+   BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower, core) );
+   BOOST_CHECK_EQUAL( init_balance - 40000, get_balance(borrower2, core) );
 
    // No margin call at this moment
 
@@ -1498,6 +1534,8 @@ BOOST_AUTO_TEST_CASE(mcfr_rounding_test)
    BOOST_CHECK_EQUAL( 40000, call2_id(db).collateral.value );
    BOOST_CHECK_EQUAL( 900, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+   BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower, core) );
+   BOOST_CHECK_EQUAL( init_balance - 40000, get_balance(borrower2, core) );
 
    // Tring to adjust price feed to get call_order into margin call territory
    BOOST_MESSAGE( "Trying to trigger a margin call" );
@@ -1505,17 +1543,40 @@ BOOST_AUTO_TEST_CASE(mcfr_rounding_test)
    feed2.settlement_price = bitusd.amount( 1 ) / core.amount(18);
    publish_feed( bitusd, feedproducer, feed2 );
 
-   // The first call order should have been filled
-   BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
-   BOOST_CHECK( !db.find<call_order_object>( call_id ) );
-   BOOST_REQUIRE( db.find<call_order_object>( call2_id ) );
+   if(hf2481)
+   {
+      // blackswan
+      BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !db.find<call_order_object>( call_id ) );
+      BOOST_CHECK( !db.find<call_order_object>( call2_id ) );
+      int64_t call_pays_to_fund = (15000 * 10 + 10) / 11;
+      BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).settlement_fund.value,
+                         call_pays_to_fund * 2 );
+      BOOST_CHECK_EQUAL( usd_id(db).dynamic_asset_data_id(db).accumulated_collateral_fees.value,
+                         15000 - call_pays_to_fund );
 
-   BOOST_CHECK_EQUAL( 100, sell_mid(db).for_sale.value );
+      // sell order doesn't change
+      BOOST_CHECK_EQUAL( 1100, sell_mid(db).for_sale.value );
+      // seller balance doesn't change
+      BOOST_CHECK_EQUAL( 900, get_balance(seller, bitusd) );
+      BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+      BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower, core) );
+      BOOST_CHECK_EQUAL( init_balance - call_pays_to_fund, get_balance(borrower2, core) );
+   }
+   else
+   {
+      // The first call order should have been filled
+      BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !db.find<call_order_object>( call_id ) );
+      BOOST_REQUIRE( db.find<call_order_object>( call2_id ) );
 
-   BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 40000, call2_id(db).collateral.value );
-   BOOST_CHECK_EQUAL( 900, get_balance(seller, bitusd) );
-   BOOST_CHECK_EQUAL( 14047, get_balance(seller, core) );
+      BOOST_CHECK_EQUAL( 100, sell_mid(db).for_sale.value );
+
+      BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 40000, call2_id(db).collateral.value );
+      BOOST_CHECK_EQUAL( 900, get_balance(seller, bitusd) );
+      BOOST_CHECK_EQUAL( 14047, get_balance(seller, core) );
+   }
 
    // generate a block to include operations above
    BOOST_MESSAGE( "Generating a new block" );
@@ -1531,7 +1592,9 @@ BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
 
    auto mi = db.get_global_properties().parameters.maintenance_interval;
 
-   if(hf1270)
+   if(hf2481)
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   else if(hf1270)
       generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    else
       generate_blocks(HARDFORK_CORE_834_TIME - mi);
@@ -1715,7 +1778,9 @@ BOOST_AUTO_TEST_CASE(target_cr_test_call_limit)
 
    auto mi = db.get_global_properties().parameters.maintenance_interval;
 
-   if(hf1270)
+   if(hf2481)
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   else if(hf1270)
       generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    else
       generate_blocks(HARDFORK_CORE_834_TIME - mi);
@@ -1921,7 +1986,10 @@ BOOST_AUTO_TEST_CASE(mcr_bug_increase_after1270)
 { try {
 
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_1270_TIME - mi);
+   if(hf2481)
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   else
+      generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    generate_block();
 
@@ -2057,7 +2125,10 @@ BOOST_AUTO_TEST_CASE(mcr_bug_decrease_after1270)
 { try {
 
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_1270_TIME - mi);
+   if(hf2481)
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   else
+      generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    generate_block();
 
@@ -2202,5 +2273,60 @@ BOOST_AUTO_TEST_CASE(target_cr_test_call_limit_after_hf1270)
 
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE(hardfork_core_338_test_after_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(hardfork_core_338_test);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(hardfork_core_453_test_after_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(hardfork_core_453_test);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(hardfork_core_625_big_limit_order_test_after_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(hardfork_core_625_big_limit_order_test);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(target_cr_test_limit_call_after_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(target_cr_test_limit_call);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(target_cr_test_call_limit_after_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(target_cr_test_call_limit);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(mcr_bug_decrease_after2481)
+{ try {
+   hf2481 = true;
+   INVOKE(mcr_bug_decrease_after1270);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(mcr_bug_increase_after2481)
+{ try {
+   hf2481 = true;
+   INVOKE(mcr_bug_increase_after1270);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(mcfr_rounding_test_after2481)
+{ try {
+   hf2481 = true;
+   INVOKE(mcfr_rounding_test);
+
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
