@@ -329,8 +329,6 @@ void database::clear_expired_orders()
          auto head_time = head_block_time();
          auto maint_time = get_dynamic_global_properties().next_maintenance_time;
 
-         bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
-         bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
          bool before_core_hardfork_606 = ( maint_time <= HARDFORK_CORE_606_TIME ); // feed always trigger call
 
          auto& limit_index = get_index_type<limit_order_index>().indices().get<by_expiration>();
@@ -351,7 +349,16 @@ void database::clear_expired_orders()
                check_call_orders( quote_asset( *this ) );
             }
          }
+} FC_CAPTURE_AND_RETHROW() }
 
+void database::clear_expired_force_settlements()
+{ try {
+   //Cancel expired limit orders
+   auto head_time = head_block_time();
+   auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+
+   bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
+   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
    // Process expired force settlement orders
    // TODO Possible performance optimization. Looping through all assets is not ideal.
    //      - One idea is to check time first, if any expired settlement found, check asset.
@@ -531,7 +538,7 @@ void database::clear_expired_orders()
          }
          if( mia.force_settled_volume != settled.amount )
          {
-            modify(mia, [settled](asset_bitasset_data_object& b) {
+            modify(mia, [&settled](asset_bitasset_data_object& b) {
                b.force_settled_volume = settled.amount;
             });
          }
