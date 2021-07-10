@@ -865,6 +865,7 @@ asset database::match_impl( const force_settlement_object& settle,
    //       the difference is the margin-call fee
 
    asset settle_receives = is_margin_call ? ( call_receives * fill_price ) : call_pays;
+   asset settle_pays     = call_receives;
 
    // Be here, the call order may be paying nothing.
    bool cull_settle_order = false; // whether need to cancel dust settle order
@@ -924,6 +925,11 @@ asset database::match_impl( const force_settlement_object& settle,
       {
          // be here, call_pays has been rounded down
 
+         // round up here to mitigate rounding issues (hf core-342).
+         // It is important to understand the math that the newly rounded up call_receives won't be greater than the
+         // old call_receives.
+         call_receives = call_pays.multiply_and_round_up( match_price );
+
          if( is_margin_call ) // implies hf core-2481
          {
             bool cap_price = false;
@@ -939,7 +945,7 @@ asset database::match_impl( const force_settlement_object& settle,
             if( cap_price )
             {
                match_price = call_debt / call_collateral;
-               call_pays = call_receives * match_price;      // round down here, in favor of call order
+               call_pays = settle_pays * match_price;      // round down here, in favor of call order
                // price changed, check if it is something-for-nothing again
                if( call_pays.amount == 0 )
                {
@@ -950,6 +956,8 @@ asset database::match_impl( const force_settlement_object& settle,
                   // If the settle order is canceled, we just return, since nothing else can be done
                   return asset( 0, call_debt.asset_id );
                }
+               // price changed, update call_receives // round up to mitigate rounding issues (hf core-342)
+               call_receives = call_pays.multiply_and_round_up( match_price );
                // update fill price and settle_receives
                if( margin_call_pays_ratio != nullptr )
                {
@@ -968,24 +976,15 @@ asset database::match_impl( const force_settlement_object& settle,
 
          // be here, we should have: call_pays <= call_collateral
 
-         // if the settle order will be completely filled, assuming we need to cull it
-         if( call_receives == settle.balance )
+         // if the settle order is too small, mark it to be culled
+         if( settle_pays == settle.balance && call_receives != settle.balance )
             cull_settle_order = true;
-         // else do nothing, since we can't cull the settle order
+         // else do nothing, since we can't cull the settle order, or it is already fully filled
 
-         // round up here to mitigate rounding issue (core-342).
-         // It is important to understand the math that the newly rounded up call_receives won't be greater than the
-         // old call_receives.
-         call_receives = call_pays.multiply_and_round_up( match_price );
-
-         if( call_receives == settle.balance ) // the settle order will be completely filled, no need to cull
-            cull_settle_order = false;
-         // else do nothing, since we still need to cull the settle order or still can't cull the settle order
+         settle_pays = call_receives;
       }
    }
    // else : before the core-184 hf or the core-342 hf, do nothing
-
-   asset settle_pays     = call_receives;
 
    /**
     *  If the least collateralized call position lacks sufficient
