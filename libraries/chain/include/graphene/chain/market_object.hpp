@@ -156,7 +156,8 @@ class call_order_object : public abstract_object<call_order_object>
       share_type get_max_debt_to_cover( price match_price,
                                         price feed_price,
                                         const uint16_t maintenance_collateral_ratio,
-                                        const optional<price>& maintenance_collateralization = optional<price>() )const;
+                                        const optional<price>& maintenance_collateralization = optional<price>()
+                                      )const;
 };
 
 /**

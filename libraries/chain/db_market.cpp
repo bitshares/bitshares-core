@@ -805,6 +805,12 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
       call_receives  = usd_to_buy;
       order_receives = usd_to_buy.multiply_and_round_up( match_price ); // round up here, in favor of limit order
       call_pays      = usd_to_buy.multiply_and_round_up( call_pays_price );
+      // Note: here we don't re-assign call_receives with (orders_receives * match_price) to receive more
+      //       debt asset, it means the call order could be receiving a bit too much less than its value.
+      //       It is a sad thing for the call order, but it is the rule -- when a call order is margin called,
+      //       it does not get more than it borrowed.
+      //       On the other hand, if the call order is not being closed (due to TCR),
+      //       it means get_max_debt_to_cover() did not return a perfect result, probably we can improve it.
    }
    order_pays = call_receives;
 
@@ -878,7 +884,7 @@ asset database::match_impl( const force_settlement_object& settle,
    //       fill_price is the price that the settle order receives,
    //       the difference is the margin-call fee
 
-   asset settle_receives = is_margin_call ? ( call_receives * fill_price ) : call_pays;
+   asset settle_receives = call_pays;
    asset settle_pays     = call_receives;
 
    // Be here, the call order may be paying nothing.
@@ -913,7 +919,7 @@ asset database::match_impl( const force_settlement_object& settle,
          call_pays.amount = 1;
          settle_receives.amount = 1; // Note: no margin-call fee in this case
       }
-   }
+   } // end : if after the core-184 hf and call_pays.amount == 0
    else if( !before_core_hardfork_342 && call_pays.amount != 0 )
    {
       // be here, the call order is not paying nothing,
@@ -933,33 +939,56 @@ asset database::match_impl( const force_settlement_object& settle,
             settle_receives = call_receives.multiply_and_round_up( fill_price );
          }
          else // be here, we should have: call_pays <= call_collateral
+         {
             settle_receives = call_pays; // Note: fill_price is not used in calculation when is_margin_call is false
+         }
       }
       else // the call order is not completely filled, due to max_settlement too small or settle order too small
       {
          // be here, call_pays has been rounded down
-
-         // round up here to mitigate rounding issues (hf core-342).
-         // It is important to understand the math that the newly rounded up call_receives won't be greater than the
-         // old call_receives.
-         call_receives = call_pays.multiply_and_round_up( match_price );
-
-         if( is_margin_call ) // implies hf core-2481
+         if( !is_margin_call )
          {
+            // it was correct to round down call_pays.
+            // round up here to mitigate rounding issues (hf core-342).
+            // It is important to understand the math that the newly rounded-up call_receives won't be greater than
+            // the old call_receives. And rounding up here would NOT make CR lower.
+            call_receives = call_pays.multiply_and_round_up( match_price );
+         }
+         // the call order is a margin call, implies hf core-2481
+         else if( settle_pays == max_settlement ) // the settle order is larger, but the call order has TCR
+         {
+            call_pays = call_receives.multiply_and_round_up( match_price ); // round up, in favor of settle order
+            settle_receives = call_receives.multiply_and_round_up( fill_price ); // round up
+            // Note: here we do NOT stabilize call_receives since it is done in get_max_debt_to_cover(),
+            //       and it is already the maximum value
+         }
+         else // the call order is a margin call, and the settle order is smaller
+         {
+            // it was correct to round down call_pays.
+
+            // check whether the call order can be filled at match_price
             bool cap_price = false;
             if( call_pays.amount >= call.collateral ) // CR too low
                cap_price = true;
             else
             {
+               // round up to mitigate rounding issues (hf core-342)
+               call_receives = call_pays.multiply_and_round_up( match_price );
+
                auto new_collateral = call_collateral - call_pays;
                auto new_debt = call_debt - call_receives; // the result is positive due to math
                if( ( new_collateral / new_debt ) < call.collateralization() ) // if CR would decrease
                   cap_price = true;
             }
-            if( cap_price )
+
+            if( !cap_price ) // match_price is good
+            {
+               settle_receives = call_receives * fill_price; // round down
+            }
+            else // match_price is not good
             {
                match_price = call_debt / call_collateral;
-               call_pays = settle_pays * match_price;      // round down here, in favor of call order
+               call_pays = settle_pays * match_price; // round down here, in favor of call order
                // price changed, check if it is something-for-nothing again
                if( call_pays.amount == 0 )
                {
@@ -971,22 +1000,23 @@ asset database::match_impl( const force_settlement_object& settle,
                   return asset( 0, call_debt.asset_id );
                }
                // price changed, update call_receives // round up to mitigate rounding issues (hf core-342)
-               call_receives = call_pays.multiply_and_round_up( match_price );
+               call_receives = call_pays.multiply_and_round_up( match_price ); // round up
                // update fill price and settle_receives
-               if( margin_call_pays_ratio != nullptr )
+               if( margin_call_pays_ratio != nullptr ) // check to be defensive
                {
                   fill_price = match_price / (*margin_call_pays_ratio);
                   settle_receives = call_receives * fill_price; // round down here, in favor of call order
                }
-               else
+               else // normally this code won't be reached. be defensive here
                {
+                  wlog( "Unexpected: margin_call_pays_ratio == nullptr" );
                   fill_price = match_price;
                   settle_receives = call_pays;
                }
             }
             if( settle_receives.amount == 0 )
                settle_receives.amount = 1; // reduce margin-call fee in this case. Note: here call_pays >= 1
-         } // end : if is_margin_call
+         } // end : if is_margin_call, else ...
 
          // be here, we should have: call_pays <= call_collateral
 
@@ -997,7 +1027,7 @@ asset database::match_impl( const force_settlement_object& settle,
 
          settle_pays = call_receives;
       }
-   }
+   } // end : if after the core-342 hf and call_pays.amount != 0
    // else : before the core-184 hf or the core-342 hf, do nothing
 
    /**
@@ -1514,6 +1544,12 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
              limit_receives = usd_to_buy.multiply_and_round_up( match_price ); // round up, in favor of limit order
              if( limit_receives.amount > call_order.collateral ) // implies !after_hf_2481
                 limit_receives.amount = call_order.collateral;
+             // Note: here we don't re-assign call_receives with (orders_receives * match_price) to receive more
+             //       debt asset, it means the call order could be receiving a bit too much less than its value.
+             //       It is a sad thing for the call order, but it is the rule -- when a call order is margin called,
+             //       it does not get more than it borrowed.
+             //       On the other hand, if the call order is not being closed (due to TCR),
+             //       it means get_max_debt_to_cover() did not return a perfect result, probably we can improve it.
           }
 
           filled_call = true; // this is safe, since BSIP38 (hard fork core-834) depends on BSIP31 (hf core-343)
