@@ -1307,7 +1307,7 @@ BOOST_AUTO_TEST_CASE(mcfr_blackswan_test)
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
    // adjust price feed to get call_order into black swan territory
-   BOOST_MESSAGE( "Trying to trigger GS" );
+   BOOST_TEST_MESSAGE( "Trying to trigger GS" );
    current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(18);
    publish_feed( bitusd, feedproducer, current_feed );
    // settlement price = 1/18, mssp = 10/198
@@ -1323,7 +1323,7 @@ BOOST_AUTO_TEST_CASE(mcfr_blackswan_test)
    BOOST_CHECK_EQUAL( 1000, sell_mid(db).for_sale.value );
 
    // generate a block to include operations above
-   BOOST_MESSAGE( "Generating a new block" );
+   BOOST_TEST_MESSAGE( "Generating a new block" );
    generate_block();
 
 } FC_LOG_AND_RETHROW() }
@@ -1413,7 +1413,7 @@ BOOST_AUTO_TEST_CASE(mcfr_blackswan_test_after_hf_core_2481)
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
    // adjust price feed to get call_order into black swan territory
-   BOOST_MESSAGE( "Trying to trigger GS" );
+   BOOST_TEST_MESSAGE( "Trying to trigger GS" );
    current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(18);
    publish_feed( bitusd, feedproducer, current_feed );
    // settlement price = 1/18, mssp = 10/198
@@ -1443,7 +1443,7 @@ BOOST_AUTO_TEST_CASE(mcfr_blackswan_test_after_hf_core_2481)
    BOOST_CHECK_EQUAL( 1000, sell_mid(db).for_sale.value );
 
    // generate a block to include operations above
-   BOOST_MESSAGE( "Generating a new block" );
+   BOOST_TEST_MESSAGE( "Generating a new block" );
    generate_block();
 
 } FC_LOG_AND_RETHROW() }
@@ -1538,7 +1538,7 @@ BOOST_AUTO_TEST_CASE(mcfr_rounding_test)
    BOOST_CHECK_EQUAL( init_balance - 40000, get_balance(borrower2, core) );
 
    // Tring to adjust price feed to get call_order into margin call territory
-   BOOST_MESSAGE( "Trying to trigger a margin call" );
+   BOOST_TEST_MESSAGE( "Trying to trigger a margin call" );
    auto feed2 = current_feed;
    feed2.settlement_price = bitusd.amount( 1 ) / core.amount(18);
    publish_feed( bitusd, feedproducer, feed2 );
@@ -1579,7 +1579,7 @@ BOOST_AUTO_TEST_CASE(mcfr_rounding_test)
    }
 
    // generate a block to include operations above
-   BOOST_MESSAGE( "Generating a new block" );
+   BOOST_TEST_MESSAGE( "Generating a new block" );
    generate_block();
 
 } FC_LOG_AND_RETHROW() }
