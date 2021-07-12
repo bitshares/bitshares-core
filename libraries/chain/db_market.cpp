@@ -1662,13 +1662,13 @@ void database::match_force_settlements( const asset_bitasset_data_object& bitass
 
 void database::pay_order( const account_object& receiver, const asset& receives, const asset& pays )
 {
-   const auto& balances = receiver.statistics(*this);
-   modify( balances, [&]( account_statistics_object& b ){
-         if( pays.asset_id == asset_id_type() )
-         {
-            b.total_core_in_orders -= pays.amount;
-         }
-   });
+   if( pays.asset_id == asset_id_type() )
+   {
+      const auto& stats = receiver.statistics(*this);
+      modify( stats, [&pays]( account_statistics_object& b ){
+         b.total_core_in_orders -= pays.amount;
+      });
+   }
    adjust_balance(receiver.get_id(), receives);
 }
 
