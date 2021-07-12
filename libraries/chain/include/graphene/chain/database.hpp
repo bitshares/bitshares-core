@@ -670,7 +670,7 @@ namespace graphene { namespace chain {
          void update_withdraw_permissions();
          void update_credit_offers_and_deals();
          bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
-                                   const asset_bitasset_data_object* bitasset_ptr = nullptr);
+                                   const asset_bitasset_data_object* bitasset_ptr = nullptr );
          void clear_expired_htlcs();
 
          ///Steps performed only at maintenance intervals

@@ -353,13 +353,13 @@ void database::clear_expired_orders()
 
 void database::clear_expired_force_settlements()
 { try {
-   //Cancel expired limit orders
+   // Process expired force settlement orders
    auto head_time = head_block_time();
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
 
    bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
-   // Process expired force settlement orders
+
    // TODO Possible performance optimization. Looping through all assets is not ideal.
    //      - One idea is to check time first, if any expired settlement found, check asset.
    //        However, due to max_settlement_volume, this does not work, i.e. time meets but have to
