@@ -80,7 +80,8 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
    }
 
    // According to the feed protection rule (https://github.com/cryptonomex/graphene/issues/436),
-   // a call order should only be called when its collateral ratio is not higher than required maintenance collateral ratio.
+   // a call order should only be called when its collateral ratio is not higher than required
+   // maintenance collateral ratio.
    // Although this should be guaranteed by the caller of this function, we still check here to be defensive.
    // Theoretically this check can be skipped for better performance.
    //
@@ -92,7 +93,8 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
    if( !target_collateral_ratio.valid() ) // target cr is not set
       return debt;
 
-   uint16_t tcr = std::max( *target_collateral_ratio, maintenance_collateral_ratio ); // use mcr if target cr is too small
+   // use mcr if target cr is too small
+   uint16_t tcr = std::max( *target_collateral_ratio, maintenance_collateral_ratio );
 
    price target_collateralization = ( after_core_hardfork_1270 ?
                                       feed_price * ratio_type( tcr, GRAPHENE_COLLATERAL_RATIO_DENOM ) :
@@ -105,7 +107,7 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
    FC_ASSERT( match_price.base.asset_id == call_price.base.asset_id
               && match_price.quote.asset_id == call_price.quote.asset_id );
 
-   typedef boost::multiprecision::int256_t i256;
+   using i256 = boost::multiprecision::int256_t;
    i256 mp_debt_amt = match_price.quote.amount.value;
    i256 mp_coll_amt = match_price.base.amount.value;
    i256 fp_debt_amt = feed_price.quote.amount.value;
@@ -175,7 +177,8 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
       max_to_cover.amount = debt;
    }
 
-   if( max_to_pay <= to_pay || max_to_cover <= to_cover ) // strange data. should skip binary search and go on, but doesn't help much
+   if( max_to_pay <= to_pay || max_to_cover <= to_cover ) // strange data. should skip binary search and go on,
+                                                          // but doesn't help much
       return debt;
    FC_ASSERT( max_to_pay > to_pay && max_to_cover > to_cover );
 

@@ -90,7 +90,14 @@ struct swan_fixture : database_fixture {
         FC_ASSERT( get_balance(borrower(),  swan()) == amount1 );
         FC_ASSERT( get_balance(borrower2(), swan()) == amount2 - 1 );
         FC_ASSERT( get_balance(borrower() , back()) == init_balance - 2*amount1 );
-        FC_ASSERT( get_balance(borrower2(), back()) == init_balance - 2*amount2 );
+        if( !hf_core_2481_passed() )
+           FC_ASSERT( get_balance(borrower2(), back()) == init_balance - 2*amount2 );
+        else
+        {
+           auto mssr = swan().bitasset_data(db).current_feed.maximum_short_squeeze_ratio;
+           auto denom = GRAPHENE_COLLATERAL_RATIO_DENOM;
+           FC_ASSERT( get_balance(borrower2(), back()) == init_balance - (2*amount2*denom+mssr-1)/mssr);
+        }
 
         BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
 
@@ -119,6 +126,17 @@ struct swan_fixture : database_fixture {
        generate_blocks(HARDFORK_CORE_1270_TIME - mi);
        wait_for_maintenance();
     }
+    void wait_for_hf_core_2481() {
+       auto mi = db.get_global_properties().parameters.maintenance_interval;
+       generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+       wait_for_maintenance();
+    }
+
+    bool hf_core_2481_passed() {
+       if( !hf2481 ) return false;
+       auto maint_time = db.get_dynamic_global_properties().next_maintenance_time;
+       return HARDFORK_CORE_2481_PASSED( maint_time );
+    }
 
     void wait_for_maintenance() {
       generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
@@ -146,7 +164,9 @@ BOOST_FIXTURE_TEST_SUITE( swan_tests, swan_fixture )
  */
 BOOST_AUTO_TEST_CASE( black_swan )
 { try {
-      if(hf1270)
+      if(hf2481)
+         wait_for_hf_core_2481();
+      else if(hf1270)
          wait_for_hf_core_1270();
 
       init_standard_swan();
@@ -291,7 +311,9 @@ BOOST_AUTO_TEST_CASE( revive_recovered )
 { try {
       init_standard_swan( 700 );
 
-      if(hf1270)
+      if(hf2481)
+         wait_for_hf_core_2481();
+      else if(hf1270)
          wait_for_hf_core_1270();
       else
          wait_for_hf_core_216();
@@ -316,7 +338,9 @@ BOOST_AUTO_TEST_CASE( recollateralize )
       // no hardfork yet
       GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), back().amount(1000), swan().amount(100) ), fc::exception );
 
-      if(hf1270)
+      if(hf2481)
+         wait_for_hf_core_2481();
+      else if(hf1270)
          wait_for_hf_core_1270();
       else
          wait_for_hf_core_216();
@@ -436,7 +460,9 @@ BOOST_AUTO_TEST_CASE( revive_empty_recovered )
 { try {
       limit_order_id_type oid = init_standard_swan( 1000 );
 
-      if(hf1270)
+      if(hf2481)
+         wait_for_hf_core_2481();
+      else if(hf1270)
          wait_for_hf_core_1270();
       else
          wait_for_hf_core_216();
@@ -466,7 +492,9 @@ BOOST_AUTO_TEST_CASE( revive_empty_recovered )
  */
 BOOST_AUTO_TEST_CASE( revive_empty )
 { try {
-      if(hf1270)
+      if(hf2481)
+         wait_for_hf_core_2481();
+      else if(hf1270)
          wait_for_hf_core_1270();
       else
          wait_for_hf_core_216();
@@ -493,7 +521,9 @@ BOOST_AUTO_TEST_CASE( revive_empty )
  */
 BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
 { try {
-      if(hf1270)
+      if(hf2481)
+         wait_for_hf_core_2481();
+      else if(hf1270)
          wait_for_hf_core_1270();
       else
          wait_for_hf_core_216();
@@ -581,6 +611,50 @@ BOOST_AUTO_TEST_CASE(revive_empty_hf1270)
 BOOST_AUTO_TEST_CASE(revive_empty_with_bid_hf1270)
 { try {
    hf1270 = true;
+   INVOKE(revive_empty_with_bid);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(black_swan_after_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(black_swan);
+
+} FC_LOG_AND_RETHROW() }
+
+// black_swan_issue_346_hf2481 is skipped as it is already failing with HARDFORK_CORE_834_TIME
+
+BOOST_AUTO_TEST_CASE(revive_recovered_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(revive_recovered);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(recollateralize_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(recollateralize);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(revive_empty_recovered_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(revive_empty_recovered);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(revive_empty_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(revive_empty);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(revive_empty_with_bid_hf2481)
+{ try {
+   hf2481 = true;
    INVOKE(revive_empty_with_bid);
 
 } FC_LOG_AND_RETHROW() }

@@ -146,6 +146,7 @@ namespace graphene { namespace chain {
          operation_result do_apply(const operation_type& op);
 
          const asset_object* asset_to_settle = nullptr;
+         const asset_bitasset_data_object* bitasset_ptr = nullptr;
    };
 
    class asset_publish_feeds_evaluator : public evaluator<asset_publish_feeds_evaluator>
