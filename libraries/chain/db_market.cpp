@@ -400,8 +400,8 @@ bool database::apply_order_before_hardfork_625(const limit_order_object& new_ord
    //  - The new order is at the front of the book
    //  - The new order is below the call limit price
    bool called_some = check_call_orders(sell_asset, true, true); // the first time when checking, call order is maker
-   called_some |= check_call_orders(receive_asset, true, true); // the other side, same as above
-   if( called_some && !find_object(order_id) ) // then we were filled by call order
+   bool called_some_else = check_call_orders(receive_asset, true, true); // the other side, same as above
+   if( ( called_some || called_some_else ) && !find_object(order_id) ) // then we were filled by call order
       return true;
 
    const auto& limit_price_idx = get_index_type<limit_order_index>().indices().get<by_price>();
@@ -683,7 +683,7 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
       match( new_settlement, *call_itr, call_pays_price, max_debt_to_cover, call_match_price, true );
 
       // Check whether the new order is gone
-      finished = ( find_object( new_obj_id ) == nullptr );
+      finished = ( nullptr == find_object( new_obj_id ) );
    }
 
 }
@@ -758,11 +758,10 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
       FC_ASSERT( usd_pays == usd.amount_for_sale() ||
                  core_pays == core.amount_for_sale() );
 
-   int result = 0;
    // the first param of match() is taker
-   result |= fill_limit_order( usd, usd_pays, usd_receives, cull_taker, match_price, false );
+   int result = fill_limit_order( usd, usd_pays, usd_receives, cull_taker, match_price, false ) ? 1 : 0;
    // the second param of match() is maker
-   result |= fill_limit_order( core, core_pays, core_receives, true, match_price, true ) << 1;
+   result += fill_limit_order( core, core_pays, core_receives, true, match_price, true ) ? 2 : 0;
    FC_ASSERT( result != 0 );
    return result;
 }
@@ -820,9 +819,8 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    FC_ASSERT(call_pays >= order_receives);
    const asset margin_call_fee = call_pays - order_receives;
 
-   int result = 0;
-   result |= fill_limit_order( bid, order_pays, order_receives, cull_taker, match_price, false ); // taker
-   result |= fill_call_order( ask, call_pays, call_receives, match_price, true, margin_call_fee ) << 1; // maker
+   int result = fill_limit_order( bid, order_pays, order_receives, cull_taker, match_price, false ) ? 1 : 0; // taker
+   result += fill_call_order( ask, call_pays, call_receives, match_price, true, margin_call_fee ) ? 2 : 0; // maker
    // result can be 0 when call order has target_collateral_ratio option set.
 
    return result;
@@ -1060,7 +1058,8 @@ asset database::match_impl( const force_settlement_object& settle,
 bool database::fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives,
                                  bool cull_if_small, const price& fill_price, const bool is_maker)
 { try {
-   cull_if_small |= (head_block_time() < HARDFORK_555_TIME);
+   if( head_block_time() < HARDFORK_555_TIME )
+      cull_if_small = true;
 
    FC_ASSERT( order.amount_for_sale().asset_id == pays.asset_id );
    FC_ASSERT( pays.asset_id != receives.asset_id );
@@ -1460,7 +1459,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        // TODO refactor code for better performance and readability, perhaps extract the new logic to a new
        //      function and call it after hf_1270, hf_bsip74 or hf_2481.
        auto usd_to_buy = call_order.get_debt();
-       if( !after_core_hardfork_2481 && usd_to_buy * call_pays_price > call_order.get_collateral() )
+       if( !after_core_hardfork_2481 && ( usd_to_buy * call_pays_price ) > call_order.get_collateral() )
        {
           // Trigger black swan
           elog( "black swan detected on asset ${symbol} (${id}) at block ${b}",

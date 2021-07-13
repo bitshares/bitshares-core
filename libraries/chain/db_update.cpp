@@ -267,7 +267,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
 
     // The variable `highest` after hf_338:
     // * if no limit order, it is expected to be the black swan price; if the call order with the least CR
-    //   has CR below or equal to the black swan price, we trigger GS;
+    //   has CR below or equal to the black swan price, we trigger GS,
     // * if there exists at least one limit order and the price is higher, we use the limit order's price,
     //   which means we will match the margin call orders with the limit order first.
     //
@@ -275,7 +275,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     // when calculating highest, which means some blackswans weren't got caught here.  Fortunately they got
     // caught by an additional check in check_call_orders().
     // This bug is fixed in hf_2481. Actually, after hf_2481,
-    // * if there is a force settlement, we totally rely on the additional checks in check_call_orders();
+    // * if there is a force settlement, we totally rely on the additional checks in check_call_orders(),
     // * if there is no force settlement, we check here with margin call fee in consideration.
 
     auto least_collateral = call_ptr->collateralization();
@@ -299,7 +299,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
        {
           // After hf_2481, when a global settlement occurs,
           // * the margin calls (whose CR <= MCR) pay a premium (by MSSR-MCFR) and a margin call fee (by MCFR), and
-          //   they are closed at the same price;
+          //   they are closed at the same price,
           // * the debt positions with CR > MCR do not pay premium or margin call fee, and they are closed at a same
           //   price too.
           // * The GS price would close the position with the least CR with no collateral left for the owner,
@@ -308,7 +308,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
           //   to the global settlement fund, because
           //   - if a part of the premium or fees goes to the global settlement fund, it means there would be a
           //     difference in settlement prices, so traders are incentivized to create new debt in the last minute
-          //     then settle after GS to earn free money;
+          //     then settle after GS to earn free money,
           //   - if no premium or fees goes to the global settlement fund, it means debt asset holders would only
           //     settle for less after GS, so they are incentivized to settle before GS which helps avoid GS.
           globally_settle_asset(mia, ~least_collateral, true );
