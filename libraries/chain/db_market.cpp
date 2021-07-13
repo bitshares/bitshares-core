@@ -1534,7 +1534,11 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
              if( call_pays.amount > call_order.collateral )
              {
                 if( after_core_hardfork_2481 )
+                {
+                   // Normally this code won't be reached. be defensive here
+                   wlog( "Unexpected: (call_pays.amount > call_order.collateral) and after_core_hardfork_2481" );
                    break;
+                }
                 call_pays.amount = call_order.collateral;
              }
              // Note: if it is a partial fill due to TCR, the math guarantees that the new CR will be higher
