@@ -401,6 +401,9 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
    // buy_low's price is too low that won't be matched
    BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
 
+   // Can not reduce CR of a call order to trigger a margin call but not get fully filled
+   BOOST_CHECK_THROW( borrow( borrower_id(db), asset(10, usd_id), asset(0), 1700), fc::exception );
+
    // generate a block
    generate_block();
 
