@@ -404,6 +404,9 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
    // Can not reduce CR of a call order to trigger a margin call but not get fully filled
    BOOST_CHECK_THROW( borrow( borrower_id(db), asset(10, usd_id), asset(0), 1700), fc::exception );
 
+   // Can not create a new call order that is partially called instantly
+   BOOST_CHECK_THROW( borrow( borrower4_id(db), asset(10, usd_id), asset(160), 1700), fc::exception );
+
    // generate a block
    generate_block();
 
