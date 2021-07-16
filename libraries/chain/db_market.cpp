@@ -966,7 +966,7 @@ asset database::match_impl( const force_settlement_object& settle,
 
             // check whether the call order can be filled at match_price
             bool cap_price = false;
-            if( call_pays.amount >= call.collateral ) // CR too low
+            if( call_pays.amount >= call.collateral ) // CR too low, normally won't be true, just be defensive here
                cap_price = true;
             else
             {
@@ -1360,6 +1360,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     const auto& limit_price_index = limit_index.indices().get<by_price>();
 
     bool before_core_hardfork_1270 = ( maint_time <= HARDFORK_CORE_1270_TIME ); // call price caching issue
+    bool after_core_hardfork_2481 = HARDFORK_CORE_2481_PASSED( maint_time ); // Match settle orders with margin calls
 
     // Looking for limit orders selling the most USD for the least CORE.
     auto max_price = price::max( bitasset.asset_id, bitasset.options.short_backing_asset );
@@ -1376,7 +1377,8 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     auto limit_itr = limit_price_index.lower_bound( max_price );
     auto limit_end = limit_price_index.upper_bound( min_price );
 
-    if( limit_itr == limit_end )
+    // Before the core-2481 hf, only check limit orders
+    if( !after_core_hardfork_2481 && limit_itr == limit_end )
        return false;
 
     const call_order_index& call_index = get_index_type<call_order_index>();
@@ -1416,8 +1418,6 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     bool before_core_hardfork_453 = ( maint_time <= HARDFORK_CORE_453_TIME ); // multiple matching issue
     bool before_core_hardfork_606 = ( maint_time <= HARDFORK_CORE_606_TIME ); // feed always trigger call
     bool before_core_hardfork_834 = ( maint_time <= HARDFORK_CORE_834_TIME ); // target collateral ratio option
-
-    bool after_core_hardfork_2481 = HARDFORK_CORE_2481_PASSED( maint_time ); // Match settle orders with margin calls
 
     while( !check_for_blackswan( mia, enable_black_swan, &bitasset ) // TODO perhaps improve performance
                                                                      //      by passing in iterators
@@ -1596,7 +1596,9 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     if( after_core_hardfork_2481 && !bitasset.has_settlement() )
     {
       // Be here, there exists at least one margin call not processed
-      match_force_settlements( bitasset );
+      bool called_some = match_force_settlements( bitasset );
+      if( called_some )
+         margin_called = true;
       // At last, check for blackswan // TODO perhaps improve performance by passing in iterators
       check_for_blackswan( mia, enable_black_swan, &bitasset );
     }
@@ -1604,7 +1606,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     return margin_called;
 } FC_CAPTURE_AND_RETHROW() }
 
-void database::match_force_settlements( const asset_bitasset_data_object& bitasset )
+bool database::match_force_settlements( const asset_bitasset_data_object& bitasset )
 {
    // Defensive checks
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
@@ -1636,6 +1638,7 @@ void database::match_force_settlements( const asset_bitasset_data_object& bitass
    auto margin_call_pays_ratio = bitasset.current_feed.margin_call_pays_ratio(
                                                 bitasset.options.extensions.value.margin_call_fee_ratio);
 
+   bool margin_called = false;
    while( settle_itr != settle_end && call_itr != call_end )
    {
       const force_settlement_object& settle_order = *settle_itr;
@@ -1643,7 +1646,7 @@ void database::match_force_settlements( const asset_bitasset_data_object& bitass
 
       // Feed protected (don't call if CR>MCR) https://github.com/cryptonomex/graphene/issues/436
       if( bitasset.current_maintenance_collateralization < call_order.collateralization() )
-         return;
+         return margin_called;
 
       // TCR applies here
       asset max_debt_to_cover( call_order.get_max_debt_to_cover( call_pays_price,
@@ -1655,12 +1658,16 @@ void database::match_force_settlements( const asset_bitasset_data_object& bitass
       // Note: if the call order's CR is too low, it is probably unable to fill at call_pays_price.
       //       In this case, the call order pays at its CR, the settle order may receive less due to margin call fee.
       //       It is processed inside the function.
-      match( call_order, settle_order, call_pays_price, max_debt_to_cover, call_match_price,
-             &margin_call_pays_ratio );
+      auto result = match( call_order, settle_order, call_pays_price, max_debt_to_cover, call_match_price,
+                           &margin_call_pays_ratio );
+
+      if( !margin_called && result.amount > 0 )
+         margin_called = true;
 
       settle_itr = settlement_index.lower_bound( bitasset.asset_id );
       call_itr = call_collateral_index.lower_bound( call_min );
    }
+   return margin_called;
 }
 
 void database::pay_order( const account_object& receiver, const asset& receives, const asset& pays )

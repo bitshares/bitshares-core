@@ -395,7 +395,10 @@ namespace graphene { namespace chain {
                                           const price& settle_price,
                                           const IndexType& call_index,
                                           bool check_margin_calls = false );
-         void match_force_settlements( const asset_bitasset_data_object& bitasset );
+         /// Match force settlements with margin calls
+         /// @param bitasset the asset that to be checked
+         /// @return true if matched at least one margin call order
+         bool match_force_settlements( const asset_bitasset_data_object& bitasset );
          /// Matches the two orders
          /// @param settle the force-settlement order
          /// @param call the call order
