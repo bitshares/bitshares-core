@@ -850,6 +850,10 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    generate_blocks(HARDFORK_CORE_2481_TIME - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
+  // 3 passes. With no matching limit order, or with a small or big matching limit order.
+  for( int i = 0; i < 3; ++ i )
+  {
+
    set_expiration( db, trx );
 
    ACTORS((buyer)(seller)(borrower)(borrower2)(borrower3)(borrower4)(borrower5)(feedproducer));
@@ -941,6 +945,19 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    // Create a sell order which will be matched with several call orders later, price 1/9
    limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(1000), core.amount(9000) )->id;
    BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_id )->for_sale.value, 1000 );
+
+   // Create another sell order which will trigger a blackswan event if matched, price 1/21
+   limit_order_id_type sell_swan;
+   if( i == 1 )
+   {
+      sell_swan = create_sell_order(seller, bitusd.amount(1), core.amount(21) )->id;
+      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 1 );
+   }
+   else if( i == 2 )
+   {
+      sell_swan = create_sell_order(seller, bitusd.amount(100), core.amount(2100) )->id;
+      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 100 );
+   }
 
    // Create a force settlement, will be matched with several call orders later
    auto result = force_settle( seller, bitusd.amount(400) );
@@ -1096,7 +1113,13 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    BOOST_CHECK_EQUAL( 1000, get_balance(borrower5, bitusd) );
 
    // check seller balance
-   BOOST_CHECK_EQUAL( 1493, get_balance(seller, bitusd) ); // 3000 - 7 - 1000 - 400 - 100
+   int expected_seller_usd_balance = 1493; // 3000 - 7 - 1000 - 400 - 100
+   if ( i == 1 )
+      expected_seller_usd_balance -= 1; // - sell_swan
+   else if ( i == 2 )
+      expected_seller_usd_balance -= 100; // - sell_swan
+
+   BOOST_CHECK_EQUAL( expected_seller_usd_balance, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 9000 + settle_receives4.value + settle_receives2.value + settle2_receives2.value,
                       get_balance(seller, core) ); // 1000*9 + 160*107/110 + 490 * call2_cr * 107/110
 
@@ -1105,6 +1128,12 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
 
    // sell_high is not matched
    BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 7 );
+
+   // sell_swan is not matched
+   if( i == 1 )
+      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 1 );
+   else if( i == 2 )
+      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 100 );
 
    // check gs fund
    BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).settlement_fund.value, expected_gs_fund.value );
@@ -1126,6 +1155,12 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    // sell_high is not matched
    BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 7 );
 
+   // sell_swan is not matched
+   if( i == 1 )
+      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 1 );
+   else if( i == 2 )
+      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 100 );
+
    // check gs fund
    BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).settlement_fund.value, expected_gs_fund.value );
    // force_settled_volume is 0
@@ -1134,6 +1169,11 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    // check margin call fees
    BOOST_CHECK_EQUAL( usd_id(db).dynamic_asset_data_id(db).accumulated_collateral_fees.value,
                       expected_margin_call_fees.value );
+
+   // reset
+   db.pop_block();
+
+  } // for
 
 } FC_LOG_AND_RETHROW() }
 
