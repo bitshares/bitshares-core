@@ -451,12 +451,20 @@ namespace graphene { namespace chain {
           * @return a bit field indicating which orders were filled (and thus removed)
           *
           * 0 - no orders were matched
-          * 1 - taker was filled
-          * 2 - maker was filled
+          * 1 - only taker was filled
+          * 2 - only maker was filled
           * 3 - both were filled
           */
          ///@{
-         int match( const limit_order_object& taker, const limit_order_object& maker, const price& trade_price );
+         enum class match_result_type
+         {
+            none_filled = 0,
+            only_taker_filled = 1,
+            only_maker_filled = 2,
+            both_filled = 3
+         };
+         match_result_type match( const limit_order_object& taker, const limit_order_object& maker,
+                                  const price& trade_price );
          /***
           * @brief Match limit order as taker to a call order as maker
           * @param taker the order that is removing liquidity from the book
@@ -469,12 +477,14 @@ namespace graphene { namespace chain {
           *    than limit order takes if call order subject to a margin call fee.
           * @returns 0 if no orders were matched, 1 if taker was filled, 2 if maker was filled, 3 if both were filled
           */
-         int match( const limit_order_object& taker, const call_order_object& maker, const price& trade_price,
+         match_result_type match( const limit_order_object& taker, const call_order_object& maker,
+                    const price& trade_price,
                     const price& feed_price, const uint16_t maintenance_collateral_ratio,
                     const optional<price>& maintenance_collateralization,
                     const price& call_pays_price);
          /// If separate call_pays_price not provided, assume call pays at trade_price:
-         int match( const limit_order_object& taker, const call_order_object& maker, const price& trade_price,
+         match_result_type match( const limit_order_object& taker, const call_order_object& maker,
+                    const price& trade_price,
                     const price& feed_price, const uint16_t maintenance_collateral_ratio,
                     const optional<price>& maintenance_collateralization) {
             return match(taker, maker, trade_price, feed_price, maintenance_collateral_ratio,
@@ -542,7 +552,7 @@ namespace graphene { namespace chain {
          bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
                                const price& fill_price, const bool is_maker, const asset& margin_fee );
 
-         // Overload provides compatible default value for margin_fee: (margin_fee.asset_id == pays.asset_id)
+         /// Overload provides compatible default value for margin_fee: (margin_fee.asset_id == pays.asset_id)
          bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
                                const price& fill_price, const bool is_maker )
          {
@@ -556,7 +566,8 @@ namespace graphene { namespace chain {
                                  bool for_new_limit_order = false,
                                  const asset_bitasset_data_object* bitasset_ptr = nullptr );
 
-         // helpers to fill_order
+         /// helpers to fill_order
+         /// @{
          void pay_order( const account_object& receiver, const asset& receives, const asset& pays );
 
          /**
@@ -570,6 +581,7 @@ namespace graphene { namespace chain {
          asset pay_market_fees(const account_object* seller, const asset_object& recv_asset, const asset& receives,
                                const bool& is_maker, const optional<asset>& calculated_market_fees = {});
          asset pay_force_settle_fees(const asset_object& collecting_asset, const asset& collat_receives);
+         /// @}
          ///@}
 
 

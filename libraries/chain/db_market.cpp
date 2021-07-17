@@ -421,7 +421,8 @@ bool database::apply_order_before_hardfork_625(const limit_order_object& new_ord
       auto old_limit_itr = limit_itr;
       ++limit_itr;
       // match returns 2 when only the old order was fully filled. In this case, we keep matching; otherwise, we stop.
-      finished = (match(new_order_object, *old_limit_itr, old_limit_itr->sell_price) != 2);
+      finished = ( match(new_order_object, *old_limit_itr, old_limit_itr->sell_price)
+                   != match_result_type::only_maker_filled );
    }
 
    // TODO Possible optimization: only check calls if the new order completely filled some old order.
@@ -551,7 +552,8 @@ bool database::apply_order(const limit_order_object& new_order_object)
          ++limit_itr;
          // match returns 2 when only the old order was fully filled.
          // In this case, we keep matching; otherwise, we stop.
-         finished = ( match( new_order_object, *old_limit_itr, old_limit_itr->sell_price ) != 2 );
+         finished = ( match( new_order_object, *old_limit_itr, old_limit_itr->sell_price )
+                      != match_result_type::only_maker_filled );
       }
 
       if( !finished && !before_core_hardfork_1270 ) // TODO refactor or cleanup duplicate code after core-1270 hf
@@ -570,15 +572,16 @@ bool database::apply_order(const limit_order_object& new_order_object)
                   || call_itr->collateralization() > sell_abd->current_maintenance_collateralization )
                break;
             // hard fork core-338 and core-625 took place at same time, not checking HARDFORK_CORE_338_TIME here.
-            int match_result = match( new_order_object, *call_itr, call_match_price,
-                                      sell_abd->current_feed.settlement_price,
-                                      sell_abd->current_feed.maintenance_collateral_ratio,
-                                      sell_abd->current_maintenance_collateralization,
-                                      call_pays_price);
+            const auto match_result = match( new_order_object, *call_itr, call_match_price,
+                                             sell_abd->current_feed.settlement_price,
+                                             sell_abd->current_feed.maintenance_collateral_ratio,
+                                             sell_abd->current_maintenance_collateralization,
+                                             call_pays_price);
             // match returns 1 or 3 when the new order was fully filled.
             // In this case, we stop matching; otherwise keep matching.
             // since match can return 0 due to BSIP38 (hf core-834), we no longer only check if the result is 2.
-            if( match_result == 1 || match_result == 3 )
+            if( match_result_type::only_taker_filled == match_result
+                  || match_result_type::both_filled == match_result )
                finished = true;
          }
       }
@@ -599,15 +602,16 @@ bool database::apply_order(const limit_order_object& new_order_object)
                break;
             // assume hard fork core-338 and core-625 will take place at same time,
             // not checking HARDFORK_CORE_338_TIME here.
-            int match_result = match( new_order_object, *call_itr, call_match_price,
-                                      sell_abd->current_feed.settlement_price,
-                                      sell_abd->current_feed.maintenance_collateral_ratio,
-                                      optional<price>() );
+            const auto match_result = match( new_order_object, *call_itr, call_match_price,
+                                             sell_abd->current_feed.settlement_price,
+                                             sell_abd->current_feed.maintenance_collateral_ratio,
+                                             optional<price>() );
             // match returns 1 or 3 when the new order was fully filled.
             // In this case, we stop matching; otherwise keep matching.
             // since match can return 0 due to BSIP38 (hard fork core-834),
             // we no longer only check if the result is 2.
-            if( match_result == 1 || match_result == 3 )
+            if( match_result_type::only_taker_filled == match_result
+                  || match_result_type::both_filled == match_result )
                finished = true;
          }
       }
@@ -619,7 +623,8 @@ bool database::apply_order(const limit_order_object& new_order_object)
       auto old_limit_itr = limit_itr;
       ++limit_itr;
       // match returns 2 when only the old order was fully filled. In this case, we keep matching; otherwise, we stop.
-      finished = ( match( new_order_object, *old_limit_itr, old_limit_itr->sell_price ) != 2 );
+      finished = ( match( new_order_object, *old_limit_itr, old_limit_itr->sell_price )
+                   != match_result_type::only_maker_filled );
    }
 
    const limit_order_object* updated_order_object = find< limit_order_object >( order_id );
@@ -688,6 +693,17 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
 
 }
 
+/// Helper function
+static database::match_result_type get_match_result( bool taker_filled, bool maker_filled )
+{
+   int8_t result = 0;
+   if( maker_filled )
+      result += static_cast<int8_t>( database::match_result_type::only_maker_filled );
+   if( taker_filled )
+      result += static_cast<int8_t>( database::match_result_type::only_taker_filled );
+   return static_cast<database::match_result_type>( result );
+}
+
 /**
  *  Matches the two orders, the first parameter is taker, the second is maker.
  *
@@ -698,7 +714,8 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
  *  2 - maker was filled
  *  3 - both were filled
  */
-int database::match( const limit_order_object& usd, const limit_order_object& core, const price& match_price )
+database::match_result_type database::match( const limit_order_object& usd, const limit_order_object& core,
+                                             const price& match_price )
 {
    FC_ASSERT( usd.sell_price.quote.asset_id == core.sell_price.base.asset_id );
    FC_ASSERT( usd.sell_price.base.asset_id  == core.sell_price.quote.asset_id );
@@ -720,7 +737,7 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
       // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
       // In this case, we see it as filled and cancel it later
       if( usd_receives.amount == 0 && maint_time > HARDFORK_CORE_184_TIME )
-         return 1;
+         return match_result_type::only_taker_filled;
 
       if( before_core_hardfork_342 )
          core_receives = usd_for_sale;
@@ -759,14 +776,17 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
                  core_pays == core.amount_for_sale() );
 
    // the first param of match() is taker
-   int result = fill_limit_order( usd, usd_pays, usd_receives, cull_taker, match_price, false ) ? 1 : 0;
+   bool taker_filled = fill_limit_order( usd, usd_pays, usd_receives, cull_taker, match_price, false );
    // the second param of match() is maker
-   result += fill_limit_order( core, core_pays, core_receives, true, match_price, true ) ? 2 : 0;
-   FC_ASSERT( result != 0 );
+   bool maker_filled = fill_limit_order( core, core_pays, core_receives, true, match_price, true );
+
+   match_result_type result = get_match_result( taker_filled, maker_filled );
+   FC_ASSERT( result != match_result_type::none_filled );
    return result;
 }
 
-int database::match( const limit_order_object& bid, const call_order_object& ask, const price& match_price,
+database::match_result_type database::match( const limit_order_object& bid, const call_order_object& ask,
+                     const price& match_price,
                      const price& feed_price, const uint16_t maintenance_collateral_ratio,
                      const optional<price>& maintenance_collateralization,
                      const price& call_pays_price )
@@ -790,7 +810,7 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
       // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
       // In this case, we see it as filled and cancel it later
       if( order_receives.amount == 0 )
-         return 1;
+         return match_result_type::only_taker_filled;
 
       // The remaining amount in the limit order would be too small,
       //   so we should cull the order in fill_limit_order() below.
@@ -819,10 +839,11 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    FC_ASSERT(call_pays >= order_receives);
    const asset margin_call_fee = call_pays - order_receives;
 
-   int result = fill_limit_order( bid, order_pays, order_receives, cull_taker, match_price, false ) ? 1 : 0; // taker
-   result += fill_call_order( ask, call_pays, call_receives, match_price, true, margin_call_fee ) ? 2 : 0; // maker
-   // result can be 0 when call order has target_collateral_ratio option set.
+   bool taker_filled = fill_limit_order( bid, order_pays, order_receives, cull_taker, match_price, false );
+   bool maker_filled = fill_call_order( ask, call_pays, call_receives, match_price, true, margin_call_fee );
 
+   // Note: result can be none_filled when call order has target_collateral_ratio option set.
+   match_result_type result = get_match_result( taker_filled, maker_filled );
    return result;
 }
 
