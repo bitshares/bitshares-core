@@ -1493,7 +1493,7 @@ BOOST_AUTO_TEST_CASE(mcfr_rounding_test)
       PUSH_TX(db, trx, ~0);
    }
 
-   update_feed_producers( bitusd, {feedproducer_id} );
+   update_feed_producers( bitusd, {feedproducer_id, feeder2_id, feeder3_id} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
@@ -1541,10 +1541,11 @@ BOOST_AUTO_TEST_CASE(mcfr_rounding_test)
    BOOST_TEST_MESSAGE( "Trying to trigger a margin call" );
    auto feed2 = current_feed;
    feed2.settlement_price = bitusd.amount( 1 ) / core.amount(18);
-   publish_feed( bitusd, feedproducer, feed2 );
 
    if(hf2481)
    {
+      publish_feed( bitusd, feedproducer, feed2 );
+
       // blackswan
       BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
       BOOST_CHECK( !db.find<call_order_object>( call_id ) );
@@ -1565,6 +1566,34 @@ BOOST_AUTO_TEST_CASE(mcfr_rounding_test)
    }
    else
    {
+      BOOST_REQUIRE_THROW( publish_feed( bitusd, feedproducer, feed2 ), fc::exception );
+
+      publish_feed( bitusd, feeder2, current_feed );
+      publish_feed( bitusd, feeder3, current_feed );
+
+      // No change
+      BOOST_CHECK_EQUAL( 1100, sell_mid(db).for_sale.value );
+
+      BOOST_CHECK_EQUAL( 1000, call_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 15000, call_id(db).collateral.value );
+      BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 40000, call2_id(db).collateral.value );
+
+      generate_blocks( db.head_block_time() + fc::seconds(43200) );
+      set_expiration( db, trx );
+
+      publish_feed( usd_id(db), feedproducer_id(db), feed2 );
+
+      // No change
+      BOOST_CHECK_EQUAL( 1100, sell_mid(db).for_sale.value );
+
+      BOOST_CHECK_EQUAL( 1000, call_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 15000, call_id(db).collateral.value );
+      BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 40000, call2_id(db).collateral.value );
+
+      generate_blocks( db.head_block_time() + fc::seconds(43200) );
+
       // The first call order should have been filled
       BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
       BOOST_CHECK( !db.find<call_order_object>( call_id ) );
@@ -1574,8 +1603,8 @@ BOOST_AUTO_TEST_CASE(mcfr_rounding_test)
 
       BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
       BOOST_CHECK_EQUAL( 40000, call2_id(db).collateral.value );
-      BOOST_CHECK_EQUAL( 900, get_balance(seller, bitusd) );
-      BOOST_CHECK_EQUAL( 14047, get_balance(seller, core) );
+      BOOST_CHECK_EQUAL( 900, get_balance(seller_id(db), usd_id(db)) );
+      BOOST_CHECK_EQUAL( 14047, get_balance(seller_id(db), core) );
    }
 
    // generate a block to include operations above

@@ -114,6 +114,7 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_settle_call)
    current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(10);
    publish_feed( bitusd, feedproducer, current_feed );
    // settlement price = 1/10, mssp = 1/11
+   price mc( asset(10*175), asset(1*100, usd_id) );
 
    // This sell order above MSSP will not be matched with a call
    limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(7), core.amount(78))->id;
@@ -139,8 +140,10 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_settle_call)
    // call and call2's CR is quite high, and debt amount is quite a lot,
    // assume neither of them will be completely filled
    price match_price( bitusd.amount(1) / core.amount(11) );
-   share_type call_to_cover = call_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750);
-   share_type call2_to_cover = call2_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750);
+   share_type call_to_cover = call_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750,mc);
+   share_type call2_to_cover = call2_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750,mc);
+   BOOST_CHECK_GT( call_to_cover.value, 0 );
+   BOOST_CHECK_GT( call2_to_cover.value, 0 );
    BOOST_CHECK_LT( call_to_cover.value, call_id(db).debt.value );
    BOOST_CHECK_LT( call2_to_cover.value, call2_id(db).debt.value );
    // even though call2 has a higher CR, since call's TCR is less than call2's TCR,
@@ -284,7 +287,7 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
 
    // check
    share_type call_to_pay = amount_to_settle * 11 / 100; // round down, favors call order
-   share_type call_to_cover = (call_to_pay * 100 + 10 ) / 11; // stablize : 101 -> 100
+   share_type call_to_cover = (call_to_pay * 100 + 10 ) / 11; // stabilize : 101 -> 100
    share_type call_to_settler = (call_to_cover * 107) / 1000; // round down, favors call order
    BOOST_CHECK_EQUAL( 100000 - call_to_cover.value, call.debt.value );
    BOOST_CHECK_EQUAL( 15000 - call_to_pay.value, call.collateral.value );
@@ -313,7 +316,7 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
 
    // check
    share_type call_to_pay2 = amount_to_settle2 * 11 / 100; // round down, favors call order
-   share_type call_to_cover2 = (call_to_pay2 * 100 + 10 ) / 11; // stablize : 100 -> 100 (no change)
+   share_type call_to_cover2 = (call_to_pay2 * 100 + 10 ) / 11; // stabilize : 100 -> 100 (no change)
    share_type call_to_settler2 = (call_to_cover2 * 107) / 1000; // round down, favors call order
    BOOST_CHECK_EQUAL( 100000 - call_to_cover.value - call_to_cover2.value, call.debt.value );
    BOOST_CHECK_EQUAL( 15000 - call_to_pay.value - call_to_pay2.value, call.collateral.value );
@@ -332,7 +335,7 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
 
    {
       // increase mssr and mcfr
-      // settlement price = 10/1, mssp = 100/13, mcop = 1000/103, mcpr = 130/127
+      // settlement price = 10/1, mssp = 100/13, mcop = 1000/103, mcpr = 130/103
       asset_update_bitasset_operation uop;
       uop.issuer = usd_id(db).issuer;
       uop.asset_to_update = usd_id;
@@ -357,7 +360,7 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
 
    // check
    share_type call_to_pay3 = amount_to_settle3 * 13 / 100; // round down, favors call order
-   share_type call_to_cover3 = (call_to_pay3 * 100 + 10 ) / 13; // stablize : 9 -> 8
+   share_type call_to_cover3 = (call_to_pay3 * 100 + 10 ) / 13; // stabilize : 9 -> 8
    share_type call_to_settler3 = (call_to_cover3 * 103) / 1000; // round down, favors call order
    BOOST_CHECK_EQUAL( 0, call_to_settler3.value );
    call_to_settler3 = 1; // 0 -> 1
@@ -514,12 +517,15 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
 
    // prepare price feed to get call and call2 (but not call3) into margin call territory
    current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(10);
+   price mc( asset(10*175), asset(1*100, usd_id) );
 
    // call and call2's CR is quite high, and debt amount is quite a lot,
    // assume neither of them will be completely filled
    price match_price = sell_id(db).sell_price * ratio_type(107,110);
-   share_type call_to_cover = call_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750);
-   share_type call2_to_cover = call2_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750);
+   share_type call_to_cover = call_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750,mc);
+   share_type call2_to_cover = call2_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750,mc);
+   BOOST_CHECK_GT( call_to_cover.value, 0 );
+   BOOST_CHECK_GT( call2_to_cover.value, 0 );
    BOOST_CHECK_LT( call_to_cover.value, call_id(db).debt.value );
    BOOST_CHECK_LT( call2_to_cover.value, call2_id(db).debt.value );
    // even though call2 has a higher CR, since call's TCR is less than call2's TCR,
@@ -572,7 +578,7 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
    price call_pays_price( asset(1, usd_id), asset(11) );
    call2_copy.debt -= call2_to_cover;
    call2_copy.collateral -= call2_to_pay;
-   auto call2_to_cover2 = call2_copy.get_max_debt_to_cover(call_pays_price,current_feed.settlement_price,1750);
+   auto call2_to_cover2 = call2_copy.get_max_debt_to_cover(call_pays_price,current_feed.settlement_price,1750,mc);
    BOOST_CHECK_GT( call2_to_cover2.value, 0 );
    share_type call2_to_pay2 = call2_to_cover2 * 11;
    BOOST_CHECK_EQUAL( 1000 - call2_to_cover.value - call2_to_cover2.value, call2.debt.value );
@@ -715,12 +721,15 @@ BOOST_AUTO_TEST_CASE(hf2481_cross_test)
 
    // prepare price feed to get call and call2 (but not call3) into margin call territory
    current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(10);
+   price mc( asset(10*175), asset(1*100, usd_id) );
 
    // call and call2's CR is quite high, and debt amount is quite a lot,
    // assume neither of them will be completely filled
    price match_price = sell_id(db).sell_price * ratio_type(107,110);
-   share_type call_to_cover = call_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750);
-   share_type call2_to_cover = call2_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750);
+   share_type call_to_cover = call_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750,mc);
+   share_type call2_to_cover = call2_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750,mc);
+   BOOST_CHECK_GT( call_to_cover.value, 0 );
+   BOOST_CHECK_GT( call2_to_cover.value, 0 );
    BOOST_CHECK_LT( call_to_cover.value, call_id(db).debt.value );
    BOOST_CHECK_LT( call2_to_cover.value, call2_id(db).debt.value );
    // even though call2 has a higher CR, since call's TCR is less than call2's TCR,
@@ -812,7 +821,7 @@ BOOST_AUTO_TEST_CASE(hf2481_cross_test)
    price call_pays_price( asset(1, usd_id), asset(11) );
    call2_copy.debt -= call2_to_cover;
    call2_copy.collateral -= call2_to_pay;
-   auto call2_to_cover2 = call2_copy.get_max_debt_to_cover(call_pays_price,current_feed.settlement_price,1750);
+   auto call2_to_cover2 = call2_copy.get_max_debt_to_cover(call_pays_price,current_feed.settlement_price,1750,mc);
    BOOST_CHECK_GT( call2_to_cover2.value, 0 );
    share_type call2_to_pay2 = call2_to_cover2 * 11;
    BOOST_CHECK_EQUAL( 1000 - call2_to_cover.value - call2_to_cover2.value, call2_id(db).debt.value );
@@ -853,6 +862,7 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
   // 3 passes. With no matching limit order, or with a small or big matching limit order.
   for( int i = 0; i < 3; ++ i )
   {
+   idump( (i) );
 
    set_expiration( db, trx );
 
@@ -888,35 +898,35 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
    current_feed.maximum_short_squeeze_ratio = 1100;
-   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(5);
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(5);
    publish_feed( bitusd, feedproducer, current_feed );
-   // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7, tcr 170% is lower than 175%
-   const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000), 1700);
+   // start out with 300% collateral, call price is 15/175 CORE/USD = 60/700, tcr 170% is lower than 175%
+   const call_order_object& call = *borrow( borrower, bitusd.amount(100000), asset(15000), 1700);
    call_order_id_type call_id = call.id;
-   // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 62/7, tcr 200% > 175%
-   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(15500), 2000);
+   // create another position with 310% collateral, call price is 15.5/175 CORE/USD = 62/700, tcr 200% > 175%
+   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(100000), asset(15500), 2000);
    call_order_id_type call2_id = call2.id;
-   // create yet another position with 500% collateral, call price is 25/1.75 CORE/USD = 100/7, no tcr
-   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(1000), asset(25000));
+   // create yet another position with 500% collateral, call price is 25/175 CORE/USD = 100/700, no tcr
+   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(25000));
    call_order_id_type call3_id = call3.id;
-   // create a small position with 320% collateral, call price is 16/1.75 CORE/USD = 64/7, no tcr
-   const call_order_object& call4 = *borrow( borrower4, bitusd.amount(10), asset(160) );
+   // create a small position with 320% collateral, call price is 16/175 CORE/USD = 64/700, no tcr
+   const call_order_object& call4 = *borrow( borrower4, bitusd.amount(1000), asset(160) );
    call_order_id_type call4_id = call4.id;
-   // create yet another position with 900% collateral, call price is 45/1.75 CORE/USD = 180/7, no tcr
-   const call_order_object& call5 = *borrow( borrower5, bitusd.amount(1000), asset(45000));
+   // create yet another position with 900% collateral, call price is 45/175 CORE/USD = 180/700, no tcr
+   const call_order_object& call5 = *borrow( borrower5, bitusd.amount(100000), asset(45000));
    call_order_id_type call5_id = call5.id;
 
-   transfer(borrower, seller, bitusd.amount(1000));
-   transfer(borrower2, seller, bitusd.amount(1000));
-   transfer(borrower3, seller, bitusd.amount(1000));
+   transfer(borrower, seller, bitusd.amount(100000));
+   transfer(borrower2, seller, bitusd.amount(100000));
+   transfer(borrower3, seller, bitusd.amount(100000));
 
-   BOOST_CHECK_EQUAL( 1000, call.debt.value );
+   BOOST_CHECK_EQUAL( 100000, call.debt.value );
    BOOST_CHECK_EQUAL( 15000, call.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
+   BOOST_CHECK_EQUAL( 100000, call2.debt.value );
    BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
    BOOST_CHECK_EQUAL( 25000, call3.collateral.value );
-   BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 300000, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
    BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower, core) );
    BOOST_CHECK_EQUAL( init_balance - 15500, get_balance(borrower2, core) );
@@ -926,64 +936,50 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(borrower2, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(borrower3, bitusd) );
-   BOOST_CHECK_EQUAL( 10, get_balance(borrower4, bitusd) );
-   BOOST_CHECK_EQUAL( 1000, get_balance(borrower5, bitusd) );
+   BOOST_CHECK_EQUAL( 1000, get_balance(borrower4, bitusd) );
+   BOOST_CHECK_EQUAL( 100000, get_balance(borrower5, bitusd) );
 
    // This sell order above MCOP will not be matched with a call
-   limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(7), core.amount(150))->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 7 );
+   limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(700), core.amount(150))->id;
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 700 );
 
-   BOOST_CHECK_EQUAL( 2993, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 299300, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
    // This buy order is too low will not be matched with a sell order
-   limit_order_id_type buy_low = create_sell_order(buyer, asset(80), bitusd.amount(10))->id;
+   limit_order_id_type buy_low = create_sell_order(buyer, asset(80), bitusd.amount(1000))->id;
 
    BOOST_CHECK_EQUAL( 0, get_balance(buyer, bitusd) );
    BOOST_CHECK_EQUAL( init_balance - 80, get_balance(buyer, core) );
 
-   // Create a sell order which will be matched with several call orders later, price 1/9
-   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(1000), core.amount(9000) )->id;
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_id )->for_sale.value, 1000 );
+   // Create a sell order which will be matched with several call orders later, price 100/9
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(100000), core.amount(9000) )->id;
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_id )->for_sale.value, 100000 );
 
-   // Create another sell order which will trigger a blackswan event if matched, price 1/21
+   // Create another sell order which will trigger a blackswan event if matched, price 100/21
    limit_order_id_type sell_swan;
    if( i == 1 )
    {
-      sell_swan = create_sell_order(seller, bitusd.amount(1), core.amount(21) )->id;
-      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 1 );
+      sell_swan = create_sell_order(seller, bitusd.amount(100), core.amount(21) )->id;
+      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 100 );
    }
    else if( i == 2 )
    {
-      sell_swan = create_sell_order(seller, bitusd.amount(100), core.amount(2100) )->id;
-      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 100 );
+      sell_swan = create_sell_order(seller, bitusd.amount(10000), core.amount(2100) )->id;
+      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 10000 );
    }
 
    // Create a force settlement, will be matched with several call orders later
-   auto result = force_settle( seller, bitusd.amount(400) );
+   auto result = force_settle( seller, bitusd.amount(40000) );
    BOOST_REQUIRE( result.is_type<object_id_type>() );
    force_settlement_id_type settle_id = result.get<object_id_type>();
    BOOST_CHECK( db.find( settle_id ) != nullptr );
 
    // Create another force settlement
-   result = force_settle( seller, bitusd.amount(100) );
+   result = force_settle( seller, bitusd.amount(10000) );
    BOOST_REQUIRE( result.is_type<object_id_type>() );
    force_settlement_id_type settle2_id = result.get<object_id_type>();
    BOOST_CHECK( db.find( settle2_id ) != nullptr );
-
-   // prepare price feed to get call, call2, call3 and call4 (but not call5) into margin call territory
-   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(20);
-
-   // since the sell limit order's price is low, and TCR is set for both call and call2,
-   // call and call2 will match with the sell limit order
-   price match_price = sell_id(db).sell_price * ratio_type(107,110);
-   share_type call_to_cover = call_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750);
-   share_type call2_to_cover = call2_id(db).get_max_debt_to_cover(match_price,current_feed.settlement_price,1750);
-   BOOST_CHECK_LT( call_to_cover.value, call_id(db).debt.value );
-   BOOST_CHECK_LT( call2_to_cover.value, call2_id(db).debt.value );
-   // even though call2 has a higher CR, since call's TCR is less than call2's TCR,
-   // so we expect call will cover less when called
-   BOOST_CHECK_LT( call_to_cover.value, call2_to_cover.value );
 
    call_order_object call_copy = call;
    call_order_object call2_copy = call2;
@@ -991,68 +987,113 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    call_order_object call4_copy = call4;
    call_order_object call5_copy = call5;
 
+   // prepare price feed to get call, call2, call3 and call4 (but not call5) into margin call territory
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(20);
+   price mc( asset(20*175), asset(100*100, usd_id) );
+
+   // since the sell limit order's price is low, and TCR is set for both call and call2,
+   // call and call2 will match with the sell limit order
+   price match_price = sell_id(db).sell_price * ratio_type(107,110);
+   share_type call_to_cover = call_copy.get_max_debt_to_cover(match_price,current_feed.settlement_price,1750,mc);
+   share_type call2_to_cover = call2_copy.get_max_debt_to_cover(match_price,current_feed.settlement_price,1750,mc);
+   BOOST_CHECK_GT( call_to_cover.value, 0 );
+   BOOST_CHECK_GT( call2_to_cover.value, 0 );
+   BOOST_CHECK_LT( call_to_cover.value, call_id(db).debt.value );
+   BOOST_CHECK_LT( call2_to_cover.value, call2_id(db).debt.value );
+   // even though call2 has a higher CR, since call's TCR is less than call2's TCR,
+   // so we expect call will cover less when called
+   BOOST_CHECK_LT( call_to_cover.value, call2_to_cover.value );
+
    // adjust price feed to get call, call2, call3 and call4 (but not call5) into margin call territory
    publish_feed( bitusd, feedproducer, current_feed );
-   // settlement price = 1/20, mssp = 1/22, mcop = 20/107, mcpr = 110/107
+   // settlement price = 100/20, mssp = 100/22, mcop = 500/107, mcpr = 110/107
 
    share_type expected_margin_call_fees = 0;
 
-   // firstly the sell limit order will match with call, at limit order's price: 1/9
-   // call will receive call_to_cover, pay 9*call_to_cover
-   share_type call_to_pay = (call_to_cover * 9 * 110 + 106) / 107; // round up since it's smaller
+   // firstly the sell limit order will match with call, at limit order's price: 100/9
+   // call will receive call_to_cover, limit order gets call_to_cover*9/100,
+   // call pays call_to_cover*9*110/100/107 = call_to_cover * 99 / 1070
+   share_type call_to_pay = (call_to_cover * 99 + 1069) / 1070; // round up since it's smaller
+   // Note: no stabilization here
+
    call_copy.debt -= call_to_cover;
    call_copy.collateral -= call_to_pay;
 
-   // the limit order then will match with call2, at limit order's price: 1/9
-   // if the limit is big enough, call2 will receive call2_to_cover, pay 9*call2_to_cover
+   share_type sell_receives1 = (call_to_cover * 9 + 99 ) / 100; // round up since the call order is smaller
+   share_type margin_call_fee_limit_1 = call_to_pay - sell_receives1;
+   expected_margin_call_fees += margin_call_fee_limit_1;
+
+   // the limit order then will match with call2, at limit order's price: 100/9
+   // if the limit is big enough, call2 will receive call2_to_cover,
    // however it's not the case, so call2 will receive less
-   call2_to_cover = 1000 - call_to_cover;
-   share_type call2_to_pay = call2_to_cover * 9 * 110 / 107; // round down since it's larger
+   call2_to_cover = 100000 - call_to_cover;
+   share_type sell_receives2 = call2_to_cover * 9 / 100; // round down since the call order is larger
+   share_type call2_to_cover_old = call2_to_cover;
+   call2_to_cover = (sell_receives2 * 100 + 8) / 9; // stabilize. Note: from sell_receives2 but not call2_to_pay
+   share_type call2_to_pay = call2_to_cover * 99 / 1070; // round down since it's larger
+   share_type sell_refund = call2_to_cover_old - call2_to_cover;
+
    call2_copy.debt -= call2_to_cover;
    call2_copy.collateral -= call2_to_pay;
 
+   share_type margin_call_fee_limit_2 = call2_to_pay - sell_receives2;
+   expected_margin_call_fees += margin_call_fee_limit_2;
+
    // sell_id is completely filled
    BOOST_CHECK( !db.find<limit_order_object>( sell_id ) );
-   share_type margin_call_fee_limit = call_to_pay + call2_to_pay - 9000;
-   expected_margin_call_fees += margin_call_fee_limit;
 
    // now call4 has the lowest CR
    // call4 will match with the settle order, since it is small and has too few collateral, it will be fully closed
    // and it will lose all collateral, 160
-   // call_pays_price is 1/16, settle_receives_price is (1/16)*(110/107) = 55/856
-   share_type settle_receives4 = 157; // (10 * 856 + 54) / 55; // round up
-   share_type margin_call_fee_settle_4 = 3; // 160 - 157
+   // call_pays_price is 100/16, settle_receives_price is (100/16)*(110/107) = 1375/214
+   share_type settle_receives4 = 156; // round_up( 1000 * 214 / 1375 )
+   share_type margin_call_fee_settle_4 = 4; // 160 - 157
    expected_margin_call_fees += margin_call_fee_settle_4;
    // borrower4 balance does not change
    BOOST_CHECK_EQUAL( init_balance - 160, get_balance(borrower4, core) );
-   BOOST_CHECK_EQUAL( 10, get_balance(borrower4, bitusd) );
+   BOOST_CHECK_EQUAL( 1000, get_balance(borrower4, bitusd) );
 
    // now call2 has the lowest CR
    // call2 is still in margin call territory after matched with limit order, now it matches with settle orders
    // the settle orders are too small to fill call2
-   share_type call2_to_cover1 = 390; // 400 - 10
+   share_type call2_to_cover1 = 39000; // 40000 - 1000
    share_type call2_to_pay1 = call2_to_cover1 * call2_copy.collateral / call2_copy.debt; // round down
+   share_type call2_to_cover1_old = call2_to_cover1;
+   // stabilize
+   call2_to_cover1 = (call2_to_pay1 * call2_copy.debt + call2_copy.collateral - 1) / call2_copy.collateral;
+   share_type settle_refund = call2_to_cover1_old - call2_to_cover1;
 
-   share_type settle_receives2 = call2_to_pay1 * 107 / 110; // round down
+   share_type settle_receives2 = call2_to_cover1 * call2_copy.collateral * 107
+                                 / (call2_copy.debt * 110); // round down
    share_type margin_call_fee_settle_2 = call2_to_pay1 - settle_receives2;
    expected_margin_call_fees += margin_call_fee_settle_2;
+
+   idump( ("before_match_settle_call2")(call2_copy) );
 
    call2_copy.debt -= call2_to_cover1;
    call2_copy.collateral -= call2_to_pay1;
 
-   // call2 matches with the other settle order
-   share_type call2_to_cover2 = 100; // 400 - 10
-   share_type call2_to_pay2 = call2_to_cover2 * call2_copy.collateral / call2_copy.debt; // round down
+   idump( ("after_match_settle_call2")(call2_copy) );
 
-   share_type settle2_receives2 = call2_to_pay2 * 107 / 110; // round down
+   // call2 matches with the other settle order
+   share_type call2_to_cover2 = 10000;
+   share_type call2_to_pay2 = call2_to_cover2 * call2_copy.collateral / call2_copy.debt; // round down
+   share_type call2_to_cover2_old = call2_to_cover2;
+   // stabilize
+   call2_to_cover2 = (call2_to_pay2 * call2_copy.debt + call2_copy.collateral - 1) / call2_copy.collateral;
+   share_type settle2_refund = call2_to_cover2_old - call2_to_cover2;
+
+   share_type settle2_receives2 = call2_to_cover2 * call2_copy.collateral * 107
+                                 / (call2_copy.debt * 110); // round down
    share_type margin_call_fee_settle2_2 = call2_to_pay2 - settle2_receives2;
    expected_margin_call_fees += margin_call_fee_settle2_2;
 
    call2_copy.debt -= call2_to_cover2;
    call2_copy.collateral -= call2_to_pay2;
 
-   // settle order is fully filled
+   // settle orders are fully filled
    BOOST_CHECK( db.find( settle_id ) == nullptr );
+   BOOST_CHECK( db.find( settle2_id ) == nullptr );
 
    // blackswan event occurs
    BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
@@ -1067,7 +1108,7 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    idump( (call2_copy) );
 
    // call2 has the lowest CR below required
-   share_type call2_to_gs_fund = (call2_copy.collateral * 10 + 10) / 11; // round up
+   share_type call2_to_gs_fund = (call2_copy.collateral * 10 + 10) / 11; // MSSR = 11/10, round up here
    share_type margin_call_fee_gs_2 = call2_copy.collateral - call2_to_gs_fund;
    expected_margin_call_fees += margin_call_fee_gs_2;
    expected_gs_fund += call2_to_gs_fund;
@@ -1110,30 +1151,32 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
 
    // borrower5 balance changes -- some collateral returned
    BOOST_CHECK_EQUAL( init_balance - call5_to_pay_gs.value, get_balance(borrower5, core) );
-   BOOST_CHECK_EQUAL( 1000, get_balance(borrower5, bitusd) );
+   BOOST_CHECK_EQUAL( 100000, get_balance(borrower5, bitusd) );
 
-   // check seller balance
-   int expected_seller_usd_balance = 1493; // 3000 - 7 - 1000 - 400 - 100
+   // check seller balance // 149300 == 300000 - 700 - 100000 - 40000 - 10000
+   share_type expected_seller_usd_balance = 149300 + sell_refund + settle_refund + settle2_refund;
    if ( i == 1 )
-      expected_seller_usd_balance -= 1; // - sell_swan
-   else if ( i == 2 )
       expected_seller_usd_balance -= 100; // - sell_swan
+   else if ( i == 2 )
+      expected_seller_usd_balance -= 10000; // - sell_swan
+   // 1000*9 + 160*107/110 + 49000 * call2_cr * 107/110
+   share_type expected_seller_core_balance = sell_receives1 + sell_receives2 + settle_receives4
+                                             + settle_receives2 + settle2_receives2;
 
-   BOOST_CHECK_EQUAL( expected_seller_usd_balance, get_balance(seller, bitusd) );
-   BOOST_CHECK_EQUAL( 9000 + settle_receives4.value + settle_receives2.value + settle2_receives2.value,
-                      get_balance(seller, core) ); // 1000*9 + 160*107/110 + 490 * call2_cr * 107/110
+   BOOST_CHECK_EQUAL( expected_seller_usd_balance.value, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( expected_seller_core_balance.value, get_balance(seller, core) );
 
    // buy_low's price is too low that won't be matched
    BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
 
    // sell_high is not matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 7 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 700 );
 
    // sell_swan is not matched
    if( i == 1 )
-      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 1 );
-   else if( i == 2 )
       BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 100 );
+   else if( i == 2 )
+      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 10000 );
 
    // check gs fund
    BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).settlement_fund.value, expected_gs_fund.value );
@@ -1153,13 +1196,13 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
 
    // sell_high is not matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 7 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 700 );
 
    // sell_swan is not matched
    if( i == 1 )
-      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 1 );
-   else if( i == 2 )
       BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 100 );
+   else if( i == 2 )
+      BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 10000 );
 
    // check gs fund
    BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).settlement_fund.value, expected_gs_fund.value );
@@ -1173,7 +1216,7 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    // reset
    db.pop_block();
 
-  } // for
+  } // for i
 
 } FC_LOG_AND_RETHROW() }
 

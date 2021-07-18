@@ -1510,7 +1510,8 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        if( usd_to_buy > usd_for_sale )
        {  // fill order
           limit_receives  = usd_for_sale * match_price; // round down, in favor of call order
-          call_pays       = usd_for_sale * call_pays_price; // (same as match_price until BSIP-74)
+          if( !after_core_hardfork_2481 )
+             call_pays = usd_for_sale * call_pays_price; // (same as match_price until BSIP-74)
 
           // Be here, the limit order won't be paying something for nothing, since if it would, it would have
           //   been cancelled elsewhere already (a maker limit order won't be paying something for nothing):
@@ -1531,6 +1532,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
           if( after_core_hardfork_2481 )
           {
+             call_pays = call_receives * call_pays_price; // calculate with updated call_receives
              if( call_pays.amount >= call_order.collateral )
                 break;
              auto new_collateral = call_order.get_collateral() - call_pays;
@@ -1556,7 +1558,8 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
              {
                 if( after_core_hardfork_2481 )
                    break;
-                call_pays.amount = call_order.collateral;
+                if( _mute_exceptions )
+                   call_pays.amount = call_order.collateral;
              }
              // Note: if it is a partial fill due to TCR, the math guarantees that the new CR will be higher
              //       than the old CR, so no additional check for potential blackswan here

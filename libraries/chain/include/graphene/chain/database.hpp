@@ -773,6 +773,8 @@ namespace graphene { namespace chain {
          const chain_property_object*           _p_chain_property_obj      = nullptr;
          const witness_schedule_object*         _p_witness_schedule_obj    = nullptr;
          ///@}
+      public:
+         bool _mute_exceptions = false;
    };
 
 } }
