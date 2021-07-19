@@ -939,11 +939,14 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    BOOST_CHECK_EQUAL( 1000, get_balance(borrower4, bitusd) );
    BOOST_CHECK_EQUAL( 100000, get_balance(borrower5, bitusd) );
 
+   share_type expected_seller_usd_balance = 300000;
+
    // This sell order above MCOP will not be matched with a call
    limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(700), core.amount(150))->id;
    BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 700 );
+   expected_seller_usd_balance -= 700;
 
-   BOOST_CHECK_EQUAL( 299300, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( expected_seller_usd_balance.value, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
    // This buy order is too low will not be matched with a sell order
@@ -955,6 +958,7 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    // Create a sell order which will be matched with several call orders later, price 100/9
    limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(100000), core.amount(9000) )->id;
    BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_id )->for_sale.value, 100000 );
+   expected_seller_usd_balance -= 100000;
 
    // Create another sell order which will trigger a blackswan event if matched, price 100/21
    limit_order_id_type sell_swan;
@@ -962,11 +966,13 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    {
       sell_swan = create_sell_order(seller, bitusd.amount(100), core.amount(21) )->id;
       BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 100 );
+      expected_seller_usd_balance -= 100;
    }
    else if( i == 2 )
    {
       sell_swan = create_sell_order(seller, bitusd.amount(10000), core.amount(2100) )->id;
       BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 10000 );
+      expected_seller_usd_balance -= 10000;
    }
 
    // Create a force settlement, will be matched with several call orders later
@@ -974,12 +980,25 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    BOOST_REQUIRE( result.is_type<object_id_type>() );
    force_settlement_id_type settle_id = result.get<object_id_type>();
    BOOST_CHECK( db.find( settle_id ) != nullptr );
+   expected_seller_usd_balance -= 40000;
 
    // Create another force settlement
    result = force_settle( seller, bitusd.amount(10000) );
    BOOST_REQUIRE( result.is_type<object_id_type>() );
    force_settlement_id_type settle2_id = result.get<object_id_type>();
    BOOST_CHECK( db.find( settle2_id ) != nullptr );
+   expected_seller_usd_balance -= 10000;
+
+   // Create the third force settlement which is small
+   result = force_settle( seller, bitusd.amount(3) );
+   BOOST_REQUIRE( result.is_type<object_id_type>() );
+   force_settlement_id_type settle3_id = result.get<object_id_type>();
+   BOOST_CHECK( db.find( settle3_id ) != nullptr );
+   expected_seller_usd_balance -= 3;
+
+   // Check seller balance
+   BOOST_CHECK_EQUAL( expected_seller_usd_balance.value, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
    call_order_object call_copy = call;
    call_order_object call2_copy = call2;
@@ -1094,6 +1113,9 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    // settle orders are fully filled
    BOOST_CHECK( db.find( settle_id ) == nullptr );
    BOOST_CHECK( db.find( settle2_id ) == nullptr );
+   // settle3 is canceled
+   BOOST_CHECK( db.find( settle3_id ) == nullptr );
+   share_type settle3_refund = 3;
 
    // blackswan event occurs
    BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
@@ -1153,12 +1175,8 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    BOOST_CHECK_EQUAL( init_balance - call5_to_pay_gs.value, get_balance(borrower5, core) );
    BOOST_CHECK_EQUAL( 100000, get_balance(borrower5, bitusd) );
 
-   // check seller balance // 149300 == 300000 - 700 - 100000 - 40000 - 10000
-   share_type expected_seller_usd_balance = 149300 + sell_refund + settle_refund + settle2_refund;
-   if ( i == 1 )
-      expected_seller_usd_balance -= 100; // - sell_swan
-   else if ( i == 2 )
-      expected_seller_usd_balance -= 10000; // - sell_swan
+   // check seller balance
+   expected_seller_usd_balance += (sell_refund + settle_refund + settle2_refund + settle3_refund);
    // 1000*9 + 160*107/110 + 49000 * call2_cr * 107/110
    share_type expected_seller_core_balance = sell_receives1 + sell_receives2 + settle_receives4
                                              + settle_receives2 + settle2_receives2;
