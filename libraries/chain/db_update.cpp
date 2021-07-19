@@ -578,7 +578,7 @@ void database::update_expired_feeds()
                && !b.current_feed.margin_call_params_equal( old_median_feed ) )
          {
             asset_ptr = &b.asset_id( *this );
-            check_call_orders( *asset_ptr, true, false, &b );
+            check_call_orders( *asset_ptr, true, false, &b, true );
          }
       }
       // update CER

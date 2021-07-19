@@ -1348,11 +1348,12 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
  *     limit order. (Only relevent before hardfork 625. apply_order_before_hardfork_625() is only
  *     function that calls this with for_new_limit_order true.)
  *  @param bitasset_ptr - an optional pointer to the bitasset_data object of the asset
+ *  @param mute_exceptions - whether to mute exceptions in a special case
  *
  *  @return true if a margin call was executed.
  */
 bool database::check_call_orders( const asset_object& mia, bool enable_black_swan, bool for_new_limit_order,
-                                  const asset_bitasset_data_object* bitasset_ptr )
+                                  const asset_bitasset_data_object* bitasset_ptr, bool mute_exceptions )
 { try {
     const auto& dyn_prop = get_dynamic_global_properties();
     auto maint_time = dyn_prop.next_maintenance_time;
@@ -1558,7 +1559,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
              {
                 if( after_core_hardfork_2481 )
                    break;
-                if( _mute_exceptions )
+                if( mute_exceptions )
                    call_pays.amount = call_order.collateral;
              }
              // Note: if it is a partial fill due to TCR, the math guarantees that the new CR will be higher

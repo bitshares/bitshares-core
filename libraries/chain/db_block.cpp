@@ -580,21 +580,6 @@ void database::apply_block( const signed_block& next_block, uint32_t skip )
    return;
 }
 
-class exception_muting_guard {
-public:
-   explicit exception_muting_guard(database& d) : db(d)
-   {
-      db._mute_exceptions = true;
-   }
-   ~exception_muting_guard() noexcept
-   {
-      db._mute_exceptions = false;
-   }
-   exception_muting_guard(const exception_muting_guard&) = delete;
-private:
-   database& db;
-};
-
 void database::_apply_block( const signed_block& next_block )
 { try {
    uint32_t next_block_num = next_block.block_num();
@@ -661,9 +646,6 @@ void database::_apply_block( const signed_block& next_block )
    clear_expired_orders();
    clear_expired_force_settlements();
    clear_expired_htlcs();
-
-   exception_muting_guard guard(*this);
-
    update_expired_feeds();       // this will update expired feeds and some core exchange rates
    update_core_exchange_rates(); // this will update remaining core exchange rates
    update_withdraw_permissions();

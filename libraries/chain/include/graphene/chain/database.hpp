@@ -564,7 +564,8 @@ namespace graphene { namespace chain {
 
          bool check_call_orders( const asset_object& mia, bool enable_black_swan = true,
                                  bool for_new_limit_order = false,
-                                 const asset_bitasset_data_object* bitasset_ptr = nullptr );
+                                 const asset_bitasset_data_object* bitasset_ptr = nullptr,
+                                 bool mute_exceptions = false );
 
          /// helpers to fill_order
          /// @{
@@ -773,8 +774,6 @@ namespace graphene { namespace chain {
          const chain_property_object*           _p_chain_property_obj      = nullptr;
          const witness_schedule_object*         _p_witness_schedule_obj    = nullptr;
          ///@}
-      public:
-         bool _mute_exceptions = false;
    };
 
 } }
