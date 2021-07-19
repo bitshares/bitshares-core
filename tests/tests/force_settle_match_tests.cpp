@@ -215,7 +215,8 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_settle_call)
 } FC_LOG_AND_RETHROW() }
 
 /***
- * After hf core-2481, matching small taker settle orders with a big maker call order
+ * After hf core-2481, matching small taker settle orders with a big maker call order.
+ * Also tests tiny call orders.
  */
 BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
 { try {
@@ -226,7 +227,7 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
 
    set_expiration( db, trx );
 
-   ACTORS((seller)(borrower)(feedproducer));
+   ACTORS((seller)(borrower)(borrower2)(borrower3)(feedproducer));
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
@@ -248,6 +249,8 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    int64_t init_balance(1000000);
 
    transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   transfer(committee_account, borrower3_id, asset(init_balance));
    update_feed_producers( bitusd, {feedproducer.id} );
 
    price_feed current_feed;
@@ -258,35 +261,63 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    // start out with 300% collateral, call price is 15/175 CORE/USD = 6/70, tcr 170% is lower than 175%
    const call_order_object& call = *borrow( borrower, bitusd.amount(100000), asset(15000), 1700);
    call_order_id_type call_id = call.id;
+   // create another position with 285% collateral
+   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(7), asset(1), 1700);
+   call_order_id_type call2_id = call2.id;
+   // create yet another position with 285% collateral
+   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(14), asset(2), 1700);
+   call_order_id_type call3_id = call3.id;
    transfer(borrower, seller, bitusd.amount(100000));
+
+   // adjust price feed to get call orders into margin call territory
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(10);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 10/1, mssp = 100/11, mcop = 1000/107, mcpr = 110/107
 
    BOOST_CHECK_EQUAL( 100000, call.debt.value );
    BOOST_CHECK_EQUAL( 15000, call.collateral.value );
+   BOOST_CHECK_EQUAL( 7, call2.debt.value );
+   BOOST_CHECK_EQUAL( 1, call2.collateral.value );
+   BOOST_CHECK_EQUAL( 14, call3.debt.value );
+   BOOST_CHECK_EQUAL( 2, call3.collateral.value );
    BOOST_CHECK_EQUAL( 100000, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
    BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower, core) );
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
-
-   // adjust price feed to get call into margin call territory
-   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(10);
-   publish_feed( bitusd, feedproducer, current_feed );
-   // settlement price = 10/1, mssp = 100/11, mcop = 1000/107, mcpr = 110/107
+   BOOST_CHECK_EQUAL( init_balance - 1, get_balance(borrower2, core) );
+   BOOST_CHECK_EQUAL( 7, get_balance(borrower2, bitusd) );
+   BOOST_CHECK_EQUAL( init_balance - 2, get_balance(borrower3, core) );
+   BOOST_CHECK_EQUAL( 14, get_balance(borrower3, bitusd) );
 
    BOOST_CHECK_EQUAL( 100000, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
    // Create a force settlement, will be matched with the call order
-   share_type amount_to_settle = 101;
+   share_type amount_to_settle = 117;
    auto result = force_settle( seller, bitusd.amount(amount_to_settle) );
    BOOST_REQUIRE( result.is_type<object_id_type>() );
    force_settlement_id_type settle_id = result.get<object_id_type>();
    BOOST_CHECK( db.find( settle_id ) == nullptr );
 
+   // the settle order will match with call2, at mssp: 100/11,
+   // since call2 is too small, so it pays all
+   BOOST_CHECK( db.find( call2_id ) == nullptr );
+   share_type expected_amount_to_settle = 110; // 117 - 7
+
+   // the settle order will match with call3, at mssp: 100/11,
+   // since call3 has TCR, it pays some collateral and stays there
+   BOOST_REQUIRE( db.find( call3_id ) != nullptr );
+
+   BOOST_CHECK_EQUAL( 5, call3.debt.value );
+   BOOST_CHECK_EQUAL( 1, call3.collateral.value );
+
+   expected_amount_to_settle = 101; // 117 - 7 - 9
+
    // the settle order will match with call, at mssp: 100/11
    BOOST_CHECK( db.find( call_id ) != nullptr );
 
    // check
-   share_type call_to_pay = amount_to_settle * 11 / 100; // round down, favors call order
+   share_type call_to_pay = expected_amount_to_settle * 11 / 100; // round down, favors call order
    share_type call_to_cover = (call_to_pay * 100 + 10 ) / 11; // stabilize : 101 -> 100
    share_type call_to_settler = (call_to_cover * 107) / 1000; // round down, favors call order
    BOOST_CHECK_EQUAL( 100000 - call_to_cover.value, call.debt.value );
@@ -297,8 +328,8 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
 
    // check seller balance
-   BOOST_CHECK_EQUAL( 99900, get_balance(seller, bitusd) ); // 100000 - 100, the rest 1 be canceled
-   int64_t expected_seller_core_balance = call_to_settler.value;
+   BOOST_CHECK_EQUAL( 99884, get_balance(seller, bitusd) ); // 100000 - 7 - 9 - 100, the rest 1 be canceled
+   int64_t expected_seller_core_balance = 1 + 1 + call_to_settler.value;
    BOOST_CHECK_EQUAL( expected_seller_core_balance, get_balance(seller, core) );
 
    // asset's force_settled_volume does not change
@@ -326,8 +357,8 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
 
    // check seller balance
-   BOOST_CHECK_EQUAL( 99800, get_balance(seller, bitusd) ); // 100000 - 100 - 100
-   expected_seller_core_balance = call_to_settler.value + call_to_settler2.value;
+   BOOST_CHECK_EQUAL( 99784, get_balance(seller, bitusd) ); // 100000 - 7 - 9 - 100 - 100
+   expected_seller_core_balance += call_to_settler2.value;
    BOOST_CHECK_EQUAL( expected_seller_core_balance, get_balance(seller, core) );
 
    // asset's force_settled_volume does not change
@@ -374,8 +405,8 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
 
    // check seller balance
-   BOOST_CHECK_EQUAL( 99792, get_balance(seller, bitusd) ); // 100000 - 100 - 100 - 8
-   expected_seller_core_balance = call_to_settler.value + call_to_settler2.value + call_to_settler3.value;
+   BOOST_CHECK_EQUAL( 99776, get_balance(seller, bitusd) ); // 100000 - 7 - 9 - 100 - 100 - 8
+   expected_seller_core_balance += call_to_settler3.value;
    BOOST_CHECK_EQUAL( expected_seller_core_balance, get_balance(seller, core) );
 
    // asset's force_settled_volume does not change
@@ -401,8 +432,8 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower, core) );
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
    // check seller balance
-   BOOST_CHECK_EQUAL( 99792, get_balance(seller, bitusd) ); // 100000 - 100 - 100 - 8
-   expected_seller_core_balance = call_to_settler.value + call_to_settler2.value + call_to_settler3.value;
+   BOOST_CHECK_EQUAL( 99776, get_balance(seller, bitusd) ); // 100000 - 7 - 9 - 100 - 100 - 8
+   // expected_seller_core_balance does not change
    BOOST_CHECK_EQUAL( expected_seller_core_balance, get_balance(seller, core) );
 
    // asset's force_settled_volume does not change

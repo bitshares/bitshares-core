@@ -1512,6 +1512,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        {  // fill order
           limit_receives  = usd_for_sale * match_price; // round down, in favor of call order
           if( !after_core_hardfork_2481 )
+             // TODO add tests about CR change
              call_pays = usd_for_sale * call_pays_price; // (same as match_price until BSIP-74)
 
           // Be here, the limit order won't be paying something for nothing, since if it would, it would have
