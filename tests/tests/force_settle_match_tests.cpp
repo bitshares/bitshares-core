@@ -1031,6 +1031,18 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    BOOST_CHECK_EQUAL( expected_seller_usd_balance.value, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
+   // Create the fourth force settlement which is a little bigger but still small
+   // Note: different execution path than settle3
+   result = force_settle( seller, bitusd.amount(5) );
+   BOOST_REQUIRE( result.is_type<object_id_type>() );
+   force_settlement_id_type settle4_id = result.get<object_id_type>();
+   BOOST_CHECK( db.find( settle4_id ) != nullptr );
+   expected_seller_usd_balance -= 5;
+
+   // Check seller balance
+   BOOST_CHECK_EQUAL( expected_seller_usd_balance.value, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
    call_order_object call_copy = call;
    call_order_object call2_copy = call2;
    call_order_object call3_copy = call3;
@@ -1147,6 +1159,9 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    // settle3 is canceled
    BOOST_CHECK( db.find( settle3_id ) == nullptr );
    share_type settle3_refund = 3;
+   // settle4 is canceled
+   BOOST_CHECK( db.find( settle4_id ) == nullptr );
+   share_type settle4_refund = 5;
 
    // blackswan event occurs
    BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
@@ -1207,7 +1222,7 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    BOOST_CHECK_EQUAL( 100000, get_balance(borrower5, bitusd) );
 
    // check seller balance
-   expected_seller_usd_balance += (sell_refund + settle_refund + settle2_refund + settle3_refund);
+   expected_seller_usd_balance += (sell_refund + settle_refund + settle2_refund + settle3_refund + settle4_refund);
    // 1000*9 + 160*107/110 + 49000 * call2_cr * 107/110
    share_type expected_seller_core_balance = sell_receives1 + sell_receives2 + settle_receives4
                                              + settle_receives2 + settle2_receives2;
