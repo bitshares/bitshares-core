@@ -436,7 +436,7 @@ namespace graphene { namespace chain {
 
          /**
           * @brief Process a new force-settlement request
-          * @param new_settlment The new force-settlement request
+          * @param new_settlement The new force-settlement request
           * @param bitasset The bitasset data object
           *
           * Since the core-2481 hard fork, this function is called after a new force-settlement object is created
