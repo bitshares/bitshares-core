@@ -178,6 +178,8 @@ const std::string doCurl(CurlRequest& curl)
       curl_easy_setopt(curl.handler, CURLOPT_POST, true);
       curl_easy_setopt(curl.handler, CURLOPT_POSTFIELDS, curl.query.c_str());
    }
+   else
+      curl_easy_setopt(curl.handler, CURLOPT_POSTFIELDS, "");
    curl_easy_setopt(curl.handler, CURLOPT_WRITEFUNCTION, WriteCallback);
    curl_easy_setopt(curl.handler, CURLOPT_WRITEDATA, (void *)&CurlReadBuffer);
    curl_easy_setopt(curl.handler, CURLOPT_USERAGENT, "libcrp/0.1");
