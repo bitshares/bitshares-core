@@ -194,6 +194,7 @@
       ],
       "scale": 10000
     },
+	"my_prop": 255,
     "block_interval": 5,
     "maintenance_interval": 86400,
     "maintenance_skip_slots": 3,

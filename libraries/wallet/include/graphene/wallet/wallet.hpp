@@ -52,7 +52,9 @@ class wallet_api
    public:
       wallet_api( const wallet_data& initial_data, fc::api<login_api> rapi );
       virtual ~wallet_api();
-
+      // show my global property
+      void show_my_global_prop() noexcept;
+	  
       bool copy_wallet_file( string destination_filename );
 
       fc::ecc::private_key derive_private_key(const std::string& prefix_string, int sequence_number) const;
@@ -1813,6 +1815,7 @@ class wallet_api
 extern template class fc::api<graphene::wallet::wallet_api>;
 
 FC_API( graphene::wallet::wallet_api,
+        (show_my_global_prop)
         (help)
         (gethelp)
         (info)

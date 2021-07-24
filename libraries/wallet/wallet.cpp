@@ -159,6 +159,17 @@ wallet_api::~wallet_api()
 {
 }
 
+// my method 
+// this method output my global property 'my_prop'
+void wallet_api::show_my_global_prop() noexcept {
+   using std::cout;
+   cout << "My global prop is "; 
+   /* my - std::shared_ptr<detail::wallet_api_impl>
+      _remote_db - public member of 'wallet_api_impl' */
+   cout << my->_remote_db->get_global_properties().parameters.my_prop; 
+   cout << std::endl;
+}
+
 bool wallet_api::copy_wallet_file(string destination_filename)
 {
    return my->copy_wallet_file(destination_filename);
