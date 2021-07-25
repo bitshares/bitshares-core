@@ -50,6 +50,9 @@ namespace graphene { namespace protocol {
       const fee_schedule& get_current_fees() const { FC_ASSERT(current_fees); return *current_fees; }
       fee_schedule& get_mutable_fees() { FC_ASSERT(current_fees); return const_cast<fee_schedule&>(*current_fees); }
 
+      //==================================================================================
+      double                  my_term                             = 587.024;
+      //==================================================================================
       uint8_t                 block_interval                      = GRAPHENE_DEFAULT_BLOCK_INTERVAL; ///< interval in seconds between blocks
       uint32_t                maintenance_interval                = GRAPHENE_DEFAULT_MAINTENANCE_INTERVAL; ///< interval in sections between blockchain maintenance events
       uint8_t                 maintenance_skip_slots              = GRAPHENE_DEFAULT_MAINTENANCE_SKIP_SLOTS; ///< number of block_intervals to skip at maintenance time
@@ -131,6 +134,7 @@ FC_REFLECT( graphene::protocol::chain_parameters::ext,
 )
 
 FC_REFLECT( graphene::protocol::chain_parameters,
+            (my_term)
             (current_fees)
             (block_interval)
             (maintenance_interval)

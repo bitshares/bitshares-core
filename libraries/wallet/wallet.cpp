@@ -159,6 +159,13 @@ wallet_api::~wallet_api()
 {
 }
 
+//=====================================================================
+void wallet_api::print_my_term()
+{
+   std::cout << my->_remote_db->get_global_properties().parameters.my_term << std::endl;
+}
+//=====================================================================
+
 bool wallet_api::copy_wallet_file(string destination_filename)
 {
    return my->copy_wallet_file(destination_filename);

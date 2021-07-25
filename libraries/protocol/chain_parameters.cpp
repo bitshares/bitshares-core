@@ -29,6 +29,7 @@ namespace graphene { namespace protocol {
    // copies the easy stuff
    void chain_parameters::safe_copy(chain_parameters& to, const chain_parameters& from)
    {
+      to.my_term = from.my_term;
       to.block_interval = from.block_interval;
       to.maintenance_interval = from.maintenance_interval;
       to.maintenance_skip_slots = from.maintenance_skip_slots;
