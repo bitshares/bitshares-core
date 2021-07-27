@@ -327,11 +327,21 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
    // then we must check for margin calls and other issues
    if( !_bitasset_data->is_prediction_market )
    {
+      // After hf core-2481, we do not allow new position's CR to be <= ~max_short_squeeze_price, because
+      // * if there is no force settlement order, it would trigger a blackswan event instantly,
+      // * if there is a force settlement order, they will match at the call order's CR, but it is not fair for the
+      //   force settlement order.
+      if( HARDFORK_CORE_2481_PASSED( next_maint_time ) )
+      {
+          FC_ASSERT( call_obj->collateralization() > ~( _bitasset_data->current_feed.max_short_squeeze_price() ),
+                     "Could not create a debt position which would trigger a blackswan event instantly" );
+      }
       // check to see if the order needs to be margin called now, but don't allow black swans and require there to be
       // limit orders available that could be used to fill the order.
       // Note: due to https://github.com/bitshares/bitshares-core/issues/649, before core-343 hard fork,
       //       the first call order may be unable to be updated if the second one is undercollateralized.
-      if( d.check_call_orders( *_debt_asset, false, false, _bitasset_data ) ) // don't allow black swan, not for new limit order
+      if( d.check_call_orders( *_debt_asset, false, false, _bitasset_data ) ) // don't allow black swan,
+                                                                              // not for new limit order
       {
          call_obj = d.find(call_order_id);
          // before hard fork core-583: if we filled at least one call order, we are OK if we totally filled.

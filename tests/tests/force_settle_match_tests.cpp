@@ -640,6 +640,21 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
    // Can not create a new call order that is partially called instantly
    BOOST_CHECK_THROW( borrow( borrower4_id(db), asset(10, usd_id), asset(160), 1700), fc::exception );
 
+   idump( (settle_id(db))(get_balance(seller, core)) );
+
+   // Can not create a new call order that is undercollateralized
+   BOOST_CHECK_THROW( borrow( borrower4_id(db), asset(10, usd_id), asset(10) ), fc::exception );
+
+   idump( (settle_id(db))(get_balance(seller, core)) );
+
+   // Can not reduce CR of a call order to make it undercollateralized
+   BOOST_CHECK_THROW( borrow( borrower3_id(db), asset(0, usd_id), asset(-24000) ), fc::exception );
+
+   idump( (settle_id(db))(get_balance(seller, core)) );
+
+   // Can not create a new call order that would trigger a black swan event
+   BOOST_CHECK_THROW( borrow( borrower4_id(db), asset(10000, usd_id), asset(10000) ), fc::exception );
+
    // generate a block
    generate_block();
 
