@@ -170,13 +170,22 @@ const std::string doCurl(CurlRequest& curl)
    struct curl_slist *headers = NULL;
    headers = curl_slist_append(headers, "Content-Type: application/json");
 
+   // Note: the variable curl.handler has a long lifetime, it only gets initialized once, then be used many times,
+   //       thus we need to clear old data
    curl_easy_setopt(curl.handler, CURLOPT_HTTPHEADER, headers);
    curl_easy_setopt(curl.handler, CURLOPT_URL, curl.url.c_str());
-   curl_easy_setopt(curl.handler, CURLOPT_CUSTOMREQUEST, curl.type.c_str());
+   curl_easy_setopt(curl.handler, CURLOPT_CUSTOMREQUEST, curl.type.c_str()); // this is OK
    if(curl.type == "POST")
    {
+      curl_easy_setopt(curl.handler, CURLOPT_HTTPGET, false);
       curl_easy_setopt(curl.handler, CURLOPT_POST, true);
       curl_easy_setopt(curl.handler, CURLOPT_POSTFIELDS, curl.query.c_str());
+   }
+   else // GET or DELETE (only these are used in this file)
+   {
+      curl_easy_setopt(curl.handler, CURLOPT_POSTFIELDS, NULL);
+      curl_easy_setopt(curl.handler, CURLOPT_POST, false);
+      curl_easy_setopt(curl.handler, CURLOPT_HTTPGET, true);
    }
    curl_easy_setopt(curl.handler, CURLOPT_WRITEFUNCTION, WriteCallback);
    curl_easy_setopt(curl.handler, CURLOPT_WRITEDATA, (void *)&CurlReadBuffer);
