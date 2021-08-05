@@ -235,7 +235,9 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 
    auto mi = db.get_global_properties().parameters.maintenance_interval;
 
-   if(hf1270)
+   if(hf2481)
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   else if(hf1270)
       generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    else
       generate_blocks(HARDFORK_CORE_343_TIME - mi);
@@ -332,7 +334,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 
    // call's call_price will be updated after the match, to 741/31/1.75 CORE/USD = 2964/217
    // it's above settlement price (10/1) so won't be margin called again
-   if(!hf1270) // can use call price only if we are before hf1270
+   if(!hf1270 && !hf2481) // can use call price only if we are before hf1270
       BOOST_CHECK( price(asset(2964),asset(217,usd_id)) == call.call_price );
 
    // This would match with call before, but would match with call2 after #343 fixed
@@ -350,7 +352,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
    BOOST_CHECK_EQUAL( 1000, call3.debt.value );
    BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
    // call2's call_price will be updated after the match, to 78/3/1.75 CORE/USD = 312/21
-   if(!hf1270) // can use call price only if we are before hf1270
+   if(!hf1270 && !hf2481) // can use call price only if we are before hf1270
       BOOST_CHECK( price(asset(312),asset(21,usd_id)) == call2.call_price );
    // it's above settlement price (10/1) so won't be margin called
 
@@ -362,27 +364,45 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
    force_settle( seller, bitusd.amount(10) );
 
    BOOST_CHECK_EQUAL( 1583, get_balance(seller, bitusd) );
-   BOOST_CHECK_EQUAL( 15401, get_balance(seller, core) );
+   if( hf2481 ) // force settle matches with margin calls, at mssp 1/11
+      BOOST_CHECK_EQUAL( 15511, get_balance(seller, core) ); // 15401 + 10 * 11
+   else
+      BOOST_CHECK_EQUAL( 15401, get_balance(seller, core) );
    BOOST_CHECK_EQUAL( 310, call.debt.value );
    BOOST_CHECK_EQUAL( 7410, call.collateral.value );
    BOOST_CHECK_EQUAL( 300, call2.debt.value );
    BOOST_CHECK_EQUAL( 7800, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   if( hf2481 ) // force settle matches with margin calls, at mssp 1/11
+   {
+      BOOST_CHECK_EQUAL( 990, call3.debt.value ); // 1000 - 10
+      BOOST_CHECK_EQUAL( 15890, call3.collateral.value ); // 16000 - 10 * 11
+   }
+   else
+   {
+      BOOST_CHECK_EQUAL( 1000, call3.debt.value );
+      BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   }
 
-   // generate blocks to let the settle order execute (price feed will expire after it)
+   // generate blocks to let the settle order execute (only before hf2481) (price feed will expire after it)
    generate_block();
    generate_blocks( db.head_block_time() + fc::hours(24) );
 
-   // call3 get settled, at settlement price 1/10: #343 fixed
+   // if before hf2481, call3 get settled, at settlement price 1/10: #343 fixed
+   // else matched at above step already
    BOOST_CHECK_EQUAL( 1583, get_balance(seller_id, usd_id) );
-   BOOST_CHECK_EQUAL( 15501, get_balance(seller_id, core_id) );
+   if( hf2481 )
+      BOOST_CHECK_EQUAL( 15511, get_balance(seller_id, core_id) ); // no change
+   else
+      BOOST_CHECK_EQUAL( 15501, get_balance(seller_id, core_id) ); // 15401 + 10 * 10
    BOOST_CHECK_EQUAL( 310, call_id(db).debt.value );
    BOOST_CHECK_EQUAL( 7410, call_id(db).collateral.value );
    BOOST_CHECK_EQUAL( 300, call2_id(db).debt.value );
    BOOST_CHECK_EQUAL( 7800, call2_id(db).collateral.value );
    BOOST_CHECK_EQUAL( 990, call3_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 15900, call3_id(db).collateral.value );
+   if( hf2481 )
+      BOOST_CHECK_EQUAL( 15890, call3_id(db).collateral.value );
+   else
+      BOOST_CHECK_EQUAL( 15900, call3_id(db).collateral.value ); // 16000 - 10 * 10
 
    set_expiration( db, trx );
    update_feed_producers( usd_id(db), {feedproducer_id} );
@@ -418,7 +438,9 @@ BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
 
    auto mi = db.get_global_properties().parameters.maintenance_interval;
 
-   if(hf1270)
+   if(hf2481)
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   else if(hf1270)
       generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    else
       generate_blocks(HARDFORK_CORE_343_TIME - mi);
@@ -503,7 +525,9 @@ BOOST_AUTO_TEST_CASE(hardfork_core_625_big_limit_order_test)
 
    auto mi = db.get_global_properties().parameters.maintenance_interval;
 
-   if(hf1270)
+   if(hf2481)
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   else if(hf1270)
       generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    else
       generate_blocks(HARDFORK_CORE_625_TIME - mi);
@@ -1211,6 +1235,385 @@ BOOST_AUTO_TEST_CASE(hard_fork_343_cross_test)
 } FC_LOG_AND_RETHROW() }
 
 /***
+ * Tests a scenario that GS may occur when there is no sufficient collateral to pay margin call fee,
+ * but GS won't occur if no need to pay margin call fee.
+ */
+BOOST_AUTO_TEST_CASE(mcfr_blackswan_test)
+{ try {
+   // Proceeds to the bsip-74 hard fork time
+   generate_blocks(HARDFORK_CORE_BSIP74_TIME);
+   set_expiration( db, trx );
+
+   ACTORS((seller)(borrower)(borrower2)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+   asset_id_type usd_id = bitusd.id;
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+
+   {
+      // set margin call fee ratio
+      asset_update_bitasset_operation uop;
+      uop.issuer = usd_id(db).issuer;
+      uop.asset_to_update = usd_id;
+      uop.new_options = usd_id(db).bitasset_data(db).options;
+      uop.new_options.extensions.value.margin_call_fee_ratio = 80;
+
+      trx.clear();
+      trx.operations.push_back(uop);
+      PUSH_TX(db, trx, ~0);
+   }
+
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(5);
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7
+   const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000));
+   call_order_id_type call_id = call.id;
+   // create another position with 400% collateral, call price is 20/1.75 CORE/USD = 80/7
+   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(20000));
+   call_order_id_type call2_id = call2.id;
+   transfer(borrower, seller, bitusd.amount(1000));
+   transfer(borrower2, seller, bitusd.amount(1000));
+
+   BOOST_CHECK_EQUAL( 1000, call.debt.value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
+   BOOST_CHECK_EQUAL( 20000, call2.collateral.value );
+   BOOST_CHECK_EQUAL( 2000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // No margin call at this moment
+
+   // This order is sufficient to close the first debt position and no GS if margin call fee ratio is 0
+   limit_order_id_type sell_mid = create_sell_order(seller, bitusd.amount(1000), core.amount(14900))->id;
+
+   BOOST_CHECK_EQUAL( 1000, sell_mid(db).for_sale.value );
+
+   BOOST_CHECK_EQUAL( 1000, call_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 15000, call_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 20000, call2_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // adjust price feed to get call_order into black swan territory
+   BOOST_TEST_MESSAGE( "Trying to trigger GS" );
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(18);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 1/18, mssp = 10/198
+
+   // GS occurs even when there is a good sell order
+   BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( !db.find<call_order_object>( call_id ) );
+   BOOST_CHECK( !db.find<call_order_object>( call2_id ) );
+   // GS price is 1/18, but the first call order has only 15000 thus capped
+   BOOST_CHECK_EQUAL( 15000 + 18000, usd_id(db).bitasset_data(db).settlement_fund.value );
+
+   // the sell order does not change
+   BOOST_CHECK_EQUAL( 1000, sell_mid(db).for_sale.value );
+
+   // generate a block to include operations above
+   BOOST_TEST_MESSAGE( "Generating a new block" );
+   generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
+/***
+ * Tests a scenario after the core-2481 hard fork that GS may occur when there is no sufficient collateral
+ * to pay margin call fee, but GS won't occur if no need to pay margin call fee. The amount gathered to the
+ * global settlement fund will be different than the case before the hard fork.
+ */
+BOOST_AUTO_TEST_CASE(mcfr_blackswan_test_after_hf_core_2481)
+{ try {
+   // Proceeds to the core-2481 hard fork time
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   set_expiration( db, trx );
+
+   ACTORS((seller)(borrower)(borrower2)(borrower3)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+   asset_id_type usd_id = bitusd.id;
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   transfer(committee_account, borrower3_id, asset(init_balance));
+
+   {
+      // set margin call fee ratio
+      asset_update_bitasset_operation uop;
+      uop.issuer = usd_id(db).issuer;
+      uop.asset_to_update = usd_id;
+      uop.new_options = usd_id(db).bitasset_data(db).options;
+      uop.new_options.extensions.value.margin_call_fee_ratio = 80;
+
+      trx.clear();
+      trx.operations.push_back(uop);
+      PUSH_TX(db, trx, ~0);
+   }
+
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(5);
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7
+   const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000));
+   call_order_id_type call_id = call.id;
+   // create another position with 400% collateral, call price is 20/1.75 CORE/USD = 80/7
+   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(20000));
+   call_order_id_type call2_id = call2.id;
+   // create yet another position with 800% collateral, call price is 40/1.75 CORE/USD = 160/7
+   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(1000), asset(40000));
+   call_order_id_type call3_id = call3.id;
+   transfer(borrower, seller, bitusd.amount(1000));
+   transfer(borrower2, seller, bitusd.amount(1000));
+   transfer(borrower3, seller, bitusd.amount(1000));
+
+   BOOST_CHECK_EQUAL( 1000, call.debt.value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
+   BOOST_CHECK_EQUAL( 20000, call2.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
+   BOOST_CHECK_EQUAL( 40000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // No margin call at this moment
+
+   // This order is sufficient to close the first debt position and no GS if margin call fee ratio is 0
+   limit_order_id_type sell_mid = create_sell_order(seller, bitusd.amount(1000), core.amount(14900))->id;
+
+   BOOST_CHECK_EQUAL( 1000, sell_mid(db).for_sale.value );
+
+   BOOST_CHECK_EQUAL( 1000, call_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 15000, call_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 20000, call2_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call3_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 40000, call3_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 2000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // adjust price feed to get call_order into black swan territory
+   BOOST_TEST_MESSAGE( "Trying to trigger GS" );
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(18);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 1/18, mssp = 10/198
+
+   // GS occurs even when there is a good sell order
+   BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( !db.find<call_order_object>( call_id ) );
+   BOOST_CHECK( !db.find<call_order_object>( call2_id ) );
+   BOOST_CHECK( !db.find<call_order_object>( call3_id ) );
+
+   // after the core-2481 hard fork, GS price is not 1/18.
+   // * the first call order would pay all collateral.
+   //   due to margin call fee, not all collateral enters global settlement fund, but
+   //   fund_receives = round_up(15000 / 1.1) = 13637
+   //   fees = 15000 - 13637 = 1363
+   // * the second call order was in margin call territory too, so it would pay a premium and margin call fee.
+   //   fund_receives = 13637
+   //   fees = 15000 - 13637 = 1363
+   //   the rest ( 20000 - 15000 = 5000 ) returns to borrower2
+   // * the third call order was not in margin call territory, so no premium or margin call fee.
+   //   fund_receives = round_up(15000 / 1.1) = 13637
+   // GS price is 1/18, but the first call order has only 15000 thus capped
+   BOOST_CHECK_EQUAL( 13637 * 3, usd_id(db).bitasset_data(db).settlement_fund.value );
+   BOOST_CHECK_EQUAL( 1363 * 2, usd_id(db).dynamic_asset_data_id(db).accumulated_collateral_fees.value );
+
+   // the sell order does not change
+   BOOST_CHECK_EQUAL( 1000, sell_mid(db).for_sale.value );
+
+   // generate a block to include operations above
+   BOOST_TEST_MESSAGE( "Generating a new block" );
+   generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
+/***
+ * Tests a scenario about rounding errors related to margin call fee
+ */
+BOOST_AUTO_TEST_CASE(mcfr_rounding_test)
+{ try {
+
+   if(hf2481)
+   {
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   }
+   else
+   {
+      // Proceeds to the bsip-74 hard fork time
+      generate_blocks(HARDFORK_CORE_BSIP74_TIME);
+   }
+   set_expiration( db, trx );
+
+   ACTORS((seller)(borrower)(borrower2)(feedproducer)(feeder2)(feeder3));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+   asset_id_type usd_id = bitusd.id;
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+
+   {
+      // set margin call fee ratio
+      asset_update_bitasset_operation uop;
+      uop.issuer = usd_id(db).issuer;
+      uop.asset_to_update = usd_id;
+      uop.new_options = usd_id(db).bitasset_data(db).options;
+      uop.new_options.extensions.value.margin_call_fee_ratio = 70;
+      uop.new_options.feed_lifetime_sec = 86400;
+      uop.new_options.minimum_feeds = 1;
+
+      trx.clear();
+      trx.operations.push_back(uop);
+      PUSH_TX(db, trx, ~0);
+   }
+
+   update_feed_producers( bitusd, {feedproducer_id, feeder2_id, feeder3_id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(5);
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7
+   const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000));
+   call_order_id_type call_id = call.id;
+   // create another position with 800% collateral, call price is 40/1.75 CORE/USD = 160/7
+   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(40000));
+   call_order_id_type call2_id = call2.id;
+   transfer(borrower, seller, bitusd.amount(1000));
+   transfer(borrower2, seller, bitusd.amount(1000));
+
+   BOOST_CHECK_EQUAL( 1000, call.debt.value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
+   BOOST_CHECK_EQUAL( 40000, call2.collateral.value );
+   BOOST_CHECK_EQUAL( 2000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+   BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower, core) );
+   BOOST_CHECK_EQUAL( init_balance - 40000, get_balance(borrower2, core) );
+
+   // No margin call at this moment
+
+   // This order would be matched later
+   limit_order_id_type sell_mid = create_sell_order(seller, bitusd.amount(1100), core.amount(15451))->id;
+   // call_pays_price = (15451 / 1100) * 1100 / (1100-70) = 15451 / 1030
+   // debt * call_pays_price = 1000 * 15451 / 1030 = 15000.9
+
+   BOOST_CHECK_EQUAL( 1100, sell_mid(db).for_sale.value );
+
+   BOOST_CHECK_EQUAL( 1000, call_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 15000, call_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 40000, call2_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 900, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+   BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower, core) );
+   BOOST_CHECK_EQUAL( init_balance - 40000, get_balance(borrower2, core) );
+
+   // Tring to adjust price feed to get call_order into margin call territory
+   BOOST_TEST_MESSAGE( "Trying to trigger a margin call" );
+   auto feed2 = current_feed;
+   feed2.settlement_price = bitusd.amount( 1 ) / core.amount(18);
+
+   if(hf2481)
+   {
+      publish_feed( bitusd, feedproducer, feed2 );
+
+      // blackswan
+      BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !db.find<call_order_object>( call_id ) );
+      BOOST_CHECK( !db.find<call_order_object>( call2_id ) );
+      int64_t call_pays_to_fund = (15000 * 10 + 10) / 11;
+      BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).settlement_fund.value,
+                         call_pays_to_fund * 2 );
+      BOOST_CHECK_EQUAL( usd_id(db).dynamic_asset_data_id(db).accumulated_collateral_fees.value,
+                         15000 - call_pays_to_fund );
+
+      // sell order doesn't change
+      BOOST_CHECK_EQUAL( 1100, sell_mid(db).for_sale.value );
+      // seller balance doesn't change
+      BOOST_CHECK_EQUAL( 900, get_balance(seller, bitusd) );
+      BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+      BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower, core) );
+      BOOST_CHECK_EQUAL( init_balance - call_pays_to_fund, get_balance(borrower2, core) );
+   }
+   else
+   {
+      BOOST_REQUIRE_THROW( publish_feed( bitusd, feedproducer, feed2 ), fc::exception );
+
+      publish_feed( bitusd, feeder2, current_feed );
+      publish_feed( bitusd, feeder3, current_feed );
+
+      // No change
+      BOOST_CHECK_EQUAL( 1100, sell_mid(db).for_sale.value );
+
+      BOOST_CHECK_EQUAL( 1000, call_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 15000, call_id(db).collateral.value );
+      BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 40000, call2_id(db).collateral.value );
+
+      generate_blocks( db.head_block_time() + fc::seconds(43200) );
+      set_expiration( db, trx );
+
+      publish_feed( usd_id(db), feedproducer_id(db), feed2 );
+
+      // No change
+      BOOST_CHECK_EQUAL( 1100, sell_mid(db).for_sale.value );
+
+      BOOST_CHECK_EQUAL( 1000, call_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 15000, call_id(db).collateral.value );
+      BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 40000, call2_id(db).collateral.value );
+
+      generate_blocks( db.head_block_time() + fc::seconds(43200) );
+
+      // The first call order should have been filled
+      BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !db.find<call_order_object>( call_id ) );
+      BOOST_REQUIRE( db.find<call_order_object>( call2_id ) );
+
+      BOOST_CHECK_EQUAL( 100, sell_mid(db).for_sale.value );
+
+      BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 40000, call2_id(db).collateral.value );
+      BOOST_CHECK_EQUAL( 900, get_balance(seller_id(db), usd_id(db)) );
+      BOOST_CHECK_EQUAL( 14047, get_balance(seller_id(db), core) );
+   }
+
+   // generate a block to include operations above
+   BOOST_TEST_MESSAGE( "Generating a new block" );
+   generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
+/***
  * BSIP38 "target_collateral_ratio" test: matching a taker limit order with multiple maker call orders
  */
 BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
@@ -1218,7 +1621,9 @@ BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
 
    auto mi = db.get_global_properties().parameters.maintenance_interval;
 
-   if(hf1270)
+   if(hf2481)
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   else if(hf1270)
       generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    else
       generate_blocks(HARDFORK_CORE_834_TIME - mi);
@@ -1402,7 +1807,9 @@ BOOST_AUTO_TEST_CASE(target_cr_test_call_limit)
 
    auto mi = db.get_global_properties().parameters.maintenance_interval;
 
-   if(hf1270)
+   if(hf2481)
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   else if(hf1270)
       generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    else
       generate_blocks(HARDFORK_CORE_834_TIME - mi);
@@ -1608,7 +2015,10 @@ BOOST_AUTO_TEST_CASE(mcr_bug_increase_after1270)
 { try {
 
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_1270_TIME - mi);
+   if(hf2481)
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   else
+      generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    generate_block();
 
@@ -1744,7 +2154,10 @@ BOOST_AUTO_TEST_CASE(mcr_bug_decrease_after1270)
 { try {
 
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_1270_TIME - mi);
+   if(hf2481)
+      generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   else
+      generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    generate_block();
 
@@ -1889,5 +2302,60 @@ BOOST_AUTO_TEST_CASE(target_cr_test_call_limit_after_hf1270)
 
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE(hardfork_core_338_test_after_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(hardfork_core_338_test);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(hardfork_core_453_test_after_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(hardfork_core_453_test);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(hardfork_core_625_big_limit_order_test_after_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(hardfork_core_625_big_limit_order_test);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(target_cr_test_limit_call_after_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(target_cr_test_limit_call);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(target_cr_test_call_limit_after_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(target_cr_test_call_limit);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(mcr_bug_decrease_after2481)
+{ try {
+   hf2481 = true;
+   INVOKE(mcr_bug_decrease_after1270);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(mcr_bug_increase_after2481)
+{ try {
+   hf2481 = true;
+   INVOKE(mcr_bug_increase_after1270);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(mcfr_rounding_test_after2481)
+{ try {
+   hf2481 = true;
+   INVOKE(mcfr_rounding_test);
+
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

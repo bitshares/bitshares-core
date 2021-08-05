@@ -644,7 +644,14 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
 {
    try {
       auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_184_TIME - mi);
+
+      if(hf2481)
+         generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+      else if(hf1270)
+         generate_blocks(HARDFORK_CORE_1270_TIME - mi);
+      else
+         generate_blocks(HARDFORK_CORE_184_TIME - mi);
+
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       set_expiration( db, trx );
 
@@ -1379,7 +1386,14 @@ BOOST_AUTO_TEST_CASE( global_settle_rounding_test_after_hf_184 )
 {
    try {
       auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_184_TIME - mi); // assume that hard fork core-184 and core-342 happen at same time
+
+      if(hf2481)
+         generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+      else if(hf1270)
+         generate_blocks(HARDFORK_CORE_1270_TIME - mi);
+      else
+         generate_blocks(HARDFORK_CORE_184_TIME - mi); // assume that hf core-184 and core-342 happen at same time
+
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       set_expiration( db, trx );
 
@@ -1671,7 +1685,15 @@ BOOST_AUTO_TEST_CASE( market_fee_of_settle_order_after_hardfork_1780 )
    try {
       INVOKE(create_bitassets);
 
-      generate_blocks( HARDFORK_CORE_1780_TIME );
+      if(hf2481)
+      {
+         auto mi = db.get_global_properties().parameters.maintenance_interval;
+         generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      }
+      else
+         generate_blocks( HARDFORK_CORE_1780_TIME );
+
       set_expiration( db, trx );
 
       GET_ACTOR(paul);
@@ -1759,7 +1781,15 @@ BOOST_AUTO_TEST_CASE( market_fee_of_instant_settle_order_after_hardfork_1780 )
    try {
       INVOKE(create_bitassets);
 
-      generate_blocks( HARDFORK_CORE_1780_TIME );
+      if(hf2481)
+      {
+         auto mi = db.get_global_properties().parameters.maintenance_interval;
+         generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      }
+      else
+         generate_blocks( HARDFORK_CORE_1780_TIME );
+
       set_expiration( db, trx );
 
       GET_ACTOR(paul);
@@ -1820,8 +1850,9 @@ BOOST_AUTO_TEST_CASE( market_fee_of_instant_settle_order_after_hardfork_1780 )
       int64_t biteur_accumulated_fee = 0;
       int64_t bitusd_accumulated_fee = 0;
       {
-         // 1000 biteur = 10000 bitusd in settlement fund
-         const auto biteur_expected_result = rachel_bitusd_count/10;
+         // before hf2481: 1000 biteur = 10000 bitusd in settlement fund
+         // after hf2481: round_up(10000/11) in settlement fund
+         const auto biteur_expected_result = hf2481 ? (rachel_bitusd_count+10)/11 : rachel_bitusd_count/10;
          const auto biteur_market_fee = biteur_expected_result / 2; // market fee percent = 50%
          biteur_balance += biteur_expected_result - biteur_market_fee;
 
@@ -1966,5 +1997,47 @@ BOOST_AUTO_TEST_CASE( global_settle_ticker_test )
       throw;
    }
 }
+
+BOOST_AUTO_TEST_CASE(settle_rounding_test_after_hf_1270)
+{ try {
+   hf1270 = true;
+   INVOKE(settle_rounding_test_after_hf_184);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(settle_rounding_test_after_hf_2481)
+{ try {
+   hf2481 = true;
+   INVOKE(settle_rounding_test_after_hf_184);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(global_settle_rounding_test_after_hf_1270)
+{ try {
+   hf1270 = true;
+   INVOKE(global_settle_rounding_test_after_hf_184);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(global_settle_rounding_test_after_hf_2481)
+{ try {
+   hf2481 = true;
+   INVOKE(global_settle_rounding_test_after_hf_184);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(market_fee_of_settle_order_after_hardfork_2481)
+{ try {
+   hf2481 = true;
+   INVOKE(market_fee_of_settle_order_after_hardfork_1780);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(market_fee_of_instant_settle_order_after_hardfork_2481)
+{ try {
+   hf2481 = true;
+   INVOKE(market_fee_of_instant_settle_order_after_hardfork_1780);
+
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
