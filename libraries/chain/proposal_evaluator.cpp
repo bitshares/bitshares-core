@@ -50,6 +50,8 @@ namespace detail {
 
    void check_asset_claim_fees_hardfork_87_74_collatfee(const fc::time_point_sec& block_time,
                                                         const asset_claim_fees_operation& op); // HF_REMOVABLE
+
+   void check_bitasset_opts_hf_core2467(const fc::time_point_sec& next_maint_time, const bitasset_options& options);
 }
 
 struct proposal_operation_hardfork_visitor
@@ -74,6 +76,7 @@ struct proposal_operation_hardfork_visitor
          detail::check_bitasset_options_hf_bsip74( block_time, *v.bitasset_opts ); // HF_REMOVABLE
          detail::check_bitasset_options_hf_bsip77( block_time, *v.bitasset_opts ); // HF_REMOVABLE
          detail::check_bitasset_options_hf_bsip87( block_time, *v.bitasset_opts ); // HF_REMOVABLE
+         detail::check_bitasset_opts_hf_core2467( next_maintenance_time, *v.bitasset_opts ); // HF_REMOVABLE
       }
 
       // TODO move as many validations as possible to validate() if not triggered before hardfork
@@ -103,6 +106,7 @@ struct proposal_operation_hardfork_visitor
       detail::check_bitasset_options_hf_bsip74( block_time, v.new_options ); // HF_REMOVABLE
       detail::check_bitasset_options_hf_bsip77( block_time, v.new_options ); // HF_REMOVABLE
       detail::check_bitasset_options_hf_bsip87( block_time, v.new_options ); // HF_REMOVABLE
+      detail::check_bitasset_opts_hf_core2467( next_maintenance_time, v.new_options ); // HF_REMOVABLE
    }
 
    void operator()(const graphene::chain::asset_claim_fees_operation &v) const {

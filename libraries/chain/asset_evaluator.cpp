@@ -144,6 +144,14 @@ namespace detail {
                  "Collateral-denominated fees are not yet active and therefore cannot be claimed." );
    }
 
+   void check_bitasset_opts_hf_core2467(const fc::time_point_sec& next_maint_time, const bitasset_options& options)
+   {
+      // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
+      FC_ASSERT( !options.extensions.value.bad_debt_settlement_method.valid()
+                 || HARDFORK_CORE_2467_PASSED(next_maint_time),
+                 "A BitAsset's bad debt settlement method cannot be set before Hardfork core-2467" );
+   }
+
 } // graphene::chain::detail
 
 void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
@@ -151,6 +159,7 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    const database& d = db();
    const time_point_sec now = d.head_block_time();
+   const fc::time_point_sec next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
 
    // Hardfork Checks:
    detail::check_asset_options_hf_1774(now, op.common_options);
@@ -161,6 +170,7 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
       detail::check_bitasset_options_hf_bsip74( now, *op.bitasset_opts ); // HF_REMOVABLE
       detail::check_bitasset_options_hf_bsip77( now, *op.bitasset_opts ); // HF_REMOVABLE
       detail::check_bitasset_options_hf_bsip87( now, *op.bitasset_opts ); // HF_REMOVABLE
+      detail::check_bitasset_opts_hf_core2467( next_maint_time, *op.bitasset_opts ); // HF_REMOVABLE
    }
 
    // TODO move as many validations as possible to validate() if not triggered before hardfork
@@ -628,12 +638,14 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 { try {
    const database& d = db();
    const time_point_sec now = d.head_block_time();
+   const fc::time_point_sec next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
 
    // Hardfork Checks:
    detail::check_bitasset_options_hf_bsip_48_75( now, op.new_options );
    detail::check_bitasset_options_hf_bsip74( now, op.new_options ); // HF_REMOVABLE
    detail::check_bitasset_options_hf_bsip77( now, op.new_options ); // HF_REMOVABLE
    detail::check_bitasset_options_hf_bsip87( now, op.new_options ); // HF_REMOVABLE
+   detail::check_bitasset_opts_hf_core2467( next_maint_time, op.new_options ); // HF_REMOVABLE
 
    const asset_object& asset_obj = op.asset_to_update(d);
 

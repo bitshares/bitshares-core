@@ -232,6 +232,8 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_bitasset_data_object, (gr
                     (is_prediction_market)
                     (settlement_price)
                     (settlement_fund)
+                    (individual_settlement_debt)
+                    (individual_settlement_fund)
                     (asset_cer_updated)
                     (feed_cer_updated)
                   )

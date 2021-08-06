@@ -108,6 +108,28 @@ namespace graphene { namespace protocol {
     */
    struct bitasset_options {
 
+      /// Defines what will happen when bad debt appears
+      enum class bad_debt_settlement_type
+      {
+         /// All debt positions are closed, all or some collateral is moved to a global-settlement fund.
+         /// Debt asset holders can claim collateral via force-settlement.
+         /// It is not allowed to create new debt positions when the fund is not empty.
+         global_settlement = 0,
+         /// No debt position is closed, and the derived settlement price is dynamically capped at the collateral
+         /// ratio of the debt position with the least collateral ratio so that all debt positions are able to pay
+         /// off their debt when being margin called or force-settled.
+         /// Also known as "Global Settlement Protection".
+         no_settlement = 1,
+         /// Only the undercollateralized debt positions are closed and their collateral is moved to a fund which
+         /// can be claimed via force-settlement. The derived settlement price is capped at the fund's collateral
+         /// ratio so that remaining debt positions will not be margin called or force-settled at a worse price.
+         individual_settlement_to_fund = 2,
+         /// Only the undercollateralized debt positions are closed and their collateral is moved to a limit order
+         /// on the order book which can be bought. The derived settlement price is NOT capped, which means remaining
+         /// debt positions could be margin called at a worse price.
+         individual_settlement_to_order = 3
+      };
+
       struct ext
       {
          /// After BSIP77, when creating a new debt position or updating an existing position,
@@ -120,6 +142,8 @@ namespace graphene { namespace protocol {
          fc::optional<uint16_t> maximum_short_squeeze_ratio;  // BSIP-75
          fc::optional<uint16_t> margin_call_fee_ratio; // BSIP 74
          fc::optional<uint16_t> force_settle_fee_percent;  // BSIP-87
+         // https://github.com/bitshares/bitshares-core/issues/2467
+         fc::optional<uint8_t> bad_debt_settlement_method;
       };
 
       /// Time before a price feed expires
@@ -601,6 +625,7 @@ FC_REFLECT( graphene::protocol::bitasset_options::ext,
             (maximum_short_squeeze_ratio)
             (margin_call_fee_ratio)
             (force_settle_fee_percent)
+            (bad_debt_settlement_method)
           )
 
 FC_REFLECT( graphene::protocol::bitasset_options,

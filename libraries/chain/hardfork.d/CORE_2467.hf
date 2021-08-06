@@ -1,0 +1,6 @@
+// bitshares-core issue #2467 Alternative bad debt settlement methods
+#ifndef HARDFORK_CORE_2467_TIME
+// Jan 1 2030, midnight; this is a dummy date until a hardfork date is scheduled
+#define HARDFORK_CORE_2467_TIME (fc::time_point_sec( 1893456000 ))
+#define HARDFORK_CORE_2467_PASSED(now) (now > HARDFORK_CORE_2467_TIME)
+#endif

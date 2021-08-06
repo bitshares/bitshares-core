@@ -299,16 +299,24 @@ namespace graphene { namespace chain {
          bool has_settlement()const { return !settlement_price.is_null(); }
 
          /**
-          *  In the event of a black swan, the swan price is saved in the settlement price, and all margin positions
-          *  are settled at the same price with the siezed collateral being moved into the settlement fund. From this
-          *  point on no further updates to the asset are permitted (no feeds, etc) and forced settlement occurs
-          *  immediately when requested, using the settlement price and fund.
+          *  In the event of global settlement, all margin positions
+          *  are settled with the siezed collateral being moved into the settlement fund. From this
+          *  point on forced settlement occurs immediately when requested, using the settlement price and fund.
           */
          ///@{
-         /// Price at which force settlements of a black swanned asset will occur
+         /// Price at which force settlements of a globally settled asset will occur
          price settlement_price;
-         /// Amount of collateral which is available for force settlement
+         /// Amount of collateral which is available for force settlement due to global settlement
          share_type settlement_fund;
+         ///@}
+
+         /// In the event of individual settlements, debt and collateral of the margin positions which got settled
+         /// are moved here.
+         ///@{
+         /// Amount of debt due to individual settlements
+         share_type individual_settlement_debt;
+         /// Amount of collateral which is available for force settlement due to individual settlements
+         share_type individual_settlement_fund;
          ///@}
 
          /// Track whether core_exchange_rate in corresponding asset_object has updated
