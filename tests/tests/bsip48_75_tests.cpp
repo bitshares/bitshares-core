@@ -51,7 +51,7 @@ BOOST_AUTO_TEST_CASE( hardfork_protection_test )
       fund( sam, asset(init_amount) );
       fund( feeder, asset(init_amount) );
 
-      uint16_t bitmask = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK;
+      uint16_t bitmask = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK & ~disable_bdsm_update;
       uint16_t uiamask = DEFAULT_UIA_ASSET_ISSUER_PERMISSION;
 
       uint16_t bitflag = ~global_settle & ~committee_fed_asset; // high bits are set
@@ -992,7 +992,7 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       fund( sam, asset(init_amount) );
       fund( feeder, asset(init_amount) );
 
-      uint16_t bitmask = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK;
+      uint16_t bitmask = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK & ~disable_bdsm_update;
       uint16_t uiamask = DEFAULT_UIA_ASSET_ISSUER_PERMISSION;
 
       uint16_t bitflag = ~global_settle & ~committee_fed_asset; // high bits are set
@@ -1062,6 +1062,8 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
 
       // advance to bsip48/75 hard fork
       generate_blocks( HARDFORK_BSIP_48_75_TIME );
+      if( hf2467 )
+         generate_blocks( HARDFORK_CORE_2467_TIME );
       set_expiration( db, trx );
 
       // take a look at flags of UIA
@@ -1071,6 +1073,7 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       auop.new_options = samcoin_id(db).options;
       for( uint16_t bit = 0x8000; bit > 0; bit >>= 1 )
       {
+         idump( (bit) );
          auop.new_options.flags = UIA_VALID_FLAGS_MASK | bit;
          if( auop.new_options.flags == UIA_VALID_FLAGS_MASK )
             continue;
@@ -1102,6 +1105,7 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       auop2.new_options = sambit_id(db).options;
       for( uint16_t bit = 0x8000; bit > 0; bit >>= 1 )
       {
+         idump( (bit) );
          auop2.new_options.flags = valid_bitflag | bit;
          if( auop2.new_options.flags == valid_bitflag )
             continue;
@@ -1155,7 +1159,8 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       // Unable to create a new MPA with an unknown bit in flags
       acop2.symbol = "NEWSAMBIT";
       // With all possible bits in permissions set to 1
-      acop2.common_options.issuer_permissions = ASSET_ISSUER_PERMISSION_MASK;
+      acop2.common_options.issuer_permissions = hf2467 ? ASSET_ISSUER_PERMISSION_MASK
+                                                       : ( ASSET_ISSUER_PERMISSION_MASK & ~disable_bdsm_update );
       for( uint16_t bit = 0x8000; bit > 0; bit >>= 1 )
       {
          acop2.common_options.flags = valid_bitflag | bit;
@@ -1181,6 +1186,10 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       BOOST_CHECK( !newsambit_id(db).can_owner_update_icr() );
       BOOST_CHECK( !newsambit_id(db).can_owner_update_mcr() );
       BOOST_CHECK( !newsambit_id(db).can_owner_update_mssr() );
+      if( hf2467 )
+         BOOST_CHECK( !newsambit_id(db).can_owner_update_bdsm() );
+      else
+         BOOST_CHECK( newsambit_id(db).can_owner_update_bdsm() );
 
       // Able to propose too
       propose( acop2 );
@@ -1191,6 +1200,12 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       edump((e.to_detail_string()));
       throw;
    }
+}
+
+BOOST_AUTO_TEST_CASE( invalid_flags_in_asset_after_hf2467 )
+{
+   hf2467 = true;
+   INVOKE( invalid_flags_in_asset );
 }
 
 BOOST_AUTO_TEST_CASE( update_asset_precision )

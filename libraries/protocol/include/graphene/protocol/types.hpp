@@ -179,7 +179,8 @@ enum asset_issuer_permission_flags {
     ///@{
     disable_mcr_update   = 0x800, ///< the bitasset owner can not update MCR, permisison only
     disable_icr_update   = 0x1000, ///< the bitasset owner can not update ICR, permisison only
-    disable_mssr_update  = 0x2000 ///< the bitasset owner can not update MSSR, permisison only
+    disable_mssr_update  = 0x2000, ///< the bitasset owner can not update MSSR, permisison only
+    disable_bdsm_update  = 0x4000  ///< the bitasset owner can not update BDSM, permission only
     ///@}
     ///@}
 };
@@ -199,7 +200,8 @@ const static uint16_t ASSET_ISSUER_PERMISSION_MASK =
         | disable_new_supply
         | disable_mcr_update
         | disable_icr_update
-        | disable_mssr_update;
+        | disable_mssr_update
+        | disable_bdsm_update;
 // The "enable" bits for non-UIA assets
 const static uint16_t ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK =
         charge_market_fee
@@ -217,7 +219,8 @@ const static uint16_t ASSET_ISSUER_PERMISSION_DISABLE_BITS_MASK =
         | disable_new_supply
         | disable_mcr_update
         | disable_icr_update
-        | disable_mssr_update;
+        | disable_mssr_update
+        | disable_bdsm_update;
 // The bits that can be used in asset issuer permissions for UIA assets
 const static uint16_t UIA_ASSET_ISSUER_PERMISSION_MASK =
         charge_market_fee
@@ -242,7 +245,8 @@ const static uint16_t PERMISSION_ONLY_MASK =
         global_settle
         | disable_mcr_update
         | disable_icr_update
-        | disable_mssr_update;
+        | disable_mssr_update
+        | disable_bdsm_update;
 // The bits that can be used in flags for non-UIA assets
 const static uint16_t VALID_FLAGS_MASK = ASSET_ISSUER_PERMISSION_MASK & ~PERMISSION_ONLY_MASK;
 // the bits that can be used in flags for UIA assets
@@ -360,6 +364,7 @@ FC_REFLECT_ENUM(graphene::protocol::asset_issuer_permission_flags,
                 (disable_mcr_update)
                 (disable_icr_update)
                 (disable_mssr_update)
+                (disable_bdsm_update)
                )
 
 namespace fc { namespace raw {

@@ -51,6 +51,7 @@ namespace detail {
    void check_asset_claim_fees_hardfork_87_74_collatfee(const fc::time_point_sec& block_time,
                                                         const asset_claim_fees_operation& op); // HF_REMOVABLE
 
+   void check_asset_options_hf_core2467(const fc::time_point_sec& next_maint_time, const asset_options& options);
    void check_bitasset_opts_hf_core2467(const fc::time_point_sec& next_maint_time, const bitasset_options& options);
 }
 
@@ -71,6 +72,7 @@ struct proposal_operation_hardfork_visitor
       detail::check_asset_options_hf_1774(block_time, v.common_options);
       detail::check_asset_options_hf_bsip_48_75(block_time, v.common_options);
       detail::check_asset_options_hf_bsip81(block_time, v.common_options);
+      detail::check_asset_options_hf_core2467( next_maintenance_time, v.common_options ); // HF_REMOVABLE
       if( v.bitasset_opts.valid() ) {
          detail::check_bitasset_options_hf_bsip_48_75( block_time, *v.bitasset_opts );
          detail::check_bitasset_options_hf_bsip74( block_time, *v.bitasset_opts ); // HF_REMOVABLE
@@ -90,6 +92,7 @@ struct proposal_operation_hardfork_visitor
       detail::check_asset_options_hf_1774(block_time, v.new_options);
       detail::check_asset_options_hf_bsip_48_75(block_time, v.new_options);
       detail::check_asset_options_hf_bsip81(block_time, v.new_options);
+      detail::check_asset_options_hf_core2467( next_maintenance_time, v.new_options ); // HF_REMOVABLE
 
       detail::check_asset_update_extensions_hf_bsip_48_75( block_time, v.extensions.value );
 

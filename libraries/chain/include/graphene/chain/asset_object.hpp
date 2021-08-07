@@ -111,6 +111,8 @@ namespace graphene { namespace chain {
          bool can_owner_update_icr()const { return !(options.issuer_permissions & disable_icr_update); }
          /// @return true if the asset owner can update MSSR directly
          bool can_owner_update_mssr()const { return !(options.issuer_permissions & disable_mssr_update); }
+         /// @return true if the asset owner can change bad debt settlement method
+         bool can_owner_update_bdsm()const { return !(options.issuer_permissions & disable_bdsm_update); }
 
          /// Helper function to get an asset object with the given amount in this asset's type
          asset amount(share_type a)const { return asset(a, id); }

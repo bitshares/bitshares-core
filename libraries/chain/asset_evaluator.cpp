@@ -144,12 +144,25 @@ namespace detail {
                  "Collateral-denominated fees are not yet active and therefore cannot be claimed." );
    }
 
+   void check_asset_options_hf_core2467(const fc::time_point_sec& next_maint_time, const asset_options& options)
+   {
+      // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
+      if ( !HARDFORK_CORE_2467_PASSED(next_maint_time) )
+      {
+         // new issuer permissions should not be set until activation of the hardfork
+         FC_ASSERT( 0 == (options.issuer_permissions & asset_issuer_permission_flags::disable_bdsm_update),
+                    "New asset issuer permission bits should not be set before Hardfork core-2467" );
+      }
+   }
+
    void check_bitasset_opts_hf_core2467(const fc::time_point_sec& next_maint_time, const bitasset_options& options)
    {
       // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
-      FC_ASSERT( !options.extensions.value.bad_debt_settlement_method.valid()
-                 || HARDFORK_CORE_2467_PASSED(next_maint_time),
-                 "A BitAsset's bad debt settlement method cannot be set before Hardfork core-2467" );
+      if ( !HARDFORK_CORE_2467_PASSED(next_maint_time) )
+      {
+         FC_ASSERT( !options.extensions.value.bad_debt_settlement_method.valid(),
+                    "A BitAsset's bad debt settlement method cannot be set before Hardfork core-2467" );
+      }
    }
 
 } // graphene::chain::detail
@@ -165,6 +178,7 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    detail::check_asset_options_hf_1774(now, op.common_options);
    detail::check_asset_options_hf_bsip_48_75(now, op.common_options);
    detail::check_asset_options_hf_bsip81(now, op.common_options);
+   detail::check_asset_options_hf_core2467( next_maint_time, op.common_options ); // HF_REMOVABLE
    if( op.bitasset_opts ) {
       detail::check_bitasset_options_hf_bsip_48_75( now, *op.bitasset_opts );
       detail::check_bitasset_options_hf_bsip74( now, *op.bitasset_opts ); // HF_REMOVABLE
@@ -409,11 +423,13 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 { try {
    const database& d = db();
    const time_point_sec now = d.head_block_time();
+   const fc::time_point_sec next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
 
    // Hardfork Checks:
    detail::check_asset_options_hf_1774(now, o.new_options);
    detail::check_asset_options_hf_bsip_48_75(now, o.new_options);
    detail::check_asset_options_hf_bsip81(now, o.new_options);
+   detail::check_asset_options_hf_core2467( next_maint_time, o.new_options ); // HF_REMOVABLE
    detail::check_asset_update_extensions_hf_bsip_48_75( now, o.extensions.value );
 
    bool hf_bsip_48_75_passed = ( HARDFORK_BSIP_48_75_PASSED( now ) );

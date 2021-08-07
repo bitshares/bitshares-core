@@ -219,6 +219,7 @@ struct database_fixture_base {
    bool skip_key_index_test = false;
    uint32_t anon_acct_count;
    bool hf1270 = false;
+   bool hf2467 = false;
    bool hf2481 = false;
    bool bsip77 = false;
 

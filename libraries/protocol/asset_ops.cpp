@@ -309,6 +309,8 @@ void asset_options::validate_flags( bool is_market_issued )const
               "Can not set disable_icr_update flag, it is for issuer permission only" );
    FC_ASSERT( !(flags & disable_mssr_update),
               "Can not set disable_mssr_update flag, it is for issuer permission only" );
+   FC_ASSERT( !(flags & disable_bdsm_update),
+              "Can not set disable_mssr_update flag, it is for issuer permission only" );
    if( !is_market_issued )
    {
       FC_ASSERT( !(flags & ~UIA_ASSET_ISSUER_PERMISSION_MASK),
