@@ -49,25 +49,25 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
 {
    bool after_core_hardfork_1270 = ( next_maintenance_time > HARDFORK_CORE_1270_TIME ); // call price caching issue
    current_feed_publication_time = current_time;
-   vector<std::reference_wrapper<const price_feed_with_icr>> current_feeds;
+   vector<std::reference_wrapper<const price_feed_with_icr>> effective_feeds;
    // find feeds that were alive at current_time
    for( const pair<account_id_type, pair<time_point_sec,price_feed_with_icr>>& f : feeds )
    {
       if( (current_time - f.second.first).to_seconds() < options.feed_lifetime_sec &&
           f.second.first != time_point_sec() )
       {
-         current_feeds.emplace_back(f.second.second);
+         effective_feeds.emplace_back(f.second.second);
          current_feed_publication_time = std::min(current_feed_publication_time, f.second.first);
       }
    }
 
    // If there are no valid feeds, or the number available is less than the minimum to calculate a median...
-   if( current_feeds.size() < options.minimum_feeds )
+   if( effective_feeds.size() < options.minimum_feeds )
    {
       //... don't calculate a median, and set a null feed
       feed_cer_updated = false; // new median cer is null, won't update asset_object anyway, set to false for better performance
       current_feed_publication_time = current_time;
-      current_feed = price_feed_with_icr();
+      median_feed = price_feed_with_icr();
       if( after_core_hardfork_1270 )
       {
          // update data derived from MCR, ICR and etc
@@ -75,21 +75,22 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
       }
       return;
    }
-   if( current_feeds.size() == 1 )
+
+   if( effective_feeds.size() == 1 )
    {
-      if( current_feed.core_exchange_rate != current_feeds.front().get().core_exchange_rate )
+      if( median_feed.core_exchange_rate != effective_feeds.front().get().core_exchange_rate )
          feed_cer_updated = true;
-      current_feed = current_feeds.front();
+      median_feed = effective_feeds.front();
       // Note: perhaps can defer updating current_maintenance_collateralization for better performance
       if( after_core_hardfork_1270 )
       {
          const auto& exts = options.extensions.value;
          if( exts.maintenance_collateral_ratio.valid() )
-            current_feed.maintenance_collateral_ratio = *exts.maintenance_collateral_ratio;
+            median_feed.maintenance_collateral_ratio = *exts.maintenance_collateral_ratio;
          if( exts.maximum_short_squeeze_ratio.valid() )
-            current_feed.maximum_short_squeeze_ratio = *exts.maximum_short_squeeze_ratio;
+            median_feed.maximum_short_squeeze_ratio = *exts.maximum_short_squeeze_ratio;
          if( exts.initial_collateral_ratio.valid() )
-            current_feed.initial_collateral_ratio = *exts.initial_collateral_ratio;
+            median_feed.initial_collateral_ratio = *exts.initial_collateral_ratio;
          // update data derived from MCR, ICR and etc
          refresh_cache();
       }
@@ -97,18 +98,18 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
    }
 
    // *** Begin Median Calculations ***
-   price_feed_with_icr median_feed;
-   const auto median_itr = current_feeds.begin() + current_feeds.size() / 2;
+   price_feed_with_icr tmp_median_feed;
+   const auto median_itr = effective_feeds.begin() + effective_feeds.size() / 2;
 #define CALCULATE_MEDIAN_VALUE(r, data, field_name) \
-   std::nth_element( current_feeds.begin(), median_itr, current_feeds.end(), \
+   std::nth_element( effective_feeds.begin(), median_itr, effective_feeds.end(), \
                      [](const price_feed_with_icr& a, const price_feed_with_icr& b) { \
       return a.field_name < b.field_name; \
    }); \
-   median_feed.field_name = median_itr->get().field_name;
+   tmp_median_feed.field_name = median_itr->get().field_name;
 
 #define CHECK_AND_CALCULATE_MEDIAN_VALUE(r, data, field_name) \
    if( options.extensions.value.field_name.valid() ) { \
-      median_feed.field_name = *options.extensions.value.field_name; \
+      tmp_median_feed.field_name = *options.extensions.value.field_name; \
    } else { \
       CALCULATE_MEDIAN_VALUE(r, data, field_name); \
    }
@@ -120,9 +121,9 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
 #undef CALCULATE_MEDIAN_VALUE
    // *** End Median Calculations ***
 
-   if( current_feed.core_exchange_rate != median_feed.core_exchange_rate )
+   if( median_feed.core_exchange_rate != tmp_median_feed.core_exchange_rate )
       feed_cer_updated = true;
-   current_feed = median_feed;
+   median_feed = tmp_median_feed;
    // Note: perhaps can defer updating current_maintenance_collateralization for better performance
    if( after_core_hardfork_1270 )
    {
@@ -133,9 +134,9 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
 
 void asset_bitasset_data_object::refresh_cache()
 {
-   current_maintenance_collateralization = current_feed.maintenance_collateralization();
-   if( current_feed.initial_collateral_ratio > current_feed.maintenance_collateral_ratio ) // if ICR is above MCR
-      current_initial_collateralization = current_feed.calculate_initial_collateralization();
+   current_maintenance_collateralization = median_feed.maintenance_collateralization();
+   if( median_feed.initial_collateral_ratio > median_feed.maintenance_collateral_ratio ) // if ICR is above MCR
+      current_initial_collateralization = median_feed.calculate_initial_collateralization();
    else // if ICR is not above MCR
       current_initial_collateralization = current_maintenance_collateralization;
 }
@@ -223,6 +224,7 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_dynamic_data_object, (gra
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_bitasset_data_object, (graphene::db::object),
                     (asset_id)
                     (feeds)
+                    (median_feed)
                     (current_feed)
                     (current_feed_publication_time)
                     (current_maintenance_collateralization)

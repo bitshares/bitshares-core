@@ -323,6 +323,18 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     return false;
 }
 
+void database::update_asset_current_feed( const asset_object& mia, const asset_bitasset_data_object& bitasset )
+{
+   modify( bitasset, [this,&mia]( asset_bitasset_data_object& abdo ) {
+      const auto& head_time = head_block_time();
+      const auto& maint_time = get_dynamic_global_properties().next_maintenance_time;
+      //bool after_core_hardfork_2467 = HARDFORK_CORE_2467_PASSED( maint_time ); // bad debt settlement methods
+      abdo.update_median_feeds( head_time, maint_time );
+      // TODO add logic related to bdsm
+      abdo.current_feed = abdo.median_feed;
+   } );
+}
+
 void database::clear_expired_orders()
 { try {
          //Cancel expired limit orders
@@ -549,7 +561,6 @@ void database::clear_expired_force_settlements()
 void database::update_expired_feeds()
 {
    const auto head_time = head_block_time();
-   const auto next_maint_time = get_dynamic_global_properties().next_maintenance_time;
    bool after_hardfork_615 = ( head_time >= HARDFORK_615_TIME );
 
    const auto& idx = get_index_type<asset_bitasset_data_index>().indices().get<by_feed_expiration>();
@@ -558,40 +569,32 @@ void database::update_expired_feeds()
    {
       const asset_bitasset_data_object& b = *itr;
       ++itr; // not always process begin() because old code skipped updating some assets before hf 615
-      bool update_cer = false; // for better performance, to only update bitasset once, also check CER in this function
-      const asset_object* asset_ptr = nullptr;
       // update feeds, check margin calls
       if( after_hardfork_615 || b.feed_is_expired_before_hardfork_615( head_time ) )
       {
          auto old_median_feed = b.current_feed;
-         modify( b, [head_time,next_maint_time,&update_cer]( asset_bitasset_data_object& abdo )
-         {
-            abdo.update_median_feeds( head_time, next_maint_time );
-            if( abdo.need_to_update_cer() )
-            {
-               update_cer = true;
-               abdo.asset_cer_updated = false;
-               abdo.feed_cer_updated = false;
-            }
-         });
+         const asset_object& asset_obj = b.asset_id( *this );
+         update_asset_current_feed( asset_obj, b );
          if( !b.current_feed.settlement_price.is_null()
                && !b.current_feed.margin_call_params_equal( old_median_feed ) )
          {
-            asset_ptr = &b.asset_id( *this );
-            check_call_orders( *asset_ptr, true, false, &b, true );
+            check_call_orders( asset_obj, true, false, &b, true );
          }
-      }
-      // update CER
-      if( update_cer )
-      {
-         if( !asset_ptr )
-            asset_ptr = &b.asset_id( *this );
-         if( asset_ptr->options.core_exchange_rate != b.current_feed.core_exchange_rate )
+         // update CER
+         if( b.need_to_update_cer() )
          {
-            modify( *asset_ptr, [&b]( asset_object& ao )
+            modify( b, []( asset_bitasset_data_object& abdo )
             {
-               ao.options.core_exchange_rate = b.current_feed.core_exchange_rate;
+               abdo.asset_cer_updated = false;
+               abdo.feed_cer_updated = false;
             });
+            if( asset_obj.options.core_exchange_rate != b.current_feed.core_exchange_rate )
+            {
+               modify( asset_obj, [&b]( asset_object& ao )
+               {
+                  ao.options.core_exchange_rate = b.current_feed.core_exchange_rate;
+               });
+            }
          }
       }
    } // for each asset whose feed is expired

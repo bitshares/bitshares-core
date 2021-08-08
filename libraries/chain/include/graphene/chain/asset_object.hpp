@@ -265,12 +265,13 @@ namespace graphene { namespace chain {
          /// The tunable options for BitAssets are stored in this field.
          bitasset_options options;
 
-         /// Feeds published for this asset. If issuer is not committee, the keys in this map are the feed publishing
-         /// accounts; otherwise, the feed publishers are the currently active committee_members and witnesses and this map
-         /// should be treated as an implementation detail. The timestamp on each feed is the time it was published.
+         /// Feeds published for this asset.
+         /// The keys in this map are the feed publishing accounts.
+         /// The timestamp on each feed is the time it was published.
          flat_map<account_id_type, pair<time_point_sec,price_feed_with_icr>> feeds;
-         /// This is the currently active price feed, calculated as the median of values from the currently active
-         /// feeds.
+         /// This is the median of values from the currently active feeds.
+         price_feed_with_icr median_feed;
+         /// This is the currently active price feed, calculated from @ref median_feed and other parameters.
          price_feed_with_icr current_feed;
          /// This is the publication time of the oldest feed which was factored into current_feed.
          time_point_sec current_feed_publication_time;
@@ -284,10 +285,6 @@ namespace graphene { namespace chain {
          /// This value is derived from @ref current_feed (which includes `ICR`) for better performance and
          /// should be kept consistent.
          price current_initial_collateralization;
-
-         /// Derive @ref current_maintenance_collateralization and @ref current_initial_collateralization from
-         /// other member variables.
-         void refresh_cache();
 
          /// True if this asset implements a @ref prediction_market
          bool is_prediction_market = false;
@@ -352,13 +349,19 @@ namespace graphene { namespace chain {
           *
           * This calculates the median feed from @ref feeds, feed_lifetime_sec
           * in @ref options, and the given parameters.
-          * It may update the current_feed_publication_time, current_feed and
-          * current_maintenance_collateralization member variables.
+          * It may update the @ref median_feed, @ref current_feed_publication_time and
+          * @ref current_maintenance_collateralization member variables.
           *
           * @param current_time the current time to use in the calculations
           * @param next_maintenance_time the next chain maintenance time
+          *
+          * @note Called by @ref database::update_asset_current_feed() which updates @ref current_feed afterwards.
           */
          void update_median_feeds(time_point_sec current_time, time_point_sec next_maintenance_time);
+      private:
+         /// Derive @ref current_maintenance_collateralization and @ref current_initial_collateralization from
+         /// other member variables.
+         void refresh_cache();
    };
 
    // key extractor for short backing asset
