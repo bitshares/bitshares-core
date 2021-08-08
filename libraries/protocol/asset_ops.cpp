@@ -258,6 +258,12 @@ void bitasset_options::validate() const
    if( extensions.value.force_settle_fee_percent.valid() )
       FC_ASSERT( *extensions.value.force_settle_fee_percent <= GRAPHENE_100_PERCENT );
 
+   if( extensions.value.bad_debt_settlement_method.valid() )
+   {
+      auto bdsm_count = static_cast<uint8_t>( bad_debt_settlement_type::BDSM_TYPE_COUNT );
+      FC_ASSERT( *extensions.value.bad_debt_settlement_method < bdsm_count,
+                 "bad_debt_settlement_method should be less than ${c}", ("c",bdsm_count) );
+   }
 }
 
 void asset_options::validate()const

@@ -127,7 +127,9 @@ namespace graphene { namespace protocol {
          /// Only the undercollateralized debt positions are closed and their collateral is moved to a limit order
          /// on the order book which can be bought. The derived settlement price is NOT capped, which means remaining
          /// debt positions could be margin called at a worse price.
-         individual_settlement_to_order = 3
+         individual_settlement_to_order = 3,
+         /// Total number of available bad debt settlement methods
+         BDSM_TYPE_COUNT = 4
       };
 
       struct ext

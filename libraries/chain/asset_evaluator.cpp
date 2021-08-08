@@ -815,7 +815,7 @@ static bool update_bitasset_object_options(
    if( op.new_options.minimum_feeds != bdo.options.minimum_feeds )
       should_update_feeds = true;
 
-   // after hardfork core-868-890, we also should call update_asset_current_feed if the feed_lifetime_sec changed
+   // after hardfork core-868-890, we also should call update_bitasset_current_feed if the feed_lifetime_sec changed
    if( after_hf_core_868_890
          && op.new_options.feed_lifetime_sec != bdo.options.feed_lifetime_sec )
    {
@@ -895,7 +895,7 @@ static bool update_bitasset_object_options(
    if( should_update_feeds )
    {
       const auto old_feed = bdo.current_feed;
-      db.update_asset_current_feed( asset_to_update, bdo );
+      db.update_bitasset_current_feed( bdo );
 
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
       feed_actually_changed = ( after_hf_core_868_890 && !old_feed.margin_call_params_equal( bdo.current_feed ) );
@@ -985,7 +985,7 @@ void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_f
          a.feeds[acc];
       }
    });
-   d.update_asset_current_feed( *asset_to_update, bitasset_to_update );
+   d.update_bitasset_current_feed( bitasset_to_update );
    // Process margin calls, allow black swan, not for a new limit order
    d.check_call_orders( *asset_to_update, true, false, &bitasset_to_update );
 
@@ -1213,7 +1213,7 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
       a.feeds[o.publisher] = make_pair( head_time, price_feed_with_icr( o.feed,
                                                       o.extensions.value.initial_collateral_ratio ) );
    });
-   d.update_asset_current_feed( base, bad );
+   d.update_bitasset_current_feed( bad );
 
    if( !old_feed.margin_call_params_equal(bad.current_feed) )
    {

@@ -294,7 +294,7 @@ namespace graphene { namespace chain {
          /// Calculate the maximum force settlement volume per maintenance interval, given the current share supply
          share_type max_force_settlement_volume(share_type current_supply)const;
 
-         /** return true if there has been a black swan, false otherwise */
+         /** return true if the bitasset has been globally settled, false otherwise */
          bool has_settlement()const { return !settlement_price.is_null(); }
 
          /**
@@ -309,14 +309,23 @@ namespace graphene { namespace chain {
          share_type settlement_fund;
          ///@}
 
-         /// In the event of individual settlements, debt and collateral of the margin positions which got settled
-         /// are moved here.
+         /// In the event of individual settlements to fund, debt and collateral of the margin positions which got
+         /// settled are moved here.
          ///@{
          /// Amount of debt due to individual settlements
          share_type individual_settlement_debt;
          /// Amount of collateral which is available for force settlement due to individual settlements
          share_type individual_settlement_fund;
          ///@}
+
+         /// Get the effective bad debt settlement method of this bitasset
+         bitasset_options::bad_debt_settlement_type get_bad_debt_settlement_method() const
+         {
+            using bdsm_type = bitasset_options::bad_debt_settlement_type;
+            if( !options.extensions.value.bad_debt_settlement_method.valid() )
+               return bdsm_type::global_settlement;
+            return static_cast<bdsm_type>( *options.extensions.value.bad_debt_settlement_method );
+         }
 
          /// Track whether core_exchange_rate in corresponding asset_object has updated
          bool asset_cer_updated = false;
@@ -349,13 +358,14 @@ namespace graphene { namespace chain {
           *
           * This calculates the median feed from @ref feeds, feed_lifetime_sec
           * in @ref options, and the given parameters.
-          * It may update the @ref median_feed, @ref current_feed_publication_time and
+          * It may update the @ref median_feed, @ref current_feed_publication_time,
+          * @ref current_initial_collateralization and
           * @ref current_maintenance_collateralization member variables.
           *
           * @param current_time the current time to use in the calculations
           * @param next_maintenance_time the next chain maintenance time
           *
-          * @note Called by @ref database::update_asset_current_feed() which updates @ref current_feed afterwards.
+          * @note Called by @ref database::update_bitasset_current_feed() which updates @ref current_feed afterwards.
           */
          void update_median_feeds(time_point_sec current_time, time_point_sec next_maintenance_time);
       private:

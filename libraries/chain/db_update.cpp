@@ -279,7 +279,8 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     // * if there is no force settlement, we check here with margin call fee in consideration.
 
     auto least_collateral = call_ptr->collateralization();
-    if( ~least_collateral >= highest  ) 
+    bool gs = after_core_hardfork_2481 ? ( ~least_collateral > highest ) : ( ~least_collateral >= highest );
+    if( gs )
     {
        wdump( (*call_ptr) );
        elog( "Black Swan detected on asset ${symbol} (${id}) at block ${b}: \n"
@@ -323,15 +324,70 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     return false;
 }
 
-void database::update_asset_current_feed( const asset_object& mia, const asset_bitasset_data_object& bitasset )
+// Helper function to check whether we need to udpate current_feed.settlement_price.
+static optional<price> get_derived_current_feed_price( const database& db,
+                                                       const asset_bitasset_data_object& bitasset )
 {
-   modify( bitasset, [this,&mia]( asset_bitasset_data_object& abdo ) {
-      const auto& head_time = head_block_time();
-      const auto& maint_time = get_dynamic_global_properties().next_maintenance_time;
-      //bool after_core_hardfork_2467 = HARDFORK_CORE_2467_PASSED( maint_time ); // bad debt settlement methods
-      abdo.update_median_feeds( head_time, maint_time );
-      // TODO add logic related to bdsm
-      abdo.current_feed = abdo.median_feed;
+   optional<price> result;
+   // check for null first
+   if( bitasset.median_feed.settlement_price.is_null() )
+      return result;
+
+   using bdsm_type = bitasset_options::bad_debt_settlement_type;
+   const auto bdsm = bitasset.get_bad_debt_settlement_method();
+   if( bdsm_type::no_settlement == bdsm )
+   {
+      const auto& call_collateral_index = db.get_index_type<call_order_index>().indices().get<by_collateral>();
+      auto call_min = price::min( bitasset.options.short_backing_asset, bitasset.asset_id );
+      auto call_itr = call_collateral_index.lower_bound( call_min );
+      if( call_itr != call_collateral_index.end() && call_itr->debt_type() == bitasset.asset_id )
+      {
+         // GS if : call_itr->collateralization() < ~( _bitasset_data->median_feed.max_short_squeeze_price() )
+         auto least_collateral = call_itr->collateralization();
+         auto lowest_callable_price = (~least_collateral) * ratio_type( GRAPHENE_COLLATERAL_RATIO_DENOM,
+                                            bitasset.median_feed.maximum_short_squeeze_ratio );
+         if( bitasset.median_feed.settlement_price < lowest_callable_price
+               && bitasset.current_feed.settlement_price != lowest_callable_price )
+            result = lowest_callable_price ;
+      }
+   }
+   else if( bdsm_type::individual_settlement_to_fund == bdsm && bitasset.individual_settlement_debt > 0 )
+   {
+      price fund_price = asset( bitasset.individual_settlement_debt, bitasset.asset_id )
+                       / asset( bitasset.individual_settlement_fund, bitasset.options.short_backing_asset );
+      // FIXME : deal with MSSR and/or MCFR
+      if( bitasset.median_feed.settlement_price < fund_price
+            && bitasset.current_feed.settlement_price != fund_price )
+         result = fund_price;
+   }
+   return result;
+}
+
+void database::update_bitasset_current_feed( const asset_bitasset_data_object& bitasset, bool skip_median_update )
+{
+   // For better performance, if nothing to update, we return
+   optional<price> new_current_feed_price;
+   if( skip_median_update )
+   {
+      new_current_feed_price = get_derived_current_feed_price( *this, bitasset );
+      if( !new_current_feed_price.valid() )
+         return;
+   }
+
+   // We need to update the database
+   modify( bitasset, [this, skip_median_update, &new_current_feed_price]
+                     ( asset_bitasset_data_object& abdo )
+   {
+      if( !skip_median_update )
+      {
+         const auto& head_time = head_block_time();
+         const auto& maint_time = get_dynamic_global_properties().next_maintenance_time;
+         abdo.update_median_feeds( head_time, maint_time );
+         abdo.current_feed = abdo.median_feed;
+         new_current_feed_price = get_derived_current_feed_price( *this, abdo );
+      }
+      if( new_current_feed_price.valid() )
+         abdo.current_feed.settlement_price = *new_current_feed_price;
    } );
 }
 
@@ -574,7 +630,7 @@ void database::update_expired_feeds()
       {
          auto old_median_feed = b.current_feed;
          const asset_object& asset_obj = b.asset_id( *this );
-         update_asset_current_feed( asset_obj, b );
+         update_bitasset_current_feed( b );
          if( !b.current_feed.settlement_price.is_null()
                && !b.current_feed.margin_call_params_equal( old_median_feed ) )
          {

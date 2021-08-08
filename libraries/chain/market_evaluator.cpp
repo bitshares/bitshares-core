@@ -333,7 +333,7 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
       //   force settlement order.
       if( HARDFORK_CORE_2481_PASSED( next_maint_time ) )
       {
-          FC_ASSERT( call_obj->collateralization() > ~( _bitasset_data->current_feed.max_short_squeeze_price() ),
+          FC_ASSERT( call_obj->collateralization() >= ~( _bitasset_data->median_feed.max_short_squeeze_price() ),
                      "Could not create a debt position which would trigger a blackswan event instantly" );
       }
       // check to see if the order needs to be margin called now, but don't allow black swans and require there to be
@@ -406,6 +406,11 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
                );
          }
       }
+      // Update current_feed if needed
+      using bdsm_type = bitasset_options::bad_debt_settlement_type;
+      const auto bdsm = _bitasset_data->get_bad_debt_settlement_method();
+      if( bdsm_type::no_settlement == bdsm )
+         d.update_bitasset_current_feed( *_bitasset_data, true );
    }
 
    return call_order_id;

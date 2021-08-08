@@ -673,7 +673,10 @@ namespace graphene { namespace chain {
       public:
          generic_operation_result process_tickets();
          /// Derive @ref asset_bitasset_data_object::current_feed from other data in the database
-         void update_asset_current_feed( const asset_object& mia, const asset_bitasset_data_object& bitasset );
+         /// @param bitasset The bitasset object
+         /// @param skip_median_update Whether to skip updating @ref asset_bitasset_data_object::median_feed
+         void update_bitasset_current_feed( const asset_bitasset_data_object& bitasset,
+                                            bool skip_median_update = false );
       private:
          void update_global_dynamic_data( const signed_block& b, const uint32_t missed_blocks );
          void update_signing_witness(const witness_object& signing_witness, const signed_block& new_block);

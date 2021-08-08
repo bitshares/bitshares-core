@@ -991,11 +991,11 @@ void process_hf_2103( database& db )
    }
 }
 
-static void update_asset_current_feeds(database& db)
+static void update_bitasset_current_feeds(database& db)
 {
    for( const auto& bitasset : db.get_index_type<asset_bitasset_data_index>().indices() )
    {
-      db.update_asset_current_feed( bitasset.asset_id(db), bitasset );
+      db.update_bitasset_current_feed( bitasset );
    }
 }
 
@@ -1064,8 +1064,8 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
       } // end loop of each feed
 
       // always update the median feed due to https://github.com/bitshares/bitshares-core/issues/890
-      db.update_asset_current_feed( current_asset, bitasset_data );
-      // NOTE: Normally we should call check_call_orders() after called update_asset_current_feed(), but for
+      db.update_bitasset_current_feed( bitasset_data );
+      // NOTE: Normally we should call check_call_orders() after called update_bitasset_current_feed(), but for
       // mainnet actually check_call_orders() would do nothing, so we skipped it for better performance.
 
    } // for each market issued asset
@@ -1485,7 +1485,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    if( to_update_and_match_call_orders_for_hf_1270 )
    {
       update_call_orders_hf_1270(*this);
-      update_asset_current_feeds(*this);
+      update_bitasset_current_feeds(*this);
       match_call_orders(*this);
    }
 
