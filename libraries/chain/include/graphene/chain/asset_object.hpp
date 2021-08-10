@@ -327,6 +327,24 @@ namespace graphene { namespace chain {
             return static_cast<bdsm_type>( *options.extensions.value.bad_debt_settlement_method );
          }
 
+         /// Get margin call order price (MCOP) of this bitasset
+         price get_margin_call_order_price() const
+         {
+            return current_feed.margin_call_order_price( options.extensions.value.margin_call_fee_ratio );
+         }
+
+         /// Get margin call order ratio (MCOR) of this bitasset
+         ratio_type get_margin_call_order_ratio() const
+         {
+            return current_feed.margin_call_order_ratio( options.extensions.value.margin_call_fee_ratio );
+         }
+
+         /// Get margin call pays ratio (MCPR) of this bitasset
+         ratio_type get_margin_call_pays_ratio() const
+         {
+            return current_feed.margin_call_pays_ratio( options.extensions.value.margin_call_fee_ratio );
+         }
+
          /// Track whether core_exchange_rate in corresponding asset_object has updated
          bool asset_cer_updated = false;
 

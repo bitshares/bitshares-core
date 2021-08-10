@@ -403,6 +403,7 @@ namespace graphene { namespace chain {
          /// @param settle the force-settlement order
          /// @param call the call order
          /// @param match_price the price to calculate how much the call order pays
+         /// @param bitasset the bitasset object corresponding to debt asset of the call order
          /// @param max_settlement the maximum debt amount to be filled during this match
          /// @param fill_price the price to be recorded in market history plugin. It is the price to calculate
          ///        how much the settle order receives when the call order is being margin called
@@ -413,6 +414,7 @@ namespace graphene { namespace chain {
          asset match_impl( const force_settlement_object& settle,
                            const call_order_object& call,
                            const price& match_price,
+                           const asset_bitasset_data_object& bitasset,
                            const asset& max_settlement,
                            const price& fill_price,
                            bool is_margin_call = false,
@@ -473,6 +475,7 @@ namespace graphene { namespace chain {
           * @param feed_price the price of the current feed
           * @param maintenance_collateral_ratio the maintenance collateral ratio
           * @param maintenance_collateralization the maintenance collateralization
+          * @param bitasset the bitasset object corresponding to debt asset of the call order
           * @param call_pays_price price call order pays. Call order may pay more collateral
           *    than limit order takes if call order subject to a margin call fee.
           * @returns 0 if no orders were matched, 1 if taker was filled, 2 if maker was filled, 3 if both were filled
@@ -481,14 +484,16 @@ namespace graphene { namespace chain {
                     const price& trade_price,
                     const price& feed_price, const uint16_t maintenance_collateral_ratio,
                     const optional<price>& maintenance_collateralization,
+                    const asset_bitasset_data_object& bitasset,
                     const price& call_pays_price);
          /// If separate call_pays_price not provided, assume call pays at trade_price:
          match_result_type match( const limit_order_object& taker, const call_order_object& maker,
                     const price& trade_price,
                     const price& feed_price, const uint16_t maintenance_collateral_ratio,
-                    const optional<price>& maintenance_collateralization) {
+                    const optional<price>& maintenance_collateralization,
+                    const asset_bitasset_data_object& bitasset) {
             return match(taker, maker, trade_price, feed_price, maintenance_collateral_ratio,
-                         maintenance_collateralization, trade_price);
+                         maintenance_collateralization, bitasset, trade_price);
          }
 
          ///@}
@@ -497,6 +502,7 @@ namespace graphene { namespace chain {
          /// @param settle the force-settlement order
          /// @param call the call order
          /// @param match_price the price to calculate how much the call order pays
+         /// @param bitasset the bitasset object corresponding to debt asset of the call order
          /// @param max_settlement the maximum debt amount to be filled during this match
          /// @param fill_price the price to be recorded in market history plugin. It is the price to calculate
          ///        how much the settle order receives when the call order is being margin called
@@ -506,6 +512,7 @@ namespace graphene { namespace chain {
          asset match( const force_settlement_object& settle,
                       const call_order_object& call,
                       const price& match_price,
+                      const asset_bitasset_data_object& bitasset,
                       const asset& max_settlement,
                       const price& fill_price,
                       bool is_margin_call = false,
@@ -515,6 +522,7 @@ namespace graphene { namespace chain {
          /// @param call the call order being margin called
          /// @param settle the force-settlement order
          /// @param match_price the price to calculate how much the call order pays
+         /// @param bitasset the bitasset object corresponding to debt asset of the call order
          /// @param max_settlement the maximum debt amount to be filled during this match
          /// @param fill_price the price to be recorded in market history plugin. It is the price to calculate
          ///        how much the settle order receives.
@@ -523,6 +531,7 @@ namespace graphene { namespace chain {
          asset match( const call_order_object& call,
                       const force_settlement_object& settle,
                       const price& match_price,
+                      const asset_bitasset_data_object& bitasset,
                       const asset& max_settlement,
                       const price& fill_price,
                       const ratio_type* margin_call_pays_ratio = nullptr );

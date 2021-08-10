@@ -533,8 +533,7 @@ bool database::apply_order(const limit_order_object& new_order_object)
             call_match_price = ~sell_abd->current_feed.max_short_squeeze_price_before_hf_1270();
             call_pays_price = call_match_price;
          } else {
-            call_match_price = ~sell_abd->current_feed.
-               margin_call_order_price(sell_abd->options.extensions.value.margin_call_fee_ratio);
+            call_match_price = ~sell_abd->get_margin_call_order_price();
             call_pays_price = ~sell_abd->current_feed.max_short_squeeze_price();
          }
          if( ~new_order_object.sell_price <= call_match_price ) // If new limit order price is good enough to
@@ -576,7 +575,7 @@ bool database::apply_order(const limit_order_object& new_order_object)
                                              sell_abd->current_feed.settlement_price,
                                              sell_abd->current_feed.maintenance_collateral_ratio,
                                              sell_abd->current_maintenance_collateralization,
-                                             call_pays_price);
+                                             *sell_abd, call_pays_price );
             // match returns 1 or 3 when the new order was fully filled.
             // In this case, we stop matching; otherwise keep matching.
             // since match can return 0 due to BSIP38 (hf core-834), we no longer only check if the result is 2.
@@ -605,7 +604,7 @@ bool database::apply_order(const limit_order_object& new_order_object)
             const auto match_result = match( new_order_object, *call_itr, call_match_price,
                                              sell_abd->current_feed.settlement_price,
                                              sell_abd->current_feed.maintenance_collateral_ratio,
-                                             optional<price>() );
+                                             optional<price>(), *sell_abd );
             // match returns 1 or 3 when the new order was fully filled.
             // In this case, we stop matching; otherwise keep matching.
             // since match can return 0 due to BSIP38 (hard fork core-834),
@@ -654,8 +653,7 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
 
    // Price at which margin calls sit on the books.
    // It is the MCOP, which may deviate from MSSP due to MCFR.
-   price call_match_price = bitasset.current_feed.
-               margin_call_order_price(bitasset.options.extensions.value.margin_call_fee_ratio);
+   price call_match_price = bitasset.get_margin_call_order_price();
    // Price margin call actually relinquishes collateral at. Equals the MSSP and it may
    // differ from call_match_price if there is a Margin Call Fee.
    price call_pays_price = bitasset.current_feed.max_short_squeeze_price();
@@ -685,7 +683,7 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
 
       // Note: the call order should be able to pay at call_pays_price,
       //       thus no need to pass in margin_call_pays_ratio
-      match( new_settlement, *call_itr, call_pays_price, max_debt_to_cover, call_match_price, true );
+      match( new_settlement, *call_itr, call_pays_price, bitasset, max_debt_to_cover, call_match_price, true );
 
       // Check whether the new order is gone
       finished = ( nullptr == find_object( new_obj_id ) );
@@ -789,6 +787,7 @@ database::match_result_type database::match( const limit_order_object& bid, cons
                      const price& match_price,
                      const price& feed_price, const uint16_t maintenance_collateral_ratio,
                      const optional<price>& maintenance_collateralization,
+                     const asset_bitasset_data_object& bitasset,
                      const price& call_pays_price )
 {
    FC_ASSERT( bid.sell_asset_id() == ask.debt_type() );
@@ -842,6 +841,10 @@ database::match_result_type database::match( const limit_order_object& bid, cons
    bool taker_filled = fill_limit_order( bid, order_pays, order_receives, cull_taker, match_price, false );
    bool maker_filled = fill_call_order( ask, call_pays, call_receives, match_price, true, margin_call_fee );
 
+   // Update current_feed after filled call order if needed
+   if( bitasset_options::bad_debt_settlement_type::no_settlement == bitasset.get_bad_debt_settlement_method() )
+      update_bitasset_current_feed( bitasset, true );
+
    // Note: result can be none_filled when call order has target_collateral_ratio option set.
    match_result_type result = get_match_result( taker_filled, maker_filled );
    return result;
@@ -851,29 +854,32 @@ database::match_result_type database::match( const limit_order_object& bid, cons
 asset database::match( const force_settlement_object& settle,
                        const call_order_object& call,
                        const price& match_price,
+                       const asset_bitasset_data_object& bitasset,
                        const asset& max_settlement,
                        const price& fill_price,
                        bool is_margin_call,
                        const ratio_type* margin_call_pays_ratio )
 {
-   return match_impl( settle, call, match_price, max_settlement, fill_price, is_margin_call, true,
+   return match_impl( settle, call, match_price, bitasset, max_settlement, fill_price, is_margin_call, true,
                       margin_call_pays_ratio );
 }
 
 asset database::match( const call_order_object& call,
                        const force_settlement_object& settle,
                        const price& match_price,
+                       const asset_bitasset_data_object& bitasset,
                        const asset& max_settlement,
                        const price& fill_price,
                        const ratio_type* margin_call_pays_ratio )
 {
-   return match_impl( settle, call, match_price, max_settlement, fill_price, true, false,
+   return match_impl( settle, call, match_price, bitasset, max_settlement, fill_price, true, false,
                       margin_call_pays_ratio );
 }
 
 asset database::match_impl( const force_settlement_object& settle,
                             const call_order_object& call,
                             const price& p_match_price,
+                            const asset_bitasset_data_object& bitasset,
                             const asset& max_settlement,
                             const price& p_fill_price,
                             bool is_margin_call,
@@ -1069,6 +1075,10 @@ asset database::match_impl( const force_settlement_object& settle,
    fill_call_order( call, call_pays, call_receives, fill_price, settle_is_taker, margin_call_fee );
    // do not pay force-settlement fee if the call is being margin called
    fill_settle_order( settle, settle_pays, settle_receives, fill_price, !settle_is_taker, !is_margin_call );
+
+   // Update current_feed after filled call order if needed
+   if( bitasset_options::bad_debt_settlement_type::no_settlement == bitasset.get_bad_debt_settlement_method() )
+      update_bitasset_current_feed( bitasset, true );
 
    if( cull_settle_order )
       cancel_settle_order( settle );
@@ -1389,11 +1399,9 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     // Stop when limit orders are selling too little USD for too much CORE.
     // Note that since BSIP74, margin calls offer somewhat less CORE per USD
     // if the issuer claims a Margin Call Fee.
-    auto min_price = ( before_core_hardfork_1270 ?
+    auto min_price = before_core_hardfork_1270 ?
                          bitasset.current_feed.max_short_squeeze_price_before_hf_1270()
-                       : bitasset.current_feed.margin_call_order_price(
-                                      bitasset.options.extensions.value.margin_call_fee_ratio )
-                     );
+                       : bitasset.get_margin_call_order_price();
 
     // NOTE limit_price_index is sorted from greatest to least
     auto limit_itr = limit_price_index.lower_bound( max_price );
@@ -1462,8 +1470,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
        price match_price  = limit_order.sell_price;
        // There was a check `match_price.validate();` here, which is removed now because it always passes
-       price call_pays_price = match_price * bitasset.current_feed.margin_call_pays_ratio(
-                                                bitasset.options.extensions.value.margin_call_fee_ratio);
+       price call_pays_price = match_price * bitasset.get_margin_call_pays_ratio();
        // Since BSIP74, the call "pays" a bit more collateral per debt than the match price, with the
        // excess being kept by the asset issuer as a margin call fee. In what follows, we use
        // call_pays_price for the black swan check, and for the TCR, but we still use the match_price,
@@ -1600,6 +1607,10 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        // when for_new_limit_order is true, the call order is maker, otherwise the call order is taker
        fill_call_order( call_order, call_pays, call_receives, match_price, for_new_limit_order, margin_call_fee);
 
+       // Update current_feed after filled call order if needed
+       if( bitasset_options::bad_debt_settlement_type::no_settlement == bitasset.get_bad_debt_settlement_method() )
+          update_bitasset_current_feed( bitasset, true );
+
        if( !before_core_hardfork_1270 )
           call_collateral_itr = call_collateral_index.lower_bound( call_min );
        else if( !before_core_hardfork_343 )
@@ -1650,15 +1661,13 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
    // Price at which margin calls sit on the books.
    // It is the MCOP, which may deviate from MSSP due to MCFR.
    // It is in debt/collateral .
-   price call_match_price = bitasset.current_feed.
-               margin_call_order_price(bitasset.options.extensions.value.margin_call_fee_ratio);
+   price call_match_price = bitasset.get_margin_call_order_price();
    // Price margin call actually relinquishes collateral at. Equals the MSSP and it may
    // differ from call_match_price if there is a Margin Call Fee.
    // It is in debt/collateral .
    price call_pays_price = bitasset.current_feed.max_short_squeeze_price();
 
-   auto margin_call_pays_ratio = bitasset.current_feed.margin_call_pays_ratio(
-                                                bitasset.options.extensions.value.margin_call_fee_ratio);
+   auto margin_call_pays_ratio = bitasset.get_margin_call_pays_ratio();
 
    bool margin_called = false;
    while( settle_itr != settle_end && call_itr != call_end )
@@ -1680,7 +1689,7 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
       // Note: if the call order's CR is too low, it is probably unable to fill at call_pays_price.
       //       In this case, the call order pays at its CR, the settle order may receive less due to margin call fee.
       //       It is processed inside the function.
-      auto result = match( call_order, settle_order, call_pays_price, max_debt_to_cover, call_match_price,
+      auto result = match( call_order, settle_order, call_pays_price, bitasset, max_debt_to_cover, call_match_price,
                            &margin_call_pays_ratio );
 
       if( !margin_called && result.amount > 0 )
