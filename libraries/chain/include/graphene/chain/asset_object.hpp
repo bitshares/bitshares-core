@@ -294,7 +294,7 @@ namespace graphene { namespace chain {
          /// Calculate the maximum force settlement volume per maintenance interval, given the current share supply
          share_type max_force_settlement_volume(share_type current_supply)const;
 
-         /** return true if the bitasset has been globally settled, false otherwise */
+         /// return true if the bitasset has been globally settled, false otherwise
          bool has_settlement()const { return !settlement_price.is_null(); }
 
          /**
@@ -309,6 +309,7 @@ namespace graphene { namespace chain {
          share_type settlement_fund;
          ///@}
 
+         /// The individual bad debt settlement pool.
          /// In the event of individual settlements to fund, debt and collateral of the margin positions which got
          /// settled are moved here.
          ///@{
@@ -317,6 +318,16 @@ namespace graphene { namespace chain {
          /// Amount of collateral which is available for force settlement due to individual settlements
          share_type individual_settlement_fund;
          ///@}
+
+         /// return true if the individual bad debt settlement pool is not empty, false otherwise
+         bool has_individual_settlement()const { return ( individual_settlement_debt != 0 ); }
+
+         /// Get the price of the individual bad debt settlement pool
+         price get_individual_settlement_price() const
+         {
+            return asset( individual_settlement_debt, asset_id )
+                   / asset( individual_settlement_fund, options.short_backing_asset );
+         }
 
          /// Get the effective bad debt settlement method of this bitasset
          bitasset_options::bad_debt_settlement_type get_bad_debt_settlement_method() const
