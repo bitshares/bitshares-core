@@ -89,7 +89,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       // add settle order and check rounding issue
       operation_result result = force_settle(rachel, bitusd.amount(4));
 
-      force_settlement_id_type settle_id = result.get<object_id_type>();
+      force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 4 );
 
       BOOST_CHECK_EQUAL(get_balance(rachel, core), 0);
@@ -139,7 +139,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       set_expiration( db, trx );
       operation_result result2 = force_settle(rachel_id(db), bitusd_id(db).amount(34));
 
-      force_settlement_id_type settle_id2 = result2.get<object_id_type>();
+      force_settlement_id_type settle_id2 = *result2.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id2(db).balance.amount.value, 34 );
 
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 0);
@@ -194,13 +194,13 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       const operation_result result4 = force_settle(rachel_id(db), bitusd_id(db).amount(434));
       const operation_result result5 = force_settle(rachel_id(db), bitusd_id(db).amount(5));
 
-      force_settlement_id_type settle_id3 = result3.get<object_id_type>();
+      force_settlement_id_type settle_id3 = *result3.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id3(db).balance.amount.value, 3 );
 
-      force_settlement_id_type settle_id4 = result4.get<object_id_type>();
+      force_settlement_id_type settle_id4 = *result4.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id4(db).balance.amount.value, 434 );
 
-      force_settlement_id_type settle_id5 = result5.get<object_id_type>();
+      force_settlement_id_type settle_id5 = *result5.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id5(db).balance.amount.value, 5 );
 
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 1);
@@ -386,13 +386,13 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       const operation_result result7 = force_settle(ted_id(db), bitusd_id(db).amount(21));
       const operation_result result8 = force_settle(ted_id(db), bitusd_id(db).amount(22));
 
-      force_settlement_id_type settle_id6 = result6.get<object_id_type>();
+      force_settlement_id_type settle_id6 = *result6.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id6(db).balance.amount.value, 20 );
 
-      force_settlement_id_type settle_id7 = result7.get<object_id_type>();
+      force_settlement_id_type settle_id7 = *result7.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id7(db).balance.amount.value, 21 );
 
-      force_settlement_id_type settle_id8 = result8.get<object_id_type>();
+      force_settlement_id_type settle_id8 = *result8.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id8(db).balance.amount.value, 22 );
 
       BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 0);
@@ -403,13 +403,16 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       const operation_result result102 = force_settle(joe_id(db), bitcny_id(db).amount(1000));
       const operation_result result103 = force_settle(joe_id(db), bitcny_id(db).amount(300));
 
-      force_settlement_id_type settle_id101 = result101.get<object_id_type>();
+      force_settlement_id_type settle_id101 = *result101.get<extendable_operation_result>()
+                                                        .value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id101(db).balance.amount.value, 100 );
 
-      force_settlement_id_type settle_id102 = result102.get<object_id_type>();
+      force_settlement_id_type settle_id102 = *result102.get<extendable_operation_result>()
+                                                        .value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id102(db).balance.amount.value, 1000 );
 
-      force_settlement_id_type settle_id103 = result103.get<object_id_type>();
+      force_settlement_id_type settle_id103 = *result103.get<extendable_operation_result>()
+                                                        .value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id103(db).balance.amount.value, 300 );
 
       BOOST_CHECK_EQUAL(get_balance(joe_id(db), core_id(db)), 0);
@@ -700,7 +703,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       // add settle order and check rounding issue
       const operation_result result = force_settle(rachel, bitusd.amount(4));
 
-      force_settlement_id_type settle_id = result.get<object_id_type>();
+      force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 4 );
 
       BOOST_CHECK_EQUAL(get_balance(rachel, core), 0);
@@ -750,7 +753,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       set_expiration( db, trx );
       const operation_result result2 = force_settle(rachel_id(db), bitusd_id(db).amount(34));
 
-      force_settlement_id_type settle_id2 = result2.get<object_id_type>();
+      force_settlement_id_type settle_id2 = *result2.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id2(db).balance.amount.value, 34 );
 
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 0);
@@ -805,13 +808,13 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       const operation_result result4 = force_settle(rachel_id(db), bitusd_id(db).amount(434));
       const operation_result result5 = force_settle(rachel_id(db), bitusd_id(db).amount(5));
 
-      force_settlement_id_type settle_id3 = result3.get<object_id_type>();
+      force_settlement_id_type settle_id3 = *result3.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id3(db).balance.amount.value, 3 );
 
-      force_settlement_id_type settle_id4 = result4.get<object_id_type>();
+      force_settlement_id_type settle_id4 = *result4.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id4(db).balance.amount.value, 434 );
 
-      force_settlement_id_type settle_id5 = result5.get<object_id_type>();
+      force_settlement_id_type settle_id5 = *result5.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id5(db).balance.amount.value, 5 );
 
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 1);
@@ -999,13 +1002,13 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       const operation_result result7 = force_settle(ted_id(db), bitusd_id(db).amount(21));
       const operation_result result8 = force_settle(ted_id(db), bitusd_id(db).amount(22));
 
-      force_settlement_id_type settle_id6 = result6.get<object_id_type>();
+      force_settlement_id_type settle_id6 = *result6.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id6(db).balance.amount.value, 20 );
 
-      force_settlement_id_type settle_id7 = result7.get<object_id_type>();
+      force_settlement_id_type settle_id7 = *result7.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id7(db).balance.amount.value, 21 );
 
-      force_settlement_id_type settle_id8 = result8.get<object_id_type>();
+      force_settlement_id_type settle_id8 = *result8.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id8(db).balance.amount.value, 22 );
 
       BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 0);
@@ -1016,13 +1019,16 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       const operation_result result102 = force_settle(joe_id(db), bitcny_id(db).amount(1000));
       const operation_result result103 = force_settle(joe_id(db), bitcny_id(db).amount(300));
 
-      force_settlement_id_type settle_id101 = result101.get<object_id_type>();
+      force_settlement_id_type settle_id101 = *result101.get<extendable_operation_result>()
+                                                        .value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id101(db).balance.amount.value, 100 );
 
-      force_settlement_id_type settle_id102 = result102.get<object_id_type>();
+      force_settlement_id_type settle_id102 = *result102.get<extendable_operation_result>()
+                                                        .value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id102(db).balance.amount.value, 1000 );
 
-      force_settlement_id_type settle_id103 = result103.get<object_id_type>();
+      force_settlement_id_type settle_id103 = *result103.get<extendable_operation_result>()
+                                                        .value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id103(db).balance.amount.value, 300 );
 
       BOOST_CHECK_EQUAL(get_balance(joe_id(db), core_id(db)), 0);

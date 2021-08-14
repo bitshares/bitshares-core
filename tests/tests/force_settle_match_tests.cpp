@@ -152,8 +152,10 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_settle_call)
 
    // Create a force settlement, will be matched with several call orders
    auto result = force_settle( seller, bitusd.amount(700*4) );
-   BOOST_REQUIRE( result.is_type<object_id_type>() );
-   force_settlement_id_type settle_id = result.get<object_id_type>();
+   BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
+   BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
+   BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
+   force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
    BOOST_CHECK( db.find( settle_id ) != nullptr );
 
    // buy orders won't change
@@ -295,8 +297,10 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    // Create a force settlement, will be matched with the call order
    share_type amount_to_settle = 117;
    auto result = force_settle( seller, bitusd.amount(amount_to_settle) );
-   BOOST_REQUIRE( result.is_type<object_id_type>() );
-   force_settlement_id_type settle_id = result.get<object_id_type>();
+   BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
+   BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
+   BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
+   force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
    BOOST_CHECK( db.find( settle_id ) == nullptr );
 
    // the settle order will match with call2, at mssp: 100/11,
@@ -338,8 +342,10 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    // Settle again
    share_type amount_to_settle2 = 100;
    result = force_settle( seller, bitusd.amount(amount_to_settle2) );
-   BOOST_REQUIRE( result.is_type<object_id_type>() );
-   force_settlement_id_type settle2_id = result.get<object_id_type>();
+   BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
+   BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
+   BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
+   force_settlement_id_type settle2_id = *result.get<extendable_operation_result>().value.new_objects->begin();
    BOOST_CHECK( db.find( settle2_id ) == nullptr );
 
    // the settle order will match with call, at mssp: 100/11
@@ -382,8 +388,10 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    // Settle again with a much smaller amount
    share_type amount_to_settle3 = 9;
    result = force_settle( seller, bitusd.amount(amount_to_settle3) );
-   BOOST_REQUIRE( result.is_type<object_id_type>() );
-   force_settlement_id_type settle3_id = result.get<object_id_type>();
+   BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
+   BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
+   BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
+   force_settlement_id_type settle3_id = *result.get<extendable_operation_result>().value.new_objects->begin();
    BOOST_CHECK( db.find( settle3_id ) == nullptr );
 
    // the settle order will match with call, at mssp
@@ -415,8 +423,10 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    // Settle again with a tiny amount that would receive nothing
    share_type amount_to_settle4 = 5;
    result = force_settle( seller, bitusd.amount(amount_to_settle4) );
-   BOOST_REQUIRE( result.is_type<object_id_type>() );
-   force_settlement_id_type settle4_id = result.get<object_id_type>();
+   BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
+   BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
+   BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
+   force_settlement_id_type settle4_id = *result.get<extendable_operation_result>().value.new_objects->begin();
    BOOST_CHECK( db.find( settle4_id ) == nullptr );
 
    // the settle order will match with call, at mssp
@@ -542,8 +552,10 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
 
    // Create a force settlement, will be matched with several call orders later
    auto result = force_settle( seller, bitusd.amount(2400) );
-   BOOST_REQUIRE( result.is_type<object_id_type>() );
-   force_settlement_id_type settle_id = result.get<object_id_type>();
+   BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
+   BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
+   BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
+   force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
    BOOST_CHECK( db.find( settle_id ) != nullptr );
 
    // prepare price feed to get call and call2 (but not call3) into margin call territory
@@ -759,8 +771,10 @@ BOOST_AUTO_TEST_CASE(hf2481_cross_test)
 
    // Create a force settlement, will be matched with several call orders later
    auto result = force_settle( seller, bitusd.amount(2400) );
-   BOOST_REQUIRE( result.is_type<object_id_type>() );
-   force_settlement_id_type settle_id = result.get<object_id_type>();
+   BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
+   BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
+   BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
+   force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
    BOOST_CHECK( db.find( settle_id ) != nullptr );
 
    BOOST_CHECK_EQUAL( 2400, settle_id(db).balance.amount.value );
@@ -1023,22 +1037,28 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
 
    // Create a force settlement, will be matched with several call orders later
    auto result = force_settle( seller, bitusd.amount(40000) );
-   BOOST_REQUIRE( result.is_type<object_id_type>() );
-   force_settlement_id_type settle_id = result.get<object_id_type>();
+   BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
+   BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
+   BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
+   force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
    BOOST_CHECK( db.find( settle_id ) != nullptr );
    expected_seller_usd_balance -= 40000;
 
    // Create another force settlement
    result = force_settle( seller, bitusd.amount(10000) );
-   BOOST_REQUIRE( result.is_type<object_id_type>() );
-   force_settlement_id_type settle2_id = result.get<object_id_type>();
+   BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
+   BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
+   BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
+   force_settlement_id_type settle2_id = *result.get<extendable_operation_result>().value.new_objects->begin();
    BOOST_CHECK( db.find( settle2_id ) != nullptr );
    expected_seller_usd_balance -= 10000;
 
    // Create the third force settlement which is small
    result = force_settle( seller, bitusd.amount(3) );
-   BOOST_REQUIRE( result.is_type<object_id_type>() );
-   force_settlement_id_type settle3_id = result.get<object_id_type>();
+   BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
+   BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
+   BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
+   force_settlement_id_type settle3_id = *result.get<extendable_operation_result>().value.new_objects->begin();
    BOOST_CHECK( db.find( settle3_id ) != nullptr );
    expected_seller_usd_balance -= 3;
 
@@ -1049,8 +1069,10 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    // Create the fourth force settlement which is a little bigger but still small
    // Note: different execution path than settle3
    result = force_settle( seller, bitusd.amount(5) );
-   BOOST_REQUIRE( result.is_type<object_id_type>() );
-   force_settlement_id_type settle4_id = result.get<object_id_type>();
+   BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
+   BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
+   BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
+   force_settlement_id_type settle4_id = *result.get<extendable_operation_result>().value.new_objects->begin();
    BOOST_CHECK( db.find( settle4_id ) != nullptr );
    expected_seller_usd_balance -= 5;
 
