@@ -999,19 +999,22 @@ void_result asset_global_settle_evaluator::do_evaluate(const asset_global_settle
    FC_ASSERT( asset_to_settle->is_market_issued(), "Can only globally settle market-issued assets" );
    FC_ASSERT( asset_to_settle->can_global_settle(), "The global_settle permission of this asset is disabled" );
    FC_ASSERT( asset_to_settle->issuer == op.issuer, "Only asset issuer can globally settle an asset" );
-   FC_ASSERT( asset_to_settle->dynamic_data(d).current_supply > 0, "Can not globally settle an asset with zero supply" );
+   FC_ASSERT( asset_to_settle->dynamic_data(d).current_supply > 0,
+              "Can not globally settle an asset with zero supply" );
 
    const asset_bitasset_data_object& _bitasset_data  = asset_to_settle->bitasset_data(d);
    // if there is a settlement for this asset, then no further global settle may be taken
    FC_ASSERT( !_bitasset_data.has_settlement(), "This asset has settlement, cannot global settle again" );
 
+   // FIXME due to individual_settlement_to_order, there can be no debt position
    const auto& idx = d.get_index_type<call_order_index>().indices().get<by_collateral>();
    FC_ASSERT( !idx.empty(), "Internal error: no debt position found" );
    auto itr = idx.lower_bound( price::min( _bitasset_data.options.short_backing_asset, op.asset_to_settle ) );
    FC_ASSERT( itr != idx.end() && itr->debt_type() == op.asset_to_settle, "Internal error: no debt position found" );
    const call_order_object& least_collateralized_short = *itr;
-   FC_ASSERT(least_collateralized_short.get_debt() * op.settle_price <= least_collateralized_short.get_collateral(),
-             "Cannot force settle at supplied price: least collateralized short lacks sufficient collateral to settle.");
+   FC_ASSERT( least_collateralized_short.get_debt() * op.settle_price <= least_collateralized_short.get_collateral(),
+              "Cannot force settle at supplied price: least collateralized short lacks "
+              "sufficient collateral to settle." );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -1120,6 +1123,11 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
 
       if( individual_settled.amount > 0 )
          d.adjust_balance( op.account, individual_settled );
+
+      // Update current_feed if needed
+      const auto bdsm = bitasset.get_bad_debt_settlement_method();
+      if( bitasset_options::bad_debt_settlement_type::individual_settlement_to_fund == bdsm )
+         d.update_bitasset_current_feed( bitasset, true );
 
       result.value.paid = vector<asset>({ pays });
       result.value.received = vector<asset>({ individual_settled });

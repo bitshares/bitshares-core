@@ -212,6 +212,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
 
     auto call_min = price::min( bitasset.options.short_backing_asset, debt_asset_id );
 
+    // FIXME there can be no debt position due to individual_settlement_to_order
     if( before_core_hardfork_1270 ) // before core-1270 hard fork, check with call_price
     {
        const auto& call_price_index = get_index_type<call_order_index>().indices().get<by_price>();
@@ -295,8 +296,22 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
        edump((enable_black_swan));
        FC_ASSERT( enable_black_swan,
                   "Black swan was detected during a margin update which is not allowed to trigger a blackswan" );
-       if( after_core_hardfork_2481 )
+
+       using bdsm_type = bitasset_options::bad_debt_settlement_type;
+       const auto bdsm = bitasset.get_bad_debt_settlement_method();
+       if( bdsm_type::individual_settlement_to_fund == bdsm )
        {
+          individually_settle_to_fund( bitasset, *call_ptr );
+       }
+       else if( bdsm_type::individual_settlement_to_order == bdsm )
+       {
+          individually_settle_to_order( mia, bitasset, *call_ptr );
+       }
+       // Global settlement or no settlement, but we should not be here if BDSM is no_settlement
+       else if( after_core_hardfork_2481 )
+       {
+          if( bdsm_type::no_settlement == bdsm ) // this should not happen, be defensive here
+             wlog( "Internal error: BDSM is no_settlement but undercollateralization occurred" );
           // After hf_2481, when a global settlement occurs,
           // * the margin calls (whose CR <= MCR) pay a premium (by MSSR-MCFR) and a margin call fee (by MCFR), and
           //   they are closed at the same price,
@@ -341,6 +356,7 @@ static optional<price> get_derived_current_feed_price( const database& db,
    const auto bdsm = bitasset.get_bad_debt_settlement_method();
    if( bdsm_type::no_settlement == bdsm )
    {
+      // FIXME there can be no debt position due to individual_settlement_to_order
       const auto& call_collateral_index = db.get_index_type<call_order_index>().indices().get<by_collateral>();
       auto call_min = price::min( bitasset.options.short_backing_asset, bitasset.asset_id );
       auto call_itr = call_collateral_index.lower_bound( call_min );
@@ -576,6 +592,7 @@ void database::clear_expired_force_settlements()
          else if( settlement_price.base.asset_id != current_asset ) // only calculate once per asset
             settlement_price = settlement_fill_price;
 
+         // FIXME there can be no debt position due to individual_settlement_to_order
          auto& call_index = get_index_type<call_order_index>().indices().get<by_collateral>();
          asset settled = mia_object.amount(mia.force_settled_volume);
          // Match against the least collateralized short until the settlement is finished or we reach max settlements

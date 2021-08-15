@@ -395,6 +395,10 @@ namespace graphene { namespace chain {
                                           const price& settle_price,
                                           const IndexType& call_index,
                                           bool check_margin_calls = false );
+         void individually_settle_to_fund( const asset_bitasset_data_object& bitasset,
+                                           const call_order_object& call_order );
+         void individually_settle_to_order( const asset_object& mia, const asset_bitasset_data_object& bitasset,
+                                            const call_order_object& call_order );
          /// Match force settlements with margin calls
          /// @param bitasset the asset that to be checked
          /// @return true if matched at least one margin call order
@@ -556,16 +560,21 @@ namespace graphene { namespace chain {
           * @param fill_price the price the transaction executed at
           * @param is_maker TRUE if the buyer is the maker, FALSE if the buyer is the taker
           * @param margin_fee Margin call fees paid in collateral asset
+          * @param reduce_current_supply Whether to reduce current supply of the asset. Usually it is true.
+          *                              When globally settleing or individually settling it is false.
           * @returns TRUE if the order was completely filled
           */
          bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
-                               const price& fill_price, const bool is_maker, const asset& margin_fee );
+                               const price& fill_price, const bool is_maker, const asset& margin_fee,
+                               bool reduce_current_supply = true );
 
          /// Overload provides compatible default value for margin_fee: (margin_fee.asset_id == pays.asset_id)
          bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
-                               const price& fill_price, const bool is_maker )
+                               const price& fill_price, const bool is_maker,
+                               bool reduce_current_supply = true )
          {
-            return fill_call_order( order, pays, receives, fill_price, is_maker, asset(0, pays.asset_id) );
+            return fill_call_order( order, pays, receives, fill_price, is_maker, asset(0, pays.asset_id),
+                                    reduce_current_supply );
          }
 
          bool fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
