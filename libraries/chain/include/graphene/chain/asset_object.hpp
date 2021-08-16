@@ -332,10 +332,7 @@ namespace graphene { namespace chain {
          /// Get the effective bad debt settlement method of this bitasset
          bitasset_options::bad_debt_settlement_type get_bad_debt_settlement_method() const
          {
-            using bdsm_type = bitasset_options::bad_debt_settlement_type;
-            if( !options.extensions.value.bad_debt_settlement_method.valid() )
-               return bdsm_type::global_settlement;
-            return static_cast<bdsm_type>( *options.extensions.value.bad_debt_settlement_method );
+            return options.get_bad_debt_settlement_method();
          }
 
          /// Get margin call order price (MCOP) of this bitasset

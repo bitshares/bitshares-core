@@ -101,8 +101,11 @@ namespace graphene { namespace chain {
          void_result do_evaluate( const asset_update_bitasset_operation& o );
          void_result do_apply( const asset_update_bitasset_operation& o );
 
+      private:
          const asset_bitasset_data_object* bitasset_to_update = nullptr;
          const asset_object* asset_to_update = nullptr;
+
+         bool update_feeds_due_to_bdsm_change = false;
    };
 
    class asset_update_feed_producers_evaluator : public evaluator<asset_update_feed_producers_evaluator>

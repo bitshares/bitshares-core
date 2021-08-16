@@ -640,7 +640,8 @@ void check_children_of_bitasset(const database& d, const asset_update_bitasset_o
          {
             const auto& child = bitasset_data.asset_id(d);
             FC_ASSERT( child.get_id() != op.new_options.short_backing_asset,
-                  "A BitAsset would be invalidated by changing this backing asset ('A' backed by 'B' backed by 'A')." );
+                  "A BitAsset would be invalidated by changing this backing asset "
+                  "('A' backed by 'B' backed by 'A')." );
 
             FC_ASSERT( child.issuer != GRAPHENE_COMMITTEE_ACCOUNT,
                   "A blockchain-controlled market asset would be invalidated by changing this backing asset." );
@@ -702,10 +703,32 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
                            || ( old_mssr.valid() && *old_mssr != *new_mssr ) );
       FC_ASSERT( !mssr_changed, "No permission to update MSSR" );
    }
+   // check if BDSM will change
+   const auto old_bdsm = current_bitasset_data.get_bad_debt_settlement_method();
+   const auto new_bdsm = op.new_options.get_bad_debt_settlement_method();
+   if( old_bdsm != new_bdsm )
+   {
+      FC_ASSERT( asset_obj.can_owner_update_bdsm(), "No permission to update BDSM" );
+      FC_ASSERT( !current_bitasset_data.has_settlement(),
+                 "Unable to update BDSM when the asset has been globally settled" );
+
+      // Note: it is probably OK to allow BDSM update, be conservative here so far
+      using bdsm_type = bitasset_options::bad_debt_settlement_type;
+      if( bdsm_type::individual_settlement_to_fund == old_bdsm )
+         FC_ASSERT( !current_bitasset_data.has_individual_settlement(),
+                 "Unable to update BDSM when the individual bad debt settlement pool is not empty" );
+      else if( bdsm_type::individual_settlement_to_order == old_bdsm )
+         FC_ASSERT( nullptr == d.find_bad_debt_settlement_order( op.asset_to_update ),
+                 "Unable to update BDSM when there exists a bad debt settlement order" );
+
+      // Since we do not allow updating in some cases (above), only check no_settlement here
+      if( bdsm_type::no_settlement == old_bdsm || bdsm_type::no_settlement == new_bdsm )
+         update_feeds_due_to_bdsm_change = true;
+   }
+
 
    // hf 922_931 is a consensus/logic change. This hf cannot be removed.
-   bool after_hf_core_922_931 = ( d.get_dynamic_global_properties().next_maintenance_time
-                                  > HARDFORK_CORE_922_931_TIME );
+   bool after_hf_core_922_931 = ( next_maint_time > HARDFORK_CORE_922_931_TIME );
 
    // Are we changing the backing asset?
    if( op.new_options.short_backing_asset != current_bitasset_data.options.short_backing_asset )
@@ -766,7 +789,8 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
          if ( new_backing_asset.is_market_issued() )
          {
             asset_id_type backing_backing_asset_id = new_backing_asset.bitasset_data(d).options.short_backing_asset;
-            FC_ASSERT( (backing_backing_asset_id == asset_id_type() || !backing_backing_asset_id(d).is_market_issued()),
+            FC_ASSERT( (backing_backing_asset_id == asset_id_type()
+                        || !backing_backing_asset_id(d).is_market_issued()),
                   "A BitAsset cannot be backed by a BitAsset that itself is backed by a BitAsset.");
          }
       }
@@ -805,7 +829,8 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
  */
 static bool update_bitasset_object_options(
       const asset_update_bitasset_operation& op, database& db,
-      asset_bitasset_data_object& bdo, const asset_object& asset_to_update )
+      asset_bitasset_data_object& bdo, const asset_object& asset_to_update,
+      bool update_feeds_due_to_bdsm_change )
 {
    const fc::time_point_sec next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
    bool after_hf_core_868_890 = ( next_maint_time > HARDFORK_CORE_868_890_TIME );
@@ -892,10 +917,13 @@ static bool update_bitasset_object_options(
    }
 
    bool feed_actually_changed = false;
-   if( should_update_feeds )
+   if( should_update_feeds || update_feeds_due_to_bdsm_change )
    {
       const auto old_feed = bdo.current_feed;
-      db.update_bitasset_current_feed( bdo );
+      if( should_update_feeds )
+         db.update_bitasset_current_feed( bdo );
+      else // to update feeds due to bdsm change
+         db.update_bitasset_current_feed( bdo, true );
 
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
       feed_actually_changed = ( after_hf_core_868_890 && !old_feed.margin_call_params_equal( bdo.current_feed ) );
@@ -912,25 +940,25 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
    try
    {
       auto& db_conn = db();
-      const auto& asset_being_updated = (*asset_to_update);
       bool to_check_call_orders = false;
 
       db_conn.modify( *bitasset_to_update,
-                      [&op, &asset_being_updated, &to_check_call_orders, &db_conn]( asset_bitasset_data_object& bdo )
+                      [&op, &to_check_call_orders, &db_conn, this]( asset_bitasset_data_object& bdo )
       {
-         to_check_call_orders = update_bitasset_object_options( op, db_conn, bdo, asset_being_updated );
+         to_check_call_orders = update_bitasset_object_options( op, db_conn, bdo, *asset_to_update,
+                                                                update_feeds_due_to_bdsm_change );
       });
 
       if( to_check_call_orders )
          // Process margin calls, allow black swan, not for a new limit order
-         db_conn.check_call_orders( asset_being_updated, true, false, bitasset_to_update );
+         db_conn.check_call_orders( *asset_to_update, true, false, bitasset_to_update );
 
       return void_result();
 
    } FC_CAPTURE_AND_RETHROW( (op) )
 }
 
-void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_update_feed_producers_evaluator::operation_type& o)
+void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_update_feed_producers_operation& o)
 { try {
    database& d = db();
 
@@ -954,7 +982,7 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_feed_producers_evaluator::operation_type& o)
+void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_feed_producers_operation& o)
 { try {
    database& d = db();
    const auto head_time = d.head_block_time();

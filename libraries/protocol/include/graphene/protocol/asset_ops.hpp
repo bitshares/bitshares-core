@@ -171,6 +171,14 @@ namespace graphene { namespace protocol {
       /// Perform internal consistency checks.
       /// @throws fc::exception if any check fails
       void validate()const;
+
+      /// Get the effective bad debt settlement method
+      bad_debt_settlement_type get_bad_debt_settlement_method() const
+      {
+         if( !extensions.value.bad_debt_settlement_method.valid() )
+            return bad_debt_settlement_type::global_settlement;
+         return static_cast<bad_debt_settlement_type>( *extensions.value.bad_debt_settlement_method );
+      }
    };
 
 
