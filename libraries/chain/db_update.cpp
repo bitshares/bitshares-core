@@ -212,7 +212,6 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
 
     auto call_min = price::min( bitasset.options.short_backing_asset, debt_asset_id );
 
-    // FIXME there can be no debt position due to individual_settlement_to_order
     if( before_core_hardfork_1270 ) // before core-1270 hard fork, check with call_price
     {
        const auto& call_price_index = get_index_type<call_order_index>().indices().get<by_price>();
@@ -223,6 +222,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     }
     else // after core-1270 hard fork, check with collateralization
     {
+       // Note: it is safe to check here even if there is no call order due to individual bad debt settlements
        const auto& call_collateral_index = get_index_type<call_order_index>().indices().get<by_collateral>();
        auto call_itr = call_collateral_index.lower_bound( call_min );
        if( call_itr == call_collateral_index.end() ) // no call order
@@ -352,7 +352,7 @@ static optional<price> get_derived_current_feed_price( const database& db,
    const auto bdsm = bitasset.get_bad_debt_settlement_method();
    if( bdsm_type::no_settlement == bdsm )
    {
-      // FIXME there can be no debt position due to individual_settlement_to_order
+      // Note: it is safe to check here even if there is no call order due to individual bad debt settlements
       const auto& call_collateral_index = db.get_index_type<call_order_index>().indices().get<by_collateral>();
       auto call_min = price::min( bitasset.options.short_backing_asset, bitasset.asset_id );
       auto call_itr = call_collateral_index.lower_bound( call_min );
@@ -549,7 +549,8 @@ void database::clear_expired_force_settlements()
             continue;
          }
          if( max_settlement_volume.asset_id != current_asset )
-            max_settlement_volume = mia_object.amount(mia.max_force_settlement_volume(mia_object.dynamic_data(*this).current_supply));
+            max_settlement_volume = mia_object.amount( mia.max_force_settlement_volume(
+                                                              mia_object.dynamic_data(*this).current_supply ) );
          // When current_asset_finished is true, this would be the 2nd time processing the same order.
          // In this case, we move to the next asset.
          if( mia.force_settled_volume >= max_settlement_volume.amount || current_asset_finished )
@@ -588,16 +589,21 @@ void database::clear_expired_force_settlements()
          else if( settlement_price.base.asset_id != current_asset ) // only calculate once per asset
             settlement_price = settlement_fill_price;
 
-         // FIXME there can be no debt position due to individual_settlement_to_order
+         // Note: there can be no debt position due to individual settlements, processed below
          auto& call_index = get_index_type<call_order_index>().indices().get<by_collateral>();
          asset settled = mia_object.amount(mia.force_settled_volume);
          // Match against the least collateralized short until the settlement is finished or we reach max settlements
          while( settled < max_settlement_volume && find_object(order_id) )
          {
-            auto itr = call_index.lower_bound(boost::make_tuple(price::min(mia_object.bitasset_data(*this).options.short_backing_asset,
-                                                                           mia_object.get_id())));
-            // There should always be a call order, since asset exists!
-            assert(itr != call_index.end() && itr->debt_type() == mia_object.get_id());
+            auto itr = call_index.lower_bound( price::min( mia.options.short_backing_asset, mia.asset_id ) );
+            // Note: there can be no debt position due to individual settlements
+            if( itr == call_index.end() || itr->debt_type() != mia.asset_id ) // no debt position
+            {
+               wlog( "No debt position found when processing force settlement ${o}", ("o",order) );
+               cancel_settle_order( order );
+               break;
+            }
+
             asset max_settlement = max_settlement_volume - settled;
 
             if( order.balance.amount == 0 )

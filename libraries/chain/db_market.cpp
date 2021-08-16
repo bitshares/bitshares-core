@@ -68,6 +68,7 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    }
    else
    {
+      // Note: it is safe to iterate here even if there is no call order due to individual bad debt settlements
       globally_settle_asset_impl( mia, settlement_price,
                                   get_index_type<call_order_index>().indices().get<by_collateral>(),
                                   check_margin_calls );
@@ -623,7 +624,7 @@ bool database::apply_order(const limit_order_object& new_order_object)
       if( !finished && !before_core_hardfork_1270 ) // TODO refactor or cleanup duplicate code after core-1270 hf
       {
          // check if there are margin calls
-         // FIXME there can be no debt position due to individual_settlement_to_order
+         // Note: it is safe to iterate here even if there is no call order due to individual bad debt settlements
          const auto& call_collateral_idx = get_index_type<call_order_index>().indices().get<by_collateral>();
          auto call_min = price::min( recv_asset_id, sell_asset_id );
          while( !finished )
@@ -727,7 +728,7 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
    bool finished = false; // whether the new order is gone
 
    // check if there are margin calls
-   // FIXME there can be no debt position due to individual_settlement_to_order
+   // Note: it is safe to iterate here even if there is no call order due to individual bad debt settlements
    const auto& call_collateral_idx = get_index_type<call_order_index>().indices().get<by_collateral>();
    auto call_min = price::min( bitasset.options.short_backing_asset, new_settlement.balance.asset_id );
    while( !finished )
@@ -1569,6 +1570,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
     const call_order_index& call_index = get_index_type<call_order_index>();
     const auto& call_price_index = call_index.indices().get<by_price>();
+    // Note: it is safe to iterate here even if there is no call order due to individual bad debt settlements
     const auto& call_collateral_index = call_index.indices().get<by_collateral>();
 
     auto call_min = price::min( bitasset.options.short_backing_asset, bitasset.asset_id );
@@ -1605,7 +1607,6 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     bool before_core_hardfork_606 = ( maint_time <= HARDFORK_CORE_606_TIME ); // feed always trigger call
     bool before_core_hardfork_834 = ( maint_time <= HARDFORK_CORE_834_TIME ); // target collateral ratio option
 
-    // FIXME there can be no call order due to individual_settlement_to_order
     auto has_call_order = [ before_core_hardfork_1270,
                             &call_collateral_itr,&call_collateral_end,
                             &call_price_itr,&call_price_end ]()
@@ -1830,7 +1831,7 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
    auto settle_itr = settlement_index.lower_bound( bitasset.asset_id );
    auto settle_end = settlement_index.upper_bound( bitasset.asset_id );
 
-   // FIXME there can be no debt position due to individual_settlement_to_order
+   // Note: it is safe to iterate here even if there is no call order due to individual bad debt settlements
    const auto& call_collateral_index = get_index_type<call_order_index>().indices().get<by_collateral>();
    auto call_min = price::min( bitasset.options.short_backing_asset, bitasset.asset_id );
    auto call_max = price::max( bitasset.options.short_backing_asset, bitasset.asset_id );
