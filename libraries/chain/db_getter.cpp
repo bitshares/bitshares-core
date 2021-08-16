@@ -27,6 +27,7 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
+#include <graphene/chain/market_object.hpp>
 #include <graphene/chain/custom_authority_object.hpp>
 
 namespace graphene { namespace chain {
@@ -144,6 +145,15 @@ const account_statistics_object& database::get_account_stats_by_owner( account_i
 const witness_schedule_object& database::get_witness_schedule_object()const
 {
    return *_p_witness_schedule_obj;
+}
+
+const limit_order_object* database::find_bad_debt_settlement_order( const asset_id_type& a )const
+{
+   const auto& limit_index = get_index_type<limit_order_index>().indices().get<by_is_settled_debt>();
+   auto itr = limit_index.lower_bound( std::make_tuple( true, a ) );
+   if( itr != limit_index.end() && itr->receive_asset_id() == a )
+      return &(*itr);
+   return nullptr;
 }
 
 } }

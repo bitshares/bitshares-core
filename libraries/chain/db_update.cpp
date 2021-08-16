@@ -299,13 +299,9 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
 
        using bdsm_type = bitasset_options::bad_debt_settlement_type;
        const auto bdsm = bitasset.get_bad_debt_settlement_method();
-       if( bdsm_type::individual_settlement_to_fund == bdsm )
+       if( bdsm_type::individual_settlement_to_fund == bdsm || bdsm_type::individual_settlement_to_order == bdsm )
        {
-          individually_settle_to_fund( bitasset, *call_ptr );
-       }
-       else if( bdsm_type::individual_settlement_to_order == bdsm )
-       {
-          individually_settle_to_order( mia, bitasset, *call_ptr );
+          individually_settle( bitasset, *call_ptr );
        }
        // Global settlement or no settlement, but we should not be here if BDSM is no_settlement
        else if( after_core_hardfork_2481 )

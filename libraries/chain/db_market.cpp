@@ -150,19 +150,36 @@ void database::globally_settle_asset_impl( const asset_object& mia,
                  "Internal error: unable to close margin call ${o}", ("o", order) );
    }
 
-   // TODO move individual settlement fund and order to the GS fund
-   // TODO update BDSM to GS
+   // Move the (individual) bad-debt settlement order to the GS fund
+   const limit_order_object* limit_ptr = find_bad_debt_settlement_order( bitasset.asset_id );
+   if( limit_ptr != nullptr )
+   {
+      collateral_gathered.amount += limit_ptr->for_sale;
+      remove( *limit_ptr );
+   }
+
+   // Move individual settlement fund to the GS fund
+   collateral_gathered.amount += bitasset.individual_settlement_fund;
 
    modify( bitasset, [&mia,&original_mia_supply,&collateral_gathered]( asset_bitasset_data_object& obj ){
+      obj.options.extensions.value.bad_debt_settlement_method.reset(); // Update BDSM to GS
+      obj.individual_settlement_debt = 0;
+      obj.individual_settlement_fund = 0;
       obj.settlement_price = mia.amount(original_mia_supply) / collateral_gathered;
       obj.settlement_fund  = collateral_gathered.amount;
    });
 
 } FC_CAPTURE_AND_RETHROW( (mia)(settlement_price) ) }
 
-void database::individually_settle_to_fund( const asset_bitasset_data_object& bitasset,
-                                            const call_order_object& order )
+void database::individually_settle( const asset_bitasset_data_object& bitasset, const call_order_object& order )
 {
+   FC_ASSERT( bitasset.asset_id == order.debt_type(), "Internal error: asset type mismatch" );
+
+   using bdsm_type = bitasset_options::bad_debt_settlement_type;
+   const auto bdsm = bitasset.get_bad_debt_settlement_method();
+   FC_ASSERT( bdsm_type::individual_settlement_to_fund == bdsm || bdsm_type::individual_settlement_to_order == bdsm,
+              "Internal error: Invalid BDSM" );
+
    auto order_debt = order.get_debt();
    auto order_collateral = order.get_collateral();
    auto fund_receives_price = (~order.collateralization()) / bitasset.get_margin_call_pays_ratio();
@@ -172,23 +189,45 @@ void database::individually_settle_to_fund( const asset_bitasset_data_object& bi
 
    auto margin_call_fee = order_collateral - fund_receives;
 
-   modify( bitasset, [&order,&fund_receives]( asset_bitasset_data_object& obj ){
-      obj.individual_settlement_debt += order.debt;
-      obj.individual_settlement_fund += fund_receives.amount;
-   });
+   if( bdsm_type::individual_settlement_to_fund == bdsm ) // settle to fund
+   {
+      modify( bitasset, [&order,&fund_receives]( asset_bitasset_data_object& obj ){
+         obj.individual_settlement_debt += order.debt;
+         obj.individual_settlement_fund += fund_receives.amount;
+      });
+   }
+   else // settle to order
+   {
+      const limit_order_object* limit_ptr = find_bad_debt_settlement_order( bitasset.asset_id );
+      if( limit_ptr != nullptr )
+      {
+         modify( *limit_ptr, [&order,&fund_receives]( limit_order_object& obj ) {
+            obj.for_sale += fund_receives.amount;
+            obj.sell_price.base.amount = obj.for_sale;
+            obj.sell_price.quote.amount += order.debt;
+         } );
+      }
+      else
+      {
+         create< limit_order_object >( [&order,&fund_receives]( limit_order_object& obj ) {
+            obj.expiration = time_point_sec::maximum();
+            obj.seller = GRAPHENE_NULL_ACCOUNT;
+            obj.for_sale = fund_receives.amount;
+            obj.sell_price = fund_receives / order.get_debt();
+            obj.is_settled_debt = true;
+         } );
+      }
+   }
 
    // call order is maker
    FC_ASSERT( fill_call_order( order, order.get_collateral(), order_debt,
                                fund_receives_price, true, margin_call_fee, false ),
               "Internal error: unable to close margin call ${o}", ("o", order) );
 
-   update_bitasset_current_feed( bitasset, true );
+   // Update current feed if needed
+   if( bdsm_type::individual_settlement_to_fund == bdsm )
+      update_bitasset_current_feed( bitasset, true );
 
-}
-
-void database::individually_settle_to_order( const asset_object& mia, const asset_bitasset_data_object& bitasset,
-                                             const call_order_object& call_order )
-{
 }
 
 void database::revive_bitasset( const asset_object& bitasset )
@@ -740,74 +779,154 @@ static database::match_result_type get_match_result( bool taker_filled, bool mak
  *  2 - maker was filled
  *  3 - both were filled
  */
-database::match_result_type database::match( const limit_order_object& usd, const limit_order_object& core,
+database::match_result_type database::match( const limit_order_object& taker, const limit_order_object& maker,
                                              const price& match_price )
 {
-   FC_ASSERT( usd.sell_price.quote.asset_id == core.sell_price.base.asset_id );
-   FC_ASSERT( usd.sell_price.base.asset_id  == core.sell_price.quote.asset_id );
-   FC_ASSERT( usd.for_sale > 0 && core.for_sale > 0 );
+   FC_ASSERT( taker.sell_price.quote.asset_id == maker.sell_price.base.asset_id );
+   FC_ASSERT( taker.sell_price.base.asset_id  == maker.sell_price.quote.asset_id );
+   FC_ASSERT( taker.for_sale > 0 && maker.for_sale > 0 );
 
-   auto usd_for_sale = usd.amount_for_sale();
-   auto core_for_sale = core.amount_for_sale();
+   return maker.is_settled_debt ? match_limit_settled_debt( taker, maker, match_price )
+                                : match_limit_normal_limit( taker, maker, match_price );
+}
 
-   asset usd_pays, usd_receives, core_pays, core_receives;
+database::match_result_type database::match_limit_normal_limit( const limit_order_object& taker,
+                               const limit_order_object& maker, const price& match_price )
+{
+   FC_ASSERT( !maker.is_settled_debt, "Internal error: maker is settled debt" );
+
+   auto taker_for_sale = taker.amount_for_sale();
+   auto maker_for_sale = maker.amount_for_sale();
+
+   asset taker_pays;
+   asset taker_receives;
+   asset maker_pays;
+   asset maker_receives;
 
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
 
    bool cull_taker = false;
-   if( usd_for_sale <= core_for_sale * match_price ) // rounding down here should be fine
+   if( taker_for_sale <= maker_for_sale * match_price ) // rounding down here should be fine
    {
-      usd_receives  = usd_for_sale * match_price; // round down, in favor of bigger order
+      taker_receives  = taker_for_sale * match_price; // round down, in favor of bigger order
 
       // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
       // In this case, we see it as filled and cancel it later
-      if( usd_receives.amount == 0 && maint_time > HARDFORK_CORE_184_TIME )
+      if( taker_receives.amount == 0 && maint_time > HARDFORK_CORE_184_TIME )
          return match_result_type::only_taker_filled;
 
       if( before_core_hardfork_342 )
-         core_receives = usd_for_sale;
+         maker_receives = taker_for_sale;
       else
       {
-         // The remaining amount in order `usd` would be too small,
+         // The remaining amount in order `taker` would be too small,
          //   so we should cull the order in fill_limit_order() below.
          // The order would receive 0 even at `match_price`, so it would receive 0 at its own price,
          //   so calling maybe_cull_small() will always cull it.
-         core_receives = usd_receives.multiply_and_round_up( match_price );
+         maker_receives = taker_receives.multiply_and_round_up( match_price );
          cull_taker = true;
       }
    }
    else
    {
-      //This line once read: assert( core_for_sale < usd_for_sale * match_price );
+      //This line once read: assert( maker_for_sale < taker_for_sale * match_price );
       //This assert is not always true -- see trade_amount_equals_zero in operation_tests.cpp
-      //Although usd_for_sale is greater than core_for_sale * match_price, core_for_sale == usd_for_sale * match_price
+      //Although taker_for_sale is greater than maker_for_sale * match_price,
+      //         maker_for_sale == taker_for_sale * match_price
       //Removing the assert seems to be safe -- apparently no asset is created or destroyed.
 
       // The maker won't be paying something for nothing, since if it would, it would have been cancelled already.
-      core_receives = core_for_sale * match_price; // round down, in favor of bigger order
+      maker_receives = maker_for_sale * match_price; // round down, in favor of bigger order
       if( before_core_hardfork_342 )
-         usd_receives = core_for_sale;
+         taker_receives = maker_for_sale;
       else
-         // The remaining amount in order `core` would be too small,
+         // The remaining amount in order `maker` would be too small,
          //   so the order will be culled in fill_limit_order() below
-         usd_receives = core_receives.multiply_and_round_up( match_price );
+         taker_receives = maker_receives.multiply_and_round_up( match_price );
    }
 
-   core_pays = usd_receives;
-   usd_pays  = core_receives;
+   maker_pays = taker_receives;
+   taker_pays  = maker_receives;
 
    if( before_core_hardfork_342 )
-      FC_ASSERT( usd_pays == usd.amount_for_sale() ||
-                 core_pays == core.amount_for_sale() );
+      FC_ASSERT( taker_pays == taker.amount_for_sale() ||
+                 maker_pays == maker.amount_for_sale() );
 
    // the first param of match() is taker
-   bool taker_filled = fill_limit_order( usd, usd_pays, usd_receives, cull_taker, match_price, false );
+   bool taker_filled = fill_limit_order( taker, taker_pays, taker_receives, cull_taker, match_price, false );
    // the second param of match() is maker
-   bool maker_filled = fill_limit_order( core, core_pays, core_receives, true, match_price, true );
+   bool maker_filled = fill_limit_order( maker, maker_pays, maker_receives, true, match_price, true );
 
    match_result_type result = get_match_result( taker_filled, maker_filled );
    FC_ASSERT( result != match_result_type::none_filled );
+   return result;
+}
+
+// When matching a limit order against settled debt, the maker actually behaviors like a call order
+database::match_result_type database::match_limit_settled_debt( const limit_order_object& taker,
+                               const limit_order_object& maker, const price& match_price )
+{
+   FC_ASSERT( maker.is_settled_debt, "Internal error: maker is not settled debt" );
+
+   bool cull_taker = false;
+   bool maker_filled = false;
+
+   auto usd_for_sale = taker.amount_for_sale();
+   auto usd_to_buy = maker.sell_price.quote;
+
+   asset call_receives;
+   asset order_receives;
+   if( usd_to_buy > usd_for_sale )
+   {  // fill taker limit order
+      order_receives  = usd_for_sale * match_price; // round down here, in favor of call order
+
+      // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
+      // In this case, we see it as filled and cancel it later
+      if( order_receives.amount == 0 )
+         return match_result_type::only_taker_filled;
+
+      // The remaining amount in the limit order could be too small,
+      //   so we should cull the order in fill_limit_order() below.
+      // If the order would receive 0 even at `match_price`, it would receive 0 at its own price,
+      //   so calling maybe_cull_small() will always cull it.
+      call_receives = order_receives.multiply_and_round_up( match_price );
+      cull_taker = true;
+   }
+   else
+   {  // fill maker "call order"
+      call_receives  = usd_to_buy;
+      order_receives = maker.amount_for_sale();
+      maker_filled = true;
+   }
+
+   // seller, pays, receives, ...
+   bool taker_filled = fill_limit_order( taker, call_receives, order_receives, cull_taker, match_price, false );
+
+   // Reduce current supply
+   const asset_dynamic_data_object& mia_ddo = call_receives.asset_id(*this).dynamic_asset_data_id(*this);
+   modify( mia_ddo, [&call_receives]( asset_dynamic_data_object& ao ){
+      ao.current_supply -= call_receives.amount;
+   });
+
+   // Push fill_order vitual operation
+   // id, seller, pays, receives, ...
+   push_applied_operation( fill_order_operation( maker.id, maker.seller, order_receives, call_receives,
+                                                 asset(0, call_receives.asset_id), match_price, true ) );
+
+   // Update the maker order
+   if( maker_filled )
+      remove( maker );
+   else
+   {
+      modify( maker, [&order_receives,&call_receives]( limit_order_object& obj ) {
+         obj.for_sale -= order_receives.amount;
+         obj.sell_price.base.amount = obj.for_sale;
+         obj.sell_price.quote.amount -= call_receives.amount;
+      });
+   }
+
+   match_result_type result = get_match_result( taker_filled, maker_filled );
    return result;
 }
 
@@ -839,9 +958,9 @@ database::match_result_type database::match( const limit_order_object& bid, cons
       if( order_receives.amount == 0 )
          return match_result_type::only_taker_filled;
 
-      // The remaining amount in the limit order would be too small,
+      // The remaining amount in the limit order could be too small,
       //   so we should cull the order in fill_limit_order() below.
-      // The order would receive 0 even at `match_price`, so it would receive 0 at its own price,
+      // If the order would receive 0 even at `match_price`, it would receive 0 at its own price,
       //   so calling maybe_cull_small() will always cull it.
       call_receives = order_receives.multiply_and_round_up( match_price );
       cull_taker = true;

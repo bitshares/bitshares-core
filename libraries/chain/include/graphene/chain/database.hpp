@@ -296,7 +296,13 @@ namespace graphene { namespace chain {
                  rejected_predicate_map* rejected_authorities = nullptr )const;
 
          uint32_t last_non_undoable_block_num() const;
+
+         /// Find the limit order which is the bad-debt settlement fund of the specified asset
+         /// @param a ID of the asset
+         /// @return nullptr if not found, pointer to the limit order if found
+         const limit_order_object* find_bad_debt_settlement_order( const asset_id_type& a )const;
          //////////////////// db_init.cpp ////////////////////
+         ///@{
 
          void initialize_evaluators();
          /// Reset the object graph in-memory
@@ -310,6 +316,7 @@ namespace graphene { namespace chain {
                   = std::make_unique<op_evaluator_impl<EvaluatorType>>();
          }
 
+         ///@}
          //////////////////// db_balance.cpp ////////////////////
 
          /**
@@ -395,10 +402,11 @@ namespace graphene { namespace chain {
                                           const price& settle_price,
                                           const IndexType& call_index,
                                           bool check_margin_calls = false );
-         void individually_settle_to_fund( const asset_bitasset_data_object& bitasset,
-                                           const call_order_object& call_order );
-         void individually_settle_to_order( const asset_object& mia, const asset_bitasset_data_object& bitasset,
-                                            const call_order_object& call_order );
+         /// Individually settle the @p call_order. Called when the call order is undercollateralized.
+         /// See @ref protocol::bitasset_options::bad_debt_settlement_type for more info.
+         /// @param bitasset the bitasset object
+         /// @param call_order the call order
+         void individually_settle( const asset_bitasset_data_object& bitasset, const call_order_object& call_order );
          /// Match force settlements with margin calls
          /// @param bitasset the asset that to be checked
          /// @return true if matched at least one margin call order
@@ -471,6 +479,10 @@ namespace graphene { namespace chain {
          };
          match_result_type match( const limit_order_object& taker, const limit_order_object& maker,
                                   const price& trade_price );
+         match_result_type match_limit_normal_limit( const limit_order_object& taker, const limit_order_object& maker,
+                                                     const price& trade_price );
+         match_result_type match_limit_settled_debt( const limit_order_object& taker, const limit_order_object& maker,
+                                                     const price& trade_price );
          /***
           * @brief Match limit order as taker to a call order as maker
           * @param taker the order that is removing liquidity from the book
