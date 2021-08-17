@@ -1111,124 +1111,145 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
-operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::operation_type& op)
-{ try {
-   database& d = db();
+static extendable_operation_result pay_settle_from_gs_fund( database& d,
+                                                 const asset_settle_evaluator::operation_type& op,
+                                                 const account_object* fee_paying_account,
+                                                 const asset_object& asset_to_settle,
+                                                 const asset_bitasset_data_object& bitasset )
+{
    const auto& head_time = d.head_block_time();
    const auto& maint_time = d.get_dynamic_global_properties().next_maintenance_time;
 
-   const auto& bitasset = *bitasset_ptr;
+   const auto& mia_dyn = asset_to_settle.dynamic_asset_data_id(d);
 
-   extendable_operation_result result;
-
-   // Process global settlement fund
-   if( bitasset.has_settlement() )
+   asset settled_amount = ( op.amount.amount == mia_dyn.current_supply )
+                          ? asset( bitasset.settlement_fund, bitasset.options.short_backing_asset )
+                          : op.amount * bitasset.settlement_price; // round down, favors global settlement fund
+   if( op.amount.amount != mia_dyn.current_supply )
    {
-      const auto& mia_dyn = asset_to_settle->dynamic_asset_data_id(d);
-
-      asset settled_amount = ( op.amount.amount == mia_dyn.current_supply )
-                             ? asset( bitasset.settlement_fund, bitasset.options.short_backing_asset )
-                             : op.amount * bitasset.settlement_price; // round down, favors global settlement fund
-      if( op.amount.amount != mia_dyn.current_supply )
-      {
-         // should be strictly < except for PM with zero outcome since in that case bitasset.settlement_fund is zero
-         FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund,
-                    "Internal error: amount in the global settlement fund is not sufficient to pay the settlement" );
-      }
-
-      if( 0 == settled_amount.amount && !bitasset.is_prediction_market )
-      {
-         if( maint_time > HARDFORK_CORE_184_TIME )
-            FC_THROW( "Settle amount is too small to receive anything due to rounding" );
-         // else do nothing. Before the hf, something for nothing issue (#184, variant F) could occur
-      }
-
-      asset pays = op.amount;
-      if( op.amount.amount != mia_dyn.current_supply
-            && settled_amount.amount != 0
-            && maint_time > HARDFORK_CORE_342_TIME )
-      {
-         pays = settled_amount.multiply_and_round_up( bitasset.settlement_price );
-      }
-
-      d.adjust_balance( op.account, -pays );
-
-      asset issuer_fees( 0, bitasset.options.short_backing_asset );
-      if( settled_amount.amount > 0 )
-      {
-         d.modify( bitasset, [&settled_amount]( asset_bitasset_data_object& obj ){
-            obj.settlement_fund -= settled_amount.amount;
-         });
-
-         // The account who settles pays market fees to the issuer of the collateral asset after HF core-1780
-         //
-         // TODO Check whether the HF check can be removed after the HF.
-         //      Note: even if logically it can be removed, perhaps the removal will lead to a small
-         //            performance loss. Needs testing.
-         if( head_time >= HARDFORK_CORE_1780_TIME )
-         {
-            issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d), settled_amount, false );
-            settled_amount -= issuer_fees;
-         }
-
-         if( settled_amount.amount > 0 )
-            d.adjust_balance( op.account, settled_amount );
-      }
-
-      d.modify( mia_dyn, [&pays]( asset_dynamic_data_object& obj ){
-         obj.current_supply -= pays.amount;
-      });
-
-      result.value.paid = vector<asset>({ pays });
-      result.value.received = vector<asset>({ settled_amount });
-      result.value.fees  = vector<asset>({ issuer_fees });
-
-      return result;
+      // should be strictly < except for PM with zero outcome since in that case bitasset.settlement_fund is zero
+      FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund,
+                 "Internal error: amount in the global settlement fund is not sufficient to pay the settlement" );
    }
 
-   // Process individual bad debt settlement pool
-   asset to_settle = op.amount;
-   if( bitasset.has_individual_settlement() )
-   {
-      asset pays( bitasset.individual_settlement_debt, bitasset.asset_id );
-      asset settled_amount( bitasset.individual_settlement_fund, bitasset.options.short_backing_asset );
-      if( to_settle.amount < bitasset.individual_settlement_debt )
-      {
-         auto settlement_price = bitasset.get_individual_settlement_price();
-         settled_amount = to_settle * settlement_price; // round down, in favor of settlement fund
-         FC_ASSERT( settled_amount.amount > 0, "Settle amount is too small to receive anything due to rounding" );
-         pays = settled_amount.multiply_and_round_up( settlement_price );
-      }
+   if( 0 == settled_amount.amount && !bitasset.is_prediction_market && maint_time > HARDFORK_CORE_184_TIME )
+      FC_THROW( "Settle amount is too small to receive anything due to rounding" );
+      // else do nothing. Before the hf, something for nothing issue (#184, variant F) could occur
 
-      d.adjust_balance( op.account, -pays );
-      d.modify( bitasset, [&pays,&settled_amount]( asset_bitasset_data_object& obj ){
-         obj.individual_settlement_debt -= pays.amount;
-         obj.individual_settlement_fund -= settled_amount.amount;
+   asset pays = op.amount;
+   if( op.amount.amount != mia_dyn.current_supply
+         && settled_amount.amount != 0
+         && maint_time > HARDFORK_CORE_342_TIME )
+   {
+      pays = settled_amount.multiply_and_round_up( bitasset.settlement_price );
+   }
+
+   d.adjust_balance( op.account, -pays );
+
+   asset issuer_fees( 0, bitasset.options.short_backing_asset );
+   if( settled_amount.amount > 0 )
+   {
+      d.modify( bitasset, [&settled_amount]( asset_bitasset_data_object& obj ){
+         obj.settlement_fund -= settled_amount.amount;
       });
-      d.modify( asset_to_settle->dynamic_asset_data_id(d), [&pays]( asset_dynamic_data_object& obj ){
-         obj.current_supply -= pays.amount;
-      });
-      auto issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d), settled_amount, false );
-      settled_amount -= issuer_fees;
+
+      // The account who settles pays market fees to the issuer of the collateral asset after HF core-1780
+      //
+      // TODO Check whether the HF check can be removed after the HF.
+      //      Note: even if logically it can be removed, perhaps the removal will lead to a small
+      //            performance loss. Needs testing.
+      if( head_time >= HARDFORK_CORE_1780_TIME )
+      {
+         issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d), settled_amount, false );
+         settled_amount -= issuer_fees;
+      }
 
       if( settled_amount.amount > 0 )
          d.adjust_balance( op.account, settled_amount );
+   }
 
-      // Update current_feed since fund price changed
-      d.update_bitasset_current_feed( bitasset, true );
+   d.modify( mia_dyn, [&pays]( asset_dynamic_data_object& obj ){
+      obj.current_supply -= pays.amount;
+   });
 
-      result.value.paid = vector<asset>({ pays });
-      result.value.received = vector<asset>({ settled_amount });
-      result.value.fees  = vector<asset>({ issuer_fees });
+   extendable_operation_result result;
+
+   result.value.paid = vector<asset>({ pays });
+   result.value.received = vector<asset>({ settled_amount });
+   result.value.fees  = vector<asset>({ issuer_fees });
+
+   return result;
+}
+
+static extendable_operation_result pay_settle_from_individual_pool( database& d,
+                                                 const asset_settle_evaluator::operation_type& op,
+                                                 const account_object* fee_paying_account,
+                                                 const asset_object& asset_to_settle,
+                                                 const asset_bitasset_data_object& bitasset )
+{
+   asset pays( bitasset.individual_settlement_debt, bitasset.asset_id );
+   asset settled_amount( bitasset.individual_settlement_fund, bitasset.options.short_backing_asset );
+   if( op.amount.amount < bitasset.individual_settlement_debt )
+   {
+      auto settlement_price = bitasset.get_individual_settlement_price();
+      settled_amount = op.amount * settlement_price; // round down, in favor of settlement fund
+      FC_ASSERT( settled_amount.amount > 0, "Settle amount is too small to receive anything due to rounding" );
+      pays = settled_amount.multiply_and_round_up( settlement_price );
+   }
+
+   d.adjust_balance( op.account, -pays );
+   d.modify( bitasset, [&pays,&settled_amount]( asset_bitasset_data_object& obj ){
+      obj.individual_settlement_debt -= pays.amount;
+      obj.individual_settlement_fund -= settled_amount.amount;
+   });
+   d.modify( asset_to_settle.dynamic_asset_data_id(d), [&pays]( asset_dynamic_data_object& obj ){
+      obj.current_supply -= pays.amount;
+   });
+   auto issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d), settled_amount, false );
+   settled_amount -= issuer_fees;
+
+   if( settled_amount.amount > 0 )
+      d.adjust_balance( op.account, settled_amount );
+
+   // Update current_feed since fund price changed
+   d.update_bitasset_current_feed( bitasset, true );
+
+   extendable_operation_result result;
+
+   result.value.paid = vector<asset>({ pays });
+   result.value.received = vector<asset>({ settled_amount });
+   result.value.fees  = vector<asset>({ issuer_fees });
+
+   return result;
+}
+
+operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::operation_type& op)
+{ try {
+   database& d = db();
+
+   const auto& bitasset = *bitasset_ptr;
+
+   // Process global settlement fund
+   if( bitasset.has_settlement() )
+      return pay_settle_from_gs_fund( d, op, fee_paying_account, *asset_to_settle, bitasset );
+
+   // Process individual bad debt settlement pool
+   extendable_operation_result result;
+   asset to_settle = op.amount;
+   if( bitasset.has_individual_settlement() )
+   {
+      result = pay_settle_from_individual_pool( d, op, fee_paying_account, *asset_to_settle, bitasset );
 
       // If the amount to settle is too small, we return
       if( bitasset.has_individual_settlement() )
          return result;
 
-      to_settle -= pays;
+      to_settle -= result.value.paid->front();
    }
 
    // Process the rest
+   const auto& head_time = d.head_block_time();
+   const auto& maint_time = d.get_dynamic_global_properties().next_maintenance_time;
    d.adjust_balance( op.account, -to_settle );
    const auto& settle = d.create<force_settlement_object>(
          [&op,&to_settle,&head_time,&bitasset](force_settlement_object& s) {
