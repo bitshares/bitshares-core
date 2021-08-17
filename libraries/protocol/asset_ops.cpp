@@ -112,13 +112,16 @@ void  asset_create_operation::validate()const
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( is_valid_symbol(symbol) );
    common_options.validate();
-   if( common_options.issuer_permissions
-         & (disable_force_settle|global_settle|disable_mcr_update|disable_icr_update|disable_mssr_update) )
+   if( 0 != ( common_options.issuer_permissions
+              & (disable_force_settle|global_settle
+                 |disable_mcr_update|disable_icr_update|disable_mssr_update|disable_bdsm_update) ) )
       FC_ASSERT( bitasset_opts.valid() );
    if( is_prediction_market )
    {
       FC_ASSERT( bitasset_opts.valid(), "Cannot have a User-Issued Asset implement a prediction market." );
-      FC_ASSERT( common_options.issuer_permissions & global_settle );
+      FC_ASSERT( 0 != (common_options.issuer_permissions & global_settle) );
+      FC_ASSERT( !bitasset_opts->extensions.value.bad_debt_settlement_method.valid(),
+                 "Can not set bad_debt_settlement_method for Prediction Markets" );
    }
    if( bitasset_opts ) bitasset_opts->validate();
 
@@ -279,9 +282,9 @@ void asset_options::validate()const
 
    FC_ASSERT( max_market_fee >= 0 && max_market_fee <= GRAPHENE_MAX_SHARE_SUPPLY );
    // There must be no high bits in permissions whose meaning is not known.
-   FC_ASSERT( !(issuer_permissions & ~ASSET_ISSUER_PERMISSION_MASK) );
+   FC_ASSERT( 0 == (issuer_permissions & (uint16_t)(~ASSET_ISSUER_PERMISSION_MASK)) );
    // The permission-only bits can not be set in flag
-   FC_ASSERT( !(flags & global_settle),
+   FC_ASSERT( 0 == (flags & global_settle),
               "Can not set global_settle flag, it is for issuer permission only" );
 
    // the witness_fed and committee_fed flags cannot be set simultaneously
@@ -291,7 +294,7 @@ void asset_options::validate()const
               core_exchange_rate.quote.asset_id.instance.value == 0 );
 
    if(!whitelist_authorities.empty() || !blacklist_authorities.empty())
-      FC_ASSERT( flags & white_list );
+      FC_ASSERT( 0 != (flags & white_list) );
    for( auto item : whitelist_markets )
    {
       FC_ASSERT( blacklist_markets.find(item) == blacklist_markets.end() );
@@ -306,20 +309,20 @@ void asset_options::validate()const
 
 void asset_options::validate_flags( bool is_market_issued )const
 {
-   FC_ASSERT( !(flags & ~ASSET_ISSUER_PERMISSION_MASK),
+   FC_ASSERT( 0 == (flags & (uint16_t)(~ASSET_ISSUER_PERMISSION_MASK)),
               "Can not set an unknown bit in flags" );
    // Note: global_settle is checked in validate(), so do not check again here
-   FC_ASSERT( !(flags & disable_mcr_update),
+   FC_ASSERT( 0 == (flags & disable_mcr_update),
               "Can not set disable_mcr_update flag, it is for issuer permission only" );
-   FC_ASSERT( !(flags & disable_icr_update),
+   FC_ASSERT( 0 == (flags & disable_icr_update),
               "Can not set disable_icr_update flag, it is for issuer permission only" );
-   FC_ASSERT( !(flags & disable_mssr_update),
+   FC_ASSERT( 0 == (flags & disable_mssr_update),
               "Can not set disable_mssr_update flag, it is for issuer permission only" );
-   FC_ASSERT( !(flags & disable_bdsm_update),
-              "Can not set disable_mssr_update flag, it is for issuer permission only" );
+   FC_ASSERT( 0 == (flags & disable_bdsm_update),
+              "Can not set disable_bdsm_update flag, it is for issuer permission only" );
    if( !is_market_issued )
    {
-      FC_ASSERT( !(flags & ~UIA_ASSET_ISSUER_PERMISSION_MASK),
+      FC_ASSERT( 0 == (flags & (uint16_t)(~UIA_ASSET_ISSUER_PERMISSION_MASK)),
                  "Can not set a flag for bitassets only to UIA" );
    }
 }
@@ -327,7 +330,7 @@ void asset_options::validate_flags( bool is_market_issued )const
 uint16_t asset_options::get_enabled_issuer_permissions_mask() const
 {
    return ( (issuer_permissions & ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK)
-          | (~issuer_permissions & ASSET_ISSUER_PERMISSION_DISABLE_BITS_MASK) );
+          | ((uint16_t)(~issuer_permissions) & ASSET_ISSUER_PERMISSION_DISABLE_BITS_MASK) );
 }
 
 void asset_claim_fees_operation::validate()const {

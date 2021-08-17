@@ -70,7 +70,7 @@ namespace detail {
       if ( !HARDFORK_BSIP_48_75_PASSED( block_time ) )
       {
          // new issuer permissions should not be set until activation of BSIP_48_75
-         FC_ASSERT( !(options.issuer_permissions & ~ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK),
+         FC_ASSERT( 0 == (options.issuer_permissions & (uint16_t)(~ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK)),
                     "New asset issuer permission bits should not be set before HARDFORK_BSIP_48_75_TIME" );
          // Note: no check for flags here because we didn't check in the past
       }
@@ -463,8 +463,9 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    if( dyn_data.current_supply != 0 )
    {
       // new issuer_permissions must be subset of old issuer permissions
-      FC_ASSERT(!(o.new_options.get_enabled_issuer_permissions_mask() & ~enabled_issuer_permissions_mask),
-                "Cannot reinstate previously revoked issuer permissions on an asset if current supply is non-zero.");
+      FC_ASSERT( 0 == ( o.new_options.get_enabled_issuer_permissions_mask()
+                        & (uint16_t)(~enabled_issuer_permissions_mask) ),
+                 "Cannot reinstate previously revoked issuer permissions on an asset if current supply is non-zero.");
       // precision can not be changed
       FC_ASSERT( !o.extensions.value.new_precision.valid(),
                  "Cannot update precision if current supply is non-zero" );
@@ -488,12 +489,13 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       // Note: if an invalid bit was set, it can be unset regardless of the permissions
       uint16_t check_bits = ( a.is_market_issued() ? VALID_FLAGS_MASK : UIA_VALID_FLAGS_MASK );
 
-      FC_ASSERT( !((o.new_options.flags ^ a.options.flags) & check_bits & ~enabled_issuer_permissions_mask),
+      FC_ASSERT( 0 == ( (o.new_options.flags ^ a.options.flags) & check_bits
+                        & (uint16_t)(~enabled_issuer_permissions_mask) ),
                  "Flag change is forbidden by issuer permissions" );
    }
    else
    {
-      FC_ASSERT( !((o.new_options.flags ^ a.options.flags) & ~a.options.issuer_permissions),
+      FC_ASSERT( 0 == ( (o.new_options.flags ^ a.options.flags) & (uint16_t)(~a.options.issuer_permissions) ),
                  "Flag change is forbidden by issuer permissions" );
    }
 
@@ -544,7 +546,7 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
    database& d = db();
 
    // If we are now disabling force settlements, cancel all open force settlement orders
-   if( (o.new_options.flags & disable_force_settle) && asset_to_update->can_force_settle() )
+   if( 0 != (o.new_options.flags & disable_force_settle) && asset_to_update->can_force_settle() )
    {
       const auto& idx = d.get_index_type<force_settlement_index>().indices().get<by_expiration>();
       // Funky iteration code because we're removing objects as we go. We have to re-initialize itr every loop instead
@@ -674,6 +676,10 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 
    FC_ASSERT( !current_bitasset_data.has_settlement(),
               "Cannot update a bitasset after a global settlement has executed" );
+
+   if( current_bitasset_data.is_prediction_market )
+      FC_ASSERT( !op.new_options.extensions.value.bad_debt_settlement_method.valid(),
+                 "Can not set bad_debt_settlement_method for Prediction Markets" );
 
    // TODO simplify code below when made sure operator==(optional,optional) works
    if( !asset_obj.can_owner_update_mcr() )
@@ -855,7 +861,7 @@ static bool update_bitasset_object_options(
    {
       backing_asset_changed = true;
       should_update_feeds = true;
-      if( asset_to_update.options.flags & ( witness_fed_asset | committee_fed_asset ) )
+      if( 0 != ( asset_to_update.options.flags & ( witness_fed_asset | committee_fed_asset ) ) )
          is_witness_or_committee_fed = true;
    }
 
@@ -968,8 +974,8 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
    const asset_object& a = o.asset_to_update(d);
 
    FC_ASSERT(a.is_market_issued(), "Cannot update feed producers on a non-BitAsset.");
-   FC_ASSERT(!(a.options.flags & committee_fed_asset), "Cannot set feed producers on a committee-fed asset.");
-   FC_ASSERT(!(a.options.flags & witness_fed_asset), "Cannot set feed producers on a witness-fed asset.");
+   FC_ASSERT(0 == (a.options.flags & committee_fed_asset), "Cannot set feed producers on a committee-fed asset.");
+   FC_ASSERT(0 == (a.options.flags & witness_fed_asset), "Cannot set feed producers on a witness-fed asset.");
 
    FC_ASSERT( a.issuer == o.issuer, "Only asset issuer can update feed producers of an asset" );
 
@@ -1282,12 +1288,12 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    }
 
    //Verify that the publisher is authoritative to publish a feed
-   if( base.options.flags & witness_fed_asset )
+   if( 0 != ( base.options.flags & witness_fed_asset ) )
    {
       FC_ASSERT( d.get(GRAPHENE_WITNESS_ACCOUNT).active.account_auths.count(o.publisher) > 0,
                  "Only active witnesses are allowed to publish price feeds for this asset" );
    }
-   else if( base.options.flags & committee_fed_asset )
+   else if( 0 != ( base.options.flags & committee_fed_asset ) )
    {
       FC_ASSERT( d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.account_auths.count(o.publisher) > 0,
                  "Only active committee members are allowed to publish price feeds for this asset" );
