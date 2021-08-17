@@ -301,6 +301,14 @@ namespace graphene { namespace chain {
          /// @param a ID of the asset
          /// @return nullptr if not found, pointer to the limit order if found
          const limit_order_object* find_bad_debt_settlement_order( const asset_id_type& a )const;
+
+         /// Find the call order with the least collateral ratio
+         /// @param bitasset The bitasset object
+         /// @param force_by_collateral_index Whether to forcefully search via the by_collateral index
+         /// @return nullptr if not found, pointer to the call order if found
+         const call_order_object* find_least_collateralized_short( const asset_bitasset_data_object& bitasset,
+                                                                   bool force_by_collateral_index )const;
+
          //////////////////// db_init.cpp ////////////////////
          ///@{
 

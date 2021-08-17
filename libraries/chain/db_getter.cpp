@@ -24,6 +24,8 @@
 
 #include <graphene/chain/database.hpp>
 
+#include <graphene/chain/hardfork.hpp>
+
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
@@ -154,6 +156,40 @@ const limit_order_object* database::find_bad_debt_settlement_order( const asset_
    if( itr != limit_index.end() && itr->receive_asset_id() == a )
       return &(*itr);
    return nullptr;
+}
+
+const call_order_object* database::find_least_collateralized_short( const asset_bitasset_data_object& bitasset,
+                                                                    bool force_by_collateral_index )const
+{
+   bool find_by_collateral = true;
+   if( !force_by_collateral_index )
+      // core-1270 hard fork : call price caching issue
+      find_by_collateral = ( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_1270_TIME );
+
+   const call_order_object* call_ptr = nullptr; // place holder
+
+   auto call_min = price::min( bitasset.options.short_backing_asset, bitasset.asset_id );
+
+   if( !find_by_collateral ) // before core-1270 hard fork, check with call_price
+   {
+      const auto& call_price_index = get_index_type<call_order_index>().indices().get<by_price>();
+      auto call_itr = call_price_index.lower_bound( call_min );
+      if( call_itr != call_price_index.end() ) // no call order
+         call_ptr = &(*call_itr);
+   }
+   else // after core-1270 hard fork, check with collateralization
+   {
+      // Note: it is safe to check here even if there is no call order due to individual bad debt settlements
+      const auto& call_collateral_index = get_index_type<call_order_index>().indices().get<by_collateral>();
+      auto call_itr = call_collateral_index.lower_bound( call_min );
+      if( call_itr != call_collateral_index.end() ) // no call order
+         call_ptr = &(*call_itr);
+   }
+   if( nullptr == call_ptr )
+      return nullptr;
+   if( call_ptr->debt_type() != bitasset.asset_id ) // no call order
+      return nullptr;
+   return call_ptr;
 }
 
 } }

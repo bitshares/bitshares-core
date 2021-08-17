@@ -208,28 +208,9 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
          return false;
     }
 
-    const call_order_object* call_ptr = nullptr; // place holder for the call order with least collateral ratio
-
-    auto call_min = price::min( bitasset.options.short_backing_asset, debt_asset_id );
-
-    if( before_core_hardfork_1270 ) // before core-1270 hard fork, check with call_price
-    {
-       const auto& call_price_index = get_index_type<call_order_index>().indices().get<by_price>();
-       auto call_itr = call_price_index.lower_bound( call_min );
-       if( call_itr == call_price_index.end() ) // no call order
-          return false;
-       call_ptr = &(*call_itr);
-    }
-    else // after core-1270 hard fork, check with collateralization
-    {
-       // Note: it is safe to check here even if there is no call order due to individual bad debt settlements
-       const auto& call_collateral_index = get_index_type<call_order_index>().indices().get<by_collateral>();
-       auto call_itr = call_collateral_index.lower_bound( call_min );
-       if( call_itr == call_collateral_index.end() ) // no call order
-          return false;
-       call_ptr = &(*call_itr);
-    }
-    if( call_ptr->debt_type() != debt_asset_id ) // no call order
+    // Find the call order with the least collateral ratio
+    const call_order_object* call_ptr = find_least_collateralized_short( bitasset, false );
+    if( nullptr == call_ptr ) // no call order
        return false;
 
     price highest = settle_price;
@@ -352,14 +333,12 @@ static optional<price> get_derived_current_feed_price( const database& db,
    const auto bdsm = bitasset.get_bad_debt_settlement_method();
    if( bdsm_type::no_settlement == bdsm )
    {
-      // Note: it is safe to check here even if there is no call order due to individual bad debt settlements
-      const auto& call_collateral_index = db.get_index_type<call_order_index>().indices().get<by_collateral>();
-      auto call_min = price::min( bitasset.options.short_backing_asset, bitasset.asset_id );
-      auto call_itr = call_collateral_index.lower_bound( call_min );
-      if( call_itr != call_collateral_index.end() && call_itr->debt_type() == bitasset.asset_id )
+      // Find the call order with the least collateral ratio
+      const call_order_object* call_ptr = db.find_least_collateralized_short( bitasset, true );
+      if( nullptr != call_ptr )
       {
-         // GS if : call_itr->collateralization() < ~( bitasset.median_feed.max_short_squeeze_price() )
-         auto least_collateral = call_itr->collateralization();
+         // GS if : call_ptr->collateralization() < ~( bitasset.median_feed.max_short_squeeze_price() )
+         auto least_collateral = call_ptr->collateralization();
          auto lowest_callable_feed_price = (~least_collateral) / ratio_type( GRAPHENE_COLLATERAL_RATIO_DENOM,
                                               bitasset.current_feed.maximum_short_squeeze_ratio );
          result = std::max( bitasset.median_feed.settlement_price, lowest_callable_feed_price );
@@ -589,15 +568,13 @@ void database::clear_expired_force_settlements()
          else if( settlement_price.base.asset_id != current_asset ) // only calculate once per asset
             settlement_price = settlement_fill_price;
 
-         // Note: there can be no debt position due to individual settlements, processed below
-         auto& call_index = get_index_type<call_order_index>().indices().get<by_collateral>();
          asset settled = mia_object.amount(mia.force_settled_volume);
          // Match against the least collateralized short until the settlement is finished or we reach max settlements
          while( settled < max_settlement_volume && find_object(order_id) )
          {
-            auto call_itr = call_index.lower_bound( price::min( mia.options.short_backing_asset, mia.asset_id ) );
+            auto call_ptr = find_least_collateralized_short( mia, true );
             // Note: there can be no debt position due to individual settlements
-            if( call_itr == call_index.end() || call_itr->debt_type() != mia.asset_id ) // no debt position
+            if( nullptr == call_ptr ) // no debt position
             {
                wlog( "No debt position found when processing force settlement ${o}", ("o",order) );
                cancel_settle_order( order );
@@ -613,7 +590,7 @@ void database::clear_expired_force_settlements()
                break;
             }
             try {
-               asset new_settled = match( order, *call_itr, settlement_price, mia,
+               asset new_settled = match( order, *call_ptr, settlement_price, mia,
                                           max_settlement, settlement_fill_price );
                if( !before_core_hardfork_184 && new_settled.amount == 0 ) // unable to fill this settle order
                {
@@ -623,12 +600,12 @@ void database::clear_expired_force_settlements()
                }
                settled += new_settled;
                // before hard fork core-342, `new_settled > 0` is always true, we'll have:
-               // * call order is completely filled (thus call_itr will change in next loop), or
+               // * call order is completely filled (thus call_ptr will change in next loop), or
                // * settle order is completely filled (thus find_object(order_id) will be false so will break out), or
                // * reached max_settlement_volume limit (thus new_settled == max_settlement so will break out).
                //
                // after hard fork core-342, if new_settled > 0, we'll have:
-               // * call order is completely filled (thus call_itr will change in next loop), or
+               // * call order is completely filled (thus call_ptr will change in next loop), or
                // * settle order is completely filled (thus find_object(order_id) will be false so will break out), or
                // * reached max_settlement_volume limit, but it's possible that new_settled < max_settlement,
                //   in this case, new_settled will be zero in next iteration of the loop, so no need to check here.
