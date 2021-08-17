@@ -982,13 +982,11 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_feed_producers_operation& o)
+void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_feed_producers_operation& o) const
 { try {
    database& d = db();
-   const auto head_time = d.head_block_time();
-   const auto next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
    const asset_bitasset_data_object& bitasset_to_update = asset_to_update->bitasset_data(d);
-   d.modify( bitasset_to_update, [&o,head_time,next_maint_time](asset_bitasset_data_object& a) {
+   d.modify( bitasset_to_update, [&o](asset_bitasset_data_object& a) {
       //This is tricky because I have a set of publishers coming in, but a map of publisher to feed is stored.
       //I need to update the map such that the keys match the new publishers, but not munge the old price feeds from
       //publishers who are being kept.
@@ -1340,7 +1338,7 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
 
    auto old_feed = bad.current_feed;
    // Store medians for this asset
-   d.modify( bad , [&o,head_time,next_maint_time](asset_bitasset_data_object& a) {
+   d.modify( bad , [&o,&head_time](asset_bitasset_data_object& a) {
       a.feeds[o.publisher] = make_pair( head_time, price_feed_with_icr( o.feed,
                                                       o.extensions.value.initial_collateral_ratio ) );
    });

@@ -32,9 +32,9 @@ using namespace graphene::chain;
 
 share_type asset_bitasset_data_object::max_force_settlement_volume(share_type current_supply) const
 {
-   if( options.maximum_force_settlement_volume == 0 )
+   if( 0 == options.maximum_force_settlement_volume )
       return 0;
-   if( options.maximum_force_settlement_volume == GRAPHENE_100_PERCENT )
+   if( GRAPHENE_100_PERCENT == options.maximum_force_settlement_volume )
       return current_supply + force_settled_volume;
 
    fc::uint128_t volume = current_supply.value;
@@ -76,7 +76,7 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
       return;
    }
 
-   if( effective_feeds.size() == 1 )
+   if( 1u == effective_feeds.size() )
    {
       if( median_feed.core_exchange_rate != effective_feeds.front().get().core_exchange_rate )
          feed_cer_updated = true;
@@ -99,7 +99,7 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
 
    // *** Begin Median Calculations ***
    price_feed_with_icr tmp_median_feed;
-   const auto median_itr = effective_feeds.begin() + effective_feeds.size() / 2;
+   const auto median_itr = effective_feeds.begin() + ( effective_feeds.size() / 2 );
 #define CALCULATE_MEDIAN_VALUE(r, data, field_name) \
    std::nth_element( effective_feeds.begin(), median_itr, effective_feeds.end(), \
                      [](const price_feed_with_icr& a, const price_feed_with_icr& b) { \

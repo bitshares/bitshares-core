@@ -808,7 +808,7 @@ database::match_result_type database::match_limit_normal_limit( const limit_orde
    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
 
    bool cull_taker = false;
-   if( taker_for_sale <= maker_for_sale * match_price ) // rounding down here should be fine
+   if( taker_for_sale <= ( maker_for_sale * match_price ) ) // rounding down here should be fine
    {
       taker_receives  = taker_for_sale * match_price; // round down, in favor of bigger order
 
@@ -831,7 +831,7 @@ database::match_result_type database::match_limit_normal_limit( const limit_orde
    }
    else
    {
-      //This line once read: assert( maker_for_sale < taker_for_sale * match_price );
+      //This line once read: assert( maker_for_sale < taker_for_sale * match_price ); // check
       //This assert is not always true -- see trade_amount_equals_zero in operation_tests.cpp
       //Although taker_for_sale is greater than maker_for_sale * match_price,
       //         maker_for_sale == taker_for_sale * match_price

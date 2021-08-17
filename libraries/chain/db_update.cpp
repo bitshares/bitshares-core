@@ -595,9 +595,9 @@ void database::clear_expired_force_settlements()
          // Match against the least collateralized short until the settlement is finished or we reach max settlements
          while( settled < max_settlement_volume && find_object(order_id) )
          {
-            auto itr = call_index.lower_bound( price::min( mia.options.short_backing_asset, mia.asset_id ) );
+            auto call_itr = call_index.lower_bound( price::min( mia.options.short_backing_asset, mia.asset_id ) );
             // Note: there can be no debt position due to individual settlements
-            if( itr == call_index.end() || itr->debt_type() != mia.asset_id ) // no debt position
+            if( call_itr == call_index.end() || call_itr->debt_type() != mia.asset_id ) // no debt position
             {
                wlog( "No debt position found when processing force settlement ${o}", ("o",order) );
                cancel_settle_order( order );
@@ -613,7 +613,8 @@ void database::clear_expired_force_settlements()
                break;
             }
             try {
-               asset new_settled = match(order, *itr, settlement_price, mia, max_settlement, settlement_fill_price);
+               asset new_settled = match( order, *call_itr, settlement_price, mia,
+                                          max_settlement, settlement_fill_price );
                if( !before_core_hardfork_184 && new_settled.amount == 0 ) // unable to fill this settle order
                {
                   if( find_object( order_id ) ) // the settle order hasn't been cancelled
@@ -622,12 +623,12 @@ void database::clear_expired_force_settlements()
                }
                settled += new_settled;
                // before hard fork core-342, `new_settled > 0` is always true, we'll have:
-               // * call order is completely filled (thus itr will change in next loop), or
+               // * call order is completely filled (thus call_itr will change in next loop), or
                // * settle order is completely filled (thus find_object(order_id) will be false so will break out), or
                // * reached max_settlement_volume limit (thus new_settled == max_settlement so will break out).
                //
                // after hard fork core-342, if new_settled > 0, we'll have:
-               // * call order is completely filled (thus itr will change in next loop), or
+               // * call order is completely filled (thus call_itr will change in next loop), or
                // * settle order is completely filled (thus find_object(order_id) will be false so will break out), or
                // * reached max_settlement_volume limit, but it's possible that new_settled < max_settlement,
                //   in this case, new_settled will be zero in next iteration of the loop, so no need to check here.
@@ -660,32 +661,33 @@ void database::update_expired_feeds()
    {
       const asset_bitasset_data_object& b = *itr;
       ++itr; // not always process begin() because old code skipped updating some assets before hf 615
+
       // update feeds, check margin calls
-      if( after_hardfork_615 || b.feed_is_expired_before_hf_615( head_time ) )
+      if( !( after_hardfork_615 || b.feed_is_expired_before_hf_615( head_time ) ) )
+         continue;
+
+      auto old_median_feed = b.current_feed;
+      const asset_object& asset_obj = b.asset_id( *this );
+      update_bitasset_current_feed( b );
+      if( !b.current_feed.settlement_price.is_null()
+            && !b.current_feed.margin_call_params_equal( old_median_feed ) )
       {
-         auto old_median_feed = b.current_feed;
-         const asset_object& asset_obj = b.asset_id( *this );
-         update_bitasset_current_feed( b );
-         if( !b.current_feed.settlement_price.is_null()
-               && !b.current_feed.margin_call_params_equal( old_median_feed ) )
+         check_call_orders( asset_obj, true, false, &b, true );
+      }
+      // update CER
+      if( b.need_to_update_cer() )
+      {
+         modify( b, []( asset_bitasset_data_object& abdo )
          {
-            check_call_orders( asset_obj, true, false, &b, true );
-         }
-         // update CER
-         if( b.need_to_update_cer() )
+            abdo.asset_cer_updated = false;
+            abdo.feed_cer_updated = false;
+         });
+         if( asset_obj.options.core_exchange_rate != b.current_feed.core_exchange_rate )
          {
-            modify( b, []( asset_bitasset_data_object& abdo )
+            modify( asset_obj, [&b]( asset_object& ao )
             {
-               abdo.asset_cer_updated = false;
-               abdo.feed_cer_updated = false;
+               ao.options.core_exchange_rate = b.current_feed.core_exchange_rate;
             });
-            if( asset_obj.options.core_exchange_rate != b.current_feed.core_exchange_rate )
-            {
-               modify( asset_obj, [&b]( asset_object& ao )
-               {
-                  ao.options.core_exchange_rate = b.current_feed.core_exchange_rate;
-               });
-            }
          }
       }
    } // for each asset whose feed is expired

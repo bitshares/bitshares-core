@@ -114,7 +114,7 @@ namespace graphene { namespace chain {
          using operation_type = asset_update_feed_producers_operation;
 
          void_result do_evaluate( const operation_type& o );
-         void_result do_apply( const operation_type& o );
+         void_result do_apply( const operation_type& o ) const;
 
          const asset_object* asset_to_update = nullptr;
    };
@@ -161,6 +161,7 @@ namespace graphene { namespace chain {
          void_result do_evaluate( const asset_publish_feed_operation& o );
          void_result do_apply( const asset_publish_feed_operation& o );
 
+      private:
          const asset_object* asset_ptr = nullptr;
          const asset_bitasset_data_object* bitasset_ptr = nullptr;
    };
