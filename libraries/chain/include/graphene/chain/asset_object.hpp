@@ -40,8 +40,6 @@
 
 namespace graphene { namespace chain {
    class asset_bitasset_data_object;
-   class database;
-   using namespace graphene::db;
 
    /**
     *  @brief tracks the asset information that changes frequently
@@ -92,27 +90,28 @@ namespace graphene { namespace chain {
          /// @return true if this is a share asset of a liquidity pool; false otherwise.
          bool is_liquidity_pool_share_asset()const { return for_liquidity_pool.valid(); }
          /// @return true if users may request force-settlement of this market-issued asset; false otherwise
-         bool can_force_settle()const { return !(options.flags & disable_force_settle); }
+         bool can_force_settle()const { return (0 == (options.flags & disable_force_settle)); }
          /// @return true if the issuer of this market-issued asset may globally settle the asset; false otherwise
-         bool can_global_settle()const { return options.issuer_permissions & global_settle; }
+         bool can_global_settle()const { return (0 != (options.issuer_permissions & global_settle)); }
          /// @return true if this asset charges a fee for the issuer on market operations; false otherwise
-         bool charges_market_fees()const { return options.flags & charge_market_fee; }
+         bool charges_market_fees()const { return (0 != (options.flags & charge_market_fee)); }
          /// @return true if this asset may only be transferred to/from the issuer or market orders
-         bool is_transfer_restricted()const { return options.flags & transfer_restricted; }
-         bool can_override()const { return options.flags & override_authority; }
-         bool allow_confidential()const { return !(options.flags & asset_issuer_permission_flags::disable_confidential); }
+         bool is_transfer_restricted()const { return (0 != (options.flags & transfer_restricted)); }
+         bool can_override()const { return (0 != (options.flags & override_authority)); }
+         bool allow_confidential()const
+         { return (0 == (options.flags & asset_issuer_permission_flags::disable_confidential)); }
          /// @return true if max supply of the asset can be updated
-         bool can_update_max_supply()const { return !(options.flags & lock_max_supply); }
+         bool can_update_max_supply()const { return (0 == (options.flags & lock_max_supply)); }
          /// @return true if can create new supply for the asset
-         bool can_create_new_supply()const { return !(options.flags & disable_new_supply); }
+         bool can_create_new_supply()const { return (0 == (options.flags & disable_new_supply)); }
          /// @return true if the asset owner can update MCR directly
-         bool can_owner_update_mcr()const { return !(options.issuer_permissions & disable_mcr_update); }
+         bool can_owner_update_mcr()const { return (0 == (options.issuer_permissions & disable_mcr_update)); }
          /// @return true if the asset owner can update ICR directly
-         bool can_owner_update_icr()const { return !(options.issuer_permissions & disable_icr_update); }
+         bool can_owner_update_icr()const { return (0 == (options.issuer_permissions & disable_icr_update)); }
          /// @return true if the asset owner can update MSSR directly
-         bool can_owner_update_mssr()const { return !(options.issuer_permissions & disable_mssr_update); }
+         bool can_owner_update_mssr()const { return (0 == (options.issuer_permissions & disable_mssr_update)); }
          /// @return true if the asset owner can change bad debt settlement method
-         bool can_owner_update_bdsm()const { return !(options.issuer_permissions & disable_bdsm_update); }
+         bool can_owner_update_bdsm()const { return (0 == (options.issuer_permissions & disable_bdsm_update)); }
 
          /// Helper function to get an asset object with the given amount in this asset's type
          asset amount(share_type a)const { return asset(a, id); }
@@ -158,8 +157,9 @@ namespace graphene { namespace chain {
             // UIAs may not be prediction markets, have force settlement, or global settlements
             if( !is_market_issued() )
             {
-               FC_ASSERT(!(options.flags & disable_force_settle || options.flags & global_settle));
-               FC_ASSERT(!(options.issuer_permissions & disable_force_settle || options.issuer_permissions & global_settle));
+               FC_ASSERT(0 == (options.flags & disable_force_settle) && 0 == (options.flags & global_settle));
+               FC_ASSERT(0 == (options.issuer_permissions & disable_force_settle)
+                         && 0 == (options.issuer_permissions & global_settle));
             }
          }
 
@@ -244,7 +244,7 @@ namespace graphene { namespace chain {
 
       /// The result will be used to check new debt positions and position updates.
       /// Calculation: ~settlement_price * initial_collateral_ratio / GRAPHENE_COLLATERAL_RATIO_DENOM
-      price calculate_initial_collateralization()const;
+      price get_initial_collateralization()const;
    };
 
    /**
@@ -294,7 +294,7 @@ namespace graphene { namespace chain {
          /// Calculate the maximum force settlement volume per maintenance interval, given the current share supply
          share_type max_force_settlement_volume(share_type current_supply)const;
 
-         /// return true if the bitasset has been globally settled, false otherwise
+         /// @return true if the bitasset has been globally settled, false otherwise
          bool has_settlement()const { return !settlement_price.is_null(); }
 
          /**
@@ -319,7 +319,7 @@ namespace graphene { namespace chain {
          share_type individual_settlement_fund;
          ///@}
 
-         /// return true if the individual bad debt settlement pool is not empty, false otherwise
+         /// @return true if the individual bad debt settlement pool is not empty, false otherwise
          bool has_individual_settlement()const { return ( individual_settlement_debt != 0 ); }
 
          /// Get the price of the individual bad debt settlement pool
@@ -353,13 +353,13 @@ namespace graphene { namespace chain {
             return current_feed.margin_call_pays_ratio( options.extensions.value.margin_call_fee_ratio );
          }
 
-         /// Track whether core_exchange_rate in corresponding asset_object has updated
+         /// Track whether core_exchange_rate in corresponding @ref asset_object has updated
          bool asset_cer_updated = false;
 
          /// Track whether core exchange rate in current feed has updated
          bool feed_cer_updated = false;
 
-         /// Whether need to update core_exchange_rate in asset_object
+         /// Whether need to update core_exchange_rate in @ref asset_object
          bool need_to_update_cer() const
          {
             return ( ( feed_cer_updated || asset_cer_updated ) && !current_feed.core_exchange_rate.is_null() );
@@ -369,13 +369,16 @@ namespace graphene { namespace chain {
          time_point_sec feed_expiration_time()const
          {
             uint32_t current_feed_seconds = current_feed_publication_time.sec_since_epoch();
-            if( std::numeric_limits<uint32_t>::max() - current_feed_seconds <= options.feed_lifetime_sec )
+            if( (std::numeric_limits<uint32_t>::max() - current_feed_seconds) <= options.feed_lifetime_sec )
                return time_point_sec::maximum();
             else
                return current_feed_publication_time + options.feed_lifetime_sec;
          }
-         bool feed_is_expired_before_hardfork_615(time_point_sec current_time)const
+         /// The old and buggy implementation of @ref feed_is_expired before the No. 615 hardfork.
+         /// See https://github.com/cryptonomex/graphene/issues/615
+         bool feed_is_expired_before_hf_615(time_point_sec current_time)const
          { return feed_expiration_time() >= current_time; }
+         /// @return whether @ref current_feed has expired
          bool feed_is_expired(time_point_sec current_time)const
          { return feed_expiration_time() <= current_time; }
 
@@ -400,10 +403,10 @@ namespace graphene { namespace chain {
          void refresh_cache();
    };
 
-   // key extractor for short backing asset
-   struct bitasset_short_backing_asset_extractor
+   /// Key extractor for short backing asset
+   struct bitasset_backing_asst_extractor
    {
-      typedef asset_id_type result_type;
+      using result_type = asset_id_type;
       result_type operator() (const asset_bitasset_data_object& obj) const
       {
          return obj.options.short_backing_asset;
@@ -414,28 +417,30 @@ namespace graphene { namespace chain {
    struct by_feed_expiration;
    struct by_cer_update;
 
-   typedef multi_index_container<
+   using bitasset_data_multi_index_type = multi_index_container<
       asset_bitasset_data_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-         ordered_non_unique< tag<by_short_backing_asset>, bitasset_short_backing_asset_extractor >,
+         ordered_non_unique< tag<by_short_backing_asset>, bitasset_backing_asst_extractor >,
          ordered_unique< tag<by_feed_expiration>,
             composite_key< asset_bitasset_data_object,
-               const_mem_fun< asset_bitasset_data_object, time_point_sec, &asset_bitasset_data_object::feed_expiration_time >,
+               const_mem_fun< asset_bitasset_data_object, time_point_sec,
+                              &asset_bitasset_data_object::feed_expiration_time >,
                member< asset_bitasset_data_object, asset_id_type, &asset_bitasset_data_object::asset_id >
             >
          >,
          ordered_non_unique< tag<by_cer_update>,
-                             const_mem_fun< asset_bitasset_data_object, bool, &asset_bitasset_data_object::need_to_update_cer >
+                             const_mem_fun< asset_bitasset_data_object, bool,
+                                            &asset_bitasset_data_object::need_to_update_cer >
          >
       >
-   > asset_bitasset_data_object_multi_index_type;
-   typedef generic_index<asset_bitasset_data_object, asset_bitasset_data_object_multi_index_type> asset_bitasset_data_index;
+   >;
+   using asset_bitasset_data_index = generic_index< asset_bitasset_data_object, bitasset_data_multi_index_type >;
 
    struct by_symbol;
    struct by_type;
    struct by_issuer;
-   typedef multi_index_container<
+   using asset_object_multi_index_type = multi_index_container<
       asset_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
@@ -453,8 +458,8 @@ namespace graphene { namespace chain {
             >
          >
       >
-   > asset_object_multi_index_type;
-   typedef generic_index<asset_object, asset_object_multi_index_type> asset_index;
+   >;
+   using asset_index = generic_index< asset_object, asset_object_multi_index_type >;
 
 } } // graphene::chain
 

@@ -136,12 +136,12 @@ void asset_bitasset_data_object::refresh_cache()
 {
    current_maintenance_collateralization = median_feed.maintenance_collateralization();
    if( median_feed.initial_collateral_ratio > median_feed.maintenance_collateral_ratio ) // if ICR is above MCR
-      current_initial_collateralization = median_feed.calculate_initial_collateralization();
+      current_initial_collateralization = median_feed.get_initial_collateralization();
    else // if ICR is not above MCR
       current_initial_collateralization = current_maintenance_collateralization;
 }
 
-price price_feed_with_icr::calculate_initial_collateralization()const
+price price_feed_with_icr::get_initial_collateralization()const
 {
    if( settlement_price.is_null() )
       return price();

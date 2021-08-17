@@ -661,7 +661,7 @@ void database::update_expired_feeds()
       const asset_bitasset_data_object& b = *itr;
       ++itr; // not always process begin() because old code skipped updating some assets before hf 615
       // update feeds, check margin calls
-      if( after_hardfork_615 || b.feed_is_expired_before_hardfork_615( head_time ) )
+      if( after_hardfork_615 || b.feed_is_expired_before_hf_615( head_time ) )
       {
          auto old_median_feed = b.current_feed;
          const asset_object& asset_obj = b.asset_id( *this );
