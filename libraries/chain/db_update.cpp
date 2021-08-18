@@ -523,11 +523,6 @@ void database::clear_expired_force_settlements()
       // In this case, we move to the next asset.
       if( mia.force_settled_volume >= max_settlement_volume.amount || current_asset_finished )
       {
-         /*
-         ilog("Skipping force settlement in ${asset}; settled ${settled_volume} / ${max_volume}",
-              ("asset", mia_object.symbol)("settlement_price_null",mia.current_feed.settlement_price.is_null())
-              ("settled_volume", mia.force_settled_volume)("max_volume", max_settlement_volume)); // for debug
-              */
          if( next_asset() )
             continue;
          break;
