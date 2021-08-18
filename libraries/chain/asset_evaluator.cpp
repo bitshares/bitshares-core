@@ -724,7 +724,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
          FC_ASSERT( !current_bitasset_data.has_individual_settlement(),
                  "Unable to update BDSM when the individual bad debt settlement pool is not empty" );
       else if( bdsm_type::individual_settlement_to_order == old_bdsm )
-         FC_ASSERT( nullptr == d.find_bad_debt_settlement_order( op.asset_to_update ),
+         FC_ASSERT( !d.find_bad_debt_settlement_order( op.asset_to_update ),
                  "Unable to update BDSM when there exists a bad debt settlement order" );
 
       // Since we do not allow updating in some cases (above), only check no_settlement here

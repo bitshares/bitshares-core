@@ -185,7 +185,7 @@ const call_order_object* database::find_least_collateralized_short( const asset_
       if( call_itr != call_collateral_index.end() ) // no call order
          call_ptr = &(*call_itr);
    }
-   if( nullptr == call_ptr )
+   if( !call_ptr )
       return nullptr;
    if( call_ptr->debt_type() != bitasset.asset_id ) // no call order
       return nullptr;

@@ -153,7 +153,7 @@ void database::globally_settle_asset_impl( const asset_object& mia,
 
    // Move the (individual) bad-debt settlement order to the GS fund
    const limit_order_object* limit_ptr = find_bad_debt_settlement_order( bitasset.asset_id );
-   if( limit_ptr != nullptr )
+   if( limit_ptr )
    {
       collateral_gathered.amount += limit_ptr->for_sale;
       remove( *limit_ptr );
@@ -200,7 +200,7 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
    else // settle to order
    {
       const limit_order_object* limit_ptr = find_bad_debt_settlement_order( bitasset.asset_id );
-      if( limit_ptr != nullptr )
+      if( limit_ptr )
       {
          modify( *limit_ptr, [&order,&fund_receives]( limit_order_object& obj ) {
             obj.for_sale += fund_receives.amount;
@@ -360,8 +360,8 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
          // if there is any CORE fee to deduct, redirect it to referral program
          if( core_cancel_fee.amount > 0 )
          {
-            seller_acc_stats = &order.seller( *this ).statistics( *this );
-            modify( *seller_acc_stats, [&]( account_statistics_object& obj ) {
+            seller_acc_stats = &get_account_stats_by_owner( order.seller );
+            modify( *seller_acc_stats, [&core_cancel_fee, this]( account_statistics_object& obj ) {
                obj.pay_fee( core_cancel_fee.amount, get_global_properties().parameters.cashback_vesting_threshold );
             } );
             deferred_fee -= core_cancel_fee.amount;
@@ -382,7 +382,7 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
                share_type cancel_fee_amount = static_cast<int64_t>(fee128);
                // cancel_fee should be positive, pay it to asset's accumulated_fees
                fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
-               modify( *fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {
+               modify( *fee_asset_dyn_data, [&cancel_fee_amount](asset_dynamic_data_object& addo) {
                   addo.accumulated_fees += cancel_fee_amount;
                });
                // cancel_fee should be no more than deferred_paid_fee
@@ -397,9 +397,9 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
    auto refunded = order.amount_for_sale();
    if( refunded.asset_id == asset_id_type() )
    {
-      if( seller_acc_stats == nullptr )
-         seller_acc_stats = &order.seller( *this ).statistics( *this );
-      modify( *seller_acc_stats, [&]( account_statistics_object& obj ) {
+      if( !seller_acc_stats )
+         seller_acc_stats = &get_account_stats_by_owner( order.seller );
+      modify( *seller_acc_stats, [&refunded]( account_statistics_object& obj ) {
          obj.total_core_in_orders -= refunded.amount;
       });
    }
@@ -418,7 +418,7 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
    {
       adjust_balance(order.seller, deferred_paid_fee);
       // be here, must have: fee_asset != CORE
-      if( fee_asset_dyn_data == nullptr )
+      if( !fee_asset_dyn_data )
          fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
       modify( *fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {
          addo.fee_pool += deferred_fee;
@@ -498,7 +498,7 @@ bool database::apply_order_before_hardfork_625(const limit_order_object& new_ord
    check_call_orders(receive_asset); // the other side, same as above
 
    const limit_order_object* updated_order_object = find< limit_order_object >( order_id );
-   if( updated_order_object == nullptr )
+   if( !updated_order_object )
       return true;
    if( head_block_time() <= HARDFORK_555_TIME )
       return false;
@@ -694,7 +694,7 @@ bool database::apply_order(const limit_order_object& new_order_object)
    }
 
    const limit_order_object* updated_order_object = find< limit_order_object >( order_id );
-   if( updated_order_object == nullptr )
+   if( !updated_order_object )
       return true;
 
    // before #555 we would have done maybe_cull_small_order() logic as a result of fill_order()
@@ -1106,8 +1106,7 @@ asset database::match_impl( const force_settlement_object& settle,
             {
                call_pays.amount = call.collateral;
                match_price = call_debt / call_collateral;
-               fill_price = ( margin_call_pays_ratio != nullptr ) ? ( match_price / (*margin_call_pays_ratio) )
-                                                                  : match_price;
+               fill_price = margin_call_pays_ratio ? ( match_price / (*margin_call_pays_ratio) ) : match_price;
             }
             settle_receives = call_receives.multiply_and_round_up( fill_price );
          }
@@ -1175,7 +1174,7 @@ asset database::match_impl( const force_settlement_object& settle,
                // price changed, update call_receives // round up to mitigate rounding issues (hf core-342)
                call_receives = call_pays.multiply_and_round_up( match_price ); // round up
                // update fill price and settle_receives
-               if( margin_call_pays_ratio != nullptr ) // check to be defensive
+               if( margin_call_pays_ratio ) // check to be defensive
                {
                   fill_price = match_price / (*margin_call_pays_ratio);
                   settle_receives = call_receives * fill_price; // round down here, in favor of call order
@@ -1961,7 +1960,7 @@ asset database::pay_market_fees(const account_object* seller, const asset_object
       asset reward = recv_asset.amount(0);
 
       auto is_rewards_allowed = [&recv_asset, seller]() {
-         if (seller == nullptr)
+         if ( !seller )
             return false;
          const auto &white_list = recv_asset.options.extensions.value.whitelist_market_fee_sharing;
          return ( !white_list || (*white_list).empty()
