@@ -176,7 +176,7 @@ void database::clear_expired_proposals()
 
 /**
  *  let HB = the highest bid for the collateral  (aka who will pay the most DEBT for the least collateral)
- *  let SP = current median feed's Settlement Price 
+ *  let SP = current median feed's Settlement Price
  *  let LC = the least collateralized call order's swan price (debt/collateral)
  *
  *  If there is no valid price feed or no bids then there is no black swan.
@@ -311,7 +311,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
        else
           globally_settle_asset(mia, ~least_collateral );
        return true;
-    } 
+    }
     return false;
 }
 
@@ -429,11 +429,6 @@ void database::clear_expired_orders()
 void database::clear_expired_force_settlements()
 { try {
    // Process expired force settlement orders
-   auto head_time = head_block_time();
-   auto maint_time = get_dynamic_global_properties().next_maintenance_time;
-
-   bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
-   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
 
    // TODO Possible performance optimization. Looping through all assets is not ideal.
    //      - One idea is to check time first, if any expired settlement found, check asset.
@@ -441,190 +436,178 @@ void database::clear_expired_force_settlements()
    //        skip due to volume limit.
    //      - Instead, maintain some data e.g. (whether_force_settle_volome_meets, first_settle_time)
    //        in bitasset_data object and index by them, then we could process here faster.
-   auto& settlement_index = get_index_type<force_settlement_index>().indices().get<by_expiration>();
-   if( !settlement_index.empty() )
+   const auto& settlement_index = get_index_type<force_settlement_index>().indices().get<by_expiration>();
+   if( settlement_index.empty() )
+      return;
+
+   const auto& head_time = head_block_time();
+   const auto& maint_time = get_dynamic_global_properties().next_maintenance_time;
+
+   const bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
+   const bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
+
+   asset_id_type current_asset = settlement_index.begin()->settlement_asset_id();
+   const asset_object* mia_object_ptr = &get(current_asset);
+   const asset_bitasset_data_object* mia_ptr = &mia_object_ptr->bitasset_data(*this);
+
+   asset max_settlement_volume;
+   price settlement_fill_price;
+   price settlement_price;
+   bool current_asset_finished = false;
+
+   auto next_asset = [&current_asset, &mia_object_ptr, &mia_ptr, &current_asset_finished, &settlement_index, this] {
+      const auto bound = settlement_index.upper_bound(current_asset);
+      if( bound == settlement_index.end() )
+         return false;
+      current_asset = bound->settlement_asset_id();
+      mia_object_ptr = &get(current_asset);
+      mia_ptr = &mia_object_ptr->bitasset_data(*this);
+      current_asset_finished = false;
+      return true;
+   };
+
+   // At each iteration, we either consume the current order and remove it, or we move to the next asset
+   for( auto itr = settlement_index.lower_bound(current_asset);
+        itr != settlement_index.end();
+        itr = settlement_index.lower_bound(current_asset) )
    {
-      asset_id_type current_asset = settlement_index.begin()->settlement_asset_id();
-      asset max_settlement_volume;
-      price settlement_fill_price;
-      price settlement_price;
-      bool current_asset_finished = false;
-      bool extra_dump = false;
+      const force_settlement_object& settle_order = *itr;
+      auto settle_order_id = settle_order.id;
 
-      auto next_asset = [&current_asset, &current_asset_finished, &settlement_index, &extra_dump] {
-         auto bound = settlement_index.upper_bound(current_asset);
-         if( bound == settlement_index.end() )
-         {
-            if( extra_dump )
-            {
-               ilog( "next_asset() returning false" );
-            }
-            return false;
-         }
-         if( extra_dump )
-         {
-            ilog( "next_asset returning true, bound is ${b}", ("b", *bound) );
-         }
-         current_asset = bound->settlement_asset_id();
-         current_asset_finished = false;
-         return true;
-      };
-
-      uint32_t count = 0;
-
-      // At each iteration, we either consume the current order and remove it, or we move to the next asset
-      for( auto itr = settlement_index.lower_bound(current_asset);
-           itr != settlement_index.end();
-           itr = settlement_index.lower_bound(current_asset) )
+      if( current_asset != settle_order.settlement_asset_id() )
       {
-         ++count;
-         const force_settlement_object& settle_order = *itr;
-         auto settle_order_id = settle_order.id;
          current_asset = settle_order.settlement_asset_id();
-         const asset_object& mia_object = get(current_asset);
-         const asset_bitasset_data_object& mia = mia_object.bitasset_data(*this);
+         mia_object_ptr = &get(current_asset);
+         mia_ptr = &mia_object_ptr->bitasset_data(*this);
+         // Note: we did not reset current_asset_finished to false here, it is OK,
+         //       because current_asset should not have changed if current_asset_finished is true
+      }
+      const asset_object& mia_object = *mia_object_ptr;
+      const asset_bitasset_data_object& mia = *mia_ptr;
 
-         extra_dump = ((count >= 1000) && (count <= 1020));
+      if( mia.has_settlement() )
+      {
+         ilog( "Canceling a force settlement because of black swan" );
+         cancel_settle_order( settle_order );
+         continue;
+      }
 
-         if( extra_dump )
+      // Has this order not reached its settlement date?
+      if( settle_order.settlement_date > head_time )
+      {
+         if( next_asset() )
+            continue;
+         break;
+      }
+      // Can we still settle in this asset?
+      if( mia.current_feed.settlement_price.is_null() )
+      {
+         ilog("Canceling a force settlement in ${asset} because settlement price is null",
+              ("asset", mia_object.symbol));
+         cancel_settle_order(settle_order);
+         continue;
+      }
+      if( GRAPHENE_100_PERCENT == mia.options.force_settlement_offset_percent ) // settle something for nothing
+      {
+         ilog( "Canceling a force settlement in ${asset} because settlement offset is 100%",
+               ("asset", mia_object.symbol));
+         cancel_settle_order(settle_order);
+         continue;
+      }
+      // Note: although current supply would decrease during filling the settle orders,
+      //       we always calculate with the initial value
+      if( max_settlement_volume.asset_id != current_asset )
+         max_settlement_volume = mia_object.amount( mia.max_force_settlement_volume(
+                                                           mia_object.dynamic_data(*this).current_supply ) );
+      // When current_asset_finished is true, this would be the 2nd time processing the same order.
+      // In this case, we move to the next asset.
+      if( mia.force_settled_volume >= max_settlement_volume.amount || current_asset_finished )
+      {
+         /*
+         ilog("Skipping force settlement in ${asset}; settled ${settled_volume} / ${max_volume}",
+              ("asset", mia_object.symbol)("settlement_price_null",mia.current_feed.settlement_price.is_null())
+              ("settled_volume", mia.force_settled_volume)("max_volume", max_settlement_volume)); // for debug
+              */
+         if( next_asset() )
+            continue;
+         break;
+      }
+
+      if( settlement_fill_price.base.asset_id != current_asset ) // only calculate once per asset
+         settlement_fill_price = mia.current_feed.settlement_price
+                                 / ratio_type( GRAPHENE_100_PERCENT - mia.options.force_settlement_offset_percent,
+                                               GRAPHENE_100_PERCENT );
+
+      if( before_core_hardfork_342 )
+      {
+         auto& pays = settle_order.balance;
+         auto receives = (settle_order.balance * mia.current_feed.settlement_price);
+         receives.amount = static_cast<uint64_t>( ( fc::uint128_t(receives.amount.value) *
+                             (GRAPHENE_100_PERCENT - mia.options.force_settlement_offset_percent) ) /
+                             GRAPHENE_100_PERCENT );
+         assert(receives <= settle_order.balance * mia.current_feed.settlement_price);
+         settlement_price = pays / receives;
+      }
+      else if( settlement_price.base.asset_id != current_asset ) // only calculate once per asset
+         settlement_price = settlement_fill_price;
+
+      asset settled = mia_object.amount(mia.force_settled_volume);
+      // Match against the least collateralized short until the settlement is finished or we reach max settlements
+      while( settled < max_settlement_volume && find_object(settle_order_id) )
+      {
+         const call_order_object* call_ptr = find_least_collateralized_short( mia, true );
+         // Note: there can be no debt position due to individual settlements
+         if( !call_ptr ) // no debt position
          {
-            wlog( "clear_expired_orders() dumping extra data for iteration ${c}", ("c", count) );
-            ilog( "head_block_num is ${hb} current_asset is ${a}", ("hb", head_block_num())("a", current_asset) );
-         }
-
-         if( mia.has_settlement() )
-         {
-            ilog( "Canceling a force settlement because of black swan" );
+            wlog( "No debt position found when processing force settlement ${o}", ("o",settle_order) );
             cancel_settle_order( settle_order );
-            continue;
-         }
-
-         // Has this order not reached its settlement date?
-         if( settle_order.settlement_date > head_time )
-         {
-            if( next_asset() )
-            {
-               if( extra_dump )
-               {
-                  ilog( "next_asset() returned true when settle_order.settlement_date > head_block_time()" );
-               }
-               continue;
-            }
-            break;
-         }
-         // Can we still settle in this asset?
-         if( mia.current_feed.settlement_price.is_null() )
-         {
-            ilog("Canceling a force settlement in ${asset} because settlement price is null",
-                 ("asset", mia_object.symbol));
-            cancel_settle_order(settle_order);
-            continue;
-         }
-         if( GRAPHENE_100_PERCENT == mia.options.force_settlement_offset_percent ) // settle something for nothing
-         {
-            ilog( "Canceling a force settlement in ${asset} because settlement offset is 100%",
-                  ("asset", mia_object.symbol));
-            cancel_settle_order(settle_order);
-            continue;
-         }
-         if( max_settlement_volume.asset_id != current_asset )
-            max_settlement_volume = mia_object.amount( mia.max_force_settlement_volume(
-                                                              mia_object.dynamic_data(*this).current_supply ) );
-         // When current_asset_finished is true, this would be the 2nd time processing the same order.
-         // In this case, we move to the next asset.
-         if( mia.force_settled_volume >= max_settlement_volume.amount || current_asset_finished )
-         {
-            /*
-            ilog("Skipping force settlement in ${asset}; settled ${settled_volume} / ${max_volume}",
-                 ("asset", mia_object.symbol)("settlement_price_null",mia.current_feed.settlement_price.is_null())
-                 ("settled_volume", mia.force_settled_volume)("max_volume", max_settlement_volume));
-                 */
-            if( next_asset() )
-            {
-               if( extra_dump )
-               {
-                  ilog( "next_asset() returned true when mia.force_settled_volume >= max_settlement_volume.amount" );
-               }
-               continue;
-            }
             break;
          }
 
-         if( settlement_fill_price.base.asset_id != current_asset ) // only calculate once per asset
-            settlement_fill_price = mia.current_feed.settlement_price
-                                    / ratio_type( GRAPHENE_100_PERCENT - mia.options.force_settlement_offset_percent,
-                                                  GRAPHENE_100_PERCENT );
-
-         if( before_core_hardfork_342 )
+         if( 0 == settle_order.balance.amount )
          {
-            auto& pays = settle_order.balance;
-            auto receives = (settle_order.balance * mia.current_feed.settlement_price);
-            receives.amount = static_cast<uint64_t>( fc::uint128_t(receives.amount.value) *
-                                (GRAPHENE_100_PERCENT - mia.options.force_settlement_offset_percent) /
-                                GRAPHENE_100_PERCENT );
-            assert(receives <= settle_order.balance * mia.current_feed.settlement_price);
-            settlement_price = pays / receives;
+            wlog( "0 settlement detected" );
+            cancel_settle_order( settle_order );
+            break;
          }
-         else if( settlement_price.base.asset_id != current_asset ) // only calculate once per asset
-            settlement_price = settlement_fill_price;
 
-         asset settled = mia_object.amount(mia.force_settled_volume);
-         // Match against the least collateralized short until the settlement is finished or we reach max settlements
-         while( settled < max_settlement_volume && find_object(settle_order_id) )
-         {
-            const call_order_object* call_ptr = find_least_collateralized_short( mia, true );
-            // Note: there can be no debt position due to individual settlements
-            if( !call_ptr ) // no debt position
-            {
-               wlog( "No debt position found when processing force settlement ${o}", ("o",settle_order) );
-               cancel_settle_order( settle_order );
-               break;
-            }
-
+         try {
             asset max_settlement = max_settlement_volume - settled;
 
-            if( settle_order.balance.amount == 0 )
+            asset new_settled = match( settle_order, *call_ptr, settlement_price, mia,
+                                       max_settlement, settlement_fill_price );
+            if( !before_core_hardfork_184 && new_settled.amount == 0 ) // unable to fill this settle order
             {
-               wlog( "0 settlement detected" );
-               cancel_settle_order( settle_order );
+               // current asset is finished when the settle order hasn't been cancelled
+               current_asset_finished = ( nullptr != find_object( settle_order_id ) );
                break;
             }
-            try {
-               asset new_settled = match( settle_order, *call_ptr, settlement_price, mia,
-                                          max_settlement, settlement_fill_price );
-               if( !before_core_hardfork_184 && new_settled.amount == 0 ) // unable to fill this settle order
-               {
-                  if( find_object( settle_order_id ) ) // the settle order hasn't been cancelled
-                     current_asset_finished = true;
-                  break;
-               }
-               settled += new_settled;
-               // before hard fork core-342, `new_settled > 0` is always true, we'll have:
-               // * call order is completely filled (thus call_ptr will change in next loop), or
-               // * settle order is completely filled (thus find_object(settle_order_id) will be false so will
-               //   break out), or
-               // * reached max_settlement_volume limit (thus new_settled == max_settlement so will break out).
-               //
-               // after hard fork core-342, if new_settled > 0, we'll have:
-               // * call order is completely filled (thus call_ptr will change in next loop), or
-               // * settle order is completely filled (thus find_object(settle_order_id) will be false so will
-               //   break out), or
-               // * reached max_settlement_volume limit, but it's possible that new_settled < max_settlement,
-               //   in this case, new_settled will be zero in next iteration of the loop, so no need to check here.
-            } 
-            catch ( const black_swan_exception& e ) { 
-               wlog( "Cancelling a settle_order since it may trigger a black swan: ${o}, ${e}",
-                     ("o", settle_order)("e", e.to_detail_string()) );
-               cancel_settle_order( settle_order );
-               break;
-            }
+            settled += new_settled;
+            // before hard fork core-342, `new_settled > 0` is always true, we'll have:
+            // * call order is completely filled (thus call_ptr will change in next loop), or
+            // * settle order is completely filled (thus find_object(settle_order_id) will be false so will
+            //   break out), or
+            // * reached max_settlement_volume limit (thus new_settled == max_settlement so will break out).
+            //
+            // after hard fork core-342, if new_settled > 0, we'll have:
+            // * call order is completely filled (thus call_ptr will change in next loop), or
+            // * settle order is completely filled (thus find_object(settle_order_id) will be false so will
+            //   break out), or
+            // * reached max_settlement_volume limit, but it's possible that new_settled < max_settlement,
+            //   in this case, new_settled will be zero in next iteration of the loop, so no need to check here.
          }
-         if( mia.force_settled_volume != settled.amount )
-         {
-            modify(mia, [&settled](asset_bitasset_data_object& b) {
-               b.force_settled_volume = settled.amount;
-            });
+         catch ( const black_swan_exception& e ) {
+            wlog( "Cancelling a settle_order since it may trigger a black swan: ${o}, ${e}",
+                  ("o", settle_order)("e", e.to_detail_string()) );
+            cancel_settle_order( settle_order );
+            break;
          }
+      }
+      if( mia.force_settled_volume != settled.amount )
+      {
+         modify(mia, [&settled](asset_bitasset_data_object& b) {
+            b.force_settled_volume = settled.amount;
+         });
       }
    }
 } FC_CAPTURE_AND_RETHROW() }
