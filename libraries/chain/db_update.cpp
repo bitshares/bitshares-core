@@ -436,6 +436,7 @@ void database::clear_expired_force_settlements()
    //        skip due to volume limit.
    //      - Instead, maintain some data e.g. (whether_force_settle_volome_meets, first_settle_time)
    //        in bitasset_data object and index by them, then we could process here faster.
+   //        Note: due to rounding, even when settled < max_volume, it is still possible that we have to skip
    const auto& settlement_index = get_index_type<force_settlement_index>().indices().get<by_expiration>();
    if( settlement_index.empty() )
       return;
