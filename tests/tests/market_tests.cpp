@@ -1449,6 +1449,107 @@ BOOST_AUTO_TEST_CASE(mcfr_blackswan_test_after_hf_core_2481)
 } FC_LOG_AND_RETHROW() }
 
 /***
+ * Tests GS price
+ */
+BOOST_AUTO_TEST_CASE(gs_price_test)
+{ try {
+   // Proceeds to a desired hard fork time
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   if( hf2481 )
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   set_expiration( db, trx );
+
+   ACTORS((seller)(borrower)(borrower2)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+   asset_id_type usd_id = bitusd.id;
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(5);
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7
+   const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000));
+   call_order_id_type call_id = call.id;
+   // create another position with 800% collateral, call price is 40/1.75 CORE/USD = 160/7
+   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(40000));
+   call_order_id_type call2_id = call2.id;
+   transfer(borrower, seller, bitusd.amount(1000));
+   transfer(borrower2, seller, bitusd.amount(1000));
+
+   BOOST_CHECK_EQUAL( 1000, call.debt.value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
+   BOOST_CHECK_EQUAL( 40000, call2.collateral.value );
+   BOOST_CHECK_EQUAL( 2000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // No margin call at this moment
+
+   // This order is right at  of the first debt position
+   limit_order_id_type sell_mid = create_sell_order(seller, bitusd.amount(2000), core.amount(30000))->id;
+
+   BOOST_CHECK_EQUAL( 2000, sell_mid(db).for_sale.value );
+
+   BOOST_CHECK_EQUAL( 1000, call_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 15000, call_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 40000, call2_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // adjust price feed to a value so that mssp is equal to call's collateralization
+   current_feed.settlement_price = bitusd.amount( 11 ) / core.amount(150);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 11/150, mssp = (11/150)*(10/11) = 1/15
+
+   if( !hf2481 )
+   {
+      // GS occurs
+      BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !db.find<call_order_object>( call_id ) );
+      BOOST_CHECK( !db.find<call_order_object>( call2_id ) );
+      // sell order did not change
+      BOOST_CHECK_EQUAL( 2000, sell_mid(db).for_sale.value );
+   }
+   else
+   {
+      // GS does not occur, call got filled
+      BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !db.find<call_order_object>( call_id ) );
+
+      // sell order got half-filled
+      BOOST_CHECK_EQUAL( 1000, sell_mid(db).for_sale.value );
+
+      // call2 did not change
+      BOOST_CHECK_EQUAL( 1000, call2_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 40000, call2_id(db).collateral.value );
+   }
+
+   // generate a block to include operations above
+   BOOST_TEST_MESSAGE( "Generating a new block" );
+   generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(gs_price_test_after_hf2481)
+{
+   hf2481 = true;
+   INVOKE(gs_price_test);
+}
+
+/***
  * Tests a scenario about rounding errors related to margin call fee
  */
 BOOST_AUTO_TEST_CASE(mcfr_rounding_test)
