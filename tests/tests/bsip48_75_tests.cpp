@@ -51,7 +51,7 @@ BOOST_AUTO_TEST_CASE( hardfork_protection_test )
       fund( sam, asset(init_amount) );
       fund( feeder, asset(init_amount) );
 
-      uint16_t bitmask = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK & ~disable_bdsm_update;
+      uint16_t bitmask = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK;
       uint16_t uiamask = DEFAULT_UIA_ASSET_ISSUER_PERMISSION;
 
       uint16_t bitflag = ~global_settle & ~committee_fed_asset; // high bits are set
@@ -992,7 +992,7 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       fund( sam, asset(init_amount) );
       fund( feeder, asset(init_amount) );
 
-      uint16_t bitmask = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK & ~disable_bdsm_update;
+      uint16_t bitmask = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK;
       uint16_t uiamask = DEFAULT_UIA_ASSET_ISSUER_PERMISSION;
 
       uint16_t bitflag = ~global_settle & ~committee_fed_asset; // high bits are set
