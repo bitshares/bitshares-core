@@ -447,24 +447,29 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       validate_new_issuer( d, a, *o.new_issuer );
    }
 
-   // Unable to set non-UIA issuer permission bits on UIA
-   if( hf_core_2467_passed && !a.is_market_issued() )
+   if( a.is_market_issued() )
+      bitasset_data = &a.bitasset_data(d);
+
+   if( hf_core_2467_passed )
    {
-      FC_ASSERT( 0 == ( o.new_options.issuer_permissions & NON_UIA_ONLY_ISSUER_PERMISSION_MASK ),
-                 "Unable to set non-UIA issuer permission bits on UIA" );
+      // Unable to set non-UIA issuer permission bits on UIA
+      if( !a.is_market_issued() )
+         FC_ASSERT( 0 == ( o.new_options.issuer_permissions & NON_UIA_ONLY_ISSUER_PERMISSION_MASK ),
+                    "Unable to set non-UIA issuer permission bits on UIA" );
+      // Unable to set disable_bdsm_update issuer permission bit on PM
+      else if( bitasset_data->is_prediction_market )
+         FC_ASSERT( 0 == ( o.new_options.issuer_permissions & disable_bdsm_update ),
+                    "Unable to set disable_bdsm_update issuer permission bit on PM" );
+      // else do nothing
    }
 
    uint16_t enabled_issuer_permissions_mask = a.options.get_enabled_issuer_permissions_mask();
-   if( hf_bsip_48_75_passed && a.is_market_issued() )
+   if( hf_bsip_48_75_passed && a.is_market_issued() && bitasset_data->is_prediction_market )
    {
-      bitasset_data = &a.bitasset_data(d);
-      if( bitasset_data->is_prediction_market )
-      {
-         // Note: if the global_settle permission was unset, it should be corrected
-         FC_ASSERT( a_copy.can_global_settle(),
-                    "The global_settle permission should be enabled for prediction markets" );
-         enabled_issuer_permissions_mask |= global_settle;
-      }
+      // Note: if the global_settle permission was unset, it should be corrected
+      FC_ASSERT( a_copy.can_global_settle(),
+                 "The global_settle permission should be enabled for prediction markets" );
+      enabled_issuer_permissions_mask |= global_settle;
    }
 
    const auto& dyn_data = a.dynamic_asset_data_id(d);
@@ -474,8 +479,13 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       if( hf_core_2467_passed && !a.is_market_issued() ) // for UIA, ignore non-UIA bits
          FC_ASSERT( 0 == ( ( o.new_options.get_enabled_issuer_permissions_mask()
                         & (uint16_t)(~enabled_issuer_permissions_mask) ) & UIA_ASSET_ISSUER_PERMISSION_MASK ),
-                 "Cannot reinstate previously revoked issuer permissions on an asset if current supply is non-zero, "
-                 "unless to unset non-UIA issuer permission bits for UIA.");
+                 "Cannot reinstate previously revoked issuer permissions on a UIA if current supply is non-zero, "
+                 "unless to unset non-UIA issuer permission bits.");
+      else if( hf_core_2467_passed && bitasset_data->is_prediction_market ) // for PM, ignore disable_bdsm_update
+         FC_ASSERT( 0 == ( ( o.new_options.get_enabled_issuer_permissions_mask()
+                        & (uint16_t)(~enabled_issuer_permissions_mask) ) & (uint16_t)(~disable_bdsm_update) ),
+                 "Cannot reinstate previously revoked issuer permissions on a PM if current supply is non-zero, "
+                 "unless to unset the disable_bdsm_update issuer permission bit.");
       else
          FC_ASSERT( 0 == ( o.new_options.get_enabled_issuer_permissions_mask()
                         & (uint16_t)(~enabled_issuer_permissions_mask) ),
@@ -527,11 +537,7 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
                  "Specified a new precision but it does not change" );
 
       if( a.is_market_issued() )
-      {
-         if( !bitasset_data )
-            bitasset_data = &asset_to_update->bitasset_data(d);
          FC_ASSERT( !bitasset_data->is_prediction_market, "Can not update precision of a prediction market" );
-      }
 
       // If any other asset is backed by this asset, this asset's precision can't be updated
       const auto& idx = d.get_index_type<graphene::chain::asset_bitasset_data_index>()

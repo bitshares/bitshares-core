@@ -120,6 +120,7 @@ void  asset_create_operation::validate()const
    {
       FC_ASSERT( bitasset_opts.valid(), "Cannot have a User-Issued Asset implement a prediction market." );
       FC_ASSERT( 0 != (common_options.issuer_permissions & global_settle) );
+      FC_ASSERT( 0 == (common_options.issuer_permissions & disable_bdsm_update) );
       FC_ASSERT( !bitasset_opts->extensions.value.bad_debt_settlement_method.valid(),
                  "Can not set bad_debt_settlement_method for Prediction Markets" );
    }
