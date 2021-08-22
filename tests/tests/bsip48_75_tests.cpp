@@ -1063,7 +1063,11 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       // advance to bsip48/75 hard fork
       generate_blocks( HARDFORK_BSIP_48_75_TIME );
       if( hf2467 )
-         generate_blocks( HARDFORK_CORE_2467_TIME );
+      {
+         auto mi = db.get_global_properties().parameters.maintenance_interval;
+         generate_blocks(HARDFORK_CORE_2467_TIME - mi);
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      }
       set_expiration( db, trx );
 
       // take a look at flags of UIA
