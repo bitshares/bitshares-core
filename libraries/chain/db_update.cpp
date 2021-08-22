@@ -260,6 +260,10 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     // * if there is no force settlement, we check here with margin call fee in consideration.
 
     auto least_collateral = call_ptr->collateralization();
+    // Note: strictly speaking, even when the call order's collateralization is lower than ~highest,
+    //       if the matching limit order is smaller, due to rounding, it is still possible that the
+    //       call order's collateralization would increase and become higher than ~highest after matched.
+    //       However, for simplicity, we only compare the prices here.
     bool gs = after_core_hardfork_2481 ? ( ~least_collateral > highest ) : ( ~least_collateral >= highest );
     if( gs )
     {
