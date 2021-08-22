@@ -561,18 +561,18 @@ void database::clear_expired_force_settlements()
       // Match against the least collateralized short until the settlement is finished or we reach max settlements
       while( settled < max_settlement_volume && find_object(settle_order_id) )
       {
+         if( 0 == settle_order.balance.amount )
+         {
+            wlog( "0 settlement detected" );
+            cancel_settle_order( settle_order );
+            break;
+         }
+
          const call_order_object* call_ptr = find_least_collateralized_short( mia, true );
          // Note: there can be no debt position due to individual settlements
          if( !call_ptr ) // no debt position
          {
             wlog( "No debt position found when processing force settlement ${o}", ("o",settle_order) );
-            cancel_settle_order( settle_order );
-            break;
-         }
-
-         if( 0 == settle_order.balance.amount )
-         {
-            wlog( "0 settlement detected" );
             cancel_settle_order( settle_order );
             break;
          }
