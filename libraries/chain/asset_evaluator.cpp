@@ -1260,8 +1260,8 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
    {
       result = pay_settle_from_individual_pool( d, op, fee_paying_account, *asset_to_settle, bitasset );
 
-      // If the amount to settle is too small, we return
-      if( bitasset.has_individual_settlement() )
+      // If the amount to settle is too small, or force settlement is disabled, we return
+      if( bitasset.has_individual_settlement() || !asset_to_settle->can_force_settle() )
          return result;
 
       to_settle -= result.value.paid->front();
