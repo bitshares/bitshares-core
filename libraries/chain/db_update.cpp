@@ -350,19 +350,17 @@ static optional<price> get_derived_current_feed_price( const database& db,
       else // there is no call order of this bitasset
          result = bitasset.median_feed.settlement_price;
    }
-   else if( bdsm_type::individual_settlement_to_fund == bdsm )
+   else if( bdsm_type::individual_settlement_to_fund == bdsm && bitasset.individual_settlement_debt > 0 )
    {
-      if( bitasset.individual_settlement_debt <= 0 )
-         result = bitasset.median_feed.settlement_price;
-      else
-      {
-         // Now bitasset.individual_settlement_debt > 0
-         price fund_price = asset( bitasset.individual_settlement_debt, bitasset.asset_id )
-                          / asset( bitasset.individual_settlement_fund, bitasset.options.short_backing_asset );
-         auto lowest_callable_feed_price = fund_price * bitasset.get_margin_call_order_ratio();
-         result = std::max( bitasset.median_feed.settlement_price, lowest_callable_feed_price );
-      }
+      // Check whether to cap
+      price fund_price = asset( bitasset.individual_settlement_debt, bitasset.asset_id )
+                       / asset( bitasset.individual_settlement_fund, bitasset.options.short_backing_asset );
+      auto lowest_callable_feed_price = fund_price * bitasset.get_margin_call_order_ratio();
+      result = std::max( bitasset.median_feed.settlement_price, lowest_callable_feed_price );
    }
+   else // should not cap
+      result = bitasset.median_feed.settlement_price;
+
    // Check whether it's necessary to update
    if( result.valid() && (*result) == bitasset.current_feed.settlement_price )
       result.reset();
@@ -378,10 +376,18 @@ void database::update_bitasset_current_feed( const asset_bitasset_data_object& b
    if( skip_median_update )
    {
       if( bdsm_type::no_settlement != bdsm && bdsm_type::individual_settlement_to_fund != bdsm )
-         return;
-      new_current_feed_price = get_derived_current_feed_price( *this, bitasset );
-      if( !new_current_feed_price.valid() )
-         return;
+      {
+         // it's possible that current_feed was capped thus we still need to update it
+         if( bitasset.current_feed.settlement_price == bitasset.median_feed.settlement_price )
+            return;
+         new_current_feed_price = bitasset.median_feed.settlement_price;
+      }
+      else
+      {
+         new_current_feed_price = get_derived_current_feed_price( *this, bitasset );
+         if( !new_current_feed_price.valid() )
+            return;
+      }
    }
 
    // We need to update the database

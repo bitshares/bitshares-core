@@ -164,6 +164,7 @@ void database::globally_settle_asset_impl( const asset_object& mia,
 
    modify( bitasset, [&mia,&original_mia_supply,&collateral_gathered]( asset_bitasset_data_object& obj ){
       obj.options.extensions.value.bad_debt_settlement_method.reset(); // Update BDSM to GS
+      obj.current_feed = obj.median_feed; // reset current feed price if was capped
       obj.individual_settlement_debt = 0;
       obj.individual_settlement_fund = 0;
       obj.settlement_price = mia.amount(original_mia_supply) / collateral_gathered;
