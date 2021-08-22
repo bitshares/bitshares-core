@@ -433,6 +433,7 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    detail::check_asset_update_extensions_hf_bsip_48_75( now, o.extensions.value );
 
    bool hf_bsip_48_75_passed = ( HARDFORK_BSIP_48_75_PASSED( now ) );
+   bool hf_core_2467_passed = ( HARDFORK_CORE_2467_PASSED( next_maint_time ) );
 
    const asset_object& a = o.asset_to_update(d);
    auto a_copy = a;
@@ -444,6 +445,13 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       FC_ASSERT( now < HARDFORK_CORE_199_TIME,
                  "Since Hardfork #199, updating issuer requires the use of asset_update_issuer_operation.");
       validate_new_issuer( d, a, *o.new_issuer );
+   }
+
+   // Unable to set non-UIA issuer permission bits on UIA
+   if( hf_core_2467_passed && !a.is_market_issued() )
+   {
+      FC_ASSERT( 0 == ( o.new_options.issuer_permissions & NON_UIA_ONLY_ISSUER_PERMISSION_MASK ),
+                 "Unable to set non-UIA issuer permission bits on UIA" );
    }
 
    uint16_t enabled_issuer_permissions_mask = a.options.get_enabled_issuer_permissions_mask();
@@ -463,7 +471,13 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    if( dyn_data.current_supply != 0 )
    {
       // new issuer_permissions must be subset of old issuer permissions
-      FC_ASSERT( 0 == ( o.new_options.get_enabled_issuer_permissions_mask()
+      if( hf_core_2467_passed && !a.is_market_issued() ) // for UIA, ignore non-UIA bits
+         FC_ASSERT( 0 == ( ( o.new_options.get_enabled_issuer_permissions_mask()
+                        & (uint16_t)(~enabled_issuer_permissions_mask) ) & UIA_ASSET_ISSUER_PERMISSION_MASK ),
+                 "Cannot reinstate previously revoked issuer permissions on an asset if current supply is non-zero, "
+                 "unless to unset non-UIA issuer permission bits for UIA.");
+      else
+         FC_ASSERT( 0 == ( o.new_options.get_enabled_issuer_permissions_mask()
                         & (uint16_t)(~enabled_issuer_permissions_mask) ),
                  "Cannot reinstate previously revoked issuer permissions on an asset if current supply is non-zero.");
       // precision can not be changed
