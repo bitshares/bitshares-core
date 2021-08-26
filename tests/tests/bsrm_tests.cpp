@@ -34,7 +34,7 @@
 using namespace graphene::chain;
 using namespace graphene::chain::test;
 
-BOOST_FIXTURE_TEST_SUITE( bdsm_tests, database_fixture )
+BOOST_FIXTURE_TEST_SUITE( bsrm_tests, database_fixture )
 
 /// Tests scenarios that unable to have BSDM-related asset issuer permission or extensions before hardfork
 BOOST_AUTO_TEST_CASE( hardfork_protection_test )
@@ -51,7 +51,7 @@ BOOST_AUTO_TEST_CASE( hardfork_protection_test )
       auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
       fund( sam, asset(init_amount) );
 
-      uint16_t old_bitmask = ASSET_ISSUER_PERMISSION_MASK & ~disable_bdsm_update;
+      uint16_t old_bitmask = ASSET_ISSUER_PERMISSION_MASK & ~disable_bsrm_update;
       uint16_t new_bitmask = ASSET_ISSUER_PERMISSION_MASK;
 
       uint16_t bitflag = VALID_FLAGS_MASK & ~committee_fed_asset;
@@ -84,10 +84,10 @@ BOOST_AUTO_TEST_CASE( hardfork_protection_test )
          op.common_options.issuer_permissions = old_bitmask;
 
          // Unable to set new extensions in bitasset options
-         op.bitasset_opts->extensions.value.bad_debt_settlement_method = 0;
+         op.bitasset_opts->extensions.value.black_swan_response_method = 0;
          BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
          ops.push_back( op );
-         op.bitasset_opts->extensions.value.bad_debt_settlement_method = {};
+         op.bitasset_opts->extensions.value.black_swan_response_method = {};
 
          acop = op;
       }
@@ -147,10 +147,10 @@ BOOST_AUTO_TEST_CASE( hardfork_protection_test )
          op.new_options.minimum_feeds = 1;
 
          // Unable to set new extensions
-         op.new_options.extensions.value.bad_debt_settlement_method = 1;
+         op.new_options.extensions.value.black_swan_response_method = 1;
          BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
          ops.push_back( op );
-         op.new_options.extensions.value.bad_debt_settlement_method = {};
+         op.new_options.extensions.value.black_swan_response_method = {};
 
          aubop = op;
       }
@@ -205,7 +205,7 @@ BOOST_AUTO_TEST_CASE( uia_issuer_permissions_update_test )
       auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
       fund( sam, asset(init_amount) );
 
-      uint16_t old_bitmask = ASSET_ISSUER_PERMISSION_MASK & ~disable_bdsm_update;
+      uint16_t old_bitmask = ASSET_ISSUER_PERMISSION_MASK & ~disable_bsrm_update;
       uint16_t new_bitmask = ASSET_ISSUER_PERMISSION_MASK;
       uint16_t uiamask = UIA_ASSET_ISSUER_PERMISSION_MASK;
 
@@ -293,7 +293,7 @@ BOOST_AUTO_TEST_CASE( uia_issuer_permissions_update_test )
       trx.operations.push_back( auop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
 
-      auop.new_options.issuer_permissions = uiamask | disable_bdsm_update;
+      auop.new_options.issuer_permissions = uiamask | disable_bsrm_update;
       trx.operations.clear();
       trx.operations.push_back( auop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
@@ -338,7 +338,7 @@ BOOST_AUTO_TEST_CASE( uia_issuer_permissions_update_test )
       trx.operations.push_back( auop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
 
-      auop.new_options.issuer_permissions = uiamask | disable_bdsm_update;
+      auop.new_options.issuer_permissions = uiamask | disable_bsrm_update;
       trx.operations.clear();
       trx.operations.push_back( auop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
@@ -350,7 +350,7 @@ BOOST_AUTO_TEST_CASE( uia_issuer_permissions_update_test )
    }
 }
 
-/// Tests what kind of assets can have BDSM-related flags / issuer permissions / extensions
+/// Tests what kind of assets can have BSRM-related flags / issuer permissions / extensions
 BOOST_AUTO_TEST_CASE( asset_permissions_flags_extensions_test )
 {
    try {
@@ -367,14 +367,14 @@ BOOST_AUTO_TEST_CASE( asset_permissions_flags_extensions_test )
       fund( sam, asset(init_amount) );
       fund( feeder, asset(init_amount) );
 
-      // Unable to create a PM with the disable_bdsm_update bit in flags
-      BOOST_CHECK_THROW( create_prediction_market( "TESTPM", sam_id, 0, disable_bdsm_update ), fc::exception );
+      // Unable to create a PM with the disable_bsrm_update bit in flags
+      BOOST_CHECK_THROW( create_prediction_market( "TESTPM", sam_id, 0, disable_bsrm_update ), fc::exception );
 
-      // Unable to create a MPA with the disable_bdsm_update bit in flags
-      BOOST_CHECK_THROW( create_bitasset( "TESTBIT", sam_id, 0, disable_bdsm_update ), fc::exception );
+      // Unable to create a MPA with the disable_bsrm_update bit in flags
+      BOOST_CHECK_THROW( create_bitasset( "TESTBIT", sam_id, 0, disable_bsrm_update ), fc::exception );
 
-      // Unable to create a UIA with the disable_bdsm_update bit in flags
-      BOOST_CHECK_THROW( create_user_issued_asset( "TESTUIA", sam_id(db), disable_bdsm_update ), fc::exception );
+      // Unable to create a UIA with the disable_bsrm_update bit in flags
+      BOOST_CHECK_THROW( create_user_issued_asset( "TESTUIA", sam_id(db), disable_bsrm_update ), fc::exception );
 
       // create a PM with a zero market_fee_percent
       const asset_object& pm = create_prediction_market( "TESTPM", sam_id, 0, charge_market_fee );
@@ -392,57 +392,57 @@ BOOST_AUTO_TEST_CASE( asset_permissions_flags_extensions_test )
       asset_update_operation auop;
       auop.issuer = sam_id;
 
-      // Unable to set disable_bdsm_update bit in flags for PM
+      // Unable to set disable_bsrm_update bit in flags for PM
       auop.asset_to_update = pm_id;
       auop.new_options = pm_id(db).options;
-      auop.new_options.flags |= disable_bdsm_update;
+      auop.new_options.flags |= disable_bsrm_update;
       trx.operations.clear();
       trx.operations.push_back( auop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
       // Unable to propose either
       BOOST_CHECK_THROW( propose( auop ), fc::exception );
 
-      // Unable to set disable_bdsm_update bit in flags for MPA
+      // Unable to set disable_bsrm_update bit in flags for MPA
       auop.asset_to_update = mpa_id;
       auop.new_options = mpa_id(db).options;
-      auop.new_options.flags |= disable_bdsm_update;
+      auop.new_options.flags |= disable_bsrm_update;
       trx.operations.clear();
       trx.operations.push_back( auop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
       // Unable to propose either
       BOOST_CHECK_THROW( propose( auop ), fc::exception );
 
-      // Unable to set disable_bdsm_update bit in flags for UIA
+      // Unable to set disable_bsrm_update bit in flags for UIA
       auop.asset_to_update = uia_id;
       auop.new_options = uia_id(db).options;
-      auop.new_options.flags |= disable_bdsm_update;
+      auop.new_options.flags |= disable_bsrm_update;
       trx.operations.clear();
       trx.operations.push_back( auop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
       // Unable to propose either
       BOOST_CHECK_THROW( propose( auop ), fc::exception );
 
-      // Unable to set disable_bdsm_update bit in issuer_permissions for PM
+      // Unable to set disable_bsrm_update bit in issuer_permissions for PM
       auop.asset_to_update = pm_id;
       auop.new_options = pm_id(db).options;
-      auop.new_options.issuer_permissions |= disable_bdsm_update;
+      auop.new_options.issuer_permissions |= disable_bsrm_update;
       trx.operations.clear();
       trx.operations.push_back( auop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
       // But able to propose
       propose( auop );
 
-      // Unable to set disable_bdsm_update bit in issuer_permissions for UIA
+      // Unable to set disable_bsrm_update bit in issuer_permissions for UIA
       auop.asset_to_update = uia_id;
       auop.new_options = uia_id(db).options;
-      auop.new_options.issuer_permissions |= disable_bdsm_update;
+      auop.new_options.issuer_permissions |= disable_bsrm_update;
       trx.operations.clear();
       trx.operations.push_back( auop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
       // But able to propose
       propose( auop );
 
-      // Unable to create a UIA with disable_bdsm_update permission bit
+      // Unable to create a UIA with disable_bsrm_update permission bit
       asset_create_operation acop;
       acop.issuer = sam_id;
       acop.symbol = "SAMCOIN";
@@ -451,7 +451,7 @@ BOOST_AUTO_TEST_CASE( asset_permissions_flags_extensions_test )
       acop.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
       acop.common_options.market_fee_percent = 100;
       acop.common_options.flags = charge_market_fee;
-      acop.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK | disable_bdsm_update;
+      acop.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK | disable_bsrm_update;
 
       trx.operations.clear();
       trx.operations.push_back( acop );
@@ -460,17 +460,17 @@ BOOST_AUTO_TEST_CASE( asset_permissions_flags_extensions_test )
       // Unable to propose either
       BOOST_CHECK_THROW( propose( acop ), fc::exception );
 
-      // Able to create UIA without disable_bdsm_update permission bit
+      // Able to create UIA without disable_bsrm_update permission bit
       acop.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK;
       trx.operations.clear();
       trx.operations.push_back( acop );
       PUSH_TX(db, trx, ~0);
 
-      // Unable to create a PM with disable_bdsm_update permission bit
+      // Unable to create a PM with disable_bsrm_update permission bit
       acop.symbol = "SAMPM";
       acop.precision = asset_id_type()(db).precision;
       acop.is_prediction_market = true;
-      acop.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK | global_settle | disable_bdsm_update;
+      acop.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK | global_settle | disable_bsrm_update;
       acop.bitasset_opts = bitasset_options();
 
       trx.operations.clear();
@@ -480,9 +480,9 @@ BOOST_AUTO_TEST_CASE( asset_permissions_flags_extensions_test )
       // Unable to propose either
       BOOST_CHECK_THROW( propose( acop ), fc::exception );
 
-      // Unable to create a PM with BDSM in extensions
+      // Unable to create a PM with BSRM in extensions
       acop.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK | global_settle;
-      acop.bitasset_opts->extensions.value.bad_debt_settlement_method = 0;
+      acop.bitasset_opts->extensions.value.black_swan_response_method = 0;
 
       trx.operations.clear();
       trx.operations.push_back( acop );
@@ -491,19 +491,19 @@ BOOST_AUTO_TEST_CASE( asset_permissions_flags_extensions_test )
       // Unable to propose either
       BOOST_CHECK_THROW( propose( acop ), fc::exception );
 
-      // Able to create PM with no disable_bdsm_update permission bit nor BDSM in extensions
+      // Able to create PM with no disable_bsrm_update permission bit nor BSRM in extensions
       acop.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK | global_settle;
-      acop.bitasset_opts->extensions.value.bad_debt_settlement_method.reset();
+      acop.bitasset_opts->extensions.value.black_swan_response_method.reset();
       trx.operations.clear();
       trx.operations.push_back( acop );
       PUSH_TX(db, trx, ~0);
 
-      // Unable to update PM to set BDSM
+      // Unable to update PM to set BSRM
       asset_update_bitasset_operation aubop;
       aubop.issuer = sam_id;
       aubop.asset_to_update = pm_id;
       aubop.new_options = pm_id(db).bitasset_data(db).options;
-      aubop.new_options.extensions.value.bad_debt_settlement_method = 1;
+      aubop.new_options.extensions.value.black_swan_response_method = 1;
 
       trx.operations.clear();
       trx.operations.push_back( aubop );
@@ -520,8 +520,8 @@ BOOST_AUTO_TEST_CASE( asset_permissions_flags_extensions_test )
    }
 }
 
-/// Tests whether asset owner has permission to update bdsm
-BOOST_AUTO_TEST_CASE( asset_owner_permissions_update_bdsm )
+/// Tests whether asset owner has permission to update bsrm
+BOOST_AUTO_TEST_CASE( asset_owner_permissions_update_bsrm )
 {
    try {
 
@@ -541,9 +541,9 @@ BOOST_AUTO_TEST_CASE( asset_owner_permissions_update_bdsm )
       const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
       asset_id_type mpa_id = mpa.id;
 
-      BOOST_CHECK( mpa_id(db).can_owner_update_bdsm() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_bsrm() );
 
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.bad_debt_settlement_method.valid() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.black_swan_response_method.valid() );
 
       // add a price feed publisher and publish a feed
       update_feed_producers( mpa_id, { feeder_id } );
@@ -564,76 +564,76 @@ BOOST_AUTO_TEST_CASE( asset_owner_permissions_update_bdsm )
       auop.asset_to_update = mpa_id;
       auop.new_options = mpa_id(db).options;
 
-      // disable owner's permission to update bdsm
-      auop.new_options.issuer_permissions |= disable_bdsm_update;
+      // disable owner's permission to update bsrm
+      auop.new_options.issuer_permissions |= disable_bsrm_update;
       trx.operations.clear();
       trx.operations.push_back( auop );
       PUSH_TX(db, trx, ~0);
 
-      BOOST_CHECK( !mpa_id(db).can_owner_update_bdsm() );
+      BOOST_CHECK( !mpa_id(db).can_owner_update_bsrm() );
 
-      // check that owner can not update bdsm
+      // check that owner can not update bsrm
       asset_update_bitasset_operation aubop;
       aubop.issuer = sam_id;
       aubop.asset_to_update = mpa_id;
       aubop.new_options = mpa_id(db).bitasset_data(db).options;
 
-      aubop.new_options.extensions.value.bad_debt_settlement_method = 1;
+      aubop.new_options.extensions.value.black_swan_response_method = 1;
       trx.operations.clear();
       trx.operations.push_back( aubop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
-      aubop.new_options.extensions.value.bad_debt_settlement_method.reset();
+      aubop.new_options.extensions.value.black_swan_response_method.reset();
 
-      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.bad_debt_settlement_method.valid() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).options.extensions.value.black_swan_response_method.valid() );
 
-      // enable owner's permission to update bdsm
-      auop.new_options.issuer_permissions &= ~disable_bdsm_update;
+      // enable owner's permission to update bsrm
+      auop.new_options.issuer_permissions &= ~disable_bsrm_update;
       trx.operations.clear();
       trx.operations.push_back( auop );
       PUSH_TX(db, trx, ~0);
 
-      BOOST_CHECK( mpa_id(db).can_owner_update_bdsm() );
+      BOOST_CHECK( mpa_id(db).can_owner_update_bsrm() );
 
-      // check that owner can update bdsm
-      aubop.new_options.extensions.value.bad_debt_settlement_method = 1;
+      // check that owner can update bsrm
+      aubop.new_options.extensions.value.black_swan_response_method = 1;
       trx.operations.clear();
       trx.operations.push_back( aubop );
       PUSH_TX(db, trx, ~0);
 
-      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.bad_debt_settlement_method.valid() );
+      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.black_swan_response_method.valid() );
 
-      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.bad_debt_settlement_method, 1u );
+      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.black_swan_response_method, 1u );
 
-      // check bdsm' valid range
-      aubop.new_options.extensions.value.bad_debt_settlement_method = 4;
+      // check bsrm' valid range
+      aubop.new_options.extensions.value.black_swan_response_method = 4;
       trx.operations.clear();
       trx.operations.push_back( aubop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
-      aubop.new_options.extensions.value.bad_debt_settlement_method = 1;
+      aubop.new_options.extensions.value.black_swan_response_method = 1;
 
       // Sam borrow some
       borrow( sam, asset(1000, mpa_id), asset(2000) );
 
-      // disable owner's permission to update bdsm
-      auop.new_options.issuer_permissions |= disable_bdsm_update;
+      // disable owner's permission to update bsrm
+      auop.new_options.issuer_permissions |= disable_bsrm_update;
       trx.operations.clear();
       trx.operations.push_back( auop );
       PUSH_TX(db, trx, ~0);
 
-      BOOST_CHECK( !mpa_id(db).can_owner_update_bdsm() );
+      BOOST_CHECK( !mpa_id(db).can_owner_update_bsrm() );
 
-      // check that owner can not update bdsm
-      aubop.new_options.extensions.value.bad_debt_settlement_method = 0;
+      // check that owner can not update bsrm
+      aubop.new_options.extensions.value.black_swan_response_method = 0;
       trx.operations.clear();
       trx.operations.push_back( aubop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
 
-      aubop.new_options.extensions.value.bad_debt_settlement_method.reset();
+      aubop.new_options.extensions.value.black_swan_response_method.reset();
       trx.operations.clear();
       trx.operations.push_back( aubop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
 
-      aubop.new_options.extensions.value.bad_debt_settlement_method = 1;
+      aubop.new_options.extensions.value.black_swan_response_method = 1;
 
       // able to update other params that still has permission E.G. force_settlement_delay_sec
       aubop.new_options.force_settlement_delay_sec += 1;
@@ -644,17 +644,17 @@ BOOST_AUTO_TEST_CASE( asset_owner_permissions_update_bdsm )
       BOOST_REQUIRE_EQUAL( mpa_id(db).bitasset_data(db).options.force_settlement_delay_sec,
                            aubop.new_options.force_settlement_delay_sec );
 
-      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.bad_debt_settlement_method.valid() );
+      BOOST_REQUIRE( mpa_id(db).bitasset_data(db).options.extensions.value.black_swan_response_method.valid() );
 
-      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.bad_debt_settlement_method, 1u );
+      BOOST_CHECK_EQUAL( *mpa_id(db).bitasset_data(db).options.extensions.value.black_swan_response_method, 1u );
 
-      // unable to enable the permission to update bdsm
-      auop.new_options.issuer_permissions &= ~disable_bdsm_update;
+      // unable to enable the permission to update bsrm
+      auop.new_options.issuer_permissions &= ~disable_bsrm_update;
       trx.operations.clear();
       trx.operations.push_back( auop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
 
-      BOOST_CHECK( !mpa_id(db).can_owner_update_bdsm() );
+      BOOST_CHECK( !mpa_id(db).can_owner_update_bsrm() );
 
       generate_block();
 

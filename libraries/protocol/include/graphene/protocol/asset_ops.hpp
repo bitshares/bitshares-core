@@ -108,8 +108,8 @@ namespace graphene { namespace protocol {
     */
    struct bitasset_options {
 
-      /// Defines what will happen when bad debt appears
-      enum class bad_debt_settlement_type
+      /// Defines how to response to black swan events
+      enum class black_swan_response_type
       {
          /// All debt positions are closed, all or some collateral is moved to a global-settlement fund.
          /// Debt asset holders can claim collateral via force-settlement.
@@ -128,8 +128,8 @@ namespace graphene { namespace protocol {
          /// on the order book which can be bought. The derived settlement price is NOT capped, which means remaining
          /// debt positions could be margin called at a worse price.
          individual_settlement_to_order = 3,
-         /// Total number of available bad debt settlement methods
-         BDSM_TYPE_COUNT = 4
+         /// Total number of available black swan response methods
+         BSRM_TYPE_COUNT = 4
       };
 
       struct ext
@@ -145,7 +145,7 @@ namespace graphene { namespace protocol {
          fc::optional<uint16_t> margin_call_fee_ratio; // BSIP 74
          fc::optional<uint16_t> force_settle_fee_percent;  // BSIP-87
          // https://github.com/bitshares/bitshares-core/issues/2467
-         fc::optional<uint8_t> bad_debt_settlement_method;
+         fc::optional<uint8_t> black_swan_response_method;
       };
 
       /// Time before a price feed expires
@@ -172,12 +172,12 @@ namespace graphene { namespace protocol {
       /// @throws fc::exception if any check fails
       void validate()const;
 
-      /// Get the effective bad debt settlement method
-      bad_debt_settlement_type get_bad_debt_settlement_method() const
+      /// Get the effective black swan response method
+      black_swan_response_type get_black_swan_response_method() const
       {
-         if( !extensions.value.bad_debt_settlement_method.valid() )
-            return bad_debt_settlement_type::global_settlement;
-         return static_cast<bad_debt_settlement_type>( *extensions.value.bad_debt_settlement_method );
+         if( !extensions.value.black_swan_response_method.valid() )
+            return black_swan_response_type::global_settlement;
+         return static_cast<black_swan_response_type>( *extensions.value.black_swan_response_method );
       }
    };
 
@@ -635,7 +635,7 @@ FC_REFLECT( graphene::protocol::bitasset_options::ext,
             (maximum_short_squeeze_ratio)
             (margin_call_fee_ratio)
             (force_settle_fee_percent)
-            (bad_debt_settlement_method)
+            (black_swan_response_method)
           )
 
 FC_REFLECT( graphene::protocol::bitasset_options,

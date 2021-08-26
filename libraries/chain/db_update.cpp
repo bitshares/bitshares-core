@@ -213,15 +213,15 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     if( !call_ptr ) // no call order
        return false;
 
-    using bdsm_type = bitasset_options::bad_debt_settlement_type;
-    const auto bdsm = bitasset.get_bad_debt_settlement_method();
+    using bsrm_type = bitasset_options::black_swan_response_type;
+    const auto bsrm = bitasset.get_black_swan_response_method();
 
     price highest = settle_price;
     // Due to #338, we won't check for black swan on incoming limit order, so need to check with MSSP here
-    // * If BDSM is individual_settlement_to_fund, check with median_feed to decide whether to settle.
-    // * If BDSM is no_settlement, check with current_feed to NOT trigger global settlement.
-    // * If BDSM is global_settlement or individual_settlement_to_order, median_feed == current_feed.
-    if( bdsm_type::individual_settlement_to_fund == bdsm )
+    // * If BSRM is individual_settlement_to_fund, check with median_feed to decide whether to settle.
+    // * If BSRM is no_settlement, check with current_feed to NOT trigger global settlement.
+    // * If BSRM is global_settlement or individual_settlement_to_order, median_feed == current_feed.
+    if( bsrm_type::individual_settlement_to_fund == bsrm )
        highest = bitasset.median_feed.max_short_squeeze_price();
     else if( !before_core_hardfork_1270 )
        highest = bitasset.current_feed.max_short_squeeze_price();
@@ -290,15 +290,15 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
        FC_ASSERT( enable_black_swan,
                   "Black swan was detected during a margin update which is not allowed to trigger a blackswan" );
 
-       if( bdsm_type::individual_settlement_to_fund == bdsm || bdsm_type::individual_settlement_to_order == bdsm )
+       if( bsrm_type::individual_settlement_to_fund == bsrm || bsrm_type::individual_settlement_to_order == bsrm )
        {
           individually_settle( bitasset, *call_ptr );
        }
-       // Global settlement or no settlement, but we should not be here if BDSM is no_settlement
+       // Global settlement or no settlement, but we should not be here if BSRM is no_settlement
        else if( after_core_hardfork_2481 )
        {
-          if( bdsm_type::no_settlement == bdsm ) // this should not happen, be defensive here
-             wlog( "Internal error: BDSM is no_settlement but undercollateralization occurred" );
+          if( bsrm_type::no_settlement == bsrm ) // this should not happen, be defensive here
+             wlog( "Internal error: BSRM is no_settlement but undercollateralization occurred" );
           // After hf_2481, when a global settlement occurs,
           // * the margin calls (whose CR <= MCR) pay a premium (by MSSR-MCFR) and a margin call fee (by MCFR), and
           //   they are closed at the same price,
@@ -339,9 +339,9 @@ static optional<price> get_derived_current_feed_price( const database& db,
          return bitasset.median_feed.settlement_price;
    }
 
-   using bdsm_type = bitasset_options::bad_debt_settlement_type;
-   const auto bdsm = bitasset.get_bad_debt_settlement_method();
-   if( bdsm_type::no_settlement == bdsm )
+   using bsrm_type = bitasset_options::black_swan_response_type;
+   const auto bsrm = bitasset.get_black_swan_response_method();
+   if( bsrm_type::no_settlement == bsrm )
    {
       // Find the call order with the least collateral ratio
       const call_order_object* call_ptr = db.find_least_collateralized_short( bitasset, true );
@@ -356,7 +356,7 @@ static optional<price> get_derived_current_feed_price( const database& db,
       else // there is no call order of this bitasset
          result = bitasset.median_feed.settlement_price;
    }
-   else if( bdsm_type::individual_settlement_to_fund == bdsm && bitasset.individual_settlement_debt > 0 )
+   else if( bsrm_type::individual_settlement_to_fund == bsrm && bitasset.individual_settlement_debt > 0 )
    {
       // Check whether to cap
       price fund_price = asset( bitasset.individual_settlement_debt, bitasset.asset_id )
@@ -377,11 +377,11 @@ void database::update_bitasset_current_feed( const asset_bitasset_data_object& b
 {
    // For better performance, if nothing to update, we return
    optional<price> new_current_feed_price;
-   using bdsm_type = bitasset_options::bad_debt_settlement_type;
-   const auto bdsm = bitasset.get_bad_debt_settlement_method();
+   using bsrm_type = bitasset_options::black_swan_response_type;
+   const auto bsrm = bitasset.get_black_swan_response_method();
    if( skip_median_update )
    {
-      if( bdsm_type::no_settlement != bdsm && bdsm_type::individual_settlement_to_fund != bdsm )
+      if( bsrm_type::no_settlement != bsrm && bsrm_type::individual_settlement_to_fund != bsrm )
       {
          // it's possible that current_feed was capped thus we still need to update it
          if( bitasset.current_feed.settlement_price == bitasset.median_feed.settlement_price )
@@ -397,7 +397,7 @@ void database::update_bitasset_current_feed( const asset_bitasset_data_object& b
    }
 
    // We need to update the database
-   modify( bitasset, [this, skip_median_update, &new_current_feed_price, &bdsm]
+   modify( bitasset, [this, skip_median_update, &new_current_feed_price, &bsrm]
                      ( asset_bitasset_data_object& abdo )
    {
       if( !skip_median_update )
@@ -406,7 +406,7 @@ void database::update_bitasset_current_feed( const asset_bitasset_data_object& b
          const auto& maint_time = get_dynamic_global_properties().next_maintenance_time;
          abdo.update_median_feeds( head_time, maint_time );
          abdo.current_feed = abdo.median_feed;
-         if( bdsm_type::no_settlement == bdsm || bdsm_type::individual_settlement_to_fund == bdsm )
+         if( bsrm_type::no_settlement == bsrm || bsrm_type::individual_settlement_to_fund == bsrm )
             new_current_feed_price = get_derived_current_feed_price( *this, abdo );
       }
       if( new_current_feed_price.valid() )

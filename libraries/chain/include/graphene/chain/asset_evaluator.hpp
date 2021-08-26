@@ -105,7 +105,7 @@ namespace graphene { namespace chain {
          const asset_bitasset_data_object* bitasset_to_update = nullptr;
          const asset_object* asset_to_update = nullptr;
 
-         bool update_feeds_due_to_bdsm_change = false;
+         bool update_feeds_due_to_bsrm_change = false;
    };
 
    class asset_update_feed_producers_evaluator : public evaluator<asset_update_feed_producers_evaluator>

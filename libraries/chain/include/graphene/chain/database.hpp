@@ -297,10 +297,10 @@ namespace graphene { namespace chain {
 
          uint32_t last_non_undoable_block_num() const;
 
-         /// Find the limit order which is the bad-debt settlement fund of the specified asset
+         /// Find the limit order which is the individual settlement fund of the specified asset
          /// @param a ID of the asset
          /// @return nullptr if not found, pointer to the limit order if found
-         const limit_order_object* find_bad_debt_settlement_order( const asset_id_type& a )const;
+         const limit_order_object* find_individual_settlemnt_order( const asset_id_type& a )const;
 
          /// Find the call order with the least collateral ratio
          /// @param bitasset The bitasset object
@@ -411,7 +411,7 @@ namespace graphene { namespace chain {
                                           const IndexType& call_index,
                                           bool check_margin_calls = false );
          /// Individually settle the @p call_order. Called when the call order is undercollateralized.
-         /// See @ref protocol::bitasset_options::bad_debt_settlement_type for more info.
+         /// See @ref protocol::bitasset_options::black_swan_response_type for more info.
          /// @param bitasset the bitasset object
          /// @param call_order the call order
          void individually_settle( const asset_bitasset_data_object& bitasset, const call_order_object& call_order );

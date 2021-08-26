@@ -68,7 +68,7 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    }
    else
    {
-      // Note: it is safe to iterate here even if there is no call order due to individual bad debt settlements
+      // Note: it is safe to iterate here even if there is no call order due to individual settlements
       globally_settle_asset_impl( mia, settlement_price,
                                   get_index_type<call_order_index>().indices().get<by_collateral>(),
                                   check_margin_calls );
@@ -151,8 +151,8 @@ void database::globally_settle_asset_impl( const asset_object& mia,
                  "Internal error: unable to close margin call ${o}", ("o", order) );
    }
 
-   // Move the (individual) bad-debt settlement order to the GS fund
-   const limit_order_object* limit_ptr = find_bad_debt_settlement_order( bitasset.asset_id );
+   // Move the individual settlement order to the GS fund
+   const limit_order_object* limit_ptr = find_individual_settlemnt_order( bitasset.asset_id );
    if( limit_ptr )
    {
       collateral_gathered.amount += limit_ptr->for_sale;
@@ -163,7 +163,7 @@ void database::globally_settle_asset_impl( const asset_object& mia,
    collateral_gathered.amount += bitasset.individual_settlement_fund;
 
    modify( bitasset, [&mia,&original_mia_supply,&collateral_gathered]( asset_bitasset_data_object& obj ){
-      obj.options.extensions.value.bad_debt_settlement_method.reset(); // Update BDSM to GS
+      obj.options.extensions.value.black_swan_response_method.reset(); // Update BSRM to GS
       obj.current_feed = obj.median_feed; // reset current feed price if was capped
       obj.individual_settlement_debt = 0;
       obj.individual_settlement_fund = 0;
@@ -177,10 +177,10 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
 {
    FC_ASSERT( bitasset.asset_id == order.debt_type(), "Internal error: asset type mismatch" );
 
-   using bdsm_type = bitasset_options::bad_debt_settlement_type;
-   const auto bdsm = bitasset.get_bad_debt_settlement_method();
-   FC_ASSERT( bdsm_type::individual_settlement_to_fund == bdsm || bdsm_type::individual_settlement_to_order == bdsm,
-              "Internal error: Invalid BDSM" );
+   using bsrm_type = bitasset_options::black_swan_response_type;
+   const auto bsrm = bitasset.get_black_swan_response_method();
+   FC_ASSERT( bsrm_type::individual_settlement_to_fund == bsrm || bsrm_type::individual_settlement_to_order == bsrm,
+              "Internal error: Invalid BSRM" );
 
    auto order_debt = order.get_debt();
    auto order_collateral = order.get_collateral();
@@ -191,7 +191,7 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
 
    auto margin_call_fee = order_collateral - fund_receives;
 
-   if( bdsm_type::individual_settlement_to_fund == bdsm ) // settle to fund
+   if( bsrm_type::individual_settlement_to_fund == bsrm ) // settle to fund
    {
       modify( bitasset, [&order,&fund_receives]( asset_bitasset_data_object& obj ){
          obj.individual_settlement_debt += order.debt;
@@ -200,7 +200,7 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
    }
    else // settle to order
    {
-      const limit_order_object* limit_ptr = find_bad_debt_settlement_order( bitasset.asset_id );
+      const limit_order_object* limit_ptr = find_individual_settlemnt_order( bitasset.asset_id );
       if( limit_ptr )
       {
          modify( *limit_ptr, [&order,&fund_receives]( limit_order_object& obj ) {
@@ -227,7 +227,7 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
               "Internal error: unable to close margin call ${o}", ("o", order) );
 
    // Update current feed if needed
-   if( bdsm_type::individual_settlement_to_fund == bdsm )
+   if( bsrm_type::individual_settlement_to_fund == bsrm )
       update_bitasset_current_feed( bitasset, true );
 
 }
@@ -625,7 +625,7 @@ bool database::apply_order(const limit_order_object& new_order_object)
       if( !finished && !before_core_hardfork_1270 ) // TODO refactor or cleanup duplicate code after core-1270 hf
       {
          // check if there are margin calls
-         // Note: it is safe to iterate here even if there is no call order due to individual bad debt settlements
+         // Note: it is safe to iterate here even if there is no call order due to individual settlements
          const auto& call_collateral_idx = get_index_type<call_order_index>().indices().get<by_collateral>();
          auto call_min = price::min( recv_asset_id, sell_asset_id );
          while( !finished )
@@ -729,7 +729,7 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
    bool finished = false; // whether the new order is gone
 
    // check if there are margin calls
-   // Note: it is safe to iterate here even if there is no call order due to individual bad debt settlements
+   // Note: it is safe to iterate here even if there is no call order due to individual settlements
    const auto& call_collateral_idx = get_index_type<call_order_index>().indices().get<by_collateral>();
    auto call_min = price::min( bitasset.options.short_backing_asset, new_settlement.balance.asset_id );
    while( !finished )
@@ -991,7 +991,7 @@ database::match_result_type database::match( const limit_order_object& bid, cons
    bool maker_filled = fill_call_order( ask, call_pays, call_receives, match_price, true, margin_call_fee );
 
    // Update current_feed after filled call order if needed
-   if( bitasset_options::bad_debt_settlement_type::no_settlement == bitasset.get_bad_debt_settlement_method() )
+   if( bitasset_options::black_swan_response_type::no_settlement == bitasset.get_black_swan_response_method() )
       update_bitasset_current_feed( bitasset, true );
 
    // Note: result can be none_filled when call order has target_collateral_ratio option set.
@@ -1225,7 +1225,7 @@ asset database::match_impl( const force_settlement_object& settle,
    fill_settle_order( settle, settle_pays, settle_receives, fill_price, !settle_is_taker, !is_margin_call );
 
    // Update current_feed after filled call order if needed
-   if( bitasset_options::bad_debt_settlement_type::no_settlement == bitasset.get_bad_debt_settlement_method() )
+   if( bitasset_options::black_swan_response_type::no_settlement == bitasset.get_black_swan_response_method() )
       update_bitasset_current_feed( bitasset, true );
 
    if( cull_settle_order )
@@ -1533,12 +1533,12 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     if ( maint_time >= HARDFORK_CORE_460_TIME && bitasset.is_prediction_market )
        return false;
 
-    using bdsm_type = bitasset_options::bad_debt_settlement_type;
-    const auto bdsm = bitasset.get_bad_debt_settlement_method();
+    using bsrm_type = bitasset_options::black_swan_response_type;
+    const auto bsrm = bitasset.get_black_swan_response_method();
 
-    // Only check for black swan here if BDSM is not individual settlement
-    if( bdsm_type::individual_settlement_to_fund != bdsm
-          && bdsm_type::individual_settlement_to_order != bdsm
+    // Only check for black swan here if BSRM is not individual settlement
+    if( bsrm_type::individual_settlement_to_fund != bsrm
+          && bsrm_type::individual_settlement_to_order != bsrm
           && check_for_blackswan( mia, enable_black_swan, &bitasset ) )
        return false;
 
@@ -1570,7 +1570,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
     const call_order_index& call_index = get_index_type<call_order_index>();
     const auto& call_price_index = call_index.indices().get<by_price>();
-    // Note: it is safe to iterate here even if there is no call order due to individual bad debt settlements
+    // Note: it is safe to iterate here even if there is no call order due to individual settlements
     const auto& call_collateral_index = call_index.indices().get<by_collateral>();
 
     auto call_min = price::min( bitasset.options.short_backing_asset, bitasset.asset_id );
@@ -1775,7 +1775,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        fill_call_order( call_order, call_pays, call_receives, match_price, for_new_limit_order, margin_call_fee);
 
        // Update current_feed after filled call order if needed
-       if( bitasset_options::bad_debt_settlement_type::no_settlement == bitasset.get_bad_debt_settlement_method() )
+       if( bitasset_options::black_swan_response_type::no_settlement == bitasset.get_black_swan_response_method() )
           update_bitasset_current_feed( bitasset, true );
 
        if( !before_core_hardfork_1270 )
@@ -1801,8 +1801,8 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
       if( called_some )
          margin_called = true;
       // At last, check for blackswan // TODO perhaps improve performance by passing in iterators
-      if( bdsm_type::individual_settlement_to_fund == bdsm
-          || bdsm_type::individual_settlement_to_order == bdsm )
+      if( bsrm_type::individual_settlement_to_fund == bsrm
+          || bsrm_type::individual_settlement_to_order == bsrm )
       {
          // Run multiple times, each time one call order gets settled
          // TODO perhaps improve performance by settling multiple call orders inside in one call
@@ -1831,7 +1831,7 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
    auto settle_itr = settlement_index.lower_bound( bitasset.asset_id );
    auto settle_end = settlement_index.upper_bound( bitasset.asset_id );
 
-   // Note: it is safe to iterate here even if there is no call order due to individual bad debt settlements
+   // Note: it is safe to iterate here even if there is no call order due to individual settlements
    const auto& call_collateral_index = get_index_type<call_order_index>().indices().get<by_collateral>();
    auto call_min = price::min( bitasset.options.short_backing_asset, bitasset.asset_id );
    auto call_max = price::max( bitasset.options.short_backing_asset, bitasset.asset_id );

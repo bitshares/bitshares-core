@@ -150,7 +150,7 @@ namespace detail {
       if ( !HARDFORK_CORE_2467_PASSED(next_maint_time) )
       {
          // new issuer permissions should not be set until activation of the hardfork
-         FC_ASSERT( 0 == (options.issuer_permissions & asset_issuer_permission_flags::disable_bdsm_update),
+         FC_ASSERT( 0 == (options.issuer_permissions & asset_issuer_permission_flags::disable_bsrm_update),
                     "New asset issuer permission bits should not be set before Hardfork core-2467" );
       }
    }
@@ -160,8 +160,8 @@ namespace detail {
       // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
       if ( !HARDFORK_CORE_2467_PASSED(next_maint_time) )
       {
-         FC_ASSERT( !options.extensions.value.bad_debt_settlement_method.valid(),
-                    "A BitAsset's bad debt settlement method cannot be set before Hardfork core-2467" );
+         FC_ASSERT( !options.extensions.value.black_swan_response_method.valid(),
+                    "A BitAsset's black swan response method cannot be set before Hardfork core-2467" );
       }
    }
 
@@ -456,10 +456,10 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       if( !a.is_market_issued() )
          FC_ASSERT( 0 == ( o.new_options.issuer_permissions & NON_UIA_ONLY_ISSUER_PERMISSION_MASK ),
                     "Unable to set non-UIA issuer permission bits on UIA" );
-      // Unable to set disable_bdsm_update issuer permission bit on PM
+      // Unable to set disable_bsrm_update issuer permission bit on PM
       else if( bitasset_data->is_prediction_market )
-         FC_ASSERT( 0 == ( o.new_options.issuer_permissions & disable_bdsm_update ),
-                    "Unable to set disable_bdsm_update issuer permission bit on PM" );
+         FC_ASSERT( 0 == ( o.new_options.issuer_permissions & disable_bsrm_update ),
+                    "Unable to set disable_bsrm_update issuer permission bit on PM" );
       // else do nothing
    }
 
@@ -481,11 +481,11 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
                         & (uint16_t)(~enabled_issuer_permissions_mask) ) & UIA_ASSET_ISSUER_PERMISSION_MASK ),
                  "Cannot reinstate previously revoked issuer permissions on a UIA if current supply is non-zero, "
                  "unless to unset non-UIA issuer permission bits.");
-      else if( hf_core_2467_passed && bitasset_data->is_prediction_market ) // for PM, ignore disable_bdsm_update
+      else if( hf_core_2467_passed && bitasset_data->is_prediction_market ) // for PM, ignore disable_bsrm_update
          FC_ASSERT( 0 == ( ( o.new_options.get_enabled_issuer_permissions_mask()
-                        & (uint16_t)(~enabled_issuer_permissions_mask) ) & (uint16_t)(~disable_bdsm_update) ),
+                        & (uint16_t)(~enabled_issuer_permissions_mask) ) & (uint16_t)(~disable_bsrm_update) ),
                  "Cannot reinstate previously revoked issuer permissions on a PM if current supply is non-zero, "
-                 "unless to unset the disable_bdsm_update issuer permission bit.");
+                 "unless to unset the disable_bsrm_update issuer permission bit.");
       else
          FC_ASSERT( 0 == ( o.new_options.get_enabled_issuer_permissions_mask()
                         & (uint16_t)(~enabled_issuer_permissions_mask) ),
@@ -698,8 +698,8 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
               "Cannot update a bitasset after a global settlement has executed" );
 
    if( current_bitasset_data.is_prediction_market )
-      FC_ASSERT( !op.new_options.extensions.value.bad_debt_settlement_method.valid(),
-                 "Can not set bad_debt_settlement_method for Prediction Markets" );
+      FC_ASSERT( !op.new_options.extensions.value.black_swan_response_method.valid(),
+                 "Can not set black_swan_response_method for Prediction Markets" );
 
    // TODO simplify code below when made sure operator==(optional,optional) works
    if( !asset_obj.can_owner_update_mcr() )
@@ -729,27 +729,27 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
                            || ( old_mssr.valid() && *old_mssr != *new_mssr ) );
       FC_ASSERT( !mssr_changed, "No permission to update MSSR" );
    }
-   // check if BDSM will change
-   const auto old_bdsm = current_bitasset_data.get_bad_debt_settlement_method();
-   const auto new_bdsm = op.new_options.get_bad_debt_settlement_method();
-   if( old_bdsm != new_bdsm )
+   // check if BSRM will change
+   const auto old_bsrm = current_bitasset_data.get_black_swan_response_method();
+   const auto new_bsrm = op.new_options.get_black_swan_response_method();
+   if( old_bsrm != new_bsrm )
    {
-      FC_ASSERT( asset_obj.can_owner_update_bdsm(), "No permission to update BDSM" );
+      FC_ASSERT( asset_obj.can_owner_update_bsrm(), "No permission to update BSRM" );
       FC_ASSERT( !current_bitasset_data.has_settlement(),
-                 "Unable to update BDSM when the asset has been globally settled" );
+                 "Unable to update BSRM when the asset has been globally settled" );
 
-      // Note: it is probably OK to allow BDSM update, be conservative here so far
-      using bdsm_type = bitasset_options::bad_debt_settlement_type;
-      if( bdsm_type::individual_settlement_to_fund == old_bdsm )
+      // Note: it is probably OK to allow BSRM update, be conservative here so far
+      using bsrm_type = bitasset_options::black_swan_response_type;
+      if( bsrm_type::individual_settlement_to_fund == old_bsrm )
          FC_ASSERT( !current_bitasset_data.has_individual_settlement(),
-                 "Unable to update BDSM when the individual bad debt settlement pool is not empty" );
-      else if( bdsm_type::individual_settlement_to_order == old_bdsm )
-         FC_ASSERT( !d.find_bad_debt_settlement_order( op.asset_to_update ),
-                 "Unable to update BDSM when there exists a bad debt settlement order" );
+                 "Unable to update BSRM when the individual settlement pool is not empty" );
+      else if( bsrm_type::individual_settlement_to_order == old_bsrm )
+         FC_ASSERT( !d.find_individual_settlemnt_order( op.asset_to_update ),
+                 "Unable to update BSRM when there exists an individual settlement order" );
 
       // Since we do not allow updating in some cases (above), only check no_settlement here
-      if( bdsm_type::no_settlement == old_bdsm || bdsm_type::no_settlement == new_bdsm )
-         update_feeds_due_to_bdsm_change = true;
+      if( bsrm_type::no_settlement == old_bsrm || bsrm_type::no_settlement == new_bsrm )
+         update_feeds_due_to_bsrm_change = true;
    }
 
 
@@ -856,7 +856,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 static bool update_bitasset_object_options(
       const asset_update_bitasset_operation& op, database& db,
       asset_bitasset_data_object& bdo, const asset_object& asset_to_update,
-      bool update_feeds_due_to_bdsm_change )
+      bool update_feeds_due_to_bsrm_change )
 {
    const fc::time_point_sec next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
    bool after_hf_core_868_890 = ( next_maint_time > HARDFORK_CORE_868_890_TIME );
@@ -943,12 +943,12 @@ static bool update_bitasset_object_options(
    }
 
    bool feed_actually_changed = false;
-   if( should_update_feeds || update_feeds_due_to_bdsm_change )
+   if( should_update_feeds || update_feeds_due_to_bsrm_change )
    {
       const auto old_feed = bdo.current_feed;
       if( should_update_feeds )
          db.update_bitasset_current_feed( bdo );
-      else // to update feeds due to bdsm change
+      else // to update feeds due to bsrm change
          db.update_bitasset_current_feed( bdo, true );
 
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
@@ -972,7 +972,7 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
                       [&op, &to_check_call_orders, &db_conn, this]( asset_bitasset_data_object& bdo )
       {
          to_check_call_orders = update_bitasset_object_options( op, db_conn, bdo, *asset_to_update,
-                                                                update_feeds_due_to_bdsm_change );
+                                                                update_feeds_due_to_bsrm_change );
       });
 
       if( to_check_call_orders )
@@ -1091,7 +1091,7 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
    FC_ASSERT( asset_to_settle->can_force_settle() || bitasset.has_settlement()
                  || bitasset.has_individual_settlement(),
               "Either the asset need to have the force_settle flag enabled, or it need to be globally settled, "
-              "or the individual bad debt settlement pool is not empty" );
+              "or the individual settlement pool is not empty" );
 
    if( bitasset.is_prediction_market )
    {
@@ -1111,7 +1111,7 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
       {
          FC_THROW_EXCEPTION( insufficient_feeds,
                              "Cannot force settle with no price feed if the asset is not globally settled and the "
-                             "individual bad debt settlement pool is not empty" );
+                             "individual settlement pool is not empty" );
       }
    }
 
@@ -1253,7 +1253,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
    if( bitasset.has_settlement() )
       return pay_settle_from_gs_fund( d, op, fee_paying_account, *asset_to_settle, bitasset );
 
-   // Process individual bad debt settlement pool
+   // Process individual settlement pool
    extendable_operation_result result;
    asset to_settle = op.amount;
    if( bitasset.has_individual_settlement() )

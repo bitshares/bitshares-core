@@ -1164,7 +1164,7 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       acop2.symbol = "NEWSAMBIT";
       // With all possible bits in permissions set to 1
       acop2.common_options.issuer_permissions = hf2467 ? ASSET_ISSUER_PERMISSION_MASK
-                                                       : ( ASSET_ISSUER_PERMISSION_MASK & ~disable_bdsm_update );
+                                                       : ( ASSET_ISSUER_PERMISSION_MASK & ~disable_bsrm_update );
       for( uint16_t bit = 0x8000; bit > 0; bit >>= 1 )
       {
          acop2.common_options.flags = valid_bitflag | bit;
@@ -1191,9 +1191,9 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       BOOST_CHECK( !newsambit_id(db).can_owner_update_mcr() );
       BOOST_CHECK( !newsambit_id(db).can_owner_update_mssr() );
       if( hf2467 )
-         BOOST_CHECK( !newsambit_id(db).can_owner_update_bdsm() );
+         BOOST_CHECK( !newsambit_id(db).can_owner_update_bsrm() );
       else
-         BOOST_CHECK( newsambit_id(db).can_owner_update_bdsm() );
+         BOOST_CHECK( newsambit_id(db).can_owner_update_bsrm() );
 
       // Able to propose too
       propose( acop2 );

@@ -110,8 +110,8 @@ namespace graphene { namespace chain {
          bool can_owner_update_icr()const { return (0 == (options.issuer_permissions & disable_icr_update)); }
          /// @return true if the asset owner can update MSSR directly
          bool can_owner_update_mssr()const { return (0 == (options.issuer_permissions & disable_mssr_update)); }
-         /// @return true if the asset owner can change bad debt settlement method
-         bool can_owner_update_bdsm()const { return (0 == (options.issuer_permissions & disable_bdsm_update)); }
+         /// @return true if the asset owner can change black swan response method
+         bool can_owner_update_bsrm()const { return (0 == (options.issuer_permissions & disable_bsrm_update)); }
 
          /// Helper function to get an asset object with the given amount in this asset's type
          asset amount(share_type a)const { return asset(a, id); }
@@ -309,7 +309,7 @@ namespace graphene { namespace chain {
          share_type settlement_fund;
          ///@}
 
-         /// The individual bad debt settlement pool.
+         /// The individual settlement pool.
          /// In the event of individual settlements to fund, debt and collateral of the margin positions which got
          /// settled are moved here.
          ///@{
@@ -319,20 +319,20 @@ namespace graphene { namespace chain {
          share_type individual_settlement_fund;
          ///@}
 
-         /// @return true if the individual bad debt settlement pool is not empty, false otherwise
+         /// @return true if the individual settlement pool is not empty, false otherwise
          bool has_individual_settlement()const { return ( individual_settlement_debt != 0 ); }
 
-         /// Get the price of the individual bad debt settlement pool
+         /// Get the price of the individual settlement pool
          price get_individual_settlement_price() const
          {
             return asset( individual_settlement_debt, asset_id )
                    / asset( individual_settlement_fund, options.short_backing_asset );
          }
 
-         /// Get the effective bad debt settlement method of this bitasset
-         bitasset_options::bad_debt_settlement_type get_bad_debt_settlement_method() const
+         /// Get the effective black swan response method of this bitasset
+         bitasset_options::black_swan_response_type get_black_swan_response_method() const
          {
-            return options.get_bad_debt_settlement_method();
+            return options.get_black_swan_response_method();
          }
 
          /// Get margin call order price (MCOP) of this bitasset

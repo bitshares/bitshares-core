@@ -305,8 +305,8 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
          d.remove( *call_obj );
 
          // Update current_feed if needed
-         const auto bdsm = _bitasset_data->get_bad_debt_settlement_method();
-         if( bitasset_options::bad_debt_settlement_type::no_settlement == bdsm )
+         const auto bsrm = _bitasset_data->get_black_swan_response_method();
+         if( bitasset_options::black_swan_response_type::no_settlement == bsrm )
             d.update_bitasset_current_feed( *_bitasset_data, true );
 
          return call_order_id;
@@ -413,8 +413,8 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
          }
       }
       // Update current_feed if needed
-      const auto bdsm = _bitasset_data->get_bad_debt_settlement_method();
-      if( bitasset_options::bad_debt_settlement_type::no_settlement == bdsm )
+      const auto bsrm = _bitasset_data->get_black_swan_response_method();
+      if( bitasset_options::black_swan_response_type::no_settlement == bsrm )
          d.update_bitasset_current_feed( *_bitasset_data, true );
    }
 

@@ -149,7 +149,7 @@ const witness_schedule_object& database::get_witness_schedule_object()const
    return *_p_witness_schedule_obj;
 }
 
-const limit_order_object* database::find_bad_debt_settlement_order( const asset_id_type& a )const
+const limit_order_object* database::find_individual_settlemnt_order( const asset_id_type& a )const
 {
    const auto& limit_index = get_index_type<limit_order_index>().indices().get<by_is_settled_debt>();
    auto itr = limit_index.lower_bound( std::make_tuple( true, a ) );
@@ -179,7 +179,7 @@ const call_order_object* database::find_least_collateralized_short( const asset_
    }
    else // after core-1270 hard fork, check with collateralization
    {
-      // Note: it is safe to check here even if there is no call order due to individual bad debt settlements
+      // Note: it is safe to check here even if there is no call order due to individual settlements
       const auto& call_collateral_index = get_index_type<call_order_index>().indices().get<by_collateral>();
       auto call_itr = call_collateral_index.lower_bound( call_min );
       if( call_itr != call_collateral_index.end() ) // no call order

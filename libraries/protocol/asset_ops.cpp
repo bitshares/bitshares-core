@@ -114,15 +114,15 @@ void  asset_create_operation::validate()const
    common_options.validate();
    if( 0 != ( common_options.issuer_permissions
               & (disable_force_settle|global_settle
-                 |disable_mcr_update|disable_icr_update|disable_mssr_update|disable_bdsm_update) ) )
+                 |disable_mcr_update|disable_icr_update|disable_mssr_update|disable_bsrm_update) ) )
       FC_ASSERT( bitasset_opts.valid() );
    if( is_prediction_market )
    {
       FC_ASSERT( bitasset_opts.valid(), "Cannot have a User-Issued Asset implement a prediction market." );
       FC_ASSERT( 0 != (common_options.issuer_permissions & global_settle) );
-      FC_ASSERT( 0 == (common_options.issuer_permissions & disable_bdsm_update) );
-      FC_ASSERT( !bitasset_opts->extensions.value.bad_debt_settlement_method.valid(),
-                 "Can not set bad_debt_settlement_method for Prediction Markets" );
+      FC_ASSERT( 0 == (common_options.issuer_permissions & disable_bsrm_update) );
+      FC_ASSERT( !bitasset_opts->extensions.value.black_swan_response_method.valid(),
+                 "Can not set black_swan_response_method for Prediction Markets" );
    }
    if( bitasset_opts ) bitasset_opts->validate();
 
@@ -262,11 +262,11 @@ void bitasset_options::validate() const
    if( extensions.value.force_settle_fee_percent.valid() )
       FC_ASSERT( *extensions.value.force_settle_fee_percent <= GRAPHENE_100_PERCENT );
 
-   if( extensions.value.bad_debt_settlement_method.valid() )
+   if( extensions.value.black_swan_response_method.valid() )
    {
-      auto bdsm_count = static_cast<uint8_t>( bad_debt_settlement_type::BDSM_TYPE_COUNT );
-      FC_ASSERT( *extensions.value.bad_debt_settlement_method < bdsm_count,
-                 "bad_debt_settlement_method should be less than ${c}", ("c",bdsm_count) );
+      auto bsrm_count = static_cast<uint8_t>( black_swan_response_type::BSRM_TYPE_COUNT );
+      FC_ASSERT( *extensions.value.black_swan_response_method < bsrm_count,
+                 "black_swan_response_method should be less than ${c}", ("c",bsrm_count) );
    }
 }
 
@@ -319,8 +319,8 @@ void asset_options::validate_flags( bool is_market_issued )const
               "Can not set disable_icr_update flag, it is for issuer permission only" );
    FC_ASSERT( 0 == (flags & disable_mssr_update),
               "Can not set disable_mssr_update flag, it is for issuer permission only" );
-   FC_ASSERT( 0 == (flags & disable_bdsm_update),
-              "Can not set disable_bdsm_update flag, it is for issuer permission only" );
+   FC_ASSERT( 0 == (flags & disable_bsrm_update),
+              "Can not set disable_bsrm_update flag, it is for issuer permission only" );
    if( !is_market_issued )
    {
       FC_ASSERT( 0 == (flags & (uint16_t)(~UIA_ASSET_ISSUER_PERMISSION_MASK)),
