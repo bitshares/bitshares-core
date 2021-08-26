@@ -213,13 +213,21 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     if( !call_ptr ) // no call order
        return false;
 
+    using bdsm_type = bitasset_options::bad_debt_settlement_type;
+    const auto bdsm = bitasset.get_bad_debt_settlement_method();
+
     price highest = settle_price;
-    if( !before_core_hardfork_1270 )
-       // due to #338, we won't check for black swan on incoming limit order, so need to check with MSSP here
+    // Due to #338, we won't check for black swan on incoming limit order, so need to check with MSSP here
+    // * If BDSM is individual_settlement_to_fund, check with median_feed to decide whether to settle.
+    // * If BDSM is no_settlement, check with current_feed to NOT trigger global settlement.
+    // * If BDSM is global_settlement or individual_settlement_to_order, median_feed == current_feed.
+    if( bdsm_type::individual_settlement_to_fund == bdsm )
+       highest = bitasset.median_feed.max_short_squeeze_price();
+    else if( !before_core_hardfork_1270 )
        highest = bitasset.current_feed.max_short_squeeze_price();
     else if( maint_time > HARDFORK_CORE_338_TIME )
-       // due to #338, we won't check for black swan on incoming limit order, so need to check with MSSP here
        highest = bitasset.current_feed.max_short_squeeze_price_before_hf_1270();
+    // else do nothing
 
     const limit_order_index& limit_index = get_index_type<limit_order_index>();
     const auto& limit_price_index = limit_index.indices().get<by_price>();
@@ -264,8 +272,8 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     //       if the matching limit order is smaller, due to rounding, it is still possible that the
     //       call order's collateralization would increase and become higher than ~highest after matched.
     //       However, for simplicity, we only compare the prices here.
-    bool gs = after_core_hardfork_2481 ? ( ~least_collateral > highest ) : ( ~least_collateral >= highest );
-    if( gs )
+    bool is_blackswan = after_core_hardfork_2481 ? ( ~least_collateral > highest ) : ( ~least_collateral >= highest );
+    if( is_blackswan )
     {
        wdump( (*call_ptr) );
        elog( "Black Swan detected on asset ${symbol} (${id}) at block ${b}: \n"
@@ -282,8 +290,6 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
        FC_ASSERT( enable_black_swan,
                   "Black swan was detected during a margin update which is not allowed to trigger a blackswan" );
 
-       using bdsm_type = bitasset_options::bad_debt_settlement_type;
-       const auto bdsm = bitasset.get_bad_debt_settlement_method();
        if( bdsm_type::individual_settlement_to_fund == bdsm || bdsm_type::individual_settlement_to_order == bdsm )
        {
           individually_settle( bitasset, *call_ptr );
