@@ -276,6 +276,10 @@ namespace graphene { namespace chain {
          /// This is the publication time of the oldest feed which was factored into current_feed.
          time_point_sec current_feed_publication_time;
 
+         /// @return whether @ref median_feed and @ref current_feed is different
+         bool is_current_feed_price_capped()const
+         { return ( median_feed.settlement_price != current_feed.settlement_price ); }
+
          /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin
          /// call territory.
          /// This value is derived from @ref current_feed for better performance and should be kept consistent.

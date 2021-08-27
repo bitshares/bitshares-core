@@ -628,6 +628,11 @@ bool database::apply_order(const limit_order_object& new_order_object)
          // Note: it is safe to iterate here even if there is no call order due to individual settlements
          const auto& call_collateral_idx = get_index_type<call_order_index>().indices().get<by_collateral>();
          auto call_min = price::min( recv_asset_id, sell_asset_id );
+         // Note: when BSRM is no_settlement, current_feed can change after filled a call order,
+         //       so we recalculate inside the loop
+         using bsrm_type = bitasset_options::black_swan_response_type;
+         bool update_call_price = ( sell_abd->get_black_swan_response_method() == bsrm_type::no_settlement
+                                    && sell_abd->is_current_feed_price_capped() );
          while( !finished )
          {
             // hard fork core-343 and core-625 took place at same time,
@@ -650,6 +655,12 @@ bool database::apply_order(const limit_order_object& new_order_object)
             if( match_result_type::only_taker_filled == match_result
                   || match_result_type::both_filled == match_result )
                finished = true;
+            else if( update_call_price )
+            {
+               call_match_price = ~sell_abd->get_margin_call_order_price();
+               call_pays_price = ~sell_abd->current_feed.max_short_squeeze_price();
+               update_call_price = sell_abd->is_current_feed_price_capped();
+            }
          }
       }
       else if( !finished ) // and before core-1270 hard fork
@@ -726,6 +737,12 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
    // differ from call_match_price if there is a Margin Call Fee.
    price call_pays_price = bitasset.current_feed.max_short_squeeze_price();
 
+   // Note: when BSRM is no_settlement, current_feed can change after filled a call order,
+   //       so we recalculate inside the loop
+   using bsrm_type = bitasset_options::black_swan_response_type;
+   bool update_call_price = ( bitasset.get_black_swan_response_method() == bsrm_type::no_settlement
+                              && bitasset.is_current_feed_price_capped() );
+
    bool finished = false; // whether the new order is gone
 
    // check if there are margin calls
@@ -756,6 +773,13 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
 
       // Check whether the new order is gone
       finished = ( nullptr == find_object( new_obj_id ) );
+
+      if( !finished && update_call_price )
+      {
+         call_match_price = bitasset.get_margin_call_order_price();
+         call_pays_price = bitasset.current_feed.max_short_squeeze_price();
+         update_call_price = bitasset.is_current_feed_price_capped();
+      }
    }
 
 }
@@ -1615,6 +1639,10 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
                                         : ( call_collateral_itr != call_collateral_end );
     };
 
+    using bsrm_type = bitasset_options::black_swan_response_type;
+    bool update_current_feed = ( bsrm_type::no_settlement == bitasset.get_black_swan_response_method()
+                                 && bitasset.is_current_feed_price_capped() );
+
     while( !check_for_blackswan( mia, enable_black_swan, &bitasset ) // TODO perhaps improve performance
                                                                      //      by passing in iterators
            && limit_itr != limit_end
@@ -1775,8 +1803,11 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        fill_call_order( call_order, call_pays, call_receives, match_price, for_new_limit_order, margin_call_fee);
 
        // Update current_feed after filled call order if needed
-       if( bitasset_options::black_swan_response_type::no_settlement == bitasset.get_black_swan_response_method() )
+       if( update_current_feed )
+       {
           update_bitasset_current_feed( bitasset, true );
+          update_current_feed = bitasset.is_current_feed_price_capped();
+       }
 
        if( !before_core_hardfork_1270 )
           call_collateral_itr = call_collateral_index.lower_bound( call_min );
