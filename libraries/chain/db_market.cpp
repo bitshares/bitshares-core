@@ -1639,9 +1639,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
                                         : ( call_collateral_itr != call_collateral_end );
     };
 
-    using bsrm_type = bitasset_options::black_swan_response_type;
-    bool update_current_feed = ( bsrm_type::no_settlement == bitasset.get_black_swan_response_method()
-                                 && bitasset.is_current_feed_price_capped() );
+    bool update_current_feed = ( bsrm_type::no_settlement == bsrm && bitasset.is_current_feed_price_capped() );
 
     while( !check_for_blackswan( mia, enable_black_swan, &bitasset ) // TODO perhaps improve performance
                                                                      //      by passing in iterators
@@ -1880,6 +1878,12 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
 
    auto margin_call_pays_ratio = bitasset.get_margin_call_pays_ratio();
 
+   // Note: when BSRM is no_settlement, current_feed can change after filled a call order,
+   //       so we recalculate inside the loop
+   using bsrm_type = bitasset_options::black_swan_response_type;
+   bool update_call_price = ( bitasset.get_black_swan_response_method() == bsrm_type::no_settlement
+                              && bitasset.is_current_feed_price_capped() );
+
    bool margin_called = false;
    while( settle_itr != settle_end && call_itr != call_end )
    {
@@ -1905,6 +1909,13 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
 
       if( !margin_called && result.amount > 0 )
          margin_called = true;
+
+      if( update_call_price )
+      {
+         call_match_price = bitasset.get_margin_call_order_price();
+         call_pays_price = bitasset.current_feed.max_short_squeeze_price();
+         update_call_price = bitasset.is_current_feed_price_capped();
+      }
 
       settle_itr = settlement_index.lower_bound( bitasset.asset_id );
       call_itr = call_collateral_index.lower_bound( call_min );
