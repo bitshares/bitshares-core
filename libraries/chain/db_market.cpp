@@ -734,7 +734,8 @@ bool database::apply_order(const limit_order_object& new_order_object)
 }
 
 void database::apply_force_settlement( const force_settlement_object& new_settlement,
-                                       const asset_bitasset_data_object& bitasset )
+                                       const asset_bitasset_data_object& bitasset,
+                                       const asset_object& asset_obj )
 {
    // Defensive checks
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
@@ -756,8 +757,8 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
    // Note: when BSRM is no_settlement, current_feed can change after filled a call order,
    //       so we recalculate inside the loop
    using bsrm_type = bitasset_options::black_swan_response_type;
-   bool update_call_price = ( bitasset.get_black_swan_response_method() == bsrm_type::no_settlement
-                              && bitasset.is_current_feed_price_capped() );
+   auto bsrm = bitasset.get_black_swan_response_method();
+   bool update_call_price = ( bsrm_type::no_settlement == bsrm && bitasset.is_current_feed_price_capped() );
 
    bool finished = false; // whether the new order is gone
 
@@ -790,11 +791,17 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
       // Check whether the new order is gone
       finished = ( nullptr == find_object( new_obj_id ) );
 
-      if( !finished && update_call_price )
+      if( update_call_price )
       {
-         call_match_price = bitasset.get_margin_call_order_price();
-         call_pays_price = bitasset.current_feed.max_short_squeeze_price();
-         update_call_price = bitasset.is_current_feed_price_capped();
+         // when current_feed is updated, it is possible that there are limit orders able to get filled,
+         // so we need to call check_call_orders(), but skip matching call orders with force settlements
+         check_call_orders( asset_obj, true, false, &bitasset, false, true );
+         if( !finished )
+         {
+            call_match_price = bitasset.get_margin_call_order_price();
+            call_pays_price = bitasset.current_feed.max_short_squeeze_price();
+            update_call_price = bitasset.is_current_feed_price_capped();
+         }
       }
    }
 
@@ -1550,11 +1557,13 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
  *     function that calls this with for_new_limit_order true.)
  *  @param bitasset_ptr - an optional pointer to the bitasset_data object of the asset
  *  @param mute_exceptions - whether to mute exceptions in a special case
+ *  @param skip_matching_settle_orders - whether to skip matching call orders with force settlements
  *
  *  @return true if a margin call was executed.
  */
 bool database::check_call_orders( const asset_object& mia, bool enable_black_swan, bool for_new_limit_order,
-                                  const asset_bitasset_data_object* bitasset_ptr, bool mute_exceptions )
+                                  const asset_bitasset_data_object* bitasset_ptr,
+                                  bool mute_exceptions, bool skip_matching_settle_orders )
 { try {
     const auto& dyn_prop = get_dynamic_global_properties();
     auto maint_time = dyn_prop.next_maintenance_time;
@@ -1820,6 +1829,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        if( update_current_feed )
        {
           update_bitasset_current_feed( bitasset, true );
+          limit_end = limit_price_index.upper_bound( bitasset.get_margin_call_order_price() );
           update_current_feed = bitasset.is_current_feed_price_capped();
        }
 
@@ -1837,9 +1847,8 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
     } // while call_itr != call_end
 
-
     // Check margin calls against force settlements
-    if( after_core_hardfork_2481 && !bitasset.has_settlement() )
+    if( !skip_matching_settle_orders && after_core_hardfork_2481 && !bitasset.has_settlement() )
     {
       // Be here, there exists at least one margin call not processed
       bool called_some = match_force_settlements( bitasset );

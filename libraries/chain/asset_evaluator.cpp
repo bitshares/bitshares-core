@@ -1282,7 +1282,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
 
    if( HARDFORK_CORE_2481_PASSED( maint_time ) )
    {
-      d.apply_force_settlement( settle, bitasset );
+      d.apply_force_settlement( settle, bitasset, *asset_to_settle );
    }
 
    return result;

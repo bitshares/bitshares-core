@@ -460,12 +460,14 @@ namespace graphene { namespace chain {
           * @brief Process a new force-settlement request
           * @param new_settlement The new force-settlement request
           * @param bitasset The bitasset data object
+          * @param asset_obj The asset object
           *
           * Since the core-2481 hard fork, this function is called after a new force-settlement object is created
           * to check if there are margin calls to be matched instantly.
           */
          void apply_force_settlement( const force_settlement_object& new_settlement,
-                                      const asset_bitasset_data_object& bitasset );
+                                      const asset_bitasset_data_object& bitasset,
+                                      const asset_object& asset_obj );
 
          /**
           * Matches the two orders, the first parameter is taker, the second is maker.
@@ -603,7 +605,8 @@ namespace graphene { namespace chain {
          bool check_call_orders( const asset_object& mia, bool enable_black_swan = true,
                                  bool for_new_limit_order = false,
                                  const asset_bitasset_data_object* bitasset_ptr = nullptr,
-                                 bool mute_exceptions = false );
+                                 bool mute_exceptions = false,
+                                 bool skip_matching_settle_orders = false );
 
          /// helpers to fill_order
          /// @{
