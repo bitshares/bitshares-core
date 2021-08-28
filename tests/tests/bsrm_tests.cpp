@@ -801,21 +801,27 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
       BOOST_CHECK_EQUAL( call3_id(db).debt.value, 1000 );
       BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 4181 );
 
-      // seller2 sells some, due to MCFR, this order won't be filled
-      const limit_order_object* sell_high = create_sell_order( seller2, asset(100,mpa_id), asset(275) );
-      BOOST_REQUIRE( sell_high );
-      limit_order_id_type sell_high_id = sell_high->id;
-      BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 100 );
-
-      // seller2 sells more, due to MCFR, this order won't be filled in the beginning, but will be filled later
+      // seller2 sells some, due to MCFR, this order won't be filled in the beginning, but will be filled later
       const limit_order_object* sell_mid = create_sell_order( seller2, asset(100,mpa_id), asset(210) );
       BOOST_REQUIRE( sell_mid );
       limit_order_id_type sell_mid_id = sell_mid->id;
       BOOST_CHECK_EQUAL( sell_mid_id(db).for_sale.value, 100 );
 
+      // seller2 sells more, this order won't be filled in the beginning either
+      const limit_order_object* sell_high = create_sell_order( seller2, asset(100,mpa_id), asset(275) );
+      BOOST_REQUIRE( sell_high );
+      limit_order_id_type sell_high_id = sell_high->id;
+      BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 100 );
+
+      // seller2 sells more, this order won't be filled
+      const limit_order_object* sell_highest = create_sell_order( seller2, asset(100,mpa_id), asset(285) );
+      BOOST_REQUIRE( sell_highest );
+      limit_order_id_type sell_highest_id = sell_highest->id;
+      BOOST_CHECK_EQUAL( sell_highest_id(db).for_sale.value, 100 );
+
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 2500 );
       BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
-      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 ); // 500 - 100 - 100
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 200 ); // 500 - 100 - 100 - 100
       BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 0 );
 
       // seller sells some, this order will be filled
@@ -824,7 +830,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
 
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 2389 ); // 2500 - 111
       BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 232 ); // 111 * (210/100) * (1299/1300)
-      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 );
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 200 );
       BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 0 );
 
       // check
@@ -851,28 +857,41 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
       BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 2403 );
       // now feed price is 13:10 * (1000-111):(2750-111*275/100)
       //                 = 13:10 * 889:2445 = 11557:24450
+      // call order match price is 1300:1299 * 889:2445 = 0.363879089
+      // sell_mid's price is 100/210 = 0.047619048
 
-      // seller2's sell_mid got filled too
+      // sell_mid got filled too
       BOOST_CHECK( !db.find( sell_mid_id ) );
 
-      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 );
       // sell_mid was selling 100 MPA for 210 CORE as maker, matched at its price
-      BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 210 );
       // call pays round_down(210*1300/1299) = 210, fee = 0
       // now feed price is 13:10 * (889-100):(2445-210)
       //                 = 13:10 * 789:2235 = 10257:22350
+      // call order match price is 1300:1299 * 789:2235 = 0.353291897
+      // sell_high's price is 100/275 = 0.363636364
 
-      BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 100 );
+      // sell_high got filled too
+      BOOST_CHECK( !db.find( sell_high_id ) );
+
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 200 );
+      // sell_mid was selling 100 MPA for 210 CORE as maker, matched at its price
+      // sell_high was selling 100 MPA for 275 CORE as maker, matched at its price
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 485 ); // 210 + 275
+      // call pays round_down(275*1300/1299) = 275, fee = 0
+      // now feed price is 13:10 * (789-100):(2235-275)
+      //                 = 13:10 * 689:1960 = 8957:19600 (>10/22)
+      // call order match price is 1300:1299 * 689:1960 = 0.351801229
+      // sell_highest's price is 100/285 = 0.350877193
 
       // check
       BOOST_CHECK( mpa.bitasset_data(db).is_current_feed_price_capped() );
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price
-                   == price( asset(10257,mpa_id), asset(22350) ) );
+                   == price( asset(8957,mpa_id), asset(19600) ) );
       BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
 
-      BOOST_CHECK_EQUAL( call_id(db).debt.value, 789 );
-      BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2235 );
+      BOOST_CHECK_EQUAL( call_id(db).debt.value, 689 );
+      BOOST_CHECK_EQUAL( call_id(db).collateral.value, 1960 );
       BOOST_CHECK( !db.find(call2_id) );
       BOOST_CHECK_EQUAL( call3_id(db).debt.value, 1000 );
       BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 4181 );
@@ -884,16 +903,16 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
 
       auto final_check = [&]
       {
-         BOOST_CHECK_EQUAL( sell_low_id(db).for_sale.value, 211 );
-         BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 100 );
+         BOOST_CHECK_EQUAL( sell_low_id(db).for_sale.value, 311 );
+         BOOST_CHECK_EQUAL( sell_highest_id(db).for_sale.value, 100 );
 
          BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 389 ); // 2500 - 111 - 1000 - 1000
-         // 2403 + round_up(789*(22350/10257)*(1299/1000))
-         // 2403 + 2234
-         BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 4637 );
+         // 2403 + round_up(689*(19600/8957)*(1299/1000))
+         // 2403 + 1959
+         BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 4362 );
 
-         BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 );
-         BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 210 ); // no change
+         BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 200 );
+         BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 485 ); // no change
 
          // check
          BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
@@ -1053,21 +1072,27 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
       BOOST_CHECK_EQUAL( call3_id(db).debt.value, 1000 );
       BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 4181 );
 
-      // seller2 sells some
-      const limit_order_object* sell_high = create_sell_order( seller2, asset(100,mpa_id), asset(275) );
-      BOOST_REQUIRE( sell_high );
-      limit_order_id_type sell_high_id = sell_high->id;
-      BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 100 );
-
-      // seller2 sells more, due to MCFR, this order won't be filled in the beginning, but will be filled later
+      // seller2 sells some, due to MCFR, this order won't be filled in the beginning, but will be filled later
       const limit_order_object* sell_mid = create_sell_order( seller2, asset(100,mpa_id), asset(210) );
       BOOST_REQUIRE( sell_mid );
       limit_order_id_type sell_mid_id = sell_mid->id;
       BOOST_CHECK_EQUAL( sell_mid_id(db).for_sale.value, 100 );
 
+      // seller2 sells more, this order won't be filled in the beginning either
+      const limit_order_object* sell_high = create_sell_order( seller2, asset(100,mpa_id), asset(275) );
+      BOOST_REQUIRE( sell_high );
+      limit_order_id_type sell_high_id = sell_high->id;
+      BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 100 );
+
+      // seller2 sells more, this order won't be filled
+      const limit_order_object* sell_highest = create_sell_order( seller2, asset(100,mpa_id), asset(285) );
+      BOOST_REQUIRE( sell_highest );
+      limit_order_id_type sell_highest_id = sell_highest->id;
+      BOOST_CHECK_EQUAL( sell_highest_id(db).for_sale.value, 100 );
+
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 2500 );
       BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
-      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 ); // 500 - 100 - 100
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 200 ); // 500 - 100 - 100 - 100
       BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 0 );
 
       // seller settles some
@@ -1077,7 +1102,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
 
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 2389 ); // 2500 - 111
       BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 232 ); // 111 * (210/100) * (1299/1300)
-      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 );
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 200 );
       BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 0 );
 
       // check
@@ -1118,13 +1143,15 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
       // then sell_high got filled by call
       BOOST_CHECK( !db.find( sell_high_id ) );
 
-      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 );
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 200 );
       // sell_mid was selling 100 MPA for 210 CORE as maker, matched at its price
       // sell_high was selling 100 MPA for 275 CORE as maker, matched at its price
       BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 485 ); // 210 + 275
       // call pays round_down(275*1300/1299) = 275, fee = 0
       // now feed price is 13:10 * (1000-100-100):(2750-210-275)
       //                 = 13:10 * 800:2265 = 10400:22650 = 208:453 (>10/22)
+      // call order match price is 1300:1299 * 800:2265 = 0.353472785
+      // sell_highest's price is 100/285 = 0.350877193
 
       // then the settle order got filled by call
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 1389 ); // 2500 - 111 - 1000
@@ -1133,6 +1160,8 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
       BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 2412 );
       // now feed price is 13:10 * (800-111):(2265-111*(22650/10400)*(13/10))
       //                 = 13:10 * 689:1951 = 8957:19510 (>10/22)
+      // call order match price is 1300:1299 * 689:1951 = 0.353424094
+      // sell_highest's price is 100/285 = 0.350877193
 
       // check
       BOOST_CHECK( mpa.bitasset_data(db).is_current_feed_price_capped() );
@@ -1155,12 +1184,14 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
       {
          BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 311 );
 
+         BOOST_CHECK_EQUAL( sell_highest_id(db).for_sale.value, 100 );
+
          BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 389 ); // 2500 - 111 - 1000 - 1000
          // 2412 + round_up(689*(19510/8957)*(1299/1000))
          // 2412 + 1950
          BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 4362 );
 
-         BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 );
+         BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 200 );
          BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 485 ); // no change
 
          // check
