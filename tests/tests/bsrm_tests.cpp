@@ -668,8 +668,8 @@ BOOST_AUTO_TEST_CASE( asset_owner_permissions_update_bsrm )
    }
 }
 
-/// Tests margin calls when BSRM is no_settlement
-BOOST_AUTO_TEST_CASE( no_settlement_and_margin_call_test )
+/// Tests margin calls when BSRM is no_settlement and call order is maker
+BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
 {
    try {
 
@@ -679,7 +679,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_and_margin_call_test )
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       set_expiration( db, trx );
 
-      ACTORS((sam)(feeder)(borrower)(borrower2)(borrower3)(seller));
+      ACTORS((sam)(feeder)(borrower)(borrower2)(borrower3)(seller)(seller2));
 
       auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
       fund( sam, asset(init_amount) );
@@ -769,6 +769,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_and_margin_call_test )
       BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
 
       // Sam update MSSR and MCFR
+      // note: borrower's position is undercollateralized again due to the mssr change
       asset_update_bitasset_operation aubop;
       aubop.issuer = sam_id;
       aubop.asset_to_update = mpa_id;
@@ -787,10 +788,11 @@ BOOST_AUTO_TEST_CASE( no_settlement_and_margin_call_test )
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(1300,mpa_id), asset(2100) ) );
       BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
 
-      // Transfer funds to seller
+      // Transfer funds to sellers
       transfer( borrower, seller, asset(1000,mpa_id) );
       transfer( borrower2, seller, asset(1000,mpa_id) );
-      transfer( borrower3, seller, asset(1000,mpa_id) );
+      transfer( borrower3, seller, asset(500,mpa_id) );
+      transfer( borrower3, seller2, asset(500,mpa_id) );
 
       BOOST_CHECK_EQUAL( call_id(db).debt.value, 1000 );
       BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2750 );
@@ -799,16 +801,31 @@ BOOST_AUTO_TEST_CASE( no_settlement_and_margin_call_test )
       BOOST_CHECK_EQUAL( call3_id(db).debt.value, 1000 );
       BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 4181 );
 
-      // seller sells some, due to MCFR, this order won't be filled
-      const limit_order_object* sell_high = create_sell_order( seller, asset(100,mpa_id), asset(210) );
+      // seller2 sells some, due to MCFR, this order won't be filled
+      const limit_order_object* sell_high = create_sell_order( seller2, asset(100,mpa_id), asset(275) );
       BOOST_REQUIRE( sell_high );
-      BOOST_CHECK_EQUAL( sell_high->for_sale.value, 100 );
+      limit_order_id_type sell_high_id = sell_high->id;
+      BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 100 );
 
-      // seller sells some again, this order will be filled
+      // seller2 sells more, due to MCFR, this order won't be filled in the beginning, but will be filled later
+      const limit_order_object* sell_mid = create_sell_order( seller2, asset(100,mpa_id), asset(210) );
+      BOOST_REQUIRE( sell_mid );
+      limit_order_id_type sell_mid_id = sell_mid->id;
+      BOOST_CHECK_EQUAL( sell_mid_id(db).for_sale.value, 100 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 2500 );
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 ); // 500 - 100 - 100
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 0 );
+
+      // seller sells some, this order will be filled
       const limit_order_object* sell_low = create_sell_order( seller, asset(111,mpa_id), asset(210) );
-      BOOST_REQUIRE( !sell_low );
-      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 2789 ); // 3000 - 100 - 111
+      BOOST_CHECK( !sell_low );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 2389 ); // 2500 - 111
       BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 232 ); // 111 * (210/100) * (1299/1300)
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 );
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 0 );
 
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
@@ -826,22 +843,36 @@ BOOST_AUTO_TEST_CASE( no_settlement_and_margin_call_test )
 
       // seller sells more
       sell_low = create_sell_order( seller, asset(1000,mpa_id), asset(100) );
-      BOOST_REQUIRE( !sell_low );
-      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 1789 ); // 3000 - 100 - 111 - 1000
+      BOOST_CHECK( !sell_low );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 1389 ); // 2500 - 111 - 1000
       // 232 + round_up(889*(18670/11557)*(1299/1000)) + 111*(275/100)*(1299/1300)
       // 232 + 1866 + 305
       BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 2403 );
+      // now feed price is 13:10 * (1000-111):(2750-111*275/100)
+      //                 = 13:10 * 889:2445 = 11557:24450
+
+      // seller2's sell_mid got filled too
+      BOOST_CHECK( !db.find( sell_mid_id ) );
+
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 );
+      // sell_mid was selling 100 MPA for 210 CORE as maker, matched at its price
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 210 );
+      // call pays round_down(210*1300/1299) = 210, fee = 0
+      // now feed price is 13:10 * (889-100):(2445-210)
+      //                 = 13:10 * 789:2235 = 10257:22350
+
+      BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 100 );
 
       // check
       BOOST_CHECK( mpa.bitasset_data(db).is_current_feed_price_capped() );
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price
-                   == price( asset(11557,mpa_id), asset(24450) ) ); // 13:10 * (1000-111):(2750-111*275/100)
-                                                                    // 13:10 * 889:2445
+                   == price( asset(10257,mpa_id), asset(22350) ) );
       BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
 
-      BOOST_CHECK_EQUAL( call_id(db).debt.value, 889 );
-      BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2445 );
+      BOOST_CHECK_EQUAL( call_id(db).debt.value, 789 );
+      BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2235 );
       BOOST_CHECK( !db.find(call2_id) );
       BOOST_CHECK_EQUAL( call3_id(db).debt.value, 1000 );
       BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 4181 );
@@ -849,23 +880,39 @@ BOOST_AUTO_TEST_CASE( no_settlement_and_margin_call_test )
       // seller sells more
       sell_low = create_sell_order( seller, asset(1000,mpa_id), asset(100) );
       BOOST_REQUIRE( sell_low );
-      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 789 ); // 3000 - 100 - 111 - 1000 - 1000
-      // 2403 + round_up(889*(24450/11557)*(1299/1000))
-      // 2403 + 2444
-      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 4847);
+      limit_order_id_type sell_low_id = sell_low->id;
 
-      BOOST_CHECK_EQUAL( sell_low->for_sale.value, 111 );
+      auto final_check = [&]
+      {
+         BOOST_CHECK_EQUAL( sell_low_id(db).for_sale.value, 211 );
+         BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 100 );
 
-      // check
-      BOOST_CHECK( !mpa.bitasset_data(db).is_current_feed_price_capped() );
-      BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+         BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 389 ); // 2500 - 111 - 1000 - 1000
+         // 2403 + round_up(789*(22350/10257)*(1299/1000))
+         // 2403 + 2234
+         BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 4637 );
 
-      BOOST_CHECK( !db.find(call_id) );
-      BOOST_CHECK( !db.find(call2_id) );
-      BOOST_CHECK_EQUAL( call3_id(db).debt.value, 1000 );
-      BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 4181 );
+         BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 );
+         BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 210 ); // no change
+
+         // check
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
+         BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
+         BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+
+         BOOST_CHECK( !db.find(call_id) );
+         BOOST_CHECK( !db.find(call2_id) );
+         BOOST_CHECK_EQUAL( call3_id(db).debt.value, 1000 );
+         BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 4181 );
+      };
+
+      final_check();
+
+      BOOST_TEST_MESSAGE( "Generate a block" );
+      generate_block();
+
+      final_check();
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
@@ -873,8 +920,8 @@ BOOST_AUTO_TEST_CASE( no_settlement_and_margin_call_test )
    }
 }
 
-/// Tests force settlements when BSRM is no_settlement
-BOOST_AUTO_TEST_CASE( no_settlement_and_force_settle_test )
+/// Tests force settlements when BSRM is no_settlement and call order is maker
+BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
 {
    try {
 
@@ -884,7 +931,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_and_force_settle_test )
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       set_expiration( db, trx );
 
-      ACTORS((sam)(feeder)(borrower)(borrower2)(borrower3)(seller));
+      ACTORS((sam)(feeder)(borrower)(borrower2)(borrower3)(seller)(seller2));
 
       auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
       fund( sam, asset(init_amount) );
@@ -974,6 +1021,7 @@ BOOST_AUTO_TEST_CASE( no_settlement_and_force_settle_test )
       BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
 
       // Sam update MSSR and MCFR
+      // note: borrower's position is undercollateralized again due to the mssr change
       asset_update_bitasset_operation aubop;
       aubop.issuer = sam_id;
       aubop.asset_to_update = mpa_id;
@@ -992,10 +1040,11 @@ BOOST_AUTO_TEST_CASE( no_settlement_and_force_settle_test )
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == price( asset(1300,mpa_id), asset(2100) ) );
       BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
 
-      // Transfer funds to seller
+      // Transfer funds to sellers
       transfer( borrower, seller, asset(1000,mpa_id) );
       transfer( borrower2, seller, asset(1000,mpa_id) );
-      transfer( borrower3, seller, asset(1000,mpa_id) );
+      transfer( borrower3, seller, asset(500,mpa_id) );
+      transfer( borrower3, seller2, asset(500,mpa_id) );
 
       BOOST_CHECK_EQUAL( call_id(db).debt.value, 1000 );
       BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2750 );
@@ -1004,18 +1053,32 @@ BOOST_AUTO_TEST_CASE( no_settlement_and_force_settle_test )
       BOOST_CHECK_EQUAL( call3_id(db).debt.value, 1000 );
       BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 4181 );
 
-      // seller sells some, due to MCFR, this order won't be filled
-      const limit_order_object* sell_high = create_sell_order( seller, asset(100,mpa_id), asset(210) );
+      // seller2 sells some
+      const limit_order_object* sell_high = create_sell_order( seller2, asset(100,mpa_id), asset(275) );
       BOOST_REQUIRE( sell_high );
-      BOOST_CHECK_EQUAL( sell_high->for_sale.value, 100 );
+      limit_order_id_type sell_high_id = sell_high->id;
+      BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 100 );
+
+      // seller2 sells more, due to MCFR, this order won't be filled in the beginning, but will be filled later
+      const limit_order_object* sell_mid = create_sell_order( seller2, asset(100,mpa_id), asset(210) );
+      BOOST_REQUIRE( sell_mid );
+      limit_order_id_type sell_mid_id = sell_mid->id;
+      BOOST_CHECK_EQUAL( sell_mid_id(db).for_sale.value, 100 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 2500 );
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 ); // 500 - 100 - 100
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 0 );
 
       // seller settles some
       auto result = force_settle( seller, asset(111,mpa_id) );
-      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 2789 ); // 3000 - 100 - 111
-      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 232 ); // 111 * (210/100) * (1299/1300)
-
       force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK( !db.find(settle_id) );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 2389 ); // 2500 - 111
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 232 ); // 111 * (210/100) * (1299/1300)
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 );
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 0 );
 
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
@@ -1033,48 +1096,91 @@ BOOST_AUTO_TEST_CASE( no_settlement_and_force_settle_test )
 
       // seller settles some more
       result = force_settle( seller, asset(1000,mpa_id) );
-      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 1789 ); // 3000 - 100 - 111 - 1000
-      // 232 + round_up(889*(18670/11557)*(1299/1000)) + 111*(275/100)*(1299/1300)
-      // 232 + 1866 + 305
-      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 2403 );
-
       settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK( !db.find(settle_id) );
+
+      // call2 is filled by settle order
+      BOOST_CHECK( !db.find(call2_id) );
+      // now feed price is 13:10 * 1000:2750 = 26:55 (>10/22)
+      // call order match price is 1300:1299 * 1000:2750 = 0.363916299
+      // sell_mid's price is 100/210 = 0.047619048
+
+      // then seller2's sell_mid got filled by call
+      BOOST_CHECK( !db.find( sell_mid_id ) );
+
+      // sell_mid was selling 100 MPA for 210 CORE as maker, matched at its price
+      // call pays round_down(210*1300/1299) = 210, fee = 0
+      // now feed price is 13:10 * (1000-100):(2750-210)
+      //                 = 13:10 * 900:2540 = 11700:25400 (>10/22)
+      // call order match price is 1300:1299 * 900:2540 = 0.32732629
+      // sell_high's price is 100/275 = 0.363636364
+
+      // then sell_high got filled by call
+      BOOST_CHECK( !db.find( sell_high_id ) );
+
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 );
+      // sell_mid was selling 100 MPA for 210 CORE as maker, matched at its price
+      // sell_high was selling 100 MPA for 275 CORE as maker, matched at its price
+      BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 485 ); // 210 + 275
+      // call pays round_down(275*1300/1299) = 275, fee = 0
+      // now feed price is 13:10 * (1000-100-100):(2750-210-275)
+      //                 = 13:10 * 800:2265 = 10400:22650 = 208:453 (>10/22)
+
+      // then the settle order got filled by call
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 1389 ); // 2500 - 111 - 1000
+      // 232 + round_up(889*(18670/11557)*(1299/1000)) + 111*(22650/10400)*(1299/1000)
+      // 232 + 1866 + 314
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 2412 );
+      // now feed price is 13:10 * (800-111):(2265-111*(22650/10400)*(13/10))
+      //                 = 13:10 * 689:1951 = 8957:19510 (>10/22)
 
       // check
       BOOST_CHECK( mpa.bitasset_data(db).is_current_feed_price_capped() );
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
       BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price
-                   == price( asset(11557,mpa_id), asset(24450) ) ); // 13:10 * (1000-111):(2750-111*275/100)
-                                                                    // 13:10 * 889:2445
+                   == price( asset(8957,mpa_id), asset(19510) ) );
       BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
 
-      BOOST_CHECK_EQUAL( call_id(db).debt.value, 889 );
-      BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2445 );
+      BOOST_CHECK_EQUAL( call_id(db).debt.value, 689 );
+      BOOST_CHECK_EQUAL( call_id(db).collateral.value, 1951 );
       BOOST_CHECK( !db.find(call2_id) );
       BOOST_CHECK_EQUAL( call3_id(db).debt.value, 1000 );
       BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 4181 );
 
       // seller settles more
       result = force_settle( seller, asset(1000,mpa_id) );
-      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 789 ); // 3000 - 100 - 111 - 1000 - 1000
-      // 2403 + round_up(889*(24450/11557)*(1299/1000))
-      // 2403 + 2444
-      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 4847);
-
       settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
-      BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 111 );
 
-      // check
-      BOOST_CHECK( !mpa.bitasset_data(db).is_current_feed_price_capped() );
-      BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( mpa.bitasset_data(db).current_feed.settlement_price == f.settlement_price );
-      BOOST_CHECK( !mpa.bitasset_data(db).has_settlement() );
+      auto final_check = [&]
+      {
+         BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 311 );
 
-      BOOST_CHECK( !db.find(call_id) );
-      BOOST_CHECK( !db.find(call2_id) );
-      BOOST_CHECK_EQUAL( call3_id(db).debt.value, 1000 );
-      BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 4181 );
+         BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 389 ); // 2500 - 111 - 1000 - 1000
+         // 2412 + round_up(689*(19510/8957)*(1299/1000))
+         // 2412 + 1950
+         BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 4362 );
+
+         BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 300 );
+         BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 485 ); // no change
+
+         // check
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
+         BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
+         BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+
+         BOOST_CHECK( !db.find(call_id) );
+         BOOST_CHECK( !db.find(call2_id) );
+         BOOST_CHECK_EQUAL( call3_id(db).debt.value, 1000 );
+         BOOST_CHECK_EQUAL( call3_id(db).collateral.value, 4181 );
+      };
+
+      final_check();
+
+      BOOST_TEST_MESSAGE( "Generate a block" );
+      generate_block();
+
+      final_check();
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
