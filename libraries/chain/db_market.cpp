@@ -609,8 +609,10 @@ bool database::apply_order(const limit_order_object& new_order_object)
    }
 
    bool finished = false; // whether the new order is gone
+   bool feed_price_updated = false; // whether current_feed.settlement_price has been updated
    if( to_check_call_orders )
    {
+      auto call_min = price::min( recv_asset_id, sell_asset_id );
       // check limit orders first, match the ones with better price in comparison to call orders
       while( !finished && limit_itr != limit_end && limit_itr->sell_price > call_match_price )
       {
@@ -627,12 +629,12 @@ bool database::apply_order(const limit_order_object& new_order_object)
          // check if there are margin calls
          // Note: it is safe to iterate here even if there is no call order due to individual settlements
          const auto& call_collateral_idx = get_index_type<call_order_index>().indices().get<by_collateral>();
-         auto call_min = price::min( recv_asset_id, sell_asset_id );
          // Note: when BSRM is no_settlement, current_feed can change after filled a call order,
          //       so we recalculate inside the loop
          using bsrm_type = bitasset_options::black_swan_response_type;
-         bool update_call_price = ( sell_abd->get_black_swan_response_method() == bsrm_type::no_settlement
-                                    && sell_abd->is_current_feed_price_capped() );
+         auto bsrm = sell_abd->get_black_swan_response_method();
+         bool update_call_price = ( bsrm_type::no_settlement == bsrm && sell_abd->is_current_feed_price_capped() );
+         auto old_current_feed_price = sell_abd->current_feed.settlement_price;
          while( !finished )
          {
             // hard fork core-343 and core-625 took place at same time,
@@ -660,14 +662,19 @@ bool database::apply_order(const limit_order_object& new_order_object)
                call_match_price = ~sell_abd->get_margin_call_order_price();
                call_pays_price = ~sell_abd->current_feed.max_short_squeeze_price();
                update_call_price = sell_abd->is_current_feed_price_capped();
+               // Since current feed price (in debt/collateral) can only decrease after updated, if there still
+               // exists a call order in margin call territory, it would be on the top of the order book,
+               // so no need to check if the current limit (buy) order would match another limit (sell) order atm.
+               // On the other hand, the current limit order is on the top of the other side of the order book.
             }
-         }
-      }
+         } // while !finished
+         if( bsrm_type::no_settlement == bsrm && sell_abd->current_feed.settlement_price != old_current_feed_price )
+            feed_price_updated = true;
+      } // if after core-1270 hf
       else if( !finished ) // and before core-1270 hard fork
       {
          // check if there are margin calls
          const auto& call_price_idx = get_index_type<call_order_index>().indices().get<by_price>();
-         auto call_min = price::min( recv_asset_id, sell_asset_id );
          while( !finished )
          {
             // assume hard fork core-343 and core-625 will take place at same time,
@@ -691,9 +698,9 @@ bool database::apply_order(const limit_order_object& new_order_object)
             if( match_result_type::only_taker_filled == match_result
                   || match_result_type::both_filled == match_result )
                finished = true;
-         }
-      }
-   }
+         } // while !finished
+      } // if before core-1270 hf
+   } // if to check call
 
    // still need to check limit orders
    while( !finished && limit_itr != limit_end )
@@ -705,16 +712,25 @@ bool database::apply_order(const limit_order_object& new_order_object)
                    != match_result_type::only_maker_filled );
    }
 
+   bool limit_order_is_gone = true;
    const limit_order_object* updated_order_object = find< limit_order_object >( order_id );
-   if( !updated_order_object )
-      return true;
+   if( updated_order_object )
+      // before #555 we would have done maybe_cull_small_order() logic as a result of fill_order()
+      // being called by match() above
+      // however after #555 we need to get rid of small orders -- #555 hardfork defers logic that
+      // was done too eagerly before, and
+      // this is the point it's deferred to.
+      limit_order_is_gone = maybe_cull_small_order( *this, *updated_order_object );
 
-   // before #555 we would have done maybe_cull_small_order() logic as a result of fill_order()
-   // being called by match() above
-   // however after #555 we need to get rid of small orders -- #555 hardfork defers logic that
-   // was done too eagerly before, and
-   // this is the point it's deferred to.
-   return maybe_cull_small_order( *this, *updated_order_object );
+   if( limit_order_is_gone && feed_price_updated )
+   {
+      // If current_feed got updated, and the new limit order is gone,
+      // it is possible that other limit orders are able to get filled,
+      // so we need to call check_call_orders()
+      check_call_orders( sell_asset, true, false, sell_abd );
+   }
+
+   return limit_order_is_gone;
 }
 
 void database::apply_force_settlement( const force_settlement_object& new_settlement,
