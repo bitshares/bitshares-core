@@ -946,10 +946,8 @@ static bool update_bitasset_object_options(
    if( should_update_feeds || update_feeds_due_to_bsrm_change )
    {
       const auto old_feed = bdo.current_feed;
-      if( should_update_feeds )
-         db.update_bitasset_current_feed( bdo );
-      else // to update feeds due to bsrm change
-         db.update_bitasset_current_feed( bdo, true );
+      // skip recalculating median feed if it is not needed
+      db.update_bitasset_current_feed( bdo, !should_update_feeds );
 
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
       feed_actually_changed = ( after_hf_core_868_890 && !old_feed.margin_call_params_equal( bdo.current_feed ) );
