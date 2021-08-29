@@ -778,8 +778,6 @@ void database::apply_force_settlement( const force_settlement_object& new_settle
                                                        bitasset.current_maintenance_collateralization ),
                                new_settlement.balance.asset_id );
 
-      // Note: the call order should be able to pay at call_pays_price,
-      //       thus no need to pass in margin_call_pays_ratio
       match( new_settlement, *call_itr, call_pays_price, bitasset, max_debt_to_cover, call_match_price, true );
 
       // Check whether the new order is gone
@@ -1051,11 +1049,9 @@ asset database::match( const force_settlement_object& settle,
                        const asset_bitasset_data_object& bitasset,
                        const asset& max_settlement,
                        const price& fill_price,
-                       bool is_margin_call,
-                       const ratio_type* margin_call_pays_ratio )
+                       bool is_margin_call )
 {
-   return match_impl( settle, call, match_price, bitasset, max_settlement, fill_price, is_margin_call, true,
-                      margin_call_pays_ratio );
+   return match_impl( settle, call, match_price, bitasset, max_settlement, fill_price, is_margin_call, true );
 }
 
 asset database::match( const call_order_object& call,
@@ -1063,11 +1059,9 @@ asset database::match( const call_order_object& call,
                        const price& match_price,
                        const asset_bitasset_data_object& bitasset,
                        const asset& max_settlement,
-                       const price& fill_price,
-                       const ratio_type* margin_call_pays_ratio )
+                       const price& fill_price )
 {
-   return match_impl( settle, call, match_price, bitasset, max_settlement, fill_price, true, false,
-                      margin_call_pays_ratio );
+   return match_impl( settle, call, match_price, bitasset, max_settlement, fill_price, true, false );
 }
 
 asset database::match_impl( const force_settlement_object& settle,
@@ -1077,8 +1071,7 @@ asset database::match_impl( const force_settlement_object& settle,
                             const asset& max_settlement,
                             const price& p_fill_price,
                             bool is_margin_call,
-                            bool settle_is_taker,
-                            const ratio_type* margin_call_pays_ratio )
+                            bool settle_is_taker )
 { try {
    FC_ASSERT(call.get_debt().asset_id == settle.balance.asset_id );
    FC_ASSERT(call.debt > 0 && call.collateral > 0 && settle.balance.amount > 0);
@@ -1141,6 +1134,7 @@ asset database::match_impl( const force_settlement_object& settle,
    } // end : if after the core-184 hf and call_pays.amount == 0
    else if( !before_core_hardfork_342 && call_pays.amount != 0 )
    {
+      auto margin_call_pays_ratio = bitasset.get_margin_call_pays_ratio();
       // be here, the call order is not paying nothing,
       // but it is still possible that the settle order is paying more than minimum required due to rounding
       if( call_receives == call_debt ) // the call order is smaller than or equal to the settle order
@@ -1152,7 +1146,7 @@ asset database::match_impl( const force_settlement_object& settle,
             {
                call_pays.amount = call.collateral;
                match_price = call_debt / call_collateral;
-               fill_price = margin_call_pays_ratio ? ( match_price / (*margin_call_pays_ratio) ) : match_price;
+               fill_price = match_price / margin_call_pays_ratio;
             }
             settle_receives = call_receives.multiply_and_round_up( fill_price );
          }
@@ -1220,17 +1214,8 @@ asset database::match_impl( const force_settlement_object& settle,
                // price changed, update call_receives // round up to mitigate rounding issues (hf core-342)
                call_receives = call_pays.multiply_and_round_up( match_price ); // round up
                // update fill price and settle_receives
-               if( margin_call_pays_ratio ) // check to be defensive
-               {
-                  fill_price = match_price / (*margin_call_pays_ratio);
-                  settle_receives = call_receives * fill_price; // round down here, in favor of call order
-               }
-               else // normally this code won't be reached. be defensive here
-               {
-                  wlog( "Unexpected: margin_call_pays_ratio == nullptr" );
-                  fill_price = match_price;
-                  settle_receives = call_pays;
-               }
+               fill_price = match_price / margin_call_pays_ratio;
+               settle_receives = call_receives * fill_price; // round down here, in favor of call order
             }
             if( settle_receives.amount == 0 )
                settle_receives.amount = 1; // reduce margin-call fee in this case. Note: here call_pays >= 1
@@ -1920,8 +1905,6 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
    // It is in debt/collateral .
    price call_pays_price = bitasset.current_feed.max_short_squeeze_price();
 
-   auto margin_call_pays_ratio = bitasset.get_margin_call_pays_ratio();
-
    // Note: when BSRM is no_settlement, current_feed can change after filled a call order,
    //       so we recalculate inside the loop
    using bsrm_type = bitasset_options::black_swan_response_type;
@@ -1948,8 +1931,7 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
       // Note: if the call order's CR is too low, it is probably unable to fill at call_pays_price.
       //       In this case, the call order pays at its CR, the settle order may receive less due to margin call fee.
       //       It is processed inside the function.
-      auto result = match( call_order, settle_order, call_pays_price, bitasset, max_debt_to_cover, call_match_price,
-                           &margin_call_pays_ratio );
+      auto result = match( call_order, settle_order, call_pays_price, bitasset, max_debt_to_cover, call_match_price );
 
       // if result.amount > 0, it means the call order got updated or removed
       if( result.amount > 0 )
