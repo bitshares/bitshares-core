@@ -647,9 +647,6 @@ bool database::apply_order(const limit_order_object& new_order_object)
                break;
             // hard fork core-338 and core-625 took place at same time, not checking HARDFORK_CORE_338_TIME here.
             const auto match_result = match( new_order_object, *call_itr, call_match_price,
-                                             sell_abd->current_feed.settlement_price,
-                                             sell_abd->current_feed.maintenance_collateral_ratio,
-                                             sell_abd->current_maintenance_collateralization,
                                              *sell_abd, call_pays_price );
             // match returns 1 or 3 when the new order was fully filled.
             // In this case, we stop matching; otherwise keep matching.
@@ -687,10 +684,7 @@ bool database::apply_order(const limit_order_object& new_order_object)
                break;
             // assume hard fork core-338 and core-625 will take place at same time,
             // not checking HARDFORK_CORE_338_TIME here.
-            const auto match_result = match( new_order_object, *call_itr, call_match_price,
-                                             sell_abd->current_feed.settlement_price,
-                                             sell_abd->current_feed.maintenance_collateral_ratio,
-                                             optional<price>(), *sell_abd );
+            const auto match_result = match( new_order_object, *call_itr, call_match_price, *sell_abd );
             // match returns 1 or 3 when the new order was fully filled.
             // In this case, we stop matching; otherwise keep matching.
             // since match can return 0 due to BSIP38 (hard fork core-834),
@@ -981,8 +975,6 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
 
 database::match_result_type database::match( const limit_order_object& bid, const call_order_object& ask,
                      const price& match_price,
-                     const price& feed_price, const uint16_t maintenance_collateral_ratio,
-                     const optional<price>& maintenance_collateralization,
                      const asset_bitasset_data_object& bitasset,
                      const price& call_pays_price )
 {
@@ -991,6 +983,12 @@ database::match_result_type database::match( const limit_order_object& bid, cons
    FC_ASSERT( bid.for_sale > 0 && ask.debt > 0 && ask.collateral > 0 );
 
    bool cull_taker = false;
+
+   const auto& feed_price = bitasset.current_feed.settlement_price;
+   const auto& maintenance_collateral_ratio = bitasset.current_feed.maintenance_collateral_ratio;
+   optional<price> maintenance_collateralization;
+   if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_1270_TIME ) // call price caching issue
+      maintenance_collateralization = bitasset.current_maintenance_collateralization;
 
    asset usd_for_sale = bid.amount_for_sale();
    asset usd_to_buy   = asset( ask.get_max_debt_to_cover( call_pays_price, feed_price,

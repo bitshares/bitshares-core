@@ -498,9 +498,6 @@ namespace graphene { namespace chain {
           * @param taker the order that is removing liquidity from the book
           * @param maker the order that put liquidity on the book
           * @param trade_price the price the trade should execute at
-          * @param feed_price the price of the current feed
-          * @param maintenance_collateral_ratio the maintenance collateral ratio
-          * @param maintenance_collateralization the maintenance collateralization
           * @param bitasset the bitasset object corresponding to debt asset of the call order
           * @param call_pays_price price call order pays. Call order may pay more collateral
           *    than limit order takes if call order subject to a margin call fee.
@@ -508,18 +505,13 @@ namespace graphene { namespace chain {
           */
          match_result_type match( const limit_order_object& taker, const call_order_object& maker,
                     const price& trade_price,
-                    const price& feed_price, const uint16_t maintenance_collateral_ratio,
-                    const optional<price>& maintenance_collateralization,
                     const asset_bitasset_data_object& bitasset,
                     const price& call_pays_price);
          /// If separate call_pays_price not provided, assume call pays at trade_price:
          match_result_type match( const limit_order_object& taker, const call_order_object& maker,
                     const price& trade_price,
-                    const price& feed_price, const uint16_t maintenance_collateral_ratio,
-                    const optional<price>& maintenance_collateralization,
                     const asset_bitasset_data_object& bitasset) {
-            return match(taker, maker, trade_price, feed_price, maintenance_collateral_ratio,
-                         maintenance_collateralization, bitasset, trade_price);
+            return match(taker, maker, trade_price, bitasset, trade_price);
          }
 
          ///@}
