@@ -387,6 +387,7 @@ struct get_impacted_account_visitor
 
 } // namespace detail
 
+// Declared in impacted.hpp
 void operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result,
       bool ignore_custom_op_required_auths )
 {
@@ -395,6 +396,7 @@ void operation_get_impacted_accounts( const operation& op, flat_set<account_id_t
   op.visit( vtor );
 }
 
+// Declared in impacted.hpp, although only used in this file
 void transaction_get_impacted_accs( const transaction& tx, flat_set<account_id_type>& result,
       bool ignore_custom_op_required_auths )
 {
@@ -402,7 +404,7 @@ void transaction_get_impacted_accs( const transaction& tx, flat_set<account_id_t
     operation_get_impacted_accounts( op, result, ignore_custom_op_required_auths );
 }
 
-void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accounts,
+static void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accounts,
                             bool ignore_custom_op_required_auths ) {
    FC_ASSERT( obj != nullptr, "Internal error: get_relevant_accounts called with nullptr" ); // This should not happen
    if( obj->id.space() == protocol_ids )
