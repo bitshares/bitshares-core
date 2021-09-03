@@ -1331,6 +1331,7 @@ asset database::match_impl( const force_settlement_object& settle,
          // the call order is a margin call, implies hf core-2481
          else if( settle_pays == max_settlement ) // the settle order is larger, but the call order has TCR
          {
+            // Note: here settle_pays == call_receives
             call_pays = call_receives.multiply_and_round_up( match_price ); // round up, in favor of settle order
             settle_receives = call_receives.multiply_and_round_up( fill_price ); // round up
             // Note: here we do NOT stabilize call_receives since it is done in get_max_debt_to_cover(),
@@ -1338,7 +1339,27 @@ asset database::match_impl( const force_settlement_object& settle,
          }
          else // the call order is a margin call, and the settle order is smaller
          {
-            // it was correct to round down call_pays.
+            // It was correct to round down call_pays. However, it is not the final result.
+            // For margin calls, due to margin call fee, it is fairer to calculate with fill_price first
+            const auto& calculate = [&settle_receives,&settle_pays,&fill_price,&call_receives,&call_pays,&match_price]
+            {
+               settle_receives  = settle_pays * fill_price; // round down here, in favor of call order
+               if( settle_receives.amount != 0 )
+               {
+                  // round up to mitigate rounding issues (hf core-342)
+                  call_receives = settle_receives.multiply_and_round_up( fill_price );
+                  // round down
+                  call_pays = call_receives * match_price;
+               }
+            };
+
+            calculate();
+            if( settle_receives.amount == 0 )
+            {
+               cancel_settle_order( settle );
+               // If the settle order is canceled, we just return, since nothing else can be done
+               return asset( 0, call_debt.asset_id );
+            }
 
             // check whether the call order can be filled at match_price
             bool cap_price = false;
@@ -1346,25 +1367,18 @@ asset database::match_impl( const force_settlement_object& settle,
                cap_price = true;
             else
             {
-               // round up to mitigate rounding issues (hf core-342)
-               call_receives = call_pays.multiply_and_round_up( match_price );
-
                auto new_collateral = call_collateral - call_pays;
                auto new_debt = call_debt - call_receives; // the result is positive due to math
                if( ( new_collateral / new_debt ) < call.collateralization() ) // if CR would decrease
                   cap_price = true;
             }
 
-            if( !cap_price ) // match_price is good
-            {
-               settle_receives = call_receives * fill_price; // round down
-            }
-            else // match_price is not good
+            if( cap_price ) // match_price is not good, update match price and fill price, then calculate again
             {
                match_price = call_debt / call_collateral;
-               call_pays = settle_pays * match_price; // round down here, in favor of call order
-               // price changed, check if it is something-for-nothing again
-               if( call_pays.amount == 0 )
+               fill_price = match_price / margin_call_pays_ratio;
+               calculate();
+               if( settle_receives.amount == 0 )
                {
                   // Note: when it is a margin call, max_settlement is max_debt_to_cover.
                   //       if need to cap price here, max_debt_to_cover should be equal to call_debt.
@@ -1373,14 +1387,7 @@ asset database::match_impl( const force_settlement_object& settle,
                   // If the settle order is canceled, we just return, since nothing else can be done
                   return asset( 0, call_debt.asset_id );
                }
-               // price changed, update call_receives // round up to mitigate rounding issues (hf core-342)
-               call_receives = call_pays.multiply_and_round_up( match_price ); // round up
-               // update fill price and settle_receives
-               fill_price = match_price / margin_call_pays_ratio;
-               settle_receives = call_receives * fill_price; // round down here, in favor of call order
             }
-            if( settle_receives.amount == 0 )
-               settle_receives.amount = 1; // reduce margin-call fee in this case. Note: here call_pays >= 1
          } // end : if is_margin_call, else ...
 
          // be here, we should have: call_pays <= call_collateral
