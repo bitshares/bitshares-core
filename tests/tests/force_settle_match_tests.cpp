@@ -321,9 +321,9 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    BOOST_CHECK( db.find( call_id ) != nullptr );
 
    // check
-   share_type call_to_pay = expected_amount_to_settle * 11 / 100; // round down, favors call order
-   share_type call_to_cover = (call_to_pay * 100 + 10 ) / 11; // stabilize : 101 -> 100
-   share_type call_to_settler = (call_to_cover * 107) / 1000; // round down, favors call order
+   share_type call_to_settler = expected_amount_to_settle * 107 / 1000; // round down, favors call order : 10
+   share_type call_to_cover = (call_to_settler * 1000 + 106 ) / 107; // stabilize : 101 -> 94
+   share_type call_to_pay = call_to_cover * 11 / 100; // round down, favors call order : 10, fee = 0
    BOOST_CHECK_EQUAL( 100000 - call_to_cover.value, call.debt.value );
    BOOST_CHECK_EQUAL( 15000 - call_to_pay.value, call.collateral.value );
    idump( (call) );
@@ -332,7 +332,7 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
 
    // check seller balance
-   BOOST_CHECK_EQUAL( 99884, get_balance(seller, bitusd) ); // 100000 - 7 - 9 - 100, the rest 1 be canceled
+   BOOST_CHECK_EQUAL( 99890, get_balance(seller, bitusd) ); // 100000 - 7 - 9 - 94, the rest 7 be canceled
    int64_t expected_seller_core_balance = 1 + 1 + call_to_settler.value;
    BOOST_CHECK_EQUAL( expected_seller_core_balance, get_balance(seller, core) );
 
@@ -352,9 +352,9 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    BOOST_CHECK( db.find( call_id ) != nullptr );
 
    // check
-   share_type call_to_pay2 = amount_to_settle2 * 11 / 100; // round down, favors call order
-   share_type call_to_cover2 = (call_to_pay2 * 100 + 10 ) / 11; // stabilize : 100 -> 100 (no change)
-   share_type call_to_settler2 = (call_to_cover2 * 107) / 1000; // round down, favors call order
+   share_type call_to_settler2 = amount_to_settle2 * 107 / 1000; // round down, favors call order : 10
+   share_type call_to_cover2 = (call_to_settler2 * 1000 + 106 ) / 107; // stabilize : 100 -> 94
+   share_type call_to_pay2 = call_to_cover2 * 11 / 100; // round down, favors call order : 10, fee = 0
    BOOST_CHECK_EQUAL( 100000 - call_to_cover.value - call_to_cover2.value, call.debt.value );
    BOOST_CHECK_EQUAL( 15000 - call_to_pay.value - call_to_pay2.value, call.collateral.value );
    idump( (call) );
@@ -363,7 +363,7 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
 
    // check seller balance
-   BOOST_CHECK_EQUAL( 99784, get_balance(seller, bitusd) ); // 100000 - 7 - 9 - 100 - 100
+   BOOST_CHECK_EQUAL( 99796, get_balance(seller, bitusd) ); // 100000 - 7 - 9 - 94 - 94
    expected_seller_core_balance += call_to_settler2.value;
    BOOST_CHECK_EQUAL( expected_seller_core_balance, get_balance(seller, core) );
 
@@ -398,22 +398,18 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    BOOST_CHECK( db.find( call_id ) != nullptr );
 
    // check
-   share_type call_to_pay3 = amount_to_settle3 * 13 / 100; // round down, favors call order
-   share_type call_to_cover3 = (call_to_pay3 * 100 + 10 ) / 13; // stabilize : 9 -> 8
-   share_type call_to_settler3 = (call_to_cover3 * 103) / 1000; // round down, favors call order
+   share_type call_to_settler3 = amount_to_settle3 * 103 / 1000; // round down, favors call order : 0
    BOOST_CHECK_EQUAL( 0, call_to_settler3.value );
-   call_to_settler3 = 1; // 0 -> 1
-   BOOST_CHECK_EQUAL( 100000 - call_to_cover.value - call_to_cover2.value - call_to_cover3.value,
-                      call.debt.value );
-   BOOST_CHECK_EQUAL( 15000 - call_to_pay.value - call_to_pay2.value - call_to_pay3.value,
-                      call.collateral.value );
+   // the settle order will be cancelled
+   BOOST_CHECK_EQUAL( 100000 - call_to_cover.value - call_to_cover2.value, call.debt.value );
+   BOOST_CHECK_EQUAL( 15000 - call_to_pay.value - call_to_pay2.value, call.collateral.value );
    idump( (call) );
    // borrower's balance doesn't change
    BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower, core) );
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
 
    // check seller balance
-   BOOST_CHECK_EQUAL( 99776, get_balance(seller, bitusd) ); // 100000 - 7 - 9 - 100 - 100 - 8
+   BOOST_CHECK_EQUAL( 99796, get_balance(seller, bitusd) ); // 100000 - 7 - 9 - 94 - 94
    expected_seller_core_balance += call_to_settler3.value;
    BOOST_CHECK_EQUAL( expected_seller_core_balance, get_balance(seller, core) );
 
@@ -433,16 +429,14 @@ BOOST_AUTO_TEST_CASE(hf2481_small_settle_call)
    BOOST_CHECK( db.find( call_id ) != nullptr );
 
    // no data change
-   BOOST_CHECK_EQUAL( 100000 - call_to_cover.value - call_to_cover2.value - call_to_cover3.value,
-                      call.debt.value );
-   BOOST_CHECK_EQUAL( 15000 - call_to_pay.value - call_to_pay2.value - call_to_pay3.value,
-                      call.collateral.value );
+   BOOST_CHECK_EQUAL( 100000 - call_to_cover.value - call_to_cover2.value, call.debt.value );
+   BOOST_CHECK_EQUAL( 15000 - call_to_pay.value - call_to_pay2.value, call.collateral.value );
    idump( (call) );
    // borrower's balance doesn't change
    BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower, core) );
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
    // check seller balance
-   BOOST_CHECK_EQUAL( 99776, get_balance(seller, bitusd) ); // 100000 - 7 - 9 - 100 - 100 - 8
+   BOOST_CHECK_EQUAL( 99796, get_balance(seller, bitusd) ); // 100000 - 7 - 9 - 94 - 94
    // expected_seller_core_balance does not change
    BOOST_CHECK_EQUAL( expected_seller_core_balance, get_balance(seller, core) );
 
@@ -1156,14 +1150,15 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
    // call2 is still in margin call territory after matched with limit order, now it matches with settle orders
    // the settle orders are too small to fill call2
    share_type call2_to_cover1 = 39000; // 40000 - 1000
-   share_type call2_to_pay1 = call2_to_cover1 * call2_copy.collateral / call2_copy.debt; // round down
-   share_type call2_to_cover1_old = call2_to_cover1;
-   // stabilize
-   call2_to_cover1 = (call2_to_pay1 * call2_copy.debt + call2_copy.collateral - 1) / call2_copy.collateral;
-   share_type settle_refund = call2_to_cover1_old - call2_to_cover1;
-
    share_type settle_receives2 = call2_to_cover1 * call2_copy.collateral * 107
                                  / (call2_copy.debt * 110); // round down
+   share_type call2_to_cover1_old = call2_to_cover1;
+   // stabilize
+   call2_to_cover1 = (settle_receives2 * call2_copy.debt * 110 + call2_copy.collateral * 107 - 1)
+                     / ( call2_copy.collateral * 107 );
+   share_type call2_to_pay1 = call2_to_cover1 * call2_copy.collateral / call2_copy.debt; // round down
+   share_type settle_refund = call2_to_cover1_old - call2_to_cover1;
+
    share_type margin_call_fee_settle_2 = call2_to_pay1 - settle_receives2;
    expected_margin_call_fees += margin_call_fee_settle_2;
 
@@ -1176,14 +1171,15 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
 
    // call2 matches with the other settle order
    share_type call2_to_cover2 = 10000;
-   share_type call2_to_pay2 = call2_to_cover2 * call2_copy.collateral / call2_copy.debt; // round down
-   share_type call2_to_cover2_old = call2_to_cover2;
-   // stabilize
-   call2_to_cover2 = (call2_to_pay2 * call2_copy.debt + call2_copy.collateral - 1) / call2_copy.collateral;
-   share_type settle2_refund = call2_to_cover2_old - call2_to_cover2;
-
    share_type settle2_receives2 = call2_to_cover2 * call2_copy.collateral * 107
                                  / (call2_copy.debt * 110); // round down
+   share_type call2_to_cover2_old = call2_to_cover2;
+   // stabilize
+   call2_to_cover2 = (settle2_receives2 * call2_copy.debt * 110 + call2_copy.collateral * 107 - 1)
+                     / ( call2_copy.collateral * 107 );
+   share_type call2_to_pay2 = call2_to_cover2 * call2_copy.collateral / call2_copy.debt; // round down
+   share_type settle2_refund = call2_to_cover2_old - call2_to_cover2;
+
    share_type margin_call_fee_settle2_2 = call2_to_pay2 - settle2_receives2;
    expected_margin_call_fees += margin_call_fee_settle2_2;
 
