@@ -1133,21 +1133,27 @@ database::match_result_type database::match( const limit_order_object& bid, cons
 
    bool cull_taker = false;
 
+   auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+   bool before_core_hardfork_1270 = ( maint_time <= HARDFORK_CORE_1270_TIME ); // call price caching issue
+   bool after_core_hardfork_2481 = HARDFORK_CORE_2481_PASSED( maint_time ); // Match settle orders with margin calls
+
    const auto& feed_price = bitasset.current_feed.settlement_price;
    const auto& maintenance_collateral_ratio = bitasset.current_feed.maintenance_collateral_ratio;
    optional<price> maintenance_collateralization;
-   if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_1270_TIME ) // call price caching issue
+   if( !before_core_hardfork_1270 )
       maintenance_collateralization = bitasset.current_maintenance_collateralization;
 
    asset usd_for_sale = bid.amount_for_sale();
    asset usd_to_buy   = asset( ask.get_max_debt_to_cover( call_pays_price, feed_price,
          maintenance_collateral_ratio,  maintenance_collateralization ), ask.debt_type() );
 
-   asset call_pays, call_receives, order_pays, order_receives;
+   asset call_pays;
+   asset call_receives;
+   asset order_pays;
+   asset order_receives;
    if( usd_to_buy > usd_for_sale )
    {  // fill limit order
       order_receives  = usd_for_sale * match_price; // round down here, in favor of call order
-      call_pays       = usd_for_sale * call_pays_price; // (same as match_price until BSIP-74)
 
       // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
       // In this case, we see it as filled and cancel it later
@@ -1159,6 +1165,11 @@ database::match_result_type database::match( const limit_order_object& bid, cons
       // If the order would receive 0 even at `match_price`, it would receive 0 at its own price,
       //   so calling maybe_cull_small() will always cull it.
       call_receives = order_receives.multiply_and_round_up( match_price );
+      if( after_core_hardfork_2481 )
+         call_pays = call_receives * call_pays_price; // calculate with updated call_receives
+      else
+         // TODO add tests about CR change
+         call_pays = usd_for_sale * call_pays_price; // (same as match_price until BSIP-74)
       cull_taker = true;
    }
    else
@@ -1876,9 +1887,6 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
          if( usd_to_buy > usd_for_sale )
          {  // fill order
             limit_receives  = usd_for_sale * match_price; // round down, in favor of call order
-            if( !after_core_hardfork_2481 )
-               // TODO add tests about CR change
-               call_pays = usd_for_sale * call_pays_price; // (same as match_price until BSIP-74)
 
             // Be here, the limit order won't be paying something for nothing, since if it would, it would have
             //   been cancelled elsewhere already (a maker limit order won't be paying something for nothing):
@@ -1897,7 +1905,10 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
                //   so calling maybe_cull_small() will always cull it.
                call_receives = limit_receives.multiply_and_round_up( match_price );
 
-            if( after_core_hardfork_2481 )
+            if( !after_core_hardfork_2481 )
+               // TODO add tests about CR change
+               call_pays = usd_for_sale * call_pays_price; // (same as match_price until BSIP-74)
+            else
             {
                call_pays = call_receives * call_pays_price; // calculate with updated call_receives
                if( call_pays.amount >= call_order.collateral )
