@@ -303,7 +303,7 @@ void database::globally_settle_asset_impl( const asset_object& mia,
    }
 
    // Move the individual settlement order to the GS fund
-   const limit_order_object* limit_ptr = find_individual_settlemnt_order( bitasset.asset_id );
+   const limit_order_object* limit_ptr = find_settled_debt_order( bitasset.asset_id );
    if( limit_ptr )
    {
       collateral_gathered.amount += limit_ptr->for_sale;
@@ -351,7 +351,7 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
    }
    else // settle to order
    {
-      const limit_order_object* limit_ptr = find_individual_settlemnt_order( bitasset.asset_id );
+      const limit_order_object* limit_ptr = find_settled_debt_order( bitasset.asset_id );
       if( limit_ptr )
       {
          modify( *limit_ptr, [&order,&fund_receives]( limit_order_object& obj ) {

@@ -694,7 +694,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_gs )
       BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method() == bsrm_type::global_settlement );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
-      BOOST_CHECK( !db.find_individual_settlemnt_order(mpa_id) );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // add a price feed publisher and publish a feed
       update_feed_producers( mpa_id, { feeder_id } );
@@ -723,7 +723,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_gs )
       BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method() == bsrm_type::global_settlement );
       BOOST_CHECK( mpa_id(db).bitasset_data(db).has_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
-      BOOST_CHECK( !db.find_individual_settlemnt_order(mpa_id) );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
       BOOST_CHECK( !db.find( call_id ) );
 
       // Sam tries to update BSRM
@@ -745,7 +745,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_gs )
       BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method() == bsrm_type::global_settlement );
       BOOST_CHECK( mpa_id(db).bitasset_data(db).has_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
-      BOOST_CHECK( !db.find_individual_settlemnt_order(mpa_id) );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // publish a new feed to revive the MPA
       ilog( "Publish a new feed to revive MPA" );
@@ -755,7 +755,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_gs )
       // check - revived
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
-      BOOST_CHECK( !db.find_individual_settlemnt_order(mpa_id) );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // Sam tries to update BSRM
       for( uint8_t i = 1; i <= 3; ++i )
@@ -785,7 +785,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_gs )
       BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method() == static_cast<bsrm_type>(3) );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
-      BOOST_CHECK( !db.find_individual_settlemnt_order(mpa_id) );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
@@ -837,7 +837,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_individual_settlement_to_fund )
                    == bsrm_type::individual_settlement_to_fund );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
-      BOOST_CHECK( !db.find_individual_settlemnt_order(mpa_id) );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // add a price feed publisher and publish a feed
       update_feed_producers( mpa_id, { feeder_id } );
@@ -868,7 +868,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_individual_settlement_to_fund )
       // check
       BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !db.find_individual_settlemnt_order(mpa_id) );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
       BOOST_CHECK( !db.find( call_id ) );
       BOOST_CHECK( db.find( call2_id ) );
 
@@ -894,7 +894,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_individual_settlement_to_fund )
                    == bsrm_type::individual_settlement_to_fund );
       BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !db.find_individual_settlemnt_order(mpa_id) );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // Settle debt
       ilog( "Settle" );
@@ -903,7 +903,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_individual_settlement_to_fund )
       // recheck
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !db.find_individual_settlemnt_order(mpa_id) );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // Sam tries to update BSRM
       for( uint8_t i = 0; i <= 3; ++i )
@@ -935,7 +935,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_individual_settlement_to_fund )
       BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method() == static_cast<bsrm_type>(3) );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !db.find_individual_settlemnt_order(mpa_id) );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
@@ -987,7 +987,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_individual_settlement_to_order )
                    == bsrm_type::individual_settlement_to_order );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( !db.find_individual_settlemnt_order(mpa_id) );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // add a price feed publisher and publish a feed
       update_feed_producers( mpa_id, { feeder_id } );
@@ -1018,7 +1018,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_individual_settlement_to_order )
       // check
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( db.find_individual_settlemnt_order(mpa_id) );
+      BOOST_CHECK( db.find_settled_debt_order(mpa_id) );
       BOOST_CHECK( !db.find( call_id ) );
       BOOST_CHECK( db.find( call2_id ) );
 
@@ -1044,7 +1044,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_individual_settlement_to_order )
                    == bsrm_type::individual_settlement_to_order );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
-      BOOST_CHECK( db.find_individual_settlemnt_order(mpa_id) );
+      BOOST_CHECK( db.find_settled_debt_order(mpa_id) );
 
       // Fill the individual settlement order
       ilog( "Buy into the individual settlement order" );
@@ -1054,7 +1054,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_individual_settlement_to_order )
       // recheck
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
-      BOOST_CHECK( !db.find_individual_settlemnt_order(mpa_id) );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
       // Sam tries to update BSRM
       for( uint8_t i = 0; i <= 3; ++i )
@@ -1086,7 +1086,7 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_individual_settlement_to_order )
       BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method() == static_cast<bsrm_type>(2) );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
       BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
-      BOOST_CHECK( !db.find_individual_settlemnt_order(mpa_id) );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));

@@ -149,7 +149,7 @@ const witness_schedule_object& database::get_witness_schedule_object()const
    return *_p_witness_schedule_obj;
 }
 
-const limit_order_object* database::find_individual_settlemnt_order( const asset_id_type& a )const
+const limit_order_object* database::find_settled_debt_order( const asset_id_type& a )const
 {
    const auto& limit_index = get_index_type<limit_order_index>().indices().get<by_is_settled_debt>();
    auto itr = limit_index.lower_bound( std::make_tuple( true, a ) );

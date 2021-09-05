@@ -213,7 +213,7 @@ namespace graphene { namespace chain {
          /// Find the limit order which is the individual settlement fund of the specified asset
          /// @param a ID of the asset
          /// @return nullptr if not found, pointer to the limit order if found
-         const limit_order_object* find_individual_settlemnt_order( const asset_id_type& a )const;
+         const limit_order_object* find_settled_debt_order( const asset_id_type& a )const;
 
          /// Find the call order with the least collateral ratio
          /// @param bitasset The bitasset object

@@ -744,7 +744,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
          FC_ASSERT( !current_bitasset_data.has_individual_settlement(),
                  "Unable to update BSRM when the individual settlement pool is not empty" );
       else if( bsrm_type::individual_settlement_to_order == old_bsrm )
-         FC_ASSERT( !d.find_individual_settlemnt_order( op.asset_to_update ),
+         FC_ASSERT( !d.find_settled_debt_order( op.asset_to_update ),
                  "Unable to update BSRM when there exists an individual settlement order" );
 
       // Since we do not allow updating in some cases (above), only check no_settlement here
