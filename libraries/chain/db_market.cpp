@@ -370,6 +370,7 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
             obj.is_settled_debt = true;
          } );
       }
+      // Note: CORE asset in settled debt is not counted in account_stats.total_core_in_orders
    }
 
    // call order is maker
@@ -1107,6 +1108,7 @@ database::match_result_type database::match_limit_settled_debt( const limit_orde
                                                  asset(0, call_receives.asset_id), match_price, true ) );
 
    // Update the maker order
+   // Note: CORE asset in settled debt is not counted in account_stats.total_core_in_orders
    if( maker_filled )
       remove( maker );
    else
