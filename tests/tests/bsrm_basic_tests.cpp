@@ -668,4 +668,117 @@ BOOST_AUTO_TEST_CASE( asset_owner_permissions_update_bsrm )
    }
 }
 
+/// Tests whether it is able to update BSRM after GS
+BOOST_AUTO_TEST_CASE( update_bsrm_after_gs )
+{
+   try {
+
+      // Advance to core-2467 hard fork
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2467_TIME - mi);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      set_expiration( db, trx );
+
+      ACTORS((sam)(feeder)(borrower));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( borrower, asset(init_amount) );
+
+      // Create asset
+      // create a MPA with a zero market_fee_percent
+      const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
+      asset_id_type mpa_id = mpa.id;
+
+      using bsrm_type = bitasset_options::black_swan_response_type;
+
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method() == bsrm_type::global_settlement );
+
+      // add a price feed publisher and publish a feed
+      update_feed_producers( mpa_id, { feeder_id } );
+
+      price_feed f;
+      f.settlement_price = price( asset(100,mpa_id), asset(1) );
+      f.core_exchange_rate = price( asset(100,mpa_id), asset(1) );
+      f.maintenance_collateral_ratio = 1850;
+      f.maximum_short_squeeze_ratio = 1250;
+
+      uint16_t feed_icr = 1900;
+
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+      // borrow some
+      const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
+      BOOST_REQUIRE( call_ptr );
+      call_order_id_type call_id = call_ptr->id;
+
+      // publish a new feed so that borrower's debt position is undercollateralized
+      ilog( "Publish a new feed to trigger GS" );
+      f.settlement_price = price( asset(1000,mpa_id), asset(22) );
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+      // check
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !db.find( call_id ) );
+
+      // Sam tries to update BSRM
+      asset_update_bitasset_operation aubop;
+      aubop.issuer = sam_id;
+      aubop.asset_to_update = mpa_id;
+      aubop.new_options = mpa_id(db).bitasset_data(db).options;
+
+      for( uint16_t i = 1; i <= 3; ++i )
+      {
+         idump( (i) );
+         aubop.new_options.extensions.value.black_swan_response_method = i;
+         trx.operations.clear();
+         trx.operations.push_back( aubop );
+         BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      }
+
+      // recheck
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method() == bsrm_type::global_settlement );
+
+      // publish a new feed to revive the MPA
+      ilog( "Publish a new feed to revive MPA" );
+      f.settlement_price = price( asset(1000,mpa_id), asset(3) );
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+      // check - revived
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+
+      // Sam tries to update BSRM
+      for( uint8_t i = 1; i <= 3; ++i )
+      {
+         idump( (i) );
+         aubop.new_options = mpa_id(db).bitasset_data(db).options;
+         aubop.new_options.extensions.value.black_swan_response_method = i;
+         trx.operations.clear();
+         trx.operations.push_back( aubop );
+         PUSH_TX(db, trx, ~0);
+         BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method() == static_cast<bsrm_type>(i) );
+
+         if( i != 3 )
+         {
+            aubop.new_options.extensions.value.black_swan_response_method = 0;
+            trx.operations.clear();
+            trx.operations.push_back( aubop );
+            PUSH_TX(db, trx, ~0);
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method() == bsrm_type::global_settlement );
+         }
+      }
+
+      ilog( "Generate a block" );
+      generate_block();
+
+      // final check
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method() == static_cast<bsrm_type>(3) );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
