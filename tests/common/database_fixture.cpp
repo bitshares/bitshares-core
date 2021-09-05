@@ -514,7 +514,10 @@ void database_fixture_base::verify_asset_supplies( const database& db )
       {
          const auto& bad = asset_obj.bitasset_data(db);
          total_balances[bad.options.short_backing_asset] += bad.settlement_fund;
+         total_balances[bad.options.short_backing_asset] += bad.individual_settlement_fund;
          total_balances[bad.options.short_backing_asset] += dasset_obj.accumulated_collateral_fees;
+         if( !bad.has_settlement() ) // Note: if asset has been globally settled, do not check total debt
+            total_debts[bad.asset_id] += bad.individual_settlement_debt;
       }
       total_balances[asset_obj.id] += dasset_obj.confidential_supply.value;
    }

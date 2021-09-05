@@ -781,4 +781,148 @@ BOOST_AUTO_TEST_CASE( update_bsrm_after_gs )
    }
 }
 
+/// Tests whether it is able to update BSRM after individual settlement to fund
+BOOST_AUTO_TEST_CASE( update_bsrm_after_individual_settlement_to_fund )
+{
+   try {
+
+      // Advance to core-2467 hard fork
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2467_TIME - mi);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      set_expiration( db, trx );
+
+      ACTORS((sam)(feeder)(borrower)(borrower2));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( borrower, asset(init_amount) );
+      fund( borrower2, asset(init_amount) );
+
+      using bsrm_type = bitasset_options::black_swan_response_type;
+      uint8_t bsrm_value = static_cast<uint8_t>(bsrm_type::individual_settlement_to_fund);
+
+      // Create asset
+      asset_create_operation acop;
+      acop.issuer = sam_id;
+      acop.symbol = "SAMMPA";
+      acop.precision = 2;
+      acop.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
+      acop.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      acop.common_options.market_fee_percent = 100; // 1%
+      acop.common_options.flags = charge_market_fee;
+      acop.common_options.issuer_permissions = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK;
+      acop.bitasset_opts = bitasset_options();
+      acop.bitasset_opts->minimum_feeds = 1;
+      acop.bitasset_opts->extensions.value.black_swan_response_method = bsrm_value;
+
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      processed_transaction ptx = PUSH_TX(db, trx, ~0);
+      const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+      asset_id_type mpa_id = mpa.id;
+
+      BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
+                   == bsrm_type::individual_settlement_to_fund );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+
+      // add a price feed publisher and publish a feed
+      update_feed_producers( mpa_id, { feeder_id } );
+
+      price_feed f;
+      f.settlement_price = price( asset(100,mpa_id), asset(1) );
+      f.core_exchange_rate = price( asset(100,mpa_id), asset(1) );
+      f.maintenance_collateral_ratio = 1850;
+      f.maximum_short_squeeze_ratio = 1250;
+
+      uint16_t feed_icr = 1900;
+
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+      // borrow some
+      const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
+      BOOST_REQUIRE( call_ptr );
+      call_order_id_type call_id = call_ptr->id;
+      const call_order_object* call2_ptr = borrow( borrower2, asset(100000, mpa_id), asset(8000) );
+      BOOST_REQUIRE( call2_ptr );
+      call_order_id_type call2_id = call2_ptr->id;
+
+      // publish a new feed so that borrower's debt position is undercollateralized
+      ilog( "Publish a new feed to trigger settlement" );
+      f.settlement_price = price( asset(1000,mpa_id), asset(22) );
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+      // check
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !db.find( call_id ) );
+      BOOST_CHECK( db.find( call2_id ) );
+
+      // Sam tries to update BSRM
+      asset_update_bitasset_operation aubop;
+      aubop.issuer = sam_id;
+      aubop.asset_to_update = mpa_id;
+      aubop.new_options = mpa_id(db).bitasset_data(db).options;
+
+      for( uint16_t i = 0; i <= 3; ++i )
+      {
+         if( static_cast<bsrm_type>(i) == bsrm_type::individual_settlement_to_fund )
+            continue;
+         idump( (i) );
+         aubop.new_options.extensions.value.black_swan_response_method = i;
+         trx.operations.clear();
+         trx.operations.push_back( aubop );
+         BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      }
+
+      // recheck
+      BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
+                   == bsrm_type::individual_settlement_to_fund );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+
+      // Settle debt
+      ilog( "Settle" );
+      force_settle( borrower2, asset(100000,mpa_id) );
+
+      // recheck
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+
+      // Sam tries to update BSRM
+      for( uint8_t i = 0; i <= 3; ++i )
+      {
+         if( static_cast<bsrm_type>(i) == bsrm_type::individual_settlement_to_fund )
+            continue;
+         idump( (i) );
+         aubop.new_options = mpa_id(db).bitasset_data(db).options;
+         aubop.new_options.extensions.value.black_swan_response_method = i;
+         trx.operations.clear();
+         trx.operations.push_back( aubop );
+         PUSH_TX(db, trx, ~0);
+         BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method() == static_cast<bsrm_type>(i) );
+         if( i != 3 )
+         {
+            aubop.new_options.extensions.value.black_swan_response_method = bsrm_value;
+            trx.operations.clear();
+            trx.operations.push_back( aubop );
+            PUSH_TX(db, trx, ~0);
+            BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
+                         == bsrm_type::individual_settlement_to_fund );
+         }
+      }
+
+      ilog( "Generate a block" );
+      generate_block();
+
+      // final check
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method() == static_cast<bsrm_type>(3) );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
