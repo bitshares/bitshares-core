@@ -668,6 +668,82 @@ BOOST_AUTO_TEST_CASE( asset_owner_permissions_update_bsrm )
    }
 }
 
+/// Tests closing debt position when there is no sufficient price feeds
+BOOST_AUTO_TEST_CASE( close_debt_position_when_no_feed )
+{
+   try {
+
+      // Advance to a time before core-2467 hard fork
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2467_TIME - mi);
+      set_expiration( db, trx );
+
+      ACTORS((sam)(feeder)(borrower));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( borrower, asset(init_amount) );
+
+      // Create asset
+      // create a MPA with a zero market_fee_percent
+      const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
+      asset_id_type mpa_id = mpa.id;
+
+      // add a price feed publisher and publish a feed
+      update_feed_producers( mpa_id, { feeder_id } );
+
+      price_feed f;
+      f.settlement_price = price( asset(100,mpa_id), asset(1) );
+      f.core_exchange_rate = price( asset(100,mpa_id), asset(1) );
+      f.maintenance_collateral_ratio = 1850;
+      f.maximum_short_squeeze_ratio = 1250;
+
+      uint16_t feed_icr = 1900;
+
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
+
+      // borrow some
+      const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
+      BOOST_REQUIRE( call_ptr );
+      call_order_id_type call_id = call_ptr->id;
+
+      // update price feed publisher list so that there is no valid feed
+      update_feed_producers( mpa_id, { sam_id } );
+
+      // no sufficient price feeds
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
+
+      // Unable to close debt position
+      BOOST_CHECK_THROW( cover( borrower, asset(100000, mpa_id), asset(2000) ), fc::exception );
+      BOOST_CHECK( db.find( call_id ) );
+
+      // Go beyond the hard fork time
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      set_expiration( db, trx );
+
+      // Still no sufficient price feeds
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
+
+      // The debt position is there
+      BOOST_CHECK( db.find( call_id ) );
+
+      // Able to close debt position
+      cover( borrower_id(db), asset(100000, mpa_id), asset(2000) );
+      BOOST_CHECK( !db.find( call_id ) );
+
+      ilog( "Generate a block" );
+      generate_block();
+
+      // final check
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
+      BOOST_CHECK( !db.find( call_id ) );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 /// Tests whether it is able to update BSRM after GS
 BOOST_AUTO_TEST_CASE( update_bsrm_after_gs )
 {
