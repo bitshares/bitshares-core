@@ -686,7 +686,7 @@ bool database::apply_order(const limit_order_object& new_order_object)
 
    // We only need to check if the new order will match with others if it is at the front of the book
    const auto& limit_price_idx = get_index_type<limit_order_index>().indices().get<by_price>();
-   auto limit_itr = limit_price_idx.lower_bound( boost::make_tuple( new_order_object.sell_price, order_id ) );
+   auto limit_itr = limit_price_idx.iterator_to( new_order_object );
    if( limit_itr != limit_price_idx.begin() )
    {
       --limit_itr;
@@ -766,13 +766,14 @@ bool database::apply_order(const limit_order_object& new_order_object)
    {
       auto call_min = price::min( recv_asset_id, sell_asset_id );
       // check limit orders first, match the ones with better price in comparison to call orders
-      while( !finished && limit_itr != limit_end && limit_itr->sell_price > call_match_price )
+      auto limit_itr_after_call = limit_price_idx.lower_bound( call_match_price );
+      while( !finished && limit_itr != limit_itr_after_call )
       {
-         auto old_limit_itr = limit_itr;
+         const limit_order_object& matching_limit_order = *limit_itr;
          ++limit_itr;
          // match returns 2 when only the old order was fully filled.
          // In this case, we keep matching; otherwise, we stop.
-         finished = ( match( new_order_object, *old_limit_itr, old_limit_itr->sell_price )
+         finished = ( match( new_order_object, matching_limit_order, matching_limit_order.sell_price )
                       != match_result_type::only_maker_filled );
       }
 
@@ -851,10 +852,10 @@ bool database::apply_order(const limit_order_object& new_order_object)
    // still need to check limit orders
    while( !finished && limit_itr != limit_end )
    {
-      auto old_limit_itr = limit_itr;
+      const limit_order_object& matching_limit_order = *limit_itr;
       ++limit_itr;
       // match returns 2 when only the old order was fully filled. In this case, we keep matching; otherwise, we stop.
-      finished = ( match( new_order_object, *old_limit_itr, old_limit_itr->sell_price )
+      finished = ( match( new_order_object, matching_limit_order, matching_limit_order.sell_price )
                    != match_result_type::only_maker_filled );
    }
 
@@ -1966,12 +1967,9 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
             if( usd_to_buy == usd_for_sale )
                filled_limit = true;
-            else if( filled_limit && maint_time <= HARDFORK_CORE_453_TIME )
-            {
+            else if( filled_limit && before_hardfork_615 )
                //NOTE: Multiple limit match problem (see issue 453, yes this happened)
-               if( before_hardfork_615 )
-                  _issue_453_affected_assets.insert( bitasset.asset_id );
-            }
+               _issue_453_affected_assets.insert( bitasset.asset_id );
          }
          limit_pays = call_receives;
 
