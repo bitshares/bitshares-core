@@ -165,11 +165,12 @@ asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation&
    auto quote_asset = _order->sell_price.quote.asset_id;
    auto refunded = _order->amount_for_sale();
 
-   d.cancel_limit_order(*_order, false /* don't create a virtual op*/);
+   d.cancel_limit_order( *_order, false ); // don't create a virtual op
 
    if( d.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_606_TIME )
    {
-      // Possible optimization: order can be called by canceling a limit order iff the canceled order was at the top of the book.
+      // Possible optimization:
+      // order can be called by canceling a limit order if the canceled order was at the top of the book.
       // Do I need to check calls in both assets?
       d.check_call_orders(base_asset(d));
       d.check_call_orders(quote_asset(d));
@@ -209,7 +210,8 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 
    /// if there is a settlement for this asset, then no further margin positions may be taken and
    /// all existing margin positions should have been closed va database::globally_settle_asset
-   FC_ASSERT( !_bitasset_data->has_settlement(), "Cannot update debt position when the asset has been globally settled" );
+   FC_ASSERT( !_bitasset_data->has_settlement(),
+              "Cannot update debt position when the asset has been globally settled" );
 
    FC_ASSERT( o.delta_collateral.asset_id == _bitasset_data->options.short_backing_asset,
               "Collateral asset type should be same as backing asset of debt asset" );
@@ -240,8 +242,10 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 
    if( _bitasset_data->is_prediction_market )
       FC_ASSERT( o.delta_collateral.amount == o.delta_debt.amount,
-                 "Debt amount and collateral amount should be same when updating debt position in a prediction market" );
-   else if( _bitasset_data->current_feed.settlement_price.is_null() )
+                 "Debt amount and collateral amount should be same when updating debt position in a prediction "
+                 "market" );
+   else if( _bitasset_data->current_feed.settlement_price.is_null()
+            && !( HARDFORK_CORE_2467_PASSED( next_maintenance_time ) && _closing_order ) )
       FC_THROW_EXCEPTION(insufficient_feeds, "Cannot borrow asset with no price feed.");
 
    // Since hard fork core-973, check asset authorization limitations
