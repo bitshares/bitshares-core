@@ -2033,7 +2033,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
             // TODO perhaps improve performance by settling multiple call orders inside in one call
             while( check_for_blackswan( mia, enable_black_swan, &bitasset ) )
             {
-               // do nothing
+               margin_called = true;
             }
          }
          else
