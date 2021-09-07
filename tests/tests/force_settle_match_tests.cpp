@@ -640,11 +640,11 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
    // buy_low's price is too low that won't be matched
    BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
 
-   // Can not reduce CR of a call order to trigger a margin call but not get fully filled
-   BOOST_CHECK_THROW( borrow( borrower_id(db), asset(10, usd_id), asset(0), 1700), fc::exception );
+   // Can not reduce CR of a call order to trigger a margin call but not get fully filled and final CR <= ICR
+   BOOST_CHECK_THROW( borrow( borrower_id(db), asset(10000, usd_id), asset(160000), 1700), fc::exception );
 
-   // Can not create a new call order that is partially called instantly
-   BOOST_CHECK_THROW( borrow( borrower4_id(db), asset(10, usd_id), asset(160), 1700), fc::exception );
+   // Can not create a new call order that is partially called instantly if final CR <= ICR
+   BOOST_CHECK_THROW( borrow( borrower4_id(db), asset(10000, usd_id), asset(160000), 1700), fc::exception );
 
    idump( (settle_id(db))(get_balance(seller, core)) );
 
@@ -660,6 +660,12 @@ BOOST_AUTO_TEST_CASE(tcr_test_hf2481_call_settle)
 
    // Can not create a new call order that would trigger a black swan event
    BOOST_CHECK_THROW( borrow( borrower4_id(db), asset(10000, usd_id), asset(10000) ), fc::exception );
+
+   // Able to reduce CR of a call order to trigger a margin call if final CR is above ICR
+   borrow( borrower_id(db), asset(10, usd_id), asset(0), 1700 );
+
+   // Able to create a new call order that is partially called instantly if final CR is above ICR
+   borrow( borrower4_id(db), asset(10, usd_id), asset(160), 1700 );
 
    // generate a block
    generate_block();
