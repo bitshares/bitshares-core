@@ -124,12 +124,10 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_margin_call_test )
       BOOST_REQUIRE( call3_ptr );
       call_order_id_type call3_id = call3_ptr->id;
 
-      // borrower is unable to adjust debt position if it's still undercollateralized
-      // 1000 * (2000/1250) * 1.25 = 2000
-      // 1000 * (22/10) * 1.25 = 2750
-      BOOST_CHECK_THROW( borrow( borrower, asset(0, mpa_id), asset(749) ), fc::exception );
       // borrower adjust debt position to right at MSSR
-      borrow( borrower, asset(0, mpa_id), asset(750) );
+      // 1000 * (22/10) * 1.25 = 2750
+      borrow( borrower, asset(0, mpa_id), asset(1) ); // can increase CR if not to increase debt, even if new CR<MSSR
+      borrow( borrower, asset(0, mpa_id), asset(749) );
 
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
@@ -395,12 +393,10 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_limit_taker_test )
       BOOST_REQUIRE( call3_ptr );
       call_order_id_type call3_id = call3_ptr->id;
 
-      // borrower is unable to adjust debt position if it's still undercollateralized
-      // 100000 * (2000/125000) * 1.25 = 2000
-      // 100000 * (22/1000) * 1.25 = 2750
-      BOOST_CHECK_THROW( borrow( borrower, asset(0, mpa_id), asset(749) ), fc::exception );
       // borrower adjust debt position to right at MSSR
-      borrow( borrower, asset(0, mpa_id), asset(750) );
+      // 100000 * (22/1000) * 1.25 = 2750
+      borrow( borrower, asset(0, mpa_id), asset(1) ); // can increase CR if not to increase debt, even if new CR<MSSR
+      borrow( borrower, asset(0, mpa_id), asset(749) );
 
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
@@ -662,12 +658,10 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_force_settle_test )
       BOOST_REQUIRE( call3_ptr );
       call_order_id_type call3_id = call3_ptr->id;
 
-      // borrower is unable to adjust debt position if it's still undercollateralized
-      // 1000 * (2000/1250) * 1.25 = 2000
-      // 1000 * (22/10) * 1.25 = 2750
-      BOOST_CHECK_THROW( borrow( borrower, asset(0, mpa_id), asset(749) ), fc::exception );
       // borrower adjust debt position to right at MSSR
-      borrow( borrower, asset(0, mpa_id), asset(750) );
+      // 1000 * (22/10) * 1.25 = 2750
+      borrow( borrower, asset(0, mpa_id), asset(1) ); // can increase CR if not to increase debt, even if new CR<MSSR
+      borrow( borrower, asset(0, mpa_id), asset(749) );
 
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
@@ -942,12 +936,10 @@ BOOST_AUTO_TEST_CASE( no_settlement_maker_small_settle_taker_test )
       BOOST_REQUIRE( call3_ptr );
       call_order_id_type call3_id = call3_ptr->id;
 
-      // borrower is unable to adjust debt position if it's still undercollateralized
-      // 100000 * (2000/125000) * 1.25 = 2000
-      // 100000 * (22/1000) * 1.25 = 2750
-      BOOST_CHECK_THROW( borrow( borrower, asset(0, mpa_id), asset(749) ), fc::exception );
       // borrower adjust debt position to right at MSSR
-      borrow( borrower, asset(0, mpa_id), asset(750) );
+      // 100000 * (22/1000) * 1.25 = 2750
+      borrow( borrower, asset(0, mpa_id), asset(1) ); // can increase CR if not to increase debt, even if new CR<MSSR
+      borrow( borrower, asset(0, mpa_id), asset(749) );
 
       // check
       BOOST_CHECK( mpa.bitasset_data(db).median_feed.settlement_price == f.settlement_price );
