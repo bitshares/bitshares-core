@@ -287,10 +287,30 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
       }
    }
 
+   if( _closing_order ) // closing the debt position
+   {
+      auto call_order_id = call_ptr->id;
+
+      d.remove( *call_ptr );
+
+      // Update current_feed if needed
+      const auto bsrm = _bitasset_data->get_black_swan_response_method();
+      if( bitasset_options::black_swan_response_type::no_settlement == bsrm )
+      {
+         auto old_feed_price = _bitasset_data->current_feed.settlement_price;
+         d.update_bitasset_current_feed( *_bitasset_data, true );
+         if( !_bitasset_data->current_feed.settlement_price.is_null()
+               && _bitasset_data->current_feed.settlement_price != old_feed_price )
+         {
+            d.check_call_orders( *_debt_asset, true, false, _bitasset_data );
+         }
+      }
+
+      return call_order_id;
+   }
+
    const auto next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
    bool before_core_hardfork_1270 = ( next_maint_time <= HARDFORK_CORE_1270_TIME ); // call price caching issue
-
-   call_order_id_type call_order_id;
 
    optional<price> old_collateralization;
    optional<share_type> old_debt;
@@ -308,32 +328,9 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
             call.call_price = price( asset( 1, o.delta_collateral.asset_id ), asset( 1, o.delta_debt.asset_id ) );
          call.target_collateral_ratio = o.extensions.value.target_collateral_ratio;
       });
-      call_order_id = call_ptr->id;
    }
    else // updating existing debt position
    {
-      call_order_id = call_ptr->id;
-
-      if( _closing_order )
-      {
-         d.remove( *call_ptr );
-
-         // Update current_feed if needed
-         const auto bsrm = _bitasset_data->get_black_swan_response_method();
-         if( bitasset_options::black_swan_response_type::no_settlement == bsrm )
-         {
-            auto old_feed_price = _bitasset_data->current_feed.settlement_price;
-            d.update_bitasset_current_feed( *_bitasset_data, true );
-            if( !_bitasset_data->current_feed.settlement_price.is_null()
-                  && _bitasset_data->current_feed.settlement_price != old_feed_price )
-            {
-               d.check_call_orders( *_debt_asset, true, false, _bitasset_data );
-            }
-         }
-
-         return call_order_id;
-      }
-
       old_collateralization = call_ptr->collateralization();
       old_debt = call_ptr->debt;
 
@@ -349,118 +346,121 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
       });
    }
 
-   // then we must check for margin calls and other issues
-   if( !_bitasset_data->is_prediction_market )
-   {
-      // After hf core-2481, we do not allow new position's CR to be <= ~max_short_squeeze_price, because
-      // * if there is no force settlement order, it would trigger a blackswan event instantly,
-      // * if there is a force settlement order, they will match at the call order's CR, but it is not fair for the
-      //   force settlement order.
-      auto call_collateralization = call_ptr->collateralization();
-      bool increasing_cr = ( old_collateralization.valid() && call_ptr->debt <= *old_debt
-                                                           && call_collateralization > *old_collateralization );
-      if( HARDFORK_CORE_2481_PASSED( next_maint_time ) )
-      {
-         // Note: if it is to increase CR and is not increasing debt amount, it is allowed,
-         //       because it implies BSRM == no_settlement
-         FC_ASSERT( increasing_cr
-                    || call_collateralization >= ~( _bitasset_data->median_feed.max_short_squeeze_price() ),
-                    "Could not create a debt position which would trigger a blackswan event instantly, "
-                    "unless it is to increase collateral ratio of an existing debt position and "
-                    "is not increasing its debt amount" );
-      }
-      // Update current_feed if needed
-      const auto bsrm = _bitasset_data->get_black_swan_response_method();
-      if( bitasset_options::black_swan_response_type::no_settlement == bsrm )
-         d.update_bitasset_current_feed( *_bitasset_data, true );
+   call_order_id_type call_order_id = call_ptr->id;
 
-      // check to see if the order needs to be margin called now, but don't allow black swans and require there to be
-      // limit orders available that could be used to fill the order.
-      // Note: due to https://github.com/bitshares/bitshares-core/issues/649, before core-343 hard fork,
-      //       the first call order may be unable to be updated if the second one is undercollateralized.
-      // Note: check call orders, don't allow black swan, not for new limit order
-      bool called_some = d.check_call_orders( *_debt_asset, false, false, _bitasset_data );
-      call_ptr = d.find(call_order_id);
-      if( called_some )
+   if( _bitasset_data->is_prediction_market )
+      return call_order_id;
+
+   // then we must check for margin calls and other issues
+
+   // After hf core-2481, we do not allow new position's CR to be <= ~max_short_squeeze_price, because
+   // * if there is no force settlement order, it would trigger a blackswan event instantly,
+   // * if there is a force settlement order, they will match at the call order's CR, but it is not fair for the
+   //   force settlement order.
+   auto call_collateralization = call_ptr->collateralization();
+   bool increasing_cr = ( old_collateralization.valid() && call_ptr->debt <= *old_debt
+                                                        && call_collateralization > *old_collateralization );
+   if( HARDFORK_CORE_2481_PASSED( next_maint_time ) )
+   {
+      // Note: if it is to increase CR and is not increasing debt amount, it is allowed,
+      //       because it implies BSRM == no_settlement
+      FC_ASSERT( increasing_cr
+                 || call_collateralization >= ~( _bitasset_data->median_feed.max_short_squeeze_price() ),
+                 "Could not create a debt position which would trigger a blackswan event instantly, "
+                 "unless it is to increase collateral ratio of an existing debt position and "
+                 "is not increasing its debt amount" );
+   }
+   // Update current_feed if needed
+   const auto bsrm = _bitasset_data->get_black_swan_response_method();
+   if( bitasset_options::black_swan_response_type::no_settlement == bsrm )
+      d.update_bitasset_current_feed( *_bitasset_data, true );
+
+   // check to see if the order needs to be margin called now, but don't allow black swans and require there to be
+   // limit orders available that could be used to fill the order.
+   // Note: due to https://github.com/bitshares/bitshares-core/issues/649, before core-343 hard fork,
+   //       the first call order may be unable to be updated if the second one is undercollateralized.
+   // Note: check call orders, don't allow black swan, not for new limit order
+   bool called_some = d.check_call_orders( *_debt_asset, false, false, _bitasset_data );
+   call_ptr = d.find(call_order_id);
+   if( called_some )
+   {
+      // before hard fork core-583: if we filled at least one call order, we are OK if we totally filled.
+      // after hard fork core-583: we want to allow increasing collateral
+      //   Note: increasing collateral won't get the call order itself matched (instantly margin called)
+      //   if there is at least a call order get matched but didn't cause a black swan event,
+      //   current order must have got matched. in this case, it's OK if it's totally filled.
+      // after hard fork core-2467: when BSRM is no_settlement, it is possible that other call orders are matched
+      //   in check_call_orders, also possible that increasing CR will get the call order itself matched
+      if( !HARDFORK_CORE_2467_PASSED( next_maint_time ) ) // before core-2467 hf
       {
-         // before hard fork core-583: if we filled at least one call order, we are OK if we totally filled.
-         // after hard fork core-583: we want to allow increasing collateral
-         //   Note: increasing collateral won't get the call order itself matched (instantly margin called)
-         //   if there is at least a call order get matched but didn't cause a black swan event,
-         //   current order must have got matched. in this case, it's OK if it's totally filled.
-         // after hard fork core-2467: when BSRM is no_settlement, it is possible that other call orders are matched
-         //   in check_call_orders, also possible that increasing CR will get the call order itself matched
-         if( !HARDFORK_CORE_2467_PASSED( next_maint_time ) ) // before core-2467 hf
-         {
-            GRAPHENE_ASSERT( !call_ptr, call_order_update_unfilled_margin_call,
-                             "Updating call order would trigger a margin call that cannot be fully filled" );
-         }
-         // after core-2467 hf
-         else
-         {
-            // if the call order is totally filled, it is OK,
-            // if it is increasing CR, it is always ok, no matter if it or another another call order is called,
-            // otherwise, the remaining call order's CR need to be > ICR
-            // TODO: perhaps it makes sense to allow more cases, e.g.
-            //       - when a position has ICR > CR > MCR, allow the owner to sell some collateral to increase CR
-            //       - allow owners to sell collateral at price < MSSP (need to update code elsewhere)
-            FC_ASSERT( !call_ptr || increasing_cr
-                       || call_ptr->collateralization() > _bitasset_data->current_initial_collateralization,
-                       "Could not create a debt position which would trigger a margin call instantly, "
-                       "unless the debt position is fully filled, or it is to increase collateral ratio of "
-                       "an existing debt position and is not increasing its debt amount, "
-                       "or the remaining debt position's collateral ratio is above required "
-                       "initial collateral ratio (ICR)" );
-         }
+         GRAPHENE_ASSERT( !call_ptr, call_order_update_unfilled_margin_call,
+                          "Updating call order would trigger a margin call that cannot be fully filled" );
       }
+      // after core-2467 hf
       else
       {
-         // we know no black swan event has occurred
-         FC_ASSERT( call_ptr, "no margin call was executed and yet the call object was deleted" );
-         // this HF must remain as-is, as the assert inside the "if" was triggered during push_proposal()
-         if( d.head_block_time() <= HARDFORK_CORE_583_TIME )
-         {
-            // We didn't fill any call orders.  This may be because we
-            // aren't in margin call territory, or it may be because there
-            // were no matching orders.  In the latter case, we throw.
-            GRAPHENE_ASSERT(
-               // we know core-583 hard fork is before core-1270 hard fork, it's ok to use call_price here
-               ~call_ptr->call_price < _bitasset_data->current_feed.settlement_price,
-               call_order_update_unfilled_margin_call,
-               "Updating call order would trigger a margin call that cannot be fully filled",
-               // we know core-583 hard fork is before core-1270 hard fork, it's ok to use call_price here
-               ("a", ~call_ptr->call_price )("b", _bitasset_data->current_feed.settlement_price)
-               );
-         }
-         else // after hard fork core-583, always allow call order to be updated if collateral ratio
-              // is increased and debt is not increased
-         {
-            // We didn't fill any call orders.  This may be because we
-            // aren't in margin call territory, or it may be because there
-            // were no matching orders. In the latter case,
-            // if collateral ratio is not increased or debt is increased, we throw.
-            // be here, we know no margin call was executed,
-            // so call_obj's collateral ratio should be set only by op
-            // ------
-            // Before BSIP77, CR of the new/updated position is required to be above MCR.
-            // After BSIP77, CR of the new/updated position is required to be above max(ICR,MCR).
-            // The `current_initial_collateralization` variable has been initialized according to the logic,
-            // so we directly use it here.
-            bool ok = increasing_cr;
-            if( !ok )
-               ok = before_core_hardfork_1270 ?
-                            ( ~call_ptr->call_price < _bitasset_data->current_feed.settlement_price )
-                          : ( call_collateralization > _bitasset_data->current_initial_collateralization );
-            FC_ASSERT( ok,
-               "Can only increase collateral ratio without increasing debt when the debt position's "
-               "collateral ratio is lower than or equal to required initial collateral ratio (ICR), "
-               "if not to trigger a margin call immediately",
-               ("old_debt", old_debt)
-               ("new_debt", call_ptr->debt)
-               ("old_collateralization", old_collateralization)
-               ("new_collateralization", call_collateralization)
-               );
-         }
+         // if the call order is totally filled, it is OK,
+         // if it is increasing CR, it is always ok, no matter if it or another another call order is called,
+         // otherwise, the remaining call order's CR need to be > ICR
+         // TODO: perhaps it makes sense to allow more cases, e.g.
+         //       - when a position has ICR > CR > MCR, allow the owner to sell some collateral to increase CR
+         //       - allow owners to sell collateral at price < MSSP (need to update code elsewhere)
+         FC_ASSERT( !call_ptr || increasing_cr
+                    || call_ptr->collateralization() > _bitasset_data->current_initial_collateralization,
+                    "Could not create a debt position which would trigger a margin call instantly, "
+                    "unless the debt position is fully filled, or it is to increase collateral ratio of "
+                    "an existing debt position and is not increasing its debt amount, "
+                    "or the remaining debt position's collateral ratio is above required "
+                    "initial collateral ratio (ICR)" );
+      }
+   }
+   else
+   {
+      // we know no black swan event has occurred
+      FC_ASSERT( call_ptr, "no margin call was executed and yet the call object was deleted" );
+      // this HF must remain as-is, as the assert inside the "if" was triggered during push_proposal()
+      if( d.head_block_time() <= HARDFORK_CORE_583_TIME )
+      {
+         // We didn't fill any call orders.  This may be because we
+         // aren't in margin call territory, or it may be because there
+         // were no matching orders.  In the latter case, we throw.
+         GRAPHENE_ASSERT(
+            // we know core-583 hard fork is before core-1270 hard fork, it's ok to use call_price here
+            ~call_ptr->call_price < _bitasset_data->current_feed.settlement_price,
+            call_order_update_unfilled_margin_call,
+            "Updating call order would trigger a margin call that cannot be fully filled",
+            // we know core-583 hard fork is before core-1270 hard fork, it's ok to use call_price here
+            ("a", ~call_ptr->call_price )("b", _bitasset_data->current_feed.settlement_price)
+            );
+      }
+      else // after hard fork core-583, always allow call order to be updated if collateral ratio
+           // is increased and debt is not increased
+      {
+         // We didn't fill any call orders.  This may be because we
+         // aren't in margin call territory, or it may be because there
+         // were no matching orders. In the latter case,
+         // if collateral ratio is not increased or debt is increased, we throw.
+         // be here, we know no margin call was executed,
+         // so call_obj's collateral ratio should be set only by op
+         // ------
+         // Before BSIP77, CR of the new/updated position is required to be above MCR.
+         // After BSIP77, CR of the new/updated position is required to be above max(ICR,MCR).
+         // The `current_initial_collateralization` variable has been initialized according to the logic,
+         // so we directly use it here.
+         bool ok = increasing_cr;
+         if( !ok )
+            ok = before_core_hardfork_1270 ?
+                         ( ~call_ptr->call_price < _bitasset_data->current_feed.settlement_price )
+                       : ( call_collateralization > _bitasset_data->current_initial_collateralization );
+         FC_ASSERT( ok,
+            "Can only increase collateral ratio without increasing debt when the debt position's "
+            "collateral ratio is lower than or equal to required initial collateral ratio (ICR), "
+            "if not to trigger a margin call immediately",
+            ("old_debt", old_debt)
+            ("new_debt", call_ptr->debt)
+            ("old_collateralization", old_collateralization)
+            ("new_collateralization", call_collateralization)
+            );
       }
    }
 
