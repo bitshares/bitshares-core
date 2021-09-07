@@ -40,7 +40,7 @@ namespace graphene { namespace chain {
          using operation_type = limit_order_create_operation;
 
          void_result do_evaluate( const limit_order_create_operation& o );
-         object_id_type do_apply( const limit_order_create_operation& o );
+         object_id_type do_apply( const limit_order_create_operation& o ) const;
 
          /** override the default behavior defined by generic_evalautor
           */
@@ -66,7 +66,7 @@ namespace graphene { namespace chain {
          using operation_type = limit_order_cancel_operation;
 
          void_result do_evaluate( const limit_order_cancel_operation& o );
-         asset do_apply( const limit_order_cancel_operation& o );
+         asset do_apply( const limit_order_cancel_operation& o ) const;
 
       private:
          const limit_order_object* _order;
@@ -96,7 +96,7 @@ namespace graphene { namespace chain {
          using operation_type = bid_collateral_operation;
 
          void_result do_evaluate( const bid_collateral_operation& o );
-         void_result do_apply( const bid_collateral_operation& o );
+         void_result do_apply( const bid_collateral_operation& o ) const;
 
       private:
          const asset_object* _debt_asset = nullptr;

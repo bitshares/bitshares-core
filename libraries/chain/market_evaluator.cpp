@@ -80,16 +80,12 @@ void limit_order_create_evaluator::convert_fee()
 {
    if( db().head_block_time() <= HARDFORK_CORE_604_TIME )
       generic_evaluator::convert_fee();
-   else
-      if( !trx_state->skip_fee )
-      {
-         if( fee_asset->get_id() != asset_id_type() )
-         {
-            db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
-               d.fee_pool -= core_fee_paid;
-            });
-         }
-      }
+   else if( !trx_state->skip_fee && fee_asset->get_id() != asset_id_type() )
+   {
+      db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
+         d.fee_pool -= core_fee_paid;
+      });
+   }
 }
 
 void limit_order_create_evaluator::pay_fee()
@@ -104,7 +100,7 @@ void limit_order_create_evaluator::pay_fee()
    }
 }
 
-object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_operation& op)
+object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_operation& op) const
 { try {
    if( op.amount_to_sell.asset_id == asset_id_type() )
    {
@@ -115,7 +111,7 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
 
    db().adjust_balance(op.seller, -op.amount_to_sell);
 
-   const auto& new_order_object = db().create<limit_order_object>([&](limit_order_object& obj){
+   const auto& new_order_object = db().create<limit_order_object>([this,&op](limit_order_object& obj){
        obj.seller   = _seller->id;
        obj.for_sale = op.amount_to_sell.amount;
        obj.sell_price = op.get_price();
@@ -140,7 +136,7 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
 
 void_result limit_order_cancel_evaluator::do_evaluate(const limit_order_cancel_operation& o)
 { try {
-   database& d = db();
+   const database& d = db();
 
    _order = d.find( o.order );
 
@@ -157,7 +153,7 @@ void_result limit_order_cancel_evaluator::do_evaluate(const limit_order_cancel_o
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation& o)
+asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation& o) const
 { try {
    database& d = db();
 
@@ -202,7 +198,7 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
       FC_ASSERT( _dynamic_data_obj->current_supply + o.delta_debt.amount <= _debt_asset->options.max_supply,
             "Borrowing this quantity would exceed MAX_SUPPLY" );
    }
-   
+
    FC_ASSERT( _dynamic_data_obj->current_supply + o.delta_debt.amount >= 0,
          "This transaction would bring current supply below zero.");
 
@@ -446,16 +442,16 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
             // be here, we know no margin call was executed,
             // so call_obj's collateral ratio should be set only by op
             // ------
-            // Before BSIP77, CR of the new/updated position is required to be above MCR;
-            // after BSIP77, CR of the new/updated position is required to be above max(ICR,MCR).
+            // Before BSIP77, CR of the new/updated position is required to be above MCR.
+            // After BSIP77, CR of the new/updated position is required to be above max(ICR,MCR).
             // The `current_initial_collateralization` variable has been initialized according to the logic,
             // so we directly use it here.
-            bool check = ( increasing_cr
-                        || ( !before_core_hardfork_1270
-                             && call_collateralization > _bitasset_data->current_initial_collateralization )
-                        || ( before_core_hardfork_1270
-                             && ~call_ptr->call_price < _bitasset_data->current_feed.settlement_price ) );
-            FC_ASSERT( check,
+            bool ok = increasing_cr;
+            if( !ok )
+               ok = before_core_hardfork_1270 ?
+                            ( ~call_ptr->call_price < _bitasset_data->current_feed.settlement_price )
+                          : ( call_collateralization > _bitasset_data->current_initial_collateralization );
+            FC_ASSERT( ok,
                "Can only increase collateral ratio without increasing debt when the debt position's "
                "collateral ratio is lower than or equal to required initial collateral ratio (ICR), "
                "if not to trigger a margin call immediately",
@@ -473,7 +469,7 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
 
 void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation& o)
 { try {
-   database& d = db();
+   const database& d = db();
 
    FC_ASSERT( d.head_block_time() > HARDFORK_CORE_216_TIME, "Not yet!" );
 
@@ -527,7 +523,7 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 
-void_result bid_collateral_evaluator::do_apply(const bid_collateral_operation& o)
+void_result bid_collateral_evaluator::do_apply(const bid_collateral_operation& o) const
 { try {
    database& d = db();
 
@@ -538,7 +534,7 @@ void_result bid_collateral_evaluator::do_apply(const bid_collateral_operation& o
 
    d.adjust_balance( o.bidder, -o.additional_collateral  );
 
-   _bid = &d.create<collateral_bid_object>([&]( collateral_bid_object& bid ) {
+   d.create<collateral_bid_object>([&o]( collateral_bid_object& bid ) {
       bid.bidder = o.bidder;
       bid.inv_swan_price = o.additional_collateral / o.debt_covered;
    });
