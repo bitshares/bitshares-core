@@ -1318,4 +1318,199 @@ BOOST_AUTO_TEST_CASE( undercollateralized_and_update_bsrm_from_no_settlement )
 
 } FC_CAPTURE_AND_RETHROW() }
 
+/// Tests scenarios:
+///   manually trigger global settlement via asset_global_settle_operation on each BSRM type
+BOOST_AUTO_TEST_CASE( manual_gs_test )
+{ try {
+
+   // Advance to core-2467 hard fork
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_2467_TIME - mi);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   set_expiration( db, trx );
+
+   using bsrm_type = bitasset_options::black_swan_response_type;
+
+   // Several passes for each BSRM type
+   for( uint8_t i = 0; i <= 3; ++i )
+   {
+      idump( (i) );
+
+      ACTORS((sam)(feeder)(borrower)(borrower2));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( borrower, asset(init_amount) );
+      fund( borrower2, asset(init_amount) );
+
+      // Create asset
+      asset_create_operation acop;
+      acop.issuer = sam_id;
+      acop.symbol = "SAMMPA";
+      acop.precision = 2;
+      acop.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
+      acop.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      acop.common_options.market_fee_percent = 100; // 1%
+      acop.common_options.flags = charge_market_fee;
+      acop.common_options.issuer_permissions = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK;
+      acop.bitasset_opts = bitasset_options();
+      acop.bitasset_opts->minimum_feeds = 1;
+      acop.bitasset_opts->extensions.value.black_swan_response_method = i;
+      acop.bitasset_opts->extensions.value.margin_call_fee_ratio = 11;
+
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      processed_transaction ptx = PUSH_TX(db, trx, ~0);
+      const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+      asset_id_type mpa_id = mpa.id;
+
+      BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method() == static_cast<bsrm_type>(i) );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+      BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
+
+      // add a price feed publisher and publish a feed
+      update_feed_producers( mpa_id, { feeder_id } );
+
+      price_feed f;
+      f.settlement_price = price( asset(100,mpa_id), asset(1) );
+      f.core_exchange_rate = price( asset(100,mpa_id), asset(1) );
+      f.maintenance_collateral_ratio = 1850;
+      f.maximum_short_squeeze_ratio = 1250;
+
+      uint16_t feed_icr = 1900;
+
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+      // borrow some
+      const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
+      BOOST_REQUIRE( call_ptr );
+      call_order_id_type call_id = call_ptr->id;
+      const call_order_object* call2_ptr = borrow( borrower2, asset(100000, mpa_id), asset(8000) );
+      BOOST_REQUIRE( call2_ptr );
+      call_order_id_type call2_id = call2_ptr->id;
+
+      // publish a new feed so that borrower's debt position is undercollateralized
+      ilog( "Publish a new feed so that the least collateralized short is undercollateralized" );
+      f.settlement_price = price( asset(1000,mpa_id), asset(22) );
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+      // check
+      const auto& check_result = [&]
+      {
+         switch( static_cast<bsrm_type>(i) )
+         {
+         case bsrm_type::global_settlement:
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method()
+                         == bsrm_type::global_settlement );
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).has_settlement() );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+            BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
+            BOOST_CHECK( !db.find( call_id ) );
+            BOOST_CHECK( !db.find( call2_id ) );
+            // can not globally settle again
+            BOOST_CHECK_THROW( force_global_settle( mpa_id(db), f.settlement_price ), fc::exception );
+            break;
+         case bsrm_type::no_settlement:
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method()
+                         == bsrm_type::no_settlement );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+            BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
+            BOOST_CHECK( db.find( call_id ) );
+            BOOST_CHECK( db.find( call2_id ) );
+            // can not globally settle at real price since the least collateralized short's CR is too low
+            BOOST_CHECK_THROW( force_global_settle( mpa_id(db), f.settlement_price ), fc::exception );
+            break;
+         case bsrm_type::individual_settlement_to_fund:
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method()
+                         == bsrm_type::individual_settlement_to_fund );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
+            BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
+            BOOST_CHECK( !db.find( call_id ) );
+            BOOST_CHECK( db.find( call2_id ) );
+
+            BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_debt.value, 100000 );
+            // MSSR = 1250, MCFR = 11, fee = round_down(2000 * 11 / 1250) = 17, fund = 2000 - 17 = 1983
+            BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 1983 );
+            break;
+         case bsrm_type::individual_settlement_to_order:
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method()
+                         == bsrm_type::individual_settlement_to_order );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+            BOOST_CHECK( db.find_settled_debt_order(mpa_id) );
+            BOOST_CHECK( !db.find( call_id ) );
+            BOOST_CHECK( db.find( call2_id ) );
+
+            BOOST_CHECK_EQUAL( db.find_settled_debt_order(mpa_id)->for_sale.value, 1983 );
+            BOOST_CHECK_EQUAL( db.find_settled_debt_order(mpa_id)->amount_to_receive().amount.value, 100000 );
+            break;
+         default:
+            BOOST_FAIL( "This should not happen" );
+            break;
+         }
+      };
+
+      check_result();
+
+      ilog( "Generate a block" );
+      generate_block();
+
+      check_result();
+
+      // globally settle
+      if( bsrm_type::no_settlement == static_cast<bsrm_type>(i) )
+         force_global_settle( mpa_id(db), price( asset(1000,mpa_id), asset(18) ) );
+      else if( bsrm_type::individual_settlement_to_fund == static_cast<bsrm_type>(i)
+               || bsrm_type::individual_settlement_to_order == static_cast<bsrm_type>(i) )
+         force_global_settle( mpa_id(db), price( asset(1000,mpa_id), asset(22) ) );
+
+      // check
+      const auto& check_result2 = [&]
+      {
+         BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method()
+                      == bsrm_type::global_settlement );
+         BOOST_CHECK( mpa_id(db).bitasset_data(db).has_settlement() );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_individual_settlement() );
+         BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
+         BOOST_CHECK( !db.find( call_id ) );
+         BOOST_CHECK( !db.find( call2_id ) );
+
+         switch( static_cast<bsrm_type>(i) )
+         {
+         case bsrm_type::global_settlement:
+            break;
+         case bsrm_type::no_settlement:
+            BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).settlement_fund.value, 3600 ); // 1800 * 2
+            break;
+         case bsrm_type::individual_settlement_to_fund:
+            BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).settlement_fund.value, 4183 ); // 1983 + 2200
+            BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_debt.value, 0 );
+            BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 0 );
+            break;
+         case bsrm_type::individual_settlement_to_order:
+            BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).settlement_fund.value, 4183 ); // 1983 + 2200
+            break;
+         default:
+            BOOST_FAIL( "This should not happen" );
+            break;
+         }
+      };
+
+      check_result2();
+
+      ilog( "Generate a block" );
+      generate_block();
+
+      check_result2();
+
+      // reset
+      db.pop_block();
+      db.pop_block();
+
+   } // for i
+
+} FC_CAPTURE_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()
