@@ -1057,17 +1057,16 @@ void_result asset_global_settle_evaluator::do_evaluate(const asset_global_settle
    FC_ASSERT( !_bitasset_data.has_settlement(),
               "This asset has been globally settled, cannot globally settle again" );
 
-   // Note: there can be no debt position due to individual settlements, processed below
-   const auto& idx = d.get_index_type<call_order_index>().indices().get<by_collateral>();
-   auto itr = idx.lower_bound( price::min( _bitasset_data.options.short_backing_asset, op.asset_to_settle ) );
-   if( itr != idx.end() && itr->debt_type() == op.asset_to_settle )
+   // Note: after core-2467 hard fork, there can be no debt position due to individual settlements, so we check here
+   const call_order_object* least_collateralized_short = d.find_least_collateralized_short( _bitasset_data, true );
+   if( least_collateralized_short )
    {
-      const call_order_object& least_collateralized_short = *itr;
-      FC_ASSERT( ( least_collateralized_short.get_debt() * op.settle_price )
-                 <= least_collateralized_short.get_collateral(),
-              "Cannot globally settle at supplied price: least collateralized short lacks "
-              "sufficient collateral to settle." );
+      FC_ASSERT( ( least_collateralized_short->get_debt() * op.settle_price )
+                   <= least_collateralized_short->get_collateral(),
+                 "Cannot globally settle at supplied price: least collateralized short lacks "
+                 "sufficient collateral to settle." );
    }
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
