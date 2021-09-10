@@ -1397,6 +1397,7 @@ BOOST_AUTO_TEST_CASE( manual_gs_test )
       // check
       const auto& check_result = [&]
       {
+         BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
          switch( static_cast<bsrm_type>(i) )
          {
          case bsrm_type::global_settlement:
@@ -1407,6 +1408,8 @@ BOOST_AUTO_TEST_CASE( manual_gs_test )
             BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
             BOOST_CHECK( !db.find( call_id ) );
             BOOST_CHECK( !db.find( call2_id ) );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
             // can not globally settle again
             BOOST_CHECK_THROW( force_global_settle( mpa_id(db), f.settlement_price ), fc::exception );
             break;
@@ -1418,6 +1421,9 @@ BOOST_AUTO_TEST_CASE( manual_gs_test )
             BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
             BOOST_CHECK( db.find( call_id ) );
             BOOST_CHECK( db.find( call2_id ) );
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price
+                         == price( asset(1250,mpa_id), asset(20) ) );
             // can not globally settle at real price since the least collateralized short's CR is too low
             BOOST_CHECK_THROW( force_global_settle( mpa_id(db), f.settlement_price ), fc::exception );
             break;
@@ -1433,6 +1439,11 @@ BOOST_AUTO_TEST_CASE( manual_gs_test )
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_debt.value, 100000 );
             // MSSR = 1250, MCFR = 11, fee = round_down(2000 * 11 / 1250) = 17, fund = 2000 - 17 = 1983
             BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 1983 );
+
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
+            // current feed = 100000:1983 * (1250-11):1000
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price
+                         == price( asset(123900,mpa_id), asset(1983) ) );
             break;
          case bsrm_type::individual_settlement_to_order:
             BOOST_CHECK( mpa_id(db).bitasset_data(db).get_black_swan_response_method()
@@ -1442,6 +1453,8 @@ BOOST_AUTO_TEST_CASE( manual_gs_test )
             BOOST_CHECK( db.find_settled_debt_order(mpa_id) );
             BOOST_CHECK( !db.find( call_id ) );
             BOOST_CHECK( db.find( call2_id ) );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
 
             BOOST_CHECK_EQUAL( db.find_settled_debt_order(mpa_id)->for_sale.value, 1983 );
             BOOST_CHECK_EQUAL( db.find_settled_debt_order(mpa_id)->amount_to_receive().amount.value, 100000 );
@@ -1476,6 +1489,9 @@ BOOST_AUTO_TEST_CASE( manual_gs_test )
          BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
          BOOST_CHECK( !db.find( call_id ) );
          BOOST_CHECK( !db.find( call2_id ) );
+         BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
+         BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
+         BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
 
          switch( static_cast<bsrm_type>(i) )
          {
