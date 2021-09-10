@@ -174,7 +174,7 @@ const call_order_object* database::find_least_collateralized_short( const asset_
    {
       const auto& call_price_index = get_index_type<call_order_index>().indices().get<by_price>();
       auto call_itr = call_price_index.lower_bound( call_min );
-      if( call_itr != call_price_index.end() ) // no call order
+      if( call_itr != call_price_index.end() ) // found a call order
          call_ptr = &(*call_itr);
    }
    else // after core-1270 hard fork, check with collateralization
@@ -182,12 +182,12 @@ const call_order_object* database::find_least_collateralized_short( const asset_
       // Note: it is safe to check here even if there is no call order due to individual settlements
       const auto& call_collateral_index = get_index_type<call_order_index>().indices().get<by_collateral>();
       auto call_itr = call_collateral_index.lower_bound( call_min );
-      if( call_itr != call_collateral_index.end() ) // no call order
+      if( call_itr != call_collateral_index.end() ) // found a call order
          call_ptr = &(*call_itr);
    }
-   if( !call_ptr )
+   if( !call_ptr ) // not found
       return nullptr;
-   if( call_ptr->debt_type() != bitasset.asset_id ) // no call order
+   if( call_ptr->debt_type() != bitasset.asset_id ) // call order is of another asset
       return nullptr;
    return call_ptr;
 }
