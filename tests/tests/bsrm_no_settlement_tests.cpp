@@ -27,7 +27,6 @@
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/market_object.hpp>
-#include <graphene/chain/proposal_object.hpp>
 
 #include <boost/test/unit_test.hpp>
 
