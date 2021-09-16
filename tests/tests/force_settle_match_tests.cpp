@@ -1323,4 +1323,159 @@ BOOST_AUTO_TEST_CASE(call_settle_blackswan)
 
 } FC_LOG_AND_RETHROW() }
 
+/***
+ * Match taker call orders with maker settle orders,
+ * then it is able to match taker call orders with maker limit orders again
+ */
+BOOST_AUTO_TEST_CASE(call_settle_limit_settle)
+{ try {
+
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   set_expiration( db, trx );
+
+   ACTORS((buyer)(seller)(seller2)(borrower)(borrower2)(borrower3)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+   asset_id_type usd_id = bitusd.id;
+   asset_id_type core_id;
+
+   {
+      // set margin call fee ratio
+      asset_update_bitasset_operation uop;
+      uop.issuer = usd_id(db).issuer;
+      uop.asset_to_update = usd_id;
+      uop.new_options = usd_id(db).bitasset_data(db).options;
+      uop.new_options.extensions.value.margin_call_fee_ratio = 30; // 3%
+
+      trx.clear();
+      trx.operations.push_back(uop);
+      PUSH_TX(db, trx, ~0);
+   }
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, buyer_id, asset(init_balance));
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   transfer(committee_account, borrower3_id, asset(init_balance));
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(5);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // start out with 300% collateral, call price is 15/175 CORE/USD = 60/700, tcr 170% is lower than 175%
+   const call_order_object& call = *borrow( borrower, bitusd.amount(100000), asset(15000), 1700);
+   call_order_id_type call_id = call.id;
+   // create another position with 360% collateral, call price is 18/175 CORE/USD = 72/700, no tcr
+   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(100000), asset(18000) );
+   call_order_id_type call2_id = call2.id;
+   // create yet another position with 800% collateral, call price is 40/175 CORE/USD = 160/700, no tcr
+   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(40000) );
+   call_order_id_type call3_id = call3.id;
+
+   transfer(borrower, seller, bitusd.amount(100000));
+   transfer(borrower2, seller, bitusd.amount(100000));
+   transfer(borrower3, seller2, bitusd.amount(100000));
+
+   BOOST_CHECK_EQUAL( 100000, call.debt.value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
+   BOOST_CHECK_EQUAL( 100000, call2.debt.value );
+   BOOST_CHECK_EQUAL( 18000, call2.collateral.value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
+   BOOST_CHECK_EQUAL( 40000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 200000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+   BOOST_CHECK_EQUAL( 100000, get_balance(seller2, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller2, core) );
+   BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower, core) );
+   BOOST_CHECK_EQUAL( init_balance - 18000, get_balance(borrower2, core) );
+   BOOST_CHECK_EQUAL( init_balance - 40000, get_balance(borrower3, core) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower2, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower3, bitusd) );
+
+   // Create a sell order which will trigger a blackswan event if matched, price 100/16
+   limit_order_id_type sell_swan = create_sell_order(seller2, bitusd.amount(10000), core.amount(1600) )->id;
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_swan )->for_sale.value, 10000 );
+
+   // Create a force settlement, will be matched with several call orders later
+   auto result = force_settle( seller, bitusd.amount(200000) );
+   BOOST_REQUIRE( result.is_type<extendable_operation_result>() );
+   BOOST_REQUIRE( result.get<extendable_operation_result>().value.new_objects.valid() );
+   BOOST_REQUIRE( !result.get<extendable_operation_result>().value.new_objects->empty() );
+   force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+   BOOST_CHECK( db.find( settle_id ) != nullptr );
+   BOOST_CHECK_EQUAL( 200000, settle_id(db).balance.amount.value );
+
+   // Check balances
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+   BOOST_CHECK_EQUAL( 90000, get_balance(seller2, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller2, core) );
+
+   // adjust price feed to get call and call2 (but not call3) into margin call territory
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(16);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 100/16, mssp = 1000/176, mcop = 100/16 * 100/107 = 625/107, mcpr = 110/107
+
+   const auto& check_result = [&]
+   {
+      // matching call with sell_swan would trigger a black swan event, so it's skipped
+      // so matching call with settle
+      // the settle order is bigger so call is fully filled
+      BOOST_CHECK( !db.find( call_id ) );
+      // call pays 15000, gets 100000
+      // settle receives round_up(15000 * 107 / 110) = 14591, margin call fee = 409
+
+      // now it is able to match call2 with sell_swan
+      // call2 is bigger, sell_swan is fully filled
+      BOOST_CHECK( !db.find( sell_swan ) );
+      // sell_swan pays 10000, gets 1600
+      // call2 pays round_down(1600 * 110 / 107) = 1644, margin call fee = 44
+
+      // now match call2 with settle
+      // the settle order is bigger so call2 is fully filled
+      BOOST_CHECK( !db.find( call2_id ) );
+      // call2 gets 90000, pays round_up(90000 * (16/100) * (11/10)) = 15840
+      // settle receives round_up(90000 * (16/100) * (107/100)) = 15408, margin call fee = 432
+
+      // the settle order is not fully filled
+      BOOST_CHECK_EQUAL( 10000, settle_id(db).balance.amount.value );
+
+      // no change to call3
+      BOOST_CHECK_EQUAL( 100000, call3_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 40000, call3_id(db).collateral.value );
+
+      // blackswan event did not occur
+      BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
+
+      // check balances
+      BOOST_CHECK_EQUAL( 0, get_balance(seller_id, usd_id) );
+      BOOST_CHECK_EQUAL( 14591+15408, get_balance(seller_id, core_id) );
+      BOOST_CHECK_EQUAL( 90000, get_balance(seller2_id, usd_id) );
+      BOOST_CHECK_EQUAL( 1600, get_balance(seller2_id, core_id) );
+      BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower_id, core_id) );
+      BOOST_CHECK_EQUAL( init_balance - 1644 - 15840, get_balance(borrower2_id, core_id) );
+      BOOST_CHECK_EQUAL( init_balance - 40000, get_balance(borrower3_id, core_id) );
+   };
+
+   // check
+   check_result();
+
+   // generate a block
+   BOOST_TEST_MESSAGE( "Generate a block" );
+   generate_block();
+   BOOST_TEST_MESSAGE( "Check again" );
+
+   // check
+   check_result();
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()
