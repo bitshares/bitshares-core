@@ -86,22 +86,6 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     if( !call_ptr ) // no call order
        return false;
 
-    using bsrm_type = bitasset_options::black_swan_response_type;
-    const auto bsrm = bitasset.get_black_swan_response_method();
-
-    price highest = settle_price;
-    // Due to #338, we won't check for black swan on incoming limit order, so need to check with MSSP here
-    // * If BSRM is individual_settlement_to_fund, check with median_feed to decide whether to settle.
-    // * If BSRM is no_settlement, check with current_feed to NOT trigger global settlement.
-    // * If BSRM is global_settlement or individual_settlement_to_order, median_feed == current_feed.
-    if( bsrm_type::individual_settlement_to_fund == bsrm )
-       highest = bitasset.median_feed.max_short_squeeze_price();
-    else if( !before_core_hardfork_1270 )
-       highest = bitasset.current_feed.max_short_squeeze_price();
-    else if( maint_time > HARDFORK_CORE_338_TIME )
-       highest = bitasset.current_feed.max_short_squeeze_price_before_hf_1270();
-    // else do nothing
-
     const limit_order_index& limit_index = get_index_type<limit_order_index>();
     const auto& limit_price_index = limit_index.indices().get<by_price>();
 
@@ -115,39 +99,62 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     auto limit_itr = limit_price_index.lower_bound( highest_possible_bid );
     auto limit_end = limit_price_index.upper_bound( lowest_possible_bid );
 
-    if( limit_itr != limit_end )
+    using bsrm_type = bitasset_options::black_swan_response_type;
+    const auto bsrm = bitasset.get_black_swan_response_method();
+
+    // when BSRM is individual settlement, we loop multiple times
+    bool settled_some = false;
+    while( true )
     {
-       FC_ASSERT( highest.base.asset_id == limit_itr->sell_price.base.asset_id );
-       auto call_pays_price = limit_itr->sell_price;
-       if( after_core_hardfork_2481 )
+       settle_price = bitasset.current_feed.settlement_price;
+       price highest = settle_price;
+       // Due to #338, we won't check for black swan on incoming limit order, so need to check with MSSP here
+       // * If BSRM is individual_settlement_to_fund, check with median_feed to decide whether to settle.
+       // * If BSRM is no_settlement, check with current_feed to NOT trigger global settlement.
+       // * If BSRM is global_settlement or individual_settlement_to_order, median_feed == current_feed.
+       if( bsrm_type::individual_settlement_to_fund == bsrm )
+          highest = bitasset.median_feed.max_short_squeeze_price();
+       else if( !before_core_hardfork_1270 )
+          highest = bitasset.current_feed.max_short_squeeze_price();
+       else if( maint_time > HARDFORK_CORE_338_TIME )
+          highest = bitasset.current_feed.max_short_squeeze_price_before_hf_1270();
+       // else do nothing
+
+       if( limit_itr != limit_end )
        {
-          // due to margin call fee, we check with MCPP (margin call pays price) here
-          call_pays_price = call_pays_price * bitasset.get_margin_call_pays_ratio();
+          FC_ASSERT( highest.base.asset_id == limit_itr->sell_price.base.asset_id );
+          auto call_pays_price = limit_itr->sell_price;
+          if( after_core_hardfork_2481 )
+          {
+             // due to margin call fee, we check with MCPP (margin call pays price) here
+             call_pays_price = call_pays_price * bitasset.get_margin_call_pays_ratio();
+          }
+          highest = std::max( call_pays_price, highest );
        }
-       highest = std::max( call_pays_price, highest );
-    }
 
-    // The variable `highest` after hf_338:
-    // * if no limit order, it is expected to be the black swan price; if the call order with the least CR
-    //   has CR below or equal to the black swan price, we trigger GS,
-    // * if there exists at least one limit order and the price is higher, we use the limit order's price,
-    //   which means we will match the margin call orders with the limit order first.
-    //
-    // However, there was a bug: after hf_bsip74 and before hf_2481, margin call fee was not considered
-    // when calculating highest, which means some blackswans weren't got caught here.  Fortunately they got
-    // caught by an additional check in check_call_orders().
-    // This bug is fixed in hf_2481. Actually, after hf_2481,
-    // * if there is a force settlement, we totally rely on the additional checks in check_call_orders(),
-    // * if there is no force settlement, we check here with margin call fee in consideration.
+       // The variable `highest` after hf_338:
+       // * if no limit order, it is expected to be the black swan price; if the call order with the least CR
+       //   has CR below or equal to the black swan price, we trigger GS,
+       // * if there exists at least one limit order and the price is higher, we use the limit order's price,
+       //   which means we will match the margin call orders with the limit order first.
+       //
+       // However, there was a bug: after hf_bsip74 and before hf_2481, margin call fee was not considered
+       // when calculating highest, which means some blackswans weren't got caught here.  Fortunately they got
+       // caught by an additional check in check_call_orders().
+       // This bug is fixed in hf_2481. Actually, after hf_2481,
+       // * if there is a force settlement, we totally rely on the additional checks in check_call_orders(),
+       // * if there is no force settlement, we check here with margin call fee in consideration.
 
-    auto least_collateral = call_ptr->collateralization();
-    // Note: strictly speaking, even when the call order's collateralization is lower than ~highest,
-    //       if the matching limit order is smaller, due to rounding, it is still possible that the
-    //       call order's collateralization would increase and become higher than ~highest after matched.
-    //       However, for simplicity, we only compare the prices here.
-    bool is_blackswan = after_core_hardfork_2481 ? ( ~least_collateral > highest ) : ( ~least_collateral >= highest );
-    if( is_blackswan )
-    {
+       auto least_collateral = call_ptr->collateralization();
+       // Note: strictly speaking, even when the call order's collateralization is lower than ~highest,
+       //       if the matching limit order is smaller, due to rounding, it is still possible that the
+       //       call order's collateralization would increase and become higher than ~highest after matched.
+       //       However, for simplicity, we only compare the prices here.
+       bool is_blackswan = after_core_hardfork_2481 ? ( ~least_collateral > highest )
+                                                    : ( ~least_collateral >= highest );
+       if( !is_blackswan )
+          return settled_some;
+
        wdump( (*call_ptr) );
        elog( "Black Swan detected on asset ${symbol} (${id}) at block ${b}: \n"
              "   Least collateralized call: ${lc}  ${~lc}\n"
@@ -166,6 +173,11 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
        if( bsrm_type::individual_settlement_to_fund == bsrm || bsrm_type::individual_settlement_to_order == bsrm )
        {
           individually_settle( bitasset, *call_ptr );
+          call_ptr = find_least_collateralized_short( bitasset, true );
+          if( !call_ptr ) // no call order
+             return true;
+          settled_some = true;
+          continue;
        }
        // Global settlement or no settlement, but we should not be here if BSRM is no_settlement
        else if( after_core_hardfork_2481 )
@@ -195,7 +207,6 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
           globally_settle_asset(mia, ~least_collateral );
        return true;
     }
-    return false;
 }
 
 /**
@@ -609,6 +620,7 @@ bool maybe_cull_small_order( database& db, const limit_order_object& order )
    return false;
 }
 
+// Note: optimizations have been done in apply_order(...)
 bool database::apply_order_before_hardfork_625(const limit_order_object& new_order_object)
 {
    auto order_id = new_order_object.id;
@@ -625,7 +637,7 @@ bool database::apply_order_before_hardfork_625(const limit_order_object& new_ord
 
    const auto& limit_price_idx = get_index_type<limit_order_index>().indices().get<by_price>();
 
-   // TODO: it should be possible to simply check the NEXT/PREV iterator after new_order_object to
+   // it should be possible to simply check the NEXT/PREV iterator after new_order_object to
    // determine whether or not this order has "changed the book" in a way that requires us to
    // check orders. For now I just lookup the lower bound and check for equality... this is log(n) vs
    // constant time check. Potential optimization.
@@ -644,8 +656,8 @@ bool database::apply_order_before_hardfork_625(const limit_order_object& new_ord
                    != match_result_type::only_maker_filled );
    }
 
-   // TODO Possible optimization: only check calls if the new order completely filled some old order.
-   //      Do I need to check both assets?
+   // Possible optimization: only check calls if the new order completely filled some old order.
+   // Do I need to check both assets?
    check_call_orders(sell_asset); // after the new limit order filled some orders on the book,
                                   // if a call order matches another order, the call order is taker
    check_call_orders(receive_asset); // the other side, same as above
@@ -1821,12 +1833,26 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
     bool update_current_feed = ( bsrm_type::no_settlement == bsrm && bitasset.is_current_feed_price_capped() );
 
-    // If update_current_feed is true and we filled a call order with a settle order,
+    const auto& settlement_index = get_index_type<force_settlement_index>().indices().get<by_expiration>();
+
+    // If we filled a call order with a settle order,
     //   we need to check limit orders again, in this case we loop multiple times.
     // In other cases we only need to loop once.
     while( true )
     {
+      // If BSRM is individual settlement, check for blackswan first
+      if( ( bsrm_type::individual_settlement_to_fund == bsrm || bsrm_type::individual_settlement_to_order == bsrm )
+          // Note: only call when conditions above are true
+          && check_for_blackswan( mia, enable_black_swan, &bitasset ) ) // TODO perhaps improve performance
+                                                                        //      by passing in iterators
+      {
+         margin_called = true;
+         call_collateral_itr = call_collateral_index.lower_bound( call_min );
+         if( bsrm_type::individual_settlement_to_fund == bsrm )
+            limit_end = limit_price_index.upper_bound( bitasset.get_margin_call_order_price() );
+      }
 
+      // match call orders with limit orders
       while( !check_for_blackswan( mia, enable_black_swan, &bitasset ) // TODO perhaps improve performance
                                                                        //      by passing in iterators
              && limit_itr != limit_end
@@ -2003,46 +2029,42 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
          if( really_filled || ( filled_limit && before_core_hardfork_453 ) )
             limit_itr = next_limit_itr;
 
-      } // while call_itr != call_end
+      } // while !blackswan and call_itr != call_end and limit_itr != limit_end
+
+      // If already GSed, or there is no call order, we return.
+      // Note: if GSed, the iterators used in has_call_order() should have been invalidated
+      if( bitasset.has_settlement() || !has_call_order() )
+         return margin_called;
+
+      // If no need to process force settlements, we return
+      if( skip_matching_settle_orders || !after_core_hardfork_2481 )
+         return margin_called;
+
+      // If feed protected, we return
+      if( bitasset.current_maintenance_collateralization < call_collateral_itr->collateralization() )
+         return margin_called;
+
+      // If no force settlements, we return
+      auto settle_itr = settlement_index.lower_bound( bitasset.asset_id );
+      if( settle_itr == settlement_index.end() || settle_itr->balance.asset_id != bitasset.asset_id )
+         return margin_called;
 
       // Check margin calls against force settlements
-      if( !skip_matching_settle_orders && after_core_hardfork_2481 && !bitasset.has_settlement() )
+      // Note: we always need to recheck limit orders after processed call-settle match,
+      //       in case when the least collateralized short was undercollateralized.
+      if( match_force_settlements( bitasset ) )
       {
-         // Be here, there exists at least one margin call not processed
-         bool called_some = match_force_settlements( bitasset );
-         if( called_some )
+         margin_called = true;
+         call_collateral_itr = call_collateral_index.lower_bound( call_min );
+         if( update_current_feed )
          {
-            margin_called = true;
-            // if called some, it means the call order is updated or removed,
-            // in this case, if update_current_feed is true,
-            // it is possible that there are limit orders able to get filled,
-            // so we need to check again
-            if( update_current_feed )
-            {
-               limit_end = limit_price_index.upper_bound( bitasset.get_margin_call_order_price() );
-               call_collateral_itr = call_collateral_index.lower_bound( call_min );
-               update_current_feed = bitasset.is_current_feed_price_capped();
-               continue;
-            }
+            limit_end = limit_price_index.upper_bound( bitasset.get_margin_call_order_price() );
+            update_current_feed = bitasset.is_current_feed_price_capped();
          }
-         // At last, check for blackswan // TODO perhaps improve performance by passing in iterators
-         if( bsrm_type::individual_settlement_to_fund == bsrm
-            || bsrm_type::individual_settlement_to_order == bsrm )
-         {
-            // Run multiple times, each time one call order gets settled
-            // TODO perhaps improve performance by settling multiple call orders inside in one call
-            while( check_for_blackswan( mia, enable_black_swan, &bitasset ) )
-            {
-               margin_called = true;
-            }
-         }
-         else
-            check_for_blackswan( mia, enable_black_swan, &bitasset );
       }
-      break;
+      // else : no more force settlements, or feed protected, both will be handled in the next loop
    } // while true
 
-   return margin_called;
 } FC_CAPTURE_AND_RETHROW() }
 
 bool database::match_force_settlements( const asset_bitasset_data_object& bitasset )
@@ -2074,13 +2096,6 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
    // It is in debt/collateral .
    price call_pays_price = bitasset.current_feed.max_short_squeeze_price();
 
-   // Note: when BSRM is no_settlement, current_feed can change after filled a call order,
-   //       so we recalculate inside the loop
-   using bsrm_type = bitasset_options::black_swan_response_type;
-   bool update_call_price = ( bitasset.get_black_swan_response_method() == bsrm_type::no_settlement
-                              && bitasset.is_current_feed_price_capped() );
-
-   bool margin_called = false;
    while( settle_itr != settle_end && call_itr != call_end )
    {
       const force_settlement_object& settle_order = *settle_itr;
@@ -2088,7 +2103,7 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
 
       // Feed protected (don't call if CR>MCR) https://github.com/cryptonomex/graphene/issues/436
       if( bitasset.current_maintenance_collateralization < call_order.collateralization() )
-         return margin_called;
+         return false;
 
       // TCR applies here
       asset max_debt_to_cover( call_order.get_max_debt_to_cover( call_pays_price,
@@ -2103,19 +2118,15 @@ bool database::match_force_settlements( const asset_bitasset_data_object& bitass
       auto result = match( call_order, settle_order, call_pays_price, bitasset, max_debt_to_cover, call_match_price );
 
       // if result.amount > 0, it means the call order got updated or removed
+      // in this case, we need to check limit orders first, so we return
       if( result.amount > 0 )
-      {
-         // if update_call_price is true, we need to check limit orders first, so we return
-         if( update_call_price )
-            return true;
-         margin_called = true;
-      }
+         return true;
       // else : result.amount == 0, it means the settle order got canceled directly and the call order did not change
 
       settle_itr = settlement_index.lower_bound( bitasset.asset_id );
       call_itr = call_collateral_index.lower_bound( call_min );
    }
-   return margin_called;
+   return false;
 }
 
 void database::pay_order( const account_object& receiver, const asset& receives, const asset& pays )
