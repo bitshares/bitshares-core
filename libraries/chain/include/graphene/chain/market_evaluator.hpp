@@ -54,7 +54,6 @@ namespace graphene { namespace chain {
       private:
          share_type                          _deferred_fee  = 0;
          asset                               _deferred_paid_fee;
-         const limit_order_create_operation* _op            = nullptr;
          const account_object*               _seller        = nullptr;
          const asset_object*                 _sell_asset    = nullptr;
          const asset_object*                 _receive_asset = nullptr;
