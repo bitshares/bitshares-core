@@ -1229,7 +1229,16 @@ static extendable_operation_result pay_settle_from_individual_pool( database& d,
       d.adjust_balance( op.account, settled_amount );
 
    // Update current_feed since fund price changed
+   auto old_feed_price = bitasset.current_feed.settlement_price;
    d.update_bitasset_current_feed( bitasset, true );
+
+   // When current_feed is updated, it is possible that there are limit orders able to get filled,
+   // so we need to call check_call_orders()
+   // Note: theoretically, if the fund is still not empty, its new CR should be >= old CR,
+   //       in this case, calling check_call_orders() should not change anything.
+   // Note: there should be no existing force settlements
+   if( 0 == bitasset.individual_settlement_debt && old_feed_price != bitasset.current_feed.settlement_price )
+      d.check_call_orders( asset_to_settle, true, false, &bitasset );
 
    extendable_operation_result result;
 
