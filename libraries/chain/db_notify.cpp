@@ -391,8 +391,7 @@ struct get_impacted_account_visitor
 void operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result,
       bool ignore_custom_op_required_auths )
 {
-  detail::get_impacted_account_visitor vtor = detail::get_impacted_account_visitor( result,
-      ignore_custom_op_required_auths );
+  detail::get_impacted_account_visitor vtor( result, ignore_custom_op_required_auths );
   op.visit( vtor );
 }
 

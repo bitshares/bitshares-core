@@ -1159,8 +1159,9 @@ database::match_result_type database::match( const limit_order_object& bid, cons
       maintenance_collateralization = bitasset.current_maintenance_collateralization;
 
    asset usd_for_sale = bid.amount_for_sale();
-   asset usd_to_buy   = asset( ask.get_max_debt_to_cover( call_pays_price, feed_price,
-         maintenance_collateral_ratio,  maintenance_collateralization ), ask.debt_type() );
+   asset usd_to_buy( ask.get_max_debt_to_cover( call_pays_price, feed_price, maintenance_collateral_ratio,
+                                                maintenance_collateralization ),
+                     ask.debt_type() );
 
    asset call_pays;
    asset call_receives;
@@ -2298,7 +2299,7 @@ asset database::pay_force_settle_fees(const asset_object& collecting_asset, cons
 
    auto value = detail::calculate_percent(collat_receives.amount,
                                           *collecting_bitasset_opts.extensions.value.force_settle_fee_percent);
-   asset settle_fee = asset{ value, collat_receives.asset_id };
+   asset settle_fee( value, collat_receives.asset_id );
 
    // Deposit fee in asset's dynamic data object:
    if( value > 0) {
