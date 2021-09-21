@@ -129,7 +129,14 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
              // due to margin call fee, we check with MCPP (margin call pays price) here
              call_pays_price = call_pays_price * bitasset.get_margin_call_pays_ratio();
           }
-          highest = std::max( call_pays_price, highest );
+          if( bsrm_type::individual_settlement_to_fund != bsrm )
+             highest = std::max( call_pays_price, highest );
+          // for individual_settlement_to_fund, if call_pays_price < current_feed.max_short_squeeze_price(),
+          // we don't match the least collateralized short with the limit order
+          //    even if call_pays_price >= median_feed.max_short_squeeze_price()
+          else if( call_pays_price >= bitasset.current_feed.max_short_squeeze_price() )
+             highest = call_pays_price;
+          // else highest is median_feed.max_short_squeeze_price()
        }
 
        // The variable `highest` after hf_338:
