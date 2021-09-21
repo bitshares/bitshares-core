@@ -319,6 +319,74 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
             BOOST_CHECK_EQUAL( get_balance( seller3_id, mpa_id ), 40022 ); // refund 22
             BOOST_CHECK_EQUAL( get_balance( seller3_id, asset_id_type() ), 199 );
          }
+         else if( 1 == i ) // to fund
+         {
+            // sell_mid price is 100000/2000 = 50
+            // call pays price is (100000/2000) * (1239:1250) = 49.56
+
+            // median feed is 100000/1800 = 55.555555556
+            // call pays price = 100000:1800 * 1000:1250 = 100000:2250 = 44.444444444
+            // call match price = 100000:1800 * 1000:1239 = 100000:2230.2 = 44.83902789
+
+            // fund collateral = 600
+            // fund debt = 30029
+            // current feed is capped at (30029:600) * (1239:1000) = 62.009885
+            // call pays price is (30029:600) * (1239:1250) = 49.607908
+            // call match price is 30029/600 = 50.048333333 (> sell_mid.price)
+
+            // call2 will not match with sell_mid
+            // call2 is individually settled
+            BOOST_CHECK( !db.find( call2_id ) );
+            // fund gets round_up(2100 * 1239/1250) = 2082, margin call fee = 2100 - 2082 = 18
+            // fund debt += 100000
+
+            // fund collateral = 600 + 2082 = 2682
+            // fund debt = 30029 + 100000 = 130029
+            // current feed is capped at (130029:2682) * (1239:1000) = 60.069325503
+            // call pays price is (130029:2682) * (1239:1250) = 48.055460403
+            // call match price is 130029/2682 = 48.482102908
+
+            // call3 is matched with sell_mid
+            // the size is the same, consider call3 as smaller
+            // call3 gets 100000, pays round_up(100000 * (2000/100000) * (1250/1239)) = 2018, margin call fee = 18
+            // 2018 < 2200, able to fill
+            BOOST_CHECK( !db.find( call3_id ) );
+            BOOST_CHECK( !db.find( sell_mid_id ) );
+
+            // sell_high price is 100000/2400 = 41.666666667 (< call match price, so will not match)
+            BOOST_REQUIRE( db.find( sell_high_id ) );
+            BOOST_CHECK_EQUAL( sell_high_id(db).for_sale.value, 100000 );
+
+            // call4 is not undercollateralized
+            BOOST_REQUIRE( db.find( call4_id ) );
+            BOOST_CHECK_EQUAL( call4_id(db).debt.value, 100000 );
+            BOOST_CHECK_EQUAL( call4_id(db).collateral.value, 2500 );
+
+            // check
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).median_feed.settlement_price == f.settlement_price );
+            BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).has_individual_settlement() );
+            BOOST_CHECK( !db.find_settled_debt_order(mpa_id) );
+
+            BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_fund.value, 2682 );
+            BOOST_CHECK_EQUAL( mpa_id(db).bitasset_data(db).individual_settlement_debt.value, 130029 );
+
+            BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price
+                         == price( asset(130029*1239,mpa_id), asset(2682*1000) ) );
+
+            BOOST_CHECK_EQUAL( get_balance( borrower_id, asset_id_type() ), init_amount - 2000 );
+            BOOST_CHECK_EQUAL( get_balance( borrower2_id, asset_id_type() ), init_amount - 2100 );
+            BOOST_CHECK_EQUAL( get_balance( borrower3_id, asset_id_type() ), init_amount - 2018 ); // refund some
+            BOOST_CHECK_EQUAL( get_balance( borrower4_id, asset_id_type() ), init_amount - 2500 );
+
+            BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 90000 ); // no change
+            BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 2190 ); // 190 + 2000
+            BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 7 ); // refund 7
+            BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 996 );
+            BOOST_CHECK_EQUAL( get_balance( seller3_id, mpa_id ), 40022 ); // refund 22
+            BOOST_CHECK_EQUAL( get_balance( seller3_id, asset_id_type() ), 199 );
+         }
       };
 
       check_result();
