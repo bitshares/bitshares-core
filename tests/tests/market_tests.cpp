@@ -1497,7 +1497,7 @@ BOOST_AUTO_TEST_CASE(gs_price_test)
 
    // No margin call at this moment
 
-   // This order is right at  of the first debt position
+   // This order is right at MSSP of the first debt position
    limit_order_id_type sell_mid = create_sell_order(seller, bitusd.amount(2000), core.amount(30000))->id;
 
    BOOST_CHECK_EQUAL( 2000, sell_mid(db).for_sale.value );
