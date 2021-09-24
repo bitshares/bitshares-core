@@ -2230,6 +2230,11 @@ BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_no_feed )
       BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 100000 );
       BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
 
+      // unable to settle when no feed
+      BOOST_CHECK_THROW( force_settle( seller, asset(11100,mpa_id) ), fc::exception );
+
+      generate_block();
+
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
