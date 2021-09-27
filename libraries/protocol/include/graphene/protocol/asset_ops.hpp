@@ -108,7 +108,7 @@ namespace graphene { namespace protocol {
     */
    struct bitasset_options {
 
-      /// Defines how to response to black swan events
+      /// Defines how a BitAsset would respond to black swan events
       enum class black_swan_response_type
       {
          /// All debt positions are closed, all or some collateral is moved to a global-settlement fund.
@@ -118,15 +118,19 @@ namespace graphene { namespace protocol {
          /// No debt position is closed, and the derived settlement price is dynamically capped at the collateral
          /// ratio of the debt position with the least collateral ratio so that all debt positions are able to pay
          /// off their debt when being margin called or force-settled.
+         /// It is allowed to create new debt positions and update existing debt positions.
          /// Also known as "Global Settlement Protection".
          no_settlement = 1,
          /// Only the undercollateralized debt positions are closed and their collateral is moved to a fund which
          /// can be claimed via force-settlement. The derived settlement price is capped at the fund's collateral
-         /// ratio so that remaining debt positions will not be margin called or force-settled at a worse price.
+         /// ratio so that remaining debt positions will not be margin called or force-settled at a worse price
+         /// when the fund is not empty.
+         /// It is allowed to create new debt positions and update existing debt positions.
          individual_settlement_to_fund = 2,
          /// Only the undercollateralized debt positions are closed and their collateral is moved to a limit order
          /// on the order book which can be bought. The derived settlement price is NOT capped, which means remaining
          /// debt positions could be margin called at a worse price.
+         /// It is allowed to create new debt positions and update existing debt positions.
          individual_settlement_to_order = 3,
          /// Total number of available black swan response methods
          BSRM_TYPE_COUNT = 4
