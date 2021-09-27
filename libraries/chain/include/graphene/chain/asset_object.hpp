@@ -276,7 +276,7 @@ namespace graphene { namespace chain {
          /// This is the publication time of the oldest feed which was factored into current_feed.
          time_point_sec current_feed_publication_time;
 
-         /// @return whether @ref median_feed and @ref current_feed is different
+         /// @return whether @ref current_feed is different from @ref median_feed
          bool is_current_feed_price_capped()const
          { return ( median_feed.settlement_price != current_feed.settlement_price ); }
 
