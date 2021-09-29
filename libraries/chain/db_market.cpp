@@ -2073,6 +2073,8 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
          call_collateral_itr = call_collateral_index.lower_bound( call_min );
          if( update_current_feed )
          {
+            // Note: we do not call update_bitasset_current_feed() here,
+            //       because it's called in match_impl() in match() in match_force_settlements()
             limit_end = limit_price_index.upper_bound( bitasset.get_margin_call_order_price() );
             update_current_feed = bitasset.is_current_feed_price_capped();
          }
