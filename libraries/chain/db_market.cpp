@@ -1188,16 +1188,17 @@ database::match_result_type database::match( const limit_order_object& bid, cons
       if( order_receives.amount == 0 )
          return match_result_type::only_taker_filled;
 
-      // The remaining amount in the limit order could be too small,
-      //   so we should cull the order in fill_limit_order() below.
-      // If the order would receive 0 even at `match_price`, it would receive 0 at its own price,
-      //   so calling maybe_cull_small() will always cull it.
       call_receives = order_receives.multiply_and_round_up( match_price );
       if( after_core_hardfork_2481 )
          call_pays = call_receives * call_pays_price; // calculate with updated call_receives
       else
          // TODO add tests about CR change
          call_pays = usd_for_sale * call_pays_price; // (same as match_price until BSIP-74)
+
+      // The remaining amount (if any) in the limit order would be too small,
+      //   so we should cull the order in fill_limit_order() below.
+      // The order would receive 0 even at `match_price`, so it would receive 0 at its own price,
+      //   so calling maybe_cull_small() will always cull it.
       cull_taker = true;
    }
    else
