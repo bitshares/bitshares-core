@@ -99,6 +99,17 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     auto limit_itr = limit_price_index.lower_bound( highest_possible_bid );
     auto limit_end = limit_price_index.upper_bound( lowest_possible_bid );
 
+    price call_pays_price;
+    if( limit_itr != limit_end )
+    {
+       call_pays_price = limit_itr->sell_price;
+       if( after_core_hardfork_2481 )
+       {
+          // due to margin call fee, we check with MCPP (margin call pays price) here
+          call_pays_price = call_pays_price * bitasset.get_margin_call_pays_ratio();
+       }
+    }
+
     using bsrm_type = bitasset_options::black_swan_response_type;
     const auto bsrm = bitasset.get_black_swan_response_method();
 
@@ -123,12 +134,6 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
        if( limit_itr != limit_end )
        {
           FC_ASSERT( highest.base.asset_id == limit_itr->sell_price.base.asset_id );
-          auto call_pays_price = limit_itr->sell_price;
-          if( after_core_hardfork_2481 )
-          {
-             // due to margin call fee, we check with MCPP (margin call pays price) here
-             call_pays_price = call_pays_price * bitasset.get_margin_call_pays_ratio();
-          }
           if( bsrm_type::individual_settlement_to_fund != bsrm )
              highest = std::max( call_pays_price, highest );
           // for individual_settlement_to_fund, if call_pays_price < current_feed.max_short_squeeze_price(),
@@ -380,11 +385,11 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
       }
       else
       {
-         create< limit_order_object >( [&order,&fund_receives]( limit_order_object& obj ) {
+         create< limit_order_object >( [&order_debt,&fund_receives]( limit_order_object& obj ) {
             obj.expiration = time_point_sec::maximum();
             obj.seller = GRAPHENE_NULL_ACCOUNT;
             obj.for_sale = fund_receives.amount;
-            obj.sell_price = fund_receives / order.get_debt();
+            obj.sell_price = fund_receives / order_debt;
             obj.is_settled_debt = true;
          } );
       }
@@ -392,7 +397,7 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
    }
 
    // call order is maker
-   FC_ASSERT( fill_call_order( order, order.get_collateral(), order_debt,
+   FC_ASSERT( fill_call_order( order, order_collateral, order_debt,
                                fund_receives_price, true, margin_call_fee, false ),
               "Internal error: unable to close margin call ${o}", ("o", order) );
 
@@ -783,7 +788,6 @@ bool database::apply_order(const limit_order_object& new_order_object)
    bool feed_price_updated = false; // whether current_feed.settlement_price has been updated
    if( to_check_call_orders )
    {
-      auto call_min = price::min( recv_asset_id, sell_asset_id );
       // check limit orders first, match the ones with better price in comparison to call orders
       auto limit_itr_after_call = limit_price_idx.lower_bound( call_match_price );
       while( !finished && limit_itr != limit_itr_after_call )
@@ -796,6 +800,7 @@ bool database::apply_order(const limit_order_object& new_order_object)
                       != match_result_type::only_maker_filled );
       }
 
+      auto call_min = price::min( recv_asset_id, sell_asset_id );
       if( !finished && !before_core_hardfork_1270 ) // TODO refactor or cleanup duplicate code after core-1270 hf
       {
          // check if there are margin calls
