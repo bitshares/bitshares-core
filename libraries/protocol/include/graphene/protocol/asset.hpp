@@ -262,7 +262,11 @@ namespace graphene { namespace protocol {
        *
        * @return The MCOP in units of DEBT per COLLATERAL.
        */
-      price margin_call_order_price(const fc::optional<uint16_t> margin_call_fee_ratio)const;
+      price margin_call_order_price(const fc::optional<uint16_t>& margin_call_fee_ratio)const;
+
+      /// Compute the MCOR, the ratio between margin_call_order_price and feed price
+      /// @return MSSR - MCFR
+      ratio_type margin_call_order_ratio( const fc::optional<uint16_t>& margin_call_fee_ratio )const;
 
       /**
        * Ratio between max_short_squeeze_price and margin_call_order_price.
@@ -281,7 +285,7 @@ namespace graphene { namespace protocol {
        *
        * @return (MSSR - MCFR) / MSSR
        */
-      ratio_type margin_call_pays_ratio(const fc::optional<uint16_t> margin_call_fee_ratio)const;
+      ratio_type margin_call_pays_ratio(const fc::optional<uint16_t>& margin_call_fee_ratio)const;
 
       /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call
       /// territory.
@@ -301,6 +305,9 @@ namespace graphene { namespace protocol {
 
       void validate() const;
       bool is_for( asset_id_type asset_id ) const;
+   private:
+      /// Helper function for other functions e.g. @ref margin_call_order_price
+      uint16_t get_margin_call_price_numerator(const fc::optional<uint16_t>& margin_call_fee_ratio)const;
    };
 
 } }

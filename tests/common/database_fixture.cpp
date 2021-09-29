@@ -493,10 +493,17 @@ void database_fixture_base::verify_asset_supplies( const database& db )
    for( const limit_order_object& o : db.get_index_type<limit_order_index>().indices() )
    {
       asset for_sale = o.amount_for_sale();
-      if( for_sale.asset_id == asset_id_type() ) core_in_orders += for_sale.amount;
+      if( for_sale.asset_id == asset_id_type() && !o.is_settled_debt )
+         // Note: CORE asset in settled debt is not counted in account_stats.total_core_in_orders
+         core_in_orders += for_sale.amount;
       total_balances[for_sale.asset_id] += for_sale.amount;
       total_balances[asset_id_type()] += o.deferred_fee;
       total_balances[o.deferred_paid_fee.asset_id] += o.deferred_paid_fee.amount;
+      if( o.is_settled_debt )
+      {
+         total_debts[o.receive_asset_id()] += o.sell_price.quote.amount;
+         BOOST_CHECK_EQUAL( o.sell_price.base.amount.value, for_sale.amount.value );
+      }
    }
    for( const call_order_object& o : db.get_index_type<call_order_index>().indices() )
    {
@@ -514,7 +521,10 @@ void database_fixture_base::verify_asset_supplies( const database& db )
       {
          const auto& bad = asset_obj.bitasset_data(db);
          total_balances[bad.options.short_backing_asset] += bad.settlement_fund;
+         total_balances[bad.options.short_backing_asset] += bad.individual_settlement_fund;
          total_balances[bad.options.short_backing_asset] += dasset_obj.accumulated_collateral_fees;
+         if( !bad.has_settlement() ) // Note: if asset has been globally settled, do not check total debt
+            total_debts[bad.asset_id] += bad.individual_settlement_debt;
       }
       total_balances[asset_obj.id] += dasset_obj.confidential_supply.value;
    }

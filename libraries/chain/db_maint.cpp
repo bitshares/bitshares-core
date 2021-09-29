@@ -991,19 +991,11 @@ void process_hf_2103( database& db )
    }
 }
 
-void update_median_feeds(database& db)
+static void update_bitasset_current_feeds(database& db)
 {
-   time_point_sec head_time = db.head_block_time();
-   time_point_sec next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
-
-   const auto update_bitasset = [head_time, next_maint_time]( asset_bitasset_data_object &o )
+   for( const auto& bitasset : db.get_index_type<asset_bitasset_data_index>().indices() )
    {
-      o.update_median_feeds( head_time, next_maint_time );
-   };
-
-   for( const auto& d : db.get_index_type<asset_bitasset_data_index>().indices() )
-   {
-      db.modify( d, update_bitasset );
+      db.update_bitasset_current_feed( bitasset );
    }
 }
 
@@ -1027,8 +1019,6 @@ void update_median_feeds(database& db)
 //       feeds were found.
 void process_hf_868_890( database& db, bool skip_check_call_orders )
 {
-   const auto next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
-   const auto head_time = db.head_block_time();
    // for each market issued asset
    const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
    for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
@@ -1074,11 +1064,9 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
       } // end loop of each feed
 
       // always update the median feed due to https://github.com/bitshares/bitshares-core/issues/890
-      db.modify( bitasset_data, [head_time,next_maint_time]( asset_bitasset_data_object &obj ) {
-         obj.update_median_feeds( head_time, next_maint_time );
-         // NOTE: Normally we should call check_call_orders() after called update_median_feeds(), but for
-         // mainnet actually check_call_orders() would do nothing, so we skipped it for better performance.
-      });
+      db.update_bitasset_current_feed( bitasset_data );
+      // NOTE: Normally we should call check_call_orders() after called update_bitasset_current_feed(), but for
+      // mainnet actually check_call_orders() would do nothing, so we skipped it for better performance.
 
    } // for each market issued asset
 }
@@ -1497,7 +1485,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    if( to_update_and_match_call_orders_for_hf_1270 )
    {
       update_call_orders_hf_1270(*this);
-      update_median_feeds(*this);
+      update_bitasset_current_feeds(*this);
       match_call_orders(*this);
    }
 

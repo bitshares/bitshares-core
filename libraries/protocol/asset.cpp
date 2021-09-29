@@ -301,27 +301,35 @@ namespace graphene { namespace protocol {
 
       // Documentation in header.
       // Calculation:  MCOP = settlement_price / (MSSR - MCFR); result is in debt/collateral
-      price price_feed::margin_call_order_price(const fc::optional<uint16_t> maybe_mcfr)const
+      price price_feed::margin_call_order_price(const fc::optional<uint16_t>& maybe_mcfr)const
+      {
+         return settlement_price / margin_call_order_ratio( maybe_mcfr );
+      }
+
+      // Calculation:  MCOR = MSSR - MCFR, floor at 1.00
+      uint16_t price_feed::get_margin_call_price_numerator(const fc::optional<uint16_t>& maybe_mcfr)const
       {
          const uint16_t mcfr = maybe_mcfr.valid() ? *maybe_mcfr : 0;
          uint16_t numerator = (mcfr < maximum_short_squeeze_ratio) ?
             (maximum_short_squeeze_ratio - mcfr) : GRAPHENE_COLLATERAL_RATIO_DENOM; // won't underflow
          if (numerator < GRAPHENE_COLLATERAL_RATIO_DENOM)
             numerator = GRAPHENE_COLLATERAL_RATIO_DENOM; // floor at 1.00
-         return settlement_price * ratio_type( GRAPHENE_COLLATERAL_RATIO_DENOM, numerator );
+         return numerator;
+      }
+
+      // Documentation in header.
+      // Calculation:  MCOR = MSSR - MCFR
+      ratio_type price_feed::margin_call_order_ratio(const fc::optional<uint16_t>& maybe_mcfr)const
+      {
+         auto numerator = get_margin_call_price_numerator( maybe_mcfr );
+         return ratio_type( numerator, GRAPHENE_COLLATERAL_RATIO_DENOM );
       }
 
       // Reason for this function is explained in header.
       // Calculation: (MSSR - MCFR) / MSSR
-      ratio_type price_feed::margin_call_pays_ratio(const fc::optional<uint16_t> maybe_mcfr)const
+      ratio_type price_feed::margin_call_pays_ratio(const fc::optional<uint16_t>& maybe_mcfr)const
       {
-         if (!maybe_mcfr.valid())
-            return ratio_type(1,1);
-         const uint16_t mcfr = *maybe_mcfr;
-         uint16_t numerator = (mcfr < maximum_short_squeeze_ratio) ?
-            (maximum_short_squeeze_ratio - mcfr) : GRAPHENE_COLLATERAL_RATIO_DENOM; // won't underflow
-         if (numerator < GRAPHENE_COLLATERAL_RATIO_DENOM)
-            numerator = GRAPHENE_COLLATERAL_RATIO_DENOM; // floor at 1.00
+         auto numerator = get_margin_call_price_numerator( maybe_mcfr );
          return ratio_type( numerator, maximum_short_squeeze_ratio );
          // Note: This ratio, if it multiplied margin_call_order_price, would yield the
          // max_short_squeeze_price, apart perhaps for truncation (rounding) error.

@@ -69,11 +69,10 @@ namespace graphene { namespace chain {
     */
    class database : public db::object_database
    {
-      public:
          //////////////////// db_management.cpp ////////////////////
-
+      public:
          database();
-         ~database();
+         virtual ~database();
 
          enum validation_steps
          {
@@ -82,8 +81,8 @@ namespace graphene { namespace chain {
             skip_transaction_signatures = 1 << 1,  ///< used by non-witness nodes
             skip_transaction_dupe_check = 1 << 2,  ///< used while reindexing
             skip_block_size_check       = 1 << 4,  ///< used when applying locally generated transactions
-            skip_tapos_check            = 1 << 5,  ///< used while reindexing -- note this skips expiration check as well
-            // skip_authority_check        = 1 << 6,  ///< removed because effectively identical to skip_transaction_signatures
+            skip_tapos_check            = 1 << 5,  ///< used while reindexing -- note this skips expiration check too
+            // skip_authority_check        = 1 << 6,  // removed, effectively identical to skip_transaction_signatures
             skip_merkle_check           = 1 << 7,  ///< used while reindexing
             skip_assert_evaluation      = 1 << 8,  ///< used while reindexing
             skip_undo_history_check     = 1 << 9,  ///< used while reindexing
@@ -126,101 +125,6 @@ namespace graphene { namespace chain {
          void wipe(const fc::path& data_dir, bool include_blocks);
          void close(bool rewind = true);
 
-         //////////////////// db_block.cpp ////////////////////
-
-         /**
-          *  @return true if the block is in our fork DB or saved to disk as
-          *  part of the official chain, otherwise return false
-          */
-         bool                       is_known_block( const block_id_type& id )const;
-         bool                       is_known_transaction( const transaction_id_type& id )const;
-         block_id_type              get_block_id_for_num( uint32_t block_num )const;
-         optional<signed_block>     fetch_block_by_id( const block_id_type& id )const;
-         optional<signed_block>     fetch_block_by_number( uint32_t num )const;
-         const signed_transaction&  get_recent_transaction( const transaction_id_type& trx_id )const;
-         std::vector<block_id_type> get_block_ids_on_fork(block_id_type head_of_fork) const;
-
-         /**
-          *  Calculate the percent of block production slots that were missed in the
-          *  past 128 blocks, not including the current block.
-          */
-         uint32_t witness_participation_rate()const;
-
-         void                              add_checkpoints( const flat_map<uint32_t,block_id_type>& checkpts );
-         const flat_map<uint32_t,block_id_type> get_checkpoints()const { return _checkpoints; }
-         bool before_last_checkpoint()const;
-
-         bool push_block( const signed_block& b, uint32_t skip = skip_nothing );
-         processed_transaction push_transaction( const precomputable_transaction& trx, uint32_t skip = skip_nothing );
-         bool _push_block( const signed_block& b );
-         processed_transaction _push_transaction( const precomputable_transaction& trx );
-
-         ///@throws fc::exception if the proposed transaction fails to apply.
-         processed_transaction push_proposal( const proposal_object& proposal );
-
-         signed_block generate_block(
-            const fc::time_point_sec when,
-            witness_id_type witness_id,
-            const fc::ecc::private_key& block_signing_private_key,
-            uint32_t skip
-            );
-         signed_block _generate_block(
-            const fc::time_point_sec when,
-            witness_id_type witness_id,
-            const fc::ecc::private_key& block_signing_private_key
-            );
-
-         void pop_block();
-         void clear_pending();
-
-         /**
-          *  This method is used to track appied operations during the evaluation of a block, these
-          *  operations should include any operation actually included in a transaction as well
-          *  as any implied/virtual operations that resulted, such as filling an order.  The
-          *  applied operations is cleared after applying each block and calling the block
-          *  observers which may want to index these operations.
-          *
-          *  @return the op_id which can be used to set the result after it has finished being applied.
-          */
-         uint32_t  push_applied_operation( const operation& op );
-         void      set_applied_operation_result( uint32_t op_id, const operation_result& r );
-         const vector<optional< operation_history_object > >& get_applied_operations()const;
-
-         string to_pretty_string( const asset& a )const;
-
-         /**
-          *  This signal is emitted after all operations and virtual operation for a
-          *  block have been applied but before the get_applied_operations() are cleared.
-          *
-          *  You may not yield from this callback because the blockchain is holding
-          *  the write lock and may be in an "inconstant state" until after it is
-          *  released.
-          */
-         fc::signal<void(const signed_block&)>           applied_block;
-
-         /**
-          * This signal is emitted any time a new transaction is added to the pending
-          * block state.
-          */
-         fc::signal<void(const signed_transaction&)>     on_pending_transaction;
-
-         /**
-          *  Emitted After a block has been applied and committed.  The callback
-          *  should not yield and should execute quickly.
-          */
-         fc::signal<void(const vector<object_id_type>&, const flat_set<account_id_type>&)> new_objects;
-
-         /**
-          *  Emitted After a block has been applied and committed.  The callback
-          *  should not yield and should execute quickly.
-          */
-         fc::signal<void(const vector<object_id_type>&, const flat_set<account_id_type>&)> changed_objects;
-
-         /** this signal is emitted any time an object is removed and contains a
-          * pointer to the last value of every object that was removed.
-          */
-         fc::signal<void(const vector<object_id_type>&, const vector<const object*>&, const flat_set<account_id_type>&)>  removed_objects;
-
          //////////////////// db_witness_schedule.cpp ////////////////////
 
          /**
@@ -259,10 +163,19 @@ namespace graphene { namespace chain {
           */
          uint32_t get_slot_at_time(fc::time_point_sec when)const;
 
+         /**
+          *  Calculate the percent of block production slots that were missed in the
+          *  past 128 blocks, not including the current block.
+          */
+         uint32_t witness_participation_rate()const;
+      private:
+         uint32_t update_witness_missed_blocks( const signed_block& b );
+
          void update_witness_schedule();
 
          //////////////////// db_getter.cpp ////////////////////
 
+      public:
          const chain_id_type&                   get_chain_id()const;
          const asset_object&                    get_core_asset()const;
          const asset_dynamic_data_object&       get_core_dynamic_data()const;
@@ -296,11 +209,26 @@ namespace graphene { namespace chain {
                  rejected_predicate_map* rejected_authorities = nullptr )const;
 
          uint32_t last_non_undoable_block_num() const;
-         //////////////////// db_init.cpp ////////////////////
 
-         void initialize_evaluators();
+         /// Find the limit order which is the individual settlement fund of the specified asset
+         /// @param a ID of the asset
+         /// @return nullptr if not found, pointer to the limit order if found
+         const limit_order_object* find_settled_debt_order( const asset_id_type& a )const;
+
+         /// Find the call order with the least collateral ratio
+         /// @param bitasset The bitasset object
+         /// @param force_by_collateral_index Whether to forcefully search via the by_collateral index
+         /// @return nullptr if not found, pointer to the call order if found
+         const call_order_object* find_least_collateralized_short( const asset_bitasset_data_object& bitasset,
+                                                                   bool force_by_collateral_index )const;
+
+         //////////////////// db_init.cpp ////////////////////
+         ///@{
+
          /// Reset the object graph in-memory
-         void initialize_indexes();
+         void initialize_indexes(); // Mark as public since it is used in tests
+      private:
+         void initialize_evaluators();
          void init_genesis(const genesis_state_type& genesis_state = genesis_state_type());
 
          template<typename EvaluatorType>
@@ -309,9 +237,11 @@ namespace graphene { namespace chain {
             _operation_evaluators[operation::tag<typename EvaluatorType::operation_type>::value]
                   = std::make_unique<op_evaluator_impl<EvaluatorType>>();
          }
+         ///@}
 
          //////////////////// db_balance.cpp ////////////////////
 
+      public:
          /**
           * @brief Retrieve a particular account's balance in a given asset
           * @param owner Account whose balance should be retrieved
@@ -330,7 +260,7 @@ namespace graphene { namespace chain {
          void adjust_balance(account_id_type account, asset delta);
 
          void deposit_market_fee_vesting_balance(const account_id_type &account_id, const asset &delta);
-        /**
+         /**
           * @brief Retrieve a particular account's market fee vesting balance in a given asset
           * @param account_id Account whose balance should be retrieved
           * @param asset_id ID of the asset to get balance in
@@ -359,10 +289,12 @@ namespace graphene { namespace chain {
             account_id_type req_owner,
             bool require_vesting );
 
-         // helper to handle cashback rewards
+         /// helper to handle cashback rewards
          void deposit_cashback(const account_object& acct, share_type amount, bool require_vesting = true);
-         // helper to handle witness pay
+         /// helper to handle witness pay
          void deposit_witness_pay(const witness_object& wit, share_type amount);
+
+         string to_pretty_string( const asset& a )const;
 
          //////////////////// db_debug.cpp ////////////////////
 
@@ -390,11 +322,19 @@ namespace graphene { namespace chain {
                            share_type collateral_from_fund, const price_feed& current_feed );
 
       private:
+         void _cancel_bids_and_revive_mpa( const asset_object& bitasset, const asset_bitasset_data_object& bad );
+         bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
+                                   const asset_bitasset_data_object* bitasset_ptr = nullptr );
          template<typename IndexType>
          void globally_settle_asset_impl( const asset_object& bitasset,
                                           const price& settle_price,
                                           const IndexType& call_index,
                                           bool check_margin_calls = false );
+         /// Individually settle the @p call_order. Called when the call order is undercollateralized.
+         /// See @ref protocol::bitasset_options::black_swan_response_type for more info.
+         /// @param bitasset the bitasset object
+         /// @param call_order the call order
+         void individually_settle( const asset_bitasset_data_object& bitasset, const call_order_object& call_order );
          /// Match force settlements with margin calls
          /// @param bitasset the asset that to be checked
          /// @return true if matched at least one margin call order
@@ -403,22 +343,21 @@ namespace graphene { namespace chain {
          /// @param settle the force-settlement order
          /// @param call the call order
          /// @param match_price the price to calculate how much the call order pays
+         /// @param bitasset the bitasset object corresponding to debt asset of the call order
          /// @param max_settlement the maximum debt amount to be filled during this match
          /// @param fill_price the price to be recorded in market history plugin. It is the price to calculate
          ///        how much the settle order receives when the call order is being margin called
          /// @param is_margin_call whether the call order is being margin called
          /// @param settle_order_is_taker whether the settle_order is the taker
-         /// @param margin_call_pays_ratio see @ref price_feed::margin_call_pays_ratio
          /// @return the amount of asset settled
          asset match_impl( const force_settlement_object& settle,
                            const call_order_object& call,
                            const price& match_price,
+                           const asset_bitasset_data_object& bitasset,
                            const asset& max_settlement,
                            const price& fill_price,
                            bool is_margin_call = false,
-                           bool settle_order_is_taker = true,
-                           const ratio_type* margin_call_pays_ratio = nullptr );
-
+                           bool settle_order_is_taker = true );
 
       public:
          /**
@@ -438,12 +377,20 @@ namespace graphene { namespace chain {
           * @brief Process a new force-settlement request
           * @param new_settlement The new force-settlement request
           * @param bitasset The bitasset data object
+          * @param asset_obj The asset object
           *
           * Since the core-2481 hard fork, this function is called after a new force-settlement object is created
           * to check if there are margin calls to be matched instantly.
           */
          void apply_force_settlement( const force_settlement_object& new_settlement,
-                                      const asset_bitasset_data_object& bitasset );
+                                      const asset_bitasset_data_object& bitasset,
+                                      const asset_object& asset_obj );
+
+         bool check_call_orders( const asset_object& mia, bool enable_black_swan = true,
+                                 bool for_new_limit_order = false,
+                                 const asset_bitasset_data_object* bitasset_ptr = nullptr,
+                                 bool mute_exceptions = false,
+                                 bool skip_matching_settle_orders = false );
 
          /**
           * Matches the two orders, the first parameter is taker, the second is maker.
@@ -463,32 +410,33 @@ namespace graphene { namespace chain {
             only_maker_filled = 2,
             both_filled = 3
          };
+
+      private:
          match_result_type match( const limit_order_object& taker, const limit_order_object& maker,
                                   const price& trade_price );
+         match_result_type match_limit_normal_limit( const limit_order_object& taker, const limit_order_object& maker,
+                                                     const price& trade_price );
+         match_result_type match_limit_settled_debt( const limit_order_object& taker, const limit_order_object& maker,
+                                                     const price& trade_price );
          /***
           * @brief Match limit order as taker to a call order as maker
           * @param taker the order that is removing liquidity from the book
           * @param maker the order that put liquidity on the book
           * @param trade_price the price the trade should execute at
-          * @param feed_price the price of the current feed
-          * @param maintenance_collateral_ratio the maintenance collateral ratio
-          * @param maintenance_collateralization the maintenance collateralization
+          * @param bitasset the bitasset object corresponding to debt asset of the call order
           * @param call_pays_price price call order pays. Call order may pay more collateral
           *    than limit order takes if call order subject to a margin call fee.
           * @returns 0 if no orders were matched, 1 if taker was filled, 2 if maker was filled, 3 if both were filled
           */
          match_result_type match( const limit_order_object& taker, const call_order_object& maker,
                     const price& trade_price,
-                    const price& feed_price, const uint16_t maintenance_collateral_ratio,
-                    const optional<price>& maintenance_collateralization,
+                    const asset_bitasset_data_object& bitasset,
                     const price& call_pays_price);
          /// If separate call_pays_price not provided, assume call pays at trade_price:
          match_result_type match( const limit_order_object& taker, const call_order_object& maker,
                     const price& trade_price,
-                    const price& feed_price, const uint16_t maintenance_collateral_ratio,
-                    const optional<price>& maintenance_collateralization) {
-            return match(taker, maker, trade_price, feed_price, maintenance_collateral_ratio,
-                         maintenance_collateralization, trade_price);
+                    const asset_bitasset_data_object& bitasset) {
+            return match(taker, maker, trade_price, bitasset, trade_price);
          }
 
          ///@}
@@ -497,35 +445,35 @@ namespace graphene { namespace chain {
          /// @param settle the force-settlement order
          /// @param call the call order
          /// @param match_price the price to calculate how much the call order pays
+         /// @param bitasset the bitasset object corresponding to debt asset of the call order
          /// @param max_settlement the maximum debt amount to be filled during this match
          /// @param fill_price the price to be recorded in market history plugin. It is the price to calculate
          ///        how much the settle order receives when the call order is being margin called
          /// @param is_margin_call whether the call order is being margin called
-         /// @param margin_call_pays_ratio see @ref price_feed::margin_call_pays_ratio
          /// @return the amount of asset settled
          asset match( const force_settlement_object& settle,
                       const call_order_object& call,
                       const price& match_price,
+                      const asset_bitasset_data_object& bitasset,
                       const asset& max_settlement,
                       const price& fill_price,
-                      bool is_margin_call = false,
-                      const ratio_type* margin_call_pays_ratio = nullptr );
+                      bool is_margin_call = false );
 
          /// Matches the two orders, the first parameter is taker, the second is maker.
          /// @param call the call order being margin called
          /// @param settle the force-settlement order
          /// @param match_price the price to calculate how much the call order pays
+         /// @param bitasset the bitasset object corresponding to debt asset of the call order
          /// @param max_settlement the maximum debt amount to be filled during this match
          /// @param fill_price the price to be recorded in market history plugin. It is the price to calculate
          ///        how much the settle order receives.
-         /// @param margin_call_pays_ratio see @ref price_feed::margin_call_pays_ratio
          /// @return the amount of asset settled
          asset match( const call_order_object& call,
                       const force_settlement_object& settle,
                       const price& match_price,
+                      const asset_bitasset_data_object& bitasset,
                       const asset& max_settlement,
-                      const price& fill_price,
-                      const ratio_type* margin_call_pays_ratio = nullptr );
+                      const price& fill_price );
 
          /**
           * @brief fills limit order
@@ -547,30 +495,31 @@ namespace graphene { namespace chain {
           * @param fill_price the price the transaction executed at
           * @param is_maker TRUE if the buyer is the maker, FALSE if the buyer is the taker
           * @param margin_fee Margin call fees paid in collateral asset
+          * @param reduce_current_supply Whether to reduce current supply of the asset. Usually it is true.
+          *                              When globally settleing or individually settling it is false.
           * @returns TRUE if the order was completely filled
           */
          bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
-                               const price& fill_price, const bool is_maker, const asset& margin_fee );
+                               const price& fill_price, const bool is_maker, const asset& margin_fee,
+                               bool reduce_current_supply = true );
 
          /// Overload provides compatible default value for margin_fee: (margin_fee.asset_id == pays.asset_id)
          bool fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
-                               const price& fill_price, const bool is_maker )
+                               const price& fill_price, const bool is_maker,
+                               bool reduce_current_supply = true )
          {
-            return fill_call_order( order, pays, receives, fill_price, is_maker, asset(0, pays.asset_id) );
+            return fill_call_order( order, pays, receives, fill_price, is_maker, asset(0, pays.asset_id),
+                                    reduce_current_supply );
          }
 
          bool fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
                                  const price& fill_price, bool is_maker, bool pay_force_settle_fee = true );
 
-         bool check_call_orders( const asset_object& mia, bool enable_black_swan = true,
-                                 bool for_new_limit_order = false,
-                                 const asset_bitasset_data_object* bitasset_ptr = nullptr,
-                                 bool mute_exceptions = false );
-
          /// helpers to fill_order
          /// @{
          void pay_order( const account_object& receiver, const asset& receives, const asset& pays );
 
+      public:
          /**
           * @brief Calculate the market fee that is to be taken
           * @param trade_asset the asset (passed in to avoid a lookup)
@@ -585,6 +534,97 @@ namespace graphene { namespace chain {
          /// @}
          ///@}
 
+         //////////////////// db_block.cpp ////////////////////
+
+         /**
+          *  @return true if the block is in our fork DB or saved to disk as
+          *  part of the official chain, otherwise return false
+          */
+         bool                       is_known_block( const block_id_type& id )const;
+         bool                       is_known_transaction( const transaction_id_type& id )const;
+         block_id_type              get_block_id_for_num( uint32_t block_num )const;
+         optional<signed_block>     fetch_block_by_id( const block_id_type& id )const;
+         optional<signed_block>     fetch_block_by_number( uint32_t num )const;
+         const signed_transaction&  get_recent_transaction( const transaction_id_type& trx_id )const;
+         std::vector<block_id_type> get_block_ids_on_fork(block_id_type head_of_fork) const;
+
+         void                       add_checkpoints( const flat_map<uint32_t,block_id_type>& checkpts );
+         const flat_map<uint32_t,block_id_type> get_checkpoints()const { return _checkpoints; }
+         bool before_last_checkpoint()const;
+
+         bool push_block( const signed_block& b, uint32_t skip = skip_nothing );
+         processed_transaction push_transaction( const precomputable_transaction& trx, uint32_t skip = skip_nothing );
+      private:
+         bool _push_block( const signed_block& b );
+      public:
+         // It is public because it is used in pending_transactions_restorer in db_with.hpp
+         processed_transaction _push_transaction( const precomputable_transaction& trx );
+         ///@throws fc::exception if the proposed transaction fails to apply.
+         processed_transaction push_proposal( const proposal_object& proposal );
+
+         signed_block generate_block(
+            const fc::time_point_sec when,
+            witness_id_type witness_id,
+            const fc::ecc::private_key& block_signing_private_key,
+            uint32_t skip
+            );
+      private:
+         signed_block _generate_block(
+            const fc::time_point_sec when,
+            witness_id_type witness_id,
+            const fc::ecc::private_key& block_signing_private_key
+            );
+
+      public:
+         void pop_block();
+         void clear_pending();
+
+         /**
+          *  This method is used to track appied operations during the evaluation of a block, these
+          *  operations should include any operation actually included in a transaction as well
+          *  as any implied/virtual operations that resulted, such as filling an order.  The
+          *  applied operations is cleared after applying each block and calling the block
+          *  observers which may want to index these operations.
+          *
+          *  @return the op_id which can be used to set the result after it has finished being applied.
+          */
+         uint32_t  push_applied_operation( const operation& op );
+         void      set_applied_operation_result( uint32_t op_id, const operation_result& r );
+         const vector<optional< operation_history_object > >& get_applied_operations()const;
+
+         /**
+          *  This signal is emitted after all operations and virtual operation for a
+          *  block have been applied but before the get_applied_operations() are cleared.
+          *
+          *  You may not yield from this callback because the blockchain is holding
+          *  the write lock and may be in an "inconstant state" until after it is
+          *  released.
+          */
+         fc::signal<void(const signed_block&)>           applied_block;
+
+         /**
+          * This signal is emitted any time a new transaction is added to the pending
+          * block state.
+          */
+         fc::signal<void(const signed_transaction&)>     on_pending_transaction;
+
+         /**
+          *  Emitted After a block has been applied and committed.  The callback
+          *  should not yield and should execute quickly.
+          */
+         fc::signal<void(const vector<object_id_type>&, const flat_set<account_id_type>&)> new_objects;
+
+         /**
+          *  Emitted After a block has been applied and committed.  The callback
+          *  should not yield and should execute quickly.
+          */
+         fc::signal<void(const vector<object_id_type>&, const flat_set<account_id_type>&)> changed_objects;
+
+         /** this signal is emitted any time an object is removed and contains a
+          * pointer to the last value of every object that was removed.
+          */
+         fc::signal<void(const vector<object_id_type>&,
+                         const vector<const object*>&, const flat_set<account_id_type>&)>  removed_objects;
 
          ///@{
          /**
@@ -601,9 +641,6 @@ namespace graphene { namespace chain {
          /**
           * @}
           */
-
-         /// Enable or disable tracking of votes of standby witnesses and committee members
-         inline void enable_standby_votes_tracking(bool enable)  { _track_standby_votes = enable; }
 
          /** Precomputes digests, signatures and operation validations depending
           *  on skip flags. "Expensive" computations may be done in a parallel
@@ -624,16 +661,14 @@ namespace graphene { namespace chain {
           *         precomputations applied
           */
          fc::future<void> precompute_parallel( const precomputable_transaction& trx )const;
-   private:
+      private:
          template<typename Trx>
          void _precompute_parallel( const Trx* trx, const size_t count, const uint32_t skip )const;
 
-   protected:
-         //Mark pop_undo() as protected -- we do not want outside calling pop_undo(); it should call pop_block() instead
+      protected:
+         // Mark pop_undo() as protected -- we do not want outside calling pop_undo(),
+         // it should call pop_block() instead
          void pop_undo() { object_database::pop_undo(); }
-         void notify_applied_block( const signed_block& block );
-         void notify_on_pending_transaction( const signed_transaction& tx );
-         void notify_changed_objects();
 
       private:
          optional<undo_database::session>       _pending_tx_session;
@@ -641,8 +676,6 @@ namespace graphene { namespace chain {
 
          template<class Index>
          vector<std::reference_wrapper<const typename Index::object_type>> sort_votable_objects(size_t count)const;
-
-         //////////////////// db_block.cpp ////////////////////
 
       public:
          // these were formerly private, but they have a fairly well-defined API, so let's make them public
@@ -653,8 +686,6 @@ namespace graphene { namespace chain {
       private:
          void                  _apply_block( const signed_block& next_block );
          processed_transaction _apply_transaction( const signed_transaction& trx );
-         void                  _cancel_bids_and_revive_mpa( const asset_object& bitasset,
-                                                            const asset_bitasset_data_object& bad );
 
          ///Steps involved in applying a new block
          ///@{
@@ -665,13 +696,21 @@ namespace graphene { namespace chain {
          void update_witnesses( fork_item& fork_entry )const;
          void create_block_summary(const signed_block& next_block);
 
-         //////////////////// db_witness_schedule.cpp ////////////////////
+         //////////////////// db_notify.cpp ////////////////////
 
-         uint32_t update_witness_missed_blocks( const signed_block& b );
+      protected:
+         void notify_applied_block( const signed_block& block );
+         void notify_on_pending_transaction( const signed_transaction& tx );
+         void notify_changed_objects();
 
          //////////////////// db_update.cpp ////////////////////
       public:
          generic_operation_result process_tickets();
+         /// Derive @ref asset_bitasset_data_object::current_feed from other data in the database
+         /// @param bitasset The bitasset object
+         /// @param skip_median_update Whether to skip updating @ref asset_bitasset_data_object::median_feed
+         void update_bitasset_current_feed( const asset_bitasset_data_object& bitasset,
+                                            bool skip_median_update = false );
       private:
          void update_global_dynamic_data( const signed_block& b, const uint32_t missed_blocks );
          void update_signing_witness(const witness_object& signing_witness, const signed_block& new_block);
@@ -685,8 +724,6 @@ namespace graphene { namespace chain {
          void update_maintenance_flag( bool new_maintenance_flag );
          void update_withdraw_permissions();
          void update_credit_offers_and_deals();
-         bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
-                                   const asset_bitasset_data_object* bitasset_ptr = nullptr );
          void clear_expired_htlcs();
 
          ///Steps performed only at maintenance intervals
@@ -760,7 +797,7 @@ namespace graphene { namespace chain {
          bool                              _opened = false;
 
          // Counts nested proposal updates
-         uint32_t                           _push_proposal_nesting_depth = 0;
+         uint32_t                          _push_proposal_nesting_depth = 0;
 
          /// Tracks assets affected by bitshares-core issue #453 before hard fork #615 in one block
          flat_set<asset_id_type>           _issue_453_affected_assets;
@@ -774,6 +811,9 @@ namespace graphene { namespace chain {
          const chain_property_object*           _p_chain_property_obj      = nullptr;
          const witness_schedule_object*         _p_witness_schedule_obj    = nullptr;
          ///@}
+      public:
+         /// Enable or disable tracking of votes of standby witnesses and committee members
+         inline void enable_standby_votes_tracking(bool enable)  { _track_standby_votes = enable; }
    };
 
 } }

@@ -252,7 +252,8 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          const int64_t rachel_settle_amount = 20 * bitusd_unit;
          operation_result result = force_settle(rachel, bitusd.amount(rachel_settle_amount));
 
-         force_settlement_id_type rachel_settle_id = result.get<object_id_type>();
+         force_settlement_id_type rachel_settle_id = *result.get<extendable_operation_result>()
+                                                           .value.new_objects->begin();
          BOOST_CHECK_EQUAL(rachel_settle_id(db).balance.amount.value, rachel_settle_amount);
 
          // Check Rachel's balance
@@ -497,7 +498,8 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          const int64_t rachel_settle_amount = 2 * bitusd_unit;
          operation_result result = force_settle(rachel, bitusd.amount(rachel_settle_amount));
 
-         force_settlement_id_type rachel_settle_id = result.get<object_id_type>();
+         force_settlement_id_type rachel_settle_id = *result.get<extendable_operation_result>()
+                                                           .value.new_objects->begin();
          BOOST_CHECK_EQUAL(rachel_settle_id(db).balance.amount.value, rachel_settle_amount);
 
          // Advance time to complete the force settlement and to update the price feed
@@ -596,7 +598,8 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          const int64_t michael_settle_amount = 5 * bitusd_unit;
          result = force_settle(michael, bitusd.amount(michael_settle_amount));
 
-         force_settlement_id_type michael_settle_id = result.get<object_id_type>();
+         force_settlement_id_type michael_settle_id = *result.get<extendable_operation_result>()
+                                                           .value.new_objects->begin();
          BOOST_CHECK_EQUAL(michael_settle_id(db).balance.amount.value, michael_settle_amount);
 
          // Advance time to complete the force settlement and to update the price feed
@@ -683,7 +686,8 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          const int64_t yanna_settle_amount = 10 * bitusd_unit;
          result = force_settle(yanna, bitusd.amount(yanna_settle_amount));
 
-         force_settlement_id_type yanna_settle_id = result.get<object_id_type>();
+         force_settlement_id_type yanna_settle_id = *result.get<extendable_operation_result>()
+                                                           .value.new_objects->begin();
          BOOST_CHECK_EQUAL(yanna_settle_id(db).balance.amount.value, yanna_settle_amount);
 
          // Advance time to complete the force settlement and to update the price feed
@@ -772,7 +776,8 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          const int64_t vikram_settle_amount = 10 * bitusd_unit;
          result = force_settle(vikram, bitusd.amount(vikram_settle_amount));
 
-         force_settlement_id_type vikram_settle_id = result.get<object_id_type>();
+         force_settlement_id_type vikram_settle_id = *result.get<extendable_operation_result>()
+                                                           .value.new_objects->begin();
          BOOST_CHECK_EQUAL(vikram_settle_id(db).balance.amount.value, vikram_settle_amount);
 
          // Advance time to complete the force settlement and to update the price feed
@@ -1119,7 +1124,8 @@ BOOST_FIXTURE_TEST_SUITE(force_settle_tests, force_settle_database_fixture)
          const int64_t rachel_settle_amount = 2 * bitusd_unit; // 200 satoshi bitusd
          operation_result result = force_settle(rachel, bitusd.amount(rachel_settle_amount));
 
-         force_settlement_id_type rachel_settle_id = result.get<object_id_type>();
+         force_settlement_id_type rachel_settle_id = *result.get<extendable_operation_result>()
+                                                           .value.new_objects->begin();
          BOOST_CHECK_EQUAL(rachel_settle_id(db).balance.amount.value, rachel_settle_amount);
 
          // Advance time to complete the force settlement and to update the price feed
