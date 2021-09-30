@@ -252,8 +252,8 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
 void asset_create_evaluator::pay_fee()
 {
-   fee_is_odd = core_fee_paid.value & 1;
-   core_fee_paid -= core_fee_paid.value/2;
+   fee_is_odd = ( ( core_fee_paid.value % 2 ) != 0 );
+   core_fee_paid -= ( core_fee_paid.value / 2 );
    generic_evaluator::pay_fee();
 }
 
