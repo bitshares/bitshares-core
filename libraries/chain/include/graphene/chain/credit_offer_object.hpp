@@ -204,7 +204,7 @@ struct by_offer_borrower;    // for protocol
 /**
 * @ingroup object_index
 */
-using credit_deal_summary_multi_index_type = multi_index_container<
+using credit_deal_summary_index_type = multi_index_container<
    credit_deal_summary_object,
    indexed_by<
       ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
@@ -220,7 +220,7 @@ using credit_deal_summary_multi_index_type = multi_index_container<
 /**
 * @ingroup object_index
 */
-using credit_deal_summary_index = generic_index<credit_deal_summary_object, credit_deal_summary_multi_index_type>;
+using credit_deal_summary_index = generic_index<credit_deal_summary_object, credit_deal_summary_index_type>;
 
 } } // graphene::chain
 
