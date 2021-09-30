@@ -33,7 +33,7 @@ namespace graphene { namespace protocol {
       using result_type = uint64_t;
 
       const fee_schedule& param;
-      const int current_op;
+      const operation::tag_type current_op;
       calc_fee_visitor( const fee_schedule& p, const operation& op ):param(p),current_op(op.which())
       { /* Nothing else to do */ }
 
