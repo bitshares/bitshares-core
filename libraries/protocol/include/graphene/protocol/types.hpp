@@ -248,7 +248,7 @@ const static uint16_t PERMISSION_ONLY_MASK =
         | disable_mssr_update
         | disable_bsrm_update;
 // The bits that can be used in flags for non-UIA assets
-const static uint16_t VALID_FLAGS_MASK = ASSET_ISSUER_PERMISSION_MASK & ~PERMISSION_ONLY_MASK;
+const static uint16_t VALID_FLAGS_MASK = ASSET_ISSUER_PERMISSION_MASK & (uint16_t)(~PERMISSION_ONLY_MASK);
 // the bits that can be used in flags for UIA assets
 const static uint16_t UIA_VALID_FLAGS_MASK = UIA_ASSET_ISSUER_PERMISSION_MASK;
 

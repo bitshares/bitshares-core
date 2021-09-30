@@ -210,7 +210,8 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
    }
 }
 
-void account_history_plugin_impl::add_account_history( const account_id_type account_id, const operation_history_id_type op_id )
+void account_history_plugin_impl::add_account_history( const account_id_type account_id,
+                                                       const operation_history_id_type op_id )
 {
    graphene::chain::database& db = database();
    const auto& stats_obj = account_id(db).statistics(db);
@@ -226,15 +227,10 @@ void account_history_plugin_impl::add_account_history( const account_id_type acc
        obj.total_ops = ath.sequence;
    });
    // Amount of history to keep depends on if account is in the "extended history" list
-   bool extended_hist = false;
-   for ( auto eh_account_id : _extended_history_accounts ) {
-      extended_hist |= (account_id == eh_account_id);
-   }
-   if ( _extended_history_registrars.size() > 0 ) {
+   bool extended_hist = ( _extended_history_accounts.find( account_id ) != _extended_history_accounts.end() );
+   if( !extended_hist && _extended_history_registrars.size() > 0 ) {
       const account_id_type registrar_id = account_id(db).registrar;
-      for ( auto eh_registrar_id : _extended_history_registrars ) {
-         extended_hist |= (registrar_id == eh_registrar_id);
-      }
+      extended_hist = ( _extended_history_registrars.find( registrar_id ) != _extended_history_registrars.end() );
    }
    // _max_ops_per_account is guaranteed to be non-zero outside; max_ops_to_keep
    // will likewise be non-zero, and also non-negative (it is unsigned).

@@ -99,7 +99,7 @@ bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer)
       // all good, but check errors in response
       fc::variant j = fc::json::from_string(CurlReadBuffer);
       bool errors = j["errors"].as_bool();
-      if(errors == true) {
+      if( errors ) {
          elog( "ES returned 200 but with errors: ${e}", ("e", CurlReadBuffer) );
          return false;
       }
