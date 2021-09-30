@@ -268,7 +268,7 @@ void database::update_active_witnesses()
 
          // total_votes is 64 bits. Subtract the number of leading low bits from 64 to get the number of useful bits,
          // then I want to keep the most significant 16 bits of what's left.
-         int8_t bits_to_drop = std::max(int(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
+         uint8_t bits_to_drop = std::max(int8_t(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
          for( const auto& weight : weights )
          {
             // Ensure that everyone has at least one vote. Zero weights aren't allowed.
@@ -369,7 +369,7 @@ void database::update_active_committee_members()
 
             // total_votes is 64 bits. Subtract the number of leading low bits from 64 to get the number of useful bits,
             // then I want to keep the most significant 16 bits of what's left.
-            int8_t bits_to_drop = std::max(int(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
+            uint8_t bits_to_drop = std::max(int8_t(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
             for( const auto& weight : weights )
             {
                // Ensure that everyone has at least one vote. Zero weights aren't allowed.
@@ -924,7 +924,7 @@ void database::process_bitassets()
       {
          const auto &asset = get( o.asset_id );
          auto flags = asset.options.flags;
-         if ( ( flags & ( witness_fed_asset | committee_fed_asset ) ) &&
+         if ( ( 0 != ( flags & ( witness_fed_asset | committee_fed_asset ) ) ) &&
               o.options.feed_lifetime_sec < head_epoch_seconds ) // if smartcoin && check overflow
          {
             fc::time_point_sec calculated = head_time - o.options.feed_lifetime_sec;

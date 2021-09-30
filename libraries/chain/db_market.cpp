@@ -2236,7 +2236,7 @@ asset database::pay_market_fees(const account_object* seller, const asset_object
       if ( is_rewards_allowed() )
       {
          const auto reward_percent = recv_asset.options.extensions.value.reward_percent;
-         if ( reward_percent && *reward_percent )
+         if ( reward_percent && (*reward_percent) > 0 )
          {
             const auto reward_value = detail::calculate_percent(issuer_fees.amount, *reward_percent);
             if ( reward_value > 0 && is_authorized_asset(*this, seller->registrar(*this), recv_asset) )
