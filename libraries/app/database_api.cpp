@@ -939,10 +939,6 @@ vector<extended_asset_object> database_api_impl::list_assets(const string& lower
    result.reserve(limit);
 
    auto itr = assets_by_symbol.lower_bound(lower_bound_symbol);
-
-   if( lower_bound_symbol == "" )
-      itr = assets_by_symbol.begin();
-
    auto end = assets_by_symbol.end();
    for( ; limit > 0 && itr != end; ++itr, --limit )
       result.emplace_back( extend_asset( *itr ) );
