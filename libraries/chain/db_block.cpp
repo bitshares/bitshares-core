@@ -563,7 +563,7 @@ const vector<optional< operation_history_object > >& database::get_applied_opera
 void database::apply_block( const signed_block& next_block, uint32_t skip )
 {
    auto block_num = next_block.block_num();
-   if( _checkpoints.size() > 0 && _checkpoints.rbegin()->second != block_id_type() )
+   if( !_checkpoints.empty() && _checkpoints.rbegin()->second != block_id_type() )
    {
       auto itr = _checkpoints.find( block_num );
       if( itr != _checkpoints.end() )

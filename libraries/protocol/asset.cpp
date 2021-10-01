@@ -146,15 +146,13 @@ namespace graphene { namespace protocol {
             if( num > den )
             {
                num /= den;
-               if( num > max )
-                  num = max;
+               num = std::min( num, max );
                den = 1;
             }
             else
             {
                den /= num;
-               if( den > max )
-                  den = max;
+               den = std::min( den, max );
                num = 1;
             }
             boost::rational<uint128_t> ncp( num, den );
@@ -175,8 +173,8 @@ namespace graphene { namespace protocol {
 
          if( shrinked || using_max )
          {
-            if( ( r.numerator() > r.denominator() && np < p )
-                  || ( r.numerator() < r.denominator() && np > p ) )
+            bool flipped = ( r.numerator() > r.denominator() ) ? ( np < p ) : ( np > p );
+            if( flipped )
                // even with an accurate result, if p is out of valid range, return it
                np = p;
          }

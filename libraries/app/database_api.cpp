@@ -943,7 +943,8 @@ vector<extended_asset_object> database_api_impl::list_assets(const string& lower
    if( lower_bound_symbol == "" )
       itr = assets_by_symbol.begin();
 
-   for( ; limit > 0 && itr != assets_by_symbol.end(); ++itr, --limit )
+   auto end = assets_by_symbol.end();
+   for( ; limit > 0 && itr != end; ++itr, --limit )
       result.emplace_back( extend_asset( *itr ) );
 
    return result;
@@ -3262,7 +3263,7 @@ vector<limit_order_object> database_api_impl::get_limit_orders( const asset_id_t
 
 bool database_api_impl::is_impacted_account( const flat_set<account_id_type>& accounts)
 {
-   if( _subscribed_accounts.size() == 0 || accounts.size() == 0 )
+   if( _subscribed_accounts.empty() || accounts.empty() )
       return false;
 
    return std::any_of(accounts.begin(), accounts.end(), [this](const account_id_type& account) {
@@ -3272,7 +3273,7 @@ bool database_api_impl::is_impacted_account( const flat_set<account_id_type>& ac
 
 void database_api_impl::broadcast_updates( const vector<variant>& updates )
 {
-   if( updates.size() > 0 && _subscribe_callback ) {
+   if( !updates.empty() && _subscribe_callback ) {
       auto capture_this = shared_from_this();
       fc::async([capture_this,updates](){
           if(capture_this->_subscribe_callback)

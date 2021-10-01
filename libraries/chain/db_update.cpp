@@ -50,7 +50,7 @@ void database::update_global_dynamic_data( const signed_block& b, const uint32_t
       const uint32_t block_num = b.block_num();
       if( BOOST_UNLIKELY( block_num == 1 ) )
          dgp.recently_missed_count = 0;
-      else if( _checkpoints.size() > 0 && _checkpoints.rbegin()->first >= block_num )
+      else if( !_checkpoints.empty() && _checkpoints.rbegin()->first >= block_num )
          dgp.recently_missed_count = 0;
       else if( missed_blocks )
          dgp.recently_missed_count += GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT*missed_blocks;

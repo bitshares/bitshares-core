@@ -228,7 +228,7 @@ void account_history_plugin_impl::add_account_history( const account_id_type acc
    });
    // Amount of history to keep depends on if account is in the "extended history" list
    bool extended_hist = ( _extended_history_accounts.find( account_id ) != _extended_history_accounts.end() );
-   if( !extended_hist && _extended_history_registrars.size() > 0 ) {
+   if( !extended_hist && !_extended_history_registrars.empty() ) {
       const account_id_type registrar_id = account_id(db).registrar;
       extended_hist = ( _extended_history_registrars.find( registrar_id ) != _extended_history_registrars.end() );
    }

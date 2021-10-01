@@ -194,7 +194,7 @@ void application_impl::new_connection( const fc::http::websocket_connection_ptr&
 
 void application_impl::reset_websocket_server()
 { try {
-   if( _options->count("rpc-endpoint") == 0 )
+   if( 0 == _options->count("rpc-endpoint") )
       return;
 
    string proxy_forward_header;
@@ -211,9 +211,9 @@ void application_impl::reset_websocket_server()
 
 void application_impl::reset_websocket_tls_server()
 { try {
-   if( _options->count("rpc-tls-endpoint") == 0 )
+   if( 0 == _options->count("rpc-tls-endpoint") )
       return;
-   if( _options->count("server-pem") == 0 )
+   if( 0 == _options->count("server-pem") )
    {
       wlog( "Please specify a server-pem to use rpc-tls-endpoint" );
       return;
