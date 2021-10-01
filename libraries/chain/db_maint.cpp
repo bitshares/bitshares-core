@@ -204,7 +204,7 @@ void database::update_active_witnesses()
 { try {
    assert( !_witness_count_histogram_buffer.empty() );
    constexpr size_t two = 2;
-   constexpr size_t vid_witness = static_cast<size_t>( vote_id_type::witness ); // 1
+   constexpr auto vid_witness = static_cast<size_t>( vote_id_type::witness ); // 1
    share_type stake_target = (_total_voting_stake[vid_witness]-_witness_count_histogram_buffer[0]) / two;
 
    /// accounts that vote for 0 or 1 witness do not get to express an opinion on
@@ -311,7 +311,7 @@ void database::update_active_committee_members()
 { try {
    assert( !_committee_count_histogram_buffer.empty() );
    constexpr size_t two = 2;
-   constexpr size_t vid_committee = static_cast<size_t>( vote_id_type::committee ); // 0
+   constexpr auto vid_committee = static_cast<size_t>( vote_id_type::committee ); // 0
    share_type stake_target = (_total_voting_stake[vid_committee]-_committee_count_histogram_buffer[0]) / two;
 
    /// accounts that vote for 0 or 1 committee member do not get to express an opinion on
