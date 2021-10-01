@@ -80,18 +80,21 @@ namespace graphene { namespace protocol {
          if( a.asset_id == b.base.asset_id )
          {
             FC_ASSERT( b.base.amount.value > 0 );
-            uint128_t result = (uint128_t(a.amount.value) * b.quote.amount.value + b.base.amount.value - 1)/b.base.amount.value;
+            uint128_t result = ( ( ( uint128_t(a.amount.value) * b.quote.amount.value ) + b.base.amount.value ) - 1 )
+                               / b.base.amount.value;
             FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
             return asset( static_cast<int64_t>(result), b.quote.asset_id );
          }
          else if( a.asset_id == b.quote.asset_id )
          {
             FC_ASSERT( b.quote.amount.value > 0 );
-            uint128_t result = (uint128_t(a.amount.value) * b.base.amount.value + b.quote.amount.value - 1)/b.quote.amount.value;
+            uint128_t result = ( ( ( uint128_t(a.amount.value) * b.base.amount.value ) + b.quote.amount.value ) - 1 )
+                               / b.quote.amount.value;
             FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
             return asset( static_cast<int64_t>(result), b.base.asset_id );
          }
-         FC_THROW_EXCEPTION( fc::assert_exception, "invalid asset::multiply_and_round_up(price)", ("asset",a)("price",b) );
+         FC_THROW_EXCEPTION( fc::assert_exception,
+                             "invalid asset::multiply_and_round_up(price)", ("asset",a)("price",b) );
       }
 
       price operator / ( const asset& base, const asset& quote )
@@ -100,8 +103,11 @@ namespace graphene { namespace protocol {
          return price{base,quote};
       } FC_CAPTURE_AND_RETHROW( (base)(quote) ) }
 
-      price price::max( asset_id_type base, asset_id_type quote ) { return asset( share_type(GRAPHENE_MAX_SHARE_SUPPLY), base ) / asset( share_type(1), quote); }
-      price price::min( asset_id_type base, asset_id_type quote ) { return asset( 1, base ) / asset( GRAPHENE_MAX_SHARE_SUPPLY, quote); }
+      price price::max( asset_id_type base, asset_id_type quote )
+      { return asset( share_type(GRAPHENE_MAX_SHARE_SUPPLY), base ) / asset( share_type(1), quote); }
+
+      price price::min( asset_id_type base, asset_id_type quote )
+      { return asset( share_type(1), base ) / asset( share_type(GRAPHENE_MAX_SHARE_SUPPLY), quote); }
 
       price operator *  ( const price& p, const ratio_type& r )
       { try {
@@ -121,13 +127,13 @@ namespace graphene { namespace protocol {
          static const uint128_t max( GRAPHENE_MAX_SHARE_SUPPLY );
          while( cp.numerator() > max || cp.denominator() > max )
          {
-            if( cp.numerator() == 1 )
+            if( 1 == cp.numerator() )
             {
                cp = boost::rational<uint128_t>( 1, max );
                using_max = true;
                break;
             }
-            else if( cp.denominator() == 1 )
+            else if( 1 == cp.denominator() )
             {
                cp = boost::rational<uint128_t>( max, 1 );
                using_max = true;
@@ -341,26 +347,32 @@ namespace graphene { namespace protocol {
 
 // compile-time table of powers of 10 using template metaprogramming
 
-template< int N >
+template< size_t N >
 struct p10
 {
-   static const int64_t v = 10 * p10<N-1>::v;
+   static constexpr int64_t v = 10 * p10<N-1>::v;
 };
 
 template<>
 struct p10<0>
 {
-   static const int64_t v = 1;
+   static constexpr int64_t v = 1;
 };
 
-const int64_t scaled_precision_lut[19] =
+share_type asset::scaled_precision( uint8_t precision )
 {
-   p10<  0 >::v, p10<  1 >::v, p10<  2 >::v, p10<  3 >::v,
-   p10<  4 >::v, p10<  5 >::v, p10<  6 >::v, p10<  7 >::v,
-   p10<  8 >::v, p10<  9 >::v, p10< 10 >::v, p10< 11 >::v,
-   p10< 12 >::v, p10< 13 >::v, p10< 14 >::v, p10< 15 >::v,
-   p10< 16 >::v, p10< 17 >::v, p10< 18 >::v
-};
+   FC_ASSERT( precision < 19 );
+   static constexpr std::array<int64_t, 19> scaled_precision_lut =
+   {
+      p10<  0 >::v, p10<  1 >::v, p10<  2 >::v, p10<  3 >::v,
+      p10<  4 >::v, p10<  5 >::v, p10<  6 >::v, p10<  7 >::v,
+      p10<  8 >::v, p10<  9 >::v, p10< 10 >::v, p10< 11 >::v,
+      p10< 12 >::v, p10< 13 >::v, p10< 14 >::v, p10< 15 >::v,
+      p10< 16 >::v, p10< 17 >::v, p10< 18 >::v
+   };
+
+   return scaled_precision_lut[ precision ];
+}
 
 } } // graphene::protocol
 

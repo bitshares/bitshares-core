@@ -26,8 +26,6 @@
 
 namespace graphene { namespace protocol {
 
-   extern const int64_t scaled_precision_lut[];
-
    struct price;
 
    struct asset
@@ -90,11 +88,7 @@ namespace graphene { namespace protocol {
          return asset( a.amount + b.amount, a.asset_id );
       }
 
-      static share_type scaled_precision( uint8_t precision )
-      {
-         FC_ASSERT( precision < 19 );
-         return scaled_precision_lut[ precision ];
-      }
+      static share_type scaled_precision( uint8_t precision );
 
       asset multiply_and_round_up( const price& p )const; ///< Multiply and round up
    };
@@ -155,9 +149,9 @@ namespace graphene { namespace protocol {
    price operator /  ( const price& p, const ratio_type& r );
 
    inline price& operator *=  ( price& p, const ratio_type& r )
-   { return p = p * r; }
+   { p = p * r; return p; }
    inline price& operator /=  ( price& p, const ratio_type& r )
-   { return p = p / r; }
+   { p = p / r; return p; }
 
    /**
     *  @class price_feed
@@ -208,7 +202,7 @@ namespace graphene { namespace protocol {
        *
        * The Maximum Short Squeeze Price is computed as follows, in units of DEBT per COLLATERAL:
        *
-       *   MSSP = settlement_price / MSSR;
+       *   MSSP = settlement_price / MSSR
        *
        * @return The MSSP in units of DEBT per COLLATERAL.
        */
@@ -237,11 +231,11 @@ namespace graphene { namespace protocol {
        * determined by the Maximum Short Squeeze Ratio (MSSR) and the Margin Call Fee Ratio (MCFR)
        * as follows, in units of DEBT per COLLATERAL:
        *
-       *   MCOP = settlement_price / (MSSR - MCFR);
+       *   MCOP = settlement_price / (MSSR - MCFR)
        *
        * Compare with Maximum Short Squeeze Price (MSSP), which is computed as follows:
        *
-       *   MSSP = settlement_price / MSSR;
+       *   MSSP = settlement_price / MSSR
        *
        * Since BSIP-74, we distinguish between Maximum Short Squeeze Price (MSSP) and Margin Call
        * Order Price (MCOP). Margin calls previously offered collateral at the MSSP, but now they
