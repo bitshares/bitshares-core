@@ -734,7 +734,7 @@ namespace graphene { namespace chain {
          void initialize_budget_record( fc::time_point_sec now, budget_record& rec )const;
          void process_budget();
          void pay_workers( share_type& budget );
-         void perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props);
+         void perform_chain_maintenance( const signed_block& next_block );
          void update_active_witnesses();
          void update_active_committee_members();
          void update_worker_votes();
@@ -776,8 +776,8 @@ namespace graphene { namespace chain {
          vector<uint64_t>                  _vote_tally_buffer;
          vector<uint64_t>                  _witness_count_histogram_buffer;
          vector<uint64_t>                  _committee_count_histogram_buffer;
-         uint64_t                          _total_voting_stake[2]; // 0=committee, 1=witness,
-                                                                   // as in vote_id_type::vote_type
+         std::array<uint64_t,2>            _total_voting_stake; // 0=committee, 1=witness,
+                                                                // as in vote_id_type::vote_type
 
          flat_map<uint32_t,block_id_type>  _checkpoints;
 

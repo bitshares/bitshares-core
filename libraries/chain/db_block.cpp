@@ -599,7 +599,6 @@ void database::_apply_block( const signed_block& next_block )
               ("id",next_block.id()) );
 
    const witness_object& signing_witness = validate_block_header(skip, next_block);
-   const auto& global_props = get_global_properties();
    const auto& dynamic_global_props = get_dynamic_global_properties();
    bool maint_needed = (dynamic_global_props.next_maintenance_time <= next_block.timestamp);
 
@@ -638,7 +637,7 @@ void database::_apply_block( const signed_block& next_block )
 
    // Are we at the maintenance interval?
    if( maint_needed )
-      perform_chain_maintenance(next_block, global_props);
+      perform_chain_maintenance( next_block );
 
    create_block_summary(next_block);
    clear_expired_transactions();
