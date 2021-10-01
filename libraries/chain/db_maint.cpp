@@ -208,7 +208,7 @@ void database::update_active_witnesses()
    /// accounts that vote for 0 or 1 witness do not get to express an opinion on
    /// the number of witnesses to have (they abstain and are non-voting accounts)
 
-   share_type stake_tally = 0; 
+   share_type stake_tally = 0;
 
    size_t witness_count = 0;
    if( stake_target > 0 )
@@ -306,8 +306,9 @@ void database::update_active_witnesses()
 
 void database::update_active_committee_members()
 { try {
-   assert( _committee_count_histogram_buffer.size() > 0 );
-   share_type stake_target = (_total_voting_stake[0]-_committee_count_histogram_buffer[0]) / 2;
+   assert( !_committee_count_histogram_buffer.empty() );
+   constexpr size_t two = 2;
+   share_type stake_target = (_total_voting_stake[0]-_committee_count_histogram_buffer[0]) / two;
 
    /// accounts that vote for 0 or 1 committee member do not get to express an opinion on
    /// the number of committee members to have (they abstain and are non-voting accounts)
@@ -324,7 +325,7 @@ void database::update_active_committee_members()
 
    const chain_property_object& cpo = get_chain_properties();
 
-   committee_member_count = std::max( committee_member_count*2+1,
+   committee_member_count = std::max( ( committee_member_count * two ) + 1,
                                       (size_t)cpo.immutable_parameters.min_committee_member_count );
    auto committee_members = sort_votable_objects<committee_member_index>( committee_member_count );
 
@@ -955,7 +956,7 @@ void database::process_bitassets()
 
 /****
  * @brief a one-time data process to correct max_supply
- * 
+ *
  * NOTE: while exceeding max_supply happened in mainnet, it seemed to have corrected
  * itself before HF 1465. But this method must remain to correct some assets in testnet
  */
@@ -970,12 +971,13 @@ void process_hf_1465( database& db )
       graphene::chain::share_type max_supply = current_asset.options.max_supply;
       if (current_supply > max_supply && max_supply != GRAPHENE_MAX_SHARE_SUPPLY)
       {
-         wlog( "Adjusting max_supply of ${asset} because current_supply (${current_supply}) is greater than ${old}.", 
-               ("asset", current_asset.symbol) 
+         wlog( "Adjusting max_supply of ${asset} because current_supply (${current_supply}) is greater than ${old}.",
+               ("asset", current_asset.symbol)
                ("current_supply", current_supply.value)
                ("old", max_supply));
          db.modify<asset_object>( current_asset, [current_supply](asset_object& obj) {
-            obj.options.max_supply = graphene::chain::share_type(std::min(current_supply.value, GRAPHENE_MAX_SHARE_SUPPLY));
+            obj.options.max_supply = graphene::chain::share_type(std::min(current_supply.value,
+                                                                          GRAPHENE_MAX_SHARE_SUPPLY));
          });
       }
    }
@@ -1203,7 +1205,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
       optional<detail::vote_recalc_times> delegator_recalc_times;
 
       vote_tally_helper( database& db )
-         : d(db), props( d.get_global_properties() ), dprops( d.get_dynamic_global_properties() ), 
+         : d(db), props( d.get_global_properties() ), dprops( d.get_dynamic_global_properties() ),
            now( d.head_block_time() ), hf2103_passed( HARDFORK_CORE_2103_PASSED( now ) ),
            hf2262_passed( HARDFORK_CORE_2262_PASSED( now ) ),
            pob_activated( dprops.total_pob > 0 || dprops.total_inactive > 0 )
@@ -1315,17 +1317,17 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
                vp_all = vp_active = voting_stake[2];
                if( !directly_voting )
                {
-                  vp_active = voting_stake[2] = detail::vote_recalc_options::delegator().get_recalced_voting_stake( 
+                  vp_active = voting_stake[2] = detail::vote_recalc_options::delegator().get_recalced_voting_stake(
                      voting_stake[2], stats.last_vote_time, *delegator_recalc_times );
                }
-               vp_witness = voting_stake[1] = detail::vote_recalc_options::witness().get_recalced_voting_stake( 
+               vp_witness = voting_stake[1] = detail::vote_recalc_options::witness().get_recalced_voting_stake(
                   voting_stake[2], opinion_account_stats.last_vote_time, *witness_recalc_times );
-               vp_committee = voting_stake[0] = detail::vote_recalc_options::committee().get_recalced_voting_stake( 
+               vp_committee = voting_stake[0] = detail::vote_recalc_options::committee().get_recalced_voting_stake(
                   voting_stake[2], opinion_account_stats.last_vote_time, *committee_recalc_times );
                num_committee_voting_stake = voting_stake[0];
                if( opinion_account.num_committee_voted > 1 )
                   voting_stake[0] /= opinion_account.num_committee_voted;
-               vp_worker = voting_stake[2] = detail::vote_recalc_options::worker().get_recalced_voting_stake( 
+               vp_worker = voting_stake[2] = detail::vote_recalc_options::worker().get_recalced_voting_stake(
                   voting_stake[2], opinion_account_stats.last_vote_time, *worker_recalc_times );
             }
 
@@ -1347,7 +1349,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
                   update_stats.vp_committee += vp_committee;
                   update_stats.vp_witness += vp_witness;
                   update_stats.vp_worker += vp_worker;
-                  // update_stats.vote_tally_time = now; 
+                  // update_stats.vote_tally_time = now;
                }
             });
 
@@ -1382,7 +1384,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    } tally_helper(*this);
 
    perform_account_maintenance( tally_helper );
-   
+
    struct clear_canary {
       clear_canary(vector<uint64_t>& target): target(target){}
       ~clear_canary() { target.clear(); }
