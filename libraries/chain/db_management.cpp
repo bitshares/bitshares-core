@@ -92,7 +92,7 @@ void database::reindex( fc::path data_dir )
          if( block.valid() )
          {
             if( block->timestamp >= last_block->timestamp - gpo.parameters.maximum_time_until_expiration )
-               skip &= ~skip_transaction_dupe_check;
+               skip &= (uint32_t)(~skip_transaction_dupe_check);
             blocks.emplace( processed_block_size, std::move(*block), fc::future<void>() );
             std::get<2>(blocks.back()) = precompute_parallel( std::get<1>(blocks.back()), skip );
          }

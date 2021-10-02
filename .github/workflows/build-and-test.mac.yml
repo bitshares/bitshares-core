@@ -28,7 +28,7 @@ jobs:
               -D CMAKE_C_COMPILER_LAUNCHER=ccache \
               -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
               -D BOOST_ROOT=/usr/local/opt/boost@1.69 \
-              -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl \
+              -D OPENSSL_ROOT_DIR=/usr/local/opt/openssl@1.1 \
               ..
     - name: Load Cache
       uses: actions/cache@v2

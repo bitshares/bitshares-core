@@ -50,7 +50,7 @@ void database::update_global_dynamic_data( const signed_block& b, const uint32_t
       const uint32_t block_num = b.block_num();
       if( BOOST_UNLIKELY( block_num == 1 ) )
          dgp.recently_missed_count = 0;
-      else if( _checkpoints.size() && _checkpoints.rbegin()->first >= block_num )
+      else if( !_checkpoints.empty() && _checkpoints.rbegin()->first >= block_num )
          dgp.recently_missed_count = 0;
       else if( missed_blocks )
          dgp.recently_missed_count += GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT*missed_blocks;
@@ -69,7 +69,7 @@ void database::update_global_dynamic_data( const signed_block& b, const uint32_t
       dgp.current_aslot += missed_blocks+1;
    });
 
-   if( !(get_node_properties().skip_flags & skip_undo_history_check) )
+   if( 0 == (get_node_properties().skip_flags & skip_undo_history_check) )
    {
       GRAPHENE_ASSERT( _dgp.head_block_number - _dgp.last_irreversible_block_num  < GRAPHENE_MAX_UNDO_HISTORY, undo_database_exception,
                  "The database does not have enough undo history to support a blockchain with so many missed blocks. "
@@ -556,8 +556,8 @@ void database::update_maintenance_flag( bool new_maintenance_flag )
    {
       auto maintenance_flag = dynamic_global_property_object::maintenance_flag;
       dpo.dynamic_flags =
-           (dpo.dynamic_flags & ~maintenance_flag)
-         | (new_maintenance_flag ? maintenance_flag : 0);
+           (dpo.dynamic_flags & (uint32_t)(~maintenance_flag))
+         | (new_maintenance_flag ? (uint32_t)maintenance_flag : 0U);
    } );
    return;
 }

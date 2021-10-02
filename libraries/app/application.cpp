@@ -126,13 +126,13 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    _p2p_network->load_configuration(data_dir / "p2p");
    _p2p_network->set_node_delegate(shared_from_this());
 
-   if( _options->count("seed-node") )
+   if( _options->count("seed-node") > 0 )
    {
       auto seeds = _options->at("seed-node").as<vector<string>>();
       _p2p_network->add_seed_nodes(seeds);
    }
 
-   if( _options->count("seed-nodes") )
+   if( _options->count("seed-nodes") > 0 )
    {
       auto seeds_str = _options->at("seed-nodes").as<string>();
       auto seeds = fc::json::from_string(seeds_str).as<vector<string>>(2);
@@ -147,7 +147,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       _p2p_network->add_seed_nodes(seeds);
    }
 
-   if( _options->count("p2p-endpoint") )
+   if( _options->count("p2p-endpoint") > 0 )
       _p2p_network->listen_on_endpoint(fc::ip::endpoint::from_string(_options->at("p2p-endpoint").as<string>()), true);
    else
       _p2p_network->listen_on_port(0, false);
@@ -194,11 +194,11 @@ void application_impl::new_connection( const fc::http::websocket_connection_ptr&
 
 void application_impl::reset_websocket_server()
 { try {
-   if( !_options->count("rpc-endpoint") )
+   if( 0 == _options->count("rpc-endpoint") )
       return;
 
    string proxy_forward_header;
-   if( _options->count("proxy-forwarded-for-header") )
+   if( _options->count("proxy-forwarded-for-header") > 0 )
       proxy_forward_header = _options->at("proxy-forwarded-for-header").as<string>();
 
    _websocket_server = std::make_shared<fc::http::websocket_server>( proxy_forward_header );
@@ -211,19 +211,20 @@ void application_impl::reset_websocket_server()
 
 void application_impl::reset_websocket_tls_server()
 { try {
-   if( !_options->count("rpc-tls-endpoint") )
+   if( 0 == _options->count("rpc-tls-endpoint") )
       return;
-   if( !_options->count("server-pem") )
+   if( 0 == _options->count("server-pem") )
    {
       wlog( "Please specify a server-pem to use rpc-tls-endpoint" );
       return;
    }
 
    string proxy_forward_header;
-   if( _options->count("proxy-forwarded-for-header") )
+   if( _options->count("proxy-forwarded-for-header") > 0 )
       proxy_forward_header = _options->at("proxy-forwarded-for-header").as<string>();
 
-   string password = _options->count("server-pem-password") ? _options->at("server-pem-password").as<string>() : "";
+   string password = ( _options->count("server-pem-password") > 0 ) ?
+                        _options->at("server-pem-password").as<string>() : "";
    _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>(
                                  _options->at("server-pem").as<string>(), password, proxy_forward_header );
    _websocket_tls_server->on_connection( std::bind(&application_impl::new_connection, this, std::placeholders::_1) );
@@ -297,108 +298,141 @@ void application_impl::initialize(const fc::path& data_dir, shared_ptr<boost::pr
 }
 
 void application_impl::set_api_limit() {
-   if (_options->count("api-limit-get-account-history-operations")) {
-      _app_options.api_limit_get_account_history_operations = _options->at("api-limit-get-account-history-operations").as<uint64_t>();
+   if (_options->count("api-limit-get-account-history-operations") > 0) {
+      _app_options.api_limit_get_account_history_operations =
+            _options->at("api-limit-get-account-history-operations").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-account-history")){
-      _app_options.api_limit_get_account_history = _options->at("api-limit-get-account-history").as<uint64_t>();
+   if(_options->count("api-limit-get-account-history") > 0){
+      _app_options.api_limit_get_account_history =
+            _options->at("api-limit-get-account-history").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-grouped-limit-orders")){
-      _app_options.api_limit_get_grouped_limit_orders = _options->at("api-limit-get-grouped-limit-orders").as<uint64_t>();
+   if(_options->count("api-limit-get-grouped-limit-orders") > 0){
+      _app_options.api_limit_get_grouped_limit_orders =
+            _options->at("api-limit-get-grouped-limit-orders").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-relative-account-history")){
-       _app_options.api_limit_get_relative_account_history = _options->at("api-limit-get-relative-account-history").as<uint64_t>();
+   if(_options->count("api-limit-get-relative-account-history") > 0){
+      _app_options.api_limit_get_relative_account_history =
+            _options->at("api-limit-get-relative-account-history").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-account-history-by-operations")){
-       _app_options.api_limit_get_account_history_by_operations = _options->at("api-limit-get-account-history-by-operations").as<uint64_t>();
+   if(_options->count("api-limit-get-account-history-by-operations") > 0){
+      _app_options.api_limit_get_account_history_by_operations =
+            _options->at("api-limit-get-account-history-by-operations").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-asset-holders")){
-       _app_options.api_limit_get_asset_holders = _options->at("api-limit-get-asset-holders").as<uint64_t>();
+   if(_options->count("api-limit-get-asset-holders") > 0){
+      _app_options.api_limit_get_asset_holders =
+            _options->at("api-limit-get-asset-holders").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-key-references")){
-       _app_options.api_limit_get_key_references = _options->at("api-limit-get-key-references").as<uint64_t>();
+   if(_options->count("api-limit-get-key-references") > 0){
+      _app_options.api_limit_get_key_references =
+            _options->at("api-limit-get-key-references").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-htlc-by")) {
-      _app_options.api_limit_get_htlc_by = _options->at("api-limit-get-htlc-by").as<uint64_t>();
+   if(_options->count("api-limit-get-htlc-by") > 0) {
+      _app_options.api_limit_get_htlc_by =
+            _options->at("api-limit-get-htlc-by").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-full-accounts")) {
-      _app_options.api_limit_get_full_accounts = _options->at("api-limit-get-full-accounts").as<uint64_t>();
+   if(_options->count("api-limit-get-full-accounts") > 0) {
+      _app_options.api_limit_get_full_accounts =
+            _options->at("api-limit-get-full-accounts").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-full-accounts-lists")) {
-      _app_options.api_limit_get_full_accounts_lists = _options->at("api-limit-get-full-accounts-lists").as<uint64_t>();
+   if(_options->count("api-limit-get-full-accounts-lists") > 0) {
+      _app_options.api_limit_get_full_accounts_lists =
+            _options->at("api-limit-get-full-accounts-lists").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-top-voters")) {
-      _app_options.api_limit_get_top_voters = _options->at("api-limit-get-top-voters").as<uint64_t>();
+   if(_options->count("api-limit-get-top-voters") > 0) {
+      _app_options.api_limit_get_top_voters =
+            _options->at("api-limit-get-top-voters").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-call-orders")) {
-      _app_options.api_limit_get_call_orders = _options->at("api-limit-get-call-orders").as<uint64_t>();
+   if(_options->count("api-limit-get-call-orders") > 0) {
+      _app_options.api_limit_get_call_orders =
+            _options->at("api-limit-get-call-orders").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-settle-orders")) {
-      _app_options.api_limit_get_settle_orders = _options->at("api-limit-get-settle-orders").as<uint64_t>();
+   if(_options->count("api-limit-get-settle-orders") > 0) {
+      _app_options.api_limit_get_settle_orders =
+            _options->at("api-limit-get-settle-orders").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-assets")) {
-      _app_options.api_limit_get_assets = _options->at("api-limit-get-assets").as<uint64_t>();
+   if(_options->count("api-limit-get-assets") > 0) {
+      _app_options.api_limit_get_assets =
+            _options->at("api-limit-get-assets").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-limit-orders")){
-      _app_options.api_limit_get_limit_orders = _options->at("api-limit-get-limit-orders").as<uint64_t>();
+   if(_options->count("api-limit-get-limit-orders") > 0){
+      _app_options.api_limit_get_limit_orders =
+            _options->at("api-limit-get-limit-orders").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-limit-orders-by-account")){
-      _app_options.api_limit_get_limit_orders_by_account = _options->at("api-limit-get-limit-orders-by-account").as<uint64_t>();
+   if(_options->count("api-limit-get-limit-orders-by-account") > 0){
+      _app_options.api_limit_get_limit_orders_by_account =
+            _options->at("api-limit-get-limit-orders-by-account").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-order-book")){
-      _app_options.api_limit_get_order_book = _options->at("api-limit-get-order-book").as<uint64_t>();
+   if(_options->count("api-limit-get-order-book") > 0){
+      _app_options.api_limit_get_order_book =
+            _options->at("api-limit-get-order-book").as<uint64_t>();
    }
-   if(_options->count("api-limit-list-htlcs")){
-      _app_options.api_limit_list_htlcs = _options->at("api-limit-list-htlcs").as<uint64_t>();
+   if(_options->count("api-limit-list-htlcs") > 0){
+      _app_options.api_limit_list_htlcs =
+            _options->at("api-limit-list-htlcs").as<uint64_t>();
    }
-   if(_options->count("api-limit-lookup-accounts")) {
-      _app_options.api_limit_lookup_accounts = _options->at("api-limit-lookup-accounts").as<uint64_t>();
+   if(_options->count("api-limit-lookup-accounts") > 0) {
+      _app_options.api_limit_lookup_accounts =
+            _options->at("api-limit-lookup-accounts").as<uint64_t>();
    }
-   if(_options->count("api-limit-lookup-witness-accounts")) {
-      _app_options.api_limit_lookup_witness_accounts = _options->at("api-limit-lookup-witness-accounts").as<uint64_t>();
+   if(_options->count("api-limit-lookup-witness-accounts") > 0) {
+      _app_options.api_limit_lookup_witness_accounts =
+            _options->at("api-limit-lookup-witness-accounts").as<uint64_t>();
    }
-   if(_options->count("api-limit-lookup-committee-member-accounts")) {
-      _app_options.api_limit_lookup_committee_member_accounts = _options->at("api-limit-lookup-committee-member-accounts").as<uint64_t>();
+   if(_options->count("api-limit-lookup-committee-member-accounts") > 0) {
+      _app_options.api_limit_lookup_committee_member_accounts =
+            _options->at("api-limit-lookup-committee-member-accounts").as<uint64_t>();
    }
-   if(_options->count("api-limit-lookup-vote-ids")) {
-      _app_options.api_limit_lookup_vote_ids = _options->at("api-limit-lookup-vote-ids").as<uint64_t>();
+   if(_options->count("api-limit-lookup-vote-ids") > 0) {
+      _app_options.api_limit_lookup_vote_ids =
+            _options->at("api-limit-lookup-vote-ids").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-account-limit-orders")) {
-      _app_options.api_limit_get_account_limit_orders = _options->at("api-limit-get-account-limit-orders").as<uint64_t>();
+   if(_options->count("api-limit-get-account-limit-orders") > 0) {
+      _app_options.api_limit_get_account_limit_orders =
+            _options->at("api-limit-get-account-limit-orders").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-collateral-bids")) {
-      _app_options.api_limit_get_collateral_bids = _options->at("api-limit-get-collateral-bids").as<uint64_t>();
+   if(_options->count("api-limit-get-collateral-bids") > 0) {
+      _app_options.api_limit_get_collateral_bids =
+            _options->at("api-limit-get-collateral-bids").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-top-markets")) {
-      _app_options.api_limit_get_top_markets = _options->at("api-limit-get-top-markets").as<uint64_t>();
+   if(_options->count("api-limit-get-top-markets") > 0) {
+      _app_options.api_limit_get_top_markets =
+            _options->at("api-limit-get-top-markets").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-trade-history")) {
-      _app_options.api_limit_get_trade_history = _options->at("api-limit-get-trade-history").as<uint64_t>();
+   if(_options->count("api-limit-get-trade-history") > 0) {
+      _app_options.api_limit_get_trade_history =
+            _options->at("api-limit-get-trade-history").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-trade-history-by-sequence")) {
-      _app_options.api_limit_get_trade_history_by_sequence = _options->at("api-limit-get-trade-history-by-sequence").as<uint64_t>();
+   if(_options->count("api-limit-get-trade-history-by-sequence") > 0) {
+      _app_options.api_limit_get_trade_history_by_sequence =
+            _options->at("api-limit-get-trade-history-by-sequence").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-withdraw-permissions-by-giver")) {
-      _app_options.api_limit_get_withdraw_permissions_by_giver = _options->at("api-limit-get-withdraw-permissions-by-giver").as<uint64_t>();
+   if(_options->count("api-limit-get-withdraw-permissions-by-giver") > 0) {
+      _app_options.api_limit_get_withdraw_permissions_by_giver =
+            _options->at("api-limit-get-withdraw-permissions-by-giver").as<uint64_t>();
    }
-   if(_options->count("api-limit-get-withdraw-permissions-by-recipient")) {
-      _app_options.api_limit_get_withdraw_permissions_by_recipient = _options->at("api-limit-get-withdraw-permissions-by-recipient").as<uint64_t>();
+   if(_options->count("api-limit-get-withdraw-permissions-by-recipient") > 0) {
+      _app_options.api_limit_get_withdraw_permissions_by_recipient =
+            _options->at("api-limit-get-withdraw-permissions-by-recipient").as<uint64_t>();
    }
    if(_options->count("api-limit-get-tickets") > 0) {
-      _app_options.api_limit_get_tickets = _options->at("api-limit-get-tickets").as<uint64_t>();
+      _app_options.api_limit_get_tickets =
+            _options->at("api-limit-get-tickets").as<uint64_t>();
    }
    if(_options->count("api-limit-get-liquidity-pools") > 0) {
-      _app_options.api_limit_get_liquidity_pools = _options->at("api-limit-get-liquidity-pools").as<uint64_t>();
+      _app_options.api_limit_get_liquidity_pools =
+            _options->at("api-limit-get-liquidity-pools").as<uint64_t>();
    }
    if(_options->count("api-limit-get-liquidity-pool-history") > 0) {
       _app_options.api_limit_get_liquidity_pool_history =
             _options->at("api-limit-get-liquidity-pool-history").as<uint64_t>();
    }
    if(_options->count("api-limit-get-samet-funds") > 0) {
-      _app_options.api_limit_get_samet_funds = _options->at("api-limit-get-samet-funds").as<uint64_t>();
+      _app_options.api_limit_get_samet_funds =
+            _options->at("api-limit-get-samet-funds").as<uint64_t>();
    }
    if(_options->count("api-limit-get-credit-offers") > 0) {
-      _app_options.api_limit_get_credit_offers = _options->at("api-limit-get-credit-offers").as<uint64_t>();
+      _app_options.api_limit_get_credit_offers =
+            _options->at("api-limit-get-credit-offers").as<uint64_t>();
    }
 }
 
@@ -608,7 +642,7 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
                     "Rejecting block with timestamp in the future", );
 
    try {
-      const uint32_t skip = (_is_block_producer | _force_validate) ?
+      const uint32_t skip = (_is_block_producer || _force_validate) ?
                                database::skip_nothing : database::skip_transaction_signatures;
       bool result = valve.do_serial( [this,&blk_msg,skip] () {
          _chain_db->precompute_parallel( blk_msg.block, skip ).wait();
