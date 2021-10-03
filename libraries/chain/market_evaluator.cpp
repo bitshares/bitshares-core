@@ -471,6 +471,7 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
 { try {
    const database& d = db();
 
+   // TODO cleanup: remove the assertion and related test cases after hardfork
    FC_ASSERT( d.head_block_time() > HARDFORK_CORE_216_TIME, "Not yet!" );
 
    // Note: bidder is the fee payer thus exists in the database
@@ -478,9 +479,15 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
    FC_ASSERT( _debt_asset->is_market_issued(), "Unable to cover ${sym} as it is not a collateralized asset.",
               ("sym", _debt_asset->symbol) );
 
+   const fc::time_point_sec next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
+   // Note: due to old bugs, an asset can have the flag set before the hardfork, so we need the hardfork check here
+   // TODO review after hardfork to see if we can remove the check
+   if( HARDFORK_CORE_2281_PASSED( next_maint_time ) )
+      FC_ASSERT( _debt_asset->can_bid_collateral(), "Collateral bidding is disabled for this asset" );
+
    _bitasset_data  = &_debt_asset->bitasset_data(d);
 
-   FC_ASSERT( _bitasset_data->has_settlement() );
+   FC_ASSERT( _bitasset_data->has_settlement(), "Cannot bid since the asset is not globally settled" );
 
    FC_ASSERT( o.additional_collateral.asset_id == _bitasset_data->options.short_backing_asset );
 

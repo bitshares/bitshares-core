@@ -112,6 +112,8 @@ namespace graphene { namespace chain {
          bool can_owner_update_mssr()const { return (0 == (options.issuer_permissions & disable_mssr_update)); }
          /// @return true if the asset owner can change black swan response method
          bool can_owner_update_bsrm()const { return (0 == (options.issuer_permissions & disable_bsrm_update)); }
+         /// @return true if can bid collateral for the asset
+         bool can_bid_collateral()const { return (0 == (options.flags & disable_collateral_bidding)); }
 
          /// Helper function to get an asset object with the given amount in this asset's type
          asset amount(share_type a)const { return asset(a, id); }

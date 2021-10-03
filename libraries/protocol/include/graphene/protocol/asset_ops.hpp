@@ -98,7 +98,7 @@ namespace graphene { namespace protocol {
 
       /// Perform checks about @ref flags.
       /// @throws fc::exception if any check fails
-      void validate_flags( bool is_market_issued )const;
+      void validate_flags( bool is_market_issued, bool allow_disable_collateral_bid = true )const;
    };
 
    /**

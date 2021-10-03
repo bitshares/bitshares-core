@@ -439,10 +439,8 @@ void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const 
 
    // cancel remaining bids
    const auto& bid_idx = get_index_type< collateral_bid_index >().indices().get<by_price>();
-   auto itr = bid_idx.lower_bound( boost::make_tuple( bitasset.id,
-                                                      price::max( bad.options.short_backing_asset, bitasset.id ),
-                                                      collateral_bid_id_type() ) );
-   while( itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == bitasset.id )
+   auto itr = bid_idx.lower_bound( bad.asset_id );
+   while( itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == bad.asset_id )
    {
       const collateral_bid_object& bid = *itr;
       ++itr;

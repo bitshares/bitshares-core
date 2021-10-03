@@ -1131,6 +1131,31 @@ void process_hf_2262( database& db )
    }
 }
 
+/// A one-time data process to cancel all collateral bids for assets that disabled collateral bidding already
+void process_hf_2281( database& db )
+{
+   const auto& bid_idx = db.get_index_type< collateral_bid_index >().indices().get<by_price>();
+   auto bid_itr = bid_idx.begin();
+   auto bid_end = bid_idx.end();
+
+   asset_id_type current_asset_id;
+   bool can_bid_collateral = true;
+
+   while( bid_itr != bid_end )
+   {
+      const collateral_bid_object& bid = *bid_itr;
+      ++bid_itr;
+      if( current_asset_id != bid.inv_swan_price.quote.asset_id )
+      {
+         current_asset_id = bid.inv_swan_price.quote.asset_id;
+         can_bid_collateral = current_asset_id(db).can_bid_collateral();
+      }
+      if( !can_bid_collateral )
+         db.cancel_bid( bid );
+   }
+
+}
+
 namespace detail {
 
    struct vote_recalc_times
@@ -1515,6 +1540,10 @@ void database::perform_chain_maintenance( const signed_block& next_block )
    // Update tickets. Note: the new values will take effect only on the next maintenance interval
    if ( dgpo.next_maintenance_time <= HARDFORK_CORE_2262_TIME && next_maintenance_time > HARDFORK_CORE_2262_TIME )
       process_hf_2262(*this);
+
+   // Cancel all collateral bids on assets which disabled collateral bidding already
+   if ( dgpo.next_maintenance_time <= HARDFORK_CORE_2281_TIME && next_maintenance_time > HARDFORK_CORE_2281_TIME )
+      process_hf_2281(*this);
 
    // To check call orders and potential match them with force settlements, for hard fork core-2481
    bool match_call_orders_for_hf_2481 = false;

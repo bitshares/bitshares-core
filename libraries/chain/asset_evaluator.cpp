@@ -144,6 +144,20 @@ namespace detail {
                  "Collateral-denominated fees are not yet active and therefore cannot be claimed." );
    }
 
+   void check_asset_options_hf_core2281( const fc::time_point_sec& next_maint_time, const asset_options& options)
+   {
+      // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
+      if ( !HARDFORK_CORE_2281_PASSED(next_maint_time) )
+      {
+         // new issuer permissions should not be set until activation of the hardfork
+         FC_ASSERT( 0 == (options.issuer_permissions & asset_issuer_permission_flags::disable_collateral_bidding),
+                    "New asset issuer permission bit 'disable_collateral_bidding' should not be set "
+                    "before Hardfork core-2281" );
+         // Note: checks about flags are more complicated due to old bugs,
+         //       and likely can not be removed after hardfork, so do not put them here
+      }
+   }
+
    void check_asset_options_hf_core2467(const fc::time_point_sec& next_maint_time, const asset_options& options)
    {
       // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
@@ -151,7 +165,8 @@ namespace detail {
       {
          // new issuer permissions should not be set until activation of the hardfork
          FC_ASSERT( 0 == (options.issuer_permissions & asset_issuer_permission_flags::disable_bsrm_update),
-                    "New asset issuer permission bits should not be set before Hardfork core-2467" );
+                    "New asset issuer permission bit 'disable_bsrm_update' should not be set "
+                    "before Hardfork core-2467" );
       }
    }
 
@@ -178,6 +193,7 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    detail::check_asset_options_hf_1774(now, op.common_options);
    detail::check_asset_options_hf_bsip_48_75(now, op.common_options);
    detail::check_asset_options_hf_bsip81(now, op.common_options);
+   detail::check_asset_options_hf_core2281( next_maint_time, op.common_options ); // HF_REMOVABLE
    detail::check_asset_options_hf_core2467( next_maint_time, op.common_options ); // HF_REMOVABLE
    if( op.bitasset_opts ) {
       detail::check_bitasset_options_hf_bsip_48_75( now, *op.bitasset_opts );
@@ -188,9 +204,14 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    }
 
    // TODO move as many validations as possible to validate() if not triggered before hardfork
-   if( HARDFORK_BSIP_48_75_PASSED( now ) )
+   if( HARDFORK_CORE_2281_PASSED( next_maint_time ) )
    {
       op.common_options.validate_flags( op.bitasset_opts.valid() );
+   }
+   else if( HARDFORK_BSIP_48_75_PASSED( now ) )
+   {
+      // do not allow the 'disable_collateral_bidding' bit
+      op.common_options.validate_flags( op.bitasset_opts.valid(), false );
    }
 
    const auto& chain_parameters = d.get_global_properties().parameters;
@@ -430,10 +451,12 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    detail::check_asset_options_hf_1774(now, o.new_options);
    detail::check_asset_options_hf_bsip_48_75(now, o.new_options);
    detail::check_asset_options_hf_bsip81(now, o.new_options);
+   detail::check_asset_options_hf_core2281( next_maint_time, o.new_options ); // HF_REMOVABLE
    detail::check_asset_options_hf_core2467( next_maint_time, o.new_options ); // HF_REMOVABLE
    detail::check_asset_update_extensions_hf_bsip_48_75( now, o.extensions.value );
 
    bool hf_bsip_48_75_passed = ( HARDFORK_BSIP_48_75_PASSED( now ) );
+   bool hf_core_2281_passed = ( HARDFORK_CORE_2281_PASSED( next_maint_time ) );
    bool hf_core_2467_passed = ( HARDFORK_CORE_2467_PASSED( next_maint_time ) );
 
    const asset_object& a = o.asset_to_update(d);
@@ -502,17 +525,25 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       }
    }
 
+   // If an invalid bit was set in flags, it should be unset
    // TODO move as many validations as possible to validate() if not triggered before hardfork
-   if( hf_bsip_48_75_passed )
+   if( hf_core_2281_passed )
    {
       o.new_options.validate_flags( a.is_market_issued() );
+   }
+   else if( hf_bsip_48_75_passed )
+   {
+      // do not allow the 'disable_collateral_bidding' bit
+      o.new_options.validate_flags( a.is_market_issued(), false );
    }
 
    // changed flags must be subset of old issuer permissions
    if( hf_bsip_48_75_passed )
    {
       // Note: if an invalid bit was set, it can be unset regardless of the permissions
-      uint16_t check_bits = ( a.is_market_issued() ? VALID_FLAGS_MASK : UIA_VALID_FLAGS_MASK );
+      uint16_t valid_flags_mask = hf_core_2281_passed ? VALID_FLAGS_MASK
+                                                      : (VALID_FLAGS_MASK & (uint16_t)(~disable_collateral_bidding));
+      uint16_t check_bits = a.is_market_issued() ? valid_flags_mask : UIA_VALID_FLAGS_MASK;
 
       FC_ASSERT( 0 == ( (o.new_options.flags ^ a.options.flags) & check_bits
                         & (uint16_t)(~enabled_issuer_permissions_mask) ),
@@ -576,6 +607,19 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
            itr != idx.end() && itr->settlement_asset_id() == o.asset_to_update;
            itr = idx.lower_bound(o.asset_to_update) )
          d.cancel_settle_order(*itr);
+   }
+
+   // If we are now disabling collateral bidding, cancel all open collateral bids
+   if( 0 != (o.new_options.flags & disable_collateral_bidding) && asset_to_update->can_bid_collateral() )
+   {
+      const auto& bid_idx = d.get_index_type< collateral_bid_index >().indices().get<by_price>();
+      auto itr = bid_idx.lower_bound( o.asset_to_update );
+      while( itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == o.asset_to_update )
+      {
+         const collateral_bid_object& bid = *itr;
+         ++itr;
+         d.cancel_bid( bid );
+      }
    }
 
    // For market-issued assets, if core exchange rate changed, update flag in bitasset data

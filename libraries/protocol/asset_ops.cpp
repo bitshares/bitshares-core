@@ -308,10 +308,15 @@ void asset_options::validate()const
       FC_ASSERT( *extensions.value.reward_percent <= GRAPHENE_100_PERCENT );
 }
 
-void asset_options::validate_flags( bool is_market_issued )const
+// Note: this function is only called after the BSIP 48/75 hardfork
+void asset_options::validate_flags( bool is_market_issued, bool allow_disable_collateral_bid )const
 {
    FC_ASSERT( 0 == (flags & (uint16_t)(~ASSET_ISSUER_PERMISSION_MASK)),
               "Can not set an unknown bit in flags" );
+   if( !allow_disable_collateral_bid ) // before core-2281 hf, can not set the disable_collateral_bidding bit
+      FC_ASSERT( 0 == (flags & disable_collateral_bidding),
+                 "Can not set the 'disable_collateral_bidding' bit in flags between the core-2281 hardfork "
+                 "and the BSIP_48_75 hardfork" );
    // Note: global_settle is checked in validate(), so do not check again here
    FC_ASSERT( 0 == (flags & disable_mcr_update),
               "Can not set disable_mcr_update flag, it is for issuer permission only" );

@@ -159,7 +159,7 @@ enum asset_issuer_permission_flags {
     override_authority   = 0x04, ///< issuer may transfer asset back to himself
     transfer_restricted  = 0x08, ///< require the issuer to be one party to every transfer
     disable_force_settle = 0x10, ///< disable force settling
-    global_settle        = 0x20, ///< allow the bitasset owner to force a global settling, permission only
+    global_settle        = 0x20, ///< allow the bitasset owner to force a global settlement, permission only
     disable_confidential = 0x40, ///< disallow the asset to be used with confidential transactions
     witness_fed_asset    = 0x80, ///< the bitasset is to be fed by witnesses
     committee_fed_asset  = 0x100, ///< the bitasset is to be fed by the committee
@@ -180,7 +180,8 @@ enum asset_issuer_permission_flags {
     disable_mcr_update   = 0x800, ///< the bitasset owner can not update MCR, permisison only
     disable_icr_update   = 0x1000, ///< the bitasset owner can not update ICR, permisison only
     disable_mssr_update  = 0x2000, ///< the bitasset owner can not update MSSR, permisison only
-    disable_bsrm_update  = 0x4000  ///< the bitasset owner can not update BSRM, permission only
+    disable_bsrm_update  = 0x4000, ///< the bitasset owner can not update BSRM, permission only
+    disable_collateral_bidding = 0x8000  ///< Can not bid collateral after a global settlement
     ///@}
     ///@}
 };
@@ -201,7 +202,8 @@ const static uint16_t ASSET_ISSUER_PERMISSION_MASK =
         | disable_mcr_update
         | disable_icr_update
         | disable_mssr_update
-        | disable_bsrm_update;
+        | disable_bsrm_update
+        | disable_collateral_bidding;
 // The "enable" bits for non-UIA assets
 const static uint16_t ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK =
         charge_market_fee
@@ -220,7 +222,8 @@ const static uint16_t ASSET_ISSUER_PERMISSION_DISABLE_BITS_MASK =
         | disable_mcr_update
         | disable_icr_update
         | disable_mssr_update
-        | disable_bsrm_update;
+        | disable_bsrm_update
+        | disable_collateral_bidding;
 // The bits that can be used in asset issuer permissions for UIA assets
 const static uint16_t UIA_ASSET_ISSUER_PERMISSION_MASK =
         charge_market_fee
@@ -365,6 +368,7 @@ FC_REFLECT_ENUM(graphene::protocol::asset_issuer_permission_flags,
                 (disable_icr_update)
                 (disable_mssr_update)
                 (disable_bsrm_update)
+                (disable_collateral_bidding)
                )
 
 namespace fc { namespace raw {
