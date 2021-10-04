@@ -36,7 +36,7 @@ using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( bsip48_75_tests, database_fixture )
 
-BOOST_AUTO_TEST_CASE( hardfork_protection_test )
+BOOST_AUTO_TEST_CASE( bsip48_75_hardfork_protection_test )
 {
    try {
 
@@ -1062,7 +1062,7 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
 
       // advance to bsip48/75 hard fork
       generate_blocks( HARDFORK_BSIP_48_75_TIME );
-      if( hf2467 )
+      if( hf2467 ) // Note: tests hf core-2281 too, assumes hf core-2281 and hf core-2467 occur at the same time
       {
          auto mi = db.get_global_properties().parameters.maintenance_interval;
          generate_blocks(HARDFORK_CORE_2467_TIME - mi);
@@ -1103,6 +1103,8 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
 
       // take a look at flags of MPA
       uint16_t valid_bitflag = VALID_FLAGS_MASK & ~committee_fed_asset;
+      if( !hf2467 ) // Note: actually it is for hf core-2281
+         valid_bitflag = valid_bitflag & ~disable_collateral_bidding;
       BOOST_CHECK( sambit_id(db).options.flags != valid_bitflag );
 
       // Try to update MPA but leave some invalid flags, should fail
@@ -1163,8 +1165,9 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       // Unable to create a new MPA with an unknown bit in flags
       acop2.symbol = "NEWSAMBIT";
       // With all possible bits in permissions set to 1
+      // Note: tests hf core-2281 too, assumes hf core-2281 and core-2267 occur at the same time
       acop2.common_options.issuer_permissions = hf2467 ? ASSET_ISSUER_PERMISSION_MASK
-                                                       : ( ASSET_ISSUER_PERMISSION_MASK & ~disable_bsrm_update );
+                  : ( ASSET_ISSUER_PERMISSION_MASK & ~disable_bsrm_update & ~disable_collateral_bidding );
       for( uint16_t bit = 0x8000; bit > 0; bit >>= 1 )
       {
          acop2.common_options.flags = valid_bitflag | bit;
@@ -1190,10 +1193,17 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
       BOOST_CHECK( !newsambit_id(db).can_owner_update_icr() );
       BOOST_CHECK( !newsambit_id(db).can_owner_update_mcr() );
       BOOST_CHECK( !newsambit_id(db).can_owner_update_mssr() );
+      // Note: tests hf core-2281 too, assumes hf core-2281 and core-2267 occur at the same time
       if( hf2467 )
+      {
          BOOST_CHECK( !newsambit_id(db).can_owner_update_bsrm() );
+         BOOST_CHECK( !newsambit_id(db).can_bid_collateral() );
+      }
       else
+      {
          BOOST_CHECK( newsambit_id(db).can_owner_update_bsrm() );
+         BOOST_CHECK( newsambit_id(db).can_bid_collateral() );
+      }
 
       // Able to propose too
       propose( acop2 );
@@ -1208,6 +1218,7 @@ BOOST_AUTO_TEST_CASE( invalid_flags_in_asset )
 
 BOOST_AUTO_TEST_CASE( invalid_flags_in_asset_after_hf2467 )
 {
+   // Note: tests hf core-2281 too, assumes hf core-2281 and hf core-2467 occur at the same time
    hf2467 = true;
    INVOKE( invalid_flags_in_asset );
 }

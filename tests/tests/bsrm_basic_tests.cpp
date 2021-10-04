@@ -37,7 +37,7 @@ using namespace graphene::chain::test;
 BOOST_FIXTURE_TEST_SUITE( bsrm_tests, database_fixture )
 
 /// Tests scenarios that unable to have BSDM-related asset issuer permission or extensions before hardfork
-BOOST_AUTO_TEST_CASE( hardfork_protection_test )
+BOOST_AUTO_TEST_CASE( bsrm_hardfork_protection_test )
 {
    try {
 
@@ -51,10 +51,13 @@ BOOST_AUTO_TEST_CASE( hardfork_protection_test )
       auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
       fund( sam, asset(init_amount) );
 
-      uint16_t old_bitmask = ASSET_ISSUER_PERMISSION_MASK & ~disable_bsrm_update;
-      uint16_t new_bitmask = ASSET_ISSUER_PERMISSION_MASK;
+      // Note: tests hf core-2281 too, assumes hf core-2281 and core-2267 occur at the same time
+      uint16_t old_bitmask = ASSET_ISSUER_PERMISSION_MASK & ~disable_bsrm_update & ~disable_collateral_bidding;
+      uint16_t new_bitmask1 = ASSET_ISSUER_PERMISSION_MASK;
+      uint16_t new_bitmask2 = ASSET_ISSUER_PERMISSION_MASK & ~disable_bsrm_update;
+      uint16_t new_bitmask3 = ASSET_ISSUER_PERMISSION_MASK & ~disable_collateral_bidding;
 
-      uint16_t bitflag = VALID_FLAGS_MASK & ~committee_fed_asset;
+      uint16_t old_bitflag = VALID_FLAGS_MASK & ~committee_fed_asset & ~disable_collateral_bidding;
 
       vector<operation> ops;
 
@@ -66,7 +69,7 @@ BOOST_AUTO_TEST_CASE( hardfork_protection_test )
       acop.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
       acop.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
       acop.common_options.market_fee_percent = 100;
-      acop.common_options.flags = bitflag;
+      acop.common_options.flags = old_bitflag;
       acop.common_options.issuer_permissions = old_bitmask;
       acop.bitasset_opts = bitasset_options();
       acop.bitasset_opts->minimum_feeds = 3;
@@ -78,7 +81,13 @@ BOOST_AUTO_TEST_CASE( hardfork_protection_test )
          auto& op = trx.operations.front().get<asset_create_operation>();
 
          // Unable to set new permission bit
-         op.common_options.issuer_permissions = new_bitmask;
+         op.common_options.issuer_permissions = new_bitmask1;
+         BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+         ops.push_back( op );
+         op.common_options.issuer_permissions = new_bitmask2;
+         BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+         ops.push_back( op );
+         op.common_options.issuer_permissions = new_bitmask3;
          BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
          ops.push_back( op );
          op.common_options.issuer_permissions = old_bitmask;
@@ -117,7 +126,13 @@ BOOST_AUTO_TEST_CASE( hardfork_protection_test )
          op.new_options.market_fee_percent = 200;
 
          // Unable to set new permission bit
-         op.new_options.issuer_permissions = new_bitmask;
+         op.new_options.issuer_permissions = new_bitmask1;
+         BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+         ops.push_back( op );
+         op.new_options.issuer_permissions = new_bitmask2;
+         BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+         ops.push_back( op );
+         op.new_options.issuer_permissions = new_bitmask3;
          BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
          ops.push_back( op );
          op.new_options.issuer_permissions = old_bitmask;
@@ -174,6 +189,7 @@ BOOST_AUTO_TEST_CASE( hardfork_protection_test )
       generate_block();
 
       // Advance to core-2467 hard fork
+      // Note: tests hf core-2281 too, assumes hf core-2281 and core-2267 occur at the same time
       auto mi = db.get_global_properties().parameters.maintenance_interval;
       generate_blocks(HARDFORK_CORE_2467_TIME - mi);
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
@@ -205,8 +221,11 @@ BOOST_AUTO_TEST_CASE( uia_issuer_permissions_update_test )
       auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
       fund( sam, asset(init_amount) );
 
-      uint16_t old_bitmask = ASSET_ISSUER_PERMISSION_MASK & ~disable_bsrm_update;
-      uint16_t new_bitmask = ASSET_ISSUER_PERMISSION_MASK;
+      // Note: tests hf core-2281 too, assumes hf core-2281 and core-2267 occur at the same time
+      uint16_t old_bitmask = ASSET_ISSUER_PERMISSION_MASK & ~disable_bsrm_update & ~disable_collateral_bidding;
+      uint16_t new_bitmask1 = ASSET_ISSUER_PERMISSION_MASK;
+      uint16_t new_bitmask2 = ASSET_ISSUER_PERMISSION_MASK & ~disable_bsrm_update;
+      uint16_t new_bitmask3 = ASSET_ISSUER_PERMISSION_MASK & ~disable_collateral_bidding;
       uint16_t uiamask = UIA_ASSET_ISSUER_PERMISSION_MASK;
 
       uint16_t uiaflag = uiamask & ~disable_new_supply; // Allow creating new supply
@@ -258,13 +277,18 @@ BOOST_AUTO_TEST_CASE( uia_issuer_permissions_update_test )
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
 
       // Advance to core-2467 hard fork
+      // Note: tests hf core-2281 too, assumes hf core-2281 and core-2267 occur at the same time
       auto mi = db.get_global_properties().parameters.maintenance_interval;
       generate_blocks(HARDFORK_CORE_2467_TIME - mi);
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       set_expiration( db, trx );
 
       // Still able to propose
-      auop.new_options.issuer_permissions = new_bitmask;
+      auop.new_options.issuer_permissions = new_bitmask1;
+      propose( auop );
+      auop.new_options.issuer_permissions = new_bitmask2;
+      propose( auop );
+      auop.new_options.issuer_permissions = new_bitmask3;
       propose( auop );
 
       // But no longer able to update directly
@@ -294,6 +318,11 @@ BOOST_AUTO_TEST_CASE( uia_issuer_permissions_update_test )
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
 
       auop.new_options.issuer_permissions = uiamask | disable_bsrm_update;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      auop.new_options.issuer_permissions = uiamask | disable_collateral_bidding;
       trx.operations.clear();
       trx.operations.push_back( auop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
@@ -339,6 +368,11 @@ BOOST_AUTO_TEST_CASE( uia_issuer_permissions_update_test )
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
 
       auop.new_options.issuer_permissions = uiamask | disable_bsrm_update;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      auop.new_options.issuer_permissions = uiamask | disable_collateral_bidding;
       trx.operations.clear();
       trx.operations.push_back( auop );
       BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
