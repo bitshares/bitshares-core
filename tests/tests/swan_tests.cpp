@@ -45,9 +45,9 @@ using namespace graphene::chain::test;
 namespace graphene { namespace chain {
 
 struct swan_fixture : database_fixture {
-    limit_order_id_type init_standard_swan(share_type amount = 1000) {
+    limit_order_id_type init_standard_swan(share_type amount = 1000, bool disable_bidding = false) {
         standard_users();
-        standard_asset();
+        standard_asset(disable_bidding);
         return trigger_swan(amount, amount);
     }
 
@@ -62,9 +62,23 @@ struct swan_fixture : database_fixture {
         transfer(committee_account, borrower2_id, asset(init_balance));
     }
 
-    void standard_asset() {
+    void standard_asset(bool disable_bidding = false) {
         set_expiration( db, trx );
-        const auto& bitusd = create_bitasset("USDBIT", _feedproducer);
+        const asset_object* bitusd_ptr;
+        if( !disable_bidding )
+           bitusd_ptr = &create_bitasset("USDBIT", _feedproducer);
+        else
+        {
+           auto cop = make_bitasset("USDBIT", _feedproducer);
+           cop.common_options.flags |= disable_collateral_bidding;
+           trx.operations.clear();
+           trx.operations.push_back(cop);
+           trx.validate();
+           processed_transaction ptx = PUSH_TX(db, trx, ~0);
+           trx.operations.clear();
+           bitusd_ptr = &db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+        }
+        const auto& bitusd = *bitusd_ptr;
         _swan = bitusd.id;
         _back = asset_id_type();
         update_feed_producers(swan(), {_feedproducer});
@@ -684,6 +698,400 @@ BOOST_AUTO_TEST_CASE( overflow )
    BOOST_CHECK_EQUAL( 1399, itr->debt.value );
 
    BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+} FC_LOG_AND_RETHROW() }
+
+/// Tests what kind of assets can have the disable_collateral_bidding flag / issuer permission
+BOOST_AUTO_TEST_CASE( hf2281_asset_permissions_flags_test )
+{
+   try {
+
+      // Advance to core-2281 hard fork
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2281_TIME - mi);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      set_expiration( db, trx );
+
+      ACTORS((sam));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+
+      // Able to create a PM with the disable_collateral_bidding bit in flags
+      create_prediction_market( "TESTPMTEST", sam_id, 0, disable_collateral_bidding );
+
+      // Able to create a MPA with the disable_collateral_bidding bit in flags
+      create_bitasset( "TESTBITTEST", sam_id, 0, disable_collateral_bidding );
+
+      // Unable to create a UIA with the disable_collateral_bidding bit in flags
+      BOOST_CHECK_THROW( create_user_issued_asset( "TESTUIA", sam_id(db), disable_collateral_bidding ),
+                         fc::exception );
+
+      // create a PM with a zero market_fee_percent
+      const asset_object& pm = create_prediction_market( "TESTPM", sam_id, 0, charge_market_fee );
+      asset_id_type pm_id = pm.id;
+
+      // create a MPA with a zero market_fee_percent
+      const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
+      asset_id_type mpa_id = mpa.id;
+
+      // create a UIA with a zero market_fee_percent
+      const asset_object& uia = create_user_issued_asset( "TESTUIA", sam_id(db), charge_market_fee );
+      asset_id_type uia_id = uia.id;
+
+      // Prepare for asset update
+      asset_update_operation auop;
+      auop.issuer = sam_id;
+
+      // Able to set disable_collateral_bidding bit in flags for PM
+      auop.asset_to_update = pm_id;
+      auop.new_options = pm_id(db).options;
+      auop.new_options.flags |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+      // Able to propose
+      propose( auop );
+
+      // Able to set disable_collateral_bidding bit in flags for MPA
+      auop.asset_to_update = mpa_id;
+      auop.new_options = mpa_id(db).options;
+      auop.new_options.flags |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+      // Able to propose
+      propose( auop );
+
+      // Unable to set disable_collateral_bidding bit in flags for UIA
+      auop.asset_to_update = uia_id;
+      auop.new_options = uia_id(db).options;
+      auop.new_options.flags |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      // Able to propose
+      propose( auop );
+
+      // Able to set disable_collateral_bidding bit in issuer_permissions for PM
+      auop.asset_to_update = pm_id;
+      auop.new_options = pm_id(db).options;
+      auop.new_options.issuer_permissions |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+      // Able to propose
+      propose( auop );
+
+      // Able to set disable_collateral_bidding bit in issuer_permissions for MPA
+      auop.asset_to_update = mpa_id;
+      auop.new_options = mpa_id(db).options;
+      auop.new_options.issuer_permissions |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+      // Able to propose
+      propose( auop );
+
+      // Unable to set disable_collateral_bidding bit in issuer_permissions for UIA
+      auop.asset_to_update = uia_id;
+      auop.new_options = uia_id(db).options;
+      auop.new_options.issuer_permissions |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      // But able to propose
+      propose( auop );
+
+      // Unable to create a UIA with disable_collateral_bidding permission bit
+      asset_create_operation acop;
+      acop.issuer = sam_id;
+      acop.symbol = "SAMCOIN";
+      acop.precision = 2;
+      acop.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
+      acop.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      acop.common_options.market_fee_percent = 100;
+      acop.common_options.flags = charge_market_fee;
+      acop.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK | disable_collateral_bidding;
+
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      // Unable to propose either
+      BOOST_CHECK_THROW( propose( acop ), fc::exception );
+
+      // Able to create UIA without disable_collateral_bidding permission bit
+      acop.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK;
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      PUSH_TX(db, trx, ~0);
+
+      // Able to create a MPA with disable_collateral_bidding permission bit
+      acop.symbol = "SAMMPA";
+      acop.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK | disable_collateral_bidding;
+      acop.bitasset_opts = bitasset_options();
+
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      PUSH_TX(db, trx, ~0);
+
+      // Able to propose
+      propose( acop );
+
+      // Able to create a PM with disable_collateral_bidding permission bit
+      acop.symbol = "SAMPM";
+      acop.precision = asset_id_type()(db).precision;
+      acop.is_prediction_market = true;
+      acop.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK | global_settle
+                                                                                | disable_collateral_bidding;
+      acop.bitasset_opts = bitasset_options();
+
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      PUSH_TX(db, trx, ~0);
+
+      // Able to propose
+      propose( acop );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/// Tests whether asset owner has permission to update the disable_collateral_bidding flag and the permission
+BOOST_AUTO_TEST_CASE( hf2281_asset_owner_permission_test )
+{
+   try {
+
+      // Advance to core-2281 hard fork
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2281_TIME - mi);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      set_expiration( db, trx );
+
+      ACTORS((sam)(feeder));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( feeder, asset(init_amount) );
+
+      // create a MPA with a zero market_fee_percent
+      const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
+      asset_id_type mpa_id = mpa.id;
+
+      BOOST_CHECK( mpa_id(db).can_bid_collateral() );
+
+      // add a price feed publisher and publish a feed
+      update_feed_producers( mpa_id, { feeder_id } );
+
+      price_feed f;
+      f.settlement_price = price( asset(1,mpa_id), asset(1) );
+      f.core_exchange_rate = price( asset(1,mpa_id), asset(1) );
+      f.maintenance_collateral_ratio = 1850;
+      f.maximum_short_squeeze_ratio = 1250;
+
+      uint16_t feed_icr = 1900;
+
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+      // Prepare for asset update
+      asset_update_operation auop;
+      auop.issuer = sam_id;
+      auop.asset_to_update = mpa_id;
+      auop.new_options = mpa_id(db).options;
+
+      // update disable_collateral_bidding flag
+      auop.new_options.flags |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      // check
+      BOOST_CHECK( !mpa_id(db).can_bid_collateral() );
+
+      // disable owner's permission to update the disable_collateral_bidding flag
+      auop.new_options.issuer_permissions |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      // check
+      BOOST_CHECK( !mpa_id(db).can_bid_collateral() );
+
+      // check that owner can not update the disable_collateral_bidding flag
+      auop.new_options.flags &= ~disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      auop.new_options = mpa_id(db).options;
+
+      // check
+      BOOST_CHECK( !mpa_id(db).can_bid_collateral() );
+
+      // enable owner's permission to update the disable_collateral_bidding flag
+      auop.new_options.issuer_permissions &= ~disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      // check
+      BOOST_CHECK( !mpa_id(db).can_bid_collateral() );
+
+      // check that owner can update the disable_collateral_bidding flag
+      auop.new_options.flags &= ~disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      // check
+      BOOST_CHECK( mpa_id(db).can_bid_collateral() );
+
+      // Sam borrow some
+      borrow( sam, asset(1000, mpa_id), asset(2000) );
+
+      // disable owner's permission to update the disable_collateral_bidding flag
+      auop.new_options.issuer_permissions |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      // check
+      BOOST_CHECK( mpa_id(db).can_bid_collateral() );
+
+      // check that owner can not update the disable_collateral_bidding flag
+      auop.new_options.flags |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      auop.new_options = mpa_id(db).options;
+
+      // check
+      BOOST_CHECK( mpa_id(db).can_bid_collateral() );
+
+      // unable to enable the permission due to non-zero supply
+      auop.new_options.issuer_permissions &= ~disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      // check
+      BOOST_CHECK( mpa_id(db).can_bid_collateral() );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/// Tests the disable_collateral_bidding bit in asset flags
+BOOST_AUTO_TEST_CASE( disable_collateral_bidding_test )
+{ try {
+   init_standard_swan( 2000 );
+
+   // Advance to core-2281 hard fork
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_2281_TIME - mi);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   set_expiration( db, trx );
+
+   BOOST_CHECK( swan().can_bid_collateral() );
+
+   bid_collateral( borrower(), back().amount(3000), swan().amount(700) );
+   bid_collateral( borrower2(), back().amount(300), swan().amount(600) );
+
+   graphene::app::database_api db_api( db, &( app.get_options() ));
+   auto swan_symbol = swan().symbol;
+   vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+   BOOST_CHECK_EQUAL( bids.size(), 2u );
+
+   // Disable collateral bidding
+   asset_update_operation auop;
+   auop.issuer = swan().issuer;
+   auop.asset_to_update = swan().id;
+   auop.new_options = swan().options;
+   auop.new_options.flags |= disable_collateral_bidding;
+   trx.operations.clear();
+   trx.operations.push_back( auop );
+   PUSH_TX(db, trx, ~0);
+
+   BOOST_CHECK( !swan().can_bid_collateral() );
+
+   // Check that existing bids are cancelled
+   bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+   BOOST_CHECK_EQUAL( bids.size(), 0u );
+
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   // Unable to bid
+   BOOST_CHECK_THROW( bid_collateral( borrower(), back().amount(3000), swan().amount(700) ), fc::exception );
+
+   // Enable collateral bidding
+   auop.new_options.flags &= ~disable_collateral_bidding;
+   trx.operations.clear();
+   trx.operations.push_back( auop );
+   PUSH_TX(db, trx, ~0);
+
+   BOOST_CHECK( swan().can_bid_collateral() );
+
+   // Able to bid again
+   bid_collateral( borrower(), back().amount(3000), swan().amount(700) );
+   bid_collateral( borrower2(), back().amount(300), swan().amount(600) );
+
+   bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+   BOOST_CHECK_EQUAL( bids.size(), 2u );
+
+   generate_block();
+
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+} FC_LOG_AND_RETHROW() }
+
+/// Tests cancelling of collateral bids at hard fork time if the disable_collateral_bidding bit in asset flags was
+/// already set due to a bug
+BOOST_AUTO_TEST_CASE( disable_collateral_bidding_cross_hardfork_test )
+{ try {
+   init_standard_swan( 2000, true );
+
+   wait_for_hf_core_216();
+
+   BOOST_CHECK( !swan().can_bid_collateral() );
+
+   bid_collateral( borrower(), back().amount(3000), swan().amount(700) );
+   bid_collateral( borrower2(), back().amount(300), swan().amount(600) );
+
+   graphene::app::database_api db_api( db, &( app.get_options() ));
+   auto swan_symbol = swan().symbol;
+   vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+   BOOST_CHECK_EQUAL( bids.size(), 2u );
+
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   // Advance to core-2281 hard fork
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_2281_TIME - mi);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   set_expiration( db, trx );
+
+   BOOST_CHECK( !swan().can_bid_collateral() );
+
+   // Check that existing bids are cancelled
+   bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+   BOOST_CHECK_EQUAL( bids.size(), 0u );
+
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   // Unable to bid
+   BOOST_CHECK_THROW( bid_collateral( borrower(), back().amount(3000), swan().amount(700) ), fc::exception );
+
+   generate_block();
+
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

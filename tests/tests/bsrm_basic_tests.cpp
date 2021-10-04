@@ -385,7 +385,7 @@ BOOST_AUTO_TEST_CASE( uia_issuer_permissions_update_test )
 }
 
 /// Tests what kind of assets can have BSRM-related flags / issuer permissions / extensions
-BOOST_AUTO_TEST_CASE( asset_permissions_flags_extensions_test )
+BOOST_AUTO_TEST_CASE( bsrm_asset_permissions_flags_extensions_test )
 {
    try {
 
@@ -395,11 +395,10 @@ BOOST_AUTO_TEST_CASE( asset_permissions_flags_extensions_test )
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       set_expiration( db, trx );
 
-      ACTORS((sam)(feeder));
+      ACTORS((sam));
 
       auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
       fund( sam, asset(init_amount) );
-      fund( feeder, asset(init_amount) );
 
       // Unable to create a PM with the disable_bsrm_update bit in flags
       BOOST_CHECK_THROW( create_prediction_market( "TESTPM", sam_id, 0, disable_bsrm_update ), fc::exception );
@@ -555,7 +554,7 @@ BOOST_AUTO_TEST_CASE( asset_permissions_flags_extensions_test )
 }
 
 /// Tests whether asset owner has permission to update bsrm
-BOOST_AUTO_TEST_CASE( asset_owner_permissions_update_bsrm )
+BOOST_AUTO_TEST_CASE( bsrm_asset_owner_permissions_update_bsrm )
 {
    try {
 
