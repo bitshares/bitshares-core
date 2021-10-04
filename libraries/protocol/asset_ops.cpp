@@ -112,9 +112,9 @@ void  asset_create_operation::validate()const
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( is_valid_symbol(symbol) );
    common_options.validate();
-   if( 0 != ( common_options.issuer_permissions
-              & (disable_force_settle|global_settle
-                 |disable_mcr_update|disable_icr_update|disable_mssr_update|disable_bsrm_update) ) )
+   // TODO fix the missing check for witness_fed_asset and committee_fed_asset with a hard fork
+   if( 0 != ( common_options.issuer_permissions & NON_UIA_ONLY_ISSUER_PERMISSION_MASK
+              & (uint16_t)( ~(witness_fed_asset|committee_fed_asset) ) ) )
       FC_ASSERT( bitasset_opts.valid() );
    if( is_prediction_market )
    {
