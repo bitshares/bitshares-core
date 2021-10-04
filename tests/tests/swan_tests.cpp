@@ -287,8 +287,10 @@ BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
          set_price( bitusd, bitusd.amount(40) / core.amount(1000) ); // $0.04
          borrow( borrower, bitusd.amount(100), asset(5000) );    // 2x collat
          transfer( borrower, seller, bitusd.amount(100) );
-         limit_order_id_type oid_019 = create_sell_order( seller, bitusd.amount(39), core.amount(2000) )->id;   // this order is at $0.019, we should not be able to match against it
-         limit_order_id_type oid_020 = create_sell_order( seller, bitusd.amount(40), core.amount(2000) )->id;   // this order is at $0.020, we should be able to match against it
+         // this order is at $0.019, we should not be able to match against it
+         limit_order_id_type oid_019 = create_sell_order( seller, bitusd.amount(39), core.amount(2000) )->id;
+         // this order is at $0.020, we should be able to match against it
+         limit_order_id_type oid_020 = create_sell_order( seller, bitusd.amount(40), core.amount(2000) )->id;
          set_price( bitusd, bitusd.amount(21) / core.amount(1000) ); // $0.021
          //
          // We attempt to match against $0.019 order and black swan,
@@ -360,7 +362,8 @@ BOOST_AUTO_TEST_CASE( recollateralize )
       // can't bid zero collateral
       GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), back().amount(0), swan().amount(100) ), fc::exception );
       // can't bid more than we have
-      GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), back().amount(b2_balance + 100), swan().amount(100) ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), back().amount(b2_balance + 100), swan().amount(100) ),
+                              fc::exception );
       trx.operations.clear();
 
       // can't bid on a live bitasset
