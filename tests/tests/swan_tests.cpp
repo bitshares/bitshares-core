@@ -426,7 +426,7 @@ BOOST_AUTO_TEST_CASE( revive_recovered_with_bids_not_by_icr_before_hf_core_2290 
       BOOST_REQUIRE( HARDFORK_BSIP_77_PASSED( db.head_block_time() ) );
 
       // price not good enough for recovery
-      set_feed( 700, 800, 1750, 1800 );
+      set_feed( 700, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
       BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
 
       bid_collateral( borrower(),  back().amount(10510), swan().amount(700) );
@@ -439,7 +439,7 @@ BOOST_AUTO_TEST_CASE( revive_recovered_with_bids_not_by_icr_before_hf_core_2290 
       BOOST_CHECK_EQUAL( 2u, bids.size() );
 
       // good feed price
-      set_feed( 701, 800, 1750, 1800 );
+      set_feed( 701, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
       BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
 
       bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
@@ -477,7 +477,7 @@ BOOST_AUTO_TEST_CASE( revive_recovered_with_bids_by_icr_after_hf_core_2290 )
       BOOST_CHECK( swan().bitasset_data(db).current_feed.settlement_price.is_null() );
 
       // price not good enough for recovery
-      set_feed( 700, 800, 1750, 1800 );
+      set_feed( 700, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
       BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
 
       bid_collateral( borrower(),  back().amount(10510), swan().amount(700) );
@@ -490,19 +490,19 @@ BOOST_AUTO_TEST_CASE( revive_recovered_with_bids_by_icr_after_hf_core_2290 )
       BOOST_CHECK_EQUAL( 2u, bids.size() );
 
       // price still not good enough for recovery
-      set_feed( 701, 800, 1750, 1800 );
+      set_feed( 701, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
       BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
       bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
       BOOST_CHECK_EQUAL( 2u, bids.size() );
 
       // price still not good enough for recovery
-      set_feed( 720, 800, 1750, 1800 );
+      set_feed( 720, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
       BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
       bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
       BOOST_CHECK_EQUAL( 2u, bids.size() );
 
       // good feed price
-      set_feed( 721, 800, 1750, 1800 );
+      set_feed( 721, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
       BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
 
       bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
