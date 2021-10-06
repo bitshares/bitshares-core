@@ -316,7 +316,7 @@ namespace graphene { namespace chain {
          void cancel_limit_order( const limit_order_object& order,
                                   bool create_virtual_op = true,
                                   bool skip_cancel_fee = false );
-         void revive_bitasset( const asset_object& bitasset );
+         void revive_bitasset( const asset_object& bitasset, const asset_bitasset_data_object& bad );
          void cancel_bid(const collateral_bid_object& bid, bool create_virtual_op = true);
          void execute_bid( const collateral_bid_object& bid, share_type debt_covered,
                            share_type collateral_from_fund, const price_feed& current_feed );

@@ -823,19 +823,30 @@ void deprecate_annual_members( database& db )
 
 void database::process_bids( const asset_bitasset_data_object& bad )
 {
-   if( bad.is_prediction_market ) return;
-   if( bad.current_feed.settlement_price.is_null() ) return;
+   if( bad.is_prediction_market || bad.current_feed.settlement_price.is_null() )
+      return;
 
-   asset_id_type to_revive_id = (asset( 0, bad.options.short_backing_asset ) * bad.settlement_price).asset_id;
+   asset_id_type to_revive_id = bad.asset_id;
    const asset_object& to_revive = to_revive_id( *this );
    const asset_dynamic_data_object& bdd = to_revive.dynamic_data( *this );
 
+   if( 0 == bdd.current_supply ) // shortcut
+   {
+      _cancel_bids_and_revive_mpa( to_revive, bad );
+      return;
+   }
+
+   bool after_hf_core_2290 = HARDFORK_CORE_2290_PASSED( get_dynamic_global_properties().next_maintenance_time );
+
    const auto& bid_idx = get_index_type< collateral_bid_index >().indices().get<by_price>();
    const auto start = bid_idx.lower_bound( to_revive_id );
+   auto end = bid_idx.upper_bound( to_revive_id );
 
    share_type covered = 0;
    auto itr = start;
-   while( covered < bdd.current_supply && itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == to_revive_id )
+   auto revive_ratio = after_hf_core_2290 ? bad.current_feed.initial_collateral_ratio
+                                          : bad.current_feed.maintenance_collateral_ratio;
+   while( covered < bdd.current_supply && itr != end )
    {
       const collateral_bid_object& bid = *itr;
       asset debt_in_bid = bid.inv_swan_price.quote;
@@ -843,15 +854,14 @@ void database::process_bids( const asset_bitasset_data_object& bad )
          debt_in_bid.amount = bdd.current_supply;
       asset total_collateral = debt_in_bid * bad.settlement_price;
       total_collateral += bid.inv_swan_price.base;
-      price call_price = price::call_price( debt_in_bid, total_collateral,
-                                            bad.current_feed.maintenance_collateral_ratio );
+      price call_price = price::call_price( debt_in_bid, total_collateral, revive_ratio );
       if( ~call_price >= bad.current_feed.settlement_price ) break;
       covered += debt_in_bid.amount;
       ++itr;
    }
    if( covered < bdd.current_supply ) return;
 
-   const auto end = itr;
+   end = itr;
    share_type to_cover = bdd.current_supply;
    share_type remaining_fund = bad.settlement_fund;
    itr = start;
@@ -943,29 +953,28 @@ void database::process_bitassets()
    uint32_t head_epoch_seconds = head_time.sec_since_epoch();
    bool after_hf_core_518 = ( head_time >= HARDFORK_CORE_518_TIME ); // clear expired feeds
 
-   const auto update_bitasset = [this,head_time,head_epoch_seconds,after_hf_core_518]( asset_bitasset_data_object &o )
+   const auto& update_bitasset = [this,&head_time,head_epoch_seconds,after_hf_core_518]
+                                 ( asset_bitasset_data_object &o )
    {
       o.force_settled_volume = 0; // Reset all BitAsset force settlement volumes to zero
 
-      // clear expired feeds
-      if( after_hf_core_518 )
+      // clear expired feeds if smartcoin (witness_fed or committee_fed) && check overflow
+      if( after_hf_core_518 && o.options.feed_lifetime_sec < head_epoch_seconds
+            && ( 0 != ( o.asset_id(*this).options.flags & ( witness_fed_asset | committee_fed_asset ) ) ) )
       {
-         const auto &asset = get( o.asset_id );
-         auto flags = asset.options.flags;
-         if ( ( 0 != ( flags & ( witness_fed_asset | committee_fed_asset ) ) ) &&
-              o.options.feed_lifetime_sec < head_epoch_seconds ) // if smartcoin && check overflow
+         fc::time_point_sec calculated = head_time - o.options.feed_lifetime_sec;
+         auto itr = o.feeds.rbegin();
+         auto end = o.feeds.rend();
+         while( itr != end ) // loop feeds
          {
-            fc::time_point_sec calculated = head_time - o.options.feed_lifetime_sec;
-            auto itr = o.feeds.rbegin();
-            auto end = o.feeds.rend();
-            while( itr != end ) // loop feeds
-            {
-               auto feed_time = itr->second.first;
-               std::advance( itr, 1 );
-               if( feed_time < calculated )
-                  o.feeds.erase( itr.base() ); // delete expired feed
-            }
+            auto feed_time = itr->second.first;
+            std::advance( itr, 1 );
+            if( feed_time < calculated )
+               o.feeds.erase( itr.base() ); // delete expired feed
          }
+         // Note: we don't update current_feed here, and the update_expired_feeds() call is a bit too late,
+         //       so theoretically there could be an inconsistency between active feeds and current_feed.
+         //       And note that the next step "process_bids()" is based on current_feed.
       }
    };
 

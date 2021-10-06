@@ -492,6 +492,8 @@ void database::update_expired_feeds()
       auto old_median_feed = b.current_feed;
       const asset_object& asset_obj = b.asset_id( *this );
       update_bitasset_current_feed( b );
+      // Note: we don't try to revive the bitasset here if it was GSed // TODO probably we should do it
+
       if( !b.current_feed.settlement_price.is_null()
             && !b.current_feed.margin_call_params_equal( old_median_feed ) )
       {

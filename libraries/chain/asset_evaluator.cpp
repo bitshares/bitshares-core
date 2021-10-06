@@ -614,7 +614,8 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
    {
       const auto& bid_idx = d.get_index_type< collateral_bid_index >().indices().get<by_price>();
       auto itr = bid_idx.lower_bound( o.asset_to_update );
-      while( itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == o.asset_to_update )
+      const auto end = bid_idx.upper_bound( o.asset_to_update );
+      while( itr != end )
       {
          const collateral_bid_object& bid = *itr;
          ++itr;
@@ -993,6 +994,7 @@ static bool update_bitasset_object_options(
       const auto old_feed = bdo.current_feed;
       // skip recalculating median feed if it is not needed
       db.update_bitasset_current_feed( bdo, !should_update_feeds );
+      // Note: we don't try to revive the bitasset here if it was GSed // TODO probably we should do it
 
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
       feed_actually_changed = ( after_hf_core_868_890 && !old_feed.margin_call_params_equal( bdo.current_feed ) );
@@ -1081,6 +1083,8 @@ void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_f
       }
    });
    d.update_bitasset_current_feed( bitasset_to_update );
+   // Note: we don't try to revive the bitasset here if it was GSed // TODO probably we should do it
+
    // Process margin calls, allow black swan, not for a new limit order
    d.check_call_orders( *asset_to_update, true, false, &bitasset_to_update );
 
@@ -1233,6 +1237,7 @@ static extendable_operation_result pay_settle_from_gs_fund( database& d,
    d.modify( mia_dyn, [&pays]( asset_dynamic_data_object& obj ){
       obj.current_supply -= pays.amount;
    });
+   // Note: we don't revive the asset here if current_supply become zero, but only do it on a new feed
 
    extendable_operation_result result;
 
@@ -1420,40 +1425,42 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
    });
    d.update_bitasset_current_feed( bad );
 
-   if( !old_feed.margin_call_params_equal(bad.current_feed) )
+   if( old_feed.margin_call_params_equal(bad.current_feed) )
+      return void_result();
+
+   // Feed changed, check whether need to revive the asset and proceed if need
+   if( bad.has_settlement() // has globally settled, implies head_block_time > HARDFORK_CORE_216_TIME
+       && !bad.current_feed.settlement_price.is_null() ) // has a valid feed
    {
-      // Check whether need to revive the asset and proceed if need
-      if( bad.has_settlement() // has globally settled, implies head_block_time > HARDFORK_CORE_216_TIME
-          && !bad.current_feed.settlement_price.is_null() ) // has a valid feed
+      bool should_revive = false;
+      const auto& mia_dyn = base.dynamic_asset_data_id(d);
+      if( mia_dyn.current_supply == 0 ) // if current supply is zero, revive the asset
+         should_revive = true;
+      // if current supply is not zero, revive the asset when collateral ratio of settlement fund
+      //    is greater than ( MCR if before HF core-2290, ICR if after)
+      else if( next_maint_time <= HARDFORK_CORE_1270_TIME )
       {
-         bool should_revive = false;
-         const auto& mia_dyn = base.dynamic_asset_data_id(d);
-         if( mia_dyn.current_supply == 0 ) // if current supply is zero, revive the asset
-            should_revive = true;
-         else // if current supply is not zero, when collateral ratio of settlement fund is greater than MCR, revive the asset
-         {
-            if( next_maint_time <= HARDFORK_CORE_1270_TIME )
-            {
-               // before core-1270 hard fork, calculate call_price and compare to median feed
-               if( ~price::call_price( asset(mia_dyn.current_supply, o.asset_id),
-                                       asset(bad.settlement_fund, bad.options.short_backing_asset),
-                                       bad.current_feed.maintenance_collateral_ratio ) < bad.current_feed.settlement_price )
-                  should_revive = true;
-            }
-            else
-            {
-               // after core-1270 hard fork, calculate collateralization and compare to maintenance_collateralization
-               if( price( asset( bad.settlement_fund, bad.options.short_backing_asset ),
-                          asset( mia_dyn.current_supply, o.asset_id ) ) > bad.current_maintenance_collateralization )
-                  should_revive = true;
-            }
-         }
-         if( should_revive )
-            d.revive_bitasset(base);
+         // before core-1270 hard fork, calculate call_price and compare to median feed
+         auto fund_call_price = ~price::call_price( asset(mia_dyn.current_supply, o.asset_id),
+                                    asset(bad.settlement_fund, bad.options.short_backing_asset),
+                                    bad.current_feed.maintenance_collateral_ratio );
+         should_revive = ( fund_call_price < bad.current_feed.settlement_price );
       }
-      // Process margin calls, allow black swan, not for a new limit order
-      d.check_call_orders( base, true, false, bitasset_ptr );
+      else
+      {
+         // after core-1270 hard fork, calculate collateralization and compare to maintenance_collateralization
+         price fund_collateralization( asset( bad.settlement_fund, bad.options.short_backing_asset ),
+                                       asset( mia_dyn.current_supply, o.asset_id ) );
+         should_revive = HARDFORK_CORE_2290_PASSED( next_maint_time ) ?
+                               ( fund_collateralization > bad.current_initial_collateralization )
+                             : ( fund_collateralization > bad.current_maintenance_collateralization );
+      }
+      if( should_revive )
+         d.revive_bitasset( base, bad );
    }
+
+   // Process margin calls, allow black swan, not for a new limit order
+   d.check_call_orders( base, true, false, bitasset_ptr );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
