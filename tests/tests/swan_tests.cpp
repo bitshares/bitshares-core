@@ -118,11 +118,12 @@ struct swan_fixture : database_fixture {
         return oid;
     }
 
-    void set_feed(share_type usd, share_type core) {
+    // Note: need to set MCR explicitly, testnet has a different default
+    void set_feed(share_type usd, share_type core, uint16_t mcr = 1750, const optional<uint16_t>& icr = {}) {
         price_feed feed;
-        feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
+        feed.maintenance_collateral_ratio = mcr;
         feed.settlement_price = swan().amount(usd) / back().amount(core);
-        publish_feed(swan(), feedproducer(), feed);
+        publish_feed(swan(), feedproducer(), feed, icr);
     }
 
     void expire_feed() {
@@ -197,6 +198,9 @@ BOOST_AUTO_TEST_CASE( black_swan )
       BOOST_TEST_MESSAGE( "Verify that we cannot borrow after black swan" );
       GRAPHENE_REQUIRE_THROW( borrow(borrower(), swan().amount(1000), back().amount(2000)), fc::exception )
       trx.operations.clear();
+
+      generate_block();
+
 } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -339,6 +343,178 @@ BOOST_AUTO_TEST_CASE( revive_recovered )
       BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
       set_feed( 701, 800 );
       BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      auto swan_symbol = _swan(db).symbol;
+      vector<call_order_object> calls = db_api.get_call_orders(swan_symbol, 100);
+      BOOST_REQUIRE_EQUAL( 1u, calls.size() );
+      BOOST_CHECK( calls[0].borrower == swan().issuer );
+      BOOST_CHECK_EQUAL( calls[0].debt.value, 1400 );
+      BOOST_CHECK_EQUAL( calls[0].collateral.value, 2800 );
+
+      generate_block();
+
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/** Creates a black swan, place bids, recover price feed - asset should be revived
+ */
+BOOST_AUTO_TEST_CASE( revive_recovered_with_bids )
+{ try {
+      init_standard_swan( 700 );
+
+      if(hf2481)
+         wait_for_hf_core_2481();
+      else if(hf1270)
+         wait_for_hf_core_1270();
+      else
+         wait_for_hf_core_216();
+
+      // price not good enough for recovery
+      set_feed( 700, 800 );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      bid_collateral( borrower(),  back().amount(10510), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(21000), swan().amount(1399) );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      auto swan_symbol = _swan(db).symbol;
+      vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK_EQUAL( 2u, bids.size() );
+
+      // revive after price recovers
+      set_feed( 701, 800 );
+      BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+
+      bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK( bids.empty() );
+
+      vector<call_order_object> calls = db_api.get_call_orders(swan_symbol, 100);
+      BOOST_REQUIRE_EQUAL( 1u, calls.size() );
+      BOOST_CHECK( calls[0].borrower == swan().issuer );
+      BOOST_CHECK_EQUAL( calls[0].debt.value, 1400 );
+      BOOST_CHECK_EQUAL( calls[0].collateral.value, 2800 );
+
+      generate_block();
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/** Creates a black swan, place bids, recover price feed with ICR, before the core-2290 hard fork,
+ *  asset should be revived based on MCR
+ */
+BOOST_AUTO_TEST_CASE( revive_recovered_with_bids_not_by_icr_before_hf_core_2290 )
+{ try {
+      init_standard_swan( 700 );
+
+      // Advance to a time before core-2290 hard fork
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2290_TIME - mi * 2);
+      set_expiration( db, trx );
+
+      BOOST_CHECK( swan().dynamic_data(db).current_supply == 1400 );
+      BOOST_CHECK( swan().bitasset_data(db).settlement_fund == 2800 );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+      BOOST_CHECK( swan().bitasset_data(db).current_feed.settlement_price.is_null() );
+
+      BOOST_REQUIRE( HARDFORK_BSIP_77_PASSED( db.head_block_time() ) );
+
+      // price not good enough for recovery
+      set_feed( 700, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      bid_collateral( borrower(),  back().amount(10510), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(21000), swan().amount(1399) );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      auto swan_symbol = _swan(db).symbol;
+      vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK_EQUAL( 2u, bids.size() );
+
+      // good feed price
+      set_feed( 701, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
+      BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+
+      bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK( bids.empty() );
+
+      vector<call_order_object> calls = db_api.get_call_orders(swan_symbol, 100);
+      BOOST_REQUIRE_EQUAL( 1u, calls.size() );
+      BOOST_CHECK( calls[0].borrower == swan().issuer );
+      BOOST_CHECK_EQUAL( calls[0].debt.value, 1400 );
+      BOOST_CHECK_EQUAL( calls[0].collateral.value, 2800 );
+
+      generate_block();
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/** Creates a black swan, place bids, recover price feed with ICR, after the core-2290 hard fork,
+ *  asset should be revived based on ICR
+ */
+BOOST_AUTO_TEST_CASE( revive_recovered_with_bids_by_icr_after_hf_core_2290 )
+{ try {
+      init_standard_swan( 700 );
+
+      // Advance to a time before core-2290 hard fork
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2290_TIME - mi);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      set_expiration( db, trx );
+
+      BOOST_CHECK( swan().dynamic_data(db).current_supply == 1400 );
+      BOOST_CHECK( swan().bitasset_data(db).settlement_fund == 2800 );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+      BOOST_CHECK( swan().bitasset_data(db).current_feed.settlement_price.is_null() );
+
+      // price not good enough for recovery
+      set_feed( 700, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      bid_collateral( borrower(),  back().amount(10510), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(21000), swan().amount(1399) );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      auto swan_symbol = _swan(db).symbol;
+      vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK_EQUAL( 2u, bids.size() );
+
+      // price still not good enough for recovery
+      set_feed( 701, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+      bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK_EQUAL( 2u, bids.size() );
+
+      // price still not good enough for recovery
+      set_feed( 720, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+      bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK_EQUAL( 2u, bids.size() );
+
+      // good feed price
+      set_feed( 721, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
+      BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+
+      bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK( bids.empty() );
+
+      vector<call_order_object> calls = db_api.get_call_orders(swan_symbol, 100);
+      BOOST_REQUIRE_EQUAL( 1u, calls.size() );
+      BOOST_CHECK( calls[0].borrower == swan().issuer );
+      BOOST_CHECK_EQUAL( calls[0].debt.value, 1400 );
+      BOOST_CHECK_EQUAL( calls[0].collateral.value, 2800 );
+
+      generate_block();
 } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -441,6 +617,104 @@ BOOST_AUTO_TEST_CASE( recollateralize )
       BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
       bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
       BOOST_CHECK( bids.empty() );
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/** Creates a black swan, recover price feed with ICR, before the core-2290 hard fork,
+ *  asset should be revived based on MCR
+ */
+BOOST_AUTO_TEST_CASE( recollateralize_not_by_icr_before_hf_core_2290 )
+{ try {
+      init_standard_swan( 700 );
+
+      // Advance to a time before core-2290 hard fork
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2290_TIME - mi * 2);
+      set_expiration( db, trx );
+
+      BOOST_CHECK( swan().dynamic_data(db).current_supply == 1400 );
+      BOOST_CHECK( swan().bitasset_data(db).settlement_fund == 2800 );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+      BOOST_CHECK( swan().bitasset_data(db).current_feed.settlement_price.is_null() );
+
+      BOOST_REQUIRE( HARDFORK_BSIP_77_PASSED( db.head_block_time() ) );
+
+      set_feed(1, 2, 1750, 1800); // MCR = 1750, ICR = 1800
+      // works
+      bid_collateral( borrower(),  back().amount(1051), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(2100), swan().amount(1399) );
+
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      auto swan_symbol = _swan(db).symbol;
+      vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK_EQUAL( 2u, bids.size() );
+
+      // revive
+      wait_for_maintenance();
+      BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+
+      bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK( bids.empty() );
+      BOOST_CHECK( swan().dynamic_data(db).current_supply == 1400 );
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/** Creates a black swan, recover price feed with ICR, after the core-2290 hard fork,
+ *  asset should be revived based on ICR
+ */
+BOOST_AUTO_TEST_CASE( recollateralize_by_icr_after_hf_core_2290 )
+{ try {
+      init_standard_swan( 700 );
+
+      // Advance to core-2290 hard fork
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2290_TIME - mi);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      set_expiration( db, trx );
+
+      BOOST_CHECK( swan().dynamic_data(db).current_supply == 1400 );
+      BOOST_CHECK( swan().bitasset_data(db).settlement_fund == 2800 );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+      BOOST_CHECK( swan().bitasset_data(db).current_feed.settlement_price.is_null() );
+
+      set_feed(1, 2, 1750, 1800); // MCR = 1750, ICR = 1800
+      // doesn't happen if some bids have a bad swan price
+      bid_collateral( borrower(),  back().amount(1051), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(2100), swan().amount(1399) );
+      wait_for_maintenance();
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      set_feed(1, 2, 1750, 1800); // MCR = 1750, ICR = 1800
+      // doesn't happen if some bids have a bad swan price
+      bid_collateral( borrower(),  back().amount(1120), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(1122), swan().amount(700) );
+      wait_for_maintenance();
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      set_feed(1, 2, 1750, 1800); // MCR = 1750, ICR = 1800
+      // works
+      bid_collateral( borrower(),  back().amount(1121), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(1122), swan().amount(700) );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      auto swan_symbol = _swan(db).symbol;
+      vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK_EQUAL( 2u, bids.size() );
+
+      // revive
+      wait_for_maintenance();
+      BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+
+      bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK( bids.empty() );
+      BOOST_CHECK( swan().dynamic_data(db).current_supply == 1400 );
 } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -604,6 +878,13 @@ BOOST_AUTO_TEST_CASE(revive_recovered_hf1270)
 
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE(revive_recovered_with_bids_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(revive_recovered_with_bids);
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE(recollateralize_hf1270)
 { try {
    hf1270 = true;
@@ -645,6 +926,13 @@ BOOST_AUTO_TEST_CASE(revive_recovered_hf2481)
 { try {
    hf2481 = true;
    INVOKE(revive_recovered);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(revive_recovered_with_bids_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(revive_recovered_with_bids);
 
 } FC_LOG_AND_RETHROW() }
 

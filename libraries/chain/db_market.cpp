@@ -407,22 +407,23 @@ void database::individually_settle( const asset_bitasset_data_object& bitasset, 
 
 }
 
-void database::revive_bitasset( const asset_object& bitasset )
+void database::revive_bitasset( const asset_object& bitasset, const asset_bitasset_data_object& bad )
 { try {
    FC_ASSERT( bitasset.is_market_issued() );
-   const asset_bitasset_data_object& bad = bitasset.bitasset_data(*this);
+   FC_ASSERT( bitasset.id == bad.asset_id );
    FC_ASSERT( bad.has_settlement() );
-   const asset_dynamic_data_object& bdd = bitasset.dynamic_asset_data_id(*this);
    FC_ASSERT( !bad.is_prediction_market );
    FC_ASSERT( !bad.current_feed.settlement_price.is_null() );
 
+   const asset_dynamic_data_object& bdd = bitasset.dynamic_asset_data_id(*this);
    if( bdd.current_supply > 0 )
    {
       // Create + execute a "bid" with 0 additional collateral
-      const collateral_bid_object& pseudo_bid = create<collateral_bid_object>([&](collateral_bid_object& bid) {
+      const collateral_bid_object& pseudo_bid = create<collateral_bid_object>(
+               [&bitasset,&bad,&bdd](collateral_bid_object& bid) {
          bid.bidder = bitasset.issuer;
          bid.inv_swan_price = asset(0, bad.options.short_backing_asset)
-                              / asset(bdd.current_supply, bitasset.id);
+                              / asset(bdd.current_supply, bad.asset_id);
       });
       execute_bid( pseudo_bid, bdd.current_supply, bad.settlement_fund, bad.current_feed );
    } else
@@ -440,7 +441,8 @@ void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const 
    // cancel remaining bids
    const auto& bid_idx = get_index_type< collateral_bid_index >().indices().get<by_price>();
    auto itr = bid_idx.lower_bound( bad.asset_id );
-   while( itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == bad.asset_id )
+   const auto end = bid_idx.upper_bound( bad.asset_id );
+   while( itr != end )
    {
       const collateral_bid_object& bid = *itr;
       ++itr;
@@ -448,7 +450,7 @@ void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const 
    }
 
    // revive
-   modify( bad, [&]( asset_bitasset_data_object& obj ){
+   modify( bad, []( asset_bitasset_data_object& obj ){
               obj.settlement_price = price();
               obj.settlement_fund = 0;
            });
@@ -472,7 +474,8 @@ void database::cancel_bid(const collateral_bid_object& bid, bool create_virtual_
 void database::execute_bid( const collateral_bid_object& bid, share_type debt_covered,
                             share_type collateral_from_fund, const price_feed& current_feed )
 {
-   const call_order_object& call_obj = create<call_order_object>( [&](call_order_object& call ){
+   const call_order_object& call_obj = create<call_order_object>(
+               [&bid, &debt_covered, &collateral_from_fund, &current_feed, this](call_order_object& call ){
          call.borrower = bid.bidder;
          call.collateral = bid.inv_swan_price.base.amount + collateral_from_fund;
          call.debt = debt_covered;
@@ -489,7 +492,7 @@ void database::execute_bid( const collateral_bid_object& bid, share_type debt_co
 
    // Note: CORE asset in collateral_bid_object is not counted in account_stats.total_core_in_orders
    if( bid.inv_swan_price.base.asset_id == asset_id_type() )
-      modify( get_account_stats_by_owner(bid.bidder), [&](account_statistics_object& stats) {
+      modify( get_account_stats_by_owner(bid.bidder), [&call_obj](account_statistics_object& stats) {
          stats.total_core_in_orders += call_obj.collateral;
       });
 
