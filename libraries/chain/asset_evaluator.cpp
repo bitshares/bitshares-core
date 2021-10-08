@@ -740,8 +740,9 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 
    const asset_bitasset_data_object& current_bitasset_data = asset_obj.bitasset_data(d);
 
-   FC_ASSERT( !current_bitasset_data.has_settlement(),
-              "Cannot update a bitasset after a global settlement has executed" );
+   if( !HARDFORK_CORE_2282_PASSED( next_maint_time ) )
+      FC_ASSERT( !current_bitasset_data.has_settlement(),
+                 "Cannot update a bitasset after a global settlement has executed" );
 
    if( current_bitasset_data.is_prediction_market )
       FC_ASSERT( !op.new_options.extensions.value.black_swan_response_method.valid(),
@@ -805,9 +806,12 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    // Are we changing the backing asset?
    if( op.new_options.short_backing_asset != current_bitasset_data.options.short_backing_asset )
    {
+      FC_ASSERT( !current_bitasset_data.has_settlement(),
+                 "Cannot change backing asset after a global settlement has executed" );
+
       const asset_dynamic_data_object& dyn = asset_obj.dynamic_asset_data_id(d);
       FC_ASSERT( dyn.current_supply == 0,
-                 "Cannot update a bitasset if there is already a current supply." );
+                 "Cannot change backing asset if there is already a current supply." );
 
       FC_ASSERT( dyn.accumulated_collateral_fees == 0,
                  "Must claim collateral-denominated fees before changing backing asset." );

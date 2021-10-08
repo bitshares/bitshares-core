@@ -772,7 +772,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
 }
 
 /******
- * @brief Test various bitasset asserts within the asset_evaluator before the HF 922 / 931
+ * @brief Test various bitasset asserts within the asset_evaluator after the HF 922 / 931
  */
 BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
 {
