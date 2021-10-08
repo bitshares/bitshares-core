@@ -47,15 +47,6 @@ namespace detail {
 
 } //detail
 
-/**
- *  let HB = the highest bid for the collateral  (aka who will pay the most DEBT for the least collateral)
- *  let SP = current median feed's Settlement Price
- *  let LC = the least collateralized call order's swan price (debt/collateral)
- *
- *  If there is no valid price feed or no bids then there is no black swan.
- *
- *  A black swan occurs if MAX(HB,SP) <= LC
- */
 bool database::check_for_blackswan( const asset_object& mia, bool enable_black_swan,
                                     const asset_bitasset_data_object* bitasset_ptr )
 {
@@ -226,7 +217,6 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
  * Collateral received goes into a force-settlement fund
  * No new margin positions can be created for this asset
  * Force settlement happens without delay at the swan price, deducting from force-settlement fund
- * No more asset updates may be issued.
 */
 void database::globally_settle_asset( const asset_object& mia, const price& settlement_price,
                                       bool check_margin_calls )
