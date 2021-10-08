@@ -1382,4 +1382,114 @@ BOOST_AUTO_TEST_CASE( disable_collateral_bidding_cross_hardfork_test )
 
 } FC_LOG_AND_RETHROW() }
 
+/// Tests updating bitasset options after GS
+BOOST_AUTO_TEST_CASE( update_bitasset_after_gs )
+{ try {
+
+   init_standard_swan( 2000, true );
+
+   // Advance to a time before core-2282 hard fork
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_2282_TIME - mi);
+   set_expiration( db, trx );
+
+   // try to update bitasset options, before hf core-2282, it is not allowed
+   auto old_options = swan().bitasset_data(db).options;
+
+   asset_update_bitasset_operation aubop;
+   aubop.issuer = swan().issuer;
+   aubop.asset_to_update = _swan;
+   aubop.new_options = old_options;
+   aubop.new_options.feed_lifetime_sec += 1;
+
+   trx.operations.clear();
+   trx.operations.push_back( aubop );
+   BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+   BOOST_CHECK( swan().bitasset_data(db).options.feed_lifetime_sec == old_options.feed_lifetime_sec );
+
+   // Advance to core-2282 hard fork
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   set_expiration( db, trx );
+
+   BOOST_CHECK( swan().bitasset_data(db).options.feed_lifetime_sec == old_options.feed_lifetime_sec );
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   // should succeed
+   PUSH_TX(db, trx, ~0);
+
+   BOOST_CHECK( swan().bitasset_data(db).options.feed_lifetime_sec == old_options.feed_lifetime_sec + 1 );
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   generate_block();
+
+   BOOST_CHECK( swan().bitasset_data(db).options.feed_lifetime_sec == old_options.feed_lifetime_sec + 1 );
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   // unable to update backing asset
+
+   asset_id_type uia_id = create_user_issued_asset( "MYUIA" ).id;
+
+   aubop.new_options.short_backing_asset = uia_id;
+
+   trx.operations.clear();
+   trx.operations.push_back( aubop );
+   BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+   BOOST_CHECK( swan().bitasset_data(db).options.short_backing_asset == old_options.short_backing_asset );
+
+   aubop.new_options.short_backing_asset = old_options.short_backing_asset;
+
+   // Update other bitasset options
+   aubop.new_options.minimum_feeds += 2;
+   aubop.new_options.force_settlement_delay_sec += 3;
+   aubop.new_options.force_settlement_offset_percent += 4;
+   aubop.new_options.maximum_force_settlement_volume += 5;
+   aubop.new_options.extensions.value.initial_collateral_ratio = 1900;
+   aubop.new_options.extensions.value.maintenance_collateral_ratio = 1800;
+   aubop.new_options.extensions.value.maximum_short_squeeze_ratio = 1005;
+   aubop.new_options.extensions.value.margin_call_fee_ratio = 10;
+   aubop.new_options.extensions.value.force_settle_fee_percent = 20;
+   trx.operations.clear();
+   trx.operations.push_back( aubop );
+   PUSH_TX(db, trx, ~0);
+
+   const auto& check_result = [&]()
+   {
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      BOOST_CHECK( swan().bitasset_data(db).options.feed_lifetime_sec
+                   == old_options.feed_lifetime_sec + 1 );
+      BOOST_CHECK( swan().bitasset_data(db).options.minimum_feeds
+                   == old_options.minimum_feeds + 2 );
+      BOOST_CHECK( swan().bitasset_data(db).options.force_settlement_delay_sec
+                   == old_options.force_settlement_delay_sec + 3 );
+      BOOST_CHECK( swan().bitasset_data(db).options.force_settlement_offset_percent
+                   == old_options.force_settlement_offset_percent + 4 );
+      BOOST_CHECK( swan().bitasset_data(db).options.maximum_force_settlement_volume
+                   == old_options.maximum_force_settlement_volume + 5 );
+
+      BOOST_CHECK( swan().bitasset_data(db).options.short_backing_asset == old_options.short_backing_asset );
+
+      auto extv = swan().bitasset_data(db).options.extensions.value;
+      BOOST_REQUIRE( extv.initial_collateral_ratio.valid() );
+      BOOST_CHECK_EQUAL( *extv.initial_collateral_ratio, 1900U );
+      BOOST_REQUIRE( extv.maintenance_collateral_ratio.valid() );
+      BOOST_CHECK_EQUAL( *extv.maintenance_collateral_ratio, 1800U );
+      BOOST_REQUIRE( extv.maximum_short_squeeze_ratio.valid() );
+      BOOST_CHECK_EQUAL( *extv.maximum_short_squeeze_ratio, 1005U );
+      BOOST_REQUIRE( extv.margin_call_fee_ratio.valid() );
+      BOOST_CHECK_EQUAL( *extv.margin_call_fee_ratio, 10U );
+      BOOST_REQUIRE( extv.force_settle_fee_percent.valid() );
+      BOOST_CHECK_EQUAL( *extv.force_settle_fee_percent, 20U );
+   };
+
+   check_result();
+
+   generate_block();
+
+   check_result();
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()
