@@ -1,4 +1,4 @@
-// bitshares-core issue #2350 Check whitelisted and blacklisted markets for liquidity pools
+// bitshares-core issue #2350 Liquidity pool exchange operation to comply with whitelist and blacklist market settings
 #ifndef HARDFORK_CORE_2350_TIME
 // Jan 1 2030, midnight; this is a dummy date until a hardfork date is scheduled
 #define HARDFORK_CORE_2350_TIME (fc::time_point_sec( 1893456000 ))
