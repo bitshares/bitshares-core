@@ -105,7 +105,7 @@ struct hardfork_visitor {
       return fc::typelist::runtime::dispatch(protocol::operation::list(), (size_t)tag, *this);
    }
    /// operation adaptor
-   bool visit(const protocol::operation& op) {
+   bool visit(const protocol::operation& op) const {
       return visit(op.which());
    }
 };
