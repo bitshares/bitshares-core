@@ -242,6 +242,12 @@ void_result credit_offer_accept_evaluator::do_evaluate(const credit_offer_accept
    FC_ASSERT( _offer->min_deal_amount <= op.borrow_amount.amount,
               "Borrowing amount should not be less than minimum deal amount" );
 
+   FC_ASSERT( _offer->fee_rate <= op.max_fee_rate,
+              "The maximum accceptable fee rate is lower than offered" );
+
+   FC_ASSERT( _offer->max_duration_seconds >= op.min_duration_seconds,
+              "The minimum accceptable duration is longer than offered" );
+
    auto coll_itr = _offer->acceptable_collateral.find( op.collateral.asset_id );
    FC_ASSERT( coll_itr != _offer->acceptable_collateral.end(),
               "Collateral asset type is not acceptable by the credit offer" );
