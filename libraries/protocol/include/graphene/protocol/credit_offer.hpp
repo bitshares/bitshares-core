@@ -128,6 +128,8 @@ namespace graphene { namespace protocol {
       credit_offer_id_type     offer_id;           ///< ID of the credit offer
       asset                    borrow_amount;      ///< The amount to borrow
       asset                    collateral;         ///< The collateral
+      uint32_t                 max_fee_rate = 0;   ///< The maximum acceptable fee rate
+      uint32_t                 min_duration_seconds = 0; ///< The minimum acceptable duration
 
       extensions_type extensions;  ///< Unused. Reserved for future use.
 
@@ -239,6 +241,8 @@ FC_REFLECT( graphene::protocol::credit_offer_accept_operation,
             (offer_id)
             (borrow_amount)
             (collateral)
+            (max_fee_rate)
+            (min_duration_seconds)
             (extensions)
           )
 

@@ -1807,21 +1807,26 @@ void database_fixture_base::update_credit_offer( account_id_type account, credit
 
 credit_offer_accept_operation database_fixture_base::make_credit_offer_accept_op(
                                        account_id_type account, credit_offer_id_type offer_id,
-                                       const asset& borrow_amount, const asset& collateral )const
+                                       const asset& borrow_amount, const asset& collateral,
+                                       uint32_t max_fee_rate, uint32_t min_duration )const
 {
    credit_offer_accept_operation op;
    op.borrower = account;
    op.offer_id = offer_id;
    op.borrow_amount = borrow_amount;
    op.collateral = collateral;
+   op.max_fee_rate = max_fee_rate;
+   op.min_duration_seconds = min_duration;
    return op;
 }
 
 const credit_deal_object& database_fixture_base::borrow_from_credit_offer(
                                        account_id_type account, credit_offer_id_type offer_id,
-                                       const asset& borrow_amount, const asset& collateral )
+                                       const asset& borrow_amount, const asset& collateral,
+                                       uint32_t max_fee_rate, uint32_t min_duration )
 {
-   credit_offer_accept_operation op = make_credit_offer_accept_op( account, offer_id, borrow_amount, collateral );
+   credit_offer_accept_operation op = make_credit_offer_accept_op( account, offer_id, borrow_amount, collateral,
+                                                                   max_fee_rate, min_duration );
    trx.operations.clear();
    trx.operations.push_back( op );
 

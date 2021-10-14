@@ -806,7 +806,7 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
       BOOST_CHECK_THROW( borrow_from_credit_offer( ray_id, tmp_co_id, asset(100), asset(200, usd_id) ),
                          fc::exception );
 
-      // create a credit offers
+      // create credit offers
       auto disable_time1 = db.head_block_time() + fc::minutes(20); // 20 minutes after init
 
       flat_map<asset_id_type, price> collateral_map1;
@@ -899,9 +899,23 @@ BOOST_AUTO_TEST_CASE( credit_offer_borrow_repay_test )
       BOOST_CHECK_THROW( borrow_from_credit_offer( ray_id, co1_id, asset(100), asset(init_amount, usd_id) ),
                          fc::exception );
 
+      // Unable to borrow : maximum acceptable fee rate too low
+      auto ok_fee_rate = co1_id(db).fee_rate;
+      auto low_fee_rate = co1_id(db).fee_rate - 1;
+      BOOST_CHECK_THROW( borrow_from_credit_offer( ray_id, co1_id, asset(100), asset(200, usd_id), low_fee_rate ),
+                         fc::exception );
+
+      // Unable to borrow : minimum acceptable duration too long
+      auto ok_duration = co1_id(db).max_duration_seconds;
+      auto long_duration = co1_id(db).max_duration_seconds + 1;
+      BOOST_CHECK_THROW( borrow_from_credit_offer( ray_id, co1_id, asset(100), asset(200, usd_id), ok_fee_rate,
+                                                   long_duration ),
+                         fc::exception );
+
       // Able to borrow the same amount with the same collateral
       BOOST_TEST_MESSAGE( "Ray borrows more" );
-      const credit_deal_object& cdo12 = borrow_from_credit_offer( ray_id, co1_id, asset(100), asset(200, usd_id) );
+      const credit_deal_object& cdo12 = borrow_from_credit_offer( ray_id, co1_id, asset(100), asset(200, usd_id),
+                                                                  ok_fee_rate, ok_duration );
       credit_deal_id_type cd12_id = cdo12.id;
       time_point_sec expected_repay_time12 = db.head_block_time() + fc::seconds(3600);  // 60 minutes after init
 

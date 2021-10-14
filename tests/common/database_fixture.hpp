@@ -517,10 +517,14 @@ struct database_fixture_base {
                                        const optional<flat_map<account_id_type, share_type>>& acceptable_borrowers );
    credit_offer_accept_operation make_credit_offer_accept_op(
                                        account_id_type account, credit_offer_id_type offer_id,
-                                       const asset& borrow_amount, const asset& collateral )const;
+                                       const asset& borrow_amount, const asset& collateral,
+                                       uint32_t max_fee_rate = GRAPHENE_FEE_RATE_DENOM,
+                                       uint32_t min_duration = 0 )const;
    const credit_deal_object& borrow_from_credit_offer(
                                        account_id_type account, credit_offer_id_type offer_id,
-                                       const asset& borrow_amount, const asset& collateral );
+                                       const asset& borrow_amount, const asset& collateral,
+                                       uint32_t max_fee_rate = GRAPHENE_FEE_RATE_DENOM,
+                                       uint32_t min_duration = 0 );
    credit_deal_repay_operation make_credit_deal_repay_op(
                                        account_id_type account, credit_deal_id_type deal_id,
                                        const asset& repay_amount, const asset& credit_fee )const;
