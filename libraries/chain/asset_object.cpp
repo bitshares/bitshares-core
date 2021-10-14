@@ -28,7 +28,7 @@
 #include <fc/io/raw.hpp>
 #include <fc/uint128.hpp>
 
-using namespace graphene::chain;
+namespace graphene { namespace chain {
 
 share_type asset_bitasset_data_object::max_force_settlement_volume(share_type current_supply) const
 {
@@ -44,8 +44,8 @@ share_type asset_bitasset_data_object::max_force_settlement_volume(share_type cu
    return static_cast<uint64_t>(volume);
 }
 
-void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_point_sec current_time,
-                                                                       time_point_sec next_maintenance_time )
+void asset_bitasset_data_object::update_median_feeds( time_point_sec current_time,
+                                                      time_point_sec next_maintenance_time )
 {
    bool after_core_hardfork_1270 = ( next_maintenance_time > HARDFORK_CORE_1270_TIME ); // call price caching issue
    current_feed_publication_time = current_time;
@@ -65,7 +65,8 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
    if( effective_feeds.size() < options.minimum_feeds )
    {
       //... don't calculate a median, and set a null feed
-      feed_cer_updated = false; // new median cer is null, won't update asset_object anyway, set to false for better performance
+      feed_cer_updated = false; // new median cer is null, won't update asset_object anyway,
+                                // set to false for better performance
       current_feed_publication_time = current_time;
       median_feed = price_feed_with_icr();
       if( after_core_hardfork_1270 )
@@ -76,7 +77,7 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
       return;
    }
 
-   if( 1u == effective_feeds.size() )
+   if( 1U == effective_feeds.size() )
    {
       if( median_feed.core_exchange_rate != effective_feeds.front().get().core_exchange_rate )
          feed_cer_updated = true;
@@ -217,6 +218,8 @@ string asset_object::amount_to_string(share_type amount) const
    }
    return result;
 }
+
+} } // namespace graphene::chain
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::asset_dynamic_data_object, (graphene::db::object),
                     (current_supply)(confidential_supply)(accumulated_fees)(accumulated_collateral_fees)(fee_pool) )
