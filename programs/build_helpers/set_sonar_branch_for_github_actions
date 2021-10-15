@@ -10,71 +10,77 @@
 #             If neither a branch or tag is available for the event type,
 #             the variable will not exist.
 
-if [ "$#" != 1 ]; then
-    echo "Usage: $0 <sonar-properties-file>" 1>&2
-    exit 1
+SONAR_CONF_FILE="sonar-project.properties"
+SONAR_BRANCH_TARGET_FILE="sonar-branch-target.properties"
+
+if [ ! -f "$SONAR_CONF_FILE" ]; then
+    exit 0
+fi
+
+if [ ! -f "$SONAR_BRANCH_TARGET_FILE" ]; then
+    SONAR_BRANCH_TARGET_FILE="$SONAR_CONF_FILE"
 fi
 
 clear_branch () {
-    sed -i '/sonar\.branch/d' "$1"
+    sed -i '/sonar\.branch/d' "$SONAR_CONF_FILE"
 }
 
 if [ -n "$GITHUB_HEAD_REF" ]; then
-    # PRs work per default, remove sonar.branch.* and add sonar.pullrequest.*
-    echo "Detected PR '$GITHUB_REF' from '$GITHUB_HEAD_REF' to '$GITHUB_BASE_REF'"
+    # For pull requests, remove sonar.branch.* and add sonar.pullrequest.*
+    echo "Detected PR '$GITHUB_REF' to merge '$GITHUB_HEAD_REF' into '$GITHUB_BASE_REF'"
     PULLREF=${GITHUB_REF#refs/pull/}
     PULLKEY=${PULLREF%/merge}
-    clear_branch "$1"
-    echo "sonar.pullrequest.key=$PULLKEY" >>"$1"
-    echo "sonar.pullrequest.base=$GITHUB_BASE_REF" >>"$1"
-    echo "sonar.pullrequest.branch=$GITHUB_HEAD_REF" >>"$1"
+    clear_branch
+    echo "sonar.pullrequest.key=$PULLKEY" >>"$SONAR_CONF_FILE"
+    echo "sonar.pullrequest.base=$GITHUB_BASE_REF" >>"$SONAR_CONF_FILE"
+    echo "sonar.pullrequest.branch=$GITHUB_HEAD_REF" >>"$SONAR_CONF_FILE"
 else
-    ORIGINAL_TARGET="$( grep 'sonar\.branch\.target' "$1" | sed 's=^.*[:=] *==' )"
-    TARGET="$ORIGINAL_TARGET"
+    ORIGINAL_TARGET="$( grep 'sonar\.branch\.target' $SONAR_CONF_FILE | sed 's=^.*[:=] *==' )"
+    TARGET="$( grep 'sonar\.branch\.target' $SONAR_BRANCH_TARGET_FILE | sed 's=^.*[:=] *==' )"
 
     if [[ ${GITHUB_REF} == "refs/tags/"* ]]; then
         # Tag build is either master or testnet
         echo "Detected tag '${GITHUB_REF}'"
         BRANCH="${GITHUB_REF#refs/}"
         case "$BRANCH" in
-	    *test*) TARGET=testnet; ;;
-	    *)	TARGET=master; ;;
+            *test*) TARGET=testnet; ;;
+            *)      TARGET=master; ;;
         esac
     else
         BRANCH="${GITHUB_REF#refs/heads/}"
         case "$BRANCH" in
-	    master|develop|testnet|hardfork)
-	        # Long-lived branches stand for themselves, no target
-	        echo "Detected long-lived branch '$BRANCH'"
-	        TARGET=
-	        ;;
-	    *test*release*)
-	        # Testnet release branch will be merged into testnet
-	        echo "Detected testnet release branch '$BRANCH'"
-	        TARGET=testnet
-	        ;;
-	    *release*)
-	        # Release branch will be merged into default (master)
-	        echo "Detected release branch '$BRANCH'"
-	        TARGET=master
-	        ;;
-	    *)
-	        # All other branches should have sonar.branch.target in their
-	        # sonar.properties, leave it unchanged
-	        echo "Detected normal branch '$BRANCH'"
+            master|develop|testnet|hardfork)
+                # Long-lived branches stand for themselves, no target
+                echo "Detected long-lived branch '$BRANCH'"
+                TARGET=
+                ;;
+            *test*release*)
+                # Testnet release branch will be merged into testnet
+                echo "Detected testnet release branch '$BRANCH'"
+                TARGET=testnet
+                ;;
+            *release*)
+                # Release branch will be merged into default (master)
+                echo "Detected release branch '$BRANCH'"
+                TARGET=master
+                ;;
+            *)
+                # All other branches should have sonar.branch.target in their
+                # SONAR_BRANCH_TARGET_FILE, leave it unchanged
+                echo "Detected normal branch '$BRANCH'"
         esac
     fi
 
     echo "Branch '$BRANCH', target '$TARGET'"
 
     if [ "x$TARGET" != "x$ORIGINAL_TARGET" ]; then
-        clear_branch "$1"
+        clear_branch
         if [ -n "$TARGET" ]; then
-            echo "sonar.branch.target=$TARGET" >>"$1"
+            echo "sonar.branch.target=$TARGET" >>"$SONAR_CONF_FILE"
         fi
     fi
     if [ -n "$BRANCH" ]; then
-        echo "sonar.branch.name=$BRANCH" >>"$1"
+        echo "sonar.branch.name=$BRANCH" >>"$SONAR_CONF_FILE"
     fi
 
 fi
