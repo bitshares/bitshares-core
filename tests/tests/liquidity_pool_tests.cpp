@@ -788,15 +788,19 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
       expected_pool_balance_a = 100;
       expected_pool_balance_b = 120;
       expected_lp_supply = 120;
-      BOOST_CHECK_EQUAL( lpo.balance_a.value, expected_pool_balance_a);
-      BOOST_CHECK_EQUAL( lpo.balance_b.value, expected_pool_balance_b);
-      BOOST_CHECK( lpo.virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
-      BOOST_CHECK_EQUAL( lpa.dynamic_data(db).current_supply.value, expected_lp_supply );
+      BOOST_CHECK_EQUAL( lp_id(db).balance_a.value, expected_pool_balance_a);
+      BOOST_CHECK_EQUAL( lp_id(db).balance_b.value, expected_pool_balance_b);
+      BOOST_CHECK( lp_id(db).virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
+      BOOST_CHECK_EQUAL( lpa_id(db).dynamic_data(db).current_supply.value, expected_lp_supply );
 
       expected_balance_sam_eur -= 100;
       expected_balance_sam_usd -= 120;
       expected_balance_sam_lpa += 120;
       check_balances();
+
+      // Generates a block
+      generate_block();
+      set_expiration( db, trx );
 
       // Deposit again with 900 EUR and 3000 USD, the pool only takes 900 EUR and 1080 USD
       result = deposit_to_liquidity_pool( sam_id, lp_id, asset( 900, eur_id ), asset( 3000, usd_id ) );
@@ -811,10 +815,10 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
       expected_pool_balance_a += 900;
       expected_pool_balance_b += 1080;
       expected_lp_supply += 1080;
-      BOOST_CHECK_EQUAL( lpo.balance_a.value, expected_pool_balance_a);
-      BOOST_CHECK_EQUAL( lpo.balance_b.value, expected_pool_balance_b);
-      BOOST_CHECK( lpo.virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
-      BOOST_CHECK_EQUAL( lpa.dynamic_data(db).current_supply.value, expected_lp_supply );
+      BOOST_CHECK_EQUAL( lp_id(db).balance_a.value, expected_pool_balance_a);
+      BOOST_CHECK_EQUAL( lp_id(db).balance_b.value, expected_pool_balance_b);
+      BOOST_CHECK( lp_id(db).virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
+      BOOST_CHECK_EQUAL( lpa_id(db).dynamic_data(db).current_supply.value, expected_lp_supply );
 
       expected_balance_sam_eur -= 900;
       expected_balance_sam_usd -= 1080;
@@ -906,15 +910,15 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
 
       expected_pool_balance_a += delta_a; // 1000 + 998 = 1998
       expected_pool_balance_b += delta_b; // 1200 - 588 = 612
-      BOOST_CHECK_EQUAL( lpo.balance_a.value, expected_pool_balance_a);
-      BOOST_CHECK_EQUAL( lpo.balance_b.value, expected_pool_balance_b);
-      BOOST_CHECK( lpo.virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
-      BOOST_CHECK_EQUAL( lpa.dynamic_data(db).current_supply.value, expected_lp_supply );
+      BOOST_CHECK_EQUAL( lp_id(db).balance_a.value, expected_pool_balance_a);
+      BOOST_CHECK_EQUAL( lp_id(db).balance_b.value, expected_pool_balance_b);
+      BOOST_CHECK( lp_id(db).virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
+      BOOST_CHECK_EQUAL( lpa_id(db).dynamic_data(db).current_supply.value, expected_lp_supply );
 
       expected_accumulated_fees_eur += maker_fee;
       expected_accumulated_fees_usd += taker_fee;
-      BOOST_CHECK_EQUAL( eur.dynamic_data(db).accumulated_fees.value, expected_accumulated_fees_eur );
-      BOOST_CHECK_EQUAL( usd.dynamic_data(db).accumulated_fees.value, expected_accumulated_fees_usd );
+      BOOST_CHECK_EQUAL( eur_id(db).dynamic_data(db).accumulated_fees.value, expected_accumulated_fees_eur );
+      BOOST_CHECK_EQUAL( usd_id(db).dynamic_data(db).accumulated_fees.value, expected_accumulated_fees_usd );
 
       expected_balance_ted_eur -= 1000;
       expected_balance_ted_usd += ted_receives;
@@ -948,15 +952,15 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
 
       expected_pool_balance_a += delta_a; // 1998 - 1214 = 784
       expected_pool_balance_b += delta_b; // 612 + 997 = 1609
-      BOOST_CHECK_EQUAL( lpo.balance_a.value, expected_pool_balance_a);
-      BOOST_CHECK_EQUAL( lpo.balance_b.value, expected_pool_balance_b);
-      BOOST_CHECK( lpo.virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
-      BOOST_CHECK_EQUAL( lpa.dynamic_data(db).current_supply.value, expected_lp_supply );
+      BOOST_CHECK_EQUAL( lp_id(db).balance_a.value, expected_pool_balance_a);
+      BOOST_CHECK_EQUAL( lp_id(db).balance_b.value, expected_pool_balance_b);
+      BOOST_CHECK( lp_id(db).virtual_value == fc::uint128_t(expected_pool_balance_a) * expected_pool_balance_b );
+      BOOST_CHECK_EQUAL( lpa_id(db).dynamic_data(db).current_supply.value, expected_lp_supply );
 
       expected_accumulated_fees_eur += taker_fee;
       expected_accumulated_fees_usd += maker_fee;
-      BOOST_CHECK_EQUAL( eur.dynamic_data(db).accumulated_fees.value, expected_accumulated_fees_eur );
-      BOOST_CHECK_EQUAL( usd.dynamic_data(db).accumulated_fees.value, expected_accumulated_fees_usd );
+      BOOST_CHECK_EQUAL( eur_id(db).dynamic_data(db).accumulated_fees.value, expected_accumulated_fees_eur );
+      BOOST_CHECK_EQUAL( usd_id(db).dynamic_data(db).accumulated_fees.value, expected_accumulated_fees_usd );
 
       expected_balance_ted_eur += ted_receives;
       expected_balance_ted_usd -= 1000;
@@ -1038,6 +1042,7 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
       auto head_time = db.head_block_time();
 
       // all histories : 1:create, 2:deposit, 3:deposit, 4:exchange, 5:exchange, 6:withdrawal
+      // The 1st block: {1, 2}, the 2nd block: {3, 4, 5, 6}
       auto histories = hist_api.get_liquidity_pool_history( lp_id );
       BOOST_CHECK_EQUAL( histories.size(), 6u );
 
@@ -1047,7 +1052,39 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
 
       // only deposits
       histories = hist_api.get_liquidity_pool_history( lp_id, {}, {}, {}, 61 );
+      BOOST_REQUIRE_EQUAL( histories.size(), 2u );
+      auto second_time = histories[0].time;
+      auto first_time = histories[1].time;
+      auto late_time = second_time + fc::seconds(1);
+      auto early_time = first_time - fc::seconds(1);
+      histories = hist_api.get_liquidity_pool_history( lp_id, second_time, {}, {}, 61 );
       BOOST_CHECK_EQUAL( histories.size(), 2u );
+      histories = hist_api.get_liquidity_pool_history( lp_id, second_time, {}, 1, 61 );
+      BOOST_CHECK_EQUAL( histories.size(), 1u );
+      histories = hist_api.get_liquidity_pool_history( lp_id, second_time, first_time, {}, 61 );
+      BOOST_CHECK_EQUAL( histories.size(), 1u );
+      histories = hist_api.get_liquidity_pool_history( lp_id, first_time, {}, {}, 61 );
+      BOOST_CHECK_EQUAL( histories.size(), 1u );
+      histories = hist_api.get_liquidity_pool_history( lp_id, {}, first_time, {}, 61 );
+      BOOST_CHECK_EQUAL( histories.size(), 1u );
+      histories = hist_api.get_liquidity_pool_history( lp_id, {}, early_time, {}, 61 );
+      BOOST_CHECK_EQUAL( histories.size(), 2u );
+      histories = hist_api.get_liquidity_pool_history( lp_id, {}, early_time, 1, 61 );
+      BOOST_CHECK_EQUAL( histories.size(), 1u );
+      histories = hist_api.get_liquidity_pool_history( lp_id, second_time, early_time, 5, 61 );
+      BOOST_CHECK_EQUAL( histories.size(), 2u );
+      histories = hist_api.get_liquidity_pool_history( lp_id, second_time, early_time, 1, 61 );
+      BOOST_CHECK_EQUAL( histories.size(), 1u );
+
+      // time is fine
+      histories = hist_api.get_liquidity_pool_history( lp_id, second_time, first_time );
+      BOOST_CHECK_EQUAL( histories.size(), 4u );
+      histories = hist_api.get_liquidity_pool_history( lp_id, {}, first_time );
+      BOOST_CHECK_EQUAL( histories.size(), 4u );
+      histories = hist_api.get_liquidity_pool_history( lp_id, first_time, early_time );
+      BOOST_CHECK_EQUAL( histories.size(), 2u );
+      histories = hist_api.get_liquidity_pool_history( lp_id, {}, early_time );
+      BOOST_CHECK_EQUAL( histories.size(), 6u );
 
       // time too early
       histories = hist_api.get_liquidity_pool_history( lp_id, head_time - fc::days(3) );
@@ -1057,9 +1094,20 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
       histories = hist_api.get_liquidity_pool_history( lp_id, head_time, head_time - fc::days(1) );
       BOOST_CHECK_EQUAL( histories.size(), 0u );
 
+      // stop and start are the same, or stop is later than start
+      histories = hist_api.get_liquidity_pool_history( lp_id, second_time, second_time );
+      BOOST_CHECK_EQUAL( histories.size(), 0u );
+      histories = hist_api.get_liquidity_pool_history( lp_id, first_time, second_time, 10 );
+      BOOST_CHECK_EQUAL( histories.size(), 0u );
+      histories = hist_api.get_liquidity_pool_history( lp_id, first_time, late_time, 10 );
+      BOOST_CHECK_EQUAL( histories.size(), 0u );
+
       // time is fine, only exchanges
       histories = hist_api.get_liquidity_pool_history( lp_id, {}, head_time - fc::days(3), {}, 63 );
       BOOST_CHECK_EQUAL( histories.size(), 2u );
+
+      // all histories : 1:create, 2:deposit, 3:deposit, 4:exchange, 5:exchange, 6:withdrawal
+      // The 1st block: {1, 2}, the 2nd block: {3, 4, 5, 6}
 
       // start = 2, limit = 3, so result sequence == {2,1}
       // note: range is (stop, start]
@@ -1070,9 +1118,29 @@ BOOST_AUTO_TEST_CASE( liquidity_pool_exchange_test )
       histories = hist_api.get_liquidity_pool_history_by_sequence( lp_id, 2, {}, 1 );
       BOOST_CHECK_EQUAL( histories.size(), 1u );
 
+      // start = 2, limit = 50, stop = the 2nd block time or later, result sequence == {}
+      histories = hist_api.get_liquidity_pool_history_by_sequence( lp_id, 2, second_time, 50 );
+      BOOST_CHECK_EQUAL( histories.size(), 0u );
+      histories = hist_api.get_liquidity_pool_history_by_sequence( lp_id, 2, late_time, 50 );
+      BOOST_CHECK_EQUAL( histories.size(), 0u );
+
+      // start = 1, limit = 10, stop = the 1st block time, result sequence == {}
+      histories = hist_api.get_liquidity_pool_history_by_sequence( lp_id, 1, first_time, 10 );
+      BOOST_CHECK_EQUAL( histories.size(), 0u );
+
+      // start = 4, limit is default, stop = the 1st block time, result sequence == {4,3}
+      histories = hist_api.get_liquidity_pool_history_by_sequence( lp_id, 4, first_time );
+      BOOST_CHECK_EQUAL( histories.size(), 2u );
+
       // start = 4, limit is default, but exchange only, so result sequence == {4}
       histories = hist_api.get_liquidity_pool_history_by_sequence( lp_id, 4, head_time - fc::days(3), {}, 63 );
       BOOST_CHECK_EQUAL( histories.size(), 1u );
+
+      // start = 4, limit is default, stop = the 2nd block time or later, exchange only, result sequence == {}
+      histories = hist_api.get_liquidity_pool_history_by_sequence( lp_id, 4, second_time, {}, 63 );
+      BOOST_CHECK_EQUAL( histories.size(), 0u );
+      histories = hist_api.get_liquidity_pool_history_by_sequence( lp_id, 4, late_time, {}, 63 );
+      BOOST_CHECK_EQUAL( histories.size(), 0u );
 
       // Proceeds to the hard fork time that added white/blacklist checks for bitshares-core issue #2350
       generate_blocks( HARDFORK_CORE_2350_TIME );
