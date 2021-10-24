@@ -30,7 +30,6 @@
 
 namespace graphene { namespace protocol {
       using fc::uint128_t;
-      using fc::int128_t;
 
       bool operator == ( const price& a, const price& b )
       {
@@ -81,18 +80,21 @@ namespace graphene { namespace protocol {
          if( a.asset_id == b.base.asset_id )
          {
             FC_ASSERT( b.base.amount.value > 0 );
-            uint128_t result = (uint128_t(a.amount.value) * b.quote.amount.value + b.base.amount.value - 1)/b.base.amount.value;
+            uint128_t result = ( ( ( uint128_t(a.amount.value) * b.quote.amount.value ) + b.base.amount.value ) - 1 )
+                               / b.base.amount.value;
             FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
             return asset( static_cast<int64_t>(result), b.quote.asset_id );
          }
          else if( a.asset_id == b.quote.asset_id )
          {
             FC_ASSERT( b.quote.amount.value > 0 );
-            uint128_t result = (uint128_t(a.amount.value) * b.base.amount.value + b.quote.amount.value - 1)/b.quote.amount.value;
+            uint128_t result = ( ( ( uint128_t(a.amount.value) * b.base.amount.value ) + b.quote.amount.value ) - 1 )
+                               / b.quote.amount.value;
             FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
             return asset( static_cast<int64_t>(result), b.base.asset_id );
          }
-         FC_THROW_EXCEPTION( fc::assert_exception, "invalid asset::multiply_and_round_up(price)", ("asset",a)("price",b) );
+         FC_THROW_EXCEPTION( fc::assert_exception,
+                             "invalid asset::multiply_and_round_up(price)", ("asset",a)("price",b) );
       }
 
       price operator / ( const asset& base, const asset& quote )
@@ -101,8 +103,11 @@ namespace graphene { namespace protocol {
          return price{base,quote};
       } FC_CAPTURE_AND_RETHROW( (base)(quote) ) }
 
-      price price::max( asset_id_type base, asset_id_type quote ) { return asset( share_type(GRAPHENE_MAX_SHARE_SUPPLY), base ) / asset( share_type(1), quote); }
-      price price::min( asset_id_type base, asset_id_type quote ) { return asset( 1, base ) / asset( GRAPHENE_MAX_SHARE_SUPPLY, quote); }
+      price price::max( asset_id_type base, asset_id_type quote )
+      { return asset( share_type(GRAPHENE_MAX_SHARE_SUPPLY), base ) / asset( share_type(1), quote); }
+
+      price price::min( asset_id_type base, asset_id_type quote )
+      { return asset( share_type(1), base ) / asset( share_type(GRAPHENE_MAX_SHARE_SUPPLY), quote); }
 
       price operator *  ( const price& p, const ratio_type& r )
       { try {
@@ -112,61 +117,59 @@ namespace graphene { namespace protocol {
 
          if( r.numerator() == r.denominator() ) return p;
 
-         boost::rational<int128_t> p128( p.base.amount.value, p.quote.amount.value );
-         boost::rational<int128_t> r128( r.numerator(), r.denominator() );
+         boost::rational<uint128_t> p128( p.base.amount.value, p.quote.amount.value );
+         boost::rational<uint128_t> r128( r.numerator(), r.denominator() );
          auto cp = p128 * r128;
          auto ocp = cp;
 
          bool shrinked = false;
          bool using_max = false;
-         static const int128_t max( GRAPHENE_MAX_SHARE_SUPPLY );
+         static const uint128_t max( GRAPHENE_MAX_SHARE_SUPPLY );
          while( cp.numerator() > max || cp.denominator() > max )
          {
-            if( cp.numerator() == 1 )
+            if( 1 == cp.numerator() )
             {
-               cp = boost::rational<int128_t>( 1, max );
+               cp = boost::rational<uint128_t>( 1, max );
                using_max = true;
                break;
             }
-            else if( cp.denominator() == 1 )
+            else if( 1 == cp.denominator() )
             {
-               cp = boost::rational<int128_t>( max, 1 );
+               cp = boost::rational<uint128_t>( max, 1 );
                using_max = true;
                break;
             }
             else
             {
-               cp = boost::rational<int128_t>( cp.numerator() >> 1, cp.denominator() >> 1 );
+               cp = boost::rational<uint128_t>( cp.numerator() >> 1, cp.denominator() >> 1 );
                shrinked = true;
             }
          }
          if( shrinked ) // maybe not accurate enough due to rounding, do additional checks here
          {
-            int128_t num = ocp.numerator();
-            int128_t den = ocp.denominator();
+            uint128_t num = ocp.numerator();
+            uint128_t den = ocp.denominator();
             if( num > den )
             {
                num /= den;
-               if( num > max )
-                  num = max;
+               num = std::min( num, max );
                den = 1;
             }
             else
             {
                den /= num;
-               if( den > max )
-                  den = max;
+               den = std::min( den, max );
                num = 1;
             }
-            boost::rational<int128_t> ncp( num, den );
+            boost::rational<uint128_t> ncp( num, den );
             if( num == max || den == max ) // it's on the edge, we know it's accurate enough
                cp = ncp;
             else
             {
                // from the accurate ocp, now we have ncp and cp. use the one which is closer to ocp.
                // TODO improve performance
-               auto diff1 = abs( ncp - ocp );
-               auto diff2 = abs( cp - ocp );
+               auto diff1 = (ncp >= ocp) ? (ncp - ocp) : (ocp - ncp);
+               auto diff2 = (cp >= ocp) ? (cp - ocp) : (ocp - cp);
                if( diff1 < diff2 ) cp = ncp;
             }
          }
@@ -176,8 +179,8 @@ namespace graphene { namespace protocol {
 
          if( shrinked || using_max )
          {
-            if( ( r.numerator() > r.denominator() && np < p )
-                  || ( r.numerator() < r.denominator() && np > p ) )
+            bool flipped = ( r.numerator() > r.denominator() ) ? ( np < p ) : ( np > p );
+            if( flipped )
                // even with an accurate result, if p is out of valid range, return it
                np = p;
          }
@@ -211,12 +214,12 @@ namespace graphene { namespace protocol {
        */
       price price::call_price( const asset& debt, const asset& collateral, uint16_t collateral_ratio)
       { try {
-         boost::rational<int128_t> swan(debt.amount.value,collateral.amount.value);
-         boost::rational<int128_t> ratio( collateral_ratio, GRAPHENE_COLLATERAL_RATIO_DENOM );
+         boost::rational<uint128_t> swan(debt.amount.value,collateral.amount.value);
+         boost::rational<uint128_t> ratio( collateral_ratio, GRAPHENE_COLLATERAL_RATIO_DENOM );
          auto cp = swan * ratio;
 
          while( cp.numerator() > GRAPHENE_MAX_SHARE_SUPPLY || cp.denominator() > GRAPHENE_MAX_SHARE_SUPPLY )
-            cp = boost::rational<int128_t>( (cp.numerator() >> 1)+1, (cp.denominator() >> 1)+1 );
+            cp = boost::rational<uint128_t>( (cp.numerator() >> 1)+1, (cp.denominator() >> 1)+1 );
 
          return  (  asset( static_cast<int64_t>(cp.denominator()), collateral.asset_id )
                   / asset( static_cast<int64_t>(cp.numerator()), debt.asset_id ) );
@@ -228,11 +231,20 @@ namespace graphene { namespace protocol {
          return ( base.asset_id == asset_id_type() && quote.asset_id == asset_id_type() );
       }
 
-      void price::validate() const
+      void price::validate( bool check_upper_bound /* = false */ )const
       { try {
-         FC_ASSERT( base.amount > share_type(0) );
-         FC_ASSERT( quote.amount > share_type(0) );
-         FC_ASSERT( base.asset_id != quote.asset_id );
+         FC_ASSERT( base.amount.value > 0, "Base amount should be positive" );
+         FC_ASSERT( quote.amount.value > 0, "Quote amount should be positive" );
+         FC_ASSERT( base.asset_id != quote.asset_id, "Base asset ID and quote asset ID should be different" );
+         if( check_upper_bound )
+         {
+            FC_ASSERT( base.amount.value <= GRAPHENE_MAX_SHARE_SUPPLY,
+                       "Base amount should not be greater than ${max}",
+                       ("max", GRAPHENE_MAX_SHARE_SUPPLY) );
+            FC_ASSERT( quote.amount.value <= GRAPHENE_MAX_SHARE_SUPPLY,
+                       "Quote amount should not be greater than ${max}",
+                       ("max", GRAPHENE_MAX_SHARE_SUPPLY) );
+         }
       } FC_CAPTURE_AND_RETHROW( (base)(quote) ) }
 
       void price_feed::validate() const
@@ -269,13 +281,13 @@ namespace graphene { namespace protocol {
       price price_feed::max_short_squeeze_price_before_hf_1270()const
       {
          // settlement price is in debt/collateral
-         boost::rational<int128_t> sp( settlement_price.base.amount.value, settlement_price.quote.amount.value );
-         boost::rational<int128_t> ratio( GRAPHENE_COLLATERAL_RATIO_DENOM, maximum_short_squeeze_ratio );
+         boost::rational<uint128_t> sp( settlement_price.base.amount.value, settlement_price.quote.amount.value );
+         boost::rational<uint128_t> ratio( GRAPHENE_COLLATERAL_RATIO_DENOM, maximum_short_squeeze_ratio );
          auto cp = sp * ratio;
 
          while( cp.numerator() > GRAPHENE_MAX_SHARE_SUPPLY || cp.denominator() > GRAPHENE_MAX_SHARE_SUPPLY )
-            cp = boost::rational<int128_t>( (cp.numerator() >> 1)+(cp.numerator()&1),
-                                            (cp.denominator() >> 1)+(cp.denominator()&1) );
+            cp = boost::rational<uint128_t>( (cp.numerator() >> 1)+(cp.numerator()&1U),
+                                            (cp.denominator() >> 1)+(cp.denominator()&1U) );
 
          return (  asset( static_cast<int64_t>(cp.numerator()), settlement_price.base.asset_id )
                  / asset( static_cast<int64_t>(cp.denominator()), settlement_price.quote.asset_id ) );
@@ -292,27 +304,35 @@ namespace graphene { namespace protocol {
 
       // Documentation in header.
       // Calculation:  MCOP = settlement_price / (MSSR - MCFR); result is in debt/collateral
-      price price_feed::margin_call_order_price(const fc::optional<uint16_t> maybe_mcfr)const
+      price price_feed::margin_call_order_price(const fc::optional<uint16_t>& maybe_mcfr)const
+      {
+         return settlement_price / margin_call_order_ratio( maybe_mcfr );
+      }
+
+      // Calculation:  MCOR = MSSR - MCFR, floor at 1.00
+      uint16_t price_feed::get_margin_call_price_numerator(const fc::optional<uint16_t>& maybe_mcfr)const
       {
          const uint16_t mcfr = maybe_mcfr.valid() ? *maybe_mcfr : 0;
          uint16_t numerator = (mcfr < maximum_short_squeeze_ratio) ?
             (maximum_short_squeeze_ratio - mcfr) : GRAPHENE_COLLATERAL_RATIO_DENOM; // won't underflow
          if (numerator < GRAPHENE_COLLATERAL_RATIO_DENOM)
             numerator = GRAPHENE_COLLATERAL_RATIO_DENOM; // floor at 1.00
-         return settlement_price * ratio_type( GRAPHENE_COLLATERAL_RATIO_DENOM, numerator );
+         return numerator;
+      }
+
+      // Documentation in header.
+      // Calculation:  MCOR = MSSR - MCFR
+      ratio_type price_feed::margin_call_order_ratio(const fc::optional<uint16_t>& maybe_mcfr)const
+      {
+         auto numerator = get_margin_call_price_numerator( maybe_mcfr );
+         return ratio_type( numerator, GRAPHENE_COLLATERAL_RATIO_DENOM );
       }
 
       // Reason for this function is explained in header.
       // Calculation: (MSSR - MCFR) / MSSR
-      ratio_type price_feed::margin_call_pays_ratio(const fc::optional<uint16_t> maybe_mcfr)const
+      ratio_type price_feed::margin_call_pays_ratio(const fc::optional<uint16_t>& maybe_mcfr)const
       {
-         if (!maybe_mcfr.valid())
-            return ratio_type(1,1);
-         const uint16_t mcfr = *maybe_mcfr;
-         uint16_t numerator = (mcfr < maximum_short_squeeze_ratio) ?
-            (maximum_short_squeeze_ratio - mcfr) : GRAPHENE_COLLATERAL_RATIO_DENOM; // won't underflow
-         if (numerator < GRAPHENE_COLLATERAL_RATIO_DENOM)
-            numerator = GRAPHENE_COLLATERAL_RATIO_DENOM; // floor at 1.00
+         auto numerator = get_margin_call_price_numerator( maybe_mcfr );
          return ratio_type( numerator, maximum_short_squeeze_ratio );
          // Note: This ratio, if it multiplied margin_call_order_price, would yield the
          // max_short_squeeze_price, apart perhaps for truncation (rounding) error.
@@ -327,26 +347,32 @@ namespace graphene { namespace protocol {
 
 // compile-time table of powers of 10 using template metaprogramming
 
-template< int N >
+template< size_t N >
 struct p10
 {
-   static const int64_t v = 10 * p10<N-1>::v;
+   static constexpr int64_t v = 10 * p10<N-1>::v;
 };
 
 template<>
 struct p10<0>
 {
-   static const int64_t v = 1;
+   static constexpr int64_t v = 1;
 };
 
-const int64_t scaled_precision_lut[19] =
+share_type asset::scaled_precision( uint8_t precision )
 {
-   p10<  0 >::v, p10<  1 >::v, p10<  2 >::v, p10<  3 >::v,
-   p10<  4 >::v, p10<  5 >::v, p10<  6 >::v, p10<  7 >::v,
-   p10<  8 >::v, p10<  9 >::v, p10< 10 >::v, p10< 11 >::v,
-   p10< 12 >::v, p10< 13 >::v, p10< 14 >::v, p10< 15 >::v,
-   p10< 16 >::v, p10< 17 >::v, p10< 18 >::v
-};
+   FC_ASSERT( precision < 19 );
+   static constexpr std::array<int64_t, 19> scaled_precision_lut =
+   {
+      p10<  0 >::v, p10<  1 >::v, p10<  2 >::v, p10<  3 >::v,
+      p10<  4 >::v, p10<  5 >::v, p10<  6 >::v, p10<  7 >::v,
+      p10<  8 >::v, p10<  9 >::v, p10< 10 >::v, p10< 11 >::v,
+      p10< 12 >::v, p10< 13 >::v, p10< 14 >::v, p10< 15 >::v,
+      p10< 16 >::v, p10< 17 >::v, p10< 18 >::v
+   };
+
+   return scaled_precision_lut[ precision ];
+}
 
 } } // graphene::protocol
 

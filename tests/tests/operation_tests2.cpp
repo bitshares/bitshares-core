@@ -1512,7 +1512,8 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
 
       BOOST_TEST_MESSAGE( "Verify partial settlement of call" );
       // Partially settle a call
-      force_settlement_id_type settle_id = force_settle( nathan_id, asset( 50, bitusd_id ) ).get< object_id_type >();
+      force_settlement_id_type settle_id = *force_settle( nathan_id, asset( 50, bitusd_id ) )
+                                               .get< extendable_operation_result >().value.new_objects->begin();
 
       // Call does not take effect immediately
       BOOST_CHECK_EQUAL( get_balance(nathan_id, bitusd_id), 14950);
@@ -1536,7 +1537,8 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
 
       BOOST_TEST_MESSAGE( "Verify pending settlement is cancelled when asset's force_settle is disabled" );
       // Ensure pending settlement is cancelled when force settle is disabled
-      settle_id = force_settle( nathan_id, asset( 50, bitusd_id ) ).get< object_id_type >();
+      settle_id = *force_settle( nathan_id, asset( 50, bitusd_id ) )
+                                               .get< extendable_operation_result >().value.new_objects->begin();
 
       BOOST_CHECK( !db.get_index_type<force_settlement_index>().indices().empty() );
       update_asset_options( bitusd_id, [&]( asset_options& new_options )
@@ -1546,7 +1548,8 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
       { new_options.flags &= ~disable_force_settle; } );
 
       BOOST_TEST_MESSAGE( "Perform iterative settlement" );
-      settle_id = force_settle( nathan_id, asset( 12500, bitusd_id ) ).get< object_id_type >();
+      settle_id = *force_settle( nathan_id, asset( 12500, bitusd_id ) )
+                                               .get< extendable_operation_result >().value.new_objects->begin();
 
       // c3 2950 : 5731   1.9427   fully settled
       // c5 5000 : 9800   1.9600   fully settled

@@ -76,7 +76,8 @@ void verify_account_votes( const database& db, const account_options& options )
    for( auto id : options.votes )
    {
       FC_ASSERT( id < max_vote_id, "Can not vote for ${id} which does not exist.", ("id",id) );
-      has_worker_votes |= (id.type() == vote_id_type::worker);
+      if( id.type() == vote_id_type::worker )
+         has_worker_votes = true;
    }
 
    if( has_worker_votes && (db.head_block_time() >= HARDFORK_607_TIME) )

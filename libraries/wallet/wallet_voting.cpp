@@ -37,7 +37,7 @@ namespace graphene { namespace wallet { namespace detail {
       from_variant( worker_settings, result, GRAPHENE_MAX_NESTED_OBJECTS );
       return result;
    }
-   
+
    signed_transaction wallet_api_impl::update_worker_votes(
       string account,
       worker_vote_delta delta,
@@ -102,7 +102,7 @@ namespace graphene { namespace wallet { namespace detail {
       return sign_transaction( tx, broadcast );
    }
 
-   signed_transaction wallet_api_impl::create_committee_member(string owner_account, string url, 
+   signed_transaction wallet_api_impl::create_committee_member(string owner_account, string url,
          bool broadcast )
    { try {
 
@@ -296,8 +296,8 @@ namespace graphene { namespace wallet { namespace detail {
       }
       else
       {
-         unsigned votes_removed = voting_account_object.options.votes.erase(committee_member_obj->vote_id);
-         if (!votes_removed)
+         auto votes_removed = voting_account_object.options.votes.erase(committee_member_obj->vote_id);
+         if( 0 == votes_removed )
             FC_THROW("Account ${account} is already not voting for committee_member ${committee_member}",
                      ("account", voting_account)("committee_member", committee_member));
       }
@@ -330,8 +330,8 @@ namespace graphene { namespace wallet { namespace detail {
       }
       else
       {
-         unsigned votes_removed = voting_account_object.options.votes.erase(witness_obj->vote_id);
-         if (!votes_removed)
+         auto votes_removed = voting_account_object.options.votes.erase(witness_obj->vote_id);
+         if( 0 == votes_removed )
             FC_THROW("Account ${account} is already not voting for witness ${witness}",
                      ("account", voting_account)("witness", witness));
       }
@@ -347,7 +347,7 @@ namespace graphene { namespace wallet { namespace detail {
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (voting_account)(witness)(approve)(broadcast) ) }
 
-   signed_transaction wallet_api_impl::set_voting_proxy(string account_to_modify, 
+   signed_transaction wallet_api_impl::set_voting_proxy(string account_to_modify,
          optional<string> voting_account, bool broadcast )
    { try {
       account_object account_object_to_modify = get_account(account_to_modify);
@@ -466,7 +466,7 @@ namespace graphene { namespace wallet { namespace detail {
             size_t n = key.size();
             for( size_t i=0; i<n; i++ )
             {
-               if( !isdigit( key[i] ) )
+               if( 0 == isdigit( key[i] ) )
                   return false;
             }
             return true;

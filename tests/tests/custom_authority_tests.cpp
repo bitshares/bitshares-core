@@ -603,6 +603,43 @@ BOOST_AUTO_TEST_CASE(container_in_not_in_checks) { try {
       } FC_LOG_AND_RETHROW()
    }
 
+BOOST_AUTO_TEST_CASE(custom_auths_unsupported_operations_test) { try {
+   //////
+   // Initialize the test
+   //////
+   generate_blocks(HARDFORK_BSIP_40_TIME);
+   generate_blocks(5);
+   db.modify(global_property_id_type()(db), [](global_property_object& gpo) {
+      gpo.parameters.extensions.value.custom_authority_options = custom_authority_options_type();
+   });
+   set_expiration(db, trx);
+   ACTORS((alice)(bob))
+   fund(alice, asset(1000*GRAPHENE_BLOCKCHAIN_PRECISION));
+   fund(bob, asset(1000*GRAPHENE_BLOCKCHAIN_PRECISION));
+
+   //////
+   // Create a custom authority where Bob is authorized to do "fill_order_operation" with Alice's account,
+   // This should fail since "fill_order_operation" is a virtual operation thus is not supported.
+   //////
+   custom_authority_create_operation op;
+   op.account = alice.get_id();
+   op.auth.add_authority(bob.get_id(), 1);
+   op.auth.weight_threshold = 1;
+   op.enabled = true;
+   op.valid_to = db.head_block_time() + 1000;
+   op.operation_type = operation::tag<fill_order_operation>::value;
+   auto account_index = member_index<fill_order_operation>("account_id");
+   op.restrictions = { restriction(account_index, restriction::func_eq, account_id_type(0))};
+
+   //////
+   // Alice publishes the custom authority
+   //////
+   trx.clear();
+   trx.operations = {op};
+   sign(trx, alice_private_key);
+   BOOST_CHECK_THROW(PUSH_TX(db, trx), fc::exception);
+
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE(custom_auths) { try {
    //////

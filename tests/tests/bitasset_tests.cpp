@@ -454,7 +454,9 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
 
    auto hf_time = HARDFORK_CORE_868_890_TIME;
-   if(hf1270)
+   if(hf2481)
+      hf_time = HARDFORK_CORE_2481_TIME;
+   else if(hf1270)
       hf_time = HARDFORK_CORE_1270_TIME;
 
    for( int i=0; i<2; ++i )
@@ -770,7 +772,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
 }
 
 /******
- * @brief Test various bitasset asserts within the asset_evaluator before the HF 922 / 931
+ * @brief Test various bitasset asserts within the asset_evaluator after the HF 922 / 931
  */
 BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
 {
@@ -927,7 +929,7 @@ BOOST_AUTO_TEST_CASE( hf_1270_test )
    generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
    generate_block( skip );
 
-   for( int i = 0; i < 10; ++i )
+   for( int i = 0; i < 12; ++i )
    {
       idump( (i) );
       int blocks = 0;
@@ -946,6 +948,11 @@ BOOST_AUTO_TEST_CASE( hf_1270_test )
       else if( i == 8 ) // go beyond hard fork BSIP77
       {
          generate_blocks( HARDFORK_BSIP_77_TIME, true, skip );
+      }
+      else if( i == 10 ) // go beyond hard fork 2481
+      {
+         generate_blocks( HARDFORK_CORE_2481_TIME - mi, true, skip );
+         generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
       }
       set_expiration( db, trx );
 
@@ -1403,6 +1410,13 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_switching_to_witness_fed )
 BOOST_AUTO_TEST_CASE(hf_890_test_hf1270)
 { try {
    hf1270 = true;
+   INVOKE(hf_890_test);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(hf_890_test_hf2481)
+{ try {
+   hf2481 = true;
    INVOKE(hf_890_test);
 
 } FC_LOG_AND_RETHROW() }

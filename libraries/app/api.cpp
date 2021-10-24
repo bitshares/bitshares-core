@@ -586,7 +586,7 @@ namespace graphene { namespace app {
           const auto& idx = hist_idx.indices().get<by_pool_op_type_time>();
           auto itr = start.valid() ? idx.lower_bound( boost::make_tuple( pool_id, *operation_type, *start ) )
                                    : idx.lower_bound( boost::make_tuple( pool_id, *operation_type ) );
-          auto itr_stop = stop.valid() ? idx.upper_bound( boost::make_tuple( pool_id, *operation_type, *stop ) )
+          auto itr_stop = stop.valid() ? idx.lower_bound( boost::make_tuple( pool_id, *operation_type, *stop ) )
                                        : idx.upper_bound( boost::make_tuple( pool_id, *operation_type ) );
           while( itr != itr_stop && result.size() < limit )
           {
@@ -599,7 +599,7 @@ namespace graphene { namespace app {
           const auto& idx = hist_idx.indices().get<by_pool_time>();
           auto itr = start.valid() ? idx.lower_bound( boost::make_tuple( pool_id, *start ) )
                                    : idx.lower_bound( pool_id );
-          auto itr_stop = stop.valid() ? idx.upper_bound( boost::make_tuple( pool_id, *stop ) )
+          auto itr_stop = stop.valid() ? idx.lower_bound( boost::make_tuple( pool_id, *stop ) )
                                        : idx.upper_bound( pool_id );
           while( itr != itr_stop && result.size() < limit )
           {
@@ -645,7 +645,11 @@ namespace graphene { namespace app {
           const auto& idx_t = hist_idx.indices().get<by_pool_op_type_time>();
           auto itr = start.valid() ? idx.lower_bound( boost::make_tuple( pool_id, *operation_type, *start ) )
                                    : idx.lower_bound( boost::make_tuple( pool_id, *operation_type ) );
-          auto itr_temp = stop.valid() ? idx_t.upper_bound( boost::make_tuple( pool_id, *operation_type, *stop ) )
+          if( itr == idx.end() || itr->pool != pool_id || itr->op_type != *operation_type ) // empty result
+             return result;
+          if( stop.valid() && itr->time <= *stop ) // empty result
+             return result;
+          auto itr_temp = stop.valid() ? idx_t.lower_bound( boost::make_tuple( pool_id, *operation_type, *stop ) )
                                        : idx_t.upper_bound( boost::make_tuple( pool_id, *operation_type ) );
           auto itr_stop = ( itr_temp == idx_t.end() ? idx.end() : idx.iterator_to( *itr_temp ) );
           while( itr != itr_stop && result.size() < limit )
@@ -660,7 +664,11 @@ namespace graphene { namespace app {
           const auto& idx_t = hist_idx.indices().get<by_pool_time>();
           auto itr = start.valid() ? idx.lower_bound( boost::make_tuple( pool_id, *start ) )
                                    : idx.lower_bound( pool_id );
-          auto itr_temp = stop.valid() ? idx_t.upper_bound( boost::make_tuple( pool_id, *stop ) )
+          if( itr == idx.end() || itr->pool != pool_id ) // empty result
+             return result;
+          if( stop.valid() && itr->time <= *stop ) // empty result
+             return result;
+          auto itr_temp = stop.valid() ? idx_t.lower_bound( boost::make_tuple( pool_id, *stop ) )
                                        : idx_t.upper_bound( pool_id );
           auto itr_stop = ( itr_temp == idx_t.end() ? idx.end() : idx.iterator_to( *itr_temp ) );
           while( itr != itr_stop && result.size() < limit )

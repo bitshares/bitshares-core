@@ -107,6 +107,7 @@ typedef generic_index<liquidity_pool_object, liquidity_pool_multi_index_type> li
 
 MAP_OBJECT_ID_TO_TYPE( graphene::chain::liquidity_pool_object )
 
+// Note: this is left here but not moved to a cpp file due to the extended_liquidity_pool_object struct in API.
 FC_REFLECT_DERIVED( graphene::chain::liquidity_pool_object, (graphene::db::object),
                     (asset_a)
                     (asset_b)

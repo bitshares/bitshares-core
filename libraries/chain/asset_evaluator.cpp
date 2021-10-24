@@ -70,7 +70,7 @@ namespace detail {
       if ( !HARDFORK_BSIP_48_75_PASSED( block_time ) )
       {
          // new issuer permissions should not be set until activation of BSIP_48_75
-         FC_ASSERT( !(options.issuer_permissions & ~ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK),
+         FC_ASSERT( 0 == (options.issuer_permissions & (uint16_t)(~ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK)),
                     "New asset issuer permission bits should not be set before HARDFORK_BSIP_48_75_TIME" );
          // Note: no check for flags here because we didn't check in the past
       }
@@ -144,6 +144,42 @@ namespace detail {
                  "Collateral-denominated fees are not yet active and therefore cannot be claimed." );
    }
 
+   void check_asset_options_hf_core2281( const fc::time_point_sec& next_maint_time, const asset_options& options)
+   {
+      // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
+      if ( !HARDFORK_CORE_2281_PASSED(next_maint_time) )
+      {
+         // new issuer permissions should not be set until activation of the hardfork
+         FC_ASSERT( 0 == (options.issuer_permissions & asset_issuer_permission_flags::disable_collateral_bidding),
+                    "New asset issuer permission bit 'disable_collateral_bidding' should not be set "
+                    "before Hardfork core-2281" );
+         // Note: checks about flags are more complicated due to old bugs,
+         //       and likely can not be removed after hardfork, so do not put them here
+      }
+   }
+
+   void check_asset_options_hf_core2467(const fc::time_point_sec& next_maint_time, const asset_options& options)
+   {
+      // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
+      if ( !HARDFORK_CORE_2467_PASSED(next_maint_time) )
+      {
+         // new issuer permissions should not be set until activation of the hardfork
+         FC_ASSERT( 0 == (options.issuer_permissions & asset_issuer_permission_flags::disable_bsrm_update),
+                    "New asset issuer permission bit 'disable_bsrm_update' should not be set "
+                    "before Hardfork core-2467" );
+      }
+   }
+
+   void check_bitasset_opts_hf_core2467(const fc::time_point_sec& next_maint_time, const bitasset_options& options)
+   {
+      // HF_REMOVABLE: Following hardfork check should be removable after hardfork date passes:
+      if ( !HARDFORK_CORE_2467_PASSED(next_maint_time) )
+      {
+         FC_ASSERT( !options.extensions.value.black_swan_response_method.valid(),
+                    "A BitAsset's black swan response method cannot be set before Hardfork core-2467" );
+      }
+   }
+
 } // graphene::chain::detail
 
 void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
@@ -151,22 +187,31 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    const database& d = db();
    const time_point_sec now = d.head_block_time();
+   const fc::time_point_sec next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
 
    // Hardfork Checks:
    detail::check_asset_options_hf_1774(now, op.common_options);
    detail::check_asset_options_hf_bsip_48_75(now, op.common_options);
    detail::check_asset_options_hf_bsip81(now, op.common_options);
+   detail::check_asset_options_hf_core2281( next_maint_time, op.common_options ); // HF_REMOVABLE
+   detail::check_asset_options_hf_core2467( next_maint_time, op.common_options ); // HF_REMOVABLE
    if( op.bitasset_opts ) {
       detail::check_bitasset_options_hf_bsip_48_75( now, *op.bitasset_opts );
       detail::check_bitasset_options_hf_bsip74( now, *op.bitasset_opts ); // HF_REMOVABLE
       detail::check_bitasset_options_hf_bsip77( now, *op.bitasset_opts ); // HF_REMOVABLE
       detail::check_bitasset_options_hf_bsip87( now, *op.bitasset_opts ); // HF_REMOVABLE
+      detail::check_bitasset_opts_hf_core2467( next_maint_time, *op.bitasset_opts ); // HF_REMOVABLE
    }
 
    // TODO move as many validations as possible to validate() if not triggered before hardfork
-   if( HARDFORK_BSIP_48_75_PASSED( now ) )
+   if( HARDFORK_CORE_2281_PASSED( next_maint_time ) )
    {
       op.common_options.validate_flags( op.bitasset_opts.valid() );
+   }
+   else if( HARDFORK_BSIP_48_75_PASSED( now ) )
+   {
+      // do not allow the 'disable_collateral_bidding' bit
+      op.common_options.validate_flags( op.bitasset_opts.valid(), false );
    }
 
    const auto& chain_parameters = d.get_global_properties().parameters;
@@ -228,8 +273,9 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
 void asset_create_evaluator::pay_fee()
 {
-   fee_is_odd = core_fee_paid.value & 1;
-   core_fee_paid -= core_fee_paid.value/2;
+   constexpr int64_t two = 2;
+   fee_is_odd = ( ( core_fee_paid.value % two ) != 0 );
+   core_fee_paid -= core_fee_paid.value / two;
    generic_evaluator::pay_fee();
 }
 
@@ -399,14 +445,19 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 { try {
    const database& d = db();
    const time_point_sec now = d.head_block_time();
+   const fc::time_point_sec next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
 
    // Hardfork Checks:
    detail::check_asset_options_hf_1774(now, o.new_options);
    detail::check_asset_options_hf_bsip_48_75(now, o.new_options);
    detail::check_asset_options_hf_bsip81(now, o.new_options);
+   detail::check_asset_options_hf_core2281( next_maint_time, o.new_options ); // HF_REMOVABLE
+   detail::check_asset_options_hf_core2467( next_maint_time, o.new_options ); // HF_REMOVABLE
    detail::check_asset_update_extensions_hf_bsip_48_75( now, o.extensions.value );
 
    bool hf_bsip_48_75_passed = ( HARDFORK_BSIP_48_75_PASSED( now ) );
+   bool hf_core_2281_passed = ( HARDFORK_CORE_2281_PASSED( next_maint_time ) );
+   bool hf_core_2467_passed = ( HARDFORK_CORE_2467_PASSED( next_maint_time ) );
 
    const asset_object& a = o.asset_to_update(d);
    auto a_copy = a;
@@ -420,25 +471,49 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       validate_new_issuer( d, a, *o.new_issuer );
    }
 
-   uint16_t enabled_issuer_permissions_mask = a.options.get_enabled_issuer_permissions_mask();
-   if( hf_bsip_48_75_passed && a.is_market_issued() )
-   {
+   if( a.is_market_issued() )
       bitasset_data = &a.bitasset_data(d);
-      if( bitasset_data->is_prediction_market )
-      {
-         // Note: if the global_settle permission was unset, it should be corrected
-         FC_ASSERT( a_copy.can_global_settle(),
-                    "The global_settle permission should be enabled for prediction markets" );
-         enabled_issuer_permissions_mask |= global_settle;
-      }
+
+   if( hf_core_2467_passed )
+   {
+      // Unable to set non-UIA issuer permission bits on UIA
+      if( !a.is_market_issued() )
+         FC_ASSERT( 0 == ( o.new_options.issuer_permissions & NON_UIA_ONLY_ISSUER_PERMISSION_MASK ),
+                    "Unable to set non-UIA issuer permission bits on UIA" );
+      // Unable to set disable_bsrm_update issuer permission bit on PM
+      else if( bitasset_data->is_prediction_market )
+         FC_ASSERT( 0 == ( o.new_options.issuer_permissions & disable_bsrm_update ),
+                    "Unable to set disable_bsrm_update issuer permission bit on PM" );
+      // else do nothing
+   }
+
+   uint16_t enabled_issuer_permissions_mask = a.options.get_enabled_issuer_permissions_mask();
+   if( hf_bsip_48_75_passed && a.is_market_issued() && bitasset_data->is_prediction_market )
+   {
+      // Note: if the global_settle permission was unset, it should be corrected
+      FC_ASSERT( a_copy.can_global_settle(),
+                 "The global_settle permission should be enabled for prediction markets" );
+      enabled_issuer_permissions_mask |= global_settle;
    }
 
    const auto& dyn_data = a.dynamic_asset_data_id(d);
    if( dyn_data.current_supply != 0 )
    {
       // new issuer_permissions must be subset of old issuer permissions
-      FC_ASSERT(!(o.new_options.get_enabled_issuer_permissions_mask() & ~enabled_issuer_permissions_mask),
-                "Cannot reinstate previously revoked issuer permissions on an asset if current supply is non-zero.");
+      if( hf_core_2467_passed && !a.is_market_issued() ) // for UIA, ignore non-UIA bits
+         FC_ASSERT( 0 == ( ( o.new_options.get_enabled_issuer_permissions_mask()
+                        & (uint16_t)(~enabled_issuer_permissions_mask) ) & UIA_ASSET_ISSUER_PERMISSION_MASK ),
+                 "Cannot reinstate previously revoked issuer permissions on a UIA if current supply is non-zero, "
+                 "unless to unset non-UIA issuer permission bits.");
+      else if( hf_core_2467_passed && bitasset_data->is_prediction_market ) // for PM, ignore disable_bsrm_update
+         FC_ASSERT( 0 == ( ( o.new_options.get_enabled_issuer_permissions_mask()
+                        & (uint16_t)(~enabled_issuer_permissions_mask) ) & (uint16_t)(~disable_bsrm_update) ),
+                 "Cannot reinstate previously revoked issuer permissions on a PM if current supply is non-zero, "
+                 "unless to unset the disable_bsrm_update issuer permission bit.");
+      else
+         FC_ASSERT( 0 == ( o.new_options.get_enabled_issuer_permissions_mask()
+                        & (uint16_t)(~enabled_issuer_permissions_mask) ),
+                 "Cannot reinstate previously revoked issuer permissions on an asset if current supply is non-zero.");
       // precision can not be changed
       FC_ASSERT( !o.extensions.value.new_precision.valid(),
                  "Cannot update precision if current supply is non-zero" );
@@ -450,24 +525,33 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       }
    }
 
+   // If an invalid bit was set in flags, it should be unset
    // TODO move as many validations as possible to validate() if not triggered before hardfork
-   if( hf_bsip_48_75_passed )
+   if( hf_core_2281_passed )
    {
       o.new_options.validate_flags( a.is_market_issued() );
+   }
+   else if( hf_bsip_48_75_passed )
+   {
+      // do not allow the 'disable_collateral_bidding' bit
+      o.new_options.validate_flags( a.is_market_issued(), false );
    }
 
    // changed flags must be subset of old issuer permissions
    if( hf_bsip_48_75_passed )
    {
       // Note: if an invalid bit was set, it can be unset regardless of the permissions
-      uint16_t check_bits = ( a.is_market_issued() ? VALID_FLAGS_MASK : UIA_VALID_FLAGS_MASK );
+      uint16_t valid_flags_mask = hf_core_2281_passed ? VALID_FLAGS_MASK
+                                                      : (VALID_FLAGS_MASK & (uint16_t)(~disable_collateral_bidding));
+      uint16_t check_bits = a.is_market_issued() ? valid_flags_mask : UIA_VALID_FLAGS_MASK;
 
-      FC_ASSERT( !((o.new_options.flags ^ a.options.flags) & check_bits & ~enabled_issuer_permissions_mask),
+      FC_ASSERT( 0 == ( (o.new_options.flags ^ a.options.flags) & check_bits
+                        & (uint16_t)(~enabled_issuer_permissions_mask) ),
                  "Flag change is forbidden by issuer permissions" );
    }
    else
    {
-      FC_ASSERT( !((o.new_options.flags ^ a.options.flags) & ~a.options.issuer_permissions),
+      FC_ASSERT( 0 == ( (o.new_options.flags ^ a.options.flags) & (uint16_t)(~a.options.issuer_permissions) ),
                  "Flag change is forbidden by issuer permissions" );
    }
 
@@ -485,11 +569,7 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
                  "Specified a new precision but it does not change" );
 
       if( a.is_market_issued() )
-      {
-         if( !bitasset_data )
-            bitasset_data = &asset_to_update->bitasset_data(d);
          FC_ASSERT( !bitasset_data->is_prediction_market, "Can not update precision of a prediction market" );
-      }
 
       // If any other asset is backed by this asset, this asset's precision can't be updated
       const auto& idx = d.get_index_type<graphene::chain::asset_bitasset_data_index>()
@@ -518,7 +598,7 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
    database& d = db();
 
    // If we are now disabling force settlements, cancel all open force settlement orders
-   if( (o.new_options.flags & disable_force_settle) && asset_to_update->can_force_settle() )
+   if( 0 != (o.new_options.flags & disable_force_settle) && asset_to_update->can_force_settle() )
    {
       const auto& idx = d.get_index_type<force_settlement_index>().indices().get<by_expiration>();
       // Funky iteration code because we're removing objects as we go. We have to re-initialize itr every loop instead
@@ -527,6 +607,20 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
            itr != idx.end() && itr->settlement_asset_id() == o.asset_to_update;
            itr = idx.lower_bound(o.asset_to_update) )
          d.cancel_settle_order(*itr);
+   }
+
+   // If we are now disabling collateral bidding, cancel all open collateral bids
+   if( 0 != (o.new_options.flags & disable_collateral_bidding) && asset_to_update->can_bid_collateral() )
+   {
+      const auto& bid_idx = d.get_index_type< collateral_bid_index >().indices().get<by_price>();
+      auto itr = bid_idx.lower_bound( o.asset_to_update );
+      const auto end = bid_idx.upper_bound( o.asset_to_update );
+      while( itr != end )
+      {
+         const collateral_bid_object& bid = *itr;
+         ++itr;
+         d.cancel_bid( bid );
+      }
    }
 
    // For market-issued assets, if core exchange rate changed, update flag in bitasset data
@@ -614,7 +708,8 @@ void check_children_of_bitasset(const database& d, const asset_update_bitasset_o
          {
             const auto& child = bitasset_data.asset_id(d);
             FC_ASSERT( child.get_id() != op.new_options.short_backing_asset,
-                  "A BitAsset would be invalidated by changing this backing asset ('A' backed by 'B' backed by 'A')." );
+                  "A BitAsset would be invalidated by changing this backing asset "
+                  "('A' backed by 'B' backed by 'A')." );
 
             FC_ASSERT( child.issuer != GRAPHENE_COMMITTEE_ACCOUNT,
                   "A blockchain-controlled market asset would be invalidated by changing this backing asset." );
@@ -628,12 +723,14 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 { try {
    const database& d = db();
    const time_point_sec now = d.head_block_time();
+   const fc::time_point_sec next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
 
    // Hardfork Checks:
    detail::check_bitasset_options_hf_bsip_48_75( now, op.new_options );
    detail::check_bitasset_options_hf_bsip74( now, op.new_options ); // HF_REMOVABLE
    detail::check_bitasset_options_hf_bsip77( now, op.new_options ); // HF_REMOVABLE
    detail::check_bitasset_options_hf_bsip87( now, op.new_options ); // HF_REMOVABLE
+   detail::check_bitasset_opts_hf_core2467( next_maint_time, op.new_options ); // HF_REMOVABLE
 
    const asset_object& asset_obj = op.asset_to_update(d);
 
@@ -643,8 +740,13 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 
    const asset_bitasset_data_object& current_bitasset_data = asset_obj.bitasset_data(d);
 
-   FC_ASSERT( !current_bitasset_data.has_settlement(),
-              "Cannot update a bitasset after a global settlement has executed" );
+   if( !HARDFORK_CORE_2282_PASSED( next_maint_time ) )
+      FC_ASSERT( !current_bitasset_data.has_settlement(),
+                 "Cannot update a bitasset after a global settlement has executed" );
+
+   if( current_bitasset_data.is_prediction_market )
+      FC_ASSERT( !op.new_options.extensions.value.black_swan_response_method.valid(),
+                 "Can not set black_swan_response_method for Prediction Markets" );
 
    // TODO simplify code below when made sure operator==(optional,optional) works
    if( !asset_obj.can_owner_update_mcr() )
@@ -674,17 +776,42 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
                            || ( old_mssr.valid() && *old_mssr != *new_mssr ) );
       FC_ASSERT( !mssr_changed, "No permission to update MSSR" );
    }
+   // check if BSRM will change
+   const auto old_bsrm = current_bitasset_data.get_black_swan_response_method();
+   const auto new_bsrm = op.new_options.get_black_swan_response_method();
+   if( old_bsrm != new_bsrm )
+   {
+      FC_ASSERT( asset_obj.can_owner_update_bsrm(), "No permission to update BSRM" );
+      FC_ASSERT( !current_bitasset_data.has_settlement(),
+                 "Unable to update BSRM when the asset has been globally settled" );
+
+      // Note: it is probably OK to allow BSRM update, be conservative here so far
+      using bsrm_type = bitasset_options::black_swan_response_type;
+      if( bsrm_type::individual_settlement_to_fund == old_bsrm )
+         FC_ASSERT( !current_bitasset_data.has_individual_settlement(),
+                 "Unable to update BSRM when the individual settlement pool is not empty" );
+      else if( bsrm_type::individual_settlement_to_order == old_bsrm )
+         FC_ASSERT( !d.find_settled_debt_order( op.asset_to_update ),
+                 "Unable to update BSRM when there exists an individual settlement order" );
+
+      // Since we do not allow updating in some cases (above), only check no_settlement here
+      if( bsrm_type::no_settlement == old_bsrm || bsrm_type::no_settlement == new_bsrm )
+         update_feeds_due_to_bsrm_change = true;
+   }
+
 
    // hf 922_931 is a consensus/logic change. This hf cannot be removed.
-   bool after_hf_core_922_931 = ( d.get_dynamic_global_properties().next_maintenance_time
-                                  > HARDFORK_CORE_922_931_TIME );
+   bool after_hf_core_922_931 = ( next_maint_time > HARDFORK_CORE_922_931_TIME );
 
    // Are we changing the backing asset?
    if( op.new_options.short_backing_asset != current_bitasset_data.options.short_backing_asset )
    {
+      FC_ASSERT( !current_bitasset_data.has_settlement(),
+                 "Cannot change backing asset after a global settlement has executed" );
+
       const asset_dynamic_data_object& dyn = asset_obj.dynamic_asset_data_id(d);
       FC_ASSERT( dyn.current_supply == 0,
-                 "Cannot update a bitasset if there is already a current supply." );
+                 "Cannot change backing asset if there is already a current supply." );
 
       FC_ASSERT( dyn.accumulated_collateral_fees == 0,
                  "Must claim collateral-denominated fees before changing backing asset." );
@@ -738,7 +865,8 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
          if ( new_backing_asset.is_market_issued() )
          {
             asset_id_type backing_backing_asset_id = new_backing_asset.bitasset_data(d).options.short_backing_asset;
-            FC_ASSERT( (backing_backing_asset_id == asset_id_type() || !backing_backing_asset_id(d).is_market_issued()),
+            FC_ASSERT( (backing_backing_asset_id == asset_id_type()
+                        || !backing_backing_asset_id(d).is_market_issued()),
                   "A BitAsset cannot be backed by a BitAsset that itself is backed by a BitAsset.");
          }
       }
@@ -777,7 +905,8 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
  */
 static bool update_bitasset_object_options(
       const asset_update_bitasset_operation& op, database& db,
-      asset_bitasset_data_object& bdo, const asset_object& asset_to_update )
+      asset_bitasset_data_object& bdo, const asset_object& asset_to_update,
+      bool update_feeds_due_to_bsrm_change )
 {
    const fc::time_point_sec next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
    bool after_hf_core_868_890 = ( next_maint_time > HARDFORK_CORE_868_890_TIME );
@@ -787,7 +916,7 @@ static bool update_bitasset_object_options(
    if( op.new_options.minimum_feeds != bdo.options.minimum_feeds )
       should_update_feeds = true;
 
-   // after hardfork core-868-890, we also should call update_median_feeds if the feed_lifetime_sec changed
+   // after hardfork core-868-890, we also should call update_bitasset_current_feed if the feed_lifetime_sec changed
    if( after_hf_core_868_890
          && op.new_options.feed_lifetime_sec != bdo.options.feed_lifetime_sec )
    {
@@ -802,7 +931,7 @@ static bool update_bitasset_object_options(
    {
       backing_asset_changed = true;
       should_update_feeds = true;
-      if( asset_to_update.options.flags & ( witness_fed_asset | committee_fed_asset ) )
+      if( 0 != ( asset_to_update.options.flags & ( witness_fed_asset | committee_fed_asset ) ) )
          is_witness_or_committee_fed = true;
    }
 
@@ -864,10 +993,12 @@ static bool update_bitasset_object_options(
    }
 
    bool feed_actually_changed = false;
-   if( should_update_feeds )
+   if( should_update_feeds || update_feeds_due_to_bsrm_change )
    {
       const auto old_feed = bdo.current_feed;
-      bdo.update_median_feeds( db.head_block_time(), next_maint_time );
+      // skip recalculating median feed if it is not needed
+      db.update_bitasset_current_feed( bdo, !should_update_feeds );
+      // Note: we don't try to revive the bitasset here if it was GSed // TODO probably we should do it
 
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
       feed_actually_changed = ( after_hf_core_868_890 && !old_feed.margin_call_params_equal( bdo.current_feed ) );
@@ -884,25 +1015,25 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
    try
    {
       auto& db_conn = db();
-      const auto& asset_being_updated = (*asset_to_update);
       bool to_check_call_orders = false;
 
       db_conn.modify( *bitasset_to_update,
-                      [&op, &asset_being_updated, &to_check_call_orders, &db_conn]( asset_bitasset_data_object& bdo )
+                      [&op, &to_check_call_orders, &db_conn, this]( asset_bitasset_data_object& bdo )
       {
-         to_check_call_orders = update_bitasset_object_options( op, db_conn, bdo, asset_being_updated );
+         to_check_call_orders = update_bitasset_object_options( op, db_conn, bdo, *asset_to_update,
+                                                                update_feeds_due_to_bsrm_change );
       });
 
       if( to_check_call_orders )
          // Process margin calls, allow black swan, not for a new limit order
-         db_conn.check_call_orders( asset_being_updated, true, false, bitasset_to_update );
+         db_conn.check_call_orders( *asset_to_update, true, false, bitasset_to_update );
 
       return void_result();
 
    } FC_CAPTURE_AND_RETHROW( (op) )
 }
 
-void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_update_feed_producers_evaluator::operation_type& o)
+void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_update_feed_producers_operation& o)
 { try {
    database& d = db();
 
@@ -912,8 +1043,8 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
    const asset_object& a = o.asset_to_update(d);
 
    FC_ASSERT(a.is_market_issued(), "Cannot update feed producers on a non-BitAsset.");
-   FC_ASSERT(!(a.options.flags & committee_fed_asset), "Cannot set feed producers on a committee-fed asset.");
-   FC_ASSERT(!(a.options.flags & witness_fed_asset), "Cannot set feed producers on a witness-fed asset.");
+   FC_ASSERT(0 == (a.options.flags & committee_fed_asset), "Cannot set feed producers on a committee-fed asset.");
+   FC_ASSERT(0 == (a.options.flags & witness_fed_asset), "Cannot set feed producers on a witness-fed asset.");
 
    FC_ASSERT( a.issuer == o.issuer, "Only asset issuer can update feed producers of an asset" );
 
@@ -926,13 +1057,11 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_feed_producers_evaluator::operation_type& o)
+void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_feed_producers_operation& o) const
 { try {
    database& d = db();
-   const auto head_time = d.head_block_time();
-   const auto next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
    const asset_bitasset_data_object& bitasset_to_update = asset_to_update->bitasset_data(d);
-   d.modify( bitasset_to_update, [&o,head_time,next_maint_time](asset_bitasset_data_object& a) {
+   d.modify( bitasset_to_update, [&o](asset_bitasset_data_object& a) {
       //This is tricky because I have a set of publishers coming in, but a map of publisher to feed is stored.
       //I need to update the map such that the keys match the new publishers, but not munge the old price feeds from
       //publishers who are being kept.
@@ -956,8 +1085,10 @@ void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_f
       {
          a.feeds[acc];
       }
-      a.update_median_feeds( head_time, next_maint_time );
    });
+   d.update_bitasset_current_feed( bitasset_to_update );
+   // Note: we don't try to revive the bitasset here if it was GSed // TODO probably we should do it
+
    // Process margin calls, allow black swan, not for a new limit order
    d.check_call_orders( *asset_to_update, true, false, &bitasset_to_update );
 
@@ -971,19 +1102,23 @@ void_result asset_global_settle_evaluator::do_evaluate(const asset_global_settle
    FC_ASSERT( asset_to_settle->is_market_issued(), "Can only globally settle market-issued assets" );
    FC_ASSERT( asset_to_settle->can_global_settle(), "The global_settle permission of this asset is disabled" );
    FC_ASSERT( asset_to_settle->issuer == op.issuer, "Only asset issuer can globally settle an asset" );
-   FC_ASSERT( asset_to_settle->dynamic_data(d).current_supply > 0, "Can not globally settle an asset with zero supply" );
+   FC_ASSERT( asset_to_settle->dynamic_data(d).current_supply > 0,
+              "Can not globally settle an asset with zero supply" );
 
    const asset_bitasset_data_object& _bitasset_data  = asset_to_settle->bitasset_data(d);
    // if there is a settlement for this asset, then no further global settle may be taken
-   FC_ASSERT( !_bitasset_data.has_settlement(), "This asset has settlement, cannot global settle again" );
+   FC_ASSERT( !_bitasset_data.has_settlement(),
+              "This asset has been globally settled, cannot globally settle again" );
 
-   const auto& idx = d.get_index_type<call_order_index>().indices().get<by_collateral>();
-   FC_ASSERT( !idx.empty(), "Internal error: no debt position found" );
-   auto itr = idx.lower_bound( price::min( _bitasset_data.options.short_backing_asset, op.asset_to_settle ) );
-   FC_ASSERT( itr != idx.end() && itr->debt_type() == op.asset_to_settle, "Internal error: no debt position found" );
-   const call_order_object& least_collateralized_short = *itr;
-   FC_ASSERT(least_collateralized_short.get_debt() * op.settle_price <= least_collateralized_short.get_collateral(),
-             "Cannot force settle at supplied price: least collateralized short lacks sufficient collateral to settle.");
+   // Note: after core-2467 hard fork, there can be no debt position due to individual settlements, so we check here
+   const call_order_object* least_collateralized_short = d.find_least_collateralized_short( _bitasset_data, true );
+   if( least_collateralized_short )
+   {
+      FC_ASSERT( ( least_collateralized_short->get_debt() * op.settle_price )
+                   <= least_collateralized_short->get_collateral(),
+                 "Cannot globally settle at supplied price: least collateralized short lacks "
+                 "sufficient collateral to settle." );
+   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -999,89 +1134,219 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
 { try {
    const database& d = db();
    asset_to_settle = &op.amount.asset_id(d);
-   FC_ASSERT(asset_to_settle->is_market_issued());
+   FC_ASSERT( asset_to_settle->is_market_issued(),
+              "Can only force settle a predition market or a market issued asset" );
+
    const auto& bitasset = asset_to_settle->bitasset_data(d);
-   FC_ASSERT(asset_to_settle->can_force_settle() || bitasset.has_settlement() );
+   FC_ASSERT( asset_to_settle->can_force_settle() || bitasset.has_settlement()
+                 || bitasset.has_individual_settlement(),
+              "Either the asset need to have the force_settle flag enabled, or it need to be globally settled, "
+              "or the individual settlement pool is not empty" );
+
    if( bitasset.is_prediction_market )
-      FC_ASSERT( bitasset.has_settlement(), "global settlement must occur before force settling a prediction market"  );
-   else if( bitasset.current_feed.settlement_price.is_null()
-            && ( d.head_block_time() <= HARDFORK_CORE_216_TIME // TODO check whether the HF check can be removed
-                 || !bitasset.has_settlement() ) )
-      FC_THROW_EXCEPTION(insufficient_feeds, "Cannot force settle with no price feed.");
+   {
+      FC_ASSERT( bitasset.has_settlement(),
+                 "Global settlement must occur before force settling a prediction market" );
+   }
+   else if( bitasset.current_feed.settlement_price.is_null() )
+   {
+      // TODO check whether the HF check can be removed
+      if( d.head_block_time() <= HARDFORK_CORE_216_TIME )
+      {
+         FC_THROW_EXCEPTION( insufficient_feeds,
+                             "Before the core-216 hard fork, unable to force settle when there is no sufficient "
+                             " price feeds, no matter if the asset has been globally settled" );
+      }
+      if( !bitasset.has_settlement() && !bitasset.has_individual_settlement() )
+      {
+         FC_THROW_EXCEPTION( insufficient_feeds,
+                             "Cannot force settle with no price feed if the asset is not globally settled and the "
+                             "individual settlement pool is not empty" );
+      }
+   }
+
    FC_ASSERT( d.get_balance( op.account, op.amount.asset_id ) >= op.amount, "Insufficient balance" );
+
+   // Since hard fork core-973, check asset authorization limitations
+   if( HARDFORK_CORE_973_PASSED(d.head_block_time()) )
+   {
+      FC_ASSERT( is_authorized_asset( d, *fee_paying_account, *asset_to_settle ),
+                 "The account is not allowed to settle the asset" );
+      FC_ASSERT( is_authorized_asset( d, *fee_paying_account, bitasset.options.short_backing_asset(d) ),
+                 "The account is not allowed to receive the backing asset" );
+   }
+
+   bitasset_ptr = &bitasset;
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
+
+static extendable_operation_result pay_settle_from_gs_fund( database& d,
+                                                 const asset_settle_evaluator::operation_type& op,
+                                                 const account_object* fee_paying_account,
+                                                 const asset_object& asset_to_settle,
+                                                 const asset_bitasset_data_object& bitasset )
+{
+   const auto& head_time = d.head_block_time();
+   const auto& maint_time = d.get_dynamic_global_properties().next_maintenance_time;
+
+   const auto& mia_dyn = asset_to_settle.dynamic_asset_data_id(d);
+
+   asset settled_amount = ( op.amount.amount == mia_dyn.current_supply )
+                          ? asset( bitasset.settlement_fund, bitasset.options.short_backing_asset )
+                          : op.amount * bitasset.settlement_price; // round down, favors global settlement fund
+   if( op.amount.amount != mia_dyn.current_supply )
+   {
+      // should be strictly < except for PM with zero outcome since in that case bitasset.settlement_fund is zero
+      FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund,
+                 "Internal error: amount in the global settlement fund is not sufficient to pay the settlement" );
+   }
+
+   if( 0 == settled_amount.amount && !bitasset.is_prediction_market && maint_time > HARDFORK_CORE_184_TIME )
+      FC_THROW( "Settle amount is too small to receive anything due to rounding" );
+      // else do nothing. Before the hf, something for nothing issue (#184, variant F) could occur
+
+   asset pays = op.amount;
+   if( op.amount.amount != mia_dyn.current_supply
+         && settled_amount.amount != 0
+         && maint_time > HARDFORK_CORE_342_TIME )
+   {
+      pays = settled_amount.multiply_and_round_up( bitasset.settlement_price );
+   }
+
+   d.adjust_balance( op.account, -pays );
+
+   asset issuer_fees( 0, bitasset.options.short_backing_asset );
+   if( settled_amount.amount > 0 )
+   {
+      d.modify( bitasset, [&settled_amount]( asset_bitasset_data_object& obj ){
+         obj.settlement_fund -= settled_amount.amount;
+      });
+
+      // The account who settles pays market fees to the issuer of the collateral asset after HF core-1780
+      //
+      // TODO Check whether the HF check can be removed after the HF.
+      //      Note: even if logically it can be removed, perhaps the removal will lead to a small
+      //            performance loss. Needs testing.
+      if( head_time >= HARDFORK_CORE_1780_TIME )
+      {
+         issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d), settled_amount, false );
+         settled_amount -= issuer_fees;
+      }
+
+      if( settled_amount.amount > 0 )
+         d.adjust_balance( op.account, settled_amount );
+   }
+
+   d.modify( mia_dyn, [&pays]( asset_dynamic_data_object& obj ){
+      obj.current_supply -= pays.amount;
+   });
+   // Note: we don't revive the asset here if current_supply become zero, but only do it on a new feed
+
+   extendable_operation_result result;
+
+   result.value.paid = vector<asset>({ pays });
+   result.value.received = vector<asset>({ settled_amount });
+   result.value.fees  = vector<asset>({ issuer_fees });
+
+   return result;
+}
+
+static extendable_operation_result pay_settle_from_individual_pool( database& d,
+                                                 const asset_settle_evaluator::operation_type& op,
+                                                 const account_object* fee_paying_account,
+                                                 const asset_object& asset_to_settle,
+                                                 const asset_bitasset_data_object& bitasset )
+{
+   asset pays( bitasset.individual_settlement_debt, bitasset.asset_id );
+   asset settled_amount( bitasset.individual_settlement_fund, bitasset.options.short_backing_asset );
+   if( op.amount.amount < bitasset.individual_settlement_debt )
+   {
+      auto settlement_price = bitasset.get_individual_settlement_price();
+      settled_amount = op.amount * settlement_price; // round down, in favor of settlement fund
+      FC_ASSERT( settled_amount.amount > 0, "Settle amount is too small to receive anything due to rounding" );
+      pays = settled_amount.multiply_and_round_up( settlement_price );
+   }
+
+   d.adjust_balance( op.account, -pays );
+   d.modify( bitasset, [&pays,&settled_amount]( asset_bitasset_data_object& obj ){
+      obj.individual_settlement_debt -= pays.amount;
+      obj.individual_settlement_fund -= settled_amount.amount;
+   });
+   d.modify( asset_to_settle.dynamic_asset_data_id(d), [&pays]( asset_dynamic_data_object& obj ){
+      obj.current_supply -= pays.amount;
+   });
+   auto issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d), settled_amount, false );
+   settled_amount -= issuer_fees;
+
+   if( settled_amount.amount > 0 )
+      d.adjust_balance( op.account, settled_amount );
+
+   // Update current_feed since fund price changed
+   auto old_feed_price = bitasset.current_feed.settlement_price;
+   d.update_bitasset_current_feed( bitasset, true );
+
+   // When current_feed is updated, it is possible that there are limit orders able to get filled,
+   // so we need to call check_call_orders()
+   // Note: theoretically, if the fund is still not empty, its new CR should be >= old CR,
+   //       in this case, calling check_call_orders() should not change anything.
+   // Note: there should be no existing force settlements
+   if( 0 == bitasset.individual_settlement_debt && old_feed_price != bitasset.current_feed.settlement_price )
+      d.check_call_orders( asset_to_settle, true, false, &bitasset );
+
+   extendable_operation_result result;
+
+   result.value.paid = vector<asset>({ pays });
+   result.value.received = vector<asset>({ settled_amount });
+   result.value.fees  = vector<asset>({ issuer_fees });
+
+   return result;
+}
 
 operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::operation_type& op)
 { try {
    database& d = db();
 
-   const auto& bitasset = asset_to_settle->bitasset_data(d);
+   const auto& bitasset = *bitasset_ptr;
+
+   // Process global settlement fund
    if( bitasset.has_settlement() )
+      return pay_settle_from_gs_fund( d, op, fee_paying_account, *asset_to_settle, bitasset );
+
+   // Process individual settlement pool
+   extendable_operation_result result;
+   asset to_settle = op.amount;
+   if( bitasset.has_individual_settlement() )
    {
-      const auto& mia_dyn = asset_to_settle->dynamic_asset_data_id(d);
+      result = pay_settle_from_individual_pool( d, op, fee_paying_account, *asset_to_settle, bitasset );
 
-      auto settled_amount = op.amount * bitasset.settlement_price; // round down, in favor of global settlement fund
-      if( op.amount.amount == mia_dyn.current_supply )
-         settled_amount.amount = bitasset.settlement_fund; // avoid rounding problems
-      else
-         FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund ); // should be strictly < except for PM with zero outcome
+      // If the amount to settle is too small, or force settlement is disabled, we return
+      if( bitasset.has_individual_settlement() || !asset_to_settle->can_force_settle() )
+         return result;
 
-      if( settled_amount.amount == 0 && !bitasset.is_prediction_market )
-      {
-         if( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
-            FC_THROW( "Settle amount is too small to receive anything due to rounding" );
-         // else do nothing. Before the hf, something for nothing issue (#184, variant F) could occur
-      }
-
-      asset pays = op.amount;
-      if( op.amount.amount != mia_dyn.current_supply
-            && settled_amount.amount != 0
-            && d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_342_TIME )
-      {
-         pays = settled_amount.multiply_and_round_up( bitasset.settlement_price );
-      }
-
-      d.adjust_balance( op.account, -pays );
-
-      if( settled_amount.amount > 0 )
-      {
-         d.modify( bitasset, [&]( asset_bitasset_data_object& obj ){
-            obj.settlement_fund -= settled_amount.amount;
-         });
-
-         // The account who settles pays market fees to the issuer of the collateral asset after HF core-1780
-         //
-         // TODO Check whether the HF check can be removed after the HF.
-         //      Note: even if logically it can be removed, perhaps the removal will lead to a small
-         //            performance loss. Needs testing.
-         if( d.head_block_time() >= HARDFORK_CORE_1780_TIME )
-         {
-            auto issuer_fees = d.pay_market_fees( fee_paying_account, settled_amount.asset_id(d),
-                  settled_amount, false );
-            settled_amount -= issuer_fees;
-         }
-
-         if( settled_amount.amount > 0 )
-            d.adjust_balance( op.account, settled_amount );
-      }
-
-      d.modify( mia_dyn, [&]( asset_dynamic_data_object& obj ){
-         obj.current_supply -= pays.amount;
-      });
-
-      return settled_amount;
+      to_settle -= result.value.paid->front();
    }
-   else
+
+   // Process the rest
+   const auto& head_time = d.head_block_time();
+   const auto& maint_time = d.get_dynamic_global_properties().next_maintenance_time;
+   d.adjust_balance( op.account, -to_settle );
+   const auto& settle = d.create<force_settlement_object>(
+         [&op,&to_settle,&head_time,&bitasset](force_settlement_object& s) {
+      s.owner = op.account;
+      s.balance = to_settle;
+      s.settlement_date = head_time + bitasset.options.force_settlement_delay_sec;
+   });
+
+   result.value.new_objects = flat_set<object_id_type>({ settle.id });
+
+   if( HARDFORK_CORE_2481_PASSED( maint_time ) )
    {
-      d.adjust_balance( op.account, -op.amount );
-      return d.create<force_settlement_object>([&](force_settlement_object& s) {
-         s.owner = op.account;
-         s.balance = op.amount;
-         s.settlement_date = d.head_block_time() + asset_to_settle->bitasset_data(d).options.force_settlement_delay_sec;
-      }).id;
+      d.apply_force_settlement( settle, bitasset, *asset_to_settle );
    }
+
+   return result;
+
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
 void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_operation& o)
@@ -1124,12 +1389,12 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    }
 
    //Verify that the publisher is authoritative to publish a feed
-   if( base.options.flags & witness_fed_asset )
+   if( 0 != ( base.options.flags & witness_fed_asset ) )
    {
       FC_ASSERT( d.get(GRAPHENE_WITNESS_ACCOUNT).active.account_auths.count(o.publisher) > 0,
                  "Only active witnesses are allowed to publish price feeds for this asset" );
    }
-   else if( base.options.flags & committee_fed_asset )
+   else if( 0 != ( base.options.flags & committee_fed_asset ) )
    {
       FC_ASSERT( d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.account_auths.count(o.publisher) > 0,
                  "Only active committee members are allowed to publish price feeds for this asset" );
@@ -1158,46 +1423,48 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
 
    auto old_feed = bad.current_feed;
    // Store medians for this asset
-   d.modify( bad , [&o,head_time,next_maint_time](asset_bitasset_data_object& a) {
+   d.modify( bad , [&o,&head_time](asset_bitasset_data_object& a) {
       a.feeds[o.publisher] = make_pair( head_time, price_feed_with_icr( o.feed,
                                                       o.extensions.value.initial_collateral_ratio ) );
-      a.update_median_feeds( head_time, next_maint_time );
    });
+   d.update_bitasset_current_feed( bad );
 
-   if( !old_feed.margin_call_params_equal(bad.current_feed) )
+   if( old_feed.margin_call_params_equal(bad.current_feed) )
+      return void_result();
+
+   // Feed changed, check whether need to revive the asset and proceed if need
+   if( bad.has_settlement() // has globally settled, implies head_block_time > HARDFORK_CORE_216_TIME
+       && !bad.current_feed.settlement_price.is_null() ) // has a valid feed
    {
-      // Check whether need to revive the asset and proceed if need
-      if( bad.has_settlement() // has globally settled, implies head_block_time > HARDFORK_CORE_216_TIME
-          && !bad.current_feed.settlement_price.is_null() ) // has a valid feed
+      bool should_revive = false;
+      const auto& mia_dyn = base.dynamic_asset_data_id(d);
+      if( mia_dyn.current_supply == 0 ) // if current supply is zero, revive the asset
+         should_revive = true;
+      // if current supply is not zero, revive the asset when collateral ratio of settlement fund
+      //    is greater than ( MCR if before HF core-2290, ICR if after)
+      else if( next_maint_time <= HARDFORK_CORE_1270_TIME )
       {
-         bool should_revive = false;
-         const auto& mia_dyn = base.dynamic_asset_data_id(d);
-         if( mia_dyn.current_supply == 0 ) // if current supply is zero, revive the asset
-            should_revive = true;
-         else // if current supply is not zero, when collateral ratio of settlement fund is greater than MCR, revive the asset
-         {
-            if( next_maint_time <= HARDFORK_CORE_1270_TIME )
-            {
-               // before core-1270 hard fork, calculate call_price and compare to median feed
-               if( ~price::call_price( asset(mia_dyn.current_supply, o.asset_id),
-                                       asset(bad.settlement_fund, bad.options.short_backing_asset),
-                                       bad.current_feed.maintenance_collateral_ratio ) < bad.current_feed.settlement_price )
-                  should_revive = true;
-            }
-            else
-            {
-               // after core-1270 hard fork, calculate collateralization and compare to maintenance_collateralization
-               if( price( asset( bad.settlement_fund, bad.options.short_backing_asset ),
-                          asset( mia_dyn.current_supply, o.asset_id ) ) > bad.current_maintenance_collateralization )
-                  should_revive = true;
-            }
-         }
-         if( should_revive )
-            d.revive_bitasset(base);
+         // before core-1270 hard fork, calculate call_price and compare to median feed
+         auto fund_call_price = ~price::call_price( asset(mia_dyn.current_supply, o.asset_id),
+                                    asset(bad.settlement_fund, bad.options.short_backing_asset),
+                                    bad.current_feed.maintenance_collateral_ratio );
+         should_revive = ( fund_call_price < bad.current_feed.settlement_price );
       }
-      // Process margin calls, allow black swan, not for a new limit order
-      d.check_call_orders( base, true, false, bitasset_ptr );
+      else
+      {
+         // after core-1270 hard fork, calculate collateralization and compare to maintenance_collateralization
+         price fund_collateralization( asset( bad.settlement_fund, bad.options.short_backing_asset ),
+                                       asset( mia_dyn.current_supply, o.asset_id ) );
+         should_revive = HARDFORK_CORE_2290_PASSED( next_maint_time ) ?
+                               ( fund_collateralization > bad.current_initial_collateralization )
+                             : ( fund_collateralization > bad.current_maintenance_collateralization );
+      }
+      if( should_revive )
+         d.revive_bitasset( base, bad );
    }
+
+   // Process margin calls, allow black swan, not for a new limit order
+   d.check_call_orders( base, true, false, bitasset_ptr );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
@@ -1240,6 +1507,8 @@ void_result asset_claim_fees_evaluator::do_evaluate( const asset_claim_fees_oper
                  "backed by (${fid}). Asset DDO: ${ddo}. Fee claim: ${claim}.", ("a",container_asset->symbol)
                  ("id",container_asset->id)("fid",o.amount_to_claim.asset_id)("ddo",*container_ddo)
                  ("claim",o.amount_to_claim) );
+      // Note: asset authorization check on (account, collateral asset) is skipped here,
+      //       because it is fine to allow the funds to be moved to account balance
    }
 
    return void_result();

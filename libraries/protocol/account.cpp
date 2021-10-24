@@ -159,10 +159,12 @@ void account_options::validate() const
    auto needed_committee = num_committee;
 
    for( vote_id_type id : votes )
-      if( id.type() == vote_id_type::witness && needed_witnesses )
+   {
+      if( id.type() == vote_id_type::witness && needed_witnesses > 0 )
          --needed_witnesses;
-      else if ( id.type() == vote_id_type::committee && needed_committee )
+      else if ( id.type() == vote_id_type::committee && needed_committee > 0 )
          --needed_committee;
+   }
 
    FC_ASSERT( needed_witnesses == 0 && needed_committee == 0,
               "May not specify fewer witnesses or committee members than the number voted for.");
