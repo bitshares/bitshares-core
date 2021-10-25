@@ -89,7 +89,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       // add settle order and check rounding issue
       operation_result result = force_settle(rachel, bitusd.amount(4));
 
-      force_settlement_id_type settle_id = result.get<object_id_type>();
+      force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 4 );
 
       BOOST_CHECK_EQUAL(get_balance(rachel, core), 0);
@@ -139,7 +139,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       set_expiration( db, trx );
       operation_result result2 = force_settle(rachel_id(db), bitusd_id(db).amount(34));
 
-      force_settlement_id_type settle_id2 = result2.get<object_id_type>();
+      force_settlement_id_type settle_id2 = *result2.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id2(db).balance.amount.value, 34 );
 
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 0);
@@ -194,13 +194,13 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       const operation_result result4 = force_settle(rachel_id(db), bitusd_id(db).amount(434));
       const operation_result result5 = force_settle(rachel_id(db), bitusd_id(db).amount(5));
 
-      force_settlement_id_type settle_id3 = result3.get<object_id_type>();
+      force_settlement_id_type settle_id3 = *result3.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id3(db).balance.amount.value, 3 );
 
-      force_settlement_id_type settle_id4 = result4.get<object_id_type>();
+      force_settlement_id_type settle_id4 = *result4.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id4(db).balance.amount.value, 434 );
 
-      force_settlement_id_type settle_id5 = result5.get<object_id_type>();
+      force_settlement_id_type settle_id5 = *result5.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id5(db).balance.amount.value, 5 );
 
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 1);
@@ -386,13 +386,13 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       const operation_result result7 = force_settle(ted_id(db), bitusd_id(db).amount(21));
       const operation_result result8 = force_settle(ted_id(db), bitusd_id(db).amount(22));
 
-      force_settlement_id_type settle_id6 = result6.get<object_id_type>();
+      force_settlement_id_type settle_id6 = *result6.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id6(db).balance.amount.value, 20 );
 
-      force_settlement_id_type settle_id7 = result7.get<object_id_type>();
+      force_settlement_id_type settle_id7 = *result7.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id7(db).balance.amount.value, 21 );
 
-      force_settlement_id_type settle_id8 = result8.get<object_id_type>();
+      force_settlement_id_type settle_id8 = *result8.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id8(db).balance.amount.value, 22 );
 
       BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 0);
@@ -403,13 +403,16 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       const operation_result result102 = force_settle(joe_id(db), bitcny_id(db).amount(1000));
       const operation_result result103 = force_settle(joe_id(db), bitcny_id(db).amount(300));
 
-      force_settlement_id_type settle_id101 = result101.get<object_id_type>();
+      force_settlement_id_type settle_id101 = *result101.get<extendable_operation_result>()
+                                                        .value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id101(db).balance.amount.value, 100 );
 
-      force_settlement_id_type settle_id102 = result102.get<object_id_type>();
+      force_settlement_id_type settle_id102 = *result102.get<extendable_operation_result>()
+                                                        .value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id102(db).balance.amount.value, 1000 );
 
-      force_settlement_id_type settle_id103 = result103.get<object_id_type>();
+      force_settlement_id_type settle_id103 = *result103.get<extendable_operation_result>()
+                                                        .value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id103(db).balance.amount.value, 300 );
 
       BOOST_CHECK_EQUAL(get_balance(joe_id(db), core_id(db)), 0);
@@ -644,7 +647,14 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
 {
    try {
       auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_184_TIME - mi);
+
+      if(hf2481)
+         generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+      else if(hf1270)
+         generate_blocks(HARDFORK_CORE_1270_TIME - mi);
+      else
+         generate_blocks(HARDFORK_CORE_184_TIME - mi);
+
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       set_expiration( db, trx );
 
@@ -693,7 +703,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       // add settle order and check rounding issue
       const operation_result result = force_settle(rachel, bitusd.amount(4));
 
-      force_settlement_id_type settle_id = result.get<object_id_type>();
+      force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 4 );
 
       BOOST_CHECK_EQUAL(get_balance(rachel, core), 0);
@@ -743,7 +753,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       set_expiration( db, trx );
       const operation_result result2 = force_settle(rachel_id(db), bitusd_id(db).amount(34));
 
-      force_settlement_id_type settle_id2 = result2.get<object_id_type>();
+      force_settlement_id_type settle_id2 = *result2.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id2(db).balance.amount.value, 34 );
 
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 0);
@@ -798,13 +808,13 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       const operation_result result4 = force_settle(rachel_id(db), bitusd_id(db).amount(434));
       const operation_result result5 = force_settle(rachel_id(db), bitusd_id(db).amount(5));
 
-      force_settlement_id_type settle_id3 = result3.get<object_id_type>();
+      force_settlement_id_type settle_id3 = *result3.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id3(db).balance.amount.value, 3 );
 
-      force_settlement_id_type settle_id4 = result4.get<object_id_type>();
+      force_settlement_id_type settle_id4 = *result4.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id4(db).balance.amount.value, 434 );
 
-      force_settlement_id_type settle_id5 = result5.get<object_id_type>();
+      force_settlement_id_type settle_id5 = *result5.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id5(db).balance.amount.value, 5 );
 
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 1);
@@ -992,13 +1002,13 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       const operation_result result7 = force_settle(ted_id(db), bitusd_id(db).amount(21));
       const operation_result result8 = force_settle(ted_id(db), bitusd_id(db).amount(22));
 
-      force_settlement_id_type settle_id6 = result6.get<object_id_type>();
+      force_settlement_id_type settle_id6 = *result6.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id6(db).balance.amount.value, 20 );
 
-      force_settlement_id_type settle_id7 = result7.get<object_id_type>();
+      force_settlement_id_type settle_id7 = *result7.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id7(db).balance.amount.value, 21 );
 
-      force_settlement_id_type settle_id8 = result8.get<object_id_type>();
+      force_settlement_id_type settle_id8 = *result8.get<extendable_operation_result>().value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id8(db).balance.amount.value, 22 );
 
       BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 0);
@@ -1009,13 +1019,16 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       const operation_result result102 = force_settle(joe_id(db), bitcny_id(db).amount(1000));
       const operation_result result103 = force_settle(joe_id(db), bitcny_id(db).amount(300));
 
-      force_settlement_id_type settle_id101 = result101.get<object_id_type>();
+      force_settlement_id_type settle_id101 = *result101.get<extendable_operation_result>()
+                                                        .value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id101(db).balance.amount.value, 100 );
 
-      force_settlement_id_type settle_id102 = result102.get<object_id_type>();
+      force_settlement_id_type settle_id102 = *result102.get<extendable_operation_result>()
+                                                        .value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id102(db).balance.amount.value, 1000 );
 
-      force_settlement_id_type settle_id103 = result103.get<object_id_type>();
+      force_settlement_id_type settle_id103 = *result103.get<extendable_operation_result>()
+                                                        .value.new_objects->begin();
       BOOST_CHECK_EQUAL( settle_id103(db).balance.amount.value, 300 );
 
       BOOST_CHECK_EQUAL(get_balance(joe_id(db), core_id(db)), 0);
@@ -1379,7 +1392,14 @@ BOOST_AUTO_TEST_CASE( global_settle_rounding_test_after_hf_184 )
 {
    try {
       auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_184_TIME - mi); // assume that hard fork core-184 and core-342 happen at same time
+
+      if(hf2481)
+         generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+      else if(hf1270)
+         generate_blocks(HARDFORK_CORE_1270_TIME - mi);
+      else
+         generate_blocks(HARDFORK_CORE_184_TIME - mi); // assume that hf core-184 and core-342 happen at same time
+
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       set_expiration( db, trx );
 
@@ -1671,7 +1691,15 @@ BOOST_AUTO_TEST_CASE( market_fee_of_settle_order_after_hardfork_1780 )
    try {
       INVOKE(create_bitassets);
 
-      generate_blocks( HARDFORK_CORE_1780_TIME );
+      if(hf2481)
+      {
+         auto mi = db.get_global_properties().parameters.maintenance_interval;
+         generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      }
+      else
+         generate_blocks( HARDFORK_CORE_1780_TIME );
+
       set_expiration( db, trx );
 
       GET_ACTOR(paul);
@@ -1759,7 +1787,15 @@ BOOST_AUTO_TEST_CASE( market_fee_of_instant_settle_order_after_hardfork_1780 )
    try {
       INVOKE(create_bitassets);
 
-      generate_blocks( HARDFORK_CORE_1780_TIME );
+      if(hf2481)
+      {
+         auto mi = db.get_global_properties().parameters.maintenance_interval;
+         generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      }
+      else
+         generate_blocks( HARDFORK_CORE_1780_TIME );
+
       set_expiration( db, trx );
 
       GET_ACTOR(paul);
@@ -1820,8 +1856,9 @@ BOOST_AUTO_TEST_CASE( market_fee_of_instant_settle_order_after_hardfork_1780 )
       int64_t biteur_accumulated_fee = 0;
       int64_t bitusd_accumulated_fee = 0;
       {
-         // 1000 biteur = 10000 bitusd in settlement fund
-         const auto biteur_expected_result = rachel_bitusd_count/10;
+         // before hf2481: 1000 biteur = 10000 bitusd in settlement fund
+         // after hf2481: round_up(10000/11) in settlement fund
+         const auto biteur_expected_result = hf2481 ? (rachel_bitusd_count+10)/11 : rachel_bitusd_count/10;
          const auto biteur_market_fee = biteur_expected_result / 2; // market fee percent = 50%
          biteur_balance += biteur_expected_result - biteur_market_fee;
 
@@ -1966,5 +2003,526 @@ BOOST_AUTO_TEST_CASE( global_settle_ticker_test )
       throw;
    }
 }
+
+/// Tests a scenario that force settlements get cancelled on the block when the asset is globally settled
+BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_gs )
+{
+   try {
+
+      // Advance to a desired hard fork time
+      // Note: this test doesn't apply after hf2481
+      generate_blocks( HARDFORK_CORE_1780_TIME );
+
+      set_expiration( db, trx );
+
+      ACTORS((sam)(feeder)(borrower)(seller));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( feeder, asset(init_amount) );
+      fund( borrower, asset(init_amount) );
+
+      // Create asset
+      asset_create_operation acop;
+      acop.issuer = sam_id;
+      acop.symbol = "SAMMPA";
+      acop.precision = 2;
+      acop.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
+      acop.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      acop.common_options.market_fee_percent = 100; // 1%
+      acop.common_options.flags = charge_market_fee;
+      acop.common_options.issuer_permissions = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK;
+      acop.bitasset_opts = bitasset_options();
+      acop.bitasset_opts->minimum_feeds = 1;
+      acop.bitasset_opts->feed_lifetime_sec = 800;
+      acop.bitasset_opts->force_settlement_delay_sec = 600;
+
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      processed_transaction ptx = PUSH_TX(db, trx, ~0);
+      const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+      asset_id_type mpa_id = mpa.id;
+
+      // add a price feed publisher and publish a feed
+      update_feed_producers( mpa_id, { feeder_id } );
+
+      price_feed f;
+      f.settlement_price = price( asset(100,mpa_id), asset(1) );
+      f.core_exchange_rate = price( asset(100,mpa_id), asset(1) );
+      f.maintenance_collateral_ratio = 1850;
+      f.maximum_short_squeeze_ratio = 1250;
+
+      publish_feed( mpa_id, feeder_id, f );
+
+      // borrowers borrow some
+      // undercollateralization price = 100000:2000 * 1250:1000 = 100000:1600
+      const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
+      BOOST_REQUIRE( call_ptr );
+      call_order_id_type call_id = call_ptr->id;
+
+      // Transfer funds to seller
+      transfer( borrower, seller, asset(100000,mpa_id) );
+
+      BOOST_CHECK_EQUAL( call_id(db).debt.value, 100000 );
+      BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2000 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 100000 );
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+      // seller settles some
+      auto result = force_settle( seller, asset(11100,mpa_id) );
+      force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+      BOOST_REQUIRE( db.find(settle_id) );
+
+      BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 11100 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 88900 ); // 100000 - 11100
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+      BOOST_CHECK( !mpa_id(db).bitasset_data(db).has_settlement() );
+
+      // generate a block
+      generate_block();
+
+      // check again
+      BOOST_REQUIRE( db.find(settle_id) );
+
+      BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 11100 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 88900 ); // 100000 - 11100
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+      // publish a new feed so that the asset is globally settled
+      f.settlement_price = price( asset(100,mpa_id), asset(10) );
+      publish_feed( mpa_id, feeder_id, f );
+
+      // check
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_settlement() );
+
+      BOOST_REQUIRE( db.find(settle_id) );
+
+      BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 11100 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 88900 ); // 100000 - 11100
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+      // generate a block
+      generate_block();
+
+      // check
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).has_settlement() );
+
+      // the settle order is cancelled
+      BOOST_REQUIRE( !db.find(settle_id) );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 100000 );
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/// Tests a scenario that force settlements get cancelled on expiration when there is no sufficient feed
+BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_no_feed )
+{
+   try {
+
+      // Advance to a desired hard fork time
+      if(hf2467)
+      {
+         auto mi = db.get_global_properties().parameters.maintenance_interval;
+         generate_blocks(HARDFORK_CORE_2467_TIME - mi);
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      }
+      else
+         generate_blocks( HARDFORK_CORE_1780_TIME );
+
+      set_expiration( db, trx );
+
+      ACTORS((sam)(feeder)(borrower)(seller));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( feeder, asset(init_amount) );
+      fund( borrower, asset(init_amount) );
+
+      // Create asset
+      asset_create_operation acop;
+      acop.issuer = sam_id;
+      acop.symbol = "SAMMPA";
+      acop.precision = 2;
+      acop.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
+      acop.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      acop.common_options.market_fee_percent = 100; // 1%
+      acop.common_options.flags = charge_market_fee;
+      acop.common_options.issuer_permissions = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK;
+      acop.bitasset_opts = bitasset_options();
+      acop.bitasset_opts->minimum_feeds = 1;
+      acop.bitasset_opts->feed_lifetime_sec = 400;
+      acop.bitasset_opts->force_settlement_delay_sec = 600;
+
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      processed_transaction ptx = PUSH_TX(db, trx, ~0);
+      const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+      asset_id_type mpa_id = mpa.id;
+
+      // add a price feed publisher and publish a feed
+      update_feed_producers( mpa_id, { feeder_id } );
+
+      price_feed f;
+      f.settlement_price = price( asset(100,mpa_id), asset(1) );
+      f.core_exchange_rate = price( asset(100,mpa_id), asset(1) );
+      f.maintenance_collateral_ratio = 1850;
+      f.maximum_short_squeeze_ratio = 1250;
+
+      publish_feed( mpa_id, feeder_id, f );
+
+      // borrowers borrow some
+      // undercollateralization price = 100000:2000 * 1250:1000 = 100000:1600
+      const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
+      BOOST_REQUIRE( call_ptr );
+      call_order_id_type call_id = call_ptr->id;
+
+      // Transfer funds to seller
+      transfer( borrower, seller, asset(100000,mpa_id) );
+
+      BOOST_CHECK_EQUAL( call_id(db).debt.value, 100000 );
+      BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2000 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 100000 );
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+      // seller settles some
+      auto result = force_settle( seller, asset(11100,mpa_id) );
+      force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+      BOOST_REQUIRE( db.find(settle_id) );
+
+      BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 11100 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 88900 ); // 100000 - 11100
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+      // let the price feed expire
+      generate_blocks( db.head_block_time() + fc::seconds(400) );
+
+      // check
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
+
+      BOOST_REQUIRE( db.find(settle_id) );
+
+      BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 11100 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 88900 ); // 100000 - 11100
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+      // let the settle order expire
+      generate_blocks( db.head_block_time() + fc::seconds(200) );
+
+      // check
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
+
+      // the settle order is cancelled
+      BOOST_REQUIRE( !db.find(settle_id) );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 100000 );
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+      // unable to settle when no feed
+      BOOST_CHECK_THROW( force_settle( seller, asset(11100,mpa_id) ), fc::exception );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/// Tests a scenario that force settlements get cancelled on expiration when the amount is zero
+BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_zero_amount )
+{
+   try {
+
+      // Advance to a desired hard fork time
+      if(hf2467)
+      {
+         auto mi = db.get_global_properties().parameters.maintenance_interval;
+         generate_blocks(HARDFORK_CORE_2467_TIME - mi);
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      }
+      else
+         generate_blocks( HARDFORK_CORE_1780_TIME );
+
+      set_expiration( db, trx );
+
+      ACTORS((sam)(feeder)(borrower)(seller));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( feeder, asset(init_amount) );
+      fund( borrower, asset(init_amount) );
+
+      // Create asset
+      asset_create_operation acop;
+      acop.issuer = sam_id;
+      acop.symbol = "SAMMPA";
+      acop.precision = 2;
+      acop.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
+      acop.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      acop.common_options.market_fee_percent = 100; // 1%
+      acop.common_options.flags = charge_market_fee;
+      acop.common_options.issuer_permissions = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK;
+      acop.bitasset_opts = bitasset_options();
+      acop.bitasset_opts->minimum_feeds = 1;
+      acop.bitasset_opts->feed_lifetime_sec = 800;
+      acop.bitasset_opts->force_settlement_delay_sec = 600;
+
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      processed_transaction ptx = PUSH_TX(db, trx, ~0);
+      const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+      asset_id_type mpa_id = mpa.id;
+
+      // add a price feed publisher and publish a feed
+      update_feed_producers( mpa_id, { feeder_id } );
+
+      price_feed f;
+      f.settlement_price = price( asset(100,mpa_id), asset(1) );
+      f.core_exchange_rate = price( asset(100,mpa_id), asset(1) );
+      f.maintenance_collateral_ratio = 1850;
+      f.maximum_short_squeeze_ratio = 1250;
+
+      publish_feed( mpa_id, feeder_id, f );
+
+      // borrowers borrow some
+      // undercollateralization price = 100000:2000 * 1250:1000 = 100000:1600
+      const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
+      BOOST_REQUIRE( call_ptr );
+      call_order_id_type call_id = call_ptr->id;
+
+      // Transfer funds to seller
+      transfer( borrower, seller, asset(100000,mpa_id) );
+
+      BOOST_CHECK_EQUAL( call_id(db).debt.value, 100000 );
+      BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2000 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 100000 );
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+      // seller settles some
+      auto result = force_settle( seller, asset(0,mpa_id) );
+      force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+      BOOST_REQUIRE( db.find(settle_id) );
+
+      BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 0 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 100000 );
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+      // generate a block
+      generate_block();
+
+      // check again
+      BOOST_REQUIRE( db.find(settle_id) );
+
+      BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 0 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 100000 );
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+      // let the settle order expire
+      generate_blocks( db.head_block_time() + fc::seconds(600) );
+
+      // check
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
+
+      // the settle order is cancelled
+      BOOST_REQUIRE( !db.find(settle_id) );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 100000 );
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/// Tests a scenario that force settlements get cancelled on expiration when offset is 100%
+BOOST_AUTO_TEST_CASE( settle_order_cancel_due_to_100_percent_offset )
+{
+   try {
+
+      // Advance to a desired hard fork time
+      if(hf2467)
+      {
+         auto mi = db.get_global_properties().parameters.maintenance_interval;
+         generate_blocks(HARDFORK_CORE_2467_TIME - mi);
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      }
+      else
+         generate_blocks( HARDFORK_CORE_1780_TIME );
+
+      set_expiration( db, trx );
+
+      ACTORS((sam)(feeder)(borrower)(seller));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( feeder, asset(init_amount) );
+      fund( borrower, asset(init_amount) );
+
+      // Create asset
+      asset_create_operation acop;
+      acop.issuer = sam_id;
+      acop.symbol = "SAMMPA";
+      acop.precision = 2;
+      acop.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
+      acop.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      acop.common_options.market_fee_percent = 100; // 1%
+      acop.common_options.flags = charge_market_fee;
+      acop.common_options.issuer_permissions = ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK;
+      acop.bitasset_opts = bitasset_options();
+      acop.bitasset_opts->minimum_feeds = 1;
+      acop.bitasset_opts->feed_lifetime_sec = 800;
+      acop.bitasset_opts->force_settlement_delay_sec = 600;
+      acop.bitasset_opts->force_settlement_offset_percent = GRAPHENE_100_PERCENT;
+
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      processed_transaction ptx = PUSH_TX(db, trx, ~0);
+      const asset_object& mpa = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+      asset_id_type mpa_id = mpa.id;
+
+      // add a price feed publisher and publish a feed
+      update_feed_producers( mpa_id, { feeder_id } );
+
+      price_feed f;
+      f.settlement_price = price( asset(100,mpa_id), asset(1) );
+      f.core_exchange_rate = price( asset(100,mpa_id), asset(1) );
+      f.maintenance_collateral_ratio = 1850;
+      f.maximum_short_squeeze_ratio = 1250;
+
+      publish_feed( mpa_id, feeder_id, f );
+
+      // borrowers borrow some
+      // undercollateralization price = 100000:2000 * 1250:1000 = 100000:1600
+      const call_order_object* call_ptr = borrow( borrower, asset(100000, mpa_id), asset(2000) );
+      BOOST_REQUIRE( call_ptr );
+      call_order_id_type call_id = call_ptr->id;
+
+      // Transfer funds to seller
+      transfer( borrower, seller, asset(100000,mpa_id) );
+
+      BOOST_CHECK_EQUAL( call_id(db).debt.value, 100000 );
+      BOOST_CHECK_EQUAL( call_id(db).collateral.value, 2000 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 100000 );
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+      // seller settles some
+      auto result = force_settle( seller, asset(11100,mpa_id) );
+      force_settlement_id_type settle_id = *result.get<extendable_operation_result>().value.new_objects->begin();
+      BOOST_REQUIRE( db.find(settle_id) );
+
+      BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 11100 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 88900 ); // 100000 - 11100
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+      // generate a block
+      generate_block();
+
+      // check again
+      BOOST_REQUIRE( db.find(settle_id) );
+
+      BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 11100 );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 88900 ); // 100000 - 11100
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+      // let the settle order expire
+      generate_blocks( db.head_block_time() + fc::seconds(600) );
+
+      // check
+      BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
+
+      // the settle order is cancelled
+      BOOST_REQUIRE( !db.find(settle_id) );
+
+      BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 100000 );
+      BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 0 );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE(settle_order_cancel_due_to_no_feed_after_hf_2467)
+{ try {
+   hf2467 = true;
+   INVOKE(settle_order_cancel_due_to_no_feed);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(settle_order_cancel_due_to_zero_amount_after_hf_2467)
+{ try {
+   hf2467 = true;
+   INVOKE(settle_order_cancel_due_to_zero_amount);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(settle_order_cancel_due_to_100_percent_offset_after_hf_2467)
+{ try {
+   hf2467 = true;
+   INVOKE(settle_order_cancel_due_to_100_percent_offset);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(settle_rounding_test_after_hf_1270)
+{ try {
+   hf1270 = true;
+   INVOKE(settle_rounding_test_after_hf_184);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(settle_rounding_test_after_hf_2481)
+{ try {
+   hf2481 = true;
+   INVOKE(settle_rounding_test_after_hf_184);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(global_settle_rounding_test_after_hf_1270)
+{ try {
+   hf1270 = true;
+   INVOKE(global_settle_rounding_test_after_hf_184);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(global_settle_rounding_test_after_hf_2481)
+{ try {
+   hf2481 = true;
+   INVOKE(global_settle_rounding_test_after_hf_184);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(market_fee_of_settle_order_after_hardfork_2481)
+{ try {
+   hf2481 = true;
+   INVOKE(market_fee_of_settle_order_after_hardfork_1780);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(market_fee_of_instant_settle_order_after_hardfork_2481)
+{ try {
+   hf2481 = true;
+   INVOKE(market_fee_of_instant_settle_order_after_hardfork_1780);
+
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

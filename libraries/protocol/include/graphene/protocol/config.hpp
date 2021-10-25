@@ -35,7 +35,7 @@
 #define GRAPHENE_MIN_ASSET_SYMBOL_LENGTH 3
 #define GRAPHENE_MAX_ASSET_SYMBOL_LENGTH 16
 
-#define GRAPHENE_MAX_SHARE_SUPPLY int64_t(1000000000000000ll)
+constexpr int64_t GRAPHENE_MAX_SHARE_SUPPLY (1000000000000000LL); // 10 ^ 15
 
 #define GRAPHENE_MAX_WORKER_NAME_LENGTH                       63
 #define GRAPHENE_MAX_URL_LENGTH                               127
@@ -116,6 +116,21 @@
 #define GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO   1200 ///< Call when collateral only pays off 175% the debt
 #define GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO        1100 ///< Stop calling when collateral only pays off 150% of the debt
 ///@}
+
+/// Denominator for SameT Fund fee calculation
+constexpr uint32_t GRAPHENE_FEE_RATE_DENOM = 1000000;
+
+/// How long a credit offer will be kept active, in days
+constexpr int64_t GRAPHENE_MAX_CREDIT_OFFER_DAYS = 380;
+/// How long a credit offer will be kept active, in seconds
+constexpr int64_t GRAPHENE_MAX_CREDIT_OFFER_SECS = GRAPHENE_MAX_CREDIT_OFFER_DAYS * 86400;
+/// How long a credit deal will be kept, in days
+constexpr int64_t GRAPHENE_MAX_CREDIT_DEAL_DAYS = 380;
+/// How long a credit deal will be kept, in seconds
+constexpr int64_t GRAPHENE_MAX_CREDIT_DEAL_SECS = GRAPHENE_MAX_CREDIT_DEAL_DAYS * 86400;
+
+/// How many iterations to run in @c fee_schedule::set_fee()
+constexpr size_t MAX_FEE_STABILIZATION_ITERATION  = 4;
 
 /**
  *  Reserved Account IDs with special meaning

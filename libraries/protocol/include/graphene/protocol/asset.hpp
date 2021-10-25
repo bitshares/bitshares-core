@@ -26,8 +26,6 @@
 
 namespace graphene { namespace protocol {
 
-   extern const int64_t scaled_precision_lut[];
-
    struct price;
 
    struct asset
@@ -90,11 +88,7 @@ namespace graphene { namespace protocol {
          return asset( a.amount + b.amount, a.asset_id );
       }
 
-      static share_type scaled_precision( uint8_t precision )
-      {
-         FC_ASSERT( precision < 19 );
-         return scaled_precision_lut[ precision ];
-      }
+      static share_type scaled_precision( uint8_t precision );
 
       asset multiply_and_round_up( const price& p )const; ///< Multiply and round up
    };
@@ -133,7 +127,9 @@ namespace graphene { namespace protocol {
       double to_real()const { return double(base.amount.value)/double(quote.amount.value); }
 
       bool is_null()const;
-      void validate()const;
+      /// @brief Check if the object is valid
+      /// @param check_upper_bound Whether to check if the amounts in the price are too large
+      void validate( bool check_upper_bound = false )const;
    };
 
    price operator / ( const asset& base, const asset& quote );
@@ -153,9 +149,9 @@ namespace graphene { namespace protocol {
    price operator /  ( const price& p, const ratio_type& r );
 
    inline price& operator *=  ( price& p, const ratio_type& r )
-   { return p = p * r; }
+   { p = p * r; return p; }
    inline price& operator /=  ( price& p, const ratio_type& r )
-   { return p = p / r; }
+   { p = p / r; return p; }
 
    /**
     *  @class price_feed
@@ -206,7 +202,7 @@ namespace graphene { namespace protocol {
        *
        * The Maximum Short Squeeze Price is computed as follows, in units of DEBT per COLLATERAL:
        *
-       *   MSSP = settlement_price / MSSR;
+       *   MSSP = settlement_price / MSSR
        *
        * @return The MSSP in units of DEBT per COLLATERAL.
        */
@@ -235,11 +231,11 @@ namespace graphene { namespace protocol {
        * determined by the Maximum Short Squeeze Ratio (MSSR) and the Margin Call Fee Ratio (MCFR)
        * as follows, in units of DEBT per COLLATERAL:
        *
-       *   MCOP = settlement_price / (MSSR - MCFR);
+       *   MCOP = settlement_price / (MSSR - MCFR)
        *
        * Compare with Maximum Short Squeeze Price (MSSP), which is computed as follows:
        *
-       *   MSSP = settlement_price / MSSR;
+       *   MSSP = settlement_price / MSSR
        *
        * Since BSIP-74, we distinguish between Maximum Short Squeeze Price (MSSP) and Margin Call
        * Order Price (MCOP). Margin calls previously offered collateral at the MSSP, but now they
@@ -260,7 +256,11 @@ namespace graphene { namespace protocol {
        *
        * @return The MCOP in units of DEBT per COLLATERAL.
        */
-      price margin_call_order_price(const fc::optional<uint16_t> margin_call_fee_ratio)const;
+      price margin_call_order_price(const fc::optional<uint16_t>& margin_call_fee_ratio)const;
+
+      /// Compute the MCOR, the ratio between margin_call_order_price and feed price
+      /// @return MSSR - MCFR
+      ratio_type margin_call_order_ratio( const fc::optional<uint16_t>& margin_call_fee_ratio )const;
 
       /**
        * Ratio between max_short_squeeze_price and margin_call_order_price.
@@ -279,7 +279,7 @@ namespace graphene { namespace protocol {
        *
        * @return (MSSR - MCFR) / MSSR
        */
-      ratio_type margin_call_pays_ratio(const fc::optional<uint16_t> margin_call_fee_ratio)const;
+      ratio_type margin_call_pays_ratio(const fc::optional<uint16_t>& margin_call_fee_ratio)const;
 
       /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call
       /// territory.
@@ -299,6 +299,9 @@ namespace graphene { namespace protocol {
 
       void validate() const;
       bool is_for( asset_id_type asset_id ) const;
+   private:
+      /// Helper function for other functions e.g. @ref margin_call_order_price
+      uint16_t get_margin_call_price_numerator(const fc::optional<uint16_t>& margin_call_fee_ratio)const;
    };
 
 } }

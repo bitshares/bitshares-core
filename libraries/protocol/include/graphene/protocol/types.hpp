@@ -60,18 +60,35 @@
 #include <graphene/protocol/object_id.hpp>
 #include <graphene/protocol/config.hpp>
 
-#define GRAPHENE_EXTERNAL_SERIALIZATION(ext, type) \
+#define GRAPHENE_EXTERNAL_SERIALIZATION_VARIANT(ext, type) \
 namespace fc { \
    ext template void from_variant( const variant& v, type& vo, uint32_t max_depth ); \
    ext template void to_variant( const type& v, variant& vo, uint32_t max_depth ); \
-namespace raw { \
-   ext template void pack< datastream<size_t>, type >( datastream<size_t>& s, const type& tx, uint32_t _max_depth ); \
-   ext template void pack< sha256::encoder, type >( sha256::encoder& s, const type& tx, uint32_t _max_depth ); \
-   ext template void pack< datastream<char*>, type >( datastream<char*>& s, const type& tx, uint32_t _max_depth ); \
-   ext template void unpack< datastream<const char*>, type >( datastream<const char*>& s, type& tx, uint32_t _max_depth ); \
-} } // fc::raw
+}
+
+#define GRAPHENE_EXTERNAL_SERIALIZATION_PACK(ext, type) \
+namespace fc { namespace raw { \
+   ext template void pack< datastream<size_t>, type >( \
+         datastream<size_t>& s, const type& tx, uint32_t _max_depth ); \
+   ext template void pack< sha256::encoder, type >( \
+         sha256::encoder& s, const type& tx, uint32_t _max_depth ); \
+   ext template void pack< datastream<char*>, type >( \
+         datastream<char*>& s, const type& tx, uint32_t _max_depth ); \
+   ext template void unpack< datastream<const char*>, type >( \
+         datastream<const char*>& s, type& tx, uint32_t _max_depth ); \
+} }
+
+#define GRAPHENE_EXTERNAL_SERIALIZATION(ext, type) \
+   GRAPHENE_EXTERNAL_SERIALIZATION_VARIANT(ext, type) \
+   GRAPHENE_EXTERNAL_SERIALIZATION_PACK(ext, type)
+
 #define GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION(type) GRAPHENE_EXTERNAL_SERIALIZATION(extern, type)
 #define GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION(type) GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, type)
+
+#define GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION_VARIANT(type) \
+   GRAPHENE_EXTERNAL_SERIALIZATION_VARIANT(/*not extern*/, type)
+#define GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION_PACK(type) \
+   GRAPHENE_EXTERNAL_SERIALIZATION_PACK(/*not extern*/, type)
 
 #define GRAPHENE_NAME_TO_OBJECT_TYPE(x, prefix, name) BOOST_PP_CAT(prefix, BOOST_PP_CAT(name, _object_type))
 #define GRAPHENE_NAME_TO_ID_TYPE(x, y, name) BOOST_PP_CAT(name, _id_type)
@@ -142,7 +159,7 @@ enum asset_issuer_permission_flags {
     override_authority   = 0x04, ///< issuer may transfer asset back to himself
     transfer_restricted  = 0x08, ///< require the issuer to be one party to every transfer
     disable_force_settle = 0x10, ///< disable force settling
-    global_settle        = 0x20, ///< allow the bitasset owner to force a global settling, permission only
+    global_settle        = 0x20, ///< allow the bitasset owner to force a global settlement, permission only
     disable_confidential = 0x40, ///< disallow the asset to be used with confidential transactions
     witness_fed_asset    = 0x80, ///< the bitasset is to be fed by witnesses
     committee_fed_asset  = 0x100, ///< the bitasset is to be fed by the committee
@@ -162,7 +179,9 @@ enum asset_issuer_permission_flags {
     ///@{
     disable_mcr_update   = 0x800, ///< the bitasset owner can not update MCR, permisison only
     disable_icr_update   = 0x1000, ///< the bitasset owner can not update ICR, permisison only
-    disable_mssr_update  = 0x2000 ///< the bitasset owner can not update MSSR, permisison only
+    disable_mssr_update  = 0x2000, ///< the bitasset owner can not update MSSR, permisison only
+    disable_bsrm_update  = 0x4000, ///< the bitasset owner can not update BSRM, permission only
+    disable_collateral_bidding = 0x8000  ///< Can not bid collateral after a global settlement
     ///@}
     ///@}
 };
@@ -182,7 +201,9 @@ const static uint16_t ASSET_ISSUER_PERMISSION_MASK =
         | disable_new_supply
         | disable_mcr_update
         | disable_icr_update
-        | disable_mssr_update;
+        | disable_mssr_update
+        | disable_bsrm_update
+        | disable_collateral_bidding;
 // The "enable" bits for non-UIA assets
 const static uint16_t ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK =
         charge_market_fee
@@ -200,7 +221,9 @@ const static uint16_t ASSET_ISSUER_PERMISSION_DISABLE_BITS_MASK =
         | disable_new_supply
         | disable_mcr_update
         | disable_icr_update
-        | disable_mssr_update;
+        | disable_mssr_update
+        | disable_bsrm_update
+        | disable_collateral_bidding;
 // The bits that can be used in asset issuer permissions for UIA assets
 const static uint16_t UIA_ASSET_ISSUER_PERMISSION_MASK =
         charge_market_fee
@@ -225,9 +248,10 @@ const static uint16_t PERMISSION_ONLY_MASK =
         global_settle
         | disable_mcr_update
         | disable_icr_update
-        | disable_mssr_update;
+        | disable_mssr_update
+        | disable_bsrm_update;
 // The bits that can be used in flags for non-UIA assets
-const static uint16_t VALID_FLAGS_MASK = ASSET_ISSUER_PERMISSION_MASK & ~PERMISSION_ONLY_MASK;
+const static uint16_t VALID_FLAGS_MASK = ASSET_ISSUER_PERMISSION_MASK & (uint16_t)(~PERMISSION_ONLY_MASK);
 // the bits that can be used in flags for UIA assets
 const static uint16_t UIA_VALID_FLAGS_MASK = UIA_ASSET_ISSUER_PERMISSION_MASK;
 
@@ -317,6 +341,9 @@ GRAPHENE_DEFINE_IDS(protocol, protocol_ids, /*protocol objects are not prefixed*
                     /* 1.17.x */ (custom_authority)
                     /* 1.18.x */ (ticket)
                     /* 1.19.x */ (liquidity_pool)
+                    /* 1.20.x */ (samet_fund)
+                    /* 1.21.x */ (credit_offer)
+                    /* 1.22.x */ (credit_deal)
                    )
 
 FC_REFLECT(graphene::protocol::public_key_type, (key_data))
@@ -340,6 +367,8 @@ FC_REFLECT_ENUM(graphene::protocol::asset_issuer_permission_flags,
                 (disable_mcr_update)
                 (disable_icr_update)
                 (disable_mssr_update)
+                (disable_bsrm_update)
+                (disable_collateral_bidding)
                )
 
 namespace fc { namespace raw {

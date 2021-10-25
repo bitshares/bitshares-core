@@ -45,9 +45,9 @@ using namespace graphene::chain::test;
 namespace graphene { namespace chain {
 
 struct swan_fixture : database_fixture {
-    limit_order_id_type init_standard_swan(share_type amount = 1000) {
+    limit_order_id_type init_standard_swan(share_type amount = 1000, bool disable_bidding = false) {
         standard_users();
-        standard_asset();
+        standard_asset(disable_bidding);
         return trigger_swan(amount, amount);
     }
 
@@ -62,9 +62,23 @@ struct swan_fixture : database_fixture {
         transfer(committee_account, borrower2_id, asset(init_balance));
     }
 
-    void standard_asset() {
+    void standard_asset(bool disable_bidding = false) {
         set_expiration( db, trx );
-        const auto& bitusd = create_bitasset("USDBIT", _feedproducer);
+        const asset_object* bitusd_ptr;
+        if( !disable_bidding )
+           bitusd_ptr = &create_bitasset("USDBIT", _feedproducer);
+        else
+        {
+           auto cop = make_bitasset("USDBIT", _feedproducer);
+           cop.common_options.flags |= disable_collateral_bidding;
+           trx.operations.clear();
+           trx.operations.push_back(cop);
+           trx.validate();
+           processed_transaction ptx = PUSH_TX(db, trx, ~0);
+           trx.operations.clear();
+           bitusd_ptr = &db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+        }
+        const auto& bitusd = *bitusd_ptr;
         _swan = bitusd.id;
         _back = asset_id_type();
         update_feed_producers(swan(), {_feedproducer});
@@ -90,18 +104,26 @@ struct swan_fixture : database_fixture {
         FC_ASSERT( get_balance(borrower(),  swan()) == amount1 );
         FC_ASSERT( get_balance(borrower2(), swan()) == amount2 - 1 );
         FC_ASSERT( get_balance(borrower() , back()) == init_balance - 2*amount1 );
-        FC_ASSERT( get_balance(borrower2(), back()) == init_balance - 2*amount2 );
+        if( !hf_core_2481_passed() )
+           FC_ASSERT( get_balance(borrower2(), back()) == init_balance - 2*amount2 );
+        else
+        {
+           auto mssr = swan().bitasset_data(db).current_feed.maximum_short_squeeze_ratio;
+           auto denom = GRAPHENE_COLLATERAL_RATIO_DENOM;
+           FC_ASSERT( get_balance(borrower2(), back()) == init_balance - (2*amount2*denom+mssr-1)/mssr);
+        }
 
         BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
 
         return oid;
     }
 
-    void set_feed(share_type usd, share_type core) {
+    // Note: need to set MCR explicitly, testnet has a different default
+    void set_feed(share_type usd, share_type core, uint16_t mcr = 1750, const optional<uint16_t>& icr = {}) {
         price_feed feed;
-        feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
+        feed.maintenance_collateral_ratio = mcr;
         feed.settlement_price = swan().amount(usd) / back().amount(core);
-        publish_feed(swan(), feedproducer(), feed);
+        publish_feed(swan(), feedproducer(), feed, icr);
     }
 
     void expire_feed() {
@@ -118,6 +140,17 @@ struct swan_fixture : database_fixture {
        auto mi = db.get_global_properties().parameters.maintenance_interval;
        generate_blocks(HARDFORK_CORE_1270_TIME - mi);
        wait_for_maintenance();
+    }
+    void wait_for_hf_core_2481() {
+       auto mi = db.get_global_properties().parameters.maintenance_interval;
+       generate_blocks(HARDFORK_CORE_2481_TIME - mi);
+       wait_for_maintenance();
+    }
+
+    bool hf_core_2481_passed() {
+       if( !hf2481 ) return false;
+       auto maint_time = db.get_dynamic_global_properties().next_maintenance_time;
+       return HARDFORK_CORE_2481_PASSED( maint_time );
     }
 
     void wait_for_maintenance() {
@@ -146,7 +179,9 @@ BOOST_FIXTURE_TEST_SUITE( swan_tests, swan_fixture )
  */
 BOOST_AUTO_TEST_CASE( black_swan )
 { try {
-      if(hf1270)
+      if(hf2481)
+         wait_for_hf_core_2481();
+      else if(hf1270)
          wait_for_hf_core_1270();
 
       init_standard_swan();
@@ -163,6 +198,9 @@ BOOST_AUTO_TEST_CASE( black_swan )
       BOOST_TEST_MESSAGE( "Verify that we cannot borrow after black swan" );
       GRAPHENE_REQUIRE_THROW( borrow(borrower(), swan().amount(1000), back().amount(2000)), fc::exception )
       trx.operations.clear();
+
+      generate_block();
+
 } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -267,8 +305,10 @@ BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
          set_price( bitusd, bitusd.amount(40) / core.amount(1000) ); // $0.04
          borrow( borrower, bitusd.amount(100), asset(5000) );    // 2x collat
          transfer( borrower, seller, bitusd.amount(100) );
-         limit_order_id_type oid_019 = create_sell_order( seller, bitusd.amount(39), core.amount(2000) )->id;   // this order is at $0.019, we should not be able to match against it
-         limit_order_id_type oid_020 = create_sell_order( seller, bitusd.amount(40), core.amount(2000) )->id;   // this order is at $0.020, we should be able to match against it
+         // this order is at $0.019, we should not be able to match against it
+         limit_order_id_type oid_019 = create_sell_order( seller, bitusd.amount(39), core.amount(2000) )->id;
+         // this order is at $0.020, we should be able to match against it
+         limit_order_id_type oid_020 = create_sell_order( seller, bitusd.amount(40), core.amount(2000) )->id;
          set_price( bitusd, bitusd.amount(21) / core.amount(1000) ); // $0.021
          //
          // We attempt to match against $0.019 order and black swan,
@@ -291,7 +331,9 @@ BOOST_AUTO_TEST_CASE( revive_recovered )
 { try {
       init_standard_swan( 700 );
 
-      if(hf1270)
+      if(hf2481)
+         wait_for_hf_core_2481();
+      else if(hf1270)
          wait_for_hf_core_1270();
       else
          wait_for_hf_core_216();
@@ -301,6 +343,178 @@ BOOST_AUTO_TEST_CASE( revive_recovered )
       BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
       set_feed( 701, 800 );
       BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      auto swan_symbol = _swan(db).symbol;
+      vector<call_order_object> calls = db_api.get_call_orders(swan_symbol, 100);
+      BOOST_REQUIRE_EQUAL( 1u, calls.size() );
+      BOOST_CHECK( calls[0].borrower == swan().issuer );
+      BOOST_CHECK_EQUAL( calls[0].debt.value, 1400 );
+      BOOST_CHECK_EQUAL( calls[0].collateral.value, 2800 );
+
+      generate_block();
+
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/** Creates a black swan, place bids, recover price feed - asset should be revived
+ */
+BOOST_AUTO_TEST_CASE( revive_recovered_with_bids )
+{ try {
+      init_standard_swan( 700 );
+
+      if(hf2481)
+         wait_for_hf_core_2481();
+      else if(hf1270)
+         wait_for_hf_core_1270();
+      else
+         wait_for_hf_core_216();
+
+      // price not good enough for recovery
+      set_feed( 700, 800 );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      bid_collateral( borrower(),  back().amount(10510), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(21000), swan().amount(1399) );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      auto swan_symbol = _swan(db).symbol;
+      vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK_EQUAL( 2u, bids.size() );
+
+      // revive after price recovers
+      set_feed( 701, 800 );
+      BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+
+      bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK( bids.empty() );
+
+      vector<call_order_object> calls = db_api.get_call_orders(swan_symbol, 100);
+      BOOST_REQUIRE_EQUAL( 1u, calls.size() );
+      BOOST_CHECK( calls[0].borrower == swan().issuer );
+      BOOST_CHECK_EQUAL( calls[0].debt.value, 1400 );
+      BOOST_CHECK_EQUAL( calls[0].collateral.value, 2800 );
+
+      generate_block();
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/** Creates a black swan, place bids, recover price feed with ICR, before the core-2290 hard fork,
+ *  asset should be revived based on MCR
+ */
+BOOST_AUTO_TEST_CASE( revive_recovered_with_bids_not_by_icr_before_hf_core_2290 )
+{ try {
+      init_standard_swan( 700 );
+
+      // Advance to a time before core-2290 hard fork
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2290_TIME - mi * 2);
+      set_expiration( db, trx );
+
+      BOOST_CHECK( swan().dynamic_data(db).current_supply == 1400 );
+      BOOST_CHECK( swan().bitasset_data(db).settlement_fund == 2800 );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+      BOOST_CHECK( swan().bitasset_data(db).current_feed.settlement_price.is_null() );
+
+      BOOST_REQUIRE( HARDFORK_BSIP_77_PASSED( db.head_block_time() ) );
+
+      // price not good enough for recovery
+      set_feed( 700, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      bid_collateral( borrower(),  back().amount(10510), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(21000), swan().amount(1399) );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      auto swan_symbol = _swan(db).symbol;
+      vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK_EQUAL( 2u, bids.size() );
+
+      // good feed price
+      set_feed( 701, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
+      BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+
+      bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK( bids.empty() );
+
+      vector<call_order_object> calls = db_api.get_call_orders(swan_symbol, 100);
+      BOOST_REQUIRE_EQUAL( 1u, calls.size() );
+      BOOST_CHECK( calls[0].borrower == swan().issuer );
+      BOOST_CHECK_EQUAL( calls[0].debt.value, 1400 );
+      BOOST_CHECK_EQUAL( calls[0].collateral.value, 2800 );
+
+      generate_block();
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/** Creates a black swan, place bids, recover price feed with ICR, after the core-2290 hard fork,
+ *  asset should be revived based on ICR
+ */
+BOOST_AUTO_TEST_CASE( revive_recovered_with_bids_by_icr_after_hf_core_2290 )
+{ try {
+      init_standard_swan( 700 );
+
+      // Advance to a time before core-2290 hard fork
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2290_TIME - mi);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      set_expiration( db, trx );
+
+      BOOST_CHECK( swan().dynamic_data(db).current_supply == 1400 );
+      BOOST_CHECK( swan().bitasset_data(db).settlement_fund == 2800 );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+      BOOST_CHECK( swan().bitasset_data(db).current_feed.settlement_price.is_null() );
+
+      // price not good enough for recovery
+      set_feed( 700, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      bid_collateral( borrower(),  back().amount(10510), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(21000), swan().amount(1399) );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      auto swan_symbol = _swan(db).symbol;
+      vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK_EQUAL( 2u, bids.size() );
+
+      // price still not good enough for recovery
+      set_feed( 701, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+      bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK_EQUAL( 2u, bids.size() );
+
+      // price still not good enough for recovery
+      set_feed( 720, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+      bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK_EQUAL( 2u, bids.size() );
+
+      // good feed price
+      set_feed( 721, 800, 1750, 1800 ); // MCR = 1750, ICR = 1800
+      BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+
+      bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK( bids.empty() );
+
+      vector<call_order_object> calls = db_api.get_call_orders(swan_symbol, 100);
+      BOOST_REQUIRE_EQUAL( 1u, calls.size() );
+      BOOST_CHECK( calls[0].borrower == swan().issuer );
+      BOOST_CHECK_EQUAL( calls[0].debt.value, 1400 );
+      BOOST_CHECK_EQUAL( calls[0].collateral.value, 2800 );
+
+      generate_block();
 } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -316,7 +530,9 @@ BOOST_AUTO_TEST_CASE( recollateralize )
       // no hardfork yet
       GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), back().amount(1000), swan().amount(100) ), fc::exception );
 
-      if(hf1270)
+      if(hf2481)
+         wait_for_hf_core_2481();
+      else if(hf1270)
          wait_for_hf_core_1270();
       else
          wait_for_hf_core_216();
@@ -336,7 +552,8 @@ BOOST_AUTO_TEST_CASE( recollateralize )
       // can't bid zero collateral
       GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), back().amount(0), swan().amount(100) ), fc::exception );
       // can't bid more than we have
-      GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), back().amount(b2_balance + 100), swan().amount(100) ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), back().amount(b2_balance + 100), swan().amount(100) ),
+                              fc::exception );
       trx.operations.clear();
 
       // can't bid on a live bitasset
@@ -406,6 +623,104 @@ BOOST_AUTO_TEST_CASE( recollateralize )
    }
 }
 
+/** Creates a black swan, recover price feed with ICR, before the core-2290 hard fork,
+ *  asset should be revived based on MCR
+ */
+BOOST_AUTO_TEST_CASE( recollateralize_not_by_icr_before_hf_core_2290 )
+{ try {
+      init_standard_swan( 700 );
+
+      // Advance to a time before core-2290 hard fork
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2290_TIME - mi * 2);
+      set_expiration( db, trx );
+
+      BOOST_CHECK( swan().dynamic_data(db).current_supply == 1400 );
+      BOOST_CHECK( swan().bitasset_data(db).settlement_fund == 2800 );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+      BOOST_CHECK( swan().bitasset_data(db).current_feed.settlement_price.is_null() );
+
+      BOOST_REQUIRE( HARDFORK_BSIP_77_PASSED( db.head_block_time() ) );
+
+      set_feed(1, 2, 1750, 1800); // MCR = 1750, ICR = 1800
+      // works
+      bid_collateral( borrower(),  back().amount(1051), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(2100), swan().amount(1399) );
+
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      auto swan_symbol = _swan(db).symbol;
+      vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK_EQUAL( 2u, bids.size() );
+
+      // revive
+      wait_for_maintenance();
+      BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+
+      bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK( bids.empty() );
+      BOOST_CHECK( swan().dynamic_data(db).current_supply == 1400 );
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/** Creates a black swan, recover price feed with ICR, after the core-2290 hard fork,
+ *  asset should be revived based on ICR
+ */
+BOOST_AUTO_TEST_CASE( recollateralize_by_icr_after_hf_core_2290 )
+{ try {
+      init_standard_swan( 700 );
+
+      // Advance to core-2290 hard fork
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2290_TIME - mi);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      set_expiration( db, trx );
+
+      BOOST_CHECK( swan().dynamic_data(db).current_supply == 1400 );
+      BOOST_CHECK( swan().bitasset_data(db).settlement_fund == 2800 );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+      BOOST_CHECK( swan().bitasset_data(db).current_feed.settlement_price.is_null() );
+
+      set_feed(1, 2, 1750, 1800); // MCR = 1750, ICR = 1800
+      // doesn't happen if some bids have a bad swan price
+      bid_collateral( borrower(),  back().amount(1051), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(2100), swan().amount(1399) );
+      wait_for_maintenance();
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      set_feed(1, 2, 1750, 1800); // MCR = 1750, ICR = 1800
+      // doesn't happen if some bids have a bad swan price
+      bid_collateral( borrower(),  back().amount(1120), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(1122), swan().amount(700) );
+      wait_for_maintenance();
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      set_feed(1, 2, 1750, 1800); // MCR = 1750, ICR = 1800
+      // works
+      bid_collateral( borrower(),  back().amount(1121), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(1122), swan().amount(700) );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      graphene::app::database_api db_api( db, &( app.get_options() ));
+      auto swan_symbol = _swan(db).symbol;
+      vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK_EQUAL( 2u, bids.size() );
+
+      // revive
+      wait_for_maintenance();
+      BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+
+      bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+      BOOST_CHECK( bids.empty() );
+      BOOST_CHECK( swan().dynamic_data(db).current_supply == 1400 );
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 /** Creates a black swan, bid, adjust bid before/after hf_1692
  */
 BOOST_AUTO_TEST_CASE( bid_issue_1692 )
@@ -436,7 +751,9 @@ BOOST_AUTO_TEST_CASE( revive_empty_recovered )
 { try {
       limit_order_id_type oid = init_standard_swan( 1000 );
 
-      if(hf1270)
+      if(hf2481)
+         wait_for_hf_core_2481();
+      else if(hf1270)
          wait_for_hf_core_1270();
       else
          wait_for_hf_core_216();
@@ -466,7 +783,9 @@ BOOST_AUTO_TEST_CASE( revive_empty_recovered )
  */
 BOOST_AUTO_TEST_CASE( revive_empty )
 { try {
-      if(hf1270)
+      if(hf2481)
+         wait_for_hf_core_2481();
+      else if(hf1270)
          wait_for_hf_core_1270();
       else
          wait_for_hf_core_216();
@@ -493,7 +812,9 @@ BOOST_AUTO_TEST_CASE( revive_empty )
  */
 BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
 { try {
-      if(hf1270)
+      if(hf2481)
+         wait_for_hf_core_2481();
+      else if(hf1270)
          wait_for_hf_core_1270();
       else
          wait_for_hf_core_216();
@@ -557,6 +878,13 @@ BOOST_AUTO_TEST_CASE(revive_recovered_hf1270)
 
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE(revive_recovered_with_bids_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(revive_recovered_with_bids);
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE(recollateralize_hf1270)
 { try {
    hf1270 = true;
@@ -585,6 +913,57 @@ BOOST_AUTO_TEST_CASE(revive_empty_with_bid_hf1270)
 
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE(black_swan_after_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(black_swan);
+
+} FC_LOG_AND_RETHROW() }
+
+// black_swan_issue_346_hf2481 is skipped as it is already failing with HARDFORK_CORE_834_TIME
+
+BOOST_AUTO_TEST_CASE(revive_recovered_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(revive_recovered);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(revive_recovered_with_bids_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(revive_recovered_with_bids);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(recollateralize_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(recollateralize);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(revive_empty_recovered_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(revive_empty_recovered);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(revive_empty_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(revive_empty);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(revive_empty_with_bid_hf2481)
+{ try {
+   hf2481 = true;
+   INVOKE(revive_empty_with_bid);
+
+} FC_LOG_AND_RETHROW() }
+
 /** Creates a black swan, bids on more than outstanding debt
  */
 BOOST_AUTO_TEST_CASE( overflow )
@@ -607,6 +986,510 @@ BOOST_AUTO_TEST_CASE( overflow )
    BOOST_CHECK_EQUAL( 1399, itr->debt.value );
 
    BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+} FC_LOG_AND_RETHROW() }
+
+/// Tests what kind of assets can have the disable_collateral_bidding flag / issuer permission
+BOOST_AUTO_TEST_CASE( hf2281_asset_permissions_flags_test )
+{
+   try {
+
+      // Advance to core-2281 hard fork
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2281_TIME - mi);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      set_expiration( db, trx );
+
+      ACTORS((sam));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+
+      // Able to create a PM with the disable_collateral_bidding bit in flags
+      create_prediction_market( "TESTPMTEST", sam_id, 0, disable_collateral_bidding );
+
+      // Able to create a MPA with the disable_collateral_bidding bit in flags
+      create_bitasset( "TESTBITTEST", sam_id, 0, disable_collateral_bidding );
+
+      // Unable to create a UIA with the disable_collateral_bidding bit in flags
+      BOOST_CHECK_THROW( create_user_issued_asset( "TESTUIA", sam_id(db), disable_collateral_bidding ),
+                         fc::exception );
+
+      // create a PM with a zero market_fee_percent
+      const asset_object& pm = create_prediction_market( "TESTPM", sam_id, 0, charge_market_fee );
+      asset_id_type pm_id = pm.id;
+
+      // create a MPA with a zero market_fee_percent
+      const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
+      asset_id_type mpa_id = mpa.id;
+
+      // create a UIA with a zero market_fee_percent
+      const asset_object& uia = create_user_issued_asset( "TESTUIA", sam_id(db), charge_market_fee );
+      asset_id_type uia_id = uia.id;
+
+      // Prepare for asset update
+      asset_update_operation auop;
+      auop.issuer = sam_id;
+
+      // Able to set disable_collateral_bidding bit in flags for PM
+      auop.asset_to_update = pm_id;
+      auop.new_options = pm_id(db).options;
+      auop.new_options.flags |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+      // Able to propose
+      propose( auop );
+
+      // Able to set disable_collateral_bidding bit in flags for MPA
+      auop.asset_to_update = mpa_id;
+      auop.new_options = mpa_id(db).options;
+      auop.new_options.flags |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+      // Able to propose
+      propose( auop );
+
+      // Unable to set disable_collateral_bidding bit in flags for UIA
+      auop.asset_to_update = uia_id;
+      auop.new_options = uia_id(db).options;
+      auop.new_options.flags |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      // Able to propose
+      propose( auop );
+
+      // Able to set disable_collateral_bidding bit in issuer_permissions for PM
+      auop.asset_to_update = pm_id;
+      auop.new_options = pm_id(db).options;
+      auop.new_options.issuer_permissions |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+      // Able to propose
+      propose( auop );
+
+      // Able to set disable_collateral_bidding bit in issuer_permissions for MPA
+      auop.asset_to_update = mpa_id;
+      auop.new_options = mpa_id(db).options;
+      auop.new_options.issuer_permissions |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+      // Able to propose
+      propose( auop );
+
+      // Unable to set disable_collateral_bidding bit in issuer_permissions for UIA
+      auop.asset_to_update = uia_id;
+      auop.new_options = uia_id(db).options;
+      auop.new_options.issuer_permissions |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      // But able to propose
+      propose( auop );
+
+      // Unable to create a UIA with disable_collateral_bidding permission bit
+      asset_create_operation acop;
+      acop.issuer = sam_id;
+      acop.symbol = "SAMCOIN";
+      acop.precision = 2;
+      acop.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
+      acop.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      acop.common_options.market_fee_percent = 100;
+      acop.common_options.flags = charge_market_fee;
+      acop.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK | disable_collateral_bidding;
+
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      // Unable to propose either
+      BOOST_CHECK_THROW( propose( acop ), fc::exception );
+
+      // Able to create UIA without disable_collateral_bidding permission bit
+      acop.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK;
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      PUSH_TX(db, trx, ~0);
+
+      // Able to create a MPA with disable_collateral_bidding permission bit
+      acop.symbol = "SAMMPA";
+      acop.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK | disable_collateral_bidding;
+      acop.bitasset_opts = bitasset_options();
+
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      PUSH_TX(db, trx, ~0);
+
+      // Able to propose
+      propose( acop );
+
+      // Able to create a PM with disable_collateral_bidding permission bit
+      acop.symbol = "SAMPM";
+      acop.precision = asset_id_type()(db).precision;
+      acop.is_prediction_market = true;
+      acop.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK | global_settle
+                                                                                | disable_collateral_bidding;
+      acop.bitasset_opts = bitasset_options();
+
+      trx.operations.clear();
+      trx.operations.push_back( acop );
+      PUSH_TX(db, trx, ~0);
+
+      // Able to propose
+      propose( acop );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/// Tests whether asset owner has permission to update the disable_collateral_bidding flag and the permission
+BOOST_AUTO_TEST_CASE( hf2281_asset_owner_permission_test )
+{
+   try {
+
+      // Advance to core-2281 hard fork
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_2281_TIME - mi);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      set_expiration( db, trx );
+
+      ACTORS((sam)(feeder));
+
+      auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      fund( sam, asset(init_amount) );
+      fund( feeder, asset(init_amount) );
+
+      // create a MPA with a zero market_fee_percent
+      const asset_object& mpa = create_bitasset( "TESTBIT", sam_id, 0, charge_market_fee );
+      asset_id_type mpa_id = mpa.id;
+
+      BOOST_CHECK( mpa_id(db).can_bid_collateral() );
+
+      // add a price feed publisher and publish a feed
+      update_feed_producers( mpa_id, { feeder_id } );
+
+      price_feed f;
+      f.settlement_price = price( asset(1,mpa_id), asset(1) );
+      f.core_exchange_rate = price( asset(1,mpa_id), asset(1) );
+      f.maintenance_collateral_ratio = 1850;
+      f.maximum_short_squeeze_ratio = 1250;
+
+      uint16_t feed_icr = 1900;
+
+      publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+      // Prepare for asset update
+      asset_update_operation auop;
+      auop.issuer = sam_id;
+      auop.asset_to_update = mpa_id;
+      auop.new_options = mpa_id(db).options;
+
+      // update disable_collateral_bidding flag
+      auop.new_options.flags |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      // check
+      BOOST_CHECK( !mpa_id(db).can_bid_collateral() );
+
+      // disable owner's permission to update the disable_collateral_bidding flag
+      auop.new_options.issuer_permissions |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      // check
+      BOOST_CHECK( !mpa_id(db).can_bid_collateral() );
+
+      // check that owner can not update the disable_collateral_bidding flag
+      auop.new_options.flags &= ~disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      auop.new_options = mpa_id(db).options;
+
+      // check
+      BOOST_CHECK( !mpa_id(db).can_bid_collateral() );
+
+      // enable owner's permission to update the disable_collateral_bidding flag
+      auop.new_options.issuer_permissions &= ~disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      // check
+      BOOST_CHECK( !mpa_id(db).can_bid_collateral() );
+
+      // check that owner can update the disable_collateral_bidding flag
+      auop.new_options.flags &= ~disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      // check
+      BOOST_CHECK( mpa_id(db).can_bid_collateral() );
+
+      // Sam borrow some
+      borrow( sam, asset(1000, mpa_id), asset(2000) );
+
+      // disable owner's permission to update the disable_collateral_bidding flag
+      auop.new_options.issuer_permissions |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      PUSH_TX(db, trx, ~0);
+
+      // check
+      BOOST_CHECK( mpa_id(db).can_bid_collateral() );
+
+      // check that owner can not update the disable_collateral_bidding flag
+      auop.new_options.flags |= disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+      auop.new_options = mpa_id(db).options;
+
+      // check
+      BOOST_CHECK( mpa_id(db).can_bid_collateral() );
+
+      // unable to enable the permission due to non-zero supply
+      auop.new_options.issuer_permissions &= ~disable_collateral_bidding;
+      trx.operations.clear();
+      trx.operations.push_back( auop );
+      BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+      // check
+      BOOST_CHECK( mpa_id(db).can_bid_collateral() );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/// Tests the disable_collateral_bidding bit in asset flags
+BOOST_AUTO_TEST_CASE( disable_collateral_bidding_test )
+{ try {
+   init_standard_swan( 2000 );
+
+   // Advance to core-2281 hard fork
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_2281_TIME - mi);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   set_expiration( db, trx );
+
+   BOOST_CHECK( swan().can_bid_collateral() );
+
+   bid_collateral( borrower(), back().amount(3000), swan().amount(700) );
+   bid_collateral( borrower2(), back().amount(300), swan().amount(600) );
+
+   graphene::app::database_api db_api( db, &( app.get_options() ));
+   auto swan_symbol = swan().symbol;
+   vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+   BOOST_CHECK_EQUAL( bids.size(), 2u );
+
+   // Disable collateral bidding
+   asset_update_operation auop;
+   auop.issuer = swan().issuer;
+   auop.asset_to_update = swan().id;
+   auop.new_options = swan().options;
+   auop.new_options.flags |= disable_collateral_bidding;
+   trx.operations.clear();
+   trx.operations.push_back( auop );
+   PUSH_TX(db, trx, ~0);
+
+   BOOST_CHECK( !swan().can_bid_collateral() );
+
+   // Check that existing bids are cancelled
+   bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+   BOOST_CHECK_EQUAL( bids.size(), 0u );
+
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   // Unable to bid
+   BOOST_CHECK_THROW( bid_collateral( borrower(), back().amount(3000), swan().amount(700) ), fc::exception );
+
+   // Enable collateral bidding
+   auop.new_options.flags &= ~disable_collateral_bidding;
+   trx.operations.clear();
+   trx.operations.push_back( auop );
+   PUSH_TX(db, trx, ~0);
+
+   BOOST_CHECK( swan().can_bid_collateral() );
+
+   // Able to bid again
+   bid_collateral( borrower(), back().amount(3000), swan().amount(700) );
+   bid_collateral( borrower2(), back().amount(300), swan().amount(600) );
+
+   bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+   BOOST_CHECK_EQUAL( bids.size(), 2u );
+
+   generate_block();
+
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+} FC_LOG_AND_RETHROW() }
+
+/// Tests cancelling of collateral bids at hard fork time if the disable_collateral_bidding bit in asset flags was
+/// already set due to a bug
+BOOST_AUTO_TEST_CASE( disable_collateral_bidding_cross_hardfork_test )
+{ try {
+   init_standard_swan( 2000, true );
+
+   wait_for_hf_core_216();
+
+   BOOST_CHECK( !swan().can_bid_collateral() );
+
+   bid_collateral( borrower(), back().amount(3000), swan().amount(700) );
+   bid_collateral( borrower2(), back().amount(300), swan().amount(600) );
+
+   graphene::app::database_api db_api( db, &( app.get_options() ));
+   auto swan_symbol = swan().symbol;
+   vector<collateral_bid_object> bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+   BOOST_CHECK_EQUAL( bids.size(), 2u );
+
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   // Advance to core-2281 hard fork
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_2281_TIME - mi);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   set_expiration( db, trx );
+
+   BOOST_CHECK( !swan().can_bid_collateral() );
+
+   // Check that existing bids are cancelled
+   bids = db_api.get_collateral_bids(swan_symbol, 100, 0);
+   BOOST_CHECK_EQUAL( bids.size(), 0u );
+
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   // Unable to bid
+   BOOST_CHECK_THROW( bid_collateral( borrower(), back().amount(3000), swan().amount(700) ), fc::exception );
+
+   generate_block();
+
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+} FC_LOG_AND_RETHROW() }
+
+/// Tests updating bitasset options after GS
+BOOST_AUTO_TEST_CASE( update_bitasset_after_gs )
+{ try {
+
+   init_standard_swan( 2000, true );
+
+   // Advance to a time before core-2282 hard fork
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_2282_TIME - mi);
+   set_expiration( db, trx );
+
+   // try to update bitasset options, before hf core-2282, it is not allowed
+   auto old_options = swan().bitasset_data(db).options;
+
+   asset_update_bitasset_operation aubop;
+   aubop.issuer = swan().issuer;
+   aubop.asset_to_update = _swan;
+   aubop.new_options = old_options;
+   aubop.new_options.feed_lifetime_sec += 1;
+
+   trx.operations.clear();
+   trx.operations.push_back( aubop );
+   BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+   BOOST_CHECK( swan().bitasset_data(db).options.feed_lifetime_sec == old_options.feed_lifetime_sec );
+
+   // Advance to core-2282 hard fork
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   set_expiration( db, trx );
+
+   BOOST_CHECK( swan().bitasset_data(db).options.feed_lifetime_sec == old_options.feed_lifetime_sec );
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   // should succeed
+   PUSH_TX(db, trx, ~0);
+
+   BOOST_CHECK( swan().bitasset_data(db).options.feed_lifetime_sec == old_options.feed_lifetime_sec + 1 );
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   generate_block();
+
+   BOOST_CHECK( swan().bitasset_data(db).options.feed_lifetime_sec == old_options.feed_lifetime_sec + 1 );
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   // unable to update backing asset
+
+   asset_id_type uia_id = create_user_issued_asset( "MYUIA" ).id;
+
+   aubop.new_options.short_backing_asset = uia_id;
+
+   trx.operations.clear();
+   trx.operations.push_back( aubop );
+   BOOST_CHECK_THROW( PUSH_TX(db, trx, ~0), fc::exception );
+
+   BOOST_CHECK( swan().bitasset_data(db).options.short_backing_asset == old_options.short_backing_asset );
+
+   aubop.new_options.short_backing_asset = old_options.short_backing_asset;
+
+   // Update other bitasset options
+   aubop.new_options.minimum_feeds += 2;
+   aubop.new_options.force_settlement_delay_sec += 3;
+   aubop.new_options.force_settlement_offset_percent += 4;
+   aubop.new_options.maximum_force_settlement_volume += 5;
+   aubop.new_options.extensions.value.initial_collateral_ratio = 1900;
+   aubop.new_options.extensions.value.maintenance_collateral_ratio = 1800;
+   aubop.new_options.extensions.value.maximum_short_squeeze_ratio = 1005;
+   aubop.new_options.extensions.value.margin_call_fee_ratio = 10;
+   aubop.new_options.extensions.value.force_settle_fee_percent = 20;
+   trx.operations.clear();
+   trx.operations.push_back( aubop );
+   PUSH_TX(db, trx, ~0);
+
+   const auto& check_result = [&]()
+   {
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      BOOST_CHECK( swan().bitasset_data(db).options.feed_lifetime_sec
+                   == old_options.feed_lifetime_sec + 1 );
+      BOOST_CHECK( swan().bitasset_data(db).options.minimum_feeds
+                   == old_options.minimum_feeds + 2 );
+      BOOST_CHECK( swan().bitasset_data(db).options.force_settlement_delay_sec
+                   == old_options.force_settlement_delay_sec + 3 );
+      BOOST_CHECK( swan().bitasset_data(db).options.force_settlement_offset_percent
+                   == old_options.force_settlement_offset_percent + 4 );
+      BOOST_CHECK( swan().bitasset_data(db).options.maximum_force_settlement_volume
+                   == old_options.maximum_force_settlement_volume + 5 );
+
+      BOOST_CHECK( swan().bitasset_data(db).options.short_backing_asset == old_options.short_backing_asset );
+
+      auto extv = swan().bitasset_data(db).options.extensions.value;
+      BOOST_REQUIRE( extv.initial_collateral_ratio.valid() );
+      BOOST_CHECK_EQUAL( *extv.initial_collateral_ratio, 1900U );
+      BOOST_REQUIRE( extv.maintenance_collateral_ratio.valid() );
+      BOOST_CHECK_EQUAL( *extv.maintenance_collateral_ratio, 1800U );
+      BOOST_REQUIRE( extv.maximum_short_squeeze_ratio.valid() );
+      BOOST_CHECK_EQUAL( *extv.maximum_short_squeeze_ratio, 1005U );
+      BOOST_REQUIRE( extv.margin_call_fee_ratio.valid() );
+      BOOST_CHECK_EQUAL( *extv.margin_call_fee_ratio, 10U );
+      BOOST_REQUIRE( extv.force_settle_fee_percent.valid() );
+      BOOST_CHECK_EQUAL( *extv.force_settle_fee_percent, 20U );
+   };
+
+   check_result();
+
+   generate_block();
+
+   check_result();
+
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

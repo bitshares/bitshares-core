@@ -70,7 +70,7 @@ namespace graphene { namespace db {
       template< typename T >
       bool is() const
       {
-         return (number >> 48) == ((T::space_id << 8) | (T::type_id));
+         return (number >> 48) == ((uint64_t)(T::space_id << 8) | (T::type_id));
       }
 
       template< typename T >

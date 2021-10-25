@@ -1695,9 +1695,10 @@ BOOST_AUTO_TEST_CASE( get_settle_orders_by_account ) {
       auto settlements = db_api.get_settle_orders_by_account("settler", force_settlement_id_type(), 100);
 
       BOOST_CHECK(settlements.size() == 1);
-      BOOST_CHECK(settlements[0].id == result.get<object_id_type>());
+      BOOST_CHECK(settlements[0].id == *result.get<extendable_operation_result>().value.new_objects->begin());
 
-      GRAPHENE_CHECK_THROW(db_api.get_settle_orders_by_account("nosuchaccount", force_settlement_id_type(), 100), fc::exception);
+      GRAPHENE_CHECK_THROW( db_api.get_settle_orders_by_account("nosuchaccount", force_settlement_id_type(), 100),
+                            fc::exception );
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));

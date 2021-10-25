@@ -28,7 +28,7 @@ namespace graphene { namespace wallet { namespace detail {
    void wallet_api_impl::dbg_make_uia(string creator, string symbol)
    {
       asset_options opts;
-      opts.flags &= ~(white_list | disable_force_settle | global_settle);
+      opts.flags &= (uint16_t)( ~(white_list | disable_force_settle | global_settle) );
       opts.issuer_permissions = opts.flags;
       opts.core_exchange_rate = price(asset(1), asset(1,asset_id_type(1)));
       create_asset(get_account(creator).name, symbol, 2, opts, {}, true);
@@ -37,7 +37,7 @@ namespace graphene { namespace wallet { namespace detail {
    void wallet_api_impl::dbg_make_mia(string creator, string symbol)
    {
       asset_options opts;
-      opts.flags &= ~white_list;
+      opts.flags &= (uint16_t)(~white_list);
       opts.issuer_permissions = opts.flags;
       opts.core_exchange_rate = price(asset(1), asset(1,asset_id_type(1)));
       bitasset_options bopts;

@@ -98,7 +98,7 @@ namespace graphene { namespace protocol {
 
       /// Perform checks about @ref flags.
       /// @throws fc::exception if any check fails
-      void validate_flags( bool is_market_issued )const;
+      void validate_flags( bool is_market_issued, bool allow_disable_collateral_bid = true )const;
    };
 
    /**
@@ -107,6 +107,34 @@ namespace graphene { namespace protocol {
     * @note Changes to this struct will break protocol compatibility
     */
    struct bitasset_options {
+
+      /// Defines how a BitAsset would respond to black swan events
+      enum class black_swan_response_type
+      {
+         /// All debt positions are closed, all or some collateral is moved to a global-settlement fund.
+         /// Debt asset holders can claim collateral via force-settlement.
+         /// It is not allowed to create new debt positions when the fund is not empty.
+         global_settlement = 0,
+         /// No debt position is closed, and the derived settlement price is dynamically capped at the collateral
+         /// ratio of the debt position with the least collateral ratio so that all debt positions are able to pay
+         /// off their debt when being margin called or force-settled.
+         /// It is allowed to create new debt positions and update existing debt positions.
+         /// Also known as "Global Settlement Protection".
+         no_settlement = 1,
+         /// Only the undercollateralized debt positions are closed and their collateral is moved to a fund which
+         /// can be claimed via force-settlement. The derived settlement price is capped at the fund's collateral
+         /// ratio so that remaining debt positions will not be margin called or force-settled at a worse price
+         /// when the fund is not empty.
+         /// It is allowed to create new debt positions and update existing debt positions.
+         individual_settlement_to_fund = 2,
+         /// Only the undercollateralized debt positions are closed and their collateral is moved to a limit order
+         /// on the order book which can be bought. The derived settlement price is NOT capped, which means remaining
+         /// debt positions could be margin called at a worse price.
+         /// It is allowed to create new debt positions and update existing debt positions.
+         individual_settlement_to_order = 3,
+         /// Total number of available black swan response methods
+         BSRM_TYPE_COUNT = 4
+      };
 
       struct ext
       {
@@ -120,6 +148,8 @@ namespace graphene { namespace protocol {
          fc::optional<uint16_t> maximum_short_squeeze_ratio;  // BSIP-75
          fc::optional<uint16_t> margin_call_fee_ratio; // BSIP 74
          fc::optional<uint16_t> force_settle_fee_percent;  // BSIP-87
+         // https://github.com/bitshares/bitshares-core/issues/2467
+         fc::optional<uint8_t> black_swan_response_method;
       };
 
       /// Time before a price feed expires
@@ -145,6 +175,14 @@ namespace graphene { namespace protocol {
       /// Perform internal consistency checks.
       /// @throws fc::exception if any check fails
       void validate()const;
+
+      /// Get the effective black swan response method
+      black_swan_response_type get_black_swan_response_method() const
+      {
+         if( !extensions.value.black_swan_response_method.valid() )
+            return black_swan_response_type::global_settlement;
+         return static_cast<black_swan_response_type>( *extensions.value.black_swan_response_method );
+      }
    };
 
 
@@ -252,13 +290,16 @@ namespace graphene { namespace protocol {
    {
       struct fee_parameters_type { };
 
+      asset_settle_cancel_operation() = default;
+      asset_settle_cancel_operation( const force_settlement_id_type& fsid, const account_id_type& aid,
+            const asset& a ) : settlement(fsid), account(aid), amount(a) {}
+
       asset           fee;
       force_settlement_id_type settlement;
       /// Account requesting the force settlement. This account pays the fee
       account_id_type account;
       /// Amount of asset to force settle. This must be a market-issued asset
       asset           amount;
-      extensions_type extensions;
 
       account_id_type fee_payer()const { return account; }
       /***
@@ -598,6 +639,7 @@ FC_REFLECT( graphene::protocol::bitasset_options::ext,
             (maximum_short_squeeze_ratio)
             (margin_call_fee_ratio)
             (force_settle_fee_percent)
+            (black_swan_response_method)
           )
 
 FC_REFLECT( graphene::protocol::bitasset_options,
@@ -670,7 +712,7 @@ FC_REFLECT( graphene::protocol::asset_update_feed_producers_operation,
 FC_REFLECT( graphene::protocol::asset_publish_feed_operation,
             (fee)(publisher)(asset_id)(feed)(extensions) )
 FC_REFLECT( graphene::protocol::asset_settle_operation, (fee)(account)(amount)(extensions) )
-FC_REFLECT( graphene::protocol::asset_settle_cancel_operation, (fee)(settlement)(account)(amount)(extensions) )
+FC_REFLECT( graphene::protocol::asset_settle_cancel_operation, (fee)(settlement)(account)(amount) )
 FC_REFLECT( graphene::protocol::asset_global_settle_operation, (fee)(issuer)(asset_to_settle)(settle_price)(extensions) )
 FC_REFLECT( graphene::protocol::asset_issue_operation,
             (fee)(issuer)(asset_to_issue)(issue_to_account)(memo)(extensions) )
