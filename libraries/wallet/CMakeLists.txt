@@ -37,6 +37,7 @@ set( SOURCES
      wallet_api_impl.cpp
      wallet_asset.cpp
      wallet_builder.cpp
+     wallet_committee.cpp
      wallet_debug.cpp
      wallet_network.cpp
      wallet_results.cpp
