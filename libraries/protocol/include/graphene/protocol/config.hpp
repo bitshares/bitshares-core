@@ -23,8 +23,8 @@
  */
 #pragma once
 
-#define GRAPHENE_SYMBOL "BTS"
-#define GRAPHENE_ADDRESS_PREFIX "BTS"
+#define GRAPHENE_SYMBOL "TEST"
+#define GRAPHENE_ADDRESS_PREFIX "TEST"
 
 #define GRAPHENE_BLOCKCHAIN_PRECISION        uint64_t( 100000 )
 #define GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS 5
@@ -113,8 +113,8 @@ constexpr int64_t GRAPHENE_MAX_SHARE_SUPPLY (1000000000000000LL); // 10 ^ 15
 #define GRAPHENE_COLLATERAL_RATIO_DENOM                 1000
 #define GRAPHENE_MIN_COLLATERAL_RATIO                   1001  ///< lower than this could result in divide by 0
 #define GRAPHENE_MAX_COLLATERAL_RATIO                   32000 ///< higher than this is unnecessary and may exceed int16 storage
-#define GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO   1750 ///< Call when collateral only pays off 175% the debt
-#define GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO        1500 ///< Stop calling when collateral only pays off 150% of the debt
+#define GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO   1200 ///< Call when collateral only pays off 175% the debt
+#define GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO        1100 ///< Stop calling when collateral only pays off 150% of the debt
 ///@}
 
 /// Denominator for SameT Fund fee calculation
@@ -152,7 +152,7 @@ constexpr size_t MAX_FEE_STABILIZATION_ITERATION  = 4;
 #define GRAPHENE_NULL_WITNESS (graphene::protocol::witness_id_type(0))
 ///@}
 
-#define GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET (asset_id_type(743))
+#define GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET (asset_id_type(1))
 
 /// Maximum duration before a custom authority can expire (1 month)
 #define GRAPHENE_DEFAULT_MAX_CUSTOM_AUTHORITY_LIFETIME_SECONDS (60*60*24*30)

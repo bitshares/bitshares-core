@@ -140,9 +140,8 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    }
    else
    {
-      // https://bitsharestalk.org/index.php/topic,23715.0.html
       vector<string> seeds = {
-         #include "../egenesis/seed-nodes.txt"
+         #include "../egenesis/seed-nodes-testnet.txt"
       };
       _p2p_network->add_seed_nodes(seeds);
    }
@@ -1143,8 +1142,10 @@ void application::set_program_options(boost::program_options::options_descriptio
           "P2P nodes to connect to on startup (may specify multiple times)")
          ("seed-nodes", bpo::value<string>()->composing(),
           "JSON array of P2P nodes to connect to on startup")
-         ("checkpoint,c", bpo::value<vector<string>>()->composing(),
-          "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
+         ("checkpoint,c", bpo::value<vector<string>>()->default_value(
+               vector<string>(1, "[\"22668518\", \"0159e4e600cb149e22ef960442ca331159914617\"]"),
+               "[\"22668518\", \"0159e4e600cb149e22ef960442ca331159914617\"]")->composing(),
+               "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
          ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"),
           "Endpoint for websocket RPC to listen on")
          ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"),

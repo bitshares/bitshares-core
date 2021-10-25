@@ -60,10 +60,10 @@ jobs:
       uses: actions/cache@v2
       with:
         path: ccache
-        key: ccache-release-${{ matrix.os }}-${{ github.ref }}-${{ github.sha }}
+        key: testnet-ccache-release-${{ matrix.os }}-${{ github.ref }}-${{ github.sha }}
         restore-keys: |
-          ccache-release-${{ matrix.os }}-${{ github.ref }}-
-          ccache-release-${{ matrix.os }}-
+          testnet-ccache-release-${{ matrix.os }}-${{ github.ref }}-
+          testnet-ccache-release-${{ matrix.os }}-
     - name: Build
       run: |
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
