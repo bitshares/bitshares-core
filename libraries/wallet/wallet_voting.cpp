@@ -25,7 +25,7 @@
 #include <graphene/utilities/key_conversion.hpp>
 
 /****
- * Methods to handle voting / workers / witnesses
+ * Methods to handle voting / workers / witnesses / committee
  */
 
 namespace graphene { namespace wallet { namespace detail {
@@ -102,6 +102,24 @@ namespace graphene { namespace wallet { namespace detail {
       return sign_transaction( tx, broadcast );
    }
 
+   signed_transaction wallet_api_impl::create_committee_member(string owner_account, string url,
+         bool broadcast )
+   { try {
+
+      committee_member_create_operation committee_member_create_op;
+      committee_member_create_op.committee_member_account = get_account_id(owner_account);
+      committee_member_create_op.url = url;
+      if (_remote_db->get_committee_member_by_account(owner_account))
+         FC_THROW("Account ${owner_account} is already a committee_member", ("owner_account", owner_account));
+
+      signed_transaction tx;
+      tx.operations.push_back( committee_member_create_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (owner_account)(broadcast) ) }
+
    witness_object wallet_api_impl::get_witness(string owner_account)
    {
       try
@@ -131,6 +149,43 @@ namespace graphene { namespace wallet { namespace detail {
             catch (const fc::exception&)
             {
                FC_THROW("No account or witness named ${account}", ("account", owner_account));
+            }
+         }
+      }
+      FC_CAPTURE_AND_RETHROW( (owner_account) )
+   }
+
+   committee_member_object wallet_api_impl::get_committee_member(string owner_account)
+   {
+      try
+      {
+         fc::optional<committee_member_id_type> committee_member_id =
+               maybe_id<committee_member_id_type>(owner_account);
+         if (committee_member_id)
+         {
+            std::vector<committee_member_id_type> ids_to_get;
+            ids_to_get.push_back(*committee_member_id);
+            std::vector<fc::optional<committee_member_object>> committee_member_objects =
+                  _remote_db->get_committee_members(ids_to_get);
+            if (committee_member_objects.front())
+               return *committee_member_objects.front();
+            FC_THROW("No committee_member is registered for id ${id}", ("id", owner_account));
+         }
+         else
+         {
+            // then maybe it's the owner account
+            try
+            {
+               fc::optional<committee_member_object> committee_member =
+                     _remote_db->get_committee_member_by_account(owner_account);
+               if (committee_member)
+                  return *committee_member;
+               else
+                  FC_THROW("No committee_member is registered for account ${account}", ("account", owner_account));
+            }
+            catch (const fc::exception&)
+            {
+               FC_THROW("No account or committee_member named ${account}", ("account", owner_account));
             }
          }
       }

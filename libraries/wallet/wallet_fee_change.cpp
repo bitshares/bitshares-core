@@ -24,96 +24,10 @@
 #include "wallet_api_impl.hpp"
 
 /****
- * Methods to handle committee
+ * Methods to handle global fee schedule
  */
 
 namespace graphene { namespace wallet { namespace detail {
-
-   signed_transaction wallet_api_impl::create_committee_member(string owner_account, string url,
-         bool broadcast )
-   { try {
-
-      committee_member_create_operation committee_member_create_op;
-      committee_member_create_op.committee_member_account = get_account_id(owner_account);
-      committee_member_create_op.url = url;
-      if (_remote_db->get_committee_member_by_account(owner_account))
-         FC_THROW("Account ${owner_account} is already a committee_member", ("owner_account", owner_account));
-
-      signed_transaction tx;
-      tx.operations.push_back( committee_member_create_op );
-      set_operation_fees( tx, _remote_db->get_global_properties().parameters.get_current_fees());
-      tx.validate();
-
-      return sign_transaction( tx, broadcast );
-   } FC_CAPTURE_AND_RETHROW( (owner_account)(broadcast) ) }
-
-   committee_member_object wallet_api_impl::get_committee_member(string owner_account)
-   {
-      try
-      {
-         fc::optional<committee_member_id_type> committee_member_id =
-               maybe_id<committee_member_id_type>(owner_account);
-         if (committee_member_id)
-         {
-            std::vector<committee_member_id_type> ids_to_get;
-            ids_to_get.push_back(*committee_member_id);
-            std::vector<fc::optional<committee_member_object>> committee_member_objects =
-                  _remote_db->get_committee_members(ids_to_get);
-            if (committee_member_objects.front())
-               return *committee_member_objects.front();
-            FC_THROW("No committee_member is registered for id ${id}", ("id", owner_account));
-         }
-         else
-         {
-            // then maybe it's the owner account
-            try
-            {
-               fc::optional<committee_member_object> committee_member =
-                     _remote_db->get_committee_member_by_account(owner_account);
-               if (committee_member)
-                  return *committee_member;
-               else
-                  FC_THROW("No committee_member is registered for account ${account}", ("account", owner_account));
-            }
-            catch (const fc::exception&)
-            {
-               FC_THROW("No account or committee_member named ${account}", ("account", owner_account));
-            }
-         }
-      }
-      FC_CAPTURE_AND_RETHROW( (owner_account) )
-   }
-
-   signed_transaction wallet_api_impl::propose_parameter_change( const string& proposing_account,
-         fc::time_point_sec expiration_time, const variant_object& changed_values, bool broadcast )
-   {
-      FC_ASSERT( !changed_values.contains("current_fees") );
-
-      const chain_parameters& current_params = get_global_properties().parameters;
-      chain_parameters new_params = current_params;
-      fc::reflector<chain_parameters>::visit(
-         fc::from_variant_visitor<chain_parameters>( changed_values, new_params, GRAPHENE_MAX_NESTED_OBJECTS )
-         );
-
-      committee_member_update_global_parameters_operation update_op;
-      update_op.new_parameters = new_params;
-
-      proposal_create_operation prop_op;
-
-      prop_op.expiration_time = expiration_time;
-      prop_op.review_period_seconds = current_params.committee_proposal_review_period;
-      prop_op.fee_paying_account = get_account(proposing_account).id;
-
-      prop_op.proposed_ops.emplace_back( update_op );
-      current_params.get_current_fees().set_fee( prop_op.proposed_ops.back().op );
-
-      signed_transaction tx;
-      tx.operations.push_back(prop_op);
-      set_operation_fees(tx, current_params.get_current_fees());
-      tx.validate();
-
-      return sign_transaction(tx, broadcast);
-   }
 
    signed_transaction wallet_api_impl::propose_fee_change( const string& proposing_account,
          fc::time_point_sec expiration_time, const variant_object& changed_fees, bool broadcast )
