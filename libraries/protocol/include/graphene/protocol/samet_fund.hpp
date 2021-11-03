@@ -79,7 +79,7 @@ namespace graphene { namespace protocol {
       account_id_type      owner_account;         ///< Owner of the fund
       samet_fund_id_type   fund_id;               ///< ID of the SameT Fund object
       optional<asset>      delta_amount;          ///< Delta amount, optional
-      optional<uint32_t>   new_fee_rate = 0;   ///< New fee rate, optional
+      optional<uint32_t>   new_fee_rate;          ///< New fee rate, optional
 
       extensions_type extensions;  ///< Unused. Reserved for future use.
 
