@@ -613,7 +613,8 @@ void database::_apply_block( const signed_block& next_block )
 
    _issue_453_affected_assets.clear();
 
-   for( const auto& trx : next_block.transactions )
+   signed_block processed_block( next_block ); // make a copy
+   for( auto& trx : processed_block.transactions )
    {
       /* We do not need to push the undo state for each transaction
        * because they either all apply and are valid or the
@@ -621,7 +622,7 @@ void database::_apply_block( const signed_block& next_block )
        * for transactions when validating broadcast transactions or
        * when building a block.
        */
-      apply_transaction( trx, skip );
+      trx.operation_results = apply_transaction( trx, skip ).operation_results;
       ++_current_trx_in_block;
    }
 
@@ -661,7 +662,7 @@ void database::_apply_block( const signed_block& next_block )
       apply_debug_updates();
 
    // notify observers that the block has been applied
-   notify_applied_block( next_block ); //emit
+   notify_applied_block( processed_block ); //emit
    _applied_ops.clear();
 
    notify_changed_objects();
