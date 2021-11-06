@@ -43,6 +43,9 @@ BOOST_AUTO_TEST_CASE( broadcast_transaction_with_callback_test ) {
       auto callback = [&]( const variant& v )
       {
          ++called;
+         idump((v));
+         auto callback_obj = v.as<graphene::app::network_broadcast_api::transaction_confirmation>(200);
+         BOOST_CHECK_EQUAL( callback_obj.trx.operations.size(), callback_obj.trx.operation_results.size() );
       };
 
       fc::ecc::private_key cid_key = fc::ecc::private_key::regenerate( fc::digest("key") );
