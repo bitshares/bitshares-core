@@ -331,6 +331,7 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
    // load ES or AH, but not both
    if(fixture.current_test_name == "elasticsearch_account_history" ||
          fixture.current_test_name == "elasticsearch_suite" ||
+         fixture.current_suite_name == "credit_offer_tests" ||
          fixture.current_test_name == "elasticsearch_history_api") {
       fixture.app.register_plugin<graphene::elasticsearch::elasticsearch_plugin>(true);
 
