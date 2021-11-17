@@ -174,15 +174,18 @@ enum asset_issuer_permission_flags {
     /// @note These parameters are for issuer permission only.
     ///       For each parameter, if it is set in issuer permission,
     ///       it means the bitasset owner can not update the corresponding parameter.
-    ///       In this case, if the value of the parameter was set by the bitasset owner, it can not be updated;
-    ///       if no value was set by the owner, the value can still be updated by the feed producers.
     ///@{
-    disable_mcr_update   = 0x800, ///< the bitasset owner can not update MCR, permisison only
-    disable_icr_update   = 0x1000, ///< the bitasset owner can not update ICR, permisison only
-    disable_mssr_update  = 0x2000, ///< the bitasset owner can not update MSSR, permisison only
-    disable_bsrm_update  = 0x4000, ///< the bitasset owner can not update BSRM, permission only
-    disable_collateral_bidding = 0x8000  ///< Can not bid collateral after a global settlement
+    /// @note For each one of these parameters, if it is set in issuer permission, and
+    ///       * if the value of the parameter was set by the bitasset owner, it can not be updated,
+    ///       * if no value was set by the owner, the value can still be updated by the feed producers.
+    ///@{
+    disable_mcr_update   = 0x800, ///< the bitasset owner can not update MCR, permission only
+    disable_icr_update   = 0x1000, ///< the bitasset owner can not update ICR, permission only
+    disable_mssr_update  = 0x2000, ///< the bitasset owner can not update MSSR, permission only
     ///@}
+    disable_bsrm_update  = 0x4000, ///< the bitasset owner can not update BSRM, permission only
+    ///@}
+    disable_collateral_bidding = 0x8000  ///< Can not bid collateral after a global settlement
     ///@}
 };
 
