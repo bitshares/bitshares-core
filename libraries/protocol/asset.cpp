@@ -149,6 +149,7 @@ namespace graphene { namespace protocol {
          {
             uint128_t num = ocp.numerator();
             uint128_t den = ocp.denominator();
+            FC_ASSERT( num > 0 && den > 0, "Internal error" );
             if( num > den )
             {
                num /= den;
