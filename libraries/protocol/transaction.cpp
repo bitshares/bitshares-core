@@ -433,7 +433,7 @@ set<public_key_type> signed_transaction::minimize_required_signatures(
 
 const transaction_id_type& precomputable_transaction::id()const
 {
-   if( !_tx_id_buffer._hash[0].value() )
+   if( 0 == _tx_id_buffer._hash[0].value() )
       transaction::id();
    return _tx_id_buffer;
 }

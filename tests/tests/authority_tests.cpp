@@ -403,7 +403,7 @@ BOOST_AUTO_TEST_CASE( proposal_failure )
       top.from = bob_id;
       top.amount = asset(2000000);
       proposal_create_operation pop;
-      pop.proposed_ops.push_back( { top } );
+      pop.proposed_ops.push_back( { op_wrapper(top) } );
       pop.expiration_time = db.head_block_time() + fc::days(1);
       pop.fee_paying_account = bob_id;
       trx.operations.push_back( pop );
@@ -458,7 +458,7 @@ BOOST_AUTO_TEST_CASE( committee_authority )
    auto _sign = [&] { trx.clear_signatures(); sign( trx, nathan_key ); };
 
    proposal_create_operation pop;
-   pop.proposed_ops.push_back({trx.operations.front()});
+   pop.proposed_ops.push_back({op_wrapper(trx.operations.front())});
    pop.expiration_time = db.head_block_time() + global_params.committee_proposal_review_period*2;
    pop.fee_paying_account = nathan.id;
    trx.operations = {pop};

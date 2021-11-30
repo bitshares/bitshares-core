@@ -38,7 +38,7 @@ fi
 echo "Waiting for head_block 131071..." 1>&2
 touch "$DATA_DIR"/info.json
 _START="`date +%s`"
-while [ $(( `date +%s` - $_START )) -lt 180 ]; do
+while [ $(( `date +%s` - $_START )) -lt 600 ]; do
     sleep 2
     curl --silent -o "$DATA_DIR"/info.json --data '{"id":0,"method":"info","params":[]}' \
 	 http://127.0.0.1:8091/rpc

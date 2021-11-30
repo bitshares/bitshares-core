@@ -220,7 +220,7 @@ class serialize_member_visitor
 template<typename T>
 struct serializer<T,false>
 {
-   static_assert( fc::reflector<T>::is_defined::value == false, "invalid template arguments" );
+   static_assert( !fc::reflector<T>::is_defined::value, "invalid template arguments" );
    static void init()
    {}
 
@@ -341,7 +341,7 @@ class register_member_visitor
 template<typename T, bool reflected>
 struct serializer
 {
-   static_assert( fc::reflector<T>::is_defined::value == reflected, "invalid template arguments" );
+   static_assert( fc::reflector<T>::is_defined::value, "invalid template arguments" );
    static void init()
    {
       auto name = js_name<T>::name();
