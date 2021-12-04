@@ -170,6 +170,7 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::witness_object, (graphene::db::
                     (url)
                     (total_missed)
                     (last_confirmed_block_num)
+                    (is_active)
                   )
 
 FC_REFLECT_DERIVED_NO_TYPENAME(
