@@ -36,12 +36,29 @@
 #include <graphene/chain/witness_schedule_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 
+#include <graphene/db/undo_database.hpp>
+#include <graphene/chain/fork_database.hpp>
+
 #include <graphene/utilities/tempdir.hpp>
 
 #include <fc/crypto/digest.hpp>
 #include <fc/io/fstream.hpp>
 
 #include "../common/database_fixture.hpp"
+
+/****
+ * A mock database just to get at some of the internals of the real one
+ */
+namespace graphene {
+   namespace chain {
+      class mock_database : public database
+      {
+         public:
+            graphene::chain::fork_database get_fork_db() { return _fork_db; }
+            //graphene::db::undo_database get_undo_db() { return _undo_db; }
+      };
+   }
+}
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
@@ -686,6 +703,214 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
       edump((e.to_detail_string()));
       throw;
    }
+}
+
+graphene::chain::signed_transaction create_simple_transaction(graphene::chain::database& db, uint16_t idx, const graphene::db::index& account_idx,
+      public_key_type& init_account_pub_key)
+{
+   graphene::chain::signed_transaction tx;
+   set_expiration(db, tx);
+   account_id_type user_id = account_idx.get_next_id();
+   account_create_operation create_op;
+   create_op.registrar = GRAPHENE_TEMP_ACCOUNT;
+   create_op.name = "nathan" + std::to_string(idx);
+   create_op.owner = authority(1, init_account_pub_key, 1);
+   create_op.active = create_op.owner;
+   tx.operations.push_back(create_op);
+   return tx;
+}
+
+void print_last_confirmed(const boost::container::flat_set<graphene::chain::witness_id_type>& witness_ids, graphene::chain::database& db)
+{
+   std::stringstream ss;
+
+   for(auto witness_id : witness_ids)
+   {
+      graphene::chain::witness_object witness = witness_id(db);
+      ss << std::to_string(witness.last_confirmed_block_num) << " ";
+   }
+   BOOST_TEST_MESSAGE(ss.str());
+}
+
+BOOST_AUTO_TEST_CASE( switch_forks_bad_block )
+{
+   /*
+      Scenario: Fork happens, LIB readjusted on the soon-to-be bad fork that causes undo_db 
+      to shrink, then something bad happens, causing a rollback. But undo_db is too small 
+      and blocks near LIB on the good fork were lost during the undo_db shrink.
+      Note: For 2/3 + 1, I am acting as if there are 5 nodes
+    */
+   try {
+      fc::temp_directory dir1( graphene::utilities::temp_directory_path() ),
+                         dir2( graphene::utilities::temp_directory_path() ),
+                         dir3( graphene::utilities::temp_directory_path() );
+      mock_database db1, db2, db3;
+      db1.open(dir1.path(), make_genesis, "TEST");
+      db2.open(dir2.path(), make_genesis, "TEST");
+      db3.open(dir3.path(), make_genesis, "TEST");
+      BOOST_CHECK( db1.get_chain_id() == db2.get_chain_id() );
+
+      auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
+      public_key_type init_account_pub_key  = init_account_priv_key.get_public_key();
+      const graphene::db::index& account_idx = db1.get_index(protocol_ids, account_object_type);
+
+      // generate blocks
+      // db1 : A B C D
+      // db2 : A M N
+      // db3 : knows about both forks
+      // Then make B the LIB, but it fails late in the process. Restoring the db2 chain can not be done, as M has disappeared
+
+      auto aw = db1.get_global_properties().active_witnesses;
+      signed_transaction trx = create_simple_transaction(db1, 1, account_idx, init_account_pub_key);
+      PUSH_TX( db1, trx );
+      auto block_a = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+      db2.push_block(block_a, database::skip_nothing);
+      db3.push_block(block_a, database::skip_nothing);
+
+      BOOST_TEST_MESSAGE( "A block number " + std::to_string(block_a.block_num()) + " DB3 max size after: " + std::to_string( db3.get_fork_db().get_max_size() ));
+
+      // trick db3 to think that all 5 nodes have confirmed this block
+      // Note: db3 will not think that A is LIB until after the next block is pushed
+      const graphene::chain::global_property_object global_properties = db3.get_global_properties();
+      boost::container::flat_set<witness_id_type> witnesses = global_properties.active_witnesses;
+      for( witness_id_type wid : witnesses )
+      {
+         const graphene::chain::witness_object& witness = wid(db3);
+         db3.modify(witness, [&](graphene::chain::witness_object& w)
+         {
+            w.last_confirmed_block_num = 1;
+         });
+      }
+
+      // now build block B
+      trx = create_simple_transaction(db1, 2, account_idx, init_account_pub_key);
+      PUSH_TX(db1, trx);
+      auto block_b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+      db3.push_block(block_b, database::skip_nothing);
+
+      BOOST_TEST_MESSAGE( "B block number " + std::to_string(block_b.block_num()) + " DB3 max size after: " + std::to_string( db3.get_fork_db().get_max_size() ));
+
+      // NOTE: Now block_a is LIB
+
+      // now build block M, and a fork should be created on db3
+      trx = create_simple_transaction(db2, 3, account_idx, init_account_pub_key);
+      PUSH_TX(db2, trx);
+      auto block_m = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+      db3.push_block(block_m, database::skip_nothing);
+      BOOST_TEST_MESSAGE( "M block number " + std::to_string(block_m.block_num()) + " DB3 max size after: " + std::to_string( db3.get_fork_db().get_max_size() ));
+
+      // block c should be on the b fork
+      trx = create_simple_transaction(db1, 4, account_idx, init_account_pub_key);
+      PUSH_TX(db1, trx);
+      auto block_c = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+      db3.push_block(block_c, database::skip_nothing);
+      BOOST_TEST_MESSAGE( "C block number " + std::to_string(block_c.block_num()) + " DB3 max size after: " + std::to_string( db3.get_fork_db().get_max_size() ));
+
+      // block d should be on the b fork
+      trx = create_simple_transaction(db1, 5, account_idx, init_account_pub_key);
+      PUSH_TX(db1, trx);
+      auto block_d = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+      db3.push_block(block_d, database::skip_nothing);
+      BOOST_TEST_MESSAGE( "D block number " + std::to_string(block_d.block_num()) + " DB3 max size after: " + std::to_string( db3.get_fork_db().get_max_size() ));
+
+      // now we have
+      // 1 1 1 1 1 1 1 2 3 4, so LIB = 1
+
+      // now move 5 of the "1" witnesses up to slot 2
+      int count = 0;
+      for(int i = 0; i < global_properties.active_witnesses.size() && count < 5; i++)
+      {
+         graphene::chain::witness_id_type wid = *global_properties.active_witnesses.nth(i);
+         const graphene::chain::witness_object& witness = wid(db3);
+         if (witness.last_confirmed_block_num == 1)
+         {
+            db3.modify(witness, [&](graphene::chain::witness_object& w)
+            {
+               w.last_confirmed_block_num = 2;
+            });
+            count++;
+         }
+      }
+     
+      // now we have
+      // 1 1 2 2 2 2 2 2 3 4, so LIB = 2, although we won't shrink the database right now
+
+      // attempt to make block M the LIB by adding a block N, this should eliminate the B fork
+      trx = create_simple_transaction(db2, 6, account_idx, init_account_pub_key);
+      PUSH_TX(db2, trx);
+      auto block_n = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+      db3.push_block(block_n, database::skip_nothing);
+      BOOST_TEST_MESSAGE( "N block number " + std::to_string(block_n.block_num()) + " DB3 max size after: " + std::to_string( db3.get_fork_db().get_max_size() ));
+
+      // once we grow beyond the length of db1's chain, we will be unable to switch back to it if we need to, as the LIB has moved forward
+
+      // add block O to chain 2, now the chains are of equal length
+      trx = create_simple_transaction(db2, 7, account_idx, init_account_pub_key);
+      PUSH_TX(db2, trx);
+      auto block_o = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+      db3.push_block(block_o, database::skip_nothing);
+      BOOST_TEST_MESSAGE( "O block number " + std::to_string(block_o.block_num()) + " DB3 max size after: " + std::to_string( db3.get_fork_db().get_max_size() ));
+
+      // add block P to chain M, now the chain M is longer than B, db3 should switch forks,
+      // and we should be unable to roll back to chain B
+      trx = create_simple_transaction(db2, 8, account_idx, init_account_pub_key);
+      PUSH_TX(db2, trx);
+      auto block_p = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+      db3.push_block(block_p, database::skip_nothing);
+      BOOST_TEST_MESSAGE( "P block number " + std::to_string(block_p.block_num()) + " DB3 max size after: " + std::to_string( db3.get_fork_db().get_max_size() ));
+
+      // attempt to roll back to chain B
+      trx = create_simple_transaction(db1, 9, account_idx, init_account_pub_key);
+      PUSH_TX(db1, trx);
+      auto block_e = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+      db3.push_block(block_e, database::skip_nothing);
+      BOOST_TEST_MESSAGE( "E block number " + std::to_string(block_e.block_num()) + " DB3 max size after: " + std::to_string( db3.get_fork_db().get_max_size() ));
+
+      trx = create_simple_transaction(db1, 10, account_idx, init_account_pub_key);
+      PUSH_TX(db1, trx);
+      auto block_f = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+      BOOST_TEST_MESSAGE("Attempting to push block F to DB3, should attempt to switch forks, but the fork should not be there");
+      // this should throw, but isn't
+      //GRAPHENE_REQUIRE_THROW(db3.push_block(block_f, database::skip_nothing), fc::exception);
+      db3.push_block(block_f, database::skip_nothing);
+      BOOST_TEST_MESSAGE( "F block number " + std::to_string(block_f.block_num()) + " DB3 max size after: " + std::to_string( db3.get_fork_db().get_max_size() ));
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( unable_to_switch )
+{
+   fc::temp_directory dir( graphene::utilities::temp_directory_path() );
+   database db;
+   db.open( dir.path(), make_genesis, "TEST" );
+
+   // make the first block
+   signed_block block1;
+   block1.timestamp = db.get_slot_time( 1 );
+   block1.witness = db.get_scheduled_witness( 1 );
+   uint32_t skipper = database::skip_witness_schedule_check | database::skip_witness_signature;
+   db.push_block( block1, skipper );
+   // add a second block
+   signed_block forka_block2;
+   forka_block2.timestamp = db.get_slot_time( 2 );
+   forka_block2.witness = db.get_scheduled_witness( 1 );
+   forka_block2.previous = block1.id();
+   db.push_block( forka_block2, skipper );
+   // make a fork off the first block
+   signed_block forkb_block2;
+   forkb_block2.timestamp = db.get_slot_time( 2 );
+   forkb_block2.witness = db.get_scheduled_witness(1);
+   forkb_block2.previous = block1.id();
+   db.push_block( forkb_block2, skipper );
+   // make a 3rd block (second on fork b). This should cause a switch as b is longer
+   signed_block forkb_block3;
+   forkb_block3.timestamp = db.get_slot_time( 3 );
+   forkb_block3.witness = db.get_scheduled_witness( 1 );
+   forkb_block3.previous = forkb_block2.id();
+   db.push_block( forkb_block3, skipper );
 }
 
 BOOST_AUTO_TEST_CASE( duplicate_transactions )
