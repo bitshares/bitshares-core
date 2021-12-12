@@ -283,7 +283,14 @@ struct adaptor_struct {
       {
          o["owner_special_authority"] = fc::json::to_string(o["owner_special_authority"]);
       }
-
+      if (o.find("acceptable_collateral") != o.end())
+      {
+         o["acceptable_collateral"] = fc::json::to_string(o["acceptable_collateral"]);
+      }
+      if (o.find("acceptable_borrowers") != o.end())
+      {
+         o["acceptable_borrowers"] = fc::json::to_string(o["acceptable_borrowers"]);
+      }
 
       variant v;
       fc::to_variant(o, v, FC_PACK_MAX_DEPTH);
