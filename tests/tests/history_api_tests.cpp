@@ -26,6 +26,8 @@
 
 #include <graphene/app/api.hpp>
 
+#include <graphene/chain/hardfork.hpp>
+
 #include <graphene/utilities/tempdir.hpp>
 
 #include <fc/crypto/digest.hpp>
@@ -43,8 +45,8 @@ BOOST_AUTO_TEST_CASE(get_account_history) {
 
       //account_id_type() do 3 ops
       create_bitasset("USD", account_id_type());
-      create_account("dan");
-      create_account("bob");
+      create_account( "dan", account_id_type()(db), GRAPHENE_WITNESS_ACCOUNT(db) );
+      create_account( "bob", account_id_type()(db), GRAPHENE_TEMP_ACCOUNT(db) );
 
       generate_block();
       fc::usleep(fc::milliseconds(2000));
@@ -53,25 +55,94 @@ BOOST_AUTO_TEST_CASE(get_account_history) {
       int account_create_op_id = operation::tag<account_create_operation>::value;
 
       //account_id_type() did 3 ops and includes id0
-      vector<operation_history_object> histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 100, operation_history_id_type());
+      vector<operation_history_object> histories = hist_api.get_account_history("1.2.0", operation_history_id_type(),
+                                                      100, operation_history_id_type());
 
       BOOST_CHECK_EQUAL(histories.size(), 3u);
       BOOST_CHECK_EQUAL(histories[2].id.instance(), 0u);
       BOOST_CHECK_EQUAL(histories[2].op.which(), asset_create_op_id);
 
       // 1 account_create op larger than id1
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 100, operation_history_id_type());
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1),
+                                                      100, operation_history_id_type());
       BOOST_CHECK_EQUAL(histories.size(), 1u);
       BOOST_CHECK(histories[0].id.instance() != 0);
       BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
 
       // Limit 2 returns 2 result
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 2, operation_history_id_type());
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(),
+                                                      2, operation_history_id_type());
       BOOST_CHECK_EQUAL(histories.size(), 2u);
       BOOST_CHECK(histories[1].id.instance() != 0);
       BOOST_CHECK_EQUAL(histories[1].op.which(), account_create_op_id);
+
       // bob has 1 op
-      histories = hist_api.get_account_history("bob", operation_history_id_type(), 100, operation_history_id_type());
+      histories = hist_api.get_account_history("bob", operation_history_id_type(),
+                                                      100, operation_history_id_type());
+      BOOST_CHECK_EQUAL(histories.size(), 1u);
+      BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
+
+      // witness-account has 0 op
+      histories = hist_api.get_account_history("witness-account", operation_history_id_type(),
+                                                      100, operation_history_id_type());
+      BOOST_CHECK_EQUAL(histories.size(), 0u);
+
+   } catch (fc::exception &e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE(get_account_history_notify_all_on_creation) {
+   try {
+      // Pass hard fork time
+      generate_blocks(HARDFORK_CORE_265_TIME);
+      set_expiration( db, trx );
+
+      graphene::app::history_api hist_api(app);
+
+      //account_id_type() do 3 ops
+      create_bitasset("USD", account_id_type());
+      create_account( "dan", account_id_type()(db), GRAPHENE_WITNESS_ACCOUNT(db) );
+      create_account( "bob", account_id_type()(db), GRAPHENE_TEMP_ACCOUNT(db) );
+
+      generate_block();
+      fc::usleep(fc::milliseconds(2000));
+
+      int asset_create_op_id = operation::tag<asset_create_operation>::value;
+      int account_create_op_id = operation::tag<account_create_operation>::value;
+
+      //account_id_type() did 3 ops and includes id0
+      vector<operation_history_object> histories = hist_api.get_account_history("1.2.0", operation_history_id_type(),
+                                                      100, operation_history_id_type());
+
+      BOOST_CHECK_EQUAL(histories.size(), 3u);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 0u);
+      BOOST_CHECK_EQUAL(histories[2].op.which(), asset_create_op_id);
+
+      // 1 account_create op larger than id1
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1),
+                                                      100, operation_history_id_type());
+      BOOST_CHECK_EQUAL(histories.size(), 1u);
+      BOOST_CHECK(histories[0].id.instance() != 0);
+      BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
+
+      // Limit 2 returns 2 result
+      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(),
+                                                      2, operation_history_id_type());
+      BOOST_CHECK_EQUAL(histories.size(), 2u);
+      BOOST_CHECK(histories[1].id.instance() != 0);
+      BOOST_CHECK_EQUAL(histories[1].op.which(), account_create_op_id);
+
+      // bob has 1 op
+      histories = hist_api.get_account_history("bob", operation_history_id_type(),
+                                                      100, operation_history_id_type());
+      BOOST_CHECK_EQUAL(histories.size(), 1u);
+      BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
+
+      // witness-account has 1 op
+      histories = hist_api.get_account_history("witness-account", operation_history_id_type(),
+                                                      100, operation_history_id_type());
       BOOST_CHECK_EQUAL(histories.size(), 1u);
       BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
 
@@ -80,6 +151,7 @@ BOOST_AUTO_TEST_CASE(get_account_history) {
       throw;
    }
 }
+
 BOOST_AUTO_TEST_CASE(get_account_history_additional) {
    try {
       graphene::app::history_api hist_api(app);

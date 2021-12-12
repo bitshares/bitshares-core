@@ -40,7 +40,7 @@ namespace graphene { namespace protocol {
 
    const block_id_type& signed_block_header::id()const
    {
-      if( !_block_id._hash[0].value() )
+      if( 0 == _block_id._hash[0].value() )
       {
          auto tmp = fc::sha224::hash( *this );
          tmp._hash[0] = boost::endian::endian_reverse(block_num()); // store the block num in the ID, 160 bits is plenty for the hash
@@ -73,7 +73,7 @@ namespace graphene { namespace protocol {
       if( transactions.size() == 0 ) 
          return empty_checksum;
 
-      if( !_calculated_merkle_root._hash[0].value() )
+      if( 0 == _calculated_merkle_root._hash[0].value() )
       {
          vector<digest_type> ids;
          ids.resize( transactions.size() );

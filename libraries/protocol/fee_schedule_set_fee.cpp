@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Contributors.
+ * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -21,22 +21,43 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-
-#include "restriction_predicate.hxx"
-#include "sliced_lists.hxx"
+#include <graphene/protocol/fee_schedule.hpp>
 
 namespace graphene { namespace protocol {
 
-using result_type = object_restriction_predicate<operation>;
+   struct set_fee_visitor
+   {
+      using result_type = void;
 
-result_type get_restriction_predicate_list_8(size_t idx, vector<restriction> rs) {
-   return typelist::runtime::dispatch(operation_list_8::list(), idx, [&rs] (auto t) -> result_type {
-      using Op = typename decltype(t)::type;
-      return [p=restrictions_to_predicate<Op>(std::move(rs), true)] (const operation& op) {
-         FC_ASSERT(op.which() == operation::tag<Op>::value,
-                   "Supplied operation is incorrect type for restriction predicate");
-         return p(op.get<Op>());
-      };
-   });
-}
-} }
+      asset _fee;
+
+      explicit set_fee_visitor( const asset& f ):_fee(f){}
+
+      template<typename OpType>
+      void operator()( OpType& op )const
+      {
+         op.fee = _fee;
+      }
+   };
+
+   asset fee_schedule::set_fee( operation& op, const price& core_exchange_rate )const
+   {
+      auto f = calculate_fee( op, core_exchange_rate );
+      for( size_t i=0; i<MAX_FEE_STABILIZATION_ITERATION; ++i )
+      {
+         op.visit( set_fee_visitor( f ) );
+         auto f2 = calculate_fee( op, core_exchange_rate );
+         if( f >= f2 )
+            break;
+         f = f2;
+         if( 0 == i )
+         {
+            // no need for warnings on later iterations
+            wlog( "set_fee requires multiple iterations to stabilize with core_exchange_rate ${p} on operation ${op}",
+               ("p", core_exchange_rate) ("op", op) );
+         }
+      }
+      return f;
+   }
+
+} } // graphene::protocol

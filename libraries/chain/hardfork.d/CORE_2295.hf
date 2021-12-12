@@ -1,0 +1,5 @@
+// bitshares-core issue #2295 Skip asset authorization checks for from_account for override_transfer
+#ifndef HARDFORK_CORE_2295_TIME
+#define HARDFORK_CORE_2295_TIME (fc::time_point_sec( 1641909720 )) // Tuesday, January 11, 2022 14:02:00 UTC
+#define HARDFORK_CORE_2295_PASSED(now) (now >= HARDFORK_CORE_2295_TIME)
+#endif

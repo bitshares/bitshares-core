@@ -50,6 +50,10 @@ namespace detail {
 
    void check_asset_claim_fees_hardfork_87_74_collatfee(const fc::time_point_sec& block_time,
                                                         const asset_claim_fees_operation& op); // HF_REMOVABLE
+
+   void check_asset_options_hf_core2281(const fc::time_point_sec& next_maint_time, const asset_options& options);
+   void check_asset_options_hf_core2467(const fc::time_point_sec& next_maint_time, const asset_options& options);
+   void check_bitasset_opts_hf_core2467(const fc::time_point_sec& next_maint_time, const bitasset_options& options);
 }
 
 struct proposal_operation_hardfork_visitor
@@ -69,17 +73,25 @@ struct proposal_operation_hardfork_visitor
       detail::check_asset_options_hf_1774(block_time, v.common_options);
       detail::check_asset_options_hf_bsip_48_75(block_time, v.common_options);
       detail::check_asset_options_hf_bsip81(block_time, v.common_options);
+      detail::check_asset_options_hf_core2281( next_maintenance_time, v.common_options ); // HF_REMOVABLE
+      detail::check_asset_options_hf_core2467( next_maintenance_time, v.common_options ); // HF_REMOVABLE
       if( v.bitasset_opts.valid() ) {
          detail::check_bitasset_options_hf_bsip_48_75( block_time, *v.bitasset_opts );
          detail::check_bitasset_options_hf_bsip74( block_time, *v.bitasset_opts ); // HF_REMOVABLE
          detail::check_bitasset_options_hf_bsip77( block_time, *v.bitasset_opts ); // HF_REMOVABLE
          detail::check_bitasset_options_hf_bsip87( block_time, *v.bitasset_opts ); // HF_REMOVABLE
+         detail::check_bitasset_opts_hf_core2467( next_maintenance_time, *v.bitasset_opts ); // HF_REMOVABLE
       }
 
       // TODO move as many validations as possible to validate() if not triggered before hardfork
-      if( HARDFORK_BSIP_48_75_PASSED( block_time ) )
+      if( HARDFORK_CORE_2281_PASSED( next_maintenance_time ) )
       {
          v.common_options.validate_flags( v.bitasset_opts.valid() );
+      }
+      else if( HARDFORK_BSIP_48_75_PASSED( block_time ) )
+      {
+         // do not allow the 'disable_collateral_bidding' bit
+         v.common_options.validate_flags( v.bitasset_opts.valid(), false );
       }
    }
 
@@ -87,13 +99,20 @@ struct proposal_operation_hardfork_visitor
       detail::check_asset_options_hf_1774(block_time, v.new_options);
       detail::check_asset_options_hf_bsip_48_75(block_time, v.new_options);
       detail::check_asset_options_hf_bsip81(block_time, v.new_options);
+      detail::check_asset_options_hf_core2281( next_maintenance_time, v.new_options ); // HF_REMOVABLE
+      detail::check_asset_options_hf_core2467( next_maintenance_time, v.new_options ); // HF_REMOVABLE
 
       detail::check_asset_update_extensions_hf_bsip_48_75( block_time, v.extensions.value );
 
       // TODO move as many validations as possible to validate() if not triggered before hardfork
-      if( HARDFORK_BSIP_48_75_PASSED( block_time ) )
+      if( HARDFORK_CORE_2281_PASSED( next_maintenance_time ) )
       {
          v.new_options.validate_flags( true );
+      }
+      else if( HARDFORK_BSIP_48_75_PASSED( block_time ) )
+      {
+         // do not allow the 'disable_collateral_bidding' bit
+         v.new_options.validate_flags( true, false );
       }
 
    }
@@ -103,6 +122,7 @@ struct proposal_operation_hardfork_visitor
       detail::check_bitasset_options_hf_bsip74( block_time, v.new_options ); // HF_REMOVABLE
       detail::check_bitasset_options_hf_bsip77( block_time, v.new_options ); // HF_REMOVABLE
       detail::check_bitasset_options_hf_bsip87( block_time, v.new_options ); // HF_REMOVABLE
+      detail::check_bitasset_opts_hf_core2467( next_maintenance_time, v.new_options ); // HF_REMOVABLE
    }
 
    void operator()(const graphene::chain::asset_claim_fees_operation &v) const {
@@ -159,6 +179,32 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!op.new_parameters.current_fees->exists<liquidity_pool_exchange_operation>(),
                    "Unable to define fees for liquidity pool operations prior to the LP hardfork");
       }
+      if (!HARDFORK_CORE_2351_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.current_fees->exists<samet_fund_create_operation>(),
+                   "Unable to define fees for samet fund operations prior to the core-2351 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<samet_fund_delete_operation>(),
+                   "Unable to define fees for samet fund operations prior to the core-2351 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<samet_fund_update_operation>(),
+                   "Unable to define fees for samet fund operations prior to the core-2351 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<samet_fund_borrow_operation>(),
+                   "Unable to define fees for samet fund operations prior to the core-2351 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<samet_fund_repay_operation>(),
+                   "Unable to define fees for samet fund operations prior to the core-2351 hardfork");
+      }
+      if (!HARDFORK_CORE_2362_PASSED(block_time)) {
+         FC_ASSERT(!op.new_parameters.current_fees->exists<credit_offer_create_operation>(),
+                   "Unable to define fees for credit offer operations prior to the core-2362 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<credit_offer_delete_operation>(),
+                   "Unable to define fees for credit offer operations prior to the core-2362 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<credit_offer_update_operation>(),
+                   "Unable to define fees for credit offer operations prior to the core-2362 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<credit_offer_accept_operation>(),
+                   "Unable to define fees for credit offer operations prior to the core-2362 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<credit_deal_repay_operation>(),
+                   "Unable to define fees for credit offer operations prior to the core-2362 hardfork");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<credit_deal_expired_operation>(),
+                   "Unable to define fees for credit offer operations prior to the core-2362 hardfork");
+      }
    }
    void operator()(const graphene::chain::htlc_create_operation &op) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
@@ -173,10 +219,10 @@ struct proposal_operation_hardfork_visitor
                "HASH160 unavailable until after HARDFORK BSIP64" );   
       }
    }
-   void operator()(const graphene::chain::htlc_redeem_operation &op) const {
+   void operator()(const graphene::chain::htlc_redeem_operation&) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
    }
-   void operator()(const graphene::chain::htlc_extend_operation &op) const {
+   void operator()(const graphene::chain::htlc_extend_operation&) const {
       FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
    }
    void operator()(const graphene::chain::custom_authority_create_operation&) const {
@@ -188,27 +234,58 @@ struct proposal_operation_hardfork_visitor
    void operator()(const graphene::chain::custom_authority_delete_operation&) const {
       FC_ASSERT( HARDFORK_BSIP_40_PASSED(block_time), "Not allowed until hardfork BSIP 40" );
    }
-   void operator()(const graphene::chain::ticket_create_operation &op) const {
+   void operator()(const graphene::chain::ticket_create_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2103_PASSED(block_time), "Not allowed until hardfork 2103" );
    }
-   void operator()(const graphene::chain::ticket_update_operation &op) const {
+   void operator()(const graphene::chain::ticket_update_operation&) const {
       FC_ASSERT( HARDFORK_CORE_2103_PASSED(block_time), "Not allowed until hardfork 2103" );
    }
-   void operator()(const graphene::chain::liquidity_pool_create_operation &op) const {
+   void operator()(const graphene::chain::liquidity_pool_create_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
    }
-   void operator()(const graphene::chain::liquidity_pool_delete_operation &op) const {
+   void operator()(const graphene::chain::liquidity_pool_delete_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
    }
-   void operator()(const graphene::chain::liquidity_pool_deposit_operation &op) const {
+   void operator()(const graphene::chain::liquidity_pool_deposit_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
    }
-   void operator()(const graphene::chain::liquidity_pool_withdraw_operation &op) const {
+   void operator()(const graphene::chain::liquidity_pool_withdraw_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
    }
-   void operator()(const graphene::chain::liquidity_pool_exchange_operation &op) const {
+   void operator()(const graphene::chain::liquidity_pool_exchange_operation&) const {
       FC_ASSERT( HARDFORK_LIQUIDITY_POOL_PASSED(block_time), "Not allowed until the LP hardfork" );
    }
+   void operator()(const graphene::chain::samet_fund_create_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
+   }
+   void operator()(const graphene::chain::samet_fund_delete_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
+   }
+   void operator()(const graphene::chain::samet_fund_update_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
+   }
+   void operator()(const graphene::chain::samet_fund_borrow_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
+   }
+   void operator()(const graphene::chain::samet_fund_repay_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2351_PASSED(block_time), "Not allowed until the core-2351 hardfork" );
+   }
+   void operator()(const graphene::chain::credit_offer_create_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
+   }
+   void operator()(const graphene::chain::credit_offer_delete_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
+   }
+   void operator()(const graphene::chain::credit_offer_update_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
+   }
+   void operator()(const graphene::chain::credit_offer_accept_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
+   }
+   void operator()(const graphene::chain::credit_deal_repay_operation&) const {
+      FC_ASSERT( HARDFORK_CORE_2362_PASSED(block_time), "Not allowed until the core-2362 hardfork" );
+   }
+   // Note: credit_deal_expired_operation is a virtual operation thus no need to add code here
 
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {

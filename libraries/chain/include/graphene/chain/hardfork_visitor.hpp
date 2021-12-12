@@ -1,4 +1,3 @@
-#pragma once
 /*
  * Copyright (c) 2019 Contributors
  *
@@ -22,6 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#pragma once
 
 #include <graphene/protocol/operations.hpp>
 
@@ -33,8 +33,6 @@
 #include <functional>
 
 namespace graphene { namespace chain {
-using namespace protocol;
-namespace TL { using namespace fc::typelist; }
 
 /**
  * @brief The hardfork_visitor struct checks whether a given operation type has been hardforked in or not
@@ -45,49 +43,69 @@ namespace TL { using namespace fc::typelist; }
  */
 struct hardfork_visitor {
    using result_type = bool;
-   using first_unforked_op = custom_authority_create_operation;
-   using BSIP_40_ops = TL::list<custom_authority_create_operation, custom_authority_update_operation,
-                                custom_authority_delete_operation>;
-   using hf2103_ops = TL::list<ticket_create_operation, ticket_update_operation>;
-   using liquidity_pool_ops = TL::list< liquidity_pool_create_operation,
-                                        liquidity_pool_delete_operation,
-                                        liquidity_pool_deposit_operation,
-                                        liquidity_pool_withdraw_operation,
-                                        liquidity_pool_exchange_operation >;
+   using first_unforked_op = protocol::custom_authority_create_operation;
+   using BSIP_40_ops = fc::typelist::list< protocol::custom_authority_create_operation,
+                                           protocol::custom_authority_update_operation,
+                                           protocol::custom_authority_delete_operation>;
+   using hf2103_ops = fc::typelist::list< protocol::ticket_create_operation,
+                                          protocol::ticket_update_operation>;
+   using liquidity_pool_ops = fc::typelist::list< protocol::liquidity_pool_create_operation,
+                                                  protocol::liquidity_pool_delete_operation,
+                                                  protocol::liquidity_pool_deposit_operation,
+                                                  protocol::liquidity_pool_withdraw_operation,
+                                                  protocol::liquidity_pool_exchange_operation >;
+   using samet_fund_ops = fc::typelist::list< protocol::samet_fund_create_operation,
+                                              protocol::samet_fund_delete_operation,
+                                              protocol::samet_fund_update_operation,
+                                              protocol::samet_fund_borrow_operation,
+                                              protocol::samet_fund_repay_operation >;
+   using credit_offer_ops = fc::typelist::list< protocol::credit_offer_create_operation,
+                                                protocol::credit_offer_delete_operation,
+                                                protocol::credit_offer_update_operation,
+                                                protocol::credit_offer_accept_operation,
+                                                protocol::credit_deal_repay_operation,
+                                                protocol::credit_deal_expired_operation >;
    fc::time_point_sec now;
 
-   hardfork_visitor(fc::time_point_sec now) : now(now) {}
+   /// @note using head block time for all operations
+   explicit hardfork_visitor(const fc::time_point_sec& head_block_time) : now(head_block_time) {}
 
    /// The real visitor implementations. Future operation types get added in here.
    /// @{
    template<typename Op>
-   std::enable_if_t<operation::tag<Op>::value < operation::tag<first_unforked_op>::value, bool>
+   std::enable_if_t<operation::tag<Op>::value < protocol::operation::tag<first_unforked_op>::value, bool>
    visit() { return true; }
    template<typename Op>
-   std::enable_if_t<TL::contains<BSIP_40_ops, Op>(), bool>
+   std::enable_if_t<fc::typelist::contains<BSIP_40_ops, Op>(), bool>
    visit() { return HARDFORK_BSIP_40_PASSED(now); }
    template<typename Op>
-   std::enable_if_t<TL::contains<hf2103_ops, Op>(), bool>
+   std::enable_if_t<fc::typelist::contains<hf2103_ops, Op>(), bool>
    visit() { return HARDFORK_CORE_2103_PASSED(now); }
    template<typename Op>
-   std::enable_if_t<TL::contains<liquidity_pool_ops, Op>(), bool>
+   std::enable_if_t<fc::typelist::contains<liquidity_pool_ops, Op>(), bool>
    visit() { return HARDFORK_LIQUIDITY_POOL_PASSED(now); }
+   template<typename Op>
+   std::enable_if_t<fc::typelist::contains<samet_fund_ops, Op>(), bool>
+   visit() { return HARDFORK_CORE_2351_PASSED(now); }
+   template<typename Op>
+   std::enable_if_t<fc::typelist::contains<credit_offer_ops, Op>(), bool>
+   visit() { return HARDFORK_CORE_2362_PASSED(now); }
    /// @}
 
    /// typelist::runtime::dispatch adaptor
    template<class W, class Op=typename W::type>
-   std::enable_if_t<TL::contains<operation::list, Op>(), bool>
+   std::enable_if_t<fc::typelist::contains<protocol::operation::list, Op>(), bool>
    operator()(W) { return visit<Op>(); }
    /// static_variant::visit adaptor
    template<class Op>
-   std::enable_if_t<TL::contains<operation::list, Op>(), bool>
+   std::enable_if_t<fc::typelist::contains<protocol::operation::list, Op>(), bool>
    operator()(const Op&) { return visit<Op>(); }
    /// Tag adaptor
-   bool visit(operation::tag_type tag) {
-      return TL::runtime::dispatch(operation::list(), (size_t)tag, *this);
+   bool visit(protocol::operation::tag_type tag) const {
+      return fc::typelist::runtime::dispatch(protocol::operation::list(), (size_t)tag, *this);
    }
    /// operation adaptor
-   bool visit(const operation& op) {
+   bool visit(const protocol::operation& op) const {
       return visit(op.which());
    }
 };

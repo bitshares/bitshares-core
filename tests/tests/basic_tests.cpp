@@ -169,6 +169,33 @@ BOOST_AUTO_TEST_CASE( price_test )
     BOOST_CHECK(a == c);
     BOOST_CHECK(!(b == c));
 
+    BOOST_CHECK_THROW( price( asset(-1), asset(1, asset_id_type(1)) ).validate(), fc::exception );
+    BOOST_CHECK_THROW( price( asset(0), asset(1, asset_id_type(1)) ).validate(), fc::exception );
+    BOOST_CHECK_THROW( price( asset(1), asset(0, asset_id_type(1)) ).validate(), fc::exception );
+    BOOST_CHECK_THROW( price( asset(1), asset(-1, asset_id_type(1)) ).validate(), fc::exception );
+    BOOST_CHECK_THROW( price( asset(1), asset(1) ).validate(), fc::exception );
+    BOOST_CHECK_THROW( price( asset(1, asset_id_type(1)), asset(1, asset_id_type(1)) ).validate(), fc::exception );
+
+    constexpr int64_t max_amount = GRAPHENE_MAX_SHARE_SUPPLY;
+    constexpr int64_t too_big_amount = GRAPHENE_MAX_SHARE_SUPPLY + 1;
+
+    price( asset(1), asset(max_amount, asset_id_type(1)) ).validate();
+    price( asset(max_amount), asset(1, asset_id_type(1)) ).validate();
+    price( asset(max_amount), asset(max_amount, asset_id_type(1)) ).validate();
+    price( asset(1), asset(max_amount, asset_id_type(1)) ).validate(true);
+    price( asset(max_amount), asset(1, asset_id_type(1)) ).validate(true);
+    price( asset(max_amount), asset(max_amount, asset_id_type(1)) ).validate(true);
+
+    price( asset(1), asset(too_big_amount, asset_id_type(1)) ).validate();
+    price( asset(too_big_amount), asset(1, asset_id_type(1)) ).validate();
+    price( asset(too_big_amount), asset(too_big_amount, asset_id_type(1)) ).validate();
+    BOOST_CHECK_THROW( price( asset(1), asset(too_big_amount, asset_id_type(1)) ).validate(true),
+                       fc::exception );
+    BOOST_CHECK_THROW( price( asset(too_big_amount), asset(1, asset_id_type(1)) ).validate(true),
+                       fc::exception );
+    BOOST_CHECK_THROW( price( asset(too_big_amount), asset(too_big_amount, asset_id_type(1)) ).validate(true),
+                       fc::exception );
+
     GRAPHENE_REQUIRE_THROW( price(asset(1),  asset(1)) * ratio_type(1,1), fc::exception );
     GRAPHENE_REQUIRE_THROW( price(asset(0),  asset(1, asset_id_type(1))) * ratio_type(1,1), fc::exception );
     GRAPHENE_REQUIRE_THROW( price(asset(-1), asset(1, asset_id_type(1))) * ratio_type(1,1), fc::exception );
