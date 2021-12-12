@@ -236,7 +236,7 @@ The `cli_wallet` program can also be configured to serve **all of its commands**
 
 Start `cli_wallet` with RPC connection enabled:
 
-    $ ./programs/cli_wallet/cli_wallet --rpc-endpoint=127.0.0.8091
+    $ ./programs/cli_wallet/cli_wallet --rpc-endpoint=127.0.0.1:8091
 
 Access the wallet API using an HTTP client:
 
