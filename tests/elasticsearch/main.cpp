@@ -196,6 +196,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
 
          generate_block();
 
+         es.endpoint = es.index_prefix + "*/data/_count";
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::simpleQuery(es);
             j = fc::json::from_string(res);
