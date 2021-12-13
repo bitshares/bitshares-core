@@ -259,37 +259,23 @@ struct adaptor_struct {
          o["owner_"] = o["owner"].as_string();
          o.erase("owner");
       }
-      if (o.find("proposed_ops") != o.end())
+
+      vector<string> to_string_fields = {
+         "proposed_ops",
+         "initializer",
+         "policy",
+         "predicates",
+         "active_special_authority",
+         "owner_special_authority",
+         "acceptable_collateral",
+         "acceptable_borrowers"
+      };
+      for( const auto& name : to_string_fields )
       {
-         o["proposed_ops"] = fc::json::to_string(o["proposed_ops"]);
-      }
-      if (o.find("initializer") != o.end())
-      {
-         o["initializer"] = fc::json::to_string(o["initializer"]);
-      }
-      if (o.find("policy") != o.end())
-      {
-         o["policy"] = fc::json::to_string(o["policy"]);
-      }
-      if (o.find("predicates") != o.end())
-      {
-         o["predicates"] = fc::json::to_string(o["predicates"]);
-      }
-      if (o.find("active_special_authority") != o.end())
-      {
-         o["active_special_authority"] = fc::json::to_string(o["active_special_authority"]);
-      }
-      if (o.find("owner_special_authority") != o.end())
-      {
-         o["owner_special_authority"] = fc::json::to_string(o["owner_special_authority"]);
-      }
-      if (o.find("acceptable_collateral") != o.end())
-      {
-         o["acceptable_collateral"] = fc::json::to_string(o["acceptable_collateral"]);
-      }
-      if (o.find("acceptable_borrowers") != o.end())
-      {
-         o["acceptable_borrowers"] = fc::json::to_string(o["acceptable_borrowers"]);
+         if (o.find(name) != o.end())
+         {
+            o[name] = fc::json::to_string(o[name]);
+         }
       }
 
       variant v;
