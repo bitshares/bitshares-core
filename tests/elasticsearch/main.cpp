@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 
+#include <graphene/chain/hardfork.hpp>
 #include <graphene/app/api.hpp>
 #include <graphene/utilities/tempdir.hpp>
 #include <fc/crypto/digest.hpp>
@@ -127,6 +128,82 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          j = fc::json::from_string(res);
          auto last_transfer_amount = j["_source"]["operation_history"]["op_object"]["amount_"]["amount"].as_string();
          BOOST_CHECK_EQUAL(last_transfer_amount, "300");
+
+         // To test credit offers
+         generate_blocks( HARDFORK_CORE_2362_TIME );
+         set_expiration( db, trx );
+
+         ACTORS((sam)(ted)(por));
+
+         auto init_amount = 10000000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         fund( sam, asset(init_amount) );
+         fund( ted, asset(init_amount) );
+
+         const asset_object& core = asset_id_type()(db);
+         asset_id_type core_id;
+
+         const asset_object& usd = create_user_issued_asset( "MYUSD" );
+         asset_id_type usd_id = usd.id;
+         issue_uia( sam, usd.amount(init_amount) );
+         issue_uia( ted, usd.amount(init_amount) );
+
+         const asset_object& eur = create_user_issued_asset( "MYEUR", sam, white_list );
+         asset_id_type eur_id = eur.id;
+         issue_uia( sam, eur.amount(init_amount) );
+         issue_uia( ted, eur.amount(init_amount) );
+
+         // propose
+         {
+            flat_map<asset_id_type, price> collateral_map;
+            collateral_map[usd_id] = price( asset(1), asset(1, usd_id) );
+
+            credit_offer_create_operation cop = make_credit_offer_create_op( sam_id, core.id, 10000, 100, 3600, 0,
+                                                   false, db.head_block_time() + fc::days(1), collateral_map, {} );
+            propose( cop );
+         }
+
+         // create credit offers
+         // 1.
+         auto disable_time1 = db.head_block_time() - fc::minutes(1); // a time in the past
+
+         flat_map<asset_id_type, price> collateral_map1;
+         collateral_map1[usd_id] = price( asset(1), asset(2, usd_id) );
+
+         const credit_offer_object& coo1 = create_credit_offer( sam_id, core.id, 10000, 100, 3600, 0, false,
+                                              disable_time1, collateral_map1, {} );
+
+         BOOST_CHECK( coo1.owner_account == sam_id );
+         BOOST_CHECK( coo1.current_balance == 10000 );
+
+         // 2.
+         auto duration2 = GRAPHENE_MAX_CREDIT_DEAL_SECS;
+         auto disable_time2 = db.head_block_time() + fc::days(GRAPHENE_MAX_CREDIT_OFFER_DAYS);
+
+         flat_map<asset_id_type, price> collateral_map2;
+         collateral_map2[core_id] = price( asset(2, usd_id), asset(3) );
+         collateral_map2[eur_id] = price( asset(3, usd_id), asset(4, eur_id) );
+
+         flat_map<account_id_type, share_type> borrower_map2;
+         borrower_map2[account_id_type()] = 0;
+         borrower_map2[sam_id] = 1;
+         borrower_map2[ted_id] = GRAPHENE_MAX_SHARE_SUPPLY;
+
+         const credit_offer_object& coo2 = create_credit_offer( ted_id, usd_id, 1, 10000000u, duration2, 10000, true,
+                                              disable_time2, collateral_map2, borrower_map2 );
+         BOOST_CHECK( coo2.owner_account == ted_id );
+         BOOST_CHECK( coo2.asset_type == usd_id );
+         BOOST_CHECK( coo2.total_balance == 1 );
+
+         generate_block();
+
+         es.endpoint = es.index_prefix + "*/data/_count";
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            res = graphene::utilities::simpleQuery(es);
+            j = fc::json::from_string(res);
+            total = j["count"].as_string();
+            return (std::stoi(total) > 13);
+         });
+
       }
    }
    catch (fc::exception &e) {
