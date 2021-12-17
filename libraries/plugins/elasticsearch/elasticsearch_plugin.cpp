@@ -249,7 +249,7 @@ struct es_data_adaptor {
    enum class data_type {
       map_type,
       static_variant_type,
-      static_variant_array_type
+      array_type
    };
    static variant adapt(const variant_object& op)
    {
@@ -313,11 +313,12 @@ struct es_data_adaptor {
       }
 
       map<string, data_type> to_string_fields = {
-         { "current_fees",             data_type::static_variant_array_type },
-         { "proposed_ops",             data_type::static_variant_array_type },
+         { "current_fees",             data_type::array_type },
+         { "op",                       data_type::static_variant_type }, // proposal_create_op.proposed_ops[*].op
+         { "proposed_ops",             data_type::array_type },
          { "initializer",              data_type::static_variant_type },
          { "policy",                   data_type::static_variant_type },
-         { "predicates",               data_type::static_variant_array_type },
+         { "predicates",               data_type::array_type },
          { "active_special_authority", data_type::static_variant_type },
          { "owner_special_authority",  data_type::static_variant_type },
          { "acceptable_collateral",    data_type::map_type },
@@ -346,12 +347,17 @@ struct es_data_adaptor {
       if( data_type::static_variant_type == type )
          return adapt_static_variant(v);
 
-      // static_variant array
+      // array_type
       fc::variants vs;
       vs.reserve( v.size() );
       for( const auto& item : v )
       {
-         vs.push_back( adapt_static_variant( item.get_array() ) );
+         if( item.is_array() ) // static_variant array
+            vs.push_back( adapt_static_variant( item.get_array() ) );
+         else if( item.is_object() ) // object array
+            vs.push_back( adapt( item.get_object() ) );
+         else
+            wlog( "Type of item is unexpected: ${item}", ("item", item) );
       }
 
       variant nv;
