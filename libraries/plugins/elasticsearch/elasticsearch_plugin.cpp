@@ -413,7 +413,7 @@ struct es_data_adaptor {
 };
 
 void elasticsearch_plugin_impl::doOperationHistory(const optional <operation_history_object>& oho)
-{
+{ try {
    os.trx_in_block = oho->trx_in_block;
    os.op_in_trx = oho->op_in_trx;
    os.operation_result = fc::json::to_string(oho->result);
@@ -430,7 +430,7 @@ void elasticsearch_plugin_impl::doOperationHistory(const optional <operation_his
    }
    if(_elasticsearch_operation_string)
       os.op = fc::json::to_string(oho->op);
-}
+} FC_CAPTURE_LOG_AND_RETHROW( (oho) ) }
 
 void elasticsearch_plugin_impl::doBlock(uint32_t trx_in_block, const signed_block& b)
 {
