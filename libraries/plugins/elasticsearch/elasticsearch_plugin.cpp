@@ -254,20 +254,44 @@ struct es_data_adaptor {
    static variant adapt(const variant_object& op)
    {
       fc::mutable_variant_object o(op);
+
+      map<string, data_type> to_string_fields = {
+         { "parameters",               data_type::array_type }, // in committee proposals, current_fees.parameters
+         { "op",                       data_type::static_variant_type }, // proposal_create_op.proposed_ops[*].op
+         { "proposed_ops",             data_type::array_type },
+         { "initializer",              data_type::static_variant_type },
+         { "policy",                   data_type::static_variant_type },
+         { "predicates",               data_type::array_type },
+         { "active_special_authority", data_type::static_variant_type },
+         { "owner_special_authority",  data_type::static_variant_type },
+         { "acceptable_collateral",    data_type::map_type },
+         { "acceptable_borrowers",     data_type::map_type }
+      };
+      map<string, fc::variants> original_arrays;
       vector<string> keys_to_rename;
       for (auto i = o.begin(); i != o.end(); ++i)
       {
+         const string& name = (*i).key();
          auto& element = (*i).value();
          if (element.is_object())
          {
-            const string& name = (*i).key();
             auto& vo = element.get_object();
             if (vo.contains(name.c_str())) // transfer_operation.amount.amount
                keys_to_rename.emplace_back(name);
             element = adapt(vo);
          }
          else if (element.is_array())
-            adapt(element.get_array());
+         {
+            auto& array = element.get_array();
+            if( to_string_fields.find(name) != to_string_fields.end() )
+            {
+               // make a backup and convert to string
+               original_arrays[name] = array;
+               element = fc::json::to_string(element);
+            }
+            else
+               adapt(array);
+         }
       }
 
       for( const auto& i : keys_to_rename ) // transfer_operation.amount
@@ -312,27 +336,12 @@ struct es_data_adaptor {
          o.erase("owner");
       }
 
-      map<string, data_type> to_string_fields = {
-         { "parameters",               data_type::array_type }, // in committee proposals, current_fees.parameters
-         { "op",                       data_type::static_variant_type }, // proposal_create_op.proposed_ops[*].op
-         { "proposed_ops",             data_type::array_type },
-         { "initializer",              data_type::static_variant_type },
-         { "policy",                   data_type::static_variant_type },
-         { "predicates",               data_type::array_type },
-         { "active_special_authority", data_type::static_variant_type },
-         { "owner_special_authority",  data_type::static_variant_type },
-         { "acceptable_collateral",    data_type::map_type },
-         { "acceptable_borrowers",     data_type::map_type }
-      };
-      for( const auto& pair : to_string_fields )
+      for( const auto& pair : original_arrays )
       {
          const auto& name = pair.first;
-         if( o.find(name) != o.end() )
-         {
-            const auto& value = o[name];
-            o[name + "_object"] = adapt( value.get_array(), pair.second );
-            o[name] = fc::json::to_string(value);
-         }
+         auto& value = pair.second;
+         auto type = to_string_fields[name];
+         o[name + "_object"] = adapt( value, type );
       }
 
       variant v;
