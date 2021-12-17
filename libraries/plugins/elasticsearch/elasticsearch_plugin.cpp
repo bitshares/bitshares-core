@@ -313,7 +313,7 @@ struct es_data_adaptor {
       }
 
       map<string, data_type> to_string_fields = {
-         { "current_fees",             data_type::array_type },
+         { "parameters",               data_type::array_type }, // in committee proposals, current_fees.parameters
          { "op",                       data_type::static_variant_type }, // proposal_create_op.proposed_ops[*].op
          { "proposed_ops",             data_type::array_type },
          { "initializer",              data_type::static_variant_type },
