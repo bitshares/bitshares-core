@@ -245,8 +245,13 @@ void elasticsearch_plugin_impl::getOperationType(const optional <operation_histo
       op_type = oho->op.which();
 }
 
-struct adaptor_struct {
-   variant adapt(const variant_object& op)
+struct es_data_adaptor {
+   enum class data_type {
+      map_type,
+      static_variant_type,
+      static_variant_array_type
+   };
+   static variant adapt(const variant_object& op)
    {
       fc::mutable_variant_object o(op);
       vector<string> keys_to_rename;
@@ -257,26 +262,37 @@ struct adaptor_struct {
          {
             const string& name = (*i).key();
             auto& vo = element.get_object();
-            if (vo.contains(name.c_str()))
+            if (vo.contains(name.c_str())) // transfer_operation.amount.amount
                keys_to_rename.emplace_back(name);
             element = adapt(vo);
          }
          else if (element.is_array())
             adapt(element.get_array());
       }
-      for (const auto& i : keys_to_rename)
+
+      for( const auto& i : keys_to_rename ) // transfer_operation.amount
       {
          string new_name = i + "_";
          o[new_name] = variant(o[i]);
          o.erase(i);
       }
 
-      if (o.find("memo") != o.end())
+      if( o.find("fee") != o.end() )
+      {
+         auto& fee = o["fee"];
+         if( fee.is_uint64() ) // fee schedule
+         {
+            o["fee_"] = fee;
+            o.erase("fee");
+         }
+      }
+
+      if( o.find("memo") != o.end() )
       {
          auto& memo = o["memo"];
-         if (memo.is_string())
+         if (memo.is_string()) // seems unused. TODO remove
          {
-            o["memo_"] = o["memo"];
+            o["memo_"] = memo;
             o.erase("memo");
          }
          else if (memo.is_object())
@@ -289,40 +305,32 @@ struct adaptor_struct {
             }
          }
       }
-      if (o.find("new_parameters") != o.end())
-      {
-         auto& tmp = o["new_parameters"];
-         if (tmp.is_object())
-         {
-            fc::mutable_variant_object tmp2(tmp.get_object());
-            if (tmp2.find("current_fees") != tmp2.end())
-            {
-               tmp2.erase("current_fees");
-               o["new_parameters"] = tmp2;
-            }
-         }
-      }
-      if (o.find("owner") != o.end() && o["owner"].is_string())
+
+      if( o.find("owner") != o.end() && o["owner"].is_string() ) // vesting_balance_*_operation.owner
       {
          o["owner_"] = o["owner"].as_string();
          o.erase("owner");
       }
 
-      vector<string> to_string_fields = {
-         "proposed_ops",
-         "initializer",
-         "policy",
-         "predicates",
-         "active_special_authority",
-         "owner_special_authority",
-         "acceptable_collateral",
-         "acceptable_borrowers"
+      map<string, data_type> to_string_fields = {
+         { "current_fees",             data_type::static_variant_array_type },
+         { "proposed_ops",             data_type::static_variant_array_type },
+         { "initializer",              data_type::static_variant_type },
+         { "policy",                   data_type::static_variant_type },
+         { "predicates",               data_type::static_variant_array_type },
+         { "active_special_authority", data_type::static_variant_type },
+         { "owner_special_authority",  data_type::static_variant_type },
+         { "acceptable_collateral",    data_type::map_type },
+         { "acceptable_borrowers",     data_type::map_type }
       };
-      for( const auto& name : to_string_fields )
+      for( const auto& pair : to_string_fields )
       {
-         if (o.find(name) != o.end())
+         const auto& name = pair.first;
+         if( o.find(name) != o.end() )
          {
-            o[name] = fc::json::to_string(o[name]);
+            const auto& value = o[name];
+            o[name + "_object"] = adapt( value.get_array(), pair.second );
+            o[name] = fc::json::to_string(value);
          }
       }
 
@@ -331,7 +339,66 @@ struct adaptor_struct {
       return v;
    }
 
-   void adapt(fc::variants& v)
+   static variant adapt( const fc::variants& v, data_type type )
+   {
+      if( data_type::map_type == type )
+         return adapt_map(v);
+      if( data_type::static_variant_type == type )
+         return adapt_static_variant(v);
+
+      // static_variant array
+      fc::variants vs;
+      vs.reserve( v.size() );
+      for( const auto& item : v )
+      {
+         vs.push_back( adapt_static_variant( item.get_array() ) );
+      }
+
+      variant nv;
+      fc::to_variant(vs, nv, FC_PACK_MAX_DEPTH);
+      return nv;
+   }
+
+   static void extract_data_from_variant( const variant& v, fc::mutable_variant_object& mv, const string& prefix )
+   {
+      if( v.is_object() )
+         mv[prefix + "_object"] = adapt( v.get_object() );
+      else if( v.is_int64() || v.is_uint64() )
+         mv[prefix + "_int"] = v;
+      else if( v.is_bool() )
+         mv[prefix + "_bool"] = v;
+      else
+         mv[prefix + "_string"] = fc::json::to_string( v );
+      // Note: we don't use double or array here, and we convert null and blob to string
+   }
+
+   static variant adapt_map( const fc::variants& v )
+   {
+      FC_ASSERT( v.size() == 2, "Internal error" );
+      fc::mutable_variant_object mv;
+
+      extract_data_from_variant( v[0], mv, "key" );
+      extract_data_from_variant( v[1], mv, "data" );
+
+      variant nv;
+      fc::to_variant( mv, nv, FC_PACK_MAX_DEPTH );
+      return nv;
+   }
+
+   static variant adapt_static_variant( const fc::variants& v )
+   {
+      FC_ASSERT( v.size() == 2, "Internal error" );
+      fc::mutable_variant_object mv;
+
+      mv["which"] = v[0];
+      extract_data_from_variant( v[1], mv, "data" );
+
+      variant nv;
+      fc::to_variant( mv, nv, FC_PACK_MAX_DEPTH );
+      return nv;
+   }
+
+   static void adapt(fc::variants& v)
    {
       for (auto& array_element : v)
       {
@@ -353,9 +420,13 @@ void elasticsearch_plugin_impl::doOperationHistory(const optional <operation_his
    os.virtual_op = oho->virtual_op;
 
    if(_elasticsearch_operation_object) {
+      // op
       oho->op.visit(fc::from_static_variant(os.op_object, FC_PACK_MAX_DEPTH));
-      adaptor_struct adaptor;
-      os.op_object = adaptor.adapt(os.op_object.get_object());
+      os.op_object = es_data_adaptor::adapt(os.op_object.get_object());
+      // operation_result
+      variant v;
+      fc::to_variant( oho->result, v, FC_PACK_MAX_DEPTH );
+      os.operation_result_object = es_data_adaptor::adapt_static_variant( v.get_array() );
    }
    if(_elasticsearch_operation_string)
       os.op = fc::json::to_string(oho->op);
