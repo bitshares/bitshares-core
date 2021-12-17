@@ -1,6 +1,5 @@
 // bitshares-core issue #2481 Match force-settlements with margin calls at normal margin call fill price
 #ifndef HARDFORK_CORE_2481_TIME
-// Jan 1 2030, midnight; this is a dummy date until a hardfork date is scheduled
-#define HARDFORK_CORE_2481_TIME (fc::time_point_sec( 1893456000 ))
+#define HARDFORK_CORE_2481_TIME (fc::time_point_sec( 1641909720 )) // Tuesday, January 11, 2022 14:02:00 UTC
 #define HARDFORK_CORE_2481_PASSED(next_maintenance_time) (next_maintenance_time > HARDFORK_CORE_2481_TIME)
 #endif
