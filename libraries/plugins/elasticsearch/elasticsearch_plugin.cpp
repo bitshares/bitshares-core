@@ -247,9 +247,9 @@ void elasticsearch_plugin_impl::getOperationType(const optional <operation_histo
 
 struct es_data_adaptor {
    enum class data_type {
-      map_type,
       static_variant_type,
-      array_type
+      map_type,
+      array_type // can be simple arrays, object arrays, static_variant arrays, or even nested arrays
    };
    static variant adapt(const variant_object& op)
    {
@@ -351,18 +351,21 @@ struct es_data_adaptor {
 
    static variant adapt( const fc::variants& v, data_type type )
    {
-      if( data_type::map_type == type )
-         return adapt_map(v);
       if( data_type::static_variant_type == type )
          return adapt_static_variant(v);
 
-      // array_type
+      // map_type or array_type
       fc::variants vs;
       vs.reserve( v.size() );
       for( const auto& item : v )
       {
-         if( item.is_array() ) // static_variant array
-            vs.push_back( adapt_static_variant( item.get_array() ) );
+         if( item.is_array() )
+         {
+            if( data_type::map_type == type )
+               vs.push_back( adapt_map_item( item.get_array() ) );
+            else // assume it is a static_variant array
+               vs.push_back( adapt_static_variant( item.get_array() ) );
+         }
          else if( item.is_object() ) // object array
             vs.push_back( adapt( item.get_object() ) );
          else
@@ -387,7 +390,7 @@ struct es_data_adaptor {
       // Note: we don't use double or array here, and we convert null and blob to string
    }
 
-   static variant adapt_map( const fc::variants& v )
+   static variant adapt_map_item( const fc::variants& v )
    {
       FC_ASSERT( v.size() == 2, "Internal error" );
       fc::mutable_variant_object mv;
