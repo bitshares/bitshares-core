@@ -301,25 +301,10 @@ struct es_data_adaptor {
          o.erase(i);
       }
 
-      if( o.find("fee") != o.end() )
-      {
-         auto& fee = o["fee"];
-         if( fee.is_uint64() ) // fee schedule
-         {
-            o["fee_"] = fee;
-            o.erase("fee");
-         }
-      }
-
       if( o.find("memo") != o.end() )
       {
          auto& memo = o["memo"];
-         if (memo.is_string()) // seems unused. TODO remove
-         {
-            o["memo_"] = memo;
-            o.erase("memo");
-         }
-         else if (memo.is_object())
+         if (memo.is_object())
          {
             fc::mutable_variant_object tmp(memo.get_object());
             if (tmp.find("nonce") != tmp.end())
