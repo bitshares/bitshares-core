@@ -74,7 +74,7 @@ class es_objects_plugin_impl
 
       uint32_t block_number;
       fc::time_point_sec block_time;
-      bool esge7 = false;
+      bool is_es_version_7_or_above = false;
 
    private:
       template<typename T>
@@ -228,7 +228,7 @@ void es_objects_plugin_impl::remove_from_database( object_id_type id, std::strin
       fc::mutable_variant_object delete_line;
       delete_line["_id"] = string(id);
       delete_line["_index"] = _es_objects_index_prefix + index;
-      if(!esge7)
+      if(!is_es_version_7_or_above)
          delete_line["_type"] = "_doc";
       fc::mutable_variant_object final_delete_line;
       final_delete_line["delete"] = delete_line;
@@ -243,7 +243,7 @@ void es_objects_plugin_impl::prepareTemplate(T blockchain_object, string index_n
 {
    fc::mutable_variant_object bulk_header;
    bulk_header["_index"] = _es_objects_index_prefix + index_name;
-   if(!esge7)
+   if(!is_es_version_7_or_above)
       bulk_header["_type"] = "_doc";
    if(_es_objects_keep_only_current)
    {
@@ -412,7 +412,7 @@ void es_objects_plugin::plugin_startup()
    const auto es_version = graphene::utilities::getVersion(es);
    auto dot_pos = es_version.find('.');
    if(std::stoi(es_version.substr(0,dot_pos)) >= 7)
-      my->esge7 = true;
+      my->is_es_version_7_or_above = true;
 }
 
 } }

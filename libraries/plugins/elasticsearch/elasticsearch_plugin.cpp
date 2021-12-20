@@ -80,7 +80,7 @@ class elasticsearch_plugin_impl
       std::string bulk_line;
       std::string index_name;
       bool is_sync = false;
-      bool esge7 = false;
+      bool is_es_version_7_or_above = false;
    private:
       bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const uint32_t block_number );
       const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
@@ -410,7 +410,7 @@ void elasticsearch_plugin_impl::prepareBulk(const account_transaction_history_id
    const std::string _id = fc::json::to_string(ath_id);
    fc::mutable_variant_object bulk_header;
    bulk_header["_index"] = index_name;
-   if(!esge7)
+   if(!is_es_version_7_or_above)
       bulk_header["_type"] = "_doc";
    bulk_header["_id"] = fc::to_string(ath_id.space_id) + "." + fc::to_string(ath_id.type_id) + "."
                       + fc::to_string(ath_id.instance.value);
@@ -574,7 +574,7 @@ void elasticsearch_plugin::plugin_startup()
    const auto es_version = graphene::utilities::getVersion(es);
    auto dot_pos = es_version.find('.');
    if(std::stoi(es_version.substr(0,dot_pos)) >= 7)
-      my->esge7 = true;
+      my->is_es_version_7_or_above = true;
 
    ilog("elasticsearch ACCOUNT HISTORY: plugin_startup() begin");
 }
