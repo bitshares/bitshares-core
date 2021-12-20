@@ -559,10 +559,7 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
                   "Error populating ES database, we are going to keep trying.");
       });
    }
-}
 
-void elasticsearch_plugin::plugin_startup()
-{
    graphene::utilities::ES es;
    es.curl = my->curl;
    es.elasticsearch_url = my->_elasticsearch_node_url;
@@ -582,7 +579,11 @@ void elasticsearch_plugin::plugin_startup()
       wlog( "Unable to get ES version, assuming it is 7 or above" );
    }
 
-   ilog("elasticsearch ACCOUNT HISTORY: plugin_startup() begin");
+}
+
+void elasticsearch_plugin::plugin_startup()
+{
+   // Nothing to do
 }
 
 operation_history_object elasticsearch_plugin::get_operation_by_id(operation_history_id_type id)

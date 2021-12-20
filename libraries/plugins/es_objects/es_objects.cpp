@@ -395,10 +395,7 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
                "Error deleting object from ES database, we are going to keep trying.");
       }
    });
-}
 
-void es_objects_plugin::plugin_startup()
-{
    graphene::utilities::ES es;
    es.curl = my->curl;
    es.elasticsearch_url = my->_es_objects_elasticsearch_url;
@@ -419,6 +416,12 @@ void es_objects_plugin::plugin_startup()
    {
       wlog( "Unable to get ES version, assuming it is 7 or above" );
    }
+
+}
+
+void es_objects_plugin::plugin_startup()
+{
+   // Nothing to do
 }
 
 } }
