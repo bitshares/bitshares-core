@@ -28,6 +28,8 @@
 #include <graphene/chain/hardfork.hpp>
 #include <curl/curl.h>
 
+#include <boost/algorithm/string.hpp>
+
 namespace graphene { namespace elasticsearch {
 
 namespace detail
@@ -105,10 +107,20 @@ elasticsearch_plugin_impl::~elasticsearch_plugin_impl()
    }
 }
 
+static const std::string generateIndexName( const fc::time_point_sec& block_date,
+                                            const std::string& _elasticsearch_index_prefix )
+{
+   auto block_date_string = block_date.to_iso_string();
+   std::vector<std::string> parts;
+   boost::split(parts, block_date_string, boost::is_any_of("-"));
+   std::string index_name = _elasticsearch_index_prefix + parts[0] + "-" + parts[1];
+   return index_name;
+}
+
 bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b )
 {
    checkState(b.timestamp);
-   index_name = graphene::utilities::generateIndexName(b.timestamp, _elasticsearch_index_prefix);
+   index_name = generateIndexName(b.timestamp, _elasticsearch_index_prefix);
 
    graphene::chain::database& db = database();
    const vector<optional< operation_history_object > >& hist = db.get_applied_operations();
