@@ -41,9 +41,12 @@ namespace detail
 class es_objects_plugin_impl
 {
    public:
-      es_objects_plugin_impl(es_objects_plugin& _plugin)
+      explicit es_objects_plugin_impl(es_objects_plugin& _plugin)
          : _self( _plugin )
-      {  curl = curl_easy_init(); }
+      {
+         curl = curl_easy_init();
+         curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
+      }
       virtual ~es_objects_plugin_impl();
 
       bool index_database(const vector<object_id_type>& ids, std::string action);
@@ -59,7 +62,7 @@ class es_objects_plugin_impl
       bool _es_objects_accounts = true;
       bool _es_objects_assets = true;
       bool _es_objects_balances = true;
-      bool _es_objects_limit_orders = true;
+      bool _es_objects_limit_orders = false;
       bool _es_objects_asset_bitasset = true;
       std::string _es_objects_index_prefix = "objects-";
       uint32_t _es_objects_start_es_after_block = 0;
@@ -269,19 +272,18 @@ es_objects_plugin_impl::~es_objects_plugin_impl()
       curl_easy_cleanup(curl);
       curl = nullptr;
    }
-   return;
 }
 
 } // end namespace detail
 
-es_objects_plugin::es_objects_plugin() :
-   my( new detail::es_objects_plugin_impl(*this) )
+es_objects_plugin::es_objects_plugin(graphene::app::application& app) :
+   plugin(app),
+   my( std::make_unique<detail::es_objects_plugin_impl>(*this) )
 {
+   // Nothing else to do
 }
 
-es_objects_plugin::~es_objects_plugin()
-{
-}
+es_objects_plugin::~es_objects_plugin() = default;
 
 std::string es_objects_plugin::plugin_name()const
 {
@@ -309,7 +311,7 @@ void es_objects_plugin::plugin_set_program_options(
          ("es-objects-accounts", boost::program_options::value<bool>(), "Store account objects(true)")
          ("es-objects-assets", boost::program_options::value<bool>(), "Store asset objects(true)")
          ("es-objects-balances", boost::program_options::value<bool>(), "Store balances objects(true)")
-         ("es-objects-limit-orders", boost::program_options::value<bool>(), "Store limit order objects(true)")
+         ("es-objects-limit-orders", boost::program_options::value<bool>(), "Store limit order objects(false)")
          ("es-objects-asset-bitasset", boost::program_options::value<bool>(), "Store feed data(true)")
          ("es-objects-index-prefix", boost::program_options::value<std::string>(),
                "Add a prefix to the index(objects-)")
@@ -323,43 +325,43 @@ void es_objects_plugin::plugin_set_program_options(
 
 void es_objects_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
-   if (options.count("es-objects-elasticsearch-url")) {
+   if (options.count("es-objects-elasticsearch-url") > 0) {
       my->_es_objects_elasticsearch_url = options["es-objects-elasticsearch-url"].as<std::string>();
    }
-   if (options.count("es-objects-auth")) {
+   if (options.count("es-objects-auth") > 0) {
       my->_es_objects_auth = options["es-objects-auth"].as<std::string>();
    }
-   if (options.count("es-objects-bulk-replay")) {
+   if (options.count("es-objects-bulk-replay") > 0) {
       my->_es_objects_bulk_replay = options["es-objects-bulk-replay"].as<uint32_t>();
    }
-   if (options.count("es-objects-bulk-sync")) {
+   if (options.count("es-objects-bulk-sync") > 0) {
       my->_es_objects_bulk_sync = options["es-objects-bulk-sync"].as<uint32_t>();
    }
-   if (options.count("es-objects-proposals")) {
+   if (options.count("es-objects-proposals") > 0) {
       my->_es_objects_proposals = options["es-objects-proposals"].as<bool>();
    }
-   if (options.count("es-objects-accounts")) {
+   if (options.count("es-objects-accounts") > 0) {
       my->_es_objects_accounts = options["es-objects-accounts"].as<bool>();
    }
-   if (options.count("es-objects-assets")) {
+   if (options.count("es-objects-assets") > 0) {
       my->_es_objects_assets = options["es-objects-assets"].as<bool>();
    }
-   if (options.count("es-objects-balances")) {
+   if (options.count("es-objects-balances") > 0) {
       my->_es_objects_balances = options["es-objects-balances"].as<bool>();
    }
-   if (options.count("es-objects-limit-orders")) {
+   if (options.count("es-objects-limit-orders") > 0) {
       my->_es_objects_limit_orders = options["es-objects-limit-orders"].as<bool>();
    }
-   if (options.count("es-objects-asset-bitasset")) {
+   if (options.count("es-objects-asset-bitasset") > 0) {
       my->_es_objects_asset_bitasset = options["es-objects-asset-bitasset"].as<bool>();
    }
-   if (options.count("es-objects-index-prefix")) {
+   if (options.count("es-objects-index-prefix") > 0) {
       my->_es_objects_index_prefix = options["es-objects-index-prefix"].as<std::string>();
    }
-   if (options.count("es-objects-keep-only-current")) {
+   if (options.count("es-objects-keep-only-current") > 0) {
       my->_es_objects_keep_only_current = options["es-objects-keep-only-current"].as<bool>();
    }
-   if (options.count("es-objects-start-es-after-block")) {
+   if (options.count("es-objects-start-es-after-block") > 0) {
       my->_es_objects_start_es_after_block = options["es-objects-start-es-after-block"].as<uint32_t>();
    }
 

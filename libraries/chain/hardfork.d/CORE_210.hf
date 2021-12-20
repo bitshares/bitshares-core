@@ -1,0 +1,6 @@
+// #210 Check authorities on custom_operation
+#ifndef HARDFORK_CORE_210_TIME
+#define HARDFORK_CORE_210_TIME (fc::time_point_sec( 1596117300 )) // Thursday, July 30, 2020 13:55:00 UTC
+// Bugfix: pre-HF 210, custom_operation's required_auths field was ignored.
+#define MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(chain_time) (chain_time <= HARDFORK_CORE_210_TIME)
+#endif

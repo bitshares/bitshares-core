@@ -32,8 +32,8 @@ namespace graphene { namespace chain {
    class witness_object : public abstract_object<witness_object>
    {
       public:
-         static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id = witness_object_type;
+         static constexpr uint8_t space_id = protocol_ids;
+         static constexpr uint8_t type_id = witness_object_type;
 
          account_id_type  witness_account;
          uint64_t         last_aslot = 0;

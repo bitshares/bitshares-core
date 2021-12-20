@@ -27,34 +27,29 @@
 #include <graphene/chain/vesting_balance_evaluator.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/is_authorized_asset.hpp>
 
 namespace graphene { namespace chain {
-namespace detail {
-   // TODO review and remove code below and links to it after hf_1268
-   void check_vesting_balance_policy_hf_1268(const fc::time_point_sec& block_time, const vesting_policy_initializer& policy)
-   {
-      if( block_time < HARDFORK_1268_TIME )
-      {
-         FC_ASSERT( !policy.is_type<instant_vesting_policy_initializer>(),
-           "Instant vesting policy is only available after HARDFORK_1268_TIME!");
-      }
-   }
-}
 
 void_result vesting_balance_create_evaluator::do_evaluate( const vesting_balance_create_operation& op )
 { try {
    const database& d = db();
 
-   const account_object& creator_account = op.creator( d );
-   /* const account_object& owner_account = */ op.owner( d );
+   const account_object& creator_account = *fee_paying_account;
+   const account_object& owner_account = op.owner( d );
 
-   // TODO: Check asset authorizations and withdrawals
+   const asset_object& asset_obj = op.amount.asset_id( d );
 
-   FC_ASSERT( op.amount.amount > 0 );
-   FC_ASSERT( d.get_balance( creator_account.id, op.amount.asset_id ) >= op.amount );
-   FC_ASSERT( !op.amount.asset_id(d).is_transfer_restricted() );
+   FC_ASSERT( !asset_obj.is_transfer_restricted(), "Asset has transfer_restricted flag enabled" );
 
-   detail::check_vesting_balance_policy_hf_1268(d.head_block_time(), op.policy);
+   // Since hard fork core-973, check asset authorization limitations
+   if( HARDFORK_CORE_973_PASSED(d.head_block_time()) )
+   {
+      FC_ASSERT( is_authorized_asset( d, creator_account, asset_obj ),
+                 "The creator account is not allowed to transact the asset" );
+      FC_ASSERT( is_authorized_asset( d, owner_account, asset_obj ),
+                 "The owner account is not allowed to transact the asset" );
+   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -103,7 +98,6 @@ object_id_type vesting_balance_create_evaluator::do_apply( const vesting_balance
    database& d = db();
    const time_point_sec now = d.head_block_time();
 
-   FC_ASSERT( d.get_balance( op.creator, op.amount.asset_id ) >= op.amount );
    d.adjust_balance( op.creator, -op.amount );
 
    const vesting_balance_object& vbo = d.create< vesting_balance_object >( [&]( vesting_balance_object& obj )
@@ -129,8 +123,8 @@ void_result vesting_balance_withdraw_evaluator::do_evaluate( const vesting_balan
    FC_ASSERT( vbo.is_withdraw_allowed( now, op.amount ), "", ("now", now)("op", op)("vbo", vbo) );
    assert( op.amount <= vbo.balance );      // is_withdraw_allowed should fail before this check is reached
 
-   /* const account_object& owner_account = */ op.owner( d );
-   // TODO: Check asset authorizations and withdrawals
+   // Note: asset authorization check is skipped here,
+   //       because it is fine to allow the funds to be moved to account balance
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
@@ -152,7 +146,6 @@ void_result vesting_balance_withdraw_evaluator::do_apply( const vesting_balance_
 
    d.adjust_balance( op.owner, op.amount );
 
-   // TODO: Check asset authorizations and withdrawals
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 

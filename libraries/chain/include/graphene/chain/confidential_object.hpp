@@ -41,8 +41,8 @@ namespace graphene { namespace chain {
 class blinded_balance_object : public graphene::db::abstract_object<blinded_balance_object>
 {
    public:
-      static const uint8_t space_id = implementation_ids;
-      static const uint8_t type_id  = impl_blinded_balance_object_type;
+      static constexpr uint8_t space_id = implementation_ids;
+      static constexpr uint8_t type_id  = impl_blinded_balance_object_type;
 
       fc::ecc::commitment_type                commitment;
       asset_id_type                           asset_id;

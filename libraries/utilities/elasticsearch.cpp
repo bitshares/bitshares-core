@@ -113,19 +113,20 @@ bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer)
       // all good, but check errors in response
       fc::variant j = fc::json::from_string(CurlReadBuffer);
       bool errors = j["errors"].as_bool();
-      if(errors == true) {
+      if( errors ) {
+         elog( "ES returned 200 but with errors: ${e}", ("e", CurlReadBuffer) );
          return false;
       }
    }
    else {
       if(http_code == 413) {
-         elog( "413 error: Can be low disk space" );
+         elog( "413 error: Can be low disk space. ${e}", ("e", CurlReadBuffer) );
       }
       else if(http_code == 401) {
-         elog( "401 error: Unauthorized" );
+         elog( "401 error: Unauthorized. ${e}", ("e", CurlReadBuffer) );
       }
       else {
-         elog( std::to_string(http_code) + " error: Unknown error" );
+         elog( "${code} error: ${e}", ("code", std::to_string(http_code)) ("e", CurlReadBuffer) );
       }
       return false;
    }
@@ -183,13 +184,22 @@ const std::string doCurl(CurlRequest& curl)
    struct curl_slist *headers = NULL;
    headers = curl_slist_append(headers, "Content-Type: application/json");
 
+   // Note: the variable curl.handler has a long lifetime, it only gets initialized once, then be used many times,
+   //       thus we need to clear old data
    curl_easy_setopt(curl.handler, CURLOPT_HTTPHEADER, headers);
    curl_easy_setopt(curl.handler, CURLOPT_URL, curl.url.c_str());
-   curl_easy_setopt(curl.handler, CURLOPT_CUSTOMREQUEST, curl.type.c_str());
+   curl_easy_setopt(curl.handler, CURLOPT_CUSTOMREQUEST, curl.type.c_str()); // this is OK
    if(curl.type == "POST")
    {
+      curl_easy_setopt(curl.handler, CURLOPT_HTTPGET, false);
       curl_easy_setopt(curl.handler, CURLOPT_POST, true);
       curl_easy_setopt(curl.handler, CURLOPT_POSTFIELDS, curl.query.c_str());
+   }
+   else // GET or DELETE (only these are used in this file)
+   {
+      curl_easy_setopt(curl.handler, CURLOPT_POSTFIELDS, NULL);
+      curl_easy_setopt(curl.handler, CURLOPT_POST, false);
+      curl_easy_setopt(curl.handler, CURLOPT_HTTPGET, true);
    }
    curl_easy_setopt(curl.handler, CURLOPT_WRITEFUNCTION, WriteCallback);
    curl_easy_setopt(curl.handler, CURLOPT_WRITEDATA, (void *)&CurlReadBuffer);

@@ -1,0 +1,5 @@
+// bitshares-core issue #973 check asset authorizations for operations
+#ifndef HARDFORK_CORE_973_TIME
+#define HARDFORK_CORE_973_TIME (fc::time_point_sec( 1641909720 )) // Tuesday, January 11, 2022 14:02:00 UTC
+#define HARDFORK_CORE_973_PASSED(now) (now >= HARDFORK_CORE_973_TIME)
+#endif

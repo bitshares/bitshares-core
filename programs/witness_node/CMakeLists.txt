@@ -16,6 +16,10 @@ PRIVATE graphene_app graphene_delayed_node graphene_account_history graphene_ela
         graphene_api_helper_indexes graphene_custom_operations
         fc ${CMAKE_DL_LIBS} ${PLATFORM_SPECIFIC_LIBS} )
 
+if (MSVC)
+    set_target_properties( witness_node PROPERTIES COMPILE_FLAGS "/bigobj" )
+endif(MSVC)
+
 install( TARGETS
    witness_node
 

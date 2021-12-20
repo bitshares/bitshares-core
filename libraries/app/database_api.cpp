@@ -28,6 +28,7 @@
 #include <graphene/chain/get_config.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/protocol/pts_address.hpp>
+#include <graphene/protocol/restriction_predicate.hpp>
 
 #include <fc/crypto/hex.hpp>
 #include <fc/rpc/api_connection.hpp>
@@ -47,7 +48,7 @@ namespace graphene { namespace app {
 //////////////////////////////////////////////////////////////////////
 
 database_api::database_api( graphene::chain::database& db, const application_options* app_options )
-   : my( new database_api_impl( db, app_options ) ) {}
+   : my( std::make_unique<database_api_impl>( db, app_options ) ) {}
 
 database_api::~database_api() {}
 
@@ -82,6 +83,16 @@ database_api_impl::database_api_impl( graphene::chain::database& db, const appli
    catch( fc::assert_exception& e )
    {
       amount_in_collateral_index = nullptr;
+   }
+
+   try
+   {
+      asset_in_liquidity_pools_index = &_db.get_index_type< primary_index< liquidity_pool_index > >()
+            .get_secondary_index<graphene::api_helper_indexes::asset_in_liquidity_pools_index>();
+   }
+   catch( const fc::assert_exception& )
+   {
+      asset_in_liquidity_pools_index = nullptr;
    }
 }
 
@@ -334,8 +345,15 @@ vector<flat_set<account_id_type>> database_api::get_key_references( vector<publi
  */
 vector<flat_set<account_id_type>> database_api_impl::get_key_references( vector<public_key_type> keys )const
 {
-   uint64_t api_limit_get_key_references=_app_options->api_limit_get_key_references;
-   FC_ASSERT(keys.size() <= api_limit_get_key_references);
+   // api_helper_indexes plugin is required for accessing the secondary index
+   FC_ASSERT( _app_options && _app_options->has_api_helper_indexes_plugin,
+              "api_helper_indexes plugin is not enabled on this server." );
+
+   const auto configured_limit = _app_options->api_limit_get_key_references;
+   FC_ASSERT( keys.size() <= configured_limit,
+              "Number of querying keys can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    const auto& idx = _db.get_index_type<account_index>();
    const auto& aidx = dynamic_cast<const base_primary_index&>(idx);
    const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
@@ -398,6 +416,11 @@ bool database_api_impl::is_public_key_registered(string public_key) const
         // An invalid public key was detected
         return false;
     }
+
+   // api_helper_indexes plugin is required for accessing the secondary index
+   FC_ASSERT( _app_options && _app_options->has_api_helper_indexes_plugin,
+              "api_helper_indexes plugin is not enabled on this server." );
+
     const auto& idx = _db.get_index_type<account_index>();
     const auto& aidx = dynamic_cast<const base_primary_index&>(idx);
     const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
@@ -448,13 +471,19 @@ std::map<string,full_account> database_api::get_full_accounts( const vector<stri
    return my->get_full_accounts( names_or_ids, subscribe );
 }
 
+vector<account_statistics_object> database_api::get_top_voters(uint32_t limit)const
+{
+   return my->get_top_voters( limit );
+}
+
 std::map<std::string, full_account> database_api_impl::get_full_accounts( const vector<std::string>& names_or_ids,
                                                                           optional<bool> subscribe )
 {
-   FC_ASSERT( names_or_ids.size() <= _app_options->api_limit_get_full_accounts );
-
-   const auto& proposal_idx = _db.get_index_type< primary_index< proposal_index > >();
-   const auto& proposals_by_account = proposal_idx.get_secondary_index<graphene::chain::required_approval_index>();
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_full_accounts;
+   FC_ASSERT( names_or_ids.size() <= configured_limit,
+              "Number of querying accounts can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    bool to_subscribe = get_whether_to_subscribe( subscribe );
 
@@ -491,26 +520,33 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       size_t api_limit_get_full_accounts_lists = static_cast<size_t>(
                 _app_options->api_limit_get_full_accounts_lists );
 
-      // Add the account's proposals
-      auto required_approvals_itr = proposals_by_account._account_to_proposals.find( account->id );
-      if( required_approvals_itr != proposals_by_account._account_to_proposals.end() )
+      // Add the account's proposals (if the data is available)
+      if( _app_options && _app_options->has_api_helper_indexes_plugin )
       {
-         acnt.proposals.reserve( std::min(required_approvals_itr->second.size(),
-                                          api_limit_get_full_accounts_lists) );
-         for( auto proposal_id : required_approvals_itr->second )
+         const auto& proposal_idx = _db.get_index_type< primary_index< proposal_index > >();
+         const auto& proposals_by_account = proposal_idx.get_secondary_index<
+                                                  graphene::chain::required_approval_index>();
+
+         auto required_approvals_itr = proposals_by_account._account_to_proposals.find( account->id );
+         if( required_approvals_itr != proposals_by_account._account_to_proposals.end() )
          {
-            if(acnt.proposals.size() >= api_limit_get_full_accounts_lists) {
-               acnt.more_data_available.proposals = true;
-               break;
+            acnt.proposals.reserve( std::min(required_approvals_itr->second.size(),
+                                             api_limit_get_full_accounts_lists) );
+            for( auto proposal_id : required_approvals_itr->second )
+            {
+               if(acnt.proposals.size() >= api_limit_get_full_accounts_lists) {
+                  acnt.more_data_available.proposals = true;
+                  break;
+               }
+               acnt.proposals.push_back(proposal_id(_db));
             }
-            acnt.proposals.push_back(proposal_id(_db));
          }
       }
 
       // Add the account's balances
       const auto& balances = _db.get_index_type< primary_index< account_balance_index > >().
             get_secondary_index< balances_by_account_index >().get_account_balances( account->id );
-      for( const auto balance : balances )
+      for( const auto& balance : balances )
       {
          if(acnt.balances.size() >= api_limit_get_full_accounts_lists) {
             acnt.more_data_available.balances = true;
@@ -619,6 +655,27 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
    return results;
 }
 
+vector<account_statistics_object> database_api_impl::get_top_voters(uint32_t limit)const
+{
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_top_voters;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   vector<account_statistics_object> result;
+
+   auto last_vote_tally_time = _db.get_dynamic_global_properties().last_vote_tally_time;
+   const auto& idx = _db.get_index_type<account_stats_index>().indices().get<by_voting_power_active>();
+
+   for(auto itr = idx.begin(); result.size() < limit && itr != idx.end() && itr->vote_tally_time >= last_vote_tally_time; ++itr)
+   {
+      result.emplace_back(*itr);
+   }
+
+   return result;
+}
+
 optional<account_object> database_api::get_account_by_name( string name )const
 {
    return my->get_account_by_name( name );
@@ -640,6 +697,10 @@ vector<account_id_type> database_api::get_account_references( const std::string 
 
 vector<account_id_type> database_api_impl::get_account_references( const std::string account_id_or_name )const
 {
+   // api_helper_indexes plugin is required for accessing the secondary index
+   FC_ASSERT( _app_options && _app_options->has_api_helper_indexes_plugin,
+              "api_helper_indexes plugin is not enabled on this server." );
+
    const auto& idx = _db.get_index_type<account_index>();
    const auto& aidx = dynamic_cast<const base_primary_index&>(idx);
    const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
@@ -662,15 +723,7 @@ vector<optional<account_object>> database_api::lookup_account_names(const vector
 
 vector<optional<account_object>> database_api_impl::lookup_account_names(const vector<string>& account_names)const
 {
-   const auto& accounts_by_name = _db.get_index_type<account_index>().indices().get<by_name>();
-   vector<optional<account_object> > result;
-   result.reserve(account_names.size());
-   std::transform(account_names.begin(), account_names.end(), std::back_inserter(result),
-                  [&accounts_by_name](const string& name) -> optional<account_object> {
-      auto itr = accounts_by_name.find(name);
-      return itr == accounts_by_name.end()? optional<account_object>() : *itr;
-   });
-   return result;
+   return get_accounts( account_names, false );
 }
 
 map<string,account_id_type> database_api::lookup_accounts( const string& lower_bound_name,
@@ -684,7 +737,12 @@ map<string,account_id_type> database_api_impl::lookup_accounts( const string& lo
                                                                 uint32_t limit,
                                                                 optional<bool> subscribe )const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_lookup_accounts );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_lookup_accounts;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    const auto& accounts_by_name = _db.get_index_type<account_index>().indices().get<by_name>();
    map<string,account_id_type> result;
 
@@ -693,8 +751,8 @@ map<string,account_id_type> database_api_impl::lookup_accounts( const string& lo
    // In addition to the common auto-subscription rules, here we auto-subscribe if only look for one account
    bool to_subscribe = (limit == 1 && get_whether_to_subscribe( subscribe ));
    for( auto itr = accounts_by_name.lower_bound(lower_bound_name);
-        limit-- && itr != accounts_by_name.end();
-        ++itr )
+        limit > 0 && itr != accounts_by_name.end();
+        ++itr, --limit )
    {
       result.insert(make_pair(itr->name, itr->get_id()));
       if( to_subscribe )
@@ -738,7 +796,7 @@ vector<asset> database_api_impl::get_account_balances( const std::string& accoun
       const auto& balance_index = _db.get_index_type< primary_index< account_balance_index > >();
       const auto& balances = balance_index.get_secondary_index< balances_by_account_index >()
                                           .get_account_balances( acnt );
-      for( const auto balance : balances )
+      for( const auto& balance : balances )
          result.push_back( balance.second->get_balance() );
    }
    else
@@ -870,20 +928,20 @@ vector<extended_asset_object> database_api::list_assets(const string& lower_boun
 
 vector<extended_asset_object> database_api_impl::list_assets(const string& lower_bound_symbol, uint32_t limit)const
 {
-   uint64_t api_limit_get_assets = _app_options->api_limit_get_assets;
-   FC_ASSERT( limit <= api_limit_get_assets );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_assets;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    const auto& assets_by_symbol = _db.get_index_type<asset_index>().indices().get<by_symbol>();
    vector<extended_asset_object> result;
    result.reserve(limit);
 
    auto itr = assets_by_symbol.lower_bound(lower_bound_symbol);
-
-   if( lower_bound_symbol == "" )
-      itr = assets_by_symbol.begin();
-
-   while(limit-- && itr != assets_by_symbol.end())
-      result.emplace_back( extend_asset( *itr++ ) );
+   auto end = assets_by_symbol.end();
+   for( ; limit > 0 && itr != end; ++itr, --limit )
+      result.emplace_back( extend_asset( *itr ) );
 
    return result;
 }
@@ -907,8 +965,11 @@ vector<extended_asset_object> database_api::get_assets_by_issuer(const std::stri
 vector<extended_asset_object> database_api_impl::get_assets_by_issuer(const std::string& issuer_name_or_id,
                                                                       asset_id_type start, uint32_t limit)const
 {
-   uint64_t api_limit_get_assets = _app_options->api_limit_get_assets;
-   FC_ASSERT( limit <= api_limit_get_assets );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_assets;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    vector<extended_asset_object> result;
    const account_id_type account = get_account_from_string(issuer_name_or_id)->id;
@@ -932,20 +993,7 @@ vector<optional<extended_asset_object>> database_api::lookup_asset_symbols(
 vector<optional<extended_asset_object>> database_api_impl::lookup_asset_symbols(
                                                          const vector<string>& symbols_or_ids )const
 {
-   const auto& assets_by_symbol = _db.get_index_type<asset_index>().indices().get<by_symbol>();
-   vector<optional<extended_asset_object> > result;
-   result.reserve(symbols_or_ids.size());
-   std::transform(symbols_or_ids.begin(), symbols_or_ids.end(), std::back_inserter(result),
-                  [this, &assets_by_symbol](const string& symbol_or_id) -> optional<extended_asset_object> {
-      if( !symbol_or_id.empty() && std::isdigit(symbol_or_id[0]) )
-      {
-         auto ptr = _db.find(variant(symbol_or_id, 1).as<asset_id_type>(1));
-         return ptr == nullptr? optional<extended_asset_object>() : extend_asset( *ptr );
-      }
-      auto itr = assets_by_symbol.find(symbol_or_id);
-      return itr == assets_by_symbol.end()? optional<extended_asset_object>() : extend_asset( *itr );
-   });
-   return result;
+   return get_assets( symbols_or_ids, false );
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -962,13 +1010,56 @@ vector<limit_order_object> database_api::get_limit_orders(std::string a, std::st
 vector<limit_order_object> database_api_impl::get_limit_orders( const std::string& a, const std::string& b,
                                                                 uint32_t limit )const
 {
-   uint64_t api_limit_get_limit_orders=_app_options->api_limit_get_limit_orders;
-   FC_ASSERT( limit <= api_limit_get_limit_orders );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_limit_orders;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    const asset_id_type asset_a_id = get_asset_from_string(a)->id;
    const asset_id_type asset_b_id = get_asset_from_string(b)->id;
 
    return get_limit_orders(asset_a_id, asset_b_id, limit);
+}
+
+vector<limit_order_object> database_api::get_limit_orders_by_account( const string& account_name_or_id,
+                              optional<uint32_t> limit, optional<limit_order_id_type> start_id )
+{
+   return my->get_limit_orders_by_account( account_name_or_id, limit, start_id );
+}
+
+vector<limit_order_object> database_api_impl::get_limit_orders_by_account( const string& account_name_or_id,
+                              optional<uint32_t> olimit, optional<limit_order_id_type> ostart_id )
+{
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_limit_orders_by_account;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   vector<limit_order_object> results;
+
+   const account_object* account = get_account_from_string(account_name_or_id);
+   if (account == nullptr)
+      return results;
+
+   limit_order_id_type start_id = ostart_id.valid() ? *ostart_id : limit_order_id_type();
+
+   const auto& index_by_account = _db.get_index_type<limit_order_index>().indices().get<by_account>();
+   auto lower_itr = index_by_account.lower_bound( std::make_tuple( account->id, start_id ) );
+   auto upper_itr = index_by_account.upper_bound( account->id );
+
+   results.reserve( limit );
+   uint32_t count = 0;
+   for ( ; lower_itr != upper_itr && count < limit; ++lower_itr, ++count)
+   {
+      const limit_order_object &order = *lower_itr;
+      results.emplace_back(order);
+   }
+
+   return results;
 }
 
 vector<limit_order_object> database_api::get_account_limit_orders(
@@ -982,7 +1073,11 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders(
                               const string& account_name_or_id, const string &base, const string &quote,
                               uint32_t limit, optional<limit_order_id_type> ostart_id, optional<price> ostart_price )
 {
-   FC_ASSERT( limit <= _app_options->api_limit_get_account_limit_orders );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_account_limit_orders;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    vector<limit_order_object>   results;
    uint32_t                     count = 0;
@@ -1003,9 +1098,9 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders(
       FC_ASSERT(ostart_price->quote.asset_id == quote_id, "Quote asset inconsistent with start price");
    }
 
-   const auto& index_by_account = _db.get_index_type<limit_order_index>().indices().get<by_account>();
-   limit_order_multi_index_type::index<by_account>::type::const_iterator lower_itr;
-   limit_order_multi_index_type::index<by_account>::type::const_iterator upper_itr;
+   const auto& index_by_account = _db.get_index_type<limit_order_index>().indices().get<by_account_price>();
+   limit_order_multi_index_type::index<by_account_price>::type::const_iterator lower_itr;
+   limit_order_multi_index_type::index<by_account_price>::type::const_iterator upper_itr;
 
    // if both order_id and price are invalid, query the first page
    if ( !ostart_id.valid() && !ostart_price.valid() )
@@ -1066,8 +1161,11 @@ vector<call_order_object> database_api::get_call_orders(const std::string& a, ui
 
 vector<call_order_object> database_api_impl::get_call_orders(const std::string& a, uint32_t limit)const
 {
-   uint64_t api_limit_get_call_orders = _app_options->api_limit_get_call_orders;
-   FC_ASSERT( limit <= api_limit_get_call_orders );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_call_orders;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    const asset_object* mia = get_asset_from_string(a);
    const auto& call_index = _db.get_index_type<call_order_index>().indices().get<by_collateral>();
@@ -1093,8 +1191,11 @@ vector<call_order_object> database_api::get_call_orders_by_account(const std::st
 vector<call_order_object> database_api_impl::get_call_orders_by_account(const std::string& account_name_or_id,
                                                                         asset_id_type start, uint32_t limit)const
 {
-   uint64_t api_limit_get_call_orders = _app_options->api_limit_get_call_orders;
-   FC_ASSERT( limit <= api_limit_get_call_orders );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_call_orders;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    vector<call_order_object> result;
    const account_id_type account = get_account_from_string(account_name_or_id)->id;
@@ -1116,8 +1217,11 @@ vector<force_settlement_object> database_api::get_settle_orders(const std::strin
 
 vector<force_settlement_object> database_api_impl::get_settle_orders(const std::string& a, uint32_t limit)const
 {
-   uint64_t api_limit_get_settle_orders = _app_options->api_limit_get_settle_orders;
-   FC_ASSERT( limit <= api_limit_get_settle_orders );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_settle_orders;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    const asset_id_type asset_a_id = get_asset_from_string(a)->id;
    const auto& settle_index = _db.get_index_type<force_settlement_index>().indices().get<by_expiration>();
@@ -1147,8 +1251,11 @@ vector<force_settlement_object> database_api_impl::get_settle_orders_by_account(
       force_settlement_id_type start,
       uint32_t limit )const
 {
-   uint64_t api_limit_get_settle_orders = _app_options->api_limit_get_settle_orders;
-   FC_ASSERT( limit <= api_limit_get_settle_orders );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_settle_orders;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    vector<force_settlement_object> result;
    const account_id_type account = get_account_from_string(account_name_or_id)->id;
@@ -1194,32 +1301,29 @@ vector<collateral_bid_object> database_api::get_collateral_bids( const std::stri
    return my->get_collateral_bids( asset, limit, start );
 }
 
-vector<collateral_bid_object> database_api_impl::get_collateral_bids( const std::string& asset,
+vector<collateral_bid_object> database_api_impl::get_collateral_bids( const std::string& asset_id_or_symbol,
                                                                       uint32_t limit, uint32_t skip )const
 { try {
-   FC_ASSERT( limit <= _app_options->api_limit_get_collateral_bids );
-   const asset_id_type asset_id = get_asset_from_string(asset)->id;
-   const asset_object& swan = asset_id(_db);
-   FC_ASSERT( swan.is_market_issued() );
-   const asset_bitasset_data_object& bad = swan.bitasset_data(_db);
-   const asset_object& back = bad.options.short_backing_asset(_db);
-   const auto& idx = _db.get_index_type<collateral_bid_index>();
-   const auto& aidx = idx.indices().get<by_price>();
-   auto start = aidx.lower_bound( boost::make_tuple( asset_id,
-                                                     price::max(back.id, asset_id),
-                                                     collateral_bid_id_type() ) );
-   auto end = aidx.lower_bound( boost::make_tuple( asset_id,
-                                                   price::min(back.id, asset_id),
-                                                   collateral_bid_id_type(GRAPHENE_DB_MAX_INSTANCE_ID) ) );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_collateral_bids;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   const asset_object& swan = *get_asset_from_string(asset_id_or_symbol);
+   FC_ASSERT( swan.is_market_issued(), "Asset is not a MPA" );
+   const asset_id_type asset_id = swan.id;
+   const auto& idx = _db.get_index_type<collateral_bid_index>().indices().get<by_price>();
+   auto itr = idx.lower_bound( asset_id );
+   auto end = idx.upper_bound( asset_id );
    vector<collateral_bid_object> result;
-   while( skip-- > 0 && start != end ) { ++start; }
-   while( start != end && limit-- > 0)
+   while( skip > 0 && itr != end ) { ++itr; --skip; }
+   for( ; itr != end && limit > 0; ++itr, --limit )
    {
-      result.push_back(*start);
-      ++start;
+      result.push_back(*itr);
    }
    return result;
-} FC_CAPTURE_AND_RETHROW( (asset)(limit)(skip) ) }
+} FC_CAPTURE_AND_RETHROW( (asset_id_or_symbol)(limit)(skip) ) }
 
 void database_api::subscribe_to_market( std::function<void(const variant&)> callback,
                                         const std::string& a, const std::string& b )
@@ -1313,8 +1417,12 @@ order_book database_api::get_order_book( const string& base, const string& quote
 
 order_book database_api_impl::get_order_book( const string& base, const string& quote, unsigned limit )const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_get_order_book );
-  
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_order_book;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    order_book result;
    result.base = base;
    result.quote = quote;
@@ -1363,7 +1471,10 @@ vector<market_ticker> database_api_impl::get_top_markets(uint32_t limit)const
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-   FC_ASSERT( limit <= _app_options->api_limit_get_top_markets );
+   const auto configured_limit = _app_options->api_limit_get_top_markets;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    const auto& volume_idx = _db.get_index_type<market_ticker_index>().indices().get<by_volume>();
    auto itr = volume_idx.rbegin();
@@ -1401,7 +1512,10 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-   FC_ASSERT( limit <= _app_options->api_limit_get_trade_history );
+   const auto configured_limit = _app_options->api_limit_get_trade_history;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    auto assets = lookup_asset_symbols( {base, quote} );
    FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
@@ -1444,6 +1558,10 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
          {
             trade.sequence = -itr->key.sequence;
             trade.side1_account_id = itr->op.account_id;
+            if(itr->op.receives.asset_id == assets[0]->id)
+               trade.type = "sell";
+            else
+               trade.type = "buy";
          }
          else
             trade.side2_account_id = itr->op.account_id;
@@ -1457,6 +1575,10 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
             {
                trade.sequence = -next_itr->key.sequence;
                trade.side1_account_id = next_itr->op.account_id;
+               if(next_itr->op.receives.asset_id == assets[0]->id)
+                  trade.type = "sell";
+               else
+                  trade.type = "buy";
             }
             else
                trade.side2_account_id = next_itr->op.account_id;
@@ -1493,7 +1615,11 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-   FC_ASSERT( limit <= _app_options->api_limit_get_trade_history_by_sequence );
+   const auto configured_limit = _app_options->api_limit_get_trade_history_by_sequence;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    FC_ASSERT( start >= 0 );
    int64_t start_seq = -start;
 
@@ -1550,6 +1676,10 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
          {
             trade.sequence = -itr->key.sequence;
             trade.side1_account_id = itr->op.account_id;
+            if(itr->op.receives.asset_id == assets[0]->id)
+               trade.type = "sell";
+            else
+               trade.type = "buy";
          }
          else
             trade.side2_account_id = itr->op.account_id;
@@ -1563,6 +1693,10 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
             {
                trade.sequence = -next_itr->key.sequence;
                trade.side1_account_id = next_itr->op.account_id;
+               if(next_itr->op.receives.asset_id == assets[0]->id)
+                  trade.type = "sell";
+               else
+                  trade.type = "buy";
             }
             else
                trade.side2_account_id = next_itr->op.account_id;
@@ -1579,6 +1713,519 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
 
    return result;
 }
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
+// Liquidity pools                                                  //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<extended_liquidity_pool_object> database_api::list_liquidity_pools(
+            optional<uint32_t> limit,
+            optional<liquidity_pool_id_type> start_id,
+            optional<bool> with_statistics )const
+{
+   return my->list_liquidity_pools(
+            limit,
+            start_id,
+            with_statistics );
+}
+
+vector<extended_liquidity_pool_object> database_api_impl::list_liquidity_pools(
+            optional<uint32_t> olimit,
+            optional<liquidity_pool_id_type> ostart_id,
+            optional<bool> with_statistics )const
+{
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   bool with_stats = ( with_statistics.valid() && *with_statistics );
+
+   vector<extended_liquidity_pool_object> results;
+
+   liquidity_pool_id_type start_id = ostart_id.valid() ? *ostart_id : liquidity_pool_id_type();
+
+   const auto& idx = _db.get_index_type<liquidity_pool_index>().indices().get<by_id>();
+   auto lower_itr = idx.lower_bound( start_id );
+   auto upper_itr = idx.end();
+
+   results.reserve( limit );
+   for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
+   {
+      results.emplace_back( extend_liquidity_pool( *lower_itr, with_stats ) );
+   }
+
+   return results;
+}
+
+vector<extended_liquidity_pool_object> database_api::get_liquidity_pools_by_asset_a(
+            std::string asset_symbol_or_id,
+            optional<uint32_t> limit,
+            optional<liquidity_pool_id_type> start_id,
+            optional<bool> with_statistics )const
+{
+   return my->get_liquidity_pools_by_asset_a(
+            asset_symbol_or_id,
+            limit,
+            start_id,
+            with_statistics );
+}
+
+vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by_asset_a(
+            std::string asset_symbol_or_id,
+            optional<uint32_t> limit,
+            optional<liquidity_pool_id_type> start_id,
+            optional<bool> with_statistics )const
+{
+   return get_liquidity_pools_by_asset_x<by_asset_a>(
+            asset_symbol_or_id,
+            limit,
+            start_id,
+            with_statistics );
+}
+
+vector<extended_liquidity_pool_object> database_api::get_liquidity_pools_by_asset_b(
+            std::string asset_symbol_or_id,
+            optional<uint32_t> limit,
+            optional<liquidity_pool_id_type> start_id,
+            optional<bool> with_statistics )const
+{
+   return my->get_liquidity_pools_by_asset_b(
+            asset_symbol_or_id,
+            limit,
+            start_id,
+            with_statistics );
+}
+
+vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by_asset_b(
+            std::string asset_symbol_or_id,
+            optional<uint32_t> limit,
+            optional<liquidity_pool_id_type> start_id,
+            optional<bool> with_statistics )const
+{
+   return get_liquidity_pools_by_asset_x<by_asset_b>(
+            asset_symbol_or_id,
+            limit,
+            start_id,
+            with_statistics );
+}
+
+vector<extended_liquidity_pool_object> database_api::get_liquidity_pools_by_one_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit,
+            const optional<liquidity_pool_id_type>& start_id,
+            const optional<bool>& with_statistics )const
+{
+   return my->get_liquidity_pools_by_one_asset(
+            asset_symbol_or_id,
+            limit,
+            start_id,
+            with_statistics );
+}
+
+vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by_one_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& olimit,
+            const optional<liquidity_pool_id_type>& ostart_id,
+            const optional<bool>& with_statistics )const
+{
+   // api_helper_indexes plugin is required for accessing the secondary index
+   FC_ASSERT( _app_options && _app_options->has_api_helper_indexes_plugin,
+              "api_helper_indexes plugin is not enabled on this server." );
+
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+   const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   asset_id_type aid = get_asset_from_string(asset_symbol_or_id)->id;
+
+   FC_ASSERT( asset_in_liquidity_pools_index, "Internal error" );
+   const auto& pools = asset_in_liquidity_pools_index->get_liquidity_pools_by_asset( aid );
+
+   liquidity_pool_id_type start_id = ostart_id.valid() ? *ostart_id : liquidity_pool_id_type();
+
+   auto itr = pools.lower_bound( start_id );
+
+   bool with_stats = ( with_statistics.valid() && *with_statistics );
+
+   vector<extended_liquidity_pool_object> results;
+
+   results.reserve( limit );
+   while( itr != pools.end() && results.size() < limit )
+   {
+      results.emplace_back( extend_liquidity_pool( (*itr)(_db), with_stats ) );
+      ++itr;
+   }
+
+   return results;
+}
+
+vector<extended_liquidity_pool_object> database_api::get_liquidity_pools_by_both_assets(
+            std::string asset_symbol_or_id_a,
+            std::string asset_symbol_or_id_b,
+            optional<uint32_t> limit,
+            optional<liquidity_pool_id_type> start_id,
+            optional<bool> with_statistics )const
+{
+   return my->get_liquidity_pools_by_both_assets(
+            asset_symbol_or_id_a,
+            asset_symbol_or_id_b,
+            limit,
+            start_id,
+            with_statistics );
+}
+
+vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by_both_assets(
+            std::string asset_symbol_or_id_a,
+            std::string asset_symbol_or_id_b,
+            optional<uint32_t> olimit,
+            optional<liquidity_pool_id_type> ostart_id,
+            optional<bool> with_statistics )const
+{
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   bool with_stats = ( with_statistics.valid() && *with_statistics );
+
+   vector<extended_liquidity_pool_object> results;
+
+   asset_id_type asset_id_a = get_asset_from_string(asset_symbol_or_id_a)->id;
+   asset_id_type asset_id_b = get_asset_from_string(asset_symbol_or_id_b)->id;
+   if( asset_id_a > asset_id_b )
+      std::swap( asset_id_a, asset_id_b );
+
+   liquidity_pool_id_type start_id = ostart_id.valid() ? *ostart_id : liquidity_pool_id_type();
+
+   const auto& idx = _db.get_index_type<liquidity_pool_index>().indices().get<by_asset_ab>();
+   auto lower_itr = idx.lower_bound( std::make_tuple( asset_id_a, asset_id_b, start_id ) );
+   auto upper_itr = idx.upper_bound( std::make_tuple( asset_id_a, asset_id_b ) );
+
+   results.reserve( limit );
+   for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
+   {
+      results.emplace_back( extend_liquidity_pool( *lower_itr, with_stats ) );
+   }
+
+   return results;
+}
+
+vector<optional<extended_liquidity_pool_object>> database_api::get_liquidity_pools(
+            const vector<liquidity_pool_id_type>& ids,
+            optional<bool> subscribe,
+            optional<bool> with_statistics )const
+{
+   return my->get_liquidity_pools(
+            ids,
+            subscribe,
+            with_statistics );
+}
+
+vector<optional<extended_liquidity_pool_object>> database_api_impl::get_liquidity_pools(
+            const vector<liquidity_pool_id_type>& ids,
+            optional<bool> subscribe,
+            optional<bool> with_statistics )const
+{
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
+   FC_ASSERT( ids.size() <= configured_limit,
+              "size of the querying list can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   bool with_stats = ( with_statistics.valid() && *with_statistics );
+
+   bool to_subscribe = get_whether_to_subscribe( subscribe );
+   vector<optional<extended_liquidity_pool_object>> result; result.reserve(ids.size());
+   std::transform(ids.begin(), ids.end(), std::back_inserter(result),
+                  [this,to_subscribe,with_stats](liquidity_pool_id_type id)
+                     -> optional<extended_liquidity_pool_object> {
+
+      if(auto o = _db.find(id))
+      {
+         auto ext_obj = extend_liquidity_pool( *o, with_stats );
+         if( to_subscribe )
+         {
+            subscribe_to_item( id );
+            if( ext_obj.statistics.valid() )
+               subscribe_to_item( ext_obj.statistics->id );
+         }
+         return ext_obj;
+      }
+      return {};
+   });
+   return result;
+}
+
+vector<optional<extended_liquidity_pool_object>> database_api::get_liquidity_pools_by_share_asset(
+            const vector<std::string>& asset_symbols_or_ids,
+            optional<bool> subscribe,
+            optional<bool> with_statistics )const
+{
+   return my->get_liquidity_pools_by_share_asset(
+            asset_symbols_or_ids,
+            subscribe,
+            with_statistics );
+}
+
+vector<optional<extended_liquidity_pool_object>> database_api_impl::get_liquidity_pools_by_share_asset(
+            const vector<std::string>& asset_symbols_or_ids,
+            optional<bool> subscribe,
+            optional<bool> with_statistics )const
+{
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
+   FC_ASSERT( asset_symbols_or_ids.size() <= configured_limit,
+              "size of the querying list can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   bool with_stats = ( with_statistics.valid() && *with_statistics );
+
+   bool to_subscribe = get_whether_to_subscribe( subscribe );
+   vector<optional<extended_liquidity_pool_object>> result; result.reserve(asset_symbols_or_ids.size());
+   std::transform(asset_symbols_or_ids.begin(), asset_symbols_or_ids.end(), std::back_inserter(result),
+                  [this,to_subscribe,with_stats](std::string id_or_name) -> optional<extended_liquidity_pool_object> {
+
+      const asset_object* asset_obj = get_asset_from_string( id_or_name, false );
+      if( asset_obj == nullptr || !asset_obj->is_liquidity_pool_share_asset() )
+         return {};
+      const liquidity_pool_object& lp_obj = (*asset_obj->for_liquidity_pool)(_db);
+      auto ext_obj = extend_liquidity_pool( lp_obj, with_stats );
+      if( to_subscribe )
+      {
+         subscribe_to_item( lp_obj.id );
+         if( ext_obj.statistics.valid() )
+            subscribe_to_item( ext_obj.statistics->id );
+      }
+      return ext_obj;
+   });
+   return result;
+}
+
+vector<extended_liquidity_pool_object> database_api::get_liquidity_pools_by_owner(
+            std::string account_name_or_id,
+            optional<uint32_t> limit,
+            optional<asset_id_type> start_id,
+            optional<bool> with_statistics )const
+{
+   return my->get_liquidity_pools_by_owner(
+            account_name_or_id,
+            limit,
+            start_id,
+            with_statistics );
+}
+
+vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by_owner(
+            std::string account_name_or_id,
+            optional<uint32_t> olimit,
+            optional<asset_id_type> ostart_id,
+            optional<bool> with_statistics )const
+{
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   bool with_stats = ( with_statistics.valid() && *with_statistics );
+
+   vector<extended_liquidity_pool_object> results;
+
+   account_id_type owner = get_account_from_string(account_name_or_id)->id;
+
+   asset_id_type start_id = ostart_id.valid() ? *ostart_id : asset_id_type();
+
+   // get assets owned by account
+   const auto& idx = _db.get_index_type<asset_index>().indices().get<by_issuer>();
+   auto lower_itr = idx.lower_bound( std::make_tuple( owner, start_id ) );
+   auto upper_itr = idx.upper_bound( owner );
+
+   results.reserve( limit );
+   for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
+   {
+      const asset_object& asset_obj = *lower_itr;
+      if( !asset_obj.is_liquidity_pool_share_asset() ) // TODO improve performance
+         continue;
+      results.emplace_back( extend_liquidity_pool( (*asset_obj.for_liquidity_pool)(_db), with_stats ) );
+   }
+
+   return results;
+}
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
+// SameT Funds                                                      //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<samet_fund_object> database_api::list_samet_funds(
+            const optional<uint32_t>& limit,
+            const optional<samet_fund_id_type>& start_id )const
+{
+   const auto& idx = my->_db.get_index_type<samet_fund_index>().indices().get<by_id>();
+   return my->get_objects_by_x< samet_fund_object,
+                                samet_fund_id_type
+                               >( &application_options::api_limit_get_samet_funds,
+                                  idx, limit, start_id );
+}
+
+vector<samet_fund_object> database_api::get_samet_funds_by_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit,
+            const optional<samet_fund_id_type>& start_id )const
+{
+   account_id_type owner = my->get_account_from_string(account_name_or_id)->id;
+   const auto& idx = my->_db.get_index_type<samet_fund_index>().indices().get<by_owner>();
+   return my->get_objects_by_x< samet_fund_object,
+                                samet_fund_id_type
+                               >( &application_options::api_limit_get_samet_funds,
+                                  idx, limit, start_id, owner );
+}
+
+vector<samet_fund_object> database_api::get_samet_funds_by_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit,
+            const optional<samet_fund_id_type>& start_id )const
+{
+   asset_id_type asset_type = my->get_asset_from_string(asset_symbol_or_id)->id;
+   const auto& idx = my->_db.get_index_type<samet_fund_index>().indices().get<by_asset_type>();
+   return my->get_objects_by_x< samet_fund_object,
+                                samet_fund_id_type
+                               >( &application_options::api_limit_get_samet_funds,
+                                  idx, limit, start_id, asset_type );
+}
+
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
+// Credit offers and credit deals                                   //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<credit_offer_object> database_api::list_credit_offers(
+            const optional<uint32_t>& limit,
+            const optional<credit_offer_id_type>& start_id )const
+{
+   const auto& idx = my->_db.get_index_type<credit_offer_index>().indices().get<by_id>();
+   return my->get_objects_by_x< credit_offer_object,
+                                credit_offer_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id );
+}
+
+vector<credit_offer_object> database_api::get_credit_offers_by_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit,
+            const optional<credit_offer_id_type>& start_id )const
+{
+   account_id_type owner = my->get_account_from_string(account_name_or_id)->id;
+   const auto& idx = my->_db.get_index_type<credit_offer_index>().indices().get<by_owner>();
+   return my->get_objects_by_x< credit_offer_object,
+                                credit_offer_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, owner );
+}
+
+vector<credit_offer_object> database_api::get_credit_offers_by_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit,
+            const optional<credit_offer_id_type>& start_id )const
+{
+   asset_id_type asset_type = my->get_asset_from_string(asset_symbol_or_id)->id;
+   const auto& idx = my->_db.get_index_type<credit_offer_index>().indices().get<by_asset_type>();
+   return my->get_objects_by_x< credit_offer_object,
+                                credit_offer_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, asset_type );
+}
+
+vector<credit_deal_object> database_api::list_credit_deals(
+            const optional<uint32_t>& limit,
+            const optional<credit_deal_id_type>& start_id )const
+{
+   const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_id>();
+   return my->get_objects_by_x< credit_deal_object,
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id );
+}
+
+vector<credit_deal_object> database_api::get_credit_deals_by_offer_id(
+            const credit_offer_id_type& offer_id,
+            const optional<uint32_t>& limit,
+            const optional<credit_deal_id_type>& start_id )const
+{
+   const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_offer_id>();
+   return my->get_objects_by_x< credit_deal_object,
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, offer_id );
+}
+
+vector<credit_deal_object> database_api::get_credit_deals_by_offer_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit,
+            const optional<credit_deal_id_type>& start_id )const
+{
+   account_id_type owner = my->get_account_from_string(account_name_or_id)->id;
+   const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_offer_owner>();
+   return my->get_objects_by_x< credit_deal_object,
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, owner );
+}
+
+vector<credit_deal_object> database_api::get_credit_deals_by_borrower(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit,
+            const optional<credit_deal_id_type>& start_id )const
+{
+   account_id_type borrower = my->get_account_from_string(account_name_or_id)->id;
+   const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_borrower>();
+   return my->get_objects_by_x< credit_deal_object,
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, borrower );
+}
+
+vector<credit_deal_object> database_api::get_credit_deals_by_debt_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit,
+            const optional<credit_deal_id_type>& start_id )const
+{
+   asset_id_type asset_type = my->get_asset_from_string(asset_symbol_or_id)->id;
+   const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_debt_asset>();
+   return my->get_objects_by_x< credit_deal_object,
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, asset_type );
+}
+
+vector<credit_deal_object> database_api::get_credit_deals_by_collateral_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit,
+            const optional<credit_deal_id_type>& start_id )const
+{
+   asset_id_type asset_type = my->get_asset_from_string(asset_symbol_or_id)->id;
+   const auto& idx = my->_db.get_index_type<credit_deal_index>().indices().get<by_collateral_asset>();
+   return my->get_objects_by_x< credit_deal_object,
+                                credit_deal_id_type
+                               >( &application_options::api_limit_get_credit_offers,
+                                  idx, limit, start_id, asset_type );
+}
+
 
 //////////////////////////////////////////////////////////////////////
 //                                                                  //
@@ -1627,7 +2274,12 @@ map<string, witness_id_type> database_api::lookup_witness_accounts( const string
 map<string, witness_id_type> database_api_impl::lookup_witness_accounts( const string& lower_bound_name,
                                                                          uint32_t limit )const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_lookup_witness_accounts );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_lookup_witness_accounts;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    const auto& witnesses_by_id = _db.get_index_type<witness_index>().indices().get<by_id>();
 
    // we want to order witnesses by account name, but that name is in the account object
@@ -1635,6 +2287,7 @@ map<string, witness_id_type> database_api_impl::lookup_witness_accounts( const s
    // get all the names and look them all up, sort them, then figure out what
    // records to return.  This could be optimized, but we expect the
    // number of witnesses to be few and the frequency of calls to be rare
+   // TODO optimize
    std::map<std::string, witness_id_type> witnesses_by_account_name;
    for (const witness_object& witness : witnesses_by_id)
        if (auto account_iter = _db.find(witness.witness_account))
@@ -1642,8 +2295,11 @@ map<string, witness_id_type> database_api_impl::lookup_witness_accounts( const s
                witnesses_by_account_name.insert(std::make_pair(account_iter->name, witness.id));
 
    auto end_iter = witnesses_by_account_name.begin();
-   while (end_iter != witnesses_by_account_name.end() && limit--)
-       ++end_iter;
+   while( end_iter != witnesses_by_account_name.end() && limit > 0 )
+   {
+      ++end_iter;
+      --limit;
+   }
    witnesses_by_account_name.erase(end_iter, witnesses_by_account_name.end());
    return witnesses_by_account_name;
 }
@@ -1709,7 +2365,12 @@ map<string, committee_member_id_type> database_api::lookup_committee_member_acco
 map<string, committee_member_id_type> database_api_impl::lookup_committee_member_accounts(
                                          const string& lower_bound_name, uint32_t limit )const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_lookup_committee_member_accounts );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_lookup_committee_member_accounts;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    const auto& committee_members_by_id = _db.get_index_type<committee_member_index>().indices().get<by_id>();
 
    // we want to order committee_members by account name, but that name is in the account object
@@ -1717,6 +2378,7 @@ map<string, committee_member_id_type> database_api_impl::lookup_committee_member
    // get all the names and look them all up, sort them, then figure out what
    // records to return.  This could be optimized, but we expect the
    // number of committee_members to be few and the frequency of calls to be rare
+   // TODO optimize
    std::map<std::string, committee_member_id_type> committee_members_by_account_name;
    for (const committee_member_object& committee_member : committee_members_by_id)
        if (auto account_iter = _db.find(committee_member.committee_member_account))
@@ -1724,8 +2386,11 @@ map<string, committee_member_id_type> database_api_impl::lookup_committee_member
                committee_members_by_account_name.insert(std::make_pair(account_iter->name, committee_member.id));
 
    auto end_iter = committee_members_by_account_name.begin();
-   while (end_iter != committee_members_by_account_name.end() && limit--)
-       ++end_iter;
+   while( end_iter != committee_members_by_account_name.end() && limit > 0 )
+   {
+      ++end_iter;
+      --limit;
+   }
    committee_members_by_account_name.erase(end_iter, committee_members_by_account_name.end());
    return committee_members_by_account_name;
 }
@@ -1747,39 +2412,56 @@ uint64_t database_api_impl::get_committee_count()const
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<worker_object> database_api::get_all_workers()const
+vector<worker_object> database_api::get_all_workers( const optional<bool> is_expired )const
 {
-    return my->get_all_workers();
+   return my->get_all_workers( is_expired );
 }
 
-vector<worker_object> database_api_impl::get_all_workers()const
+vector<worker_object> database_api_impl::get_all_workers( const optional<bool> is_expired )const
 {
-    vector<worker_object> result;
-    const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_id>();
-    for( const auto& w : workers_idx )
-    {
-       result.push_back( w );
-    }
-    return result;
+   vector<worker_object> result;
+
+   if( !is_expired.valid() ) // query for all workers
+   {
+      const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_id>();
+      result.reserve( workers_idx.size() );
+      for( const auto& w : workers_idx )
+      {
+         result.push_back( w );
+      }
+   }
+   else // query for workers that are expired only or not expired only
+   {
+      const time_point_sec now = _db.head_block_time();
+      const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_end_date>();
+      auto itr = *is_expired ? workers_idx.begin() : workers_idx.lower_bound( now );
+      auto end = *is_expired ? workers_idx.upper_bound( now ) : workers_idx.end();
+      for( ; itr != end; ++itr )
+      {
+         result.push_back( *itr );
+      }
+   }
+
+   return result;
 }
 
-vector<optional<worker_object>> database_api::get_workers_by_account(const std::string account_id_or_name)const
+vector<worker_object> database_api::get_workers_by_account(const std::string account_id_or_name)const
 {
-    return my->get_workers_by_account( account_id_or_name );
+   return my->get_workers_by_account( account_id_or_name );
 }
 
-vector<optional<worker_object>> database_api_impl::get_workers_by_account(const std::string account_id_or_name)const
+vector<worker_object> database_api_impl::get_workers_by_account(const std::string account_id_or_name)const
 {
-   vector<optional<worker_object>> result;
+   vector<worker_object> result;
    const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_account>();
 
    const account_id_type account = get_account_from_string(account_id_or_name)->id;
-   for( const auto& w : workers_idx )
-    {
-        if( w.worker_account == account )
-            result.push_back( w );
-    }
-    return result;
+   auto range = workers_idx.equal_range(account);
+   for(auto itr = range.first; itr != range.second; ++itr)
+   {
+      result.push_back( *itr );
+   }
+   return result;
 }
 
 uint64_t database_api::get_worker_count()const
@@ -1807,7 +2489,11 @@ vector<variant> database_api::lookup_vote_ids( const vector<vote_id_type>& votes
 
 vector<variant> database_api_impl::lookup_vote_ids( const vector<vote_id_type>& votes )const
 {
-   FC_ASSERT( votes.size() < _app_options->api_limit_lookup_vote_ids );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_lookup_vote_ids;
+   FC_ASSERT( votes.size() <= configured_limit,
+              "Number of querying votes can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    const auto& witness_idx = _db.get_index_type<witness_index>().indices().get<by_vote_id>();
    const auto& committee_idx = _db.get_index_type<committee_member_index>().indices().get<by_vote_id>();
@@ -1884,15 +2570,15 @@ std::string database_api_impl::get_transaction_hex(const signed_transaction& trx
 }
 
 std::string database_api::get_transaction_hex_without_sig(
-   const signed_transaction &trx) const
+   const transaction &trx) const
 {
    return my->get_transaction_hex_without_sig(trx);
 }
 
 std::string database_api_impl::get_transaction_hex_without_sig(
-   const signed_transaction &trx) const
+   const transaction &trx) const
 {
-   return fc::to_hex(fc::raw::pack(static_cast<transaction>(trx)));
+   return fc::to_hex(fc::raw::pack(trx));
 }
 
 set<public_key_type> database_api::get_required_signatures( const signed_transaction& trx,
@@ -1904,12 +2590,15 @@ set<public_key_type> database_api::get_required_signatures( const signed_transac
 set<public_key_type> database_api_impl::get_required_signatures( const signed_transaction& trx,
                                                             const flat_set<public_key_type>& available_keys )const
 {
-   bool allow_non_immediate_owner = ( _db.head_block_time() >= HARDFORK_CORE_584_TIME );
+   auto chain_time = _db.head_block_time();
+   bool allow_non_immediate_owner = ( chain_time >= HARDFORK_CORE_584_TIME );
+   bool ignore_custom_op_reqd_auths = MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( chain_time );
    auto result = trx.get_required_signatures( _db.get_chain_id(),
                                        available_keys,
                                        [&]( account_id_type id ){ return &id(_db).active; },
                                        [&]( account_id_type id ){ return &id(_db).owner; },
                                        allow_non_immediate_owner,
+                                       ignore_custom_op_reqd_auths,
                                        _db.get_global_properties().parameters.max_authority_depth );
    return result;
 }
@@ -1925,34 +2614,36 @@ set<address> database_api::get_potential_address_signatures( const signed_transa
 
 set<public_key_type> database_api_impl::get_potential_signatures( const signed_transaction& trx )const
 {
-   bool allow_non_immediate_owner = ( _db.head_block_time() >= HARDFORK_CORE_584_TIME );
+   auto chain_time = _db.head_block_time();
+   bool allow_non_immediate_owner = ( chain_time >= HARDFORK_CORE_584_TIME );
+   bool ignore_custom_op_reqd_auths = MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( chain_time );
+
    set<public_key_type> result;
-   trx.get_required_signatures(
-      _db.get_chain_id(),
-      flat_set<public_key_type>(),
-      [&]( account_id_type id )
-      {
-         const auto& auth = id(_db).active;
-         for( const auto& k : auth.get_keys() )
-            result.insert(k);
-         return &auth;
-      },
-      [&]( account_id_type id )
-      {
-         const auto& auth = id(_db).owner;
-         for( const auto& k : auth.get_keys() )
-            result.insert(k);
-         return &auth;
-      },
-      allow_non_immediate_owner,
-      _db.get_global_properties().parameters.max_authority_depth
-   );
+   auto get_active = [this, &result]( account_id_type id ){
+      const auto& auth = id( _db ).active;
+      for( const auto& k : auth.get_keys() )
+         result.insert( k );
+      return &auth;
+   };
+   auto get_owner = [this, &result]( account_id_type id ){
+      const auto& auth = id( _db ).owner;
+      for( const auto& k : auth.get_keys() )
+         result.insert( k );
+      return &auth;
+   };
+
+   trx.get_required_signatures( _db.get_chain_id(),
+                                flat_set<public_key_type>(),
+                                get_active, get_owner,
+                                allow_non_immediate_owner,
+                                ignore_custom_op_reqd_auths,
+                                _db.get_global_properties().parameters.max_authority_depth );
 
    // Insert keys in required "other" authories
    flat_set<account_id_type> required_active;
    flat_set<account_id_type> required_owner;
    vector<authority> other;
-   trx.get_required_authorities( required_active, required_owner, other );
+   trx.get_required_authorities( required_active, required_owner, other, ignore_custom_op_reqd_auths );
    for( const auto& auth : other )
       for( const auto& key : auth.get_keys() )
          result.insert( key );
@@ -1962,26 +2653,30 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
 
 set<address> database_api_impl::get_potential_address_signatures( const signed_transaction& trx )const
 {
+   auto chain_time = _db.head_block_time();
+   bool allow_non_immediate_owner = ( chain_time >= HARDFORK_CORE_584_TIME );
+   bool ignore_custom_op_reqd_auths = MUST_IGNORE_CUSTOM_OP_REQD_AUTHS( chain_time );
+
    set<address> result;
-   trx.get_required_signatures(
-      _db.get_chain_id(),
-      flat_set<public_key_type>(),
-      [&]( account_id_type id )
-      {
-         const auto& auth = id(_db).active;
-         for( const auto& k : auth.get_addresses() )
-            result.insert(k);
-         return &auth;
-      },
-      [&]( account_id_type id )
-      {
-         const auto& auth = id(_db).owner;
-         for( const auto& k : auth.get_addresses() )
-            result.insert(k);
-         return &auth;
-      },
-      _db.get_global_properties().parameters.max_authority_depth
-   );
+   auto get_active = [this, &result]( account_id_type id ){
+      const auto& auth = id( _db ).active;
+      for( const auto& k : auth.get_addresses() )
+         result.insert( k );
+      return &auth;
+   };
+   auto get_owner = [this, &result]( account_id_type id ) {
+      const auto& auth = id( _db ).owner;
+      for (const auto& k : auth.get_addresses())
+         result.insert( k );
+      return &auth;
+   };
+
+   trx.get_required_signatures( _db.get_chain_id(),
+                                flat_set<public_key_type>(),
+                                get_active, get_owner,
+                                allow_non_immediate_owner,
+                                ignore_custom_op_reqd_auths,
+                                _db.get_global_properties().parameters.max_authority_depth );
    return result;
 }
 
@@ -1996,6 +2691,8 @@ bool database_api_impl::verify_authority( const signed_transaction& trx )const
    trx.verify_authority( _db.get_chain_id(),
                          [this]( account_id_type id ){ return &id(_db).active; },
                          [this]( account_id_type id ){ return &id(_db).owner; },
+                         [this]( account_id_type id, const operation& op, rejected_predicate_map* rejects ) {
+                           return _db.get_viable_custom_authorities(id, op, rejects); },
                          allow_non_immediate_owner,
                          _db.get_global_properties().parameters.max_authority_depth );
    return true;
@@ -2021,7 +2718,9 @@ bool database_api_impl::verify_account_authority( const string& account_name_or_
       graphene::chain::verify_authority(ops, keys,
             [this]( account_id_type id ){ return &id(_db).active; },
             [this]( account_id_type id ){ return &id(_db).owner; },
-            true );
+            // Use a no-op lookup for custom authorities; we don't want it even if one does apply for our dummy op
+            [](auto, auto, auto*) { return vector<authority>(); },
+            true, MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(_db.head_block_time()) );
    }
    catch (fc::exception& ex)
    {
@@ -2139,6 +2838,10 @@ vector<proposal_object> database_api::get_proposed_transactions( const std::stri
 
 vector<proposal_object> database_api_impl::get_proposed_transactions( const std::string account_id_or_name )const
 {
+   // api_helper_indexes plugin is required for accessing the secondary index
+   FC_ASSERT( _app_options && _app_options->has_api_helper_indexes_plugin,
+              "api_helper_indexes plugin is not enabled on this server." );
+
    const auto& proposal_idx = _db.get_index_type< primary_index< proposal_index > >();
    const auto& proposals_by_account = proposal_idx.get_secondary_index<graphene::chain::required_approval_index>();
 
@@ -2203,7 +2906,12 @@ vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_b
                                       withdraw_permission_id_type start,
                                       uint32_t limit)const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_get_withdraw_permissions_by_giver );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_withdraw_permissions_by_giver;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    vector<withdraw_permission_object> result;
 
    const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_from>();
@@ -2232,7 +2940,12 @@ vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_b
                                       withdraw_permission_id_type start,
                                       uint32_t limit)const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_get_withdraw_permissions_by_recipient );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_withdraw_permissions_by_recipient;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    vector<withdraw_permission_object> result;
 
    const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_authorized>();
@@ -2277,7 +2990,12 @@ vector<htlc_object> database_api::get_htlc_by_from( const std::string account_id
 vector<htlc_object> database_api_impl::get_htlc_by_from( const std::string account_id_or_name,
                                                          htlc_id_type start, uint32_t limit ) const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_get_htlc_by );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_htlc_by;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
    vector<htlc_object> result;
 
    const auto& htlc_idx = _db.get_index_type< htlc_index >().indices().get< by_from_id >();
@@ -2302,8 +3020,12 @@ vector<htlc_object> database_api::get_htlc_by_to( const std::string account_id_o
 vector<htlc_object> database_api_impl::get_htlc_by_to( const std::string account_id_or_name,
                                                        htlc_id_type start, uint32_t limit ) const
 {
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_htlc_by;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
-   FC_ASSERT( limit <= _app_options->api_limit_get_htlc_by );
    vector<htlc_object> result;
 
    const auto& htlc_idx = _db.get_index_type< htlc_index >().indices().get< by_to_id >();
@@ -2326,7 +3048,11 @@ vector<htlc_object> database_api::list_htlcs(const htlc_id_type start, uint32_t 
 
 vector<htlc_object> database_api_impl::list_htlcs(const htlc_id_type start, uint32_t limit) const
 {
-   FC_ASSERT( limit <= _app_options->api_limit_list_htlcs );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_list_htlcs;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    vector<htlc_object> result;
    const auto& htlc_idx = _db.get_index_type<htlc_index>().indices().get<by_id>();
@@ -2341,6 +3067,95 @@ vector<htlc_object> database_api_impl::list_htlcs(const htlc_id_type start, uint
 
 //////////////////////////////////////////////////////////////////////
 //                                                                  //
+// Tickets                                                          //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<ticket_object> database_api::list_tickets(
+            optional<uint32_t> limit,
+            optional<ticket_id_type> start_id )const
+{
+   return my->list_tickets(
+            limit,
+            start_id );
+}
+
+vector<ticket_object> database_api_impl::list_tickets(
+            optional<uint32_t> olimit,
+            optional<ticket_id_type> ostart_id )const
+{
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_tickets;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   vector<ticket_object> results;
+
+   ticket_id_type start_id = ostart_id.valid() ? *ostart_id : ticket_id_type();
+
+   const auto& idx = _db.get_index_type<ticket_index>().indices().get<by_id>();
+   auto lower_itr = idx.lower_bound( start_id );
+   auto upper_itr = idx.end();
+
+   results.reserve( limit );
+   uint32_t count = 0;
+   for ( ; lower_itr != upper_itr && count < limit; ++lower_itr, ++count)
+   {
+      results.emplace_back( *lower_itr );
+   }
+
+   return results;
+}
+
+vector<ticket_object> database_api::get_tickets_by_account(
+            std::string account_name_or_id,
+            optional<uint32_t> limit,
+            optional<ticket_id_type> start_id )const
+{
+   return my->get_tickets_by_account(
+            account_name_or_id,
+            limit,
+            start_id );
+}
+
+vector<ticket_object> database_api_impl::get_tickets_by_account(
+            std::string account_name_or_id,
+            optional<uint32_t> olimit,
+            optional<ticket_id_type> ostart_id )const
+{
+   uint32_t limit = olimit.valid() ? *olimit : 101;
+
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_tickets;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
+
+   vector<ticket_object> results;
+
+   account_id_type account = get_account_from_string(account_name_or_id)->id;
+
+   ticket_id_type start_id = ostart_id.valid() ? *ostart_id : ticket_id_type();
+
+   const auto& idx = _db.get_index_type<ticket_index>().indices().get<by_account>();
+   auto lower_itr = idx.lower_bound( std::make_tuple( account, start_id ) );
+   auto upper_itr = idx.upper_bound( account );
+
+   results.reserve( limit );
+   uint32_t count = 0;
+   for ( ; lower_itr != upper_itr && count < limit; ++lower_itr, ++count)
+   {
+      results.emplace_back( *lower_itr );
+   }
+
+   return results;
+}
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
 // Private methods                                                  //
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
@@ -2349,40 +3164,52 @@ const account_object* database_api_impl::get_account_from_string( const std::str
                                                                   bool throw_if_not_found ) const
 {
    // TODO cache the result to avoid repeatly fetching from db
-   FC_ASSERT( name_or_id.size() > 0);
-   const account_object* account = nullptr;
-   if (std::isdigit(name_or_id[0]))
-      account = _db.find(fc::variant(name_or_id, 1).as<account_id_type>(1));
+   if( name_or_id.empty() )
+   {
+      if( throw_if_not_found )
+         FC_THROW_EXCEPTION( fc::assert_exception, "no such account" );
+      else
+         return nullptr;
+   }
+   const account_object* account_ptr = nullptr;
+   if( 0 != std::isdigit(name_or_id[0]) )
+      account_ptr = _db.find(fc::variant(name_or_id, 1).as<account_id_type>(1));
    else
    {
       const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
       auto itr = idx.find(name_or_id);
       if (itr != idx.end())
-         account = &*itr;
+         account_ptr = &(*itr);
    }
    if(throw_if_not_found)
-      FC_ASSERT( account, "no such account" );
-   return account;
+      FC_ASSERT( account_ptr, "no such account" );
+   return account_ptr;
 }
 
 const asset_object* database_api_impl::get_asset_from_string( const std::string& symbol_or_id,
                                                               bool throw_if_not_found ) const
 {
    // TODO cache the result to avoid repeatly fetching from db
-   FC_ASSERT( symbol_or_id.size() > 0);
-   const asset_object* asset = nullptr;
-   if (std::isdigit(symbol_or_id[0]))
-      asset = _db.find(fc::variant(symbol_or_id, 1).as<asset_id_type>(1));
+   if( symbol_or_id.empty() )
+   {
+      if( throw_if_not_found )
+         FC_THROW_EXCEPTION( fc::assert_exception, "no such asset" );
+      else
+         return nullptr;
+   }
+   const asset_object* asset_ptr = nullptr;
+   if( 0 != std::isdigit(symbol_or_id[0]) )
+      asset_ptr = _db.find(fc::variant(symbol_or_id, 1).as<asset_id_type>(1));
    else
    {
       const auto& idx = _db.get_index_type<asset_index>().indices().get<by_symbol>();
       auto itr = idx.find(symbol_or_id);
       if (itr != idx.end())
-         asset = &*itr;
+         asset_ptr = &(*itr);
    }
    if(throw_if_not_found)
-      FC_ASSERT( asset, "no such asset" );
-   return asset;
+      FC_ASSERT( asset_ptr, "no such asset" );
+   return asset_ptr;
 }
 
 // helper function
@@ -2408,8 +3235,11 @@ vector<optional<extended_asset_object>> database_api_impl::get_assets( const vec
 vector<limit_order_object> database_api_impl::get_limit_orders( const asset_id_type a, const asset_id_type b,
                                                                 const uint32_t limit )const
 {
-   uint64_t api_limit_get_limit_orders=_app_options->api_limit_get_limit_orders;
-   FC_ASSERT( limit <= api_limit_get_limit_orders );
+   FC_ASSERT( _app_options, "Internal error" );
+   const auto configured_limit = _app_options->api_limit_get_limit_orders;
+   FC_ASSERT( limit <= configured_limit,
+              "limit can not be greater than ${configured_limit}",
+              ("configured_limit", configured_limit) );
 
    const auto& limit_order_idx = _db.get_index_type<limit_order_index>();
    const auto& limit_price_idx = limit_order_idx.indices().get<by_price>();
@@ -2441,7 +3271,7 @@ vector<limit_order_object> database_api_impl::get_limit_orders( const asset_id_t
 
 bool database_api_impl::is_impacted_account( const flat_set<account_id_type>& accounts)
 {
-   if( !_subscribed_accounts.size() || !accounts.size() )
+   if( _subscribed_accounts.empty() || accounts.empty() )
       return false;
 
    return std::any_of(accounts.begin(), accounts.end(), [this](const account_id_type& account) {
@@ -2451,7 +3281,7 @@ bool database_api_impl::is_impacted_account( const flat_set<account_id_type>& ac
 
 void database_api_impl::broadcast_updates( const vector<variant>& updates )
 {
-   if( updates.size() && _subscribe_callback ) {
+   if( !updates.empty() && _subscribe_callback ) {
       auto capture_this = shared_from_this();
       fc::async([capture_this,updates](){
           if(capture_this->_subscribe_callback)
@@ -2462,7 +3292,7 @@ void database_api_impl::broadcast_updates( const vector<variant>& updates )
 
 void database_api_impl::broadcast_market_updates( const market_queue_type& queue)
 {
-   if( queue.size() )
+   if( !queue.empty() )
    {
       auto capture_this = shared_from_this();
       fc::async([capture_this, this, queue](){
@@ -2539,11 +3369,11 @@ void database_api_impl::handle_object_changed( bool force_notify,
          }
       }
 
-      if( updates.size() )
+      if( !updates.empty() )
          broadcast_updates(updates);
    }
 
-   if( _market_subscriptions.size() )
+   if( !_market_subscriptions.empty() )
    {
       market_queue_type broadcast_queue;
 
@@ -2564,7 +3394,7 @@ void database_api_impl::handle_object_changed( bool force_notify,
          }
       }
 
-      if( broadcast_queue.size() )
+      if( !broadcast_queue.empty() )
          broadcast_market_updates(broadcast_queue);
    }
 }
@@ -2583,7 +3413,7 @@ void database_api_impl::on_applied_block()
       });
    }
 
-   if(_market_subscriptions.size() == 0)
+   if( _market_subscriptions.empty() )
       return;
 
    const auto& ops = _db.get_applied_operations();
@@ -2610,7 +3440,7 @@ void database_api_impl::on_applied_block()
          */
          default: break;
       }
-      if( market.valid() && _market_subscriptions.count(*market) )
+      if( market.valid() && _market_subscriptions.count(*market) > 0 )
          // FIXME this may cause fill_order_operation be pushed before order creation
          subscribed_markets_ops[*market].emplace_back(std::make_pair(op.op, op.result));
    }

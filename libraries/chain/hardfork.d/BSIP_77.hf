@@ -1,0 +1,5 @@
+// BSIP 77 ("Initial Collateral Ratio" (ICR)) hardfork check
+#ifndef HARDFORK_BSIP_77_TIME
+#define HARDFORK_BSIP_77_TIME (fc::time_point_sec( 1596117300 )) // Thursday, July 30, 2020 13:55:00 UTC
+#define HARDFORK_BSIP_77_PASSED(now) (now >= HARDFORK_BSIP_77_TIME)
+#endif

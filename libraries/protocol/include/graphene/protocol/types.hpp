@@ -44,6 +44,7 @@
 #include <fc/crypto/sha1.hpp>
 #include <fc/crypto/sha224.hpp>
 #include <fc/crypto/sha256.hpp>
+#include <fc/crypto/hash160.hpp>
 #include <fc/crypto/elliptic.hpp>
 #include <fc/reflect/reflect.hpp>
 #include <fc/reflect/variant.hpp>
@@ -59,18 +60,35 @@
 #include <graphene/protocol/object_id.hpp>
 #include <graphene/protocol/config.hpp>
 
-#define GRAPHENE_EXTERNAL_SERIALIZATION(ext, type) \
+#define GRAPHENE_EXTERNAL_SERIALIZATION_VARIANT(ext, type) \
 namespace fc { \
    ext template void from_variant( const variant& v, type& vo, uint32_t max_depth ); \
    ext template void to_variant( const type& v, variant& vo, uint32_t max_depth ); \
-namespace raw { \
-   ext template void pack< datastream<size_t>, type >( datastream<size_t>& s, const type& tx, uint32_t _max_depth ); \
-   ext template void pack< sha256::encoder, type >( sha256::encoder& s, const type& tx, uint32_t _max_depth ); \
-   ext template void pack< datastream<char*>, type >( datastream<char*>& s, const type& tx, uint32_t _max_depth ); \
-   ext template void unpack< datastream<const char*>, type >( datastream<const char*>& s, type& tx, uint32_t _max_depth ); \
-} } // fc::raw
+}
+
+#define GRAPHENE_EXTERNAL_SERIALIZATION_PACK(ext, type) \
+namespace fc { namespace raw { \
+   ext template void pack< datastream<size_t>, type >( \
+         datastream<size_t>& s, const type& tx, uint32_t _max_depth ); \
+   ext template void pack< sha256::encoder, type >( \
+         sha256::encoder& s, const type& tx, uint32_t _max_depth ); \
+   ext template void pack< datastream<char*>, type >( \
+         datastream<char*>& s, const type& tx, uint32_t _max_depth ); \
+   ext template void unpack< datastream<const char*>, type >( \
+         datastream<const char*>& s, type& tx, uint32_t _max_depth ); \
+} }
+
+#define GRAPHENE_EXTERNAL_SERIALIZATION(ext, type) \
+   GRAPHENE_EXTERNAL_SERIALIZATION_VARIANT(ext, type) \
+   GRAPHENE_EXTERNAL_SERIALIZATION_PACK(ext, type)
+
 #define GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION(type) GRAPHENE_EXTERNAL_SERIALIZATION(extern, type)
 #define GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION(type) GRAPHENE_EXTERNAL_SERIALIZATION(/*not extern*/, type)
+
+#define GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION_VARIANT(type) \
+   GRAPHENE_EXTERNAL_SERIALIZATION_VARIANT(/*not extern*/, type)
+#define GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION_PACK(type) \
+   GRAPHENE_EXTERNAL_SERIALIZATION_PACK(/*not extern*/, type)
 
 #define GRAPHENE_NAME_TO_OBJECT_TYPE(x, prefix, name) BOOST_PP_CAT(prefix, BOOST_PP_CAT(name, _object_type))
 #define GRAPHENE_NAME_TO_ID_TYPE(x, y, name) BOOST_PP_CAT(name, _id_type)
@@ -132,17 +150,65 @@ using chain_id_type = fc::sha256;
 using ratio_type = boost::rational<int32_t>;
 
 enum asset_issuer_permission_flags {
-    charge_market_fee    = 0x01, /**< an issuer-specified percentage of all market trades in this asset is paid to the issuer */
-    white_list           = 0x02, /**< accounts must be whitelisted in order to hold this asset */
-    override_authority   = 0x04, /**< issuer may transfer asset back to himself */
-    transfer_restricted  = 0x08, /**< require the issuer to be one party to every transfer */
-    disable_force_settle = 0x10, /**< disable force settling */
-    global_settle        = 0x20, /**< allow the bitasset issuer to force a global settling -- this may be set in permissions, but not flags */
-    disable_confidential = 0x40, /**< allow the asset to be used with confidential transactions */
-    witness_fed_asset    = 0x80, /**< allow the asset to be fed by witnesses */
-    committee_fed_asset  = 0x100 /**< allow the asset to be fed by the committee */
+    /// @note If one of these bits is set in asset issuer permissions,
+    ///       it means the asset issuer (or owner for bitassets) has the permission to update
+    ///       the corresponding flag, parameters or perform certain actions.
+    ///@{
+    charge_market_fee    = 0x01, ///< market trades in this asset may be charged
+    white_list           = 0x02, ///< accounts must be whitelisted in order to hold or transact this asset
+    override_authority   = 0x04, ///< issuer may transfer asset back to himself
+    transfer_restricted  = 0x08, ///< require the issuer to be one party to every transfer
+    disable_force_settle = 0x10, ///< disable force settling
+    global_settle        = 0x20, ///< allow the bitasset owner to force a global settlement, permission only
+    disable_confidential = 0x40, ///< disallow the asset to be used with confidential transactions
+    witness_fed_asset    = 0x80, ///< the bitasset is to be fed by witnesses
+    committee_fed_asset  = 0x100, ///< the bitasset is to be fed by the committee
+    ///@}
+    /// @note If one of these bits is set in asset issuer permissions,
+    ///       it means the asset issuer (or owner for bitassets) does NOT have the permission to update
+    ///       the corresponding flag, parameters or perform certain actions.
+    ///       This is to be compatible with old client software.
+    ///@{
+    lock_max_supply      = 0x200, ///< the max supply of the asset can not be updated
+    disable_new_supply   = 0x400, ///< unable to create new supply for the asset
+    /// @note These parameters are for issuer permission only.
+    ///       For each parameter, if it is set in issuer permission,
+    ///       it means the bitasset owner can not update the corresponding parameter.
+    ///@{
+    /// @note For each one of these parameters, if it is set in issuer permission, and
+    ///       * if the value of the parameter was set by the bitasset owner, it can not be updated,
+    ///       * if no value was set by the owner, the value can still be updated by the feed producers.
+    ///@{
+    disable_mcr_update   = 0x800, ///< the bitasset owner can not update MCR, permission only
+    disable_icr_update   = 0x1000, ///< the bitasset owner can not update ICR, permission only
+    disable_mssr_update  = 0x2000, ///< the bitasset owner can not update MSSR, permission only
+    ///@}
+    disable_bsrm_update  = 0x4000, ///< the bitasset owner can not update BSRM, permission only
+    ///@}
+    disable_collateral_bidding = 0x8000  ///< Can not bid collateral after a global settlement
+    ///@}
 };
-const static uint32_t ASSET_ISSUER_PERMISSION_MASK =
+
+// The bits that can be used in asset issuer permissions for non-UIA assets
+const static uint16_t ASSET_ISSUER_PERMISSION_MASK =
+        charge_market_fee
+        | white_list
+        | override_authority
+        | transfer_restricted
+        | disable_force_settle
+        | global_settle
+        | disable_confidential
+        | witness_fed_asset
+        | committee_fed_asset
+        | lock_max_supply
+        | disable_new_supply
+        | disable_mcr_update
+        | disable_icr_update
+        | disable_mssr_update
+        | disable_bsrm_update
+        | disable_collateral_bidding;
+// The "enable" bits for non-UIA assets
+const static uint16_t ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK =
         charge_market_fee
         | white_list
         | override_authority
@@ -152,12 +218,45 @@ const static uint32_t ASSET_ISSUER_PERMISSION_MASK =
         | disable_confidential
         | witness_fed_asset
         | committee_fed_asset;
-const static uint32_t UIA_ASSET_ISSUER_PERMISSION_MASK =
+// The "disable" bits for non-UIA assets
+const static uint16_t ASSET_ISSUER_PERMISSION_DISABLE_BITS_MASK =
+        lock_max_supply
+        | disable_new_supply
+        | disable_mcr_update
+        | disable_icr_update
+        | disable_mssr_update
+        | disable_bsrm_update
+        | disable_collateral_bidding;
+// The bits that can be used in asset issuer permissions for UIA assets
+const static uint16_t UIA_ASSET_ISSUER_PERMISSION_MASK =
+        charge_market_fee
+        | white_list
+        | override_authority
+        | transfer_restricted
+        | disable_confidential
+        | lock_max_supply
+        | disable_new_supply;
+// The bits that can be used in asset issuer permissions for UIA assets before hf48/75
+const static uint16_t DEFAULT_UIA_ASSET_ISSUER_PERMISSION =
         charge_market_fee
         | white_list
         | override_authority
         | transfer_restricted
         | disable_confidential;
+// The bits that can be used in asset issuer permissions for non-UIA assets but not for UIA assets
+const static uint16_t NON_UIA_ONLY_ISSUER_PERMISSION_MASK =
+        ASSET_ISSUER_PERMISSION_MASK ^ UIA_ASSET_ISSUER_PERMISSION_MASK;
+// The bits that can be used in asset issuer permissions but can not be used in flags
+const static uint16_t PERMISSION_ONLY_MASK =
+        global_settle
+        | disable_mcr_update
+        | disable_icr_update
+        | disable_mssr_update
+        | disable_bsrm_update;
+// The bits that can be used in flags for non-UIA assets
+const static uint16_t VALID_FLAGS_MASK = ASSET_ISSUER_PERMISSION_MASK & (uint16_t)(~PERMISSION_ONLY_MASK);
+// the bits that can be used in flags for UIA assets
+const static uint16_t UIA_VALID_FLAGS_MASK = UIA_ASSET_ISSUER_PERMISSION_MASK;
 
 enum reserved_spaces {
     relative_protocol_ids = 0,
@@ -222,24 +321,33 @@ void from_variant( const fc::variant& var, std::shared_ptr<const graphene::proto
 
 } // fc::raw
 
+
+/// Object types in the Protocol Space (enum object_type (1.x.x))
 GRAPHENE_DEFINE_IDS(protocol, protocol_ids, /*protocol objects are not prefixed*/,
-                    (null)
-                    (base)
-                    (account)
-                    (asset)
-                    (force_settlement)
-                    (committee_member)
-                    (witness)
-                    (limit_order)
-                    (call_order)
-                    (custom)
-                    (proposal)
-                    (operation_history)
-                    (withdraw_permission)
-                    (vesting_balance)
-                    (worker)
-                    (balance)
-                    (htlc))
+                    /* 1.0.x  */ (null) // no data
+                    /* 1.1.x  */ (base) // no data
+                    /* 1.2.x  */ (account)
+                    /* 1.3.x  */ (asset)
+                    /* 1.4.x  */ (force_settlement)
+                    /* 1.5.x  */ (committee_member)
+                    /* 1.6.x  */ (witness)
+                    /* 1.7.x  */ (limit_order)
+                    /* 1.8.x  */ (call_order)
+                    /* 1.9.x  */ (custom) // unused
+                    /* 1.10.x */ (proposal)
+                    /* 1.11.x */ (operation_history) // strictly speaking it is not in protocol
+                    /* 1.12.x */ (withdraw_permission)
+                    /* 1.13.x */ (vesting_balance)
+                    /* 1.14.x */ (worker)
+                    /* 1.15.x */ (balance)
+                    /* 1.16.x */ (htlc)
+                    /* 1.17.x */ (custom_authority)
+                    /* 1.18.x */ (ticket)
+                    /* 1.19.x */ (liquidity_pool)
+                    /* 1.20.x */ (samet_fund)
+                    /* 1.21.x */ (credit_offer)
+                    /* 1.22.x */ (credit_deal)
+                   )
 
 FC_REFLECT(graphene::protocol::public_key_type, (key_data))
 FC_REFLECT(graphene::protocol::public_key_type::binary_key, (data)(check))
@@ -256,7 +364,15 @@ FC_REFLECT_ENUM(graphene::protocol::asset_issuer_permission_flags,
                 (global_settle)
                 (disable_confidential)
                 (witness_fed_asset)
-                (committee_fed_asset))
+                (committee_fed_asset)
+                (lock_max_supply)
+                (disable_new_supply)
+                (disable_mcr_update)
+                (disable_icr_update)
+                (disable_mssr_update)
+                (disable_bsrm_update)
+                (disable_collateral_bidding)
+               )
 
 namespace fc { namespace raw {
    extern template void pack( datastream<size_t>& s, const graphene::protocol::public_key_type& tx,
