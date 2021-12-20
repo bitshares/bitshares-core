@@ -699,7 +699,7 @@ graphene::utilities::ES elasticsearch_plugin::prepareHistoryQuery(string query)
    es.curl = curl;
    es.elasticsearch_url = my->_elasticsearch_node_url;
    es.index_prefix = my->_elasticsearch_index_prefix;
-   es.endpoint = es.index_prefix + "*/data/_search";
+   es.endpoint = es.index_prefix + "*/_doc/_search";
    es.query = query;
 
    return es;
