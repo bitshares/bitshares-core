@@ -417,7 +417,7 @@ void es_objects_plugin::plugin_startup()
    }
    catch( ... )
    {
-      wlog( "Unable to get ES version, assuming it is above 7" );
+      wlog( "Unable to get ES version, assuming it is 7 or above" );
    }
 }
 
