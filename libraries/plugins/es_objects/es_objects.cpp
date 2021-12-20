@@ -229,7 +229,7 @@ void es_objects_plugin_impl::remove_from_database( object_id_type id, std::strin
       delete_line["_id"] = string(id);
       delete_line["_index"] = _es_objects_index_prefix + index;
       if(!esge7)
-         delete_line["_type"] = "data";
+         delete_line["_type"] = "_doc";
       fc::mutable_variant_object final_delete_line;
       final_delete_line["delete"] = delete_line;
       prepare.push_back(fc::json::to_string(final_delete_line));
@@ -244,7 +244,7 @@ void es_objects_plugin_impl::prepareTemplate(T blockchain_object, string index_n
    fc::mutable_variant_object bulk_header;
    bulk_header["_index"] = _es_objects_index_prefix + index_name;
    if(!esge7)
-      bulk_header["_type"] = "data";
+      bulk_header["_type"] = "_doc";
    if(_es_objects_keep_only_current)
    {
       bulk_header["_id"] = string(blockchain_object.id);
