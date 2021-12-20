@@ -121,7 +121,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
 
          // check the visitor data
          auto block_date = db.head_block_time();
-         std::string index_name = graphene::utilities::generateIndexName(block_date, es_index_prefix);
+         std::string index_name = es_index_prefix + block_date.to_iso_string().substr( 0, 7 ); // yyyy-mm
 
          es.endpoint = index_name + "/_doc/2.9.12"; // we know last op is a transfer of amount 300
          res = graphene::utilities::getEndPoint(es);
