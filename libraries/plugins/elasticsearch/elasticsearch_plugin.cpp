@@ -80,7 +80,7 @@ class elasticsearch_plugin_impl
       std::string bulk_line;
       std::string index_name;
       bool is_sync = false;
-      bool is_es_version_7_or_above = false;
+      bool is_es_version_7_or_above = true;
    private:
       bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const uint32_t block_number );
       const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
@@ -571,10 +571,16 @@ void elasticsearch_plugin::plugin_startup()
    if(!graphene::utilities::checkES(es))
       FC_THROW_EXCEPTION(fc::exception, "ES database is not up in url ${url}", ("url", my->_elasticsearch_node_url));
 
-   const auto es_version = graphene::utilities::getVersion(es);
-   auto dot_pos = es_version.find('.');
-   if(std::stoi(es_version.substr(0,dot_pos)) >= 7)
-      my->is_es_version_7_or_above = true;
+   try {
+      const auto es_version = graphene::utilities::getVersion(es);
+      auto dot_pos = es_version.find('.');
+      if( std::stoi(es_version.substr(0,dot_pos)) < 7 )
+         my->is_es_version_7_or_above = false;
+   }
+   catch( ... )
+   {
+      wlog( "Unable to get ES version, assuming it is above 7" );
+   }
 
    ilog("elasticsearch ACCOUNT HISTORY: plugin_startup() begin");
 }

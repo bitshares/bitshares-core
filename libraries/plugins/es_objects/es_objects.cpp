@@ -74,7 +74,7 @@ class es_objects_plugin_impl
 
       uint32_t block_number;
       fc::time_point_sec block_time;
-      bool is_es_version_7_or_above = false;
+      bool is_es_version_7_or_above = true;
 
    private:
       template<typename T>
@@ -409,10 +409,16 @@ void es_objects_plugin::plugin_startup()
       FC_THROW_EXCEPTION(fc::exception, "ES database is not up in url ${url}", ("url", my->_es_objects_elasticsearch_url));
    ilog("elasticsearch OBJECTS: plugin_startup() begin");
 
-   const auto es_version = graphene::utilities::getVersion(es);
-   auto dot_pos = es_version.find('.');
-   if(std::stoi(es_version.substr(0,dot_pos)) >= 7)
-      my->is_es_version_7_or_above = true;
+   try {
+      const auto es_version = graphene::utilities::getVersion(es);
+      auto dot_pos = es_version.find('.');
+      if( std::stoi(es_version.substr(0,dot_pos)) < 7 )
+         my->is_es_version_7_or_above = false;
+   }
+   catch( ... )
+   {
+      wlog( "Unable to get ES version, assuming it is above 7" );
+   }
 }
 
 } }
