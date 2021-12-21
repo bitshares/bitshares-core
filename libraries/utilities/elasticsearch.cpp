@@ -49,7 +49,7 @@ bool checkES(ES& es)
 
 }
 
-const std::string getVersion(ES& es)
+std::string getESVersion(ES& es)
 {
    graphene::utilities::CurlRequest curl_request;
    curl_request.handler = es.curl;
@@ -62,7 +62,22 @@ const std::string getVersion(ES& es)
    return response["version"]["number"].as_string();
 }
 
-const std::string simpleQuery(ES& es)
+void checkESVersion7OrAbove(ES& es, bool& result) noexcept
+{
+   static const int64_t version_7 = 7;
+   try {
+      const auto es_version = graphene::utilities::getESVersion(es);
+      auto dot_pos = es_version.find('.');
+      result = ( std::stoi(es_version.substr(0,dot_pos)) >= version_7 );
+   }
+   catch( ... )
+   {
+      wlog( "Unable to get ES version, assuming it is 7 or above" );
+      result = true;
+   }
+}
+
+std::string simpleQuery(ES& es)
 {
    graphene::utilities::CurlRequest curl_request;
    curl_request.handler = es.curl;
@@ -92,7 +107,7 @@ bool SendBulk(ES&& es)
    return false;
 }
 
-const std::string joinBulkLines(const std::vector<std::string>& bulk)
+std::string joinBulkLines(const std::vector<std::string>& bulk)
 {
    auto bulking = boost::algorithm::join(bulk, "\n");
    bulking = bulking + "\n";
@@ -132,7 +147,7 @@ bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer)
    return true;
 }
 
-const std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, std::string&& data)
+std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, std::string&& data)
 {
    std::vector<std::string> bulk;
    fc::mutable_variant_object final_bulk_header;
@@ -157,7 +172,7 @@ bool deleteAll(ES& es)
    else
       return true;
 }
-const std::string getEndPoint(ES& es)
+std::string getEndPoint(ES& es)
 {
    graphene::utilities::CurlRequest curl_request;
    curl_request.handler = es.curl;
@@ -168,7 +183,7 @@ const std::string getEndPoint(ES& es)
    return doCurl(curl_request);
 }
 
-const std::string doCurl(CurlRequest& curl)
+std::string doCurl(CurlRequest& curl)
 {
    std::string CurlReadBuffer;
    struct curl_slist *headers = NULL;

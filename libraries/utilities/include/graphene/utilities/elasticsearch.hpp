@@ -54,15 +54,16 @@ namespace graphene { namespace utilities {
    };
 
    bool SendBulk(ES&& es);
-   const std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, std::string&& data);
+   std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, std::string&& data);
    bool checkES(ES& es);
-   const std::string getVersion(ES& es);
-   const std::string simpleQuery(ES& es);
+   std::string getESVersion(ES& es);
+   void checkESVersion7OrAbove(ES& es, bool& result) noexcept;
+   std::string simpleQuery(ES& es);
    bool deleteAll(ES& es);
    bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer);
-   const std::string getEndPoint(ES& es);
-   const std::string doCurl(CurlRequest& curl);
-   const std::string joinBulkLines(const std::vector<std::string>& bulk);
+   std::string getEndPoint(ES& es);
+   std::string doCurl(CurlRequest& curl);
+   std::string joinBulkLines(const std::vector<std::string>& bulk);
    long getResponseCode(CURL *handler);
 
 } } // end namespace graphene::utilities

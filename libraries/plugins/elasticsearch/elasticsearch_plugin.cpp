@@ -53,6 +53,10 @@ class elasticsearch_plugin_impl
          return _self.database();
       }
 
+      friend class graphene::elasticsearch::elasticsearch_plugin;
+
+   private:
+
       elasticsearch_plugin& _self;
       primary_index< operation_history_index >* _oho_index;
 
@@ -81,7 +85,7 @@ class elasticsearch_plugin_impl
       std::string index_name;
       bool is_sync = false;
       bool is_es_version_7_or_above = true;
-   private:
+
       bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const uint32_t block_number );
       const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
                                                             const account_id_type& account_id,
@@ -97,6 +101,7 @@ class elasticsearch_plugin_impl
       void createBulkLine(const account_transaction_history_object& ath);
       void prepareBulk(const account_transaction_history_id_type& ath_id);
       void populateESstruct();
+      void init_program_options(const boost::program_options::variables_map& options);
 };
 
 elasticsearch_plugin_impl::~elasticsearch_plugin_impl()
@@ -107,8 +112,8 @@ elasticsearch_plugin_impl::~elasticsearch_plugin_impl()
    }
 }
 
-static const std::string generateIndexName( const fc::time_point_sec& block_date,
-                                            const std::string& _elasticsearch_index_prefix )
+static std::string generateIndexName( const fc::time_point_sec& block_date,
+                                      const std::string& _elasticsearch_index_prefix )
 {
    auto block_date_string = block_date.to_iso_string();
    std::vector<std::string> parts;
@@ -509,44 +514,49 @@ void elasticsearch_plugin::plugin_set_program_options(
    cfg.add(cli);
 }
 
-void elasticsearch_plugin::plugin_initialize(const boost::program_options::variables_map& options)
+void detail::elasticsearch_plugin_impl::init_program_options(const boost::program_options::variables_map& options)
 {
-   my->_oho_index = database().add_index< primary_index< operation_history_index > >();
-   database().add_index< primary_index< account_transaction_history_index > >();
-
    if (options.count("elasticsearch-node-url") > 0) {
-      my->_elasticsearch_node_url = options["elasticsearch-node-url"].as<std::string>();
+      _elasticsearch_node_url = options["elasticsearch-node-url"].as<std::string>();
    }
    if (options.count("elasticsearch-bulk-replay") > 0) {
-      my->_elasticsearch_bulk_replay = options["elasticsearch-bulk-replay"].as<uint32_t>();
+      _elasticsearch_bulk_replay = options["elasticsearch-bulk-replay"].as<uint32_t>();
    }
    if (options.count("elasticsearch-bulk-sync") > 0) {
-      my->_elasticsearch_bulk_sync = options["elasticsearch-bulk-sync"].as<uint32_t>();
+      _elasticsearch_bulk_sync = options["elasticsearch-bulk-sync"].as<uint32_t>();
    }
    if (options.count("elasticsearch-visitor") > 0) {
-      my->_elasticsearch_visitor = options["elasticsearch-visitor"].as<bool>();
+      _elasticsearch_visitor = options["elasticsearch-visitor"].as<bool>();
    }
    if (options.count("elasticsearch-basic-auth") > 0) {
-      my->_elasticsearch_basic_auth = options["elasticsearch-basic-auth"].as<std::string>();
+      _elasticsearch_basic_auth = options["elasticsearch-basic-auth"].as<std::string>();
    }
    if (options.count("elasticsearch-index-prefix") > 0) {
-      my->_elasticsearch_index_prefix = options["elasticsearch-index-prefix"].as<std::string>();
+      _elasticsearch_index_prefix = options["elasticsearch-index-prefix"].as<std::string>();
    }
    if (options.count("elasticsearch-operation-object") > 0) {
-      my->_elasticsearch_operation_object = options["elasticsearch-operation-object"].as<bool>();
+      _elasticsearch_operation_object = options["elasticsearch-operation-object"].as<bool>();
    }
    if (options.count("elasticsearch-start-es-after-block") > 0) {
-      my->_elasticsearch_start_es_after_block = options["elasticsearch-start-es-after-block"].as<uint32_t>();
+      _elasticsearch_start_es_after_block = options["elasticsearch-start-es-after-block"].as<uint32_t>();
    }
    if (options.count("elasticsearch-operation-string") > 0) {
-      my->_elasticsearch_operation_string = options["elasticsearch-operation-string"].as<bool>();
+      _elasticsearch_operation_string = options["elasticsearch-operation-string"].as<bool>();
    }
    if (options.count("elasticsearch-mode") > 0) {
       const auto option_number = options["elasticsearch-mode"].as<uint16_t>();
       if(option_number > mode::all)
          FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Elasticsearch mode not valid");
-      my->_elasticsearch_mode = static_cast<mode>(options["elasticsearch-mode"].as<uint16_t>());
+      _elasticsearch_mode = static_cast<mode>(options["elasticsearch-mode"].as<uint16_t>());
    }
+}
+
+void elasticsearch_plugin::plugin_initialize(const boost::program_options::variables_map& options)
+{
+   my->_oho_index = database().add_index< primary_index< operation_history_index > >();
+   database().add_index< primary_index< account_transaction_history_index > >();
+
+   my->init_program_options( options );
 
    if(my->_elasticsearch_mode != mode::only_query) {
       if (my->_elasticsearch_mode == mode::all && !my->_elasticsearch_operation_string)
@@ -566,19 +576,9 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
    es.auth = my->_elasticsearch_basic_auth;
 
    if(!graphene::utilities::checkES(es))
-      FC_THROW_EXCEPTION(fc::exception, "ES database is not up in url ${url}", ("url", my->_elasticsearch_node_url));
+      FC_THROW( "ES database is not up in url ${url}", ("url", my->_elasticsearch_node_url) );
 
-   try {
-      const auto es_version = graphene::utilities::getVersion(es);
-      auto dot_pos = es_version.find('.');
-      if( std::stoi(es_version.substr(0,dot_pos)) < 7 )
-         my->is_es_version_7_or_above = false;
-   }
-   catch( ... )
-   {
-      wlog( "Unable to get ES version, assuming it is 7 or above" );
-   }
-
+   graphene::utilities::checkESVersion7OrAbove(es, my->is_es_version_7_or_above);
 }
 
 void elasticsearch_plugin::plugin_startup()

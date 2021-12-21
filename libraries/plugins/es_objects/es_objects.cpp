@@ -53,6 +53,9 @@ class es_objects_plugin_impl
       bool genesis();
       void remove_from_database(object_id_type id, std::string index);
 
+      friend class graphene::es_objects::es_objects_plugin;
+
+   private:
       es_objects_plugin& _self;
       std::string _es_objects_elasticsearch_url = "http://localhost:9200/";
       std::string _es_objects_auth = "";
@@ -76,9 +79,10 @@ class es_objects_plugin_impl
       fc::time_point_sec block_time;
       bool is_es_version_7_or_above = true;
 
-   private:
       template<typename T>
       void prepareTemplate(T blockchain_object, string index_name);
+
+      void init_program_options(const boost::program_options::variables_map& options);
 };
 
 bool es_objects_plugin_impl::genesis()
@@ -323,47 +327,52 @@ void es_objects_plugin::plugin_set_program_options(
    cfg.add(cli);
 }
 
-void es_objects_plugin::plugin_initialize(const boost::program_options::variables_map& options)
+void detail::es_objects_plugin_impl::init_program_options(const boost::program_options::variables_map& options)
 {
    if (options.count("es-objects-elasticsearch-url") > 0) {
-      my->_es_objects_elasticsearch_url = options["es-objects-elasticsearch-url"].as<std::string>();
+      _es_objects_elasticsearch_url = options["es-objects-elasticsearch-url"].as<std::string>();
    }
    if (options.count("es-objects-auth") > 0) {
-      my->_es_objects_auth = options["es-objects-auth"].as<std::string>();
+      _es_objects_auth = options["es-objects-auth"].as<std::string>();
    }
    if (options.count("es-objects-bulk-replay") > 0) {
-      my->_es_objects_bulk_replay = options["es-objects-bulk-replay"].as<uint32_t>();
+      _es_objects_bulk_replay = options["es-objects-bulk-replay"].as<uint32_t>();
    }
    if (options.count("es-objects-bulk-sync") > 0) {
-      my->_es_objects_bulk_sync = options["es-objects-bulk-sync"].as<uint32_t>();
+      _es_objects_bulk_sync = options["es-objects-bulk-sync"].as<uint32_t>();
    }
    if (options.count("es-objects-proposals") > 0) {
-      my->_es_objects_proposals = options["es-objects-proposals"].as<bool>();
+      _es_objects_proposals = options["es-objects-proposals"].as<bool>();
    }
    if (options.count("es-objects-accounts") > 0) {
-      my->_es_objects_accounts = options["es-objects-accounts"].as<bool>();
+      _es_objects_accounts = options["es-objects-accounts"].as<bool>();
    }
    if (options.count("es-objects-assets") > 0) {
-      my->_es_objects_assets = options["es-objects-assets"].as<bool>();
+      _es_objects_assets = options["es-objects-assets"].as<bool>();
    }
    if (options.count("es-objects-balances") > 0) {
-      my->_es_objects_balances = options["es-objects-balances"].as<bool>();
+      _es_objects_balances = options["es-objects-balances"].as<bool>();
    }
    if (options.count("es-objects-limit-orders") > 0) {
-      my->_es_objects_limit_orders = options["es-objects-limit-orders"].as<bool>();
+      _es_objects_limit_orders = options["es-objects-limit-orders"].as<bool>();
    }
    if (options.count("es-objects-asset-bitasset") > 0) {
-      my->_es_objects_asset_bitasset = options["es-objects-asset-bitasset"].as<bool>();
+      _es_objects_asset_bitasset = options["es-objects-asset-bitasset"].as<bool>();
    }
    if (options.count("es-objects-index-prefix") > 0) {
-      my->_es_objects_index_prefix = options["es-objects-index-prefix"].as<std::string>();
+      _es_objects_index_prefix = options["es-objects-index-prefix"].as<std::string>();
    }
    if (options.count("es-objects-keep-only-current") > 0) {
-      my->_es_objects_keep_only_current = options["es-objects-keep-only-current"].as<bool>();
+      _es_objects_keep_only_current = options["es-objects-keep-only-current"].as<bool>();
    }
    if (options.count("es-objects-start-es-after-block") > 0) {
-      my->_es_objects_start_es_after_block = options["es-objects-start-es-after-block"].as<uint32_t>();
+      _es_objects_start_es_after_block = options["es-objects-start-es-after-block"].as<uint32_t>();
    }
+}
+
+void es_objects_plugin::plugin_initialize(const boost::program_options::variables_map& options)
+{
+   my->init_program_options( options );
 
    database().applied_block.connect([this](const signed_block &b) {
       if(b.block_num() == 1 && my->_es_objects_start_es_after_block == 0) {
@@ -403,20 +412,9 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
    es.auth = my->_es_objects_index_prefix;
 
    if(!graphene::utilities::checkES(es))
-      FC_THROW_EXCEPTION(fc::exception, "ES database is not up in url ${url}", ("url", my->_es_objects_elasticsearch_url));
-   ilog("elasticsearch OBJECTS: plugin_startup() begin");
+      FC_THROW( "ES database is not up in url ${url}", ("url", my->_es_objects_elasticsearch_url) );
 
-   try {
-      const auto es_version = graphene::utilities::getVersion(es);
-      auto dot_pos = es_version.find('.');
-      if( std::stoi(es_version.substr(0,dot_pos)) < 7 )
-         my->is_es_version_7_or_above = false;
-   }
-   catch( ... )
-   {
-      wlog( "Unable to get ES version, assuming it is 7 or above" );
-   }
-
+   graphene::utilities::checkESVersion7OrAbove(es, my->is_es_version_7_or_above);
 }
 
 void es_objects_plugin::plugin_startup()
