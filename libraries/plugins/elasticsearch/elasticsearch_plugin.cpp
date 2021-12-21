@@ -56,7 +56,6 @@ class elasticsearch_plugin_impl
       friend class graphene::elasticsearch::elasticsearch_plugin;
 
    private:
-
       elasticsearch_plugin& _self;
       primary_index< operation_history_index >* _oho_index;
 
@@ -86,7 +85,8 @@ class elasticsearch_plugin_impl
       bool is_sync = false;
       bool is_es_version_7_or_above = true;
 
-      bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const uint32_t block_number );
+      bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho,
+                              const uint32_t block_number );
       const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
                                                             const account_id_type& account_id,
                                                             const optional <operation_history_object>& oho);
@@ -306,7 +306,8 @@ void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_obje
    vs.transfer_data.asset = o_v.transfer_asset_id;
    vs.transfer_data.asset_name = transfer_asset.symbol;
    vs.transfer_data.amount = o_v.transfer_amount;
-   vs.transfer_data.amount_units = (o_v.transfer_amount.value)/(double)asset::scaled_precision(transfer_asset.precision).value;
+   vs.transfer_data.amount_units = (o_v.transfer_amount.value)
+                                 / (double)asset::scaled_precision(transfer_asset.precision).value;
    vs.transfer_data.from = o_v.transfer_from;
    vs.transfer_data.to = o_v.transfer_to;
 
@@ -317,14 +318,18 @@ void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_obje
    vs.fill_data.pays_asset_id = o_v.fill_pays_asset_id;
    vs.fill_data.pays_asset_name = fill_pays_asset.symbol;
    vs.fill_data.pays_amount = o_v.fill_pays_amount;
-   vs.fill_data.pays_amount_units = (o_v.fill_pays_amount.value)/(double)asset::scaled_precision(fill_pays_asset.precision).value;
+   vs.fill_data.pays_amount_units = (o_v.fill_pays_amount.value)
+                                  / (double)asset::scaled_precision(fill_pays_asset.precision).value;
    vs.fill_data.receives_asset_id = o_v.fill_receives_asset_id;
    vs.fill_data.receives_asset_name = fill_receives_asset.symbol;
    vs.fill_data.receives_amount = o_v.fill_receives_amount;
-   vs.fill_data.receives_amount_units = (o_v.fill_receives_amount.value)/(double)asset::scaled_precision(fill_receives_asset.precision).value;
+   vs.fill_data.receives_amount_units = (o_v.fill_receives_amount.value)
+                                      / (double)asset::scaled_precision(fill_receives_asset.precision).value;
 
-   auto fill_price = (o_v.fill_receives_amount.value/(double)asset::scaled_precision(fill_receives_asset.precision).value) /
-           (o_v.fill_pays_amount.value/(double)asset::scaled_precision(fill_pays_asset.precision).value);
+   auto fill_price = (o_v.fill_receives_amount.value
+                      / (double)asset::scaled_precision(fill_receives_asset.precision).value)
+                   / (o_v.fill_pays_amount.value
+                      / (double)asset::scaled_precision(fill_pays_asset.precision).value);
    vs.fill_data.fill_price_units = fill_price;
    vs.fill_data.fill_price = o_v.fill_fill_price;
    vs.fill_data.is_maker = o_v.fill_is_maker;
@@ -373,9 +378,10 @@ const account_statistics_object& elasticsearch_plugin_impl::getStatsObject(const
    return stats_obj;
 }
 
-const account_transaction_history_object& elasticsearch_plugin_impl::addNewEntry(const account_statistics_object& stats_obj,
-                                                                                 const account_id_type& account_id,
-                                                                                 const optional <operation_history_object>& oho)
+const account_transaction_history_object& elasticsearch_plugin_impl::addNewEntry(
+      const account_statistics_object& stats_obj,
+      const account_id_type& account_id,
+      const optional <operation_history_object>& oho)
 {
    graphene::chain::database& db = database();
    const auto &ath = db.create<account_transaction_history_object>([&](account_transaction_history_object &obj) {
@@ -424,7 +430,8 @@ void elasticsearch_plugin_impl::prepareBulk(const account_transaction_history_id
    prepare.clear();
 }
 
-void elasticsearch_plugin_impl::cleanObjects(const account_transaction_history_id_type& ath_id, const account_id_type& account_id)
+void elasticsearch_plugin_impl::cleanObjects( const account_transaction_history_id_type& ath_id,
+                                              const account_id_type& account_id )
 {
    graphene::chain::database& db = database();
    // remove everything except current object from ath
@@ -652,7 +659,7 @@ vector<operation_history_object> elasticsearch_plugin::get_account_history(
 
    const auto response = graphene::utilities::simpleQuery(es);
    variant variant_response = fc::json::from_string(response);
-   
+
    const auto hits = variant_response["hits"]["total"];
    uint32_t size;
    if( hits.is_object() ) // ES-7 ?
@@ -710,6 +717,5 @@ mode elasticsearch_plugin::get_running_mode()
 {
    return my->_elasticsearch_mode;
 }
-
 
 } }
