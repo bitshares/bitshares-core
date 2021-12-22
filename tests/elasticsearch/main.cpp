@@ -72,7 +72,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          generate_block();
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
-         es.endpoint = es.index_prefix + "*/data/_count";
+         es.endpoint = es.index_prefix + "*/_doc/_count";
          es.query = query;
 
          string res;
@@ -86,7 +86,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
             return (total == "5");
          });
 
-         es.endpoint = es.index_prefix + "*/data/_search";
+         es.endpoint = es.index_prefix + "*/_doc/_search";
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
          auto first_id = j["hits"]["hits"][size_t(0)]["_id"].as_string();
@@ -96,7 +96,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          auto willie = create_account("willie");
          generate_block();
 
-         es.endpoint = es.index_prefix + "*/data/_count";
+         es.endpoint = es.index_prefix + "*/_doc/_count";
 
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::simpleQuery(es);
@@ -121,9 +121,9 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
 
          // check the visitor data
          auto block_date = db.head_block_time();
-         std::string index_name = graphene::utilities::generateIndexName(block_date, es_index_prefix);
+         std::string index_name = es_index_prefix + block_date.to_iso_string().substr( 0, 7 ); // yyyy-MM
 
-         es.endpoint = index_name + "/data/2.9.12"; // we know last op is a transfer of amount 300
+         es.endpoint = index_name + "/_doc/2.9.12"; // we know last op is a transfer of amount 300
          res = graphene::utilities::getEndPoint(es);
          j = fc::json::from_string(res);
          auto last_transfer_amount = j["_source"]["operation_history"]["op_object"]["amount_"]["amount"].as_string();
@@ -196,7 +196,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
 
          generate_block();
 
-         es.endpoint = es.index_prefix + "*/data/_count";
+         es.endpoint = es.index_prefix + "*/_doc/_count";
          fc::wait_for( ES_WAIT_TIME,  [&]() {
             res = graphene::utilities::simpleQuery(es);
             j = fc::json::from_string(res);
@@ -237,7 +237,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
          generate_block();
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
-         es.endpoint = es.index_prefix + "*/data/_count";
+         es.endpoint = es.index_prefix + "*/_doc/_count";
          es.query = query;
 
          string res;
@@ -251,14 +251,14 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
             return (total == "2");
          });
 
-         es.endpoint = es.index_prefix + "asset/data/_search";
+         es.endpoint = es.index_prefix + "asset/_doc/_search";
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
          auto first_id = j["hits"]["hits"][size_t(0)]["_source"]["symbol"].as_string();
          BOOST_CHECK_EQUAL(first_id, "USD");
 
          auto bitasset_data_id = j["hits"]["hits"][size_t(0)]["_source"]["bitasset_data_id"].as_string();
-         es.endpoint = es.index_prefix + "bitasset/data/_search";
+         es.endpoint = es.index_prefix + "bitasset/_doc/_search";
          es.query = "{ \"query\" : { \"bool\": { \"must\" : [{ \"term\": { \"object_id\": \""+bitasset_data_id+"\"}}] } } }";
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
