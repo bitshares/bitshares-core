@@ -319,18 +319,9 @@ struct es_data_adaptor {
          o.erase(i);
       }
 
-      if( o.find("memo") != o.end() )
+      if( o.find("nonce") != o.end() )
       {
-         auto& memo = o["memo"];
-         if (memo.is_object())
-         {
-            fc::mutable_variant_object tmp(memo.get_object());
-            if (tmp.find("nonce") != tmp.end())
-            {
-               tmp["nonce"] = tmp["nonce"].as_string();
-               o["memo"] = tmp;
-            }
-         }
+         o["nonce"] = o["nonce"].as_string();
       }
 
       if( o.find("owner") != o.end() && o["owner"].is_string() ) // vesting_balance_*_operation.owner
