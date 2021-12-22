@@ -273,7 +273,7 @@ struct es_data_adaptor {
    {
       fc::mutable_variant_object o(op);
 
-      map<string, data_type> to_string_fields = {
+      static const map<string, data_type, std::less<>> to_string_fields = {
          { "parameters",               data_type::array_type }, // in committee proposals, current_fees.parameters
          { "op",                       data_type::static_variant_type }, // proposal_create_op.proposed_ops[*].op
          { "proposed_ops",             data_type::array_type },
@@ -285,20 +285,20 @@ struct es_data_adaptor {
          { "acceptable_collateral",    data_type::map_type },
          { "acceptable_borrowers",     data_type::map_type }
       };
-      map<string, fc::variants> original_arrays;
+      map<string, fc::variants, std::less<>> original_arrays;
       vector<string> keys_to_rename;
-      for (auto i = o.begin(); i != o.end(); ++i)
+      for( auto& i : o )
       {
-         const string& name = (*i).key();
-         auto& element = (*i).value();
-         if (element.is_object())
+         const string& name = i.key();
+         auto& element = i.value();
+         if( element.is_object() )
          {
-            auto& vo = element.get_object();
-            if (vo.contains(name.c_str())) // transfer_operation.amount.amount
+            const auto& vo = element.get_object();
+            if( vo.contains(name.c_str()) ) // transfer_operation.amount.amount
                keys_to_rename.emplace_back(name);
             element = adapt(vo);
          }
-         else if (element.is_array())
+         else if( element.is_array() )
          {
             auto& array = element.get_array();
             if( to_string_fields.find(name) != to_string_fields.end() )
@@ -343,7 +343,7 @@ struct es_data_adaptor {
       {
          const auto& name = pair.first;
          auto& value = pair.second;
-         auto type = to_string_fields[name];
+         auto type = to_string_fields.at(name);
          o[name + "_object"] = adapt( value, type );
       }
 
@@ -465,7 +465,7 @@ void elasticsearch_plugin_impl::doBlock(uint32_t trx_in_block, const signed_bloc
 
 struct operation_visitor
 {
-   typedef void result_type;
+   using result_type = void;
 
    share_type fee_amount;
    asset_id_type fee_asset;
