@@ -123,6 +123,7 @@ namespace graphene { namespace protocol {
 
    struct base_operation
    {
+      virtual ~base_operation() = default;
       template<typename T>
       share_type calculate_fee(const T& params)const
       {
