@@ -54,15 +54,43 @@ namespace graphene { namespace utilities {
    };
 
    bool SendBulk(ES&& es);
-   const std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, std::string&& data);
+   std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, std::string&& data);
    bool checkES(ES& es);
-   const std::string simpleQuery(ES& es);
+   std::string getESVersion(ES& es);
+   void checkESVersion7OrAbove(ES& es, bool& result) noexcept;
+   std::string simpleQuery(ES& es);
    bool deleteAll(ES& es);
    bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer);
-   const std::string getEndPoint(ES& es);
-   const std::string generateIndexName(const fc::time_point_sec& block_date, const std::string& _elasticsearch_index_prefix);
-   const std::string doCurl(CurlRequest& curl);
-   const std::string joinBulkLines(const std::vector<std::string>& bulk);
+   std::string getEndPoint(ES& es);
+   std::string doCurl(CurlRequest& curl);
+   std::string joinBulkLines(const std::vector<std::string>& bulk);
    long getResponseCode(CURL *handler);
+
+struct es_data_adaptor
+{
+   enum class data_type
+   {
+      static_variant_type,
+      map_type,
+      array_type // can be simple arrays, object arrays, static_variant arrays, or even nested arrays
+   };
+
+   static fc::variant adapt( const fc::variant_object& op );
+
+   static fc::variant adapt( const fc::variants& v, data_type type );
+
+   static fc::variant adapt_map_item( const fc::variants& v );
+
+   static fc::variant adapt_static_variant( const fc::variants& v );
+
+   /// In-place update
+   static void adapt( fc::variants& v );
+
+   /// Extract data from @p v into @p mv
+   static void extract_data_from_variant( const fc::variant& v,
+                                          fc::mutable_variant_object& mv,
+                                          const std::string& prefix );
+
+};
 
 } } // end namespace graphene::utilities

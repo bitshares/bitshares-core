@@ -24,9 +24,9 @@
 #include <graphene/utilities/elasticsearch.hpp>
 
 #include <boost/algorithm/string/join.hpp>
-#include <boost/algorithm/string.hpp>
 #include <fc/log/logger.hpp>
 #include <fc/io/json.hpp>
+#include <fc/exception/exception.hpp>
 
 size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
 {
@@ -49,7 +49,36 @@ bool checkES(ES& es)
    return true;
 
 }
-const std::string simpleQuery(ES& es)
+
+std::string getESVersion(ES& es)
+{
+   graphene::utilities::CurlRequest curl_request;
+   curl_request.handler = es.curl;
+   curl_request.url = es.elasticsearch_url;
+   curl_request.auth = es.auth;
+   curl_request.type = "GET";
+
+   fc::variant response = fc::json::from_string(doCurl(curl_request));
+
+   return response["version"]["number"].as_string();
+}
+
+void checkESVersion7OrAbove(ES& es, bool& result) noexcept
+{
+   static const int64_t version_7 = 7;
+   try {
+      const auto es_version = graphene::utilities::getESVersion(es);
+      auto dot_pos = es_version.find('.');
+      result = ( std::stoi(es_version.substr(0,dot_pos)) >= version_7 );
+   }
+   catch( ... )
+   {
+      wlog( "Unable to get ES version, assuming it is 7 or above" );
+      result = true;
+   }
+}
+
+std::string simpleQuery(ES& es)
 {
    graphene::utilities::CurlRequest curl_request;
    curl_request.handler = es.curl;
@@ -79,7 +108,7 @@ bool SendBulk(ES&& es)
    return false;
 }
 
-const std::string joinBulkLines(const std::vector<std::string>& bulk)
+std::string joinBulkLines(const std::vector<std::string>& bulk)
 {
    auto bulking = boost::algorithm::join(bulk, "\n");
    bulking = bulking + "\n";
@@ -119,13 +148,13 @@ bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer)
    return true;
 }
 
-const std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, std::string&& data)
+std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, std::string&& data)
 {
    std::vector<std::string> bulk;
    fc::mutable_variant_object final_bulk_header;
    final_bulk_header["index"] = bulk_header;
    bulk.push_back(fc::json::to_string(final_bulk_header));
-   bulk.push_back(data);
+   bulk.emplace_back(std::move(data));
 
    return bulk;
 }
@@ -144,7 +173,7 @@ bool deleteAll(ES& es)
    else
       return true;
 }
-const std::string getEndPoint(ES& es)
+std::string getEndPoint(ES& es)
 {
    graphene::utilities::CurlRequest curl_request;
    curl_request.handler = es.curl;
@@ -155,16 +184,7 @@ const std::string getEndPoint(ES& es)
    return doCurl(curl_request);
 }
 
-const std::string generateIndexName(const fc::time_point_sec& block_date, const std::string& _elasticsearch_index_prefix)
-{
-   auto block_date_string = block_date.to_iso_string();
-   std::vector<std::string> parts;
-   boost::split(parts, block_date_string, boost::is_any_of("-"));
-   std::string index_name = _elasticsearch_index_prefix + parts[0] + "-" + parts[1];
-   return index_name;
-}
-
-const std::string doCurl(CurlRequest& curl)
+std::string doCurl(CurlRequest& curl)
 {
    std::string CurlReadBuffer;
    struct curl_slist *headers = NULL;
@@ -195,6 +215,184 @@ const std::string doCurl(CurlRequest& curl)
    curl_easy_perform(curl.handler);
 
    return CurlReadBuffer;
+}
+
+fc::variant es_data_adaptor::adapt(const fc::variant_object& op)
+{
+   fc::mutable_variant_object o(op);
+
+   // Note: these fields are maps, but were stored in ES as flattened arrays
+   static const std::map<std::string, data_type, std::less<>> flattened_fields = {
+      { "account_auths",    data_type::map_type },
+      { "address_auths",    data_type::map_type },
+      { "key_auths",        data_type::map_type }
+   };
+   // Note:
+   // object arrays listed in this map are stored redundantly in ES, with one instance as a nested object and
+   //      the other as a string for backward compatibility,
+   // object arrays not listed in this map are stored as nested objects only.
+   static const std::map<std::string, data_type, std::less<>> to_string_fields = {
+      { "parameters",               data_type::array_type }, // in committee proposals, current_fees.parameters
+      { "op",                       data_type::static_variant_type }, // proposal_create_op.proposed_ops[*].op
+      { "proposed_ops",             data_type::array_type },
+      { "operations",               data_type::array_type }, // proposal_object.operations
+      { "initializer",              data_type::static_variant_type },
+      { "policy",                   data_type::static_variant_type },
+      { "predicates",               data_type::array_type },
+      { "active_special_authority", data_type::static_variant_type },
+      { "owner_special_authority",  data_type::static_variant_type },
+      { "feeds",                    data_type::map_type }, // asset_bitasset_data_object.feeds
+      { "acceptable_collateral",    data_type::map_type },
+      { "acceptable_borrowers",     data_type::map_type }
+   };
+   std::map<std::string, fc::variants, std::less<>> original_arrays;
+   std::vector<std::string> keys_to_rename;
+   for( auto& i : o )
+   {
+      const std::string& name = i.key();
+      auto& element = i.value();
+      if( element.is_object() )
+      {
+         const auto& vo = element.get_object();
+         if( vo.contains(name.c_str()) ) // transfer_operation.amount.amount
+            keys_to_rename.emplace_back(name);
+         element = adapt(vo);
+      }
+      else if( element.is_array() )
+      {
+         auto& array = element.get_array();
+         if( to_string_fields.find(name) != to_string_fields.end() )
+         {
+            // make a backup and convert to string
+            original_arrays[name] = array;
+            element = fc::json::to_string(element);
+         }
+         else if( flattened_fields.find(name) != flattened_fields.end() )
+         {
+            // make a backup and adapt the original
+            auto backup = array;
+            original_arrays[name] = backup;
+            adapt(array);
+         }
+         else
+            adapt(array);
+      }
+   }
+
+   for( const auto& i : keys_to_rename ) // transfer_operation.amount
+   {
+      std::string new_name = i + "_";
+      o[new_name] = fc::variant(o[i]);
+      o.erase(i);
+   }
+
+   if( o.find("nonce") != o.end() )
+   {
+      o["nonce"] = o["nonce"].as_string();
+   }
+
+   if( o.find("owner") != o.end() && o["owner"].is_string() ) // vesting_balance_*_operation.owner
+   {
+      o["owner_"] = o["owner"].as_string();
+      o.erase("owner");
+   }
+
+   for( const auto& pair : original_arrays )
+   {
+      const auto& name = pair.first;
+      auto& value = pair.second;
+      auto type = data_type::map_type;
+      if( to_string_fields.find(name) != to_string_fields.end() )
+         type =  to_string_fields.at(name);
+      o[name + "_object"] = adapt( value, type );
+   }
+
+   fc::variant v;
+   fc::to_variant(o, v, FC_PACK_MAX_DEPTH);
+   return v;
+}
+
+fc::variant es_data_adaptor::adapt( const fc::variants& v, data_type type )
+{
+   if( data_type::static_variant_type == type )
+      return adapt_static_variant(v);
+
+   // map_type or array_type
+   fc::variants vs;
+   vs.reserve( v.size() );
+   for( const auto& item : v )
+   {
+      if( item.is_array() )
+      {
+         if( data_type::map_type == type )
+            vs.push_back( adapt_map_item( item.get_array() ) );
+         else // assume it is a static_variant array
+            vs.push_back( adapt_static_variant( item.get_array() ) );
+      }
+      else if( item.is_object() ) // object array
+         vs.push_back( adapt( item.get_object() ) );
+      else
+         wlog( "Type of item is unexpected: ${item}", ("item", item) );
+   }
+
+   fc::variant nv;
+   fc::to_variant(vs, nv, FC_PACK_MAX_DEPTH);
+   return nv;
+}
+
+void es_data_adaptor::extract_data_from_variant(
+      const fc::variant& v, fc::mutable_variant_object& mv, const std::string& prefix )
+{
+   if( v.is_object() )
+      mv[prefix + "_object"] = adapt( v.get_object() );
+   else if( v.is_int64() || v.is_uint64() )
+      mv[prefix + "_int"] = v;
+   else if( v.is_bool() )
+      mv[prefix + "_bool"] = v;
+   else if( v.is_string() )
+      mv[prefix + "_string"] = v.get_string();
+   else
+      mv[prefix + "_string"] = fc::json::to_string( v );
+   // Note: we don't use double or array here, and we convert null and blob to string
+}
+
+fc::variant es_data_adaptor::adapt_map_item( const fc::variants& v )
+{
+   FC_ASSERT( v.size() == 2, "Internal error" );
+   fc::mutable_variant_object mv;
+
+   extract_data_from_variant( v[0], mv, "key" );
+   extract_data_from_variant( v[1], mv, "data" );
+
+   fc::variant nv;
+   fc::to_variant( mv, nv, FC_PACK_MAX_DEPTH );
+   return nv;
+}
+
+fc::variant es_data_adaptor::adapt_static_variant( const fc::variants& v )
+{
+   FC_ASSERT( v.size() == 2, "Internal error" );
+   fc::mutable_variant_object mv;
+
+   mv["which"] = v[0];
+   extract_data_from_variant( v[1], mv, "data" );
+
+   fc::variant nv;
+   fc::to_variant( mv, nv, FC_PACK_MAX_DEPTH );
+   return nv;
+}
+
+void es_data_adaptor::adapt(fc::variants& v)
+{
+   for (auto& array_element : v)
+   {
+      if (array_element.is_object())
+         array_element = adapt(array_element.get_object());
+      else if (array_element.is_array())
+         adapt(array_element.get_array());
+      else
+         array_element = array_element.as_string();
+   }
 }
 
 } } // end namespace graphene::utilities
