@@ -273,6 +273,16 @@ struct es_data_adaptor {
    {
       fc::mutable_variant_object o(op);
 
+      // Note: these fields are maps, but were stored in ES as flattened arrays
+      static const map<string, data_type, std::less<>> flattened_fields = {
+         { "account_auths",    data_type::map_type },
+         { "address_auths",    data_type::map_type },
+         { "key_auths",        data_type::map_type }
+      };
+      // Note:
+      // object arrays listed in this map are stored redundantly in ES, with one instance as a nested object and
+      //      the other as a string for backward compatibility,
+      // object arrays not listed in this map are stored as nested objects only.
       static const map<string, data_type, std::less<>> to_string_fields = {
          { "parameters",               data_type::array_type }, // in committee proposals, current_fees.parameters
          { "op",                       data_type::static_variant_type }, // proposal_create_op.proposed_ops[*].op
@@ -307,6 +317,13 @@ struct es_data_adaptor {
                original_arrays[name] = array;
                element = fc::json::to_string(element);
             }
+            else if( flattened_fields.find(name) != flattened_fields.end() )
+            {
+               // make a backup and adapt the original
+               auto backup = array;
+               original_arrays[name] = backup;
+               adapt(array);
+            }
             else
                adapt(array);
          }
@@ -334,7 +351,9 @@ struct es_data_adaptor {
       {
          const auto& name = pair.first;
          auto& value = pair.second;
-         auto type = to_string_fields.at(name);
+         auto type = data_type::map_type;
+         if( to_string_fields.find(name) != to_string_fields.end() )
+            type =  to_string_fields.at(name);
          o[name + "_object"] = adapt( value, type );
       }
 
