@@ -398,6 +398,8 @@ struct es_data_adaptor {
          mv[prefix + "_int"] = v;
       else if( v.is_bool() )
          mv[prefix + "_bool"] = v;
+      else if( v.is_string() )
+         mv[prefix + "_string"] = v.get_string();
       else
          mv[prefix + "_string"] = fc::json::to_string( v );
       // Note: we don't use double or array here, and we convert null and blob to string
