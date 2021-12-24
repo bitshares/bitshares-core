@@ -235,11 +235,13 @@ fc::variant es_data_adaptor::adapt(const fc::variant_object& op)
       { "parameters",               data_type::array_type }, // in committee proposals, current_fees.parameters
       { "op",                       data_type::static_variant_type }, // proposal_create_op.proposed_ops[*].op
       { "proposed_ops",             data_type::array_type },
+      { "operations",               data_type::array_type }, // proposal_object.operations
       { "initializer",              data_type::static_variant_type },
       { "policy",                   data_type::static_variant_type },
       { "predicates",               data_type::array_type },
       { "active_special_authority", data_type::static_variant_type },
       { "owner_special_authority",  data_type::static_variant_type },
+      { "feeds",                    data_type::map_type }, // asset_bitasset_data_object.feeds
       { "acceptable_collateral",    data_type::map_type },
       { "acceptable_borrowers",     data_type::map_type }
    };
