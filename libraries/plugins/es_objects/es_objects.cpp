@@ -54,6 +54,7 @@ class es_objects_plugin_impl
       void remove_from_database(object_id_type id, std::string index);
 
       friend class graphene::es_objects::es_objects_plugin;
+      friend struct genesis_inserter;
 
    private:
       es_objects_plugin& _self;
@@ -85,6 +86,31 @@ class es_objects_plugin_impl
       void init_program_options(const boost::program_options::variables_map& options);
 };
 
+struct genesis_inserter
+{
+   template<uint8_t SpaceID, uint8_t TypeID, typename ObjType, typename DB>
+   static void insert_genesis_objects( bool b, const string& prefix, es_objects_plugin_impl* my, DB& db )
+   {
+      if( !b )
+         return;
+
+      db.get_index( SpaceID, TypeID ).inspect_all_objects( [my, &db, &prefix](const graphene::db::object &o) {
+         auto a = static_cast<const ObjType *>(&o);
+         my->prepareTemplate<ObjType>(*a, prefix);
+      });
+
+      graphene::utilities::ES es;
+      es.curl = my->curl;
+      es.bulk_lines = my->bulk;
+      es.elasticsearch_url = my->_es_objects_elasticsearch_url;
+      es.auth = my->_es_objects_auth;
+      if (!graphene::utilities::SendBulk(std::move(es)))
+         FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error inserting genesis data.");
+      else
+         my->bulk.clear();
+   }
+};
+
 bool es_objects_plugin_impl::genesis()
 {
    ilog("elasticsearch OBJECTS: inserting data from genesis");
@@ -94,40 +120,9 @@ bool es_objects_plugin_impl::genesis()
    block_number = db.head_block_num();
    block_time = db.head_block_time();
 
-   if (_es_objects_accounts) {
-      auto &index_accounts = db.get_index(1, 2);
-      index_accounts.inspect_all_objects([this, &db](const graphene::db::object &o) {
-         auto obj = db.find_object(o.id);
-         auto a = static_cast<const account_object *>(obj);
-         prepareTemplate<account_object>(*a, "account");
-      });
-   }
-   if (_es_objects_assets) {
-      auto &index_assets = db.get_index(1, 3);
-      index_assets.inspect_all_objects([this, &db](const graphene::db::object &o) {
-         auto obj = db.find_object(o.id);
-         auto a = static_cast<const asset_object *>(obj);
-         prepareTemplate<asset_object>(*a, "asset");
-      });
-   }
-   if (_es_objects_balances) {
-      auto &index_balances = db.get_index(2, 5);
-      index_balances.inspect_all_objects([this, &db](const graphene::db::object &o) {
-         auto obj = db.find_object(o.id);
-         auto b = static_cast<const account_balance_object *>(obj);
-         prepareTemplate<account_balance_object>(*b, "balance");
-      });
-   }
-
-   graphene::utilities::ES es;
-   es.curl = curl;
-   es.bulk_lines = bulk;
-   es.elasticsearch_url = _es_objects_elasticsearch_url;
-   es.auth = _es_objects_auth;
-   if (!graphene::utilities::SendBulk(std::move(es)))
-      FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error inserting genesis data.");
-   else
-      bulk.clear();
+   genesis_inserter::insert_genesis_objects<1,2,account_object        >( _es_objects_accounts, "account", this, db );
+   genesis_inserter::insert_genesis_objects<1,3,asset_object          >( _es_objects_assets,   "asset",   this, db );
+   genesis_inserter::insert_genesis_objects<2,5,account_balance_object>( _es_objects_balances, "balance", this, db );
 
    return true;
 }
