@@ -66,4 +66,31 @@ namespace graphene { namespace utilities {
    std::string joinBulkLines(const std::vector<std::string>& bulk);
    long getResponseCode(CURL *handler);
 
+struct es_data_adaptor
+{
+   enum class data_type
+   {
+      static_variant_type,
+      map_type,
+      array_type // can be simple arrays, object arrays, static_variant arrays, or even nested arrays
+   };
+
+   static fc::variant adapt( const fc::variant_object& op );
+
+   static fc::variant adapt( const fc::variants& v, data_type type );
+
+   static fc::variant adapt_map_item( const fc::variants& v );
+
+   static fc::variant adapt_static_variant( const fc::variants& v );
+
+   /// In-place update
+   static void adapt( fc::variants& v );
+
+   /// Extract data from @p v into @p mv
+   static void extract_data_from_variant( const fc::variant& v,
+                                          fc::mutable_variant_object& mv,
+                                          const std::string& prefix );
+
+};
+
 } } // end namespace graphene::utilities
