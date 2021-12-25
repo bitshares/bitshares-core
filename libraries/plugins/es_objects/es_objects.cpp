@@ -90,7 +90,7 @@ class es_objects_plugin_impl
 struct genesis_inserter
 {
    template<uint8_t SpaceID, uint8_t TypeID, typename ObjType, typename DB>
-   static void insert_genesis_objects( bool b, const string& prefix, es_objects_plugin_impl* my, DB& db )
+   static void insert( bool b, const string& prefix, es_objects_plugin_impl* my, DB& db )
    {
       if( !b )
          return;
@@ -111,9 +111,10 @@ bool es_objects_plugin_impl::genesis()
    block_number = db.head_block_num();
    block_time = db.head_block_time();
 
-   genesis_inserter::insert_genesis_objects<1,2,account_object        >( _es_objects_accounts, "account", this, db );
-   genesis_inserter::insert_genesis_objects<1,3,asset_object          >( _es_objects_assets,   "asset",   this, db );
-   genesis_inserter::insert_genesis_objects<2,5,account_balance_object>( _es_objects_balances, "balance", this, db );
+   genesis_inserter::insert<1,2,account_object             >( _es_objects_accounts,       "account",  this, db );
+   genesis_inserter::insert<1,3,asset_object               >( _es_objects_assets,         "asset",    this, db );
+   genesis_inserter::insert<2,4,asset_bitasset_data_object >( _es_objects_asset_bitasset, "bitasset", this, db );
+   genesis_inserter::insert<2,5,account_balance_object     >( _es_objects_balances,       "balance",  this, db );
 
    return true;
 }
