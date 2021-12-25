@@ -54,26 +54,37 @@ class es_objects_plugin_impl
       void remove_from_database(object_id_type id, std::string index);
 
       friend class graphene::es_objects::es_objects_plugin;
+      friend struct genesis_inserter;
 
    private:
+      struct plugin_options
+      {
+         std::string _es_objects_elasticsearch_url = "http://localhost:9200/";
+         std::string _es_objects_auth = "";
+         uint32_t _es_objects_bulk_replay = 10000;
+         uint32_t _es_objects_bulk_sync = 100;
+         bool _es_objects_proposals = true;
+         bool _es_objects_accounts = true;
+         bool _es_objects_assets = true;
+         bool _es_objects_balances = true;
+         bool _es_objects_limit_orders = false;
+         bool _es_objects_asset_bitasset = true;
+         std::string _es_objects_index_prefix = "objects-";
+         uint32_t _es_objects_start_es_after_block = 0;
+         bool _es_objects_keep_only_current = true;
+
+         void init(const boost::program_options::variables_map& options);
+      };
+
       es_objects_plugin& _self;
-      std::string _es_objects_elasticsearch_url = "http://localhost:9200/";
-      std::string _es_objects_auth = "";
-      uint32_t _es_objects_bulk_replay = 10000;
-      uint32_t _es_objects_bulk_sync = 100;
-      bool _es_objects_proposals = true;
-      bool _es_objects_accounts = true;
-      bool _es_objects_assets = true;
-      bool _es_objects_balances = true;
-      bool _es_objects_limit_orders = false;
-      bool _es_objects_asset_bitasset = true;
-      std::string _es_objects_index_prefix = "objects-";
-      uint32_t _es_objects_start_es_after_block = 0;
+      plugin_options _options;
+
+      uint32_t limit_documents = _options._es_objects_bulk_replay;
+
       CURL *curl; // curl handler
-      vector <std::string> bulk;
+      vector<std::string> bulk;
       vector<std::string> prepare;
 
-      bool _es_objects_keep_only_current = true;
 
       uint32_t block_number;
       fc::time_point_sec block_time;
@@ -85,6 +96,30 @@ class es_objects_plugin_impl
       void init_program_options(const boost::program_options::variables_map& options);
 };
 
+struct genesis_inserter
+{
+   es_objects_plugin_impl* my;
+   graphene::chain::database &db;
+
+   explicit genesis_inserter( es_objects_plugin_impl* _my )
+   : my(_my), db( my->_self.database() )
+   { // Nothing to do
+   }
+
+   template<typename ObjType>
+   void insert( bool b, const string& prefix )
+   {
+      if( !b )
+         return;
+
+      db.get_index( ObjType::space_id, ObjType::type_id ).inspect_all_objects(
+            [this, &prefix](const graphene::db::object &o) {
+         auto a = static_cast<const ObjType *>(&o);
+         my->prepareTemplate<ObjType>(*a, prefix);
+      });
+   }
+};
+
 bool es_objects_plugin_impl::genesis()
 {
    ilog("elasticsearch OBJECTS: inserting data from genesis");
@@ -94,40 +129,12 @@ bool es_objects_plugin_impl::genesis()
    block_number = db.head_block_num();
    block_time = db.head_block_time();
 
-   if (_es_objects_accounts) {
-      auto &index_accounts = db.get_index(1, 2);
-      index_accounts.inspect_all_objects([this, &db](const graphene::db::object &o) {
-         auto obj = db.find_object(o.id);
-         auto a = static_cast<const account_object *>(obj);
-         prepareTemplate<account_object>(*a, "account");
-      });
-   }
-   if (_es_objects_assets) {
-      auto &index_assets = db.get_index(1, 3);
-      index_assets.inspect_all_objects([this, &db](const graphene::db::object &o) {
-         auto obj = db.find_object(o.id);
-         auto a = static_cast<const asset_object *>(obj);
-         prepareTemplate<asset_object>(*a, "asset");
-      });
-   }
-   if (_es_objects_balances) {
-      auto &index_balances = db.get_index(2, 5);
-      index_balances.inspect_all_objects([this, &db](const graphene::db::object &o) {
-         auto obj = db.find_object(o.id);
-         auto b = static_cast<const account_balance_object *>(obj);
-         prepareTemplate<account_balance_object>(*b, "balance");
-      });
-   }
+   genesis_inserter inserter( this );
 
-   graphene::utilities::ES es;
-   es.curl = curl;
-   es.bulk_lines = bulk;
-   es.elasticsearch_url = _es_objects_elasticsearch_url;
-   es.auth = _es_objects_auth;
-   if (!graphene::utilities::SendBulk(std::move(es)))
-      FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error inserting genesis data.");
-   else
-      bulk.clear();
+   inserter.insert<account_object             >( _options._es_objects_accounts,       "account"  );
+   inserter.insert<asset_object               >( _options._es_objects_assets,         "asset"    );
+   inserter.insert<asset_bitasset_data_object >( _options._es_objects_asset_bitasset, "bitasset" );
+   inserter.insert<account_balance_object     >( _options._es_objects_balances,       "balance"  );
 
    return true;
 }
@@ -139,18 +146,17 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
    block_time = db.head_block_time();
    block_number = db.head_block_num();
 
-   if(block_number > _es_objects_start_es_after_block) {
+   if(block_number > _options._es_objects_start_es_after_block) {
 
       // check if we are in replay or in sync and change number of bulk documents accordingly
-      uint32_t limit_documents = 0;
       if ((fc::time_point::now() - block_time) < fc::seconds(30))
-         limit_documents = _es_objects_bulk_sync;
+         limit_documents = _options._es_objects_bulk_sync;
       else
-         limit_documents = _es_objects_bulk_replay;
+         limit_documents = _options._es_objects_bulk_replay;
 
 
       for (auto const &value: ids) {
-         if (value.is<proposal_object>() && _es_objects_proposals) {
+         if (value.is<proposal_object>() && _options._es_objects_proposals) {
             auto obj = db.find_object(value);
             auto p = static_cast<const proposal_object *>(obj);
             if (p != nullptr) {
@@ -159,7 +165,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
                else
                   prepareTemplate<proposal_object>(*p, "proposal");
             }
-         } else if (value.is<account_object>() && _es_objects_accounts) {
+         } else if (value.is<account_object>() && _options._es_objects_accounts) {
             auto obj = db.find_object(value);
             auto a = static_cast<const account_object *>(obj);
             if (a != nullptr) {
@@ -168,7 +174,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
                else
                   prepareTemplate<account_object>(*a, "account");
             }
-         } else if (value.is<asset_object>() && _es_objects_assets) {
+         } else if (value.is<asset_object>() && _options._es_objects_assets) {
             auto obj = db.find_object(value);
             auto a = static_cast<const asset_object *>(obj);
             if (a != nullptr) {
@@ -177,7 +183,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
                else
                   prepareTemplate<asset_object>(*a, "asset");
             }
-         } else if (value.is<account_balance_object>() && _es_objects_balances) {
+         } else if (value.is<account_balance_object>() && _options._es_objects_balances) {
             auto obj = db.find_object(value);
             auto b = static_cast<const account_balance_object *>(obj);
             if (b != nullptr) {
@@ -186,7 +192,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
                else
                   prepareTemplate<account_balance_object>(*b, "balance");
             }
-         } else if (value.is<limit_order_object>() && _es_objects_limit_orders) {
+         } else if (value.is<limit_order_object>() && _options._es_objects_limit_orders) {
             auto obj = db.find_object(value);
             auto l = static_cast<const limit_order_object *>(obj);
             if (l != nullptr) {
@@ -195,7 +201,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
                else
                   prepareTemplate<limit_order_object>(*l, "limitorder");
             }
-         } else if (value.is<asset_bitasset_data_object>() && _es_objects_asset_bitasset) {
+         } else if (value.is<asset_bitasset_data_object>() && _options._es_objects_asset_bitasset) {
             auto obj = db.find_object(value);
             auto ba = static_cast<const asset_bitasset_data_object *>(obj);
             if (ba != nullptr) {
@@ -212,8 +218,8 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
          graphene::utilities::ES es;
          es.curl = curl;
          es.bulk_lines = bulk;
-         es.elasticsearch_url = _es_objects_elasticsearch_url;
-         es.auth = _es_objects_auth;
+         es.elasticsearch_url = _options._es_objects_elasticsearch_url;
+         es.auth = _options._es_objects_auth;
 
          if (!graphene::utilities::SendBulk(std::move(es)))
             return false;
@@ -227,11 +233,11 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
 
 void es_objects_plugin_impl::remove_from_database( object_id_type id, std::string index)
 {
-   if(_es_objects_keep_only_current)
+   if(_options._es_objects_keep_only_current)
    {
       fc::mutable_variant_object delete_line;
       delete_line["_id"] = string(id);
-      delete_line["_index"] = _es_objects_index_prefix + index;
+      delete_line["_index"] = _options._es_objects_index_prefix + index;
       if(!is_es_version_7_or_above)
          delete_line["_type"] = "_doc";
       fc::mutable_variant_object final_delete_line;
@@ -246,10 +252,10 @@ template<typename T>
 void es_objects_plugin_impl::prepareTemplate(T blockchain_object, string index_name)
 {
    fc::mutable_variant_object bulk_header;
-   bulk_header["_index"] = _es_objects_index_prefix + index_name;
+   bulk_header["_index"] = _options._es_objects_index_prefix + index_name;
    if(!is_es_version_7_or_above)
       bulk_header["_type"] = "_doc";
-   if(_es_objects_keep_only_current)
+   if(_options._es_objects_keep_only_current)
    {
       bulk_header["_id"] = string(blockchain_object.id);
    }
@@ -267,6 +273,19 @@ void es_objects_plugin_impl::prepareTemplate(T blockchain_object, string index_n
    prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
    std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk));
    prepare.clear();
+
+   if( curl && bulk.size() >= limit_documents ) // send data to elasticsearch when bulk is too large
+   {
+      graphene::utilities::ES es;
+      es.curl = curl;
+      es.bulk_lines = bulk;
+      es.elasticsearch_url = _options._es_objects_elasticsearch_url;
+      es.auth = _options._es_objects_auth;
+      if (!graphene::utilities::SendBulk(std::move(es)))
+         FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error sending bulk data.");
+      else
+         bulk.clear();
+   }
 }
 
 es_objects_plugin_impl::~es_objects_plugin_impl()
@@ -328,6 +347,11 @@ void es_objects_plugin::plugin_set_program_options(
 
 void detail::es_objects_plugin_impl::init_program_options(const boost::program_options::variables_map& options)
 {
+   _options.init( options );
+}
+
+void detail::es_objects_plugin_impl::plugin_options::init(const boost::program_options::variables_map& options)
+{
    if (options.count("es-objects-elasticsearch-url") > 0) {
       _es_objects_elasticsearch_url = options["es-objects-elasticsearch-url"].as<std::string>();
    }
@@ -374,7 +398,7 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
    my->init_program_options( options );
 
    database().applied_block.connect([this](const signed_block &b) {
-      if(b.block_num() == 1 && my->_es_objects_start_es_after_block == 0) {
+      if( 1U == b.block_num() && 0 == my->_options._es_objects_start_es_after_block ) {
          if (!my->genesis())
             FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error populating genesis data.");
       }
@@ -406,12 +430,12 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
 
    graphene::utilities::ES es;
    es.curl = my->curl;
-   es.elasticsearch_url = my->_es_objects_elasticsearch_url;
-   es.auth = my->_es_objects_auth;
-   es.auth = my->_es_objects_index_prefix;
+   es.elasticsearch_url = my->_options._es_objects_elasticsearch_url;
+   es.auth = my->_options._es_objects_auth;
+   es.auth = my->_options._es_objects_index_prefix;
 
    if(!graphene::utilities::checkES(es))
-      FC_THROW( "ES database is not up in url ${url}", ("url", my->_es_objects_elasticsearch_url) );
+      FC_THROW( "ES database is not up in url ${url}", ("url", my->_options._es_objects_elasticsearch_url) );
 
    graphene::utilities::checkESVersion7OrAbove(es, my->is_es_version_7_or_above);
 }
