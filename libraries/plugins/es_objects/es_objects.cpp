@@ -62,6 +62,7 @@ class es_objects_plugin_impl
       std::string _es_objects_auth = "";
       uint32_t _es_objects_bulk_replay = 10000;
       uint32_t _es_objects_bulk_sync = 100;
+      uint32_t limit_documents = _es_objects_bulk_replay;
       bool _es_objects_proposals = true;
       bool _es_objects_accounts = true;
       bool _es_objects_assets = true;
@@ -98,16 +99,6 @@ struct genesis_inserter
          auto a = static_cast<const ObjType *>(&o);
          my->prepareTemplate<ObjType>(*a, prefix);
       });
-
-      graphene::utilities::ES es;
-      es.curl = my->curl;
-      es.bulk_lines = my->bulk;
-      es.elasticsearch_url = my->_es_objects_elasticsearch_url;
-      es.auth = my->_es_objects_auth;
-      if (!graphene::utilities::SendBulk(std::move(es)))
-         FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error inserting genesis data.");
-      else
-         my->bulk.clear();
    }
 };
 
@@ -137,7 +128,6 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
    if(block_number > _es_objects_start_es_after_block) {
 
       // check if we are in replay or in sync and change number of bulk documents accordingly
-      uint32_t limit_documents = 0;
       if ((fc::time_point::now() - block_time) < fc::seconds(30))
          limit_documents = _es_objects_bulk_sync;
       else
@@ -262,6 +252,19 @@ void es_objects_plugin_impl::prepareTemplate(T blockchain_object, string index_n
    prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
    std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk));
    prepare.clear();
+
+   if( curl && bulk.size() >= limit_documents ) // send data to elasticsearch when bulk is too large
+   {
+      graphene::utilities::ES es;
+      es.curl = curl;
+      es.bulk_lines = bulk;
+      es.elasticsearch_url = _es_objects_elasticsearch_url;
+      es.auth = _es_objects_auth;
+      if (!graphene::utilities::SendBulk(std::move(es)))
+         FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error sending bulk data.");
+      else
+         bulk.clear();
+   }
 }
 
 es_objects_plugin_impl::~es_objects_plugin_impl()
