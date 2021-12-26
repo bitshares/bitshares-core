@@ -264,20 +264,24 @@ void elasticsearch_plugin_impl::getOperationType(const optional <operation_histo
 }
 
 void elasticsearch_plugin_impl::doOperationHistory(const optional <operation_history_object>& oho)
-{
+{ try {
    os.trx_in_block = oho->trx_in_block;
    os.op_in_trx = oho->op_in_trx;
    os.operation_result = fc::json::to_string(oho->result);
    os.virtual_op = oho->virtual_op;
 
    if(_elasticsearch_operation_object) {
+      // op
       oho->op.visit(fc::from_static_variant(os.op_object, FC_PACK_MAX_DEPTH));
-      adaptor_struct adaptor;
-      os.op_object = adaptor.adapt(os.op_object.get_object());
+      os.op_object = graphene::utilities::es_data_adaptor::adapt( os.op_object.get_object() );
+      // operation_result
+      variant v;
+      fc::to_variant( oho->result, v, FC_PACK_MAX_DEPTH );
+      os.operation_result_object = graphene::utilities::es_data_adaptor::adapt_static_variant( v.get_array() );
    }
    if(_elasticsearch_operation_string)
       os.op = fc::json::to_string(oho->op);
-}
+} FC_CAPTURE_LOG_AND_RETHROW( (oho) ) }
 
 void elasticsearch_plugin_impl::doBlock(uint32_t trx_in_block, const signed_block& b)
 {
@@ -288,6 +292,61 @@ void elasticsearch_plugin_impl::doBlock(uint32_t trx_in_block, const signed_bloc
    bs.block_time = b.timestamp;
    bs.trx_id = trx_id;
 }
+
+struct operation_visitor
+{
+   using result_type = void;
+
+   share_type fee_amount;
+   asset_id_type fee_asset;
+
+   asset_id_type transfer_asset_id;
+   share_type transfer_amount;
+   account_id_type transfer_from;
+   account_id_type transfer_to;
+
+   void operator()( const graphene::chain::transfer_operation& o )
+   {
+      fee_asset = o.fee.asset_id;
+      fee_amount = o.fee.amount;
+
+      transfer_asset_id = o.amount.asset_id;
+      transfer_amount = o.amount.amount;
+      transfer_from = o.from;
+      transfer_to = o.to;
+   }
+
+   object_id_type      fill_order_id;
+   account_id_type     fill_account_id;
+   asset_id_type       fill_pays_asset_id;
+   share_type          fill_pays_amount;
+   asset_id_type       fill_receives_asset_id;
+   share_type          fill_receives_amount;
+   double              fill_fill_price;
+   bool                fill_is_maker;
+
+   void operator()( const graphene::chain::fill_order_operation& o )
+   {
+      fee_asset = o.fee.asset_id;
+      fee_amount = o.fee.amount;
+
+      fill_order_id = o.order_id;
+      fill_account_id = o.account_id;
+      fill_pays_asset_id = o.pays.asset_id;
+      fill_pays_amount = o.pays.amount;
+      fill_receives_asset_id = o.receives.asset_id;
+      fill_receives_amount = o.receives.amount;
+      fill_fill_price = o.fill_price.to_real();
+      fill_is_maker = o.is_maker;
+   }
+
+   template<typename T>
+   void operator()( const T& o )
+   {
+      fee_asset = o.fee.asset_id;
+      fee_amount = o.fee.amount;
+   }
+};
 
 void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_object>& oho)
 {
