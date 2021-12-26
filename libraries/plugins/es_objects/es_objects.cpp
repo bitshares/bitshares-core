@@ -60,17 +60,17 @@ class es_objects_plugin_impl
          deletion
       };
 
-      bool on_objects_create(const vector<object_id_type>& ids)
-      { return index_database( ids, action_type::insertion ); }
+      void on_objects_create(const vector<object_id_type>& ids)
+      { index_database( ids, action_type::insertion ); }
 
-      bool on_objects_update(const vector<object_id_type>& ids)
-      { return index_database( ids, action_type::update ); }
+      void on_objects_update(const vector<object_id_type>& ids)
+      { index_database( ids, action_type::update ); }
 
-      bool on_objects_delete(const vector<object_id_type>& ids)
-      { return index_database( ids, action_type::deletion ); }
+      void on_objects_delete(const vector<object_id_type>& ids)
+      { index_database( ids, action_type::deletion ); }
 
-      bool index_database(const vector<object_id_type>& ids, action_type action);
-      bool genesis();
+      void index_database(const vector<object_id_type>& ids, action_type action);
+      void genesis();
       void remove_from_database(object_id_type id, std::string index);
 
       struct plugin_options
@@ -110,6 +110,8 @@ class es_objects_plugin_impl
       void prepareTemplate(const T& blockchain_object, string index_name);
 
       void init_program_options(const boost::program_options::variables_map& options);
+
+      void send_bulk_if_ready();
 };
 
 struct genesis_inserter
@@ -135,7 +137,7 @@ struct genesis_inserter
    }
 };
 
-bool es_objects_plugin_impl::genesis()
+void es_objects_plugin_impl::genesis()
 {
    ilog("elasticsearch OBJECTS: inserting data from genesis");
 
@@ -150,100 +152,60 @@ bool es_objects_plugin_impl::genesis()
    inserter.insert<asset_object               >( _options._es_objects_assets,         "asset"    );
    inserter.insert<asset_bitasset_data_object >( _options._es_objects_asset_bitasset, "bitasset" );
    inserter.insert<account_balance_object     >( _options._es_objects_balances,       "balance"  );
-
-   return true;
 }
 
-bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, action_type action)
+void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, action_type action)
 {
    graphene::chain::database &db = _self.database();
 
-   block_time = db.head_block_time();
    block_number = db.head_block_num();
 
-   if(block_number > _options._es_objects_start_es_after_block) {
+   if( block_number <= _options._es_objects_start_es_after_block )
+      return;
 
-      // check if we are in replay or in sync and change number of bulk documents accordingly
-      if ((fc::time_point::now() - block_time) < fc::seconds(30))
-         limit_documents = _options._es_objects_bulk_sync;
-      else
-         limit_documents = _options._es_objects_bulk_replay;
+   block_time = db.head_block_time();
 
+   // check if we are in replay or in sync and change number of bulk documents accordingly
+   if( (fc::time_point::now() - block_time) < fc::seconds(30) )
+      limit_documents = _options._es_objects_bulk_sync;
+   else
+      limit_documents = _options._es_objects_bulk_replay;
 
-      for (auto const &value: ids) {
-         if (value.is<proposal_object>() && _options._es_objects_proposals) {
-            auto obj = db.find_object(value);
-            auto p = static_cast<const proposal_object *>(obj);
-            if (p != nullptr) {
-               if( action_type::deletion == action )
-                  remove_from_database(p->id, "proposal");
-               else
-                  prepareTemplate<proposal_object>(*p, "proposal");
-            }
-         } else if (value.is<account_object>() && _options._es_objects_accounts) {
-            auto obj = db.find_object(value);
-            auto a = static_cast<const account_object *>(obj);
-            if (a != nullptr) {
-               if( action_type::deletion == action )
-                  remove_from_database(a->id, "account");
-               else
-                  prepareTemplate<account_object>(*a, "account");
-            }
-         } else if (value.is<asset_object>() && _options._es_objects_assets) {
-            auto obj = db.find_object(value);
-            auto a = static_cast<const asset_object *>(obj);
-            if (a != nullptr) {
-               if( action_type::deletion == action )
-                  remove_from_database(a->id, "asset");
-               else
-                  prepareTemplate<asset_object>(*a, "asset");
-            }
-         } else if (value.is<account_balance_object>() && _options._es_objects_balances) {
-            auto obj = db.find_object(value);
-            auto b = static_cast<const account_balance_object *>(obj);
-            if (b != nullptr) {
-               if( action_type::deletion == action )
-                  remove_from_database(b->id, "balance");
-               else
-                  prepareTemplate<account_balance_object>(*b, "balance");
-            }
-         } else if (value.is<limit_order_object>() && _options._es_objects_limit_orders) {
-            auto obj = db.find_object(value);
-            auto l = static_cast<const limit_order_object *>(obj);
-            if (l != nullptr) {
-               if( action_type::deletion == action )
-                  remove_from_database(l->id, "limitorder");
-               else
-                  prepareTemplate<limit_order_object>(*l, "limitorder");
-            }
-         } else if (value.is<asset_bitasset_data_object>() && _options._es_objects_asset_bitasset) {
-            auto obj = db.find_object(value);
-            auto ba = static_cast<const asset_bitasset_data_object *>(obj);
-            if (ba != nullptr) {
-               if( action_type::deletion == action )
-                  remove_from_database(ba->id, "bitasset");
-               else
-                  prepareTemplate<asset_bitasset_data_object>(*ba, "bitasset");
-            }
-         }
-      }
-
-      if (curl && bulk.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
-
-         graphene::utilities::ES es;
-         es.curl = curl;
-         es.bulk_lines = bulk;
-         es.elasticsearch_url = _options._es_objects_elasticsearch_url;
-         es.auth = _options._es_objects_auth;
-
-         if (!graphene::utilities::SendBulk(std::move(es)))
-            FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error sending bulk data.");
+   for( auto const &value: ids )
+   {
+      if( value.is<account_balance_object>() && _options._es_objects_balances ) {
+         if( action_type::deletion == action )
+            remove_from_database( value, "balance" );
          else
-            bulk.clear();
+            prepareTemplate( account_balance_id_type(value)(db), "balance" );
+      } else if( value.is<limit_order_object>() && _options._es_objects_limit_orders ) {
+         if( action_type::deletion == action )
+            remove_from_database( value, "limitorder" );
+         else
+            prepareTemplate( limit_order_id_type(value)(db), "limitorder" );
+      } else if( value.is<asset_bitasset_data_object>() && _options._es_objects_asset_bitasset) {
+         if( action_type::deletion == action )
+            remove_from_database( value, "bitasset" );
+         else
+            prepareTemplate( asset_bitasset_data_id_type(value)(db), "bitasset" );
+      } else if( value.is<asset_object>() && _options._es_objects_assets ) {
+         if( action_type::deletion == action )
+            remove_from_database( value, "asset" );
+         else
+            prepareTemplate( asset_id_type(value)(db), "asset" );
+      } else if( value.is<account_object>() && _options._es_objects_accounts ) {
+         if( action_type::deletion == action )
+            remove_from_database( value, "account" );
+         else
+            prepareTemplate( account_id_type(value)(db), "account" );
+      } else if( value.is<proposal_object>() && _options._es_objects_proposals ) {
+         if( action_type::deletion == action )
+            remove_from_database( value, "proposal" );
+         else
+            prepareTemplate( proposal_id_type(value)(db), "proposal" );
       }
    }
 
-   return true;
 }
 
 void es_objects_plugin_impl::remove_from_database( object_id_type id, std::string index)
@@ -260,6 +222,8 @@ void es_objects_plugin_impl::remove_from_database( object_id_type id, std::strin
       prepare.push_back(fc::json::to_string(final_delete_line));
       std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk));
       prepare.clear();
+
+      send_bulk_if_ready();
    }
 }
 
@@ -289,6 +253,11 @@ void es_objects_plugin_impl::prepareTemplate(const T& blockchain_object, string 
    std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk));
    prepare.clear();
 
+   send_bulk_if_ready();
+}
+
+void es_objects_plugin_impl::send_bulk_if_ready()
+{
    if( curl && bulk.size() >= limit_documents ) // send data to elasticsearch when bulk is too large
    {
       graphene::utilities::ES es;
