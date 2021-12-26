@@ -49,14 +49,30 @@ class es_objects_plugin_impl
       }
       virtual ~es_objects_plugin_impl();
 
-      bool index_database(const vector<object_id_type>& ids, std::string action);
-      bool genesis();
-      void remove_from_database(object_id_type id, std::string index);
-
+   private:
       friend class graphene::es_objects::es_objects_plugin;
       friend struct genesis_inserter;
 
-   private:
+      enum class action_type
+      {
+         insertion,
+         update,
+         deletion
+      };
+
+      bool on_objects_create(const vector<object_id_type>& ids)
+      { return index_database( ids, action_type::insertion ); }
+
+      bool on_objects_update(const vector<object_id_type>& ids)
+      { return index_database( ids, action_type::update ); }
+
+      bool on_objects_delete(const vector<object_id_type>& ids)
+      { return index_database( ids, action_type::deletion ); }
+
+      bool index_database(const vector<object_id_type>& ids, action_type action);
+      bool genesis();
+      void remove_from_database(object_id_type id, std::string index);
+
       struct plugin_options
       {
          std::string _es_objects_elasticsearch_url = "http://localhost:9200/";
@@ -91,7 +107,7 @@ class es_objects_plugin_impl
       bool is_es_version_7_or_above = true;
 
       template<typename T>
-      void prepareTemplate(T blockchain_object, string index_name);
+      void prepareTemplate(const T& blockchain_object, string index_name);
 
       void init_program_options(const boost::program_options::variables_map& options);
 };
@@ -114,8 +130,7 @@ struct genesis_inserter
 
       db.get_index( ObjType::space_id, ObjType::type_id ).inspect_all_objects(
             [this, &prefix](const graphene::db::object &o) {
-         auto a = static_cast<const ObjType *>(&o);
-         my->prepareTemplate<ObjType>(*a, prefix);
+         my->prepareTemplate( static_cast<const ObjType&>(o), prefix);
       });
    }
 };
@@ -139,7 +154,7 @@ bool es_objects_plugin_impl::genesis()
    return true;
 }
 
-bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, std::string action)
+bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, action_type action)
 {
    graphene::chain::database &db = _self.database();
 
@@ -160,7 +175,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
             auto obj = db.find_object(value);
             auto p = static_cast<const proposal_object *>(obj);
             if (p != nullptr) {
-               if (action == "delete")
+               if( action_type::deletion == action )
                   remove_from_database(p->id, "proposal");
                else
                   prepareTemplate<proposal_object>(*p, "proposal");
@@ -169,7 +184,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
             auto obj = db.find_object(value);
             auto a = static_cast<const account_object *>(obj);
             if (a != nullptr) {
-               if (action == "delete")
+               if( action_type::deletion == action )
                   remove_from_database(a->id, "account");
                else
                   prepareTemplate<account_object>(*a, "account");
@@ -178,7 +193,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
             auto obj = db.find_object(value);
             auto a = static_cast<const asset_object *>(obj);
             if (a != nullptr) {
-               if (action == "delete")
+               if( action_type::deletion == action )
                   remove_from_database(a->id, "asset");
                else
                   prepareTemplate<asset_object>(*a, "asset");
@@ -187,7 +202,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
             auto obj = db.find_object(value);
             auto b = static_cast<const account_balance_object *>(obj);
             if (b != nullptr) {
-               if (action == "delete")
+               if( action_type::deletion == action )
                   remove_from_database(b->id, "balance");
                else
                   prepareTemplate<account_balance_object>(*b, "balance");
@@ -196,7 +211,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
             auto obj = db.find_object(value);
             auto l = static_cast<const limit_order_object *>(obj);
             if (l != nullptr) {
-               if (action == "delete")
+               if( action_type::deletion == action )
                   remove_from_database(l->id, "limitorder");
                else
                   prepareTemplate<limit_order_object>(*l, "limitorder");
@@ -205,7 +220,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
             auto obj = db.find_object(value);
             auto ba = static_cast<const asset_bitasset_data_object *>(obj);
             if (ba != nullptr) {
-               if (action == "delete")
+               if( action_type::deletion == action )
                   remove_from_database(ba->id, "bitasset");
                else
                   prepareTemplate<asset_bitasset_data_object>(*ba, "bitasset");
@@ -222,7 +237,7 @@ bool es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, s
          es.auth = _options._es_objects_auth;
 
          if (!graphene::utilities::SendBulk(std::move(es)))
-            return false;
+            FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error sending bulk data.");
          else
             bulk.clear();
       }
@@ -249,7 +264,7 @@ void es_objects_plugin_impl::remove_from_database( object_id_type id, std::strin
 }
 
 template<typename T>
-void es_objects_plugin_impl::prepareTemplate(T blockchain_object, string index_name)
+void es_objects_plugin_impl::prepareTemplate(const T& blockchain_object, string index_name)
 {
    fc::mutable_variant_object bulk_header;
    bulk_header["_index"] = _options._es_objects_index_prefix + index_name;
@@ -399,33 +414,20 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
 
    database().applied_block.connect([this](const signed_block &b) {
       if( 1U == b.block_num() && 0 == my->_options._es_objects_start_es_after_block ) {
-         if (!my->genesis())
-            FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error populating genesis data.");
+         my->genesis();
       }
    });
    database().new_objects.connect([this]( const vector<object_id_type>& ids,
-         const flat_set<account_id_type>& impacted_accounts ) {
-      if(!my->index_database(ids, "create"))
-      {
-         FC_THROW_EXCEPTION(graphene::chain::plugin_exception,
-               "Error creating object from ES database, we are going to keep trying.");
-      }
+         const flat_set<account_id_type>& ) {
+      my->on_objects_create( ids );
    });
    database().changed_objects.connect([this]( const vector<object_id_type>& ids,
-         const flat_set<account_id_type>& impacted_accounts ) {
-      if(!my->index_database(ids, "update"))
-      {
-         FC_THROW_EXCEPTION(graphene::chain::plugin_exception,
-               "Error updating object from ES database, we are going to keep trying.");
-      }
+         const flat_set<account_id_type>& ) {
+      my->on_objects_update( ids );
    });
    database().removed_objects.connect([this](const vector<object_id_type>& ids,
-         const vector<const object*>& objs, const flat_set<account_id_type>& impacted_accounts) {
-      if(!my->index_database(ids, "delete"))
-      {
-         FC_THROW_EXCEPTION(graphene::chain::plugin_exception,
-               "Error deleting object from ES database, we are going to keep trying.");
-      }
+         const vector<const object*>&, const flat_set<account_id_type>& ) {
+      my->on_objects_delete( ids );
    });
 
    graphene::utilities::ES es;
