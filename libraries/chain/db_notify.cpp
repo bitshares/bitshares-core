@@ -599,7 +599,7 @@ void database::notify_changed_objects()
                                   MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(chain_time));
         }
 
-        if( new_ids.size() )
+        if( !new_ids.empty() )
            GRAPHENE_TRY_NOTIFY( new_objects, new_ids, new_accounts_impacted)
       }
 
@@ -616,7 +616,7 @@ void database::notify_changed_objects()
                                 MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(chain_time));
         }
 
-        if( changed_ids.size() )
+        if( !changed_ids.empty() )
            GRAPHENE_TRY_NOTIFY( changed_objects, changed_ids, changed_accounts_impacted)
       }
 
@@ -637,7 +637,7 @@ void database::notify_changed_objects()
                                 MUST_IGNORE_CUSTOM_OP_REQD_AUTHS(chain_time));
         }
 
-        if( removed_ids.size() )
+        if( !removed_ids.empty() )
            GRAPHENE_TRY_NOTIFY( removed_objects, removed_ids, removed, removed_accounts_impacted )
       }
    }
