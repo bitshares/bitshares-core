@@ -189,7 +189,31 @@ void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, a
       if( action_type::deletion == action )
          remove_from_database( value, prefix );
       else
-         prepareTemplate( db.get_object(value), prefix );
+      {
+         switch( itr->first )
+         {
+         case account_id_type::space_type:
+            prepareTemplate( db.get<account_object>(value), prefix );
+            break;
+         case account_balance_id_type::space_type:
+            prepareTemplate( db.get<account_balance_object>(value), prefix );
+            break;
+         case asset_id_type::space_type:
+            prepareTemplate( db.get<asset_object>(value), prefix );
+            break;
+         case asset_bitasset_data_id_type::space_type:
+            prepareTemplate( db.get<asset_bitasset_data_object>(value), prefix );
+            break;
+         case limit_order_id_type::space_type:
+            prepareTemplate( db.get<limit_order_object>(value), prefix );
+            break;
+         case proposal_id_type::space_type:
+            prepareTemplate( db.get<proposal_object>(value), prefix );
+            break;
+         default:
+            break;
+         }
+      }
    }
 
 }
