@@ -56,7 +56,7 @@ namespace graphene { namespace db {
       friend bool  operator < ( const object_id_type& a, const object_id_type& b ) { return a.number < b.number; }
       friend bool  operator > ( const object_id_type& a, const object_id_type& b ) { return a.number > b.number; }
 
-      object_id_type& operator++(int) { ++number; return *this; }
+      object_id_type& operator++() { ++number; return *this; }
 
       friend object_id_type operator+(const object_id_type& a, int64_t delta ) {
          return object_id_type( a.space(), a.type(), a.instance() + delta );
