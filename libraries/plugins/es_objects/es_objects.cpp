@@ -33,6 +33,11 @@
 
 #include <graphene/utilities/elasticsearch.hpp>
 
+namespace graphene { namespace db {
+   template<uint8_t SpaceID, uint8_t TypeID>
+   constexpr uint16_t object_id<SpaceID, TypeID>::space_type;
+} };
+
 namespace graphene { namespace es_objects {
 
 namespace detail
