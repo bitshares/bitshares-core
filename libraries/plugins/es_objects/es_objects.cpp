@@ -71,7 +71,7 @@ class es_objects_plugin_impl
 
       void index_database(const vector<object_id_type>& ids, action_type action);
       void genesis();
-      void remove_from_database(object_id_type id, std::string index);
+      void remove_from_database(const object_id_type& id, const std::string& index);
 
       struct plugin_options
       {
@@ -107,7 +107,7 @@ class es_objects_plugin_impl
       bool is_es_version_7_or_above = true;
 
       template<typename T>
-      void prepareTemplate(const T& blockchain_object, string index_name);
+      void prepareTemplate(const T& blockchain_object, const string& index_name);
 
       void init_program_options(const boost::program_options::variables_map& options);
 
@@ -208,7 +208,7 @@ void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, a
 
 }
 
-void es_objects_plugin_impl::remove_from_database( object_id_type id, std::string index)
+void es_objects_plugin_impl::remove_from_database( const object_id_type& id, const std::string& index)
 {
    if(_options._es_objects_keep_only_current)
    {
@@ -228,7 +228,7 @@ void es_objects_plugin_impl::remove_from_database( object_id_type id, std::strin
 }
 
 template<typename T>
-void es_objects_plugin_impl::prepareTemplate(const T& blockchain_object, string index_name)
+void es_objects_plugin_impl::prepareTemplate(const T& blockchain_object, const string& index_name)
 {
    fc::mutable_variant_object bulk_header;
    bulk_header["_index"] = _options._es_objects_index_prefix + index_name;
