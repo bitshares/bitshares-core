@@ -171,39 +171,25 @@ void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, a
    else
       limit_documents = _options._es_objects_bulk_replay;
 
-   for( auto const &value: ids )
+   static const unordered_map<uint16_t,std::pair<string,bool>> data_type_map = {
+      { account_id_type::space_type,             { "account",    _options._es_objects_accounts       } },
+      { account_balance_id_type::space_type,     { "balance",    _options._es_objects_balances       } },
+      { asset_id_type::space_type,               { "asset",      _options._es_objects_assets         } },
+      { asset_bitasset_data_id_type::space_type, { "bitasset",   _options._es_objects_asset_bitasset } },
+      { limit_order_id_type::space_type,         { "limitorder", _options._es_objects_limit_orders   } },
+      { proposal_id_type::space_type,            { "proposal",   _options._es_objects_proposals      } }
+   };
+
+   for( const auto& value: ids )
    {
-      if( value.is<account_balance_object>() && _options._es_objects_balances ) {
-         if( action_type::deletion == action )
-            remove_from_database( value, "balance" );
-         else
-            prepareTemplate( account_balance_id_type(value)(db), "balance" );
-      } else if( value.is<limit_order_object>() && _options._es_objects_limit_orders ) {
-         if( action_type::deletion == action )
-            remove_from_database( value, "limitorder" );
-         else
-            prepareTemplate( limit_order_id_type(value)(db), "limitorder" );
-      } else if( value.is<asset_bitasset_data_object>() && _options._es_objects_asset_bitasset) {
-         if( action_type::deletion == action )
-            remove_from_database( value, "bitasset" );
-         else
-            prepareTemplate( asset_bitasset_data_id_type(value)(db), "bitasset" );
-      } else if( value.is<asset_object>() && _options._es_objects_assets ) {
-         if( action_type::deletion == action )
-            remove_from_database( value, "asset" );
-         else
-            prepareTemplate( asset_id_type(value)(db), "asset" );
-      } else if( value.is<account_object>() && _options._es_objects_accounts ) {
-         if( action_type::deletion == action )
-            remove_from_database( value, "account" );
-         else
-            prepareTemplate( account_id_type(value)(db), "account" );
-      } else if( value.is<proposal_object>() && _options._es_objects_proposals ) {
-         if( action_type::deletion == action )
-            remove_from_database( value, "proposal" );
-         else
-            prepareTemplate( proposal_id_type(value)(db), "proposal" );
-      }
+      const auto itr = data_type_map.find( value.space_type() );
+      if( itr == data_type_map.end() || !(itr->second.second) )
+         continue;
+      const string& prefix = itr->second.first;
+      if( action_type::deletion == action )
+         remove_from_database( value, prefix );
+      else
+         prepareTemplate( db.get_object(value), prefix );
    }
 
 }
