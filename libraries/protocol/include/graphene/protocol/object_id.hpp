@@ -216,7 +216,7 @@ struct member_name<graphene::db::object_id<S,T>, 0> { static constexpr const cha
  template<uint8_t SpaceID, uint8_t TypeID>
  void to_variant( const graphene::db::object_id<SpaceID,TypeID>& var,  fc::variant& vo, uint32_t max_depth = 1 )
  {
-    vo = fc::to_string(SpaceID) + "." + fc::to_string(TypeID) + "." + fc::to_string(var.instance.value);
+    vo = std::string( var );
  }
  template<uint8_t SpaceID, uint8_t TypeID>
  void from_variant( const fc::variant& var,  graphene::db::object_id<SpaceID,TypeID>& vo, uint32_t max_depth = 1 )
