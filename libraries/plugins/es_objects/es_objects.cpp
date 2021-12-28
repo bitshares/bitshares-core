@@ -57,7 +57,7 @@ class es_objects_plugin_impl
 
    private:
       friend class graphene::es_objects::es_objects_plugin;
-      friend struct genesis_inserter;
+      friend struct data_loader;
 
       struct plugin_options
       {
@@ -86,6 +86,7 @@ class es_objects_plugin_impl
 
          std::string index_prefix = "objects-";
          uint32_t start_es_after_block = 0;
+         bool sync_db_on_startup = false;
 
          void init(const boost::program_options::variables_map& options);
       };
@@ -107,7 +108,7 @@ class es_objects_plugin_impl
       { index_database( ids, action_type::deletion ); }
 
       void index_database(const vector<object_id_type>& ids, action_type action);
-      void genesis();
+      void sync_db();
       void remove_from_database( const object_id_type& id, const plugin_options::object_options& opt );
 
       es_objects_plugin& _self;
@@ -132,18 +133,18 @@ class es_objects_plugin_impl
       void send_bulk_if_ready();
 };
 
-struct genesis_inserter
+struct data_loader
 {
    es_objects_plugin_impl* my;
    graphene::chain::database &db;
 
-   explicit genesis_inserter( es_objects_plugin_impl* _my )
+   explicit data_loader( es_objects_plugin_impl* _my )
    : my(_my), db( my->_self.database() )
    { // Nothing to do
    }
 
    template<typename ObjType>
-   void insert( const es_objects_plugin_impl::plugin_options::object_options& opt )
+   void load( const es_objects_plugin_impl::plugin_options::object_options& opt )
    {
       if( !opt.enabled )
          return;
@@ -155,21 +156,23 @@ struct genesis_inserter
    }
 };
 
-void es_objects_plugin_impl::genesis()
+void es_objects_plugin_impl::sync_db()
 {
-   ilog("elasticsearch OBJECTS: inserting data from genesis");
+   ilog("elasticsearch OBJECTS: loading data from the object database (chain state)");
 
    graphene::chain::database &db = _self.database();
 
    block_number = db.head_block_num();
    block_time = db.head_block_time();
 
-   genesis_inserter inserter( this );
+   data_loader loader( this );
 
-   inserter.insert<account_object             >( _options.accounts );
-   inserter.insert<asset_object               >( _options.assets );
-   inserter.insert<asset_bitasset_data_object >( _options.asset_bitasset );
-   inserter.insert<account_balance_object     >( _options.balances );
+   loader.load<account_object             >( _options.accounts );
+   loader.load<asset_object               >( _options.assets );
+   loader.load<asset_bitasset_data_object >( _options.asset_bitasset );
+   loader.load<account_balance_object     >( _options.balances );
+   loader.load<proposal_object            >( _options.proposals );
+   loader.load<limit_order_object         >( _options.limit_orders );
 }
 
 void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, action_type action)
@@ -384,6 +387,8 @@ void es_objects_plugin::plugin_set_program_options(
                "Keep only current state of the objects(true)")
          ("es-objects-start-es-after-block", boost::program_options::value<uint32_t>(),
                "Start doing ES job after block(0)")
+         ("es-objects-sync-db-on-startup", boost::program_options::value<bool>(),
+               "Copy all applicable objects from the object database (chain state) to ES on program startup (false)")
          ;
    cfg.add(cli);
 }
@@ -415,17 +420,13 @@ void detail::es_objects_plugin_impl::plugin_options::init(const boost::program_o
    utilities::get_program_option( options, "es-objects-asset-bitasset-store-updates", asset_bitasset.store_updates );
    utilities::get_program_option( options, "es-objects-index-prefix",         index_prefix );
    utilities::get_program_option( options, "es-objects-start-es-after-block", start_es_after_block );
+   utilities::get_program_option( options, "es-objects-sync-db-on-startup",   sync_db_on_startup );
 }
 
 void es_objects_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
    my->init_program_options( options );
 
-   database().applied_block.connect([this](const signed_block &b) {
-      if( 1U == b.block_num() && 0 == my->_options.start_es_after_block ) {
-         my->genesis();
-      }
-   });
    database().new_objects.connect([this]( const vector<object_id_type>& ids,
          const flat_set<account_id_type>& ) {
       my->on_objects_create( ids );
@@ -452,7 +453,8 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
 
 void es_objects_plugin::plugin_startup()
 {
-   // Nothing to do
+   if( my->_options.sync_db_on_startup || 0 == database().head_block_num() )
+      my->sync_db();
 }
 
 } }
