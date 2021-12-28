@@ -48,6 +48,7 @@ class es_objects_plugin : public graphene::app::plugin
          boost::program_options::options_description& cfg) override;
       void plugin_initialize(const boost::program_options::variables_map& options) override;
       void plugin_startup() override;
+      void plugin_shutdown() override;
 
    private:
       std::unique_ptr<detail::es_objects_plugin_impl> my;

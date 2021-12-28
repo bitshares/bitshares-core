@@ -130,7 +130,7 @@ class es_objects_plugin_impl
 
       void init_program_options(const boost::program_options::variables_map& options);
 
-      void send_bulk_if_ready();
+      void send_bulk_if_ready( bool force = false );
 };
 
 struct data_loader
@@ -289,20 +289,21 @@ void es_objects_plugin_impl::prepareTemplate(
    send_bulk_if_ready();
 }
 
-void es_objects_plugin_impl::send_bulk_if_ready()
+void es_objects_plugin_impl::send_bulk_if_ready( bool force )
 {
-   if( curl && bulk.size() >= limit_documents ) // send data to elasticsearch when bulk is too large
-   {
-      graphene::utilities::ES es;
-      es.curl = curl;
-      es.bulk_lines = bulk;
-      es.elasticsearch_url = _options.elasticsearch_url;
-      es.auth = _options.auth;
-      if (!graphene::utilities::SendBulk(std::move(es)))
-         FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error sending bulk data.");
-      else
-         bulk.clear();
-   }
+   if( !curl || bulk.empty() )
+      return;
+   if( !force && bulk.size() < limit_documents )
+      return;
+   // send data to elasticsearch when being forced or bulk is too large
+   graphene::utilities::ES es;
+   es.curl = curl;
+   es.bulk_lines = bulk;
+   es.elasticsearch_url = _options.elasticsearch_url;
+   es.auth = _options.auth;
+   if( !graphene::utilities::SendBulk(std::move(es)) )
+      FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error sending bulk data.");
+   bulk.clear();
 }
 
 es_objects_plugin_impl::~es_objects_plugin_impl()
@@ -455,6 +456,11 @@ void es_objects_plugin::plugin_startup()
 {
    if( my->_options.sync_db_on_startup || 0 == database().head_block_num() )
       my->sync_db();
+}
+
+void es_objects_plugin::plugin_shutdown()
+{
+   my->send_bulk_if_ready(true); // flush
 }
 
 } }
