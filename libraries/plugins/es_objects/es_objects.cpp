@@ -32,6 +32,7 @@
 #include <graphene/chain/account_object.hpp>
 
 #include <graphene/utilities/elasticsearch.hpp>
+#include <graphene/utilities/boost_program_options.hpp>
 
 namespace graphene { namespace db {
    template<uint8_t SpaceID, uint8_t TypeID>
@@ -394,74 +395,26 @@ void detail::es_objects_plugin_impl::init_program_options(const boost::program_o
 
 void detail::es_objects_plugin_impl::plugin_options::init(const boost::program_options::variables_map& options)
 {
-   if (options.count("es-objects-elasticsearch-url") > 0) {
-      elasticsearch_url = options["es-objects-elasticsearch-url"].as<std::string>();
-   }
-   if (options.count("es-objects-auth") > 0) {
-      auth = options["es-objects-auth"].as<std::string>();
-   }
-   if (options.count("es-objects-bulk-replay") > 0) {
-      bulk_replay = options["es-objects-bulk-replay"].as<uint32_t>();
-   }
-   if (options.count("es-objects-bulk-sync") > 0) {
-      bulk_sync = options["es-objects-bulk-sync"].as<uint32_t>();
-   }
-
-   if (options.count("es-objects-proposals") > 0) {
-      proposals.enabled = options["es-objects-proposals"].as<bool>();
-   }
-   if (options.count("es-objects-proposals-store-updates") > 0) {
-      proposals.store_updates = options["es-objects-proposals-store-updates"].as<bool>();
-   }
-   if (options.count("es-objects-proposals-no-delete") > 0) {
-      proposals.no_delete = options["es-objects-proposals-no-delete"].as<bool>();
-   }
-
-
-   if (options.count("es-objects-accounts") > 0) {
-      accounts.enabled = options["es-objects-accounts"].as<bool>();
-   }
-   if (options.count("es-objects-accounts-store-updates") > 0) {
-      accounts.store_updates = options["es-objects-accounts-store-updates"].as<bool>();
-   }
-
-   if (options.count("es-objects-assets") > 0) {
-      assets.enabled = options["es-objects-assets"].as<bool>();
-   }
-   if (options.count("es-objects-assets-store-updates") > 0) {
-      assets.store_updates = options["es-objects-assets-store-updates"].as<bool>();
-   }
-
-   if (options.count("es-objects-balances") > 0) {
-      balances.enabled = options["es-objects-balances"].as<bool>();
-   }
-   if (options.count("es-objects-balances-store-updates") > 0) {
-      balances.store_updates = options["es-objects-balances-store-updates"].as<bool>();
-   }
-
-   if (options.count("es-objects-limit-orders") > 0) {
-      limit_orders.enabled = options["es-objects-limit-orders"].as<bool>();
-   }
-   if (options.count("es-objects-limit-orders-store-updates") > 0) {
-      limit_orders.store_updates = options["es-objects-limit-orders-store-updates"].as<bool>();
-   }
-   if (options.count("es-objects-limit-orders-no-delete") > 0) {
-      limit_orders.no_delete = options["es-objects-limit-orders-no-delete"].as<bool>();
-   }
-
-   if (options.count("es-objects-asset-bitasset") > 0) {
-      asset_bitasset.enabled = options["es-objects-asset-bitasset"].as<bool>();
-   }
-   if (options.count("es-objects-asset-bitasset-store-updates") > 0) {
-      asset_bitasset.store_updates = options["es-objects-asset-bitasset-store-updates"].as<bool>();
-   }
-
-   if (options.count("es-objects-index-prefix") > 0) {
-      index_prefix = options["es-objects-index-prefix"].as<std::string>();
-   }
-   if (options.count("es-objects-start-es-after-block") > 0) {
-      start_es_after_block = options["es-objects-start-es-after-block"].as<uint32_t>();
-   }
+   utilities::get_program_option( options, "es-objects-elasticsearch-url", elasticsearch_url );
+   utilities::get_program_option( options, "es-objects-auth",              auth );
+   utilities::get_program_option( options, "es-objects-bulk-replay",       bulk_replay );
+   utilities::get_program_option( options, "es-objects-bulk-sync",         bulk_sync );
+   utilities::get_program_option( options, "es-objects-proposals",                    proposals.enabled );
+   utilities::get_program_option( options, "es-objects-proposals-store-updates",      proposals.store_updates );
+   utilities::get_program_option( options, "es-objects-proposals-no-delete",          proposals.no_delete );
+   utilities::get_program_option( options, "es-objects-accounts",                     accounts.enabled );
+   utilities::get_program_option( options, "es-objects-accounts-store-updates",       accounts.store_updates );
+   utilities::get_program_option( options, "es-objects-assets",                       assets.enabled );
+   utilities::get_program_option( options, "es-objects-assets-store-updates",         assets.store_updates );
+   utilities::get_program_option( options, "es-objects-balances",                     balances.enabled );
+   utilities::get_program_option( options, "es-objects-balances-store-updates",       balances.store_updates );
+   utilities::get_program_option( options, "es-objects-limit-orders",                 limit_orders.enabled );
+   utilities::get_program_option( options, "es-objects-limit-orders-store-updates",   limit_orders.store_updates );
+   utilities::get_program_option( options, "es-objects-limit-orders-no-delete",       limit_orders.no_delete );
+   utilities::get_program_option( options, "es-objects-asset-bitasset",               asset_bitasset.enabled );
+   utilities::get_program_option( options, "es-objects-asset-bitasset-store-updates", asset_bitasset.store_updates );
+   utilities::get_program_option( options, "es-objects-index-prefix",         index_prefix );
+   utilities::get_program_option( options, "es-objects-start-es-after-block", start_es_after_block );
 }
 
 void es_objects_plugin::plugin_initialize(const boost::program_options::variables_map& options)
