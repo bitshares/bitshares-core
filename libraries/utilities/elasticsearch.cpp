@@ -262,14 +262,14 @@ fc::variant es_data_adaptor::adapt(const fc::variant_object& op)
          if( to_string_fields.find(name) != to_string_fields.end() )
          {
             // make a backup and convert to string
-            original_arrays.emplace_back( std::make_pair( name, array ) );
+            original_arrays.emplace_back( name, array );
             element = fc::json::to_string(element);
          }
          else if( flattened_fields.find(name) != flattened_fields.end() )
          {
             // make a backup and adapt the original
             auto backup = array;
-            original_arrays.emplace_back( std::make_pair( name, backup ) );
+            original_arrays.emplace_back( name, backup );
             adapt(array);
          }
          else
