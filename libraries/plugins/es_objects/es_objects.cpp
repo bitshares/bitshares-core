@@ -58,6 +58,37 @@ class es_objects_plugin_impl
       friend class graphene::es_objects::es_objects_plugin;
       friend struct genesis_inserter;
 
+      struct plugin_options
+      {
+         struct object_options
+         {
+            object_options( bool e, bool su, bool nd, const string& in )
+            : enabled(e), store_updates(su), no_delete(nd), index_name(in)
+            {}
+
+            bool enabled = true;
+            bool store_updates = false;
+            bool no_delete = false;
+            string index_name = "";
+         };
+         std::string elasticsearch_url = "http://localhost:9200/";
+         std::string auth = "";
+         uint32_t bulk_replay = 10000;
+         uint32_t bulk_sync = 100;
+
+         object_options proposals      { true, false, true,  "proposal"   };
+         object_options accounts       { true, false, true,  "account"    };
+         object_options assets         { true, false, true,  "asset"      };
+         object_options balances       { true, false, true,  "balance"    };
+         object_options limit_orders   { true, false, false, "limitorder" };
+         object_options asset_bitasset { true, false, true,  "bitasset"   };
+
+         std::string index_prefix = "objects-";
+         uint32_t start_es_after_block = 0;
+
+         void init(const boost::program_options::variables_map& options);
+      };
+
       enum class action_type
       {
          insertion,
@@ -76,31 +107,12 @@ class es_objects_plugin_impl
 
       void index_database(const vector<object_id_type>& ids, action_type action);
       void genesis();
-      void remove_from_database(const object_id_type& id, const std::string& index);
-
-      struct plugin_options
-      {
-         std::string _es_objects_elasticsearch_url = "http://localhost:9200/";
-         std::string _es_objects_auth = "";
-         uint32_t _es_objects_bulk_replay = 10000;
-         uint32_t _es_objects_bulk_sync = 100;
-         bool _es_objects_proposals = true;
-         bool _es_objects_accounts = true;
-         bool _es_objects_assets = true;
-         bool _es_objects_balances = true;
-         bool _es_objects_limit_orders = false;
-         bool _es_objects_asset_bitasset = true;
-         std::string _es_objects_index_prefix = "objects-";
-         uint32_t _es_objects_start_es_after_block = 0;
-         bool _es_objects_keep_only_current = true;
-
-         void init(const boost::program_options::variables_map& options);
-      };
+      void remove_from_database( const object_id_type& id, const plugin_options::object_options& opt );
 
       es_objects_plugin& _self;
       plugin_options _options;
 
-      uint32_t limit_documents = _options._es_objects_bulk_replay;
+      uint32_t limit_documents = _options.bulk_replay;
 
       CURL *curl; // curl handler
       vector<std::string> bulk;
@@ -112,7 +124,7 @@ class es_objects_plugin_impl
       bool is_es_version_7_or_above = true;
 
       template<typename T>
-      void prepareTemplate(const T& blockchain_object, const string& index_name);
+      void prepareTemplate( const T& blockchain_object, const plugin_options::object_options& opt );
 
       void init_program_options(const boost::program_options::variables_map& options);
 
@@ -130,14 +142,14 @@ struct genesis_inserter
    }
 
    template<typename ObjType>
-   void insert( bool b, const string& prefix )
+   void insert( const es_objects_plugin_impl::plugin_options::object_options& opt )
    {
-      if( !b )
+      if( !opt.enabled )
          return;
 
       db.get_index( ObjType::space_id, ObjType::type_id ).inspect_all_objects(
-            [this, &prefix](const graphene::db::object &o) {
-         my->prepareTemplate( static_cast<const ObjType&>(o), prefix);
+            [this, &opt](const graphene::db::object &o) {
+         my->prepareTemplate( static_cast<const ObjType&>(o), opt );
       });
    }
 };
@@ -153,10 +165,10 @@ void es_objects_plugin_impl::genesis()
 
    genesis_inserter inserter( this );
 
-   inserter.insert<account_object             >( _options._es_objects_accounts,       "account"  );
-   inserter.insert<asset_object               >( _options._es_objects_assets,         "asset"    );
-   inserter.insert<asset_bitasset_data_object >( _options._es_objects_asset_bitasset, "bitasset" );
-   inserter.insert<account_balance_object     >( _options._es_objects_balances,       "balance"  );
+   inserter.insert<account_object             >( _options.accounts );
+   inserter.insert<asset_object               >( _options.assets );
+   inserter.insert<asset_bitasset_data_object >( _options.asset_bitasset );
+   inserter.insert<account_balance_object     >( _options.balances );
 }
 
 void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, action_type action)
@@ -165,55 +177,55 @@ void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, a
 
    block_number = db.head_block_num();
 
-   if( block_number <= _options._es_objects_start_es_after_block )
+   if( block_number <= _options.start_es_after_block )
       return;
 
    block_time = db.head_block_time();
 
    // check if we are in replay or in sync and change number of bulk documents accordingly
    if( (fc::time_point::now() - block_time) < fc::seconds(30) )
-      limit_documents = _options._es_objects_bulk_sync;
+      limit_documents = _options.bulk_sync;
    else
-      limit_documents = _options._es_objects_bulk_replay;
+      limit_documents = _options.bulk_replay;
 
-   static const unordered_map<uint16_t,std::pair<string,bool>> data_type_map = {
-      { account_id_type::space_type,             { "account",    _options._es_objects_accounts       } },
-      { account_balance_id_type::space_type,     { "balance",    _options._es_objects_balances       } },
-      { asset_id_type::space_type,               { "asset",      _options._es_objects_assets         } },
-      { asset_bitasset_data_id_type::space_type, { "bitasset",   _options._es_objects_asset_bitasset } },
-      { limit_order_id_type::space_type,         { "limitorder", _options._es_objects_limit_orders   } },
-      { proposal_id_type::space_type,            { "proposal",   _options._es_objects_proposals      } }
+   static const unordered_map<uint16_t,plugin_options::object_options&> data_type_map = {
+      { account_id_type::space_type,             _options.accounts       },
+      { account_balance_id_type::space_type,     _options.balances       },
+      { asset_id_type::space_type,               _options.assets         },
+      { asset_bitasset_data_id_type::space_type, _options.asset_bitasset },
+      { limit_order_id_type::space_type,         _options.limit_orders   },
+      { proposal_id_type::space_type,            _options.proposals      }
    };
 
    for( const auto& value: ids )
    {
       const auto itr = data_type_map.find( value.space_type() );
-      if( itr == data_type_map.end() || !(itr->second.second) )
+      if( itr == data_type_map.end() || !(itr->second.enabled) )
          continue;
-      const string& prefix = itr->second.first;
+      const auto& opt = itr->second;
       if( action_type::deletion == action )
-         remove_from_database( value, prefix );
+         remove_from_database( value, opt );
       else
       {
          switch( itr->first )
          {
          case account_id_type::space_type:
-            prepareTemplate( db.get<account_object>(value), prefix );
+            prepareTemplate( db.get<account_object>(value), opt );
             break;
          case account_balance_id_type::space_type:
-            prepareTemplate( db.get<account_balance_object>(value), prefix );
+            prepareTemplate( db.get<account_balance_object>(value), opt );
             break;
          case asset_id_type::space_type:
-            prepareTemplate( db.get<asset_object>(value), prefix );
+            prepareTemplate( db.get<asset_object>(value), opt );
             break;
          case asset_bitasset_data_id_type::space_type:
-            prepareTemplate( db.get<asset_bitasset_data_object>(value), prefix );
+            prepareTemplate( db.get<asset_bitasset_data_object>(value), opt );
             break;
          case limit_order_id_type::space_type:
-            prepareTemplate( db.get<limit_order_object>(value), prefix );
+            prepareTemplate( db.get<limit_order_object>(value), opt );
             break;
          case proposal_id_type::space_type:
-            prepareTemplate( db.get<proposal_object>(value), prefix );
+            prepareTemplate( db.get<proposal_object>(value), opt );
             break;
          default:
             break;
@@ -223,33 +235,35 @@ void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, a
 
 }
 
-void es_objects_plugin_impl::remove_from_database( const object_id_type& id, const std::string& index)
+void es_objects_plugin_impl::remove_from_database(
+      const object_id_type& id, const es_objects_plugin_impl::plugin_options::object_options& opt )
 {
-   if(_options._es_objects_keep_only_current)
-   {
-      fc::mutable_variant_object delete_line;
-      delete_line["_id"] = string(id);
-      delete_line["_index"] = _options._es_objects_index_prefix + index;
-      if(!is_es_version_7_or_above)
-         delete_line["_type"] = "_doc";
-      fc::mutable_variant_object final_delete_line;
-      final_delete_line["delete"] = delete_line;
-      prepare.push_back(fc::json::to_string(final_delete_line));
-      std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk));
-      prepare.clear();
+   if( opt.no_delete )
+      return;
 
-      send_bulk_if_ready();
-   }
+   fc::mutable_variant_object delete_line;
+   delete_line["_id"] = string(id); // Note: this does not work if `store_updates` is true
+   delete_line["_index"] = _options.index_prefix + opt.index_name;
+   if( !is_es_version_7_or_above )
+      delete_line["_type"] = "_doc";
+   fc::mutable_variant_object final_delete_line;
+   final_delete_line["delete"] = std::move( delete_line );
+   prepare.push_back( fc::json::to_string(final_delete_line) );
+   std::move( prepare.begin(), prepare.end(), std::back_inserter(bulk) );
+   prepare.clear();
+
+   send_bulk_if_ready();
 }
 
 template<typename T>
-void es_objects_plugin_impl::prepareTemplate(const T& blockchain_object, const string& index_name)
+void es_objects_plugin_impl::prepareTemplate(
+      const T& blockchain_object, const es_objects_plugin_impl::plugin_options::object_options& opt )
 {
    fc::mutable_variant_object bulk_header;
-   bulk_header["_index"] = _options._es_objects_index_prefix + index_name;
-   if(!is_es_version_7_or_above)
+   bulk_header["_index"] = _options.index_prefix + opt.index_name;
+   if( !is_es_version_7_or_above )
       bulk_header["_type"] = "_doc";
-   if(_options._es_objects_keep_only_current)
+   if( !opt.store_updates )
    {
       bulk_header["_id"] = string(blockchain_object.id);
    }
@@ -278,8 +292,8 @@ void es_objects_plugin_impl::send_bulk_if_ready()
       graphene::utilities::ES es;
       es.curl = curl;
       es.bulk_lines = bulk;
-      es.elasticsearch_url = _options._es_objects_elasticsearch_url;
-      es.auth = _options._es_objects_auth;
+      es.elasticsearch_url = _options.elasticsearch_url;
+      es.auth = _options.auth;
       if (!graphene::utilities::SendBulk(std::move(es)))
          FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error sending bulk data.");
       else
@@ -328,15 +342,44 @@ void es_objects_plugin::plugin_set_program_options(
                "Number of bulk documents to index on replay(10000)")
          ("es-objects-bulk-sync", boost::program_options::value<uint32_t>(),
                "Number of bulk documents to index on a synchronized chain(100)")
-         ("es-objects-proposals", boost::program_options::value<bool>(), "Store proposal objects(true)")
-         ("es-objects-accounts", boost::program_options::value<bool>(), "Store account objects(true)")
-         ("es-objects-assets", boost::program_options::value<bool>(), "Store asset objects(true)")
-         ("es-objects-balances", boost::program_options::value<bool>(), "Store balances objects(true)")
-         ("es-objects-limit-orders", boost::program_options::value<bool>(), "Store limit order objects(false)")
-         ("es-objects-asset-bitasset", boost::program_options::value<bool>(), "Store feed data(true)")
+
+         ("es-objects-proposals", boost::program_options::value<bool>(), "Store proposal objects (true)")
+         ("es-objects-proposals-store-updates", boost::program_options::value<bool>(),
+               "Store all updates to the proposal objects (false)")
+         ("es-objects-proposals-no-delete", boost::program_options::value<bool>(),
+               "Do not delete a proposal from ES even if it is deleted from chain state. "
+               "It is implicitly true and can not be set to false if es-objects-proposals-store-updates is true. "
+               "(true)")
+
+         ("es-objects-accounts", boost::program_options::value<bool>(), "Store account objects (true)")
+         ("es-objects-accounts-store-updates", boost::program_options::value<bool>(),
+               "Store all updates to the account objects (false)")
+
+         ("es-objects-assets", boost::program_options::value<bool>(), "Store asset objects (true)")
+         ("es-objects-assets-store-updates", boost::program_options::value<bool>(),
+               "Store all updates to the asset objects (false)")
+
+         ("es-objects-balances", boost::program_options::value<bool>(), "Store account balances (true)")
+         ("es-objects-balances-store-updates", boost::program_options::value<bool>(),
+               "Store all updates to the account balances (false)")
+
+         ("es-objects-limit-orders", boost::program_options::value<bool>(), "Store limit order objects (true)")
+         ("es-objects-limit-orders-store-updates", boost::program_options::value<bool>(),
+               "Store all updates to the limit orders (false)")
+         ("es-objects-limit-orders-no-delete", boost::program_options::value<bool>(),
+               "Do not delete a limit order object from ES even if it is deleted from chain state. "
+               "It is implicitly true and can not be set to false if es-objects-limit-orders-store-updates is true. "
+               "(false)")
+
+         ("es-objects-asset-bitasset", boost::program_options::value<bool>(),
+               "Store bitasset data, including price feeds (true)")
+         ("es-objects-asset-bitasset-store-updates", boost::program_options::value<bool>(),
+               "Store all updates to the bitasset data (false)")
+
          ("es-objects-index-prefix", boost::program_options::value<std::string>(),
                "Add a prefix to the index(objects-)")
          ("es-objects-keep-only-current", boost::program_options::value<bool>(),
+               "Deprecated. Please use the store-updates or no-delete options. "
                "Keep only current state of the objects(true)")
          ("es-objects-start-es-after-block", boost::program_options::value<uint32_t>(),
                "Start doing ES job after block(0)")
@@ -352,43 +395,72 @@ void detail::es_objects_plugin_impl::init_program_options(const boost::program_o
 void detail::es_objects_plugin_impl::plugin_options::init(const boost::program_options::variables_map& options)
 {
    if (options.count("es-objects-elasticsearch-url") > 0) {
-      _es_objects_elasticsearch_url = options["es-objects-elasticsearch-url"].as<std::string>();
+      elasticsearch_url = options["es-objects-elasticsearch-url"].as<std::string>();
    }
    if (options.count("es-objects-auth") > 0) {
-      _es_objects_auth = options["es-objects-auth"].as<std::string>();
+      auth = options["es-objects-auth"].as<std::string>();
    }
    if (options.count("es-objects-bulk-replay") > 0) {
-      _es_objects_bulk_replay = options["es-objects-bulk-replay"].as<uint32_t>();
+      bulk_replay = options["es-objects-bulk-replay"].as<uint32_t>();
    }
    if (options.count("es-objects-bulk-sync") > 0) {
-      _es_objects_bulk_sync = options["es-objects-bulk-sync"].as<uint32_t>();
+      bulk_sync = options["es-objects-bulk-sync"].as<uint32_t>();
    }
+
    if (options.count("es-objects-proposals") > 0) {
-      _es_objects_proposals = options["es-objects-proposals"].as<bool>();
+      proposals.enabled = options["es-objects-proposals"].as<bool>();
    }
+   if (options.count("es-objects-proposals-store-updates") > 0) {
+      proposals.store_updates = options["es-objects-proposals-store-updates"].as<bool>();
+   }
+   if (options.count("es-objects-proposals-no-delete") > 0) {
+      proposals.no_delete = options["es-objects-proposals-no-delete"].as<bool>();
+   }
+
+
    if (options.count("es-objects-accounts") > 0) {
-      _es_objects_accounts = options["es-objects-accounts"].as<bool>();
+      accounts.enabled = options["es-objects-accounts"].as<bool>();
    }
+   if (options.count("es-objects-accounts-store-updates") > 0) {
+      accounts.store_updates = options["es-objects-accounts-store-updates"].as<bool>();
+   }
+
    if (options.count("es-objects-assets") > 0) {
-      _es_objects_assets = options["es-objects-assets"].as<bool>();
+      assets.enabled = options["es-objects-assets"].as<bool>();
    }
+   if (options.count("es-objects-assets-store-updates") > 0) {
+      assets.store_updates = options["es-objects-assets-store-updates"].as<bool>();
+   }
+
    if (options.count("es-objects-balances") > 0) {
-      _es_objects_balances = options["es-objects-balances"].as<bool>();
+      balances.enabled = options["es-objects-balances"].as<bool>();
    }
+   if (options.count("es-objects-balances-store-updates") > 0) {
+      balances.store_updates = options["es-objects-balances-store-updates"].as<bool>();
+   }
+
    if (options.count("es-objects-limit-orders") > 0) {
-      _es_objects_limit_orders = options["es-objects-limit-orders"].as<bool>();
+      limit_orders.enabled = options["es-objects-limit-orders"].as<bool>();
    }
+   if (options.count("es-objects-limit-orders-store-updates") > 0) {
+      limit_orders.store_updates = options["es-objects-limit-orders-store-updates"].as<bool>();
+   }
+   if (options.count("es-objects-limit-orders-no-delete") > 0) {
+      limit_orders.no_delete = options["es-objects-limit-orders-no-delete"].as<bool>();
+   }
+
    if (options.count("es-objects-asset-bitasset") > 0) {
-      _es_objects_asset_bitasset = options["es-objects-asset-bitasset"].as<bool>();
+      asset_bitasset.enabled = options["es-objects-asset-bitasset"].as<bool>();
    }
+   if (options.count("es-objects-asset-bitasset-store-updates") > 0) {
+      asset_bitasset.store_updates = options["es-objects-asset-bitasset-store-updates"].as<bool>();
+   }
+
    if (options.count("es-objects-index-prefix") > 0) {
-      _es_objects_index_prefix = options["es-objects-index-prefix"].as<std::string>();
-   }
-   if (options.count("es-objects-keep-only-current") > 0) {
-      _es_objects_keep_only_current = options["es-objects-keep-only-current"].as<bool>();
+      index_prefix = options["es-objects-index-prefix"].as<std::string>();
    }
    if (options.count("es-objects-start-es-after-block") > 0) {
-      _es_objects_start_es_after_block = options["es-objects-start-es-after-block"].as<uint32_t>();
+      start_es_after_block = options["es-objects-start-es-after-block"].as<uint32_t>();
    }
 }
 
@@ -397,7 +469,7 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
    my->init_program_options( options );
 
    database().applied_block.connect([this](const signed_block &b) {
-      if( 1U == b.block_num() && 0 == my->_options._es_objects_start_es_after_block ) {
+      if( 1U == b.block_num() && 0 == my->_options.start_es_after_block ) {
          my->genesis();
       }
    });
@@ -416,12 +488,11 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
 
    graphene::utilities::ES es;
    es.curl = my->curl;
-   es.elasticsearch_url = my->_options._es_objects_elasticsearch_url;
-   es.auth = my->_options._es_objects_auth;
-   es.auth = my->_options._es_objects_index_prefix;
+   es.elasticsearch_url = my->_options.elasticsearch_url;
+   es.auth = my->_options.auth;
 
    if(!graphene::utilities::checkES(es))
-      FC_THROW( "ES database is not up in url ${url}", ("url", my->_options._es_objects_elasticsearch_url) );
+      FC_THROW( "ES database is not up in url ${url}", ("url", my->_options.elasticsearch_url) );
 
    graphene::utilities::checkESVersion7OrAbove(es, my->is_es_version_7_or_above);
 }
