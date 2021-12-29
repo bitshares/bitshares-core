@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 oxarbitrage, and contributors.
+ * Copyright (c) 2021 Abit More, and contributors.
  *
  * The MIT License
  *
@@ -22,36 +22,17 @@
  * THE SOFTWARE.
  */
 #pragma once
+#include <boost/program_options.hpp>
 
-#include <graphene/app/plugin.hpp>
-#include <graphene/chain/database.hpp>
+namespace graphene { namespace utilities {
 
-namespace graphene { namespace es_objects {
-
-using namespace chain;
-
-namespace detail
+template<typename T>
+void get_program_option( const boost::program_options::variables_map& from, const std::string& key, T& to )
 {
-    class es_objects_plugin_impl;
+   if( from.count( key ) > 0 )
+   {
+      to = from[key].as<T>();
+   }
 }
 
-class es_objects_plugin : public graphene::app::plugin
-{
-   public:
-      explicit es_objects_plugin(graphene::app::application& app);
-      ~es_objects_plugin() override;
-
-      std::string plugin_name()const override;
-      std::string plugin_description()const override;
-      void plugin_set_program_options(
-         boost::program_options::options_description& cli,
-         boost::program_options::options_description& cfg) override;
-      void plugin_initialize(const boost::program_options::variables_map& options) override;
-      void plugin_startup() override;
-      void plugin_shutdown() override;
-
-   private:
-      std::unique_ptr<detail::es_objects_plugin_impl> my;
-};
-
-} } //graphene::es_objects
+} } // end namespace graphene::utilities

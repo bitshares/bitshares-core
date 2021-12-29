@@ -222,16 +222,13 @@ fc::variant es_data_adaptor::adapt(const fc::variant_object& op)
    fc::mutable_variant_object o(op);
 
    // Note: these fields are maps, but were stored in ES as flattened arrays
-   static const std::map<std::string, data_type, std::less<>> flattened_fields = {
-      { "account_auths",    data_type::map_type },
-      { "address_auths",    data_type::map_type },
-      { "key_auths",        data_type::map_type }
-   };
+   static const std::unordered_set<std::string> flattened_fields = { "account_auths", "address_auths", "key_auths" };
+
    // Note:
    // object arrays listed in this map are stored redundantly in ES, with one instance as a nested object and
    //      the other as a string for backward compatibility,
    // object arrays not listed in this map are stored as nested objects only.
-   static const std::map<std::string, data_type, std::less<>> to_string_fields = {
+   static const std::unordered_map<std::string, data_type> to_string_fields = {
       { "parameters",               data_type::array_type }, // in committee proposals, current_fees.parameters
       { "op",                       data_type::static_variant_type }, // proposal_create_op.proposed_ops[*].op
       { "proposed_ops",             data_type::array_type },
@@ -246,7 +243,7 @@ fc::variant es_data_adaptor::adapt(const fc::variant_object& op)
       { "acceptable_collateral",    data_type::map_type },
       { "acceptable_borrowers",     data_type::map_type }
    };
-   std::map<std::string, fc::variants, std::less<>> original_arrays;
+   std::vector<std::pair<std::string, fc::variants>> original_arrays;
    std::vector<std::string> keys_to_rename;
    for( auto& i : o )
    {
@@ -265,14 +262,14 @@ fc::variant es_data_adaptor::adapt(const fc::variant_object& op)
          if( to_string_fields.find(name) != to_string_fields.end() )
          {
             // make a backup and convert to string
-            original_arrays[name] = array;
+            original_arrays.emplace_back( name, array );
             element = fc::json::to_string(element);
          }
          else if( flattened_fields.find(name) != flattened_fields.end() )
          {
             // make a backup and adapt the original
             auto backup = array;
-            original_arrays[name] = backup;
+            original_arrays.emplace_back( name, backup );
             adapt(array);
          }
          else

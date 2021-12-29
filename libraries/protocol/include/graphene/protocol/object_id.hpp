@@ -56,12 +56,8 @@ namespace graphene { namespace db {
       friend bool  operator < ( const object_id_type& a, const object_id_type& b ) { return a.number < b.number; }
       friend bool  operator > ( const object_id_type& a, const object_id_type& b ) { return a.number > b.number; }
 
-      object_id_type& operator++(int) { ++number; return *this; }
-      object_id_type& operator++()    { ++number; return *this; }
+      object_id_type& operator++() { ++number; return *this; }
 
-      friend object_id_type operator+(const object_id_type& a, int delta ) {
-         return object_id_type( a.space(), a.type(), a.instance() + delta );
-      }
       friend object_id_type operator+(const object_id_type& a, int64_t delta ) {
          return object_id_type( a.space(), a.type(), a.instance() + delta );
       }
@@ -82,7 +78,7 @@ namespace graphene { namespace db {
 
       explicit operator std::string() const
       {
-          return fc::to_string(space()) + "." + fc::to_string(type()) + "." + fc::to_string(instance());
+         return fc::to_string(space()) + "." + fc::to_string(type()) + "." + fc::to_string(instance());
       }
 
       uint64_t                   number;
@@ -110,6 +106,8 @@ namespace graphene { namespace db {
       static constexpr uint8_t space_id = SpaceID;
       static constexpr uint8_t type_id = TypeID;
 
+      static constexpr uint16_t space_type = uint16_t(uint16_t(space_id) << 8) | uint16_t(type_id);
+
       object_id() = default;
       object_id( unsigned_int i ):instance(i){}
       explicit object_id( uint64_t i ):instance(i)
@@ -121,7 +119,6 @@ namespace graphene { namespace db {
       }
 
       friend object_id operator+(const object_id a, int64_t delta ) { return object_id( uint64_t(a.instance.value+delta) ); }
-      friend object_id operator+(const object_id a, int delta ) { return object_id( uint64_t(a.instance.value+delta) ); }
 
       operator object_id_type()const { return object_id_type( SpaceID, TypeID, instance.value ); }
       explicit operator uint64_t()const { return object_id_type( *this ).number; }
@@ -144,6 +141,11 @@ namespace graphene { namespace db {
       friend bool  operator > ( const object_id& a, const object_id& b ) { return a.instance.value > b.instance.value; }
 
       friend size_t hash_value( object_id v ) { return std::hash<uint64_t>()(v.instance.value); }
+
+      explicit operator std::string() const
+      {
+         return fc::to_string(space_id) + "." + fc::to_string(type_id) + "." + fc::to_string(instance.value);
+      }
 
       unsigned_int instance;
    };
@@ -214,7 +216,7 @@ struct member_name<graphene::db::object_id<S,T>, 0> { static constexpr const cha
  template<uint8_t SpaceID, uint8_t TypeID>
  void to_variant( const graphene::db::object_id<SpaceID,TypeID>& var,  fc::variant& vo, uint32_t max_depth = 1 )
  {
-    vo = fc::to_string(SpaceID) + "." + fc::to_string(TypeID) + "." + fc::to_string(var.instance.value);
+    vo = std::string( var );
  }
  template<uint8_t SpaceID, uint8_t TypeID>
  void from_variant( const fc::variant& var,  graphene::db::object_id<SpaceID,TypeID>& vo, uint32_t max_depth = 1 )
