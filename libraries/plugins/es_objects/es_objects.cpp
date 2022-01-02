@@ -30,6 +30,7 @@
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
+#include <graphene/chain/budget_record_object.hpp>
 
 #include <graphene/utilities/elasticsearch.hpp>
 #include <graphene/utilities/boost_program_options.hpp>
@@ -83,6 +84,7 @@ class es_objects_plugin_impl
          object_options balances       { true, false, true,  "balance"    };
          object_options limit_orders   { true, false, false, "limitorder" };
          object_options asset_bitasset { true, false, true,  "bitasset"   };
+         object_options budget         { true, false, true,  "budget"     };
 
          std::string index_prefix = "objects-";
          uint32_t start_es_after_block = 0;
@@ -173,6 +175,7 @@ void es_objects_plugin_impl::sync_db()
    loader.load<account_balance_object     >( _options.balances );
    loader.load<proposal_object            >( _options.proposals );
    loader.load<limit_order_object         >( _options.limit_orders );
+   loader.load<budget_record_object       >( _options.budget );
 }
 
 void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, action_type action)
@@ -198,7 +201,8 @@ void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, a
       { asset_id_type::space_type,               _options.assets         },
       { asset_bitasset_data_id_type::space_type, _options.asset_bitasset },
       { limit_order_id_type::space_type,         _options.limit_orders   },
-      { proposal_id_type::space_type,            _options.proposals      }
+      { proposal_id_type::space_type,            _options.proposals      },
+      { budget_record_id_type::space_type,       _options.budget         }
    };
 
    for( const auto& value: ids )
@@ -230,6 +234,9 @@ void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, a
             break;
          case proposal_id_type::space_type:
             prepareTemplate( db.get<proposal_object>(value), opt );
+            break;
+         case budget_record_id_type::space_type:
+            prepareTemplate( db.get<budget_record_object>(value), opt );
             break;
          default:
             break;
@@ -381,6 +388,8 @@ void es_objects_plugin::plugin_set_program_options(
          ("es-objects-asset-bitasset-store-updates", boost::program_options::value<bool>(),
                "Store all updates to the bitasset data (false)")
 
+         ("es-objects-budget-records", boost::program_options::value<bool>(), "Store budget records (true)")
+
          ("es-objects-index-prefix", boost::program_options::value<std::string>(),
                "Add a prefix to the index(objects-)")
          ("es-objects-keep-only-current", boost::program_options::value<bool>(),
@@ -419,6 +428,7 @@ void detail::es_objects_plugin_impl::plugin_options::init(const boost::program_o
    utilities::get_program_option( options, "es-objects-limit-orders-no-delete",       limit_orders.no_delete );
    utilities::get_program_option( options, "es-objects-asset-bitasset",               asset_bitasset.enabled );
    utilities::get_program_option( options, "es-objects-asset-bitasset-store-updates", asset_bitasset.store_updates );
+   utilities::get_program_option( options, "es-objects-budget-records",               budget.enabled );
    utilities::get_program_option( options, "es-objects-index-prefix",         index_prefix );
    utilities::get_program_option( options, "es-objects-start-es-after-block", start_es_after_block );
    utilities::get_program_option( options, "es-objects-sync-db-on-startup",   sync_db_on_startup );
