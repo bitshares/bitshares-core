@@ -661,7 +661,7 @@ operation_history_object elasticsearch_plugin::get_operation_by_id(operation_his
       "query": {
          "match":
          {
-            "account_history.operation_id": )" + operation_id_string + R"("
+            "account_history.operation_id": ")" + operation_id_string + R"("
          }
       }
    }

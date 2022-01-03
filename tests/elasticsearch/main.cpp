@@ -224,7 +224,10 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
       es.elasticsearch_url = GRAPHENE_TESTING_ES_URL;
       es.index_prefix = es_obj_index_prefix;
 
-      // delete all first
+      // The head block number is 1
+      BOOST_CHECK_EQUAL( db.head_block_num(), 1u );
+
+      // delete all first, this will delete genesis data and data inserted at block 1
       auto delete_objects = graphene::utilities::deleteAll(es);
       BOOST_REQUIRE(delete_objects); // require successful deletion
 
@@ -259,11 +262,30 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
 
          auto bitasset_data_id = j["hits"]["hits"][size_t(0)]["_source"]["bitasset_data_id"].as_string();
          es.endpoint = es.index_prefix + "bitasset/_doc/_search";
-         es.query = "{ \"query\" : { \"bool\": { \"must\" : [{ \"term\": { \"object_id\": \""+bitasset_data_id+"\"}}] } } }";
+         es.query = "{ \"query\" : { \"bool\": { \"must\" : [{ \"term\": { \"object_id\": \""
+                  + bitasset_data_id + "\"}}] } } }";
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
          auto bitasset_object_id = j["hits"]["hits"][size_t(0)]["_source"]["object_id"].as_string();
          BOOST_CHECK_EQUAL(bitasset_object_id, bitasset_data_id);
+
+         // maintenance, for budget records
+         generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+
+         es.endpoint = es.index_prefix + "budget/_doc/_count";
+         es.query = "";
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            res = graphene::utilities::getEndPoint(es);
+            j = fc::json::from_string(res);
+            if( !j.is_object() )
+               return false;
+            const auto& obj = j.get_object();
+            if( obj.find("count") == obj.end() )
+               return false;
+            total = obj["count"].as_string();
+            return (total == "1"); // new record inserted at the first maintenance block
+         });
+
       }
    }
    catch (fc::exception &e) {
