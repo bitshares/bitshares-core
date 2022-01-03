@@ -30,9 +30,94 @@
 #include <fc/time.hpp>
 #include <fc/variant_object.hpp>
 
-size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp);
-
 namespace graphene { namespace utilities {
+
+class curl_wrapper
+{
+public:
+   curl_wrapper();
+
+   // Note: the numbers are used in the request() function. If we need to update or add, please check the function
+   enum class http_request_method
+   {
+      GET     = 0,
+      POST    = 1,
+      HEAD    = 2,
+      PUT     = 3,
+      DELETE  = 4,
+      PATCH   = 5,
+      OPTIONS = 6
+   };
+
+   struct response
+   {
+      long        code;
+      std::string content;
+   };
+
+   response request( http_request_method method,
+                     const std::string& url,
+                     const std::string& auth,
+                     const std::string& query ) const;
+
+   response get( const std::string& url, const std::string& auth ) const
+   { return request( http_request_method::GET, url, auth, "" ); }
+
+   response del( const std::string& url, const std::string& auth ) const
+   { return request( http_request_method::DELETE, url, auth, "" ); }
+
+   response post( const std::string& url, const std::string& auth, const std::string& query ) const
+   { return request( http_request_method::POST, url, auth, query ); }
+
+   response put( const std::string& url, const std::string& auth, const std::string& query ) const
+   { return request( http_request_method::PUT, url, auth, query ); }
+
+private:
+
+   struct curl_deleter
+   {
+      void operator()( CURL* curl ) const
+      {
+         if( !curl )
+            curl_easy_cleanup( curl );
+      }
+   };
+
+   struct curl_slist_deleter
+   {
+      void operator()( curl_slist* slist ) const
+      {
+         if( !slist )
+            curl_slist_free_all( slist );
+      }
+   };
+
+   std::unique_ptr<CURL, curl_deleter> curl;
+   std::unique_ptr<curl_slist, curl_slist_deleter> request_headers;
+};
+
+class es_client
+{
+public:
+   es_client( const std::string& p_base_url, const std::string& p_auth ) : base_url(p_base_url), auth(p_auth) {}
+
+   bool check_status() const;
+   std::string get_version() const;
+   void check_version_7_or_above( bool& result ) const noexcept;
+
+   bool send_bulk( const std::vector<std::string>& bulk_lines ) const;
+   bool del( const std::string& path ) const;
+   std::string get( const std::string& path ) const;
+   std::string query( const std::string& path, const std::string& query ) const;
+private:
+   std::string base_url;
+   std::string auth;
+   curl_wrapper curl;
+   //std::string index_prefix; // bitshares-, objects-
+   //std::string endpoint; // index_prefix + "*/_doc/_search";
+   //std::string query; // json
+   //std::vector <std::string> bulk_lines;
+};
 
    class ES {
       public:
@@ -54,17 +139,16 @@ namespace graphene { namespace utilities {
    };
 
    bool SendBulk(ES&& es);
-   std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, std::string&& data);
    bool checkES(ES& es);
    std::string getESVersion(ES& es);
    void checkESVersion7OrAbove(ES& es, bool& result) noexcept;
    std::string simpleQuery(ES& es);
    bool deleteAll(ES& es);
-   bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer);
    std::string getEndPoint(ES& es);
+
    std::string doCurl(CurlRequest& curl);
-   std::string joinBulkLines(const std::vector<std::string>& bulk);
-   long getResponseCode(CURL *handler);
+
+   std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, std::string&& data);
 
 struct es_data_adaptor
 {
