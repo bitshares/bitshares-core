@@ -50,7 +50,7 @@ namespace detail
     class elasticsearch_plugin_impl;
 }
 
-enum mode { only_save = 0 , only_query = 1, all = 2 };
+enum class mode { only_save = 0 , only_query = 1, all = 2 };
 
 class elasticsearch_plugin : public graphene::app::plugin
 {
