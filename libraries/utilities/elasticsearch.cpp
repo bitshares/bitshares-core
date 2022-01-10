@@ -309,7 +309,7 @@ std::string es_client::get_version() const
    const auto response = curl.get( base_url, auth );
    if( response.code != 200 )
       FC_THROW( "Error on es_client::get_version(): code = ${code}, message = ${message} ",
-                ("code", response.code) ("message", response.content) );
+                ("code", int64_t(response.code)) ("message", response.content) );
 
    fc::variant content = fc::json::from_string( response.content );
    return content["version"]["number"].as_string();
