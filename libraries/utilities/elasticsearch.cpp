@@ -222,18 +222,24 @@ std::string doCurl(CurlRequest& curl)
    return CurlReadBuffer;
 }
 
-curl_wrapper::curl_wrapper()
+static CURL* init_curl()
 {
-   curl.reset( curl_easy_init() );
-   if( !curl )
-      FC_THROW( "Unable to init cURL" );
+   CURL* curl = curl_easy_init();
+   FC_ASSERT( curl, "Unable to init cURL" );
+   return curl;
+}
 
+static curl_slist* init_request_headers()
+{
+   curl_slist* request_headers = curl_slist_append( NULL, "Content-Type: application/json" );
+   FC_ASSERT( request_headers, "Unable to init cURL request headers" );
+   return request_headers;
+}
+
+curl_wrapper::curl_wrapper()
+: curl( init_curl() ), request_headers( init_request_headers() )
+{
    curl_easy_setopt( curl.get(), CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2 );
-
-   request_headers.reset( curl_slist_append( NULL, "Content-Type: application/json" ) );
-   if( !request_headers )
-      FC_THROW( "Unable to init cURL request headers" );
-
    curl_easy_setopt( curl.get(), CURLOPT_HTTPHEADER, request_headers.get() );
    curl_easy_setopt( curl.get(), CURLOPT_USERAGENT, "bitshares-core/6.1" );
 }
