@@ -273,8 +273,8 @@ curl_wrapper::response curl_wrapper::request( curl_wrapper::http_request_method 
    const auto* p_custom_request = custom_request.empty() ? NULL : custom_request.c_str();
    curl_easy_setopt( curl.get(), CURLOPT_CUSTOMREQUEST, p_custom_request );
 
-   if( curl_wrapper::http_request_method::POST == method
-       || curl_wrapper::http_request_method::PUT == method )
+   if( curl_wrapper::http_request_method::_POST == method
+       || curl_wrapper::http_request_method::_PUT == method )
    {
       curl_easy_setopt( curl.get(), CURLOPT_HTTPGET, false );
       curl_easy_setopt( curl.get(), CURLOPT_POST, true );

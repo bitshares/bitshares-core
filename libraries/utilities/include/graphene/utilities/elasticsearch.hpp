@@ -40,13 +40,13 @@ public:
    // Note: the numbers are used in the request() function. If we need to update or add, please check the function
    enum class http_request_method
    {
-      GET     = 0,
-      POST    = 1,
-      HEAD    = 2,
-      PUT     = 3,
-      DELETE  = 4,
-      PATCH   = 5,
-      OPTIONS = 6
+      _GET     = 0,
+      _POST    = 1,
+      _HEAD    = 2,
+      _PUT     = 3,
+      _DELETE  = 4,
+      _PATCH   = 5,
+      _OPTIONS = 6
    };
 
    struct response
@@ -61,16 +61,16 @@ public:
                      const std::string& query ) const;
 
    response get( const std::string& url, const std::string& auth ) const
-   { return request( http_request_method::GET, url, auth, "" ); }
+   { return request( http_request_method::_GET, url, auth, "" ); }
 
    response del( const std::string& url, const std::string& auth ) const
-   { return request( http_request_method::DELETE, url, auth, "" ); }
+   { return request( http_request_method::_DELETE, url, auth, "" ); }
 
    response post( const std::string& url, const std::string& auth, const std::string& query ) const
-   { return request( http_request_method::POST, url, auth, query ); }
+   { return request( http_request_method::_POST, url, auth, query ); }
 
    response put( const std::string& url, const std::string& auth, const std::string& query ) const
-   { return request( http_request_method::PUT, url, auth, query ); }
+   { return request( http_request_method::_PUT, url, auth, query ); }
 
 private:
 
