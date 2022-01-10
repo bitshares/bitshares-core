@@ -71,12 +71,8 @@ class elasticsearch_plugin : public graphene::app::plugin
             operation_history_id_type stop, unsigned limit, operation_history_id_type start);
       mode get_running_mode();
 
-      friend class detail::elasticsearch_plugin_impl;
-      std::unique_ptr<detail::elasticsearch_plugin_impl> my;
-
    private:
-      operation_history_object fromEStoOperation(variant source);
-      graphene::utilities::ES prepareHistoryQuery(string query);
+      std::unique_ptr<detail::elasticsearch_plugin_impl> my;
 };
 
 
