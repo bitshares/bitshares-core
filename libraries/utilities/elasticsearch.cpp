@@ -225,8 +225,12 @@ std::string doCurl(CurlRequest& curl)
 static CURL* init_curl()
 {
    CURL* curl = curl_easy_init();
-   FC_ASSERT( curl, "Unable to init cURL" );
-   return curl;
+   if( curl )
+   {
+      curl_easy_setopt( curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2 );
+      return curl;
+   }
+   FC_THROW( "Unable to init cURL" );
 }
 
 static curl_slist* init_request_headers()
@@ -239,7 +243,6 @@ static curl_slist* init_request_headers()
 curl_wrapper::curl_wrapper()
 : curl( init_curl() ), request_headers( init_request_headers() )
 {
-   curl_easy_setopt( curl.get(), CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2 );
    curl_easy_setopt( curl.get(), CURLOPT_HTTPHEADER, request_headers.get() );
    curl_easy_setopt( curl.get(), CURLOPT_USERAGENT, "bitshares-core/6.1" );
 }
