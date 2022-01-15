@@ -24,7 +24,6 @@
 
 #include <graphene/es_objects/es_objects.hpp>
 
-#include <curl/curl.h>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/market_object.hpp>
@@ -50,11 +49,7 @@ class es_objects_plugin_impl
    public:
       explicit es_objects_plugin_impl(es_objects_plugin& _plugin)
          : _self( _plugin )
-      {
-         curl = curl_easy_init();
-         curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
-      }
-      virtual ~es_objects_plugin_impl();
+      { }
 
    private:
       friend class graphene::es_objects::es_objects_plugin;
@@ -118,10 +113,9 @@ class es_objects_plugin_impl
 
       uint32_t limit_documents = _options.bulk_replay;
 
-      CURL *curl; // curl handler
-      vector<std::string> bulk;
-      vector<std::string> prepare;
+      std::unique_ptr<graphene::utilities::es_client> es;
 
+      vector<std::string> bulk_lines;
 
       uint32_t block_number;
       fc::time_point_sec block_time;
@@ -195,6 +189,8 @@ void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, a
    else
       limit_documents = _options.bulk_replay;
 
+   bulk_lines.reserve(limit_documents);
+
    static const unordered_map<uint16_t,plugin_options::object_options&> data_type_map = {
       { account_id_type::space_type,             _options.accounts       },
       { account_balance_id_type::space_type,     _options.balances       },
@@ -259,9 +255,8 @@ void es_objects_plugin_impl::remove_from_database(
       delete_line["_type"] = "_doc";
    fc::mutable_variant_object final_delete_line;
    final_delete_line["delete"] = std::move( delete_line );
-   prepare.push_back( fc::json::to_string(final_delete_line) );
-   std::move( prepare.begin(), prepare.end(), std::back_inserter(bulk) );
-   prepare.clear();
+
+   bulk_lines.push_back( fc::json::to_string(final_delete_line) );
 
    send_bulk_if_ready();
 }
@@ -289,36 +284,33 @@ void es_objects_plugin_impl::prepareTemplate(
 
    string data = fc::json::to_string(o, fc::json::legacy_generator);
 
-   prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
-   std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk));
-   prepare.clear();
+   auto prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
+   std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk_lines));
 
    send_bulk_if_ready();
 }
 
 void es_objects_plugin_impl::send_bulk_if_ready( bool force )
 {
-   if( !curl || bulk.empty() )
+   if( bulk_lines.empty() )
       return;
-   if( !force && bulk.size() < limit_documents )
+   if( !force && bulk_lines.size() < limit_documents )
       return;
    // send data to elasticsearch when being forced or bulk is too large
-   graphene::utilities::ES es;
-   es.curl = curl;
-   es.bulk_lines = bulk;
-   es.elasticsearch_url = _options.elasticsearch_url;
-   es.auth = _options.auth;
-   if( !graphene::utilities::SendBulk(std::move(es)) )
-      FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error sending bulk data.");
-   bulk.clear();
-}
-
-es_objects_plugin_impl::~es_objects_plugin_impl()
-{
-   if (curl) {
-      curl_easy_cleanup(curl);
-      curl = nullptr;
+   if( !es->send_bulk( bulk_lines ) )
+   {
+      elog( "Error sending ${n} lines of bulk data to ElasticSearch, the first lines are:",
+            ("n",bulk_lines.size()) );
+      const auto log_max = std::min( bulk_lines.size(), size_t(10) );
+      for( size_t i = 0; i < log_max; ++i )
+      {
+         edump( (bulk_lines[i]) );
+      }
+      FC_THROW_EXCEPTION( graphene::chain::plugin_exception,
+            "Error populating ES database, we are going to keep trying." );
    }
+   bulk_lines.clear();
+   bulk_lines.reserve(limit_documents);
 }
 
 } // end namespace detail
@@ -406,6 +398,12 @@ void es_objects_plugin::plugin_set_program_options(
 void detail::es_objects_plugin_impl::init_program_options(const boost::program_options::variables_map& options)
 {
    _options.init( options );
+
+   es = std::make_unique<graphene::utilities::es_client>( _options.elasticsearch_url, _options.auth );
+
+   FC_ASSERT( es->check_status(), "ES database is not up in url ${url}", ("url", _options.elasticsearch_url) );
+
+   es->check_version_7_or_above( is_es_version_7_or_above );
 }
 
 void detail::es_objects_plugin_impl::plugin_options::init(const boost::program_options::variables_map& options)
@@ -451,15 +449,6 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
       my->on_objects_delete( ids );
    });
 
-   graphene::utilities::ES es;
-   es.curl = my->curl;
-   es.elasticsearch_url = my->_options.elasticsearch_url;
-   es.auth = my->_options.auth;
-
-   if(!graphene::utilities::checkES(es))
-      FC_THROW( "ES database is not up in url ${url}", ("url", my->_options.elasticsearch_url) );
-
-   graphene::utilities::checkESVersion7OrAbove(es, my->is_es_version_7_or_above);
 }
 
 void es_objects_plugin::plugin_startup()
