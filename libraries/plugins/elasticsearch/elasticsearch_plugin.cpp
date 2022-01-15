@@ -194,11 +194,11 @@ void elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
          }
       }
 
-      for( auto& a : other )
-         for( auto& item : a.account_auths )
+      for( const auto& a : other )
+         for( const auto& item : a.account_auths )
             impacted.insert( item.first );
 
-      for( auto& account_id : impacted )
+      for( const auto& account_id : impacted )
       {
          // Note: we send bulk if there are too many items in bulk_lines
          add_elasticsearch( account_id, oho, b.block_num() );
@@ -586,7 +586,7 @@ static operation_history_object fromEStoOperation(const variant& source)
    return result;
 }
 
-operation_history_object elasticsearch_plugin::get_operation_by_id(operation_history_id_type id)
+operation_history_object elasticsearch_plugin::get_operation_by_id( const operation_history_id_type& id ) const
 {
    const string operation_id_string = std::string(object_id_type(id));
 
@@ -608,12 +608,12 @@ operation_history_object elasticsearch_plugin::get_operation_by_id(operation_his
 }
 
 vector<operation_history_object> elasticsearch_plugin::get_account_history(
-      const account_id_type account_id,
-      operation_history_id_type stop = operation_history_id_type(),
-      unsigned limit = 100,
-      operation_history_id_type start = operation_history_id_type())
+      const account_id_type& account_id,
+      const operation_history_id_type& stop,
+      uint64_t limit,
+      const operation_history_id_type& start ) const
 {
-   const string account_id_string = std::string(object_id_type(account_id));
+   const string account_id_string = std::string( account_id );
 
    const auto stop_number = stop.instance.value;
    const auto start_number = start.instance.value;
@@ -623,6 +623,7 @@ vector<operation_history_object> elasticsearch_plugin::get_account_history(
       range = " AND operation_id_num: ["+fc::to_string(stop_number)+" TO "+fc::to_string(start_number)+"]";
    else if(stop_number > 0)
       range = " AND operation_id_num: {"+fc::to_string(stop_number)+" TO "+fc::to_string(start_number)+"]";
+   // FIXME the code above is either redundant or buggy
 
    const string query = R"(
    {
@@ -654,21 +655,21 @@ vector<operation_history_object> elasticsearch_plugin::get_account_history(
    const auto hits = variant_response["hits"]["total"];
    size_t size;
    if( hits.is_object() ) // ES-7 ?
-      size = static_cast<size_t>(hits["value"].as_uint64());
+      size = hits["value"].as_uint64();
    else // probably ES-6
-      size = static_cast<size_t>(hits.as_uint64());
+      size = hits.as_uint64();
    size = std::min( size, size_t(limit) );
 
    const auto& data = variant_response["hits"]["hits"];
-   for(size_t i=0; i<size; i++)
+   for( size_t i=0; i<size; ++i )
    {
-      const auto& source = data[size_t(i)]["_source"];
+      const auto& source = data[i]["_source"];
       result.push_back(fromEStoOperation(source));
    }
    return result;
 }
 
-mode elasticsearch_plugin::get_running_mode()
+mode elasticsearch_plugin::get_running_mode() const
 {
    return my->_options.elasticsearch_mode;
 }

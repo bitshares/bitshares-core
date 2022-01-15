@@ -66,10 +66,13 @@ class elasticsearch_plugin : public graphene::app::plugin
       void plugin_initialize(const boost::program_options::variables_map& options) override;
       void plugin_startup() override;
 
-      operation_history_object get_operation_by_id(operation_history_id_type id);
-      vector<operation_history_object> get_account_history(const account_id_type account_id,
-            operation_history_id_type stop, unsigned limit, operation_history_id_type start);
-      mode get_running_mode();
+      operation_history_object get_operation_by_id(const operation_history_id_type& id) const;
+      vector<operation_history_object> get_account_history(
+            const account_id_type& account_id,
+            const operation_history_id_type& stop = operation_history_id_type(),
+            uint64_t limit = 100,
+            const operation_history_id_type& start = operation_history_id_type() ) const;
+      mode get_running_mode() const;
 
    private:
       std::unique_ptr<detail::elasticsearch_plugin_impl> my;
