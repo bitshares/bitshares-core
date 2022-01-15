@@ -128,11 +128,11 @@ static std::string joinBulkLines(const std::vector<std::string>& bulk)
    return bulking;
 }
 
-static long getResponseCode(CURL *handler)
+static uint16_t getResponseCode(CURL *handler)
 {
    long http_code = 0;
    curl_easy_getinfo (handler, CURLINFO_RESPONSE_CODE, &http_code);
-   return http_code;
+   return static_cast<uint16_t>(http_code);
 }
 
 bool SendBulk(ES&& es)

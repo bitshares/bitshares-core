@@ -613,7 +613,7 @@ vector<operation_history_object> elasticsearch_plugin::get_account_history(
       uint64_t limit,
       const operation_history_id_type& start ) const
 {
-   const string account_id_string = std::string( account_id );
+   const auto account_id_string = std::string( account_id );
 
    const auto stop_number = stop.instance.value;
    const auto start_number = start.instance.value;
