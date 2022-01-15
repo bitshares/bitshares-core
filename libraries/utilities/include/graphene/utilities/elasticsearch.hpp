@@ -60,7 +60,7 @@ public:
    {
       uint16_t    code;
       std::string content;
-      bool is_200() const { return ( http_response_code::HTTP_200 == code ); }
+      bool is_200() const; ///< @return if @ref code is 200
    };
 
    http_response request( http_request_method method,
@@ -68,17 +68,10 @@ public:
                           const std::string& auth,
                           const std::string& query ) const;
 
-   http_response get( const std::string& url, const std::string& auth ) const
-   { return request( http_request_method::HTTP_GET, url, auth, "" ); }
-
-   http_response del( const std::string& url, const std::string& auth ) const
-   { return request( http_request_method::HTTP_DELETE, url, auth, "" ); }
-
-   http_response post( const std::string& url, const std::string& auth, const std::string& query ) const
-   { return request( http_request_method::HTTP_POST, url, auth, query ); }
-
-   http_response put( const std::string& url, const std::string& auth, const std::string& query ) const
-   { return request( http_request_method::HTTP_PUT, url, auth, query ); }
+   http_response get( const std::string& url, const std::string& auth ) const;
+   http_response del( const std::string& url, const std::string& auth ) const;
+   http_response post( const std::string& url, const std::string& auth, const std::string& query ) const;
+   http_response put( const std::string& url, const std::string& auth, const std::string& query ) const;
 
 private:
 
@@ -87,20 +80,12 @@ private:
 
    struct curl_deleter
    {
-      void operator()( CURL* curl ) const
-      {
-         if( !curl )
-            curl_easy_cleanup( curl );
-      }
+      void operator()( CURL* curl ) const;
    };
 
    struct curl_slist_deleter
    {
-      void operator()( curl_slist* slist ) const
-      {
-         if( !slist )
-            curl_slist_free_all( slist );
-      }
+      void operator()( curl_slist* slist ) const;
    };
 
    std::unique_ptr<CURL, curl_deleter> curl { init_curl() };

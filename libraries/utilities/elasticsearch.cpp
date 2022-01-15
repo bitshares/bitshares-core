@@ -222,6 +222,11 @@ std::string doCurl(CurlRequest& curl)
    return CurlReadBuffer;
 }
 
+bool curl_wrapper::http_response::is_200() const
+{
+   return ( http_response_code::HTTP_200 == code );
+}
+
 CURL* curl_wrapper::init_curl()
 {
    CURL* curl = curl_easy_init();
@@ -244,6 +249,18 @@ curl_wrapper::curl_wrapper()
 {
    curl_easy_setopt( curl.get(), CURLOPT_HTTPHEADER, request_headers.get() );
    curl_easy_setopt( curl.get(), CURLOPT_USERAGENT, "bitshares-core/6.1" );
+}
+
+void curl_wrapper::curl_deleter::operator()( CURL* curl ) const
+{
+   if( !curl )
+      curl_easy_cleanup( curl );
+}
+
+void curl_wrapper::curl_slist_deleter::operator()( curl_slist* slist ) const
+{
+   if( !slist )
+      curl_slist_free_all( slist );
 }
 
 curl_wrapper::http_response curl_wrapper::request( curl_wrapper::http_request_method method,
@@ -298,6 +315,28 @@ curl_wrapper::http_response curl_wrapper::request( curl_wrapper::http_request_me
    resp.code = static_cast<uint16_t>( code );
 
    return resp;
+}
+
+curl_wrapper::http_response curl_wrapper::get( const std::string& url, const std::string& auth ) const
+{
+   return request( http_request_method::HTTP_GET, url, auth, "" );
+}
+
+curl_wrapper::http_response curl_wrapper::del( const std::string& url, const std::string& auth ) const
+{
+   return request( http_request_method::HTTP_DELETE, url, auth, "" );
+}
+
+curl_wrapper::http_response curl_wrapper::post( const std::string& url, const std::string& auth,
+                                                const std::string& query ) const
+{
+   return request( http_request_method::HTTP_POST, url, auth, query );
+}
+
+curl_wrapper::http_response curl_wrapper::put( const std::string& url, const std::string& auth,
+                                               const std::string& query ) const
+{
+   return request( http_request_method::HTTP_PUT, url, auth, query );
 }
 
 bool es_client::check_status() const
