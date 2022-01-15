@@ -90,9 +90,9 @@ std::string simpleQuery(ES& es)
    return doCurl(curl_request);
 }
 
-static bool handle_bulk_response( long http_code, const std::string& curl_read_buffer )
+static bool handle_bulk_response( uint16_t http_code, const std::string& curl_read_buffer )
 {
-   if( 200 == http_code )
+   if( curl_wrapper::http_response_code::HTTP_200 == http_code )
    {
       // all good, but check errors in response
       fc::variant j = fc::json::from_string(curl_read_buffer);
@@ -105,11 +105,11 @@ static bool handle_bulk_response( long http_code, const std::string& curl_read_b
       return true;
    }
 
-   if( 413 == http_code )
+   if( curl_wrapper::http_response_code::HTTP_413 == http_code )
    {
       elog( "413 error: Request too large. Can be low disk space. ${e}", ("e", curl_read_buffer) );
    }
-   else if( 401 == http_code )
+   else if( curl_wrapper::http_response_code::HTTP_401 == http_code )
    {
       elog( "401 error: Unauthorized. ${e}", ("e", curl_read_buffer) );
    }
@@ -222,7 +222,7 @@ std::string doCurl(CurlRequest& curl)
    return CurlReadBuffer;
 }
 
-static CURL* init_curl()
+CURL* curl_wrapper::init_curl()
 {
    CURL* curl = curl_easy_init();
    if( curl )
@@ -233,7 +233,7 @@ static CURL* init_curl()
    FC_THROW( "Unable to init cURL" );
 }
 
-static curl_slist* init_request_headers()
+curl_slist* curl_wrapper::init_request_headers()
 {
    curl_slist* request_headers = curl_slist_append( NULL, "Content-Type: application/json" );
    FC_ASSERT( request_headers, "Unable to init cURL request headers" );
@@ -241,18 +241,17 @@ static curl_slist* init_request_headers()
 }
 
 curl_wrapper::curl_wrapper()
-: curl( init_curl() ), request_headers( init_request_headers() )
 {
    curl_easy_setopt( curl.get(), CURLOPT_HTTPHEADER, request_headers.get() );
    curl_easy_setopt( curl.get(), CURLOPT_USERAGENT, "bitshares-core/6.1" );
 }
 
-curl_wrapper::response curl_wrapper::request( curl_wrapper::http_request_method method,
-                                              const std::string& url,
-                                              const std::string& auth,
-                                              const std::string& query ) const
+curl_wrapper::http_response curl_wrapper::request( curl_wrapper::http_request_method method,
+                                                   const std::string& url,
+                                                   const std::string& auth,
+                                                   const std::string& query ) const
 {
-   curl_wrapper::response resp;
+   curl_wrapper::http_response resp;
 
    // Note: the variable curl has a long lifetime, it only gets initialized once, then be used many times,
    //       thus we need to clear old data
@@ -276,8 +275,8 @@ curl_wrapper::response curl_wrapper::request( curl_wrapper::http_request_method 
    const auto* p_custom_request = custom_request.empty() ? NULL : custom_request.c_str();
    curl_easy_setopt( curl.get(), CURLOPT_CUSTOMREQUEST, p_custom_request );
 
-   if( curl_wrapper::http_request_method::_POST == method
-       || curl_wrapper::http_request_method::_PUT == method )
+   if( curl_wrapper::http_request_method::HTTP_POST == method
+       || curl_wrapper::http_request_method::HTTP_PUT == method )
    {
       curl_easy_setopt( curl.get(), CURLOPT_HTTPGET, false );
       curl_easy_setopt( curl.get(), CURLOPT_POST, true );
@@ -294,7 +293,9 @@ curl_wrapper::response curl_wrapper::request( curl_wrapper::http_request_method 
    curl_easy_setopt( curl.get(), CURLOPT_WRITEDATA, (void *)(&resp.content) );
    curl_easy_perform( curl.get() );
 
-   curl_easy_getinfo( curl.get(), CURLINFO_RESPONSE_CODE, &resp.code );
+   long code;
+   curl_easy_getinfo( curl.get(), CURLINFO_RESPONSE_CODE, &code );
+   resp.code = static_cast<uint16_t>( code );
 
    return resp;
 }
@@ -310,9 +311,9 @@ bool es_client::check_status() const
 std::string es_client::get_version() const
 { try {
    const auto response = curl.get( base_url, auth );
-   if( response.code != 200 )
+   if( !response.is_200() )
       FC_THROW( "Error on es_client::get_version(): code = ${code}, message = ${message} ",
-                ("code", int64_t(response.code)) ("message", response.content) );
+                ("code", response.code) ("message", response.content) );
 
    fc::variant content = fc::json::from_string( response.content );
    return content["version"]["number"].as_string();

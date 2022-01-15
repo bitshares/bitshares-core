@@ -40,39 +40,50 @@ public:
    // Note: the numbers are used in the request() function. If we need to update or add, please check the function
    enum class http_request_method
    {
-      _GET     = 0,
-      _POST    = 1,
-      _HEAD    = 2,
-      _PUT     = 3,
-      _DELETE  = 4,
-      _PATCH   = 5,
-      _OPTIONS = 6
+      HTTP_GET     = 0,
+      HTTP_POST    = 1,
+      HTTP_HEAD    = 2,
+      HTTP_PUT     = 3,
+      HTTP_DELETE  = 4,
+      HTTP_PATCH   = 5,
+      HTTP_OPTIONS = 6
    };
 
-   struct response
+   struct http_response_code
    {
-      long        code;
-      std::string content;
+      static constexpr uint16_t HTTP_200 = 200;
+      static constexpr uint16_t HTTP_401 = 401;
+      static constexpr uint16_t HTTP_413 = 413;
    };
 
-   response request( http_request_method method,
-                     const std::string& url,
-                     const std::string& auth,
-                     const std::string& query ) const;
+   struct http_response
+   {
+      uint16_t    code;
+      std::string content;
+      bool is_200() const { return ( http_response_code::HTTP_200 == code ); }
+   };
 
-   response get( const std::string& url, const std::string& auth ) const
-   { return request( http_request_method::_GET, url, auth, "" ); }
+   http_response request( http_request_method method,
+                          const std::string& url,
+                          const std::string& auth,
+                          const std::string& query ) const;
 
-   response del( const std::string& url, const std::string& auth ) const
-   { return request( http_request_method::_DELETE, url, auth, "" ); }
+   http_response get( const std::string& url, const std::string& auth ) const
+   { return request( http_request_method::HTTP_GET, url, auth, "" ); }
 
-   response post( const std::string& url, const std::string& auth, const std::string& query ) const
-   { return request( http_request_method::_POST, url, auth, query ); }
+   http_response del( const std::string& url, const std::string& auth ) const
+   { return request( http_request_method::HTTP_DELETE, url, auth, "" ); }
 
-   response put( const std::string& url, const std::string& auth, const std::string& query ) const
-   { return request( http_request_method::_PUT, url, auth, query ); }
+   http_response post( const std::string& url, const std::string& auth, const std::string& query ) const
+   { return request( http_request_method::HTTP_POST, url, auth, query ); }
+
+   http_response put( const std::string& url, const std::string& auth, const std::string& query ) const
+   { return request( http_request_method::HTTP_PUT, url, auth, query ); }
 
 private:
+
+   static CURL* init_curl();
+   static curl_slist* init_request_headers();
 
    struct curl_deleter
    {
@@ -92,8 +103,8 @@ private:
       }
    };
 
-   std::unique_ptr<CURL, curl_deleter> curl;
-   std::unique_ptr<curl_slist, curl_slist_deleter> request_headers;
+   std::unique_ptr<CURL, curl_deleter> curl { init_curl() };
+   std::unique_ptr<curl_slist, curl_slist_deleter> request_headers { init_request_headers() };
 };
 
 class es_client
@@ -113,10 +124,6 @@ private:
    std::string base_url;
    std::string auth;
    curl_wrapper curl;
-   //std::string index_prefix; // bitshares-, objects-
-   //std::string endpoint; // index_prefix + "*/_doc/_search";
-   //std::string query; // json
-   //std::vector <std::string> bulk_lines;
 };
 
    class ES {
