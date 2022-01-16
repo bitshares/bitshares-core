@@ -80,7 +80,7 @@ private:
 
    struct curl_deleter
    {
-      void operator()( CURL* curl ) const;
+      void operator()( CURL* p_curl ) const;
    };
 
    struct curl_slist_deleter

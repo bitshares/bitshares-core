@@ -251,10 +251,10 @@ curl_wrapper::curl_wrapper()
    curl_easy_setopt( curl.get(), CURLOPT_USERAGENT, "bitshares-core/6.1" );
 }
 
-void curl_wrapper::curl_deleter::operator()( CURL* curl ) const
+void curl_wrapper::curl_deleter::operator()( CURL* p_curl ) const
 {
-   if( !curl )
-      curl_easy_cleanup( curl );
+   if( !p_curl )
+      curl_easy_cleanup( p_curl );
 }
 
 void curl_wrapper::curl_slist_deleter::operator()( curl_slist* slist ) const
