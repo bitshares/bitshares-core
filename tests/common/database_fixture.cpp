@@ -48,6 +48,7 @@
 #include <iomanip>
 
 #include "database_fixture.hpp"
+#include "elasticsearch.hpp"
 
 using namespace graphene::chain::test;
 
