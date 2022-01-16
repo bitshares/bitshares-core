@@ -108,13 +108,13 @@ curl_wrapper::curl_wrapper()
 
 void curl_wrapper::curl_deleter::operator()( CURL* p_curl ) const
 {
-   if( !p_curl )
+   if( p_curl )
       curl_easy_cleanup( p_curl );
 }
 
 void curl_wrapper::curl_slist_deleter::operator()( curl_slist* slist ) const
 {
-   if( !slist )
+   if( slist )
       curl_slist_free_all( slist );
 }
 
