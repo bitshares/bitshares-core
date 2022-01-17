@@ -94,9 +94,9 @@ class elasticsearch_plugin_impl
                               uint32_t block_number );
       void send_bulk();
 
-      void doOperationHistory(const optional <operation_history_object>& oho, operation_history_struct& os);
-      void doBlock(uint32_t trx_in_block, const signed_block& b, block_struct& bs);
-      void doVisitor(const optional <operation_history_object>& oho, visitor_struct& vs);
+      void doOperationHistory(const optional <operation_history_object>& oho, operation_history_struct& os) const;
+      void doBlock(uint32_t trx_in_block, const signed_block& b, block_struct& bs) const;
+      void doVisitor(const optional <operation_history_object>& oho, visitor_struct& vs) const;
       void checkState(const fc::time_point_sec& block_time);
       void cleanObjects(const account_transaction_history_id_type& ath, const account_id_type& account_id);
 
@@ -247,7 +247,7 @@ void elasticsearch_plugin_impl::checkState(const fc::time_point_sec& block_time)
 }
 
 void elasticsearch_plugin_impl::doOperationHistory( const optional <operation_history_object>& oho,
-                                                    operation_history_struct& os )
+                                                    operation_history_struct& os ) const
 { try {
    os.trx_in_block = oho->trx_in_block;
    os.op_in_trx = oho->op_in_trx;
@@ -267,7 +267,7 @@ void elasticsearch_plugin_impl::doOperationHistory( const optional <operation_hi
       os.op = fc::json::to_string(oho->op);
 } FC_CAPTURE_LOG_AND_RETHROW( (oho) ) }
 
-void elasticsearch_plugin_impl::doBlock(uint32_t trx_in_block, const signed_block& b, block_struct& bs)
+void elasticsearch_plugin_impl::doBlock(uint32_t trx_in_block, const signed_block& b, block_struct& bs) const
 {
    std::string trx_id = "";
    if(trx_in_block < b.transactions.size())
@@ -332,9 +332,9 @@ struct operation_visitor
    }
 };
 
-void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_object>& oho, visitor_struct& vs)
+void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_object>& oho, visitor_struct& vs) const
 {
-   graphene::chain::database& db = database();
+   const graphene::chain::database& db = _self.database();
 
    operation_visitor o_v;
    oho->op.visit(o_v);

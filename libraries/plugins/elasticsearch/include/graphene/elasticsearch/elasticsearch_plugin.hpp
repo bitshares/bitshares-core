@@ -80,17 +80,17 @@ class elasticsearch_plugin : public graphene::app::plugin
 
 
 struct operation_history_struct {
-   int trx_in_block;
-   int op_in_trx;
+   uint16_t trx_in_block;
+   uint16_t op_in_trx;
    std::string operation_result;
-   int virtual_op;
+   uint32_t virtual_op;
    std::string op;
    variant op_object;
    variant operation_result_object;
 };
 
 struct block_struct {
-   int block_num;
+   uint32_t block_num;
    fc::time_point_sec block_time;
    std::string trx_id;
 };
@@ -136,8 +136,8 @@ struct visitor_struct {
 struct bulk_struct {
    account_transaction_history_object account_history;
    operation_history_struct operation_history;
-   int operation_type;
-   int operation_id_num;
+   int64_t  operation_type;
+   uint64_t operation_id_num;
    block_struct block_data;
    optional<visitor_struct> additional_data;
 };
