@@ -84,10 +84,8 @@ class elasticsearch_plugin_impl
 
       vector <string> bulk_lines; //  vector of op lines
 
-      int16_t op_type;
-      operation_history_struct os;
-      block_struct bs;
-      visitor_struct vs;
+      bulk_struct bulk_line_struct;
+
       std::string index_name;
       bool is_sync = false;
       bool is_es_version_7_or_above = true;
@@ -96,10 +94,9 @@ class elasticsearch_plugin_impl
                               uint32_t block_number );
       void send_bulk();
 
-      void getOperationType(const optional <operation_history_object>& oho);
-      void doOperationHistory(const optional <operation_history_object>& oho);
-      void doBlock(uint32_t trx_in_block, const signed_block& b);
-      void doVisitor(const optional <operation_history_object>& oho);
+      void doOperationHistory(const optional <operation_history_object>& oho, operation_history_struct& os);
+      void doBlock(uint32_t trx_in_block, const signed_block& b, block_struct& bs);
+      void doVisitor(const optional <operation_history_object>& oho, visitor_struct& vs);
       void checkState(const fc::time_point_sec& block_time);
       void cleanObjects(const account_transaction_history_id_type& ath, const account_id_type& account_id);
 
@@ -159,11 +156,15 @@ void elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
       oho = create_oho();
 
       // populate what we can before impacted loop
-      getOperationType(oho);
-      doOperationHistory(oho);
-      doBlock(oho->trx_in_block, b);
-      if(_options.visitor)
-         doVisitor(oho);
+      if( o_op->block_num > _options.start_es_after_block )
+      {
+         bulk_line_struct.operation_type = oho->op.which();
+         bulk_line_struct.operation_id_num = oho->id.instance();
+         doOperationHistory( oho, bulk_line_struct.operation_history );
+         doBlock( oho->trx_in_block, b, bulk_line_struct.block_data );
+         if( _options.visitor )
+            doVisitor( oho, *bulk_line_struct.additional_data );
+      }
 
       const operation_history_object& op = *o_op;
 
@@ -245,13 +246,8 @@ void elasticsearch_plugin_impl::checkState(const fc::time_point_sec& block_time)
    bulk_lines.reserve(limit_documents);
 }
 
-void elasticsearch_plugin_impl::getOperationType(const optional <operation_history_object>& oho)
-{
-   if (!oho->id.is_null())
-      op_type = oho->op.which();
-}
-
-void elasticsearch_plugin_impl::doOperationHistory(const optional <operation_history_object>& oho)
+void elasticsearch_plugin_impl::doOperationHistory( const optional <operation_history_object>& oho,
+                                                    operation_history_struct& os )
 { try {
    os.trx_in_block = oho->trx_in_block;
    os.op_in_trx = oho->op_in_trx;
@@ -271,7 +267,7 @@ void elasticsearch_plugin_impl::doOperationHistory(const optional <operation_his
       os.op = fc::json::to_string(oho->op);
 } FC_CAPTURE_LOG_AND_RETHROW( (oho) ) }
 
-void elasticsearch_plugin_impl::doBlock(uint32_t trx_in_block, const signed_block& b)
+void elasticsearch_plugin_impl::doBlock(uint32_t trx_in_block, const signed_block& b, block_struct& bs)
 {
    std::string trx_id = "";
    if(trx_in_block < b.transactions.size())
@@ -336,7 +332,7 @@ struct operation_visitor
    }
 };
 
-void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_object>& oho)
+void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_object>& oho, visitor_struct& vs)
 {
    graphene::chain::database& db = database();
 
@@ -405,14 +401,8 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type& accoun
 
    if( block_number > _options.start_es_after_block )
    {
-      bulk_struct bulk_line_struct;
       bulk_line_struct.account_history = ath;
-      bulk_line_struct.operation_history = os;
-      bulk_line_struct.operation_type = op_type;
-      bulk_line_struct.operation_id_num = ath.operation_id.instance.value;
-      bulk_line_struct.block_data = bs;
-      if(_options.visitor)
-         bulk_line_struct.additional_data = vs;
+
       auto bulk_line = fc::json::to_string(bulk_line_struct, fc::json::legacy_generator);
 
       fc::mutable_variant_object bulk_header;
@@ -512,6 +502,9 @@ void elasticsearch_plugin::plugin_set_program_options(
 void detail::elasticsearch_plugin_impl::init_program_options(const boost::program_options::variables_map& options)
 {
    _options.init( options );
+
+   if( _options.visitor )
+      bulk_line_struct.additional_data = visitor_struct();
 
    es = std::make_unique<graphene::utilities::es_client>( _options.elasticsearch_url, _options.auth );
 
