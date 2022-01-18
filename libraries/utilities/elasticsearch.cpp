@@ -24,11 +24,11 @@
 #include <graphene/utilities/elasticsearch.hpp>
 
 #include <boost/algorithm/string/join.hpp>
-#include <fc/log/logger.hpp>
+
 #include <fc/io/json.hpp>
 #include <fc/exception/exception.hpp>
 
-size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
+static size_t curl_write_function(void *contents, size_t size, size_t nmemb, void *userp)
 {
    ((std::string*)userp)->append((char*)contents, size * nmemb);
    return size * nmemb;
@@ -36,116 +36,34 @@ size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
 
 namespace graphene { namespace utilities {
 
-bool checkES(ES& es)
+static bool handle_bulk_response( uint16_t http_code, const std::string& curl_read_buffer )
 {
-   graphene::utilities::CurlRequest curl_request;
-   curl_request.handler = es.curl;
-   curl_request.url = es.elasticsearch_url + "_nodes";
-   curl_request.auth = es.auth;
-   curl_request.type = "GET";
-
-   if(doCurl(curl_request).empty())
-      return false;
-   return true;
-
-}
-
-std::string getESVersion(ES& es)
-{
-   graphene::utilities::CurlRequest curl_request;
-   curl_request.handler = es.curl;
-   curl_request.url = es.elasticsearch_url;
-   curl_request.auth = es.auth;
-   curl_request.type = "GET";
-
-   fc::variant response = fc::json::from_string(doCurl(curl_request));
-
-   return response["version"]["number"].as_string();
-}
-
-void checkESVersion7OrAbove(ES& es, bool& result) noexcept
-{
-   static const int64_t version_7 = 7;
-   try {
-      const auto es_version = graphene::utilities::getESVersion(es);
-      auto dot_pos = es_version.find('.');
-      result = ( std::stoi(es_version.substr(0,dot_pos)) >= version_7 );
-   }
-   catch( ... )
+   if( curl_wrapper::http_response_code::HTTP_200 == http_code )
    {
-      wlog( "Unable to get ES version, assuming it is 7 or above" );
-      result = true;
-   }
-}
-
-std::string simpleQuery(ES& es)
-{
-   graphene::utilities::CurlRequest curl_request;
-   curl_request.handler = es.curl;
-   curl_request.url = es.elasticsearch_url + es.endpoint;
-   curl_request.auth = es.auth;
-   curl_request.type = "POST";
-   curl_request.query = es.query;
-
-   return doCurl(curl_request);
-}
-
-bool SendBulk(ES&& es)
-{
-   std::string bulking = joinBulkLines(es.bulk_lines);
-
-   graphene::utilities::CurlRequest curl_request;
-   curl_request.handler = es.curl;
-   curl_request.url = es.elasticsearch_url + "_bulk";
-   curl_request.auth = es.auth;
-   curl_request.type = "POST";
-   curl_request.query = std::move(bulking);
-
-   auto curlResponse = doCurl(curl_request);
-
-   if(handleBulkResponse(getResponseCode(curl_request.handler), curlResponse))
-      return true;
-   return false;
-}
-
-std::string joinBulkLines(const std::vector<std::string>& bulk)
-{
-   auto bulking = boost::algorithm::join(bulk, "\n");
-   bulking = bulking + "\n";
-
-   return bulking;
-}
-long getResponseCode(CURL *handler)
-{
-   long http_code = 0;
-   curl_easy_getinfo (handler, CURLINFO_RESPONSE_CODE, &http_code);
-   return http_code;
-}
-
-bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer)
-{
-   if(http_code == 200) {
       // all good, but check errors in response
-      fc::variant j = fc::json::from_string(CurlReadBuffer);
+      fc::variant j = fc::json::from_string(curl_read_buffer);
       bool errors = j["errors"].as_bool();
-      if( errors ) {
-         elog( "ES returned 200 but with errors: ${e}", ("e", CurlReadBuffer) );
+      if( errors )
+      {
+         elog( "ES returned 200 but with errors: ${e}", ("e", curl_read_buffer) );
          return false;
       }
+      return true;
    }
-   else {
-      if(http_code == 413) {
-         elog( "413 error: Can be low disk space. ${e}", ("e", CurlReadBuffer) );
-      }
-      else if(http_code == 401) {
-         elog( "401 error: Unauthorized. ${e}", ("e", CurlReadBuffer) );
-      }
-      else {
-         elog( "${code} error: ${e}", ("code", std::to_string(http_code)) ("e", CurlReadBuffer) );
-      }
-      return false;
+
+   if( curl_wrapper::http_response_code::HTTP_413 == http_code )
+   {
+      elog( "413 error: Request too large. Can be low disk space. ${e}", ("e", curl_read_buffer) );
    }
-   return true;
+   else if( curl_wrapper::http_response_code::HTTP_401 == http_code )
+   {
+      elog( "401 error: Unauthorized. ${e}", ("e", curl_read_buffer) );
+   }
+   else
+   {
+      elog( "${code} error: ${e}", ("code", std::to_string(http_code)) ("e", curl_read_buffer) );
+   }
+   return false;
 }
 
 std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, std::string&& data)
@@ -159,62 +77,187 @@ std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_heade
    return bulk;
 }
 
-bool deleteAll(ES& es)
+bool curl_wrapper::http_response::is_200() const
 {
-   graphene::utilities::CurlRequest curl_request;
-   curl_request.handler = es.curl;
-   curl_request.url = es.elasticsearch_url + es.index_prefix + "*";
-   curl_request.auth = es.auth;
-   curl_request.type = "DELETE";
-
-   auto curl_response = doCurl(curl_request);
-   if(curl_response.empty())
-      return false;
-   else
-      return true;
-}
-std::string getEndPoint(ES& es)
-{
-   graphene::utilities::CurlRequest curl_request;
-   curl_request.handler = es.curl;
-   curl_request.url = es.elasticsearch_url + es.endpoint;
-   curl_request.auth = es.auth;
-   curl_request.type = "GET";
-
-   return doCurl(curl_request);
+   return ( http_response_code::HTTP_200 == code );
 }
 
-std::string doCurl(CurlRequest& curl)
+CURL* curl_wrapper::init_curl()
 {
-   std::string CurlReadBuffer;
-   struct curl_slist *headers = NULL;
-   headers = curl_slist_append(headers, "Content-Type: application/json");
-
-   // Note: the variable curl.handler has a long lifetime, it only gets initialized once, then be used many times,
-   //       thus we need to clear old data
-   curl_easy_setopt(curl.handler, CURLOPT_HTTPHEADER, headers);
-   curl_easy_setopt(curl.handler, CURLOPT_URL, curl.url.c_str());
-   curl_easy_setopt(curl.handler, CURLOPT_CUSTOMREQUEST, curl.type.c_str()); // this is OK
-   if(curl.type == "POST")
+   CURL* curl = curl_easy_init();
+   if( curl )
    {
-      curl_easy_setopt(curl.handler, CURLOPT_HTTPGET, false);
-      curl_easy_setopt(curl.handler, CURLOPT_POST, true);
-      curl_easy_setopt(curl.handler, CURLOPT_POSTFIELDS, curl.query.c_str());
+      curl_easy_setopt( curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2 );
+      return curl;
+   }
+   FC_THROW( "Unable to init cURL" );
+}
+
+curl_slist* curl_wrapper::init_request_headers()
+{
+   curl_slist* request_headers = curl_slist_append( NULL, "Content-Type: application/json" );
+   FC_ASSERT( request_headers, "Unable to init cURL request headers" );
+   return request_headers;
+}
+
+curl_wrapper::curl_wrapper()
+{
+   curl_easy_setopt( curl.get(), CURLOPT_HTTPHEADER, request_headers.get() );
+   curl_easy_setopt( curl.get(), CURLOPT_USERAGENT, "bitshares-core/6.1" );
+}
+
+void curl_wrapper::curl_deleter::operator()( CURL* p_curl ) const
+{
+   if( p_curl )
+      curl_easy_cleanup( p_curl );
+}
+
+void curl_wrapper::curl_slist_deleter::operator()( curl_slist* slist ) const
+{
+   if( slist )
+      curl_slist_free_all( slist );
+}
+
+curl_wrapper::http_response curl_wrapper::request( curl_wrapper::http_request_method method,
+                                                   const std::string& url,
+                                                   const std::string& auth,
+                                                   const std::string& query ) const
+{
+   curl_wrapper::http_response resp;
+
+   // Note: the variable curl has a long lifetime, it only gets initialized once, then be used many times,
+   //       thus we need to clear old data
+
+   // Note: host and auth are always the same in the program, ideally we don't need to set them every time
+   curl_easy_setopt( curl.get(), CURLOPT_URL, url.c_str() );
+   if( !auth.empty() )
+      curl_easy_setopt( curl.get(), CURLOPT_USERPWD, auth.c_str() );
+
+   // Empty for GET, POST or HEAD, non-empty for DELETE or PUT
+   static const std::vector<std::string> http_request_method_custom_str = {
+      "", // GET
+      "", // POST
+      "", // HEAD
+      "PUT",
+      "DELETE",
+      "PATCH",
+      "OPTIONS"
+   };
+   const auto& custom_request = http_request_method_custom_str[static_cast<size_t>(method)];
+   const auto* p_custom_request = custom_request.empty() ? NULL : custom_request.c_str();
+   curl_easy_setopt( curl.get(), CURLOPT_CUSTOMREQUEST, p_custom_request );
+
+   if( curl_wrapper::http_request_method::HTTP_POST == method
+       || curl_wrapper::http_request_method::HTTP_PUT == method )
+   {
+      curl_easy_setopt( curl.get(), CURLOPT_HTTPGET, false );
+      curl_easy_setopt( curl.get(), CURLOPT_POST, true );
+      curl_easy_setopt( curl.get(), CURLOPT_POSTFIELDS, query.c_str() );
    }
    else // GET or DELETE (only these are used in this file)
    {
-      curl_easy_setopt(curl.handler, CURLOPT_POSTFIELDS, NULL);
-      curl_easy_setopt(curl.handler, CURLOPT_POST, false);
-      curl_easy_setopt(curl.handler, CURLOPT_HTTPGET, true);
+      curl_easy_setopt( curl.get(), CURLOPT_POSTFIELDS, NULL );
+      curl_easy_setopt( curl.get(), CURLOPT_POST, false );
+      curl_easy_setopt( curl.get(), CURLOPT_HTTPGET, true );
    }
-   curl_easy_setopt(curl.handler, CURLOPT_WRITEFUNCTION, WriteCallback);
-   curl_easy_setopt(curl.handler, CURLOPT_WRITEDATA, (void *)&CurlReadBuffer);
-   curl_easy_setopt(curl.handler, CURLOPT_USERAGENT, "libcrp/0.1");
-   if(!curl.auth.empty())
-      curl_easy_setopt(curl.handler, CURLOPT_USERPWD, curl.auth.c_str());
-   curl_easy_perform(curl.handler);
 
-   return CurlReadBuffer;
+   curl_easy_setopt( curl.get(), CURLOPT_WRITEFUNCTION, curl_write_function );
+   curl_easy_setopt( curl.get(), CURLOPT_WRITEDATA, (void *)(&resp.content) );
+   curl_easy_perform( curl.get() );
+
+   long code;
+   curl_easy_getinfo( curl.get(), CURLINFO_RESPONSE_CODE, &code );
+   resp.code = static_cast<uint16_t>( code );
+
+   return resp;
+}
+
+curl_wrapper::http_response curl_wrapper::get( const std::string& url, const std::string& auth ) const
+{
+   return request( http_request_method::HTTP_GET, url, auth, "" );
+}
+
+curl_wrapper::http_response curl_wrapper::del( const std::string& url, const std::string& auth ) const
+{
+   return request( http_request_method::HTTP_DELETE, url, auth, "" );
+}
+
+curl_wrapper::http_response curl_wrapper::post( const std::string& url, const std::string& auth,
+                                                const std::string& query ) const
+{
+   return request( http_request_method::HTTP_POST, url, auth, query );
+}
+
+curl_wrapper::http_response curl_wrapper::put( const std::string& url, const std::string& auth,
+                                               const std::string& query ) const
+{
+   return request( http_request_method::HTTP_PUT, url, auth, query );
+}
+
+bool es_client::check_status() const
+{
+   const auto response = curl.get( base_url + "_nodes", auth );
+
+   // Note: response.code is ignored here
+   return !response.content.empty();
+}
+
+std::string es_client::get_version() const
+{ try {
+   const auto response = curl.get( base_url, auth );
+   if( !response.is_200() )
+      FC_THROW( "Error on es_client::get_version(): code = ${code}, message = ${message} ",
+                ("code", response.code) ("message", response.content) );
+
+   fc::variant content = fc::json::from_string( response.content );
+   return content["version"]["number"].as_string();
+} FC_CAPTURE_AND_RETHROW() }
+
+void es_client::check_version_7_or_above( bool& result ) const noexcept
+{
+   static const int64_t version_7 = 7;
+   try {
+      const auto es_version = get_version();
+      auto dot_pos = es_version.find('.');
+      result = ( std::stoi(es_version.substr(0,dot_pos)) >= version_7 );
+   }
+   catch( ... )
+   {
+      wlog( "Unable to get ES version, assuming it is 7 or above" );
+      result = true;
+   }
+}
+
+bool es_client::send_bulk( const std::vector<std::string>& bulk_lines ) const
+{
+   auto bulk_str = boost::algorithm::join( bulk_lines, "\n" ) + "\n";
+   const auto response = curl.post( base_url + "_bulk", auth, bulk_str );
+
+   return handle_bulk_response( response.code, response.content );
+}
+
+bool es_client::del( const std::string& path ) const
+{
+   const auto response = curl.del( base_url + path, auth );
+
+   // Note: response.code is ignored here
+   return !response.content.empty();
+}
+
+std::string es_client::get( const std::string& path ) const
+{
+   const auto response = curl.get( base_url + path, auth );
+
+   // Note: response.code is ignored here
+   return response.content;
+}
+
+std::string es_client::query( const std::string& path, const std::string& query ) const
+{
+   const auto response = curl.post( base_url + path, auth, query );
+
+   // Note: response.code is ignored here
+   return response.content;
 }
 
 fc::variant es_data_adaptor::adapt(const fc::variant_object& op)

@@ -31,9 +31,8 @@
 #include <graphene/elasticsearch/elasticsearch_plugin.hpp>
 
 #include "../common/init_unit_test_suite.hpp"
-
 #include "../common/database_fixture.hpp"
-
+#include "../common/elasticsearch.hpp"
 #include "../common/utils.hpp"
 
 #define ES_WAIT_TIME (fc::milliseconds(10000))

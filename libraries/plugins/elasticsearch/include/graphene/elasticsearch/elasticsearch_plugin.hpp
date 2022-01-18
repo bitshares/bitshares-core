@@ -50,7 +50,7 @@ namespace detail
     class elasticsearch_plugin_impl;
 }
 
-enum mode { only_save = 0 , only_query = 1, all = 2 };
+enum class mode { only_save = 0 , only_query = 1, all = 2 };
 
 class elasticsearch_plugin : public graphene::app::plugin
 {
@@ -66,32 +66,31 @@ class elasticsearch_plugin : public graphene::app::plugin
       void plugin_initialize(const boost::program_options::variables_map& options) override;
       void plugin_startup() override;
 
-      operation_history_object get_operation_by_id(operation_history_id_type id);
-      vector<operation_history_object> get_account_history(const account_id_type account_id,
-            operation_history_id_type stop, unsigned limit, operation_history_id_type start);
-      mode get_running_mode();
-
-      friend class detail::elasticsearch_plugin_impl;
-      std::unique_ptr<detail::elasticsearch_plugin_impl> my;
+      operation_history_object get_operation_by_id(const operation_history_id_type& id) const;
+      vector<operation_history_object> get_account_history(
+            const account_id_type& account_id,
+            const operation_history_id_type& stop = operation_history_id_type(),
+            uint64_t limit = 100,
+            const operation_history_id_type& start = operation_history_id_type() ) const;
+      mode get_running_mode() const;
 
    private:
-      operation_history_object fromEStoOperation(variant source);
-      graphene::utilities::ES prepareHistoryQuery(string query);
+      std::unique_ptr<detail::elasticsearch_plugin_impl> my;
 };
 
 
 struct operation_history_struct {
-   int trx_in_block;
-   int op_in_trx;
+   uint16_t trx_in_block;
+   uint16_t op_in_trx;
    std::string operation_result;
-   int virtual_op;
+   uint32_t virtual_op;
    std::string op;
    variant op_object;
    variant operation_result_object;
 };
 
 struct block_struct {
-   int block_num;
+   uint32_t block_num;
    fc::time_point_sec block_time;
    std::string trx_id;
 };
@@ -137,8 +136,8 @@ struct visitor_struct {
 struct bulk_struct {
    account_transaction_history_object account_history;
    operation_history_struct operation_history;
-   int operation_type;
-   int operation_id_num;
+   int64_t  operation_type;
+   uint64_t operation_id_num;
    block_struct block_data;
    optional<visitor_struct> additional_data;
 };
