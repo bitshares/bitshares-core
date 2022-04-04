@@ -8,7 +8,7 @@ env:
   BOOST_DOTTED_VERSION: 1.69.0
   CURL_VERSION: 7.67.0
   OPENSSL_VERSION: 1.1.1d
-  ZLIB_VERSION: 1.2.11
+  ZLIB_VERSION: 1.2.12
 jobs:
   prepare-mingw64-libs:
     name: Build required 3rd-party libraries
