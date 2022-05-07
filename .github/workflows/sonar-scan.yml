@@ -17,8 +17,9 @@ jobs:
     steps:
     - name: Download and install latest SonarScanner CLI tool
       run: |
-        SONAR_SCANNER_VERSION=`curl https://github.com/SonarSource/sonar-scanner-cli/releases/latest \
-                                    2>/dev/null | cut -f2 -d'"' | cut -f8 -d'/'`
+        SONAR_SCANNER_VERSION=`curl -w %{redirect_url} \
+             https://github.com/SonarSource/sonar-scanner-cli/releases/latest \
+             2>/dev/null | cut -f8 -d'/'`
         SONAR_DOWNLOAD_PATH=https://binaries.sonarsource.com/Distribution/sonar-scanner-cli
         curl --create-dirs -sSLo $HOME/.sonar/sonar-scanner.zip \
              $SONAR_DOWNLOAD_PATH/sonar-scanner-cli-$SONAR_SCANNER_VERSION-linux.zip
