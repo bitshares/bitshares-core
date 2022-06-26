@@ -911,6 +911,9 @@ static bool update_bitasset_object_options(
    const fc::time_point_sec next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
    bool after_hf_core_868_890 = ( next_maint_time > HARDFORK_CORE_868_890_TIME );
 
+   const auto& head_time = db.head_block_time();
+   bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
+
    // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
    bool should_update_feeds = false;
    if( op.new_options.minimum_feeds != bdo.options.minimum_feeds )
@@ -996,12 +999,19 @@ static bool update_bitasset_object_options(
    if( should_update_feeds || update_feeds_due_to_bsrm_change )
    {
       const auto old_feed = bdo.current_feed;
+      const auto old_median_feed = bdo.median_feed;
       // skip recalculating median feed if it is not needed
       db.update_bitasset_current_feed( bdo, !should_update_feeds );
       // Note: we don't try to revive the bitasset here if it was GSed // TODO probably we should do it
 
+      // TODO potential optimization: check only when should_update_feeds == true
+
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
       feed_actually_changed = ( after_hf_core_868_890 && !old_feed.margin_call_params_equal( bdo.current_feed ) );
+
+      if( !feed_actually_changed && after_core_hardfork_2582
+            && !old_median_feed.margin_call_params_equal( bdo.median_feed ) )
+         feed_actually_changed = true;
    }
 
    // Conditions under which a call to check_call_orders is needed in response to the updates applied here:
@@ -1331,6 +1341,11 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
    const auto& head_time = d.head_block_time();
    const auto& maint_time = d.get_dynamic_global_properties().next_maintenance_time;
    d.adjust_balance( op.account, -to_settle );
+
+   bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
+   if( after_core_hardfork_2582 && 0 == to_settle.amount )
+      return result;
+
    const auto& settle = d.create<force_settlement_object>(
          [&op,&to_settle,&head_time,&bitasset](force_settlement_object& s) {
       s.owner = op.account;
@@ -1422,6 +1437,7 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
    const asset_bitasset_data_object& bad = *bitasset_ptr;
 
    auto old_feed = bad.current_feed;
+   auto old_median_feed = bad.median_feed;
    // Store medians for this asset
    d.modify( bad , [&o,&head_time](asset_bitasset_data_object& a) {
       a.feeds[o.publisher] = make_pair( head_time, price_feed_with_icr( o.feed,
@@ -1429,7 +1445,11 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
    });
    d.update_bitasset_current_feed( bad );
 
-   if( old_feed.margin_call_params_equal(bad.current_feed) )
+   bool after_core_hardfork_2582 = HARDFORK_CORE_2582_PASSED( head_time ); // Price feed issues
+
+   if( !after_core_hardfork_2582 && old_feed.margin_call_params_equal(bad.current_feed) )
+      return void_result();
+   if( after_core_hardfork_2582 && old_median_feed.margin_call_params_equal(bad.median_feed) )
       return void_result();
 
    // Feed changed, check whether need to revive the asset and proceed if need
