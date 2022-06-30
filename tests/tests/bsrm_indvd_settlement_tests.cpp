@@ -466,6 +466,33 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
 
       check_result();
 
+      if( 1 == i ) // additional tests
+      {
+         set_expiration( db, trx );
+
+         // cancel sell_high
+         cancel_limit_order( sell_high_id(db) );
+
+         // publish a new feed so that call4 is undercollateralized
+         f.settlement_price = price( asset(80000,mpa_id), asset(2057) );
+         publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+         auto check_result_1 = [&]
+         {
+            BOOST_CHECK( !db.find( call4_id ) );
+         };
+
+         check_result_1();
+
+         BOOST_TEST_MESSAGE( "Generate a block again" );
+         generate_block();
+
+         check_result_1();
+
+         // reset
+         db.pop_block();
+      }
+
       // reset
       db.pop_block();
 
