@@ -8,7 +8,7 @@ jobs:
     name: Build and test in macOS
     strategy:
       matrix:
-        os: [macos-10.15, macos-11]
+        os: [macos-10.15, macos-11, macos-12]
     runs-on: ${{ matrix.os }}
     steps:
     - name: Install dependencies
