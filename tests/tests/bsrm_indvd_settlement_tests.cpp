@@ -44,8 +44,10 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
    generate_blocks(HARDFORK_CORE_2467_TIME - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
-   // two passes, one for individual settlement to order, the other for individual settlement to fund
-   for( int i = 0; i < 2; ++ i )
+   // multiple passes,
+   // 0 : individual settlement to order
+   // 1, 2 : individual settlement to fund
+   for( int i = 0; i < 3; ++ i )
    {
       idump( (i) );
 
@@ -90,7 +92,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
       if( 0 == i )
          BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
                       == bsrm_type::individual_settlement_to_order );
-      else if( 1 == i )
+      else if( 1 == i || 2 == i )
          BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
                       == bsrm_type::individual_settlement_to_fund );
 
@@ -363,7 +365,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
             BOOST_CHECK_EQUAL( get_balance( seller4_id, mpa_id ), 980000 ); // no change
             BOOST_CHECK_EQUAL( get_balance( seller4_id, asset_id_type() ), 439 ); // 439
          }
-         else if( 1 == i ) // to fund
+         else if( 1 == i || 2 == i ) // to fund
          {
             // sell_mid price is 100000/2000 = 50
             // call pays price is (100000/2000) * (1239:1250) = 49.56
@@ -412,12 +414,15 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
             // call pays price is (1130029:24885) * (1239:1250) = 45.010437806
             // call match price is 1130029/24885 = 45.410046213 (< sell_mid2.price)
 
+            // call4 is 100000:2500 = 40
+            // will be called if median_feed <= 100000:2500 * 1850:1000 = 74
             // sell_mid2 is matched with call4
             // sell_mid2 is smaller thus fully filled
             BOOST_CHECK( !db.find( sell_mid2_id ) );
             // sell_mid2 gets 439, pays 20000
             // call4 gets 20000, pays round_down(439 * 1250/1239) = 442, margin call fee = 3
             // call4 is now (100000-20000):(2500-442) = 80000:2058 = 38.872691934 (< MSSP 44.444444444)
+            // will be called if median_feed <= 80000:2058 * 1850:1000 = 71.914480078
 
             // sell_high price is 100000/2400 = 41.666666667 (< call match price, so will not match)
             BOOST_REQUIRE( db.find( sell_high_id ) );
@@ -488,6 +493,51 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
          generate_block();
 
          check_result_1();
+
+         // reset
+         db.pop_block();
+      }
+      else if( 2 == i ) // additional tests
+      {
+         set_expiration( db, trx );
+
+         // median feed is 100000/1800 = 55.555555556
+         // call pays price = 100000:1800 * 1000:1250 = 100000:2250 = 44.444444444
+         // call match price = 100000:1800 * 1000:1239 = 100000:2230.2 = 44.83902789
+         // (1 / maintenance collateralization) is 100000/1800/1.85 = 30.03003003
+
+         // current feed is capped at (1130029:24885) * (1239:1000) = 56.263047257
+         // call pays price is (1130029:24885) * (1239:1250) = 45.010437806
+         // call match price is 1130029/24885 = 45.410046213
+         // fake (1 / maintenance collateralization) is (1130029/24885)*(1239/1000)/1.85 = 30.412457977
+
+         // borrower4 adds collateral to call4, and setup target CR
+         BOOST_TEST_MESSAGE( "Borrower4 adds collateral" );
+         borrow( borrower4_id(db), asset(0,mpa_id), asset(605), 1000 );
+         // call4 is now 80000:(2058+605) = 80000:2663 = 30.041306797
+         // Its CR is still below required MCR, but above the fake MCR (if calculate with the capped feed)
+
+         // seller4 sells some, this should be matched with call4
+         // due to TCR, both it and call4 won't be fully filled
+         BOOST_TEST_MESSAGE( "Seller4 sells some" );
+         const limit_order_object* sell_mid3 = create_sell_order( seller4, asset(20000,mpa_id), asset(439) );
+         BOOST_REQUIRE( sell_mid3 );
+         limit_order_id_type sell_mid3_id = sell_mid3->id;
+
+         auto check_result_2 = [&]
+         {
+            BOOST_REQUIRE( db.find( sell_mid3_id ) );
+            BOOST_CHECK_LT( sell_mid3_id(db).for_sale.value, 20000 );
+            BOOST_REQUIRE( db.find( call4_id ) );
+            BOOST_CHECK_LT( call4_id(db).debt.value, 80000 );
+         };
+
+         check_result_2();
+
+         BOOST_TEST_MESSAGE( "Generate a block again" );
+         generate_block();
+
+         check_result_2();
 
          // reset
          db.pop_block();
