@@ -44,10 +44,19 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
    generate_blocks(HARDFORK_CORE_2467_TIME - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
-   // two passes, one for individual settlement to order, the other for individual settlement to fund
-   for( int i = 0; i < 2; ++ i )
+   // multiple passes,
+   // 0 : individual settlement to order
+   // 1, 2 : individual settlement to fund
+   for( int i = 0; i < 3; ++ i )
    {
       idump( (i) );
+
+      if( 1 == i )
+      {
+         // Advance to core-2582 hard fork
+         generate_blocks(HARDFORK_CORE_2582_TIME);
+         generate_block();
+      }
 
       set_expiration( db, trx );
 
@@ -90,7 +99,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
       if( 0 == i )
          BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
                       == bsrm_type::individual_settlement_to_order );
-      else if( 1 == i )
+      else if( 1 == i || 2 == i )
          BOOST_CHECK( mpa.bitasset_data(db).get_black_swan_response_method()
                       == bsrm_type::individual_settlement_to_fund );
 
@@ -363,7 +372,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
             BOOST_CHECK_EQUAL( get_balance( seller4_id, mpa_id ), 980000 ); // no change
             BOOST_CHECK_EQUAL( get_balance( seller4_id, asset_id_type() ), 439 ); // 439
          }
-         else if( 1 == i ) // to fund
+         else if( 1 == i || 2 == i ) // to fund
          {
             // sell_mid price is 100000/2000 = 50
             // call pays price is (100000/2000) * (1239:1250) = 49.56
@@ -412,12 +421,15 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
             // call pays price is (1130029:24885) * (1239:1250) = 45.010437806
             // call match price is 1130029/24885 = 45.410046213 (< sell_mid2.price)
 
+            // call4 is 100000:2500 = 40
+            // will be called if median_feed <= 100000:2500 * 1850:1000 = 74
             // sell_mid2 is matched with call4
             // sell_mid2 is smaller thus fully filled
             BOOST_CHECK( !db.find( sell_mid2_id ) );
             // sell_mid2 gets 439, pays 20000
             // call4 gets 20000, pays round_down(439 * 1250/1239) = 442, margin call fee = 3
             // call4 is now (100000-20000):(2500-442) = 80000:2058 = 38.872691934 (< MSSP 44.444444444)
+            // will be called if median_feed <= 80000:2058 * 1850:1000 = 71.914480078
 
             // sell_high price is 100000/2400 = 41.666666667 (< call match price, so will not match)
             BOOST_REQUIRE( db.find( sell_high_id ) );
@@ -465,6 +477,78 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
       generate_block();
 
       check_result();
+
+      if( 1 == i ) // additional tests
+      {
+         set_expiration( db, trx );
+
+         // cancel sell_high
+         cancel_limit_order( sell_high_id(db) );
+
+         // publish a new feed so that call4 is undercollateralized
+         f.settlement_price = price( asset(80000,mpa_id), asset(2057) );
+         publish_feed( mpa_id, feeder_id, f, feed_icr );
+
+         auto check_result_1 = [&]
+         {
+            BOOST_CHECK( !db.find( call4_id ) );
+         };
+
+         check_result_1();
+
+         BOOST_TEST_MESSAGE( "Generate a block again" );
+         generate_block();
+
+         check_result_1();
+
+         // reset
+         db.pop_block();
+      }
+      else if( 2 == i ) // additional tests
+      {
+         set_expiration( db, trx );
+
+         // median feed is 100000/1800 = 55.555555556
+         // call pays price = 100000:1800 * 1000:1250 = 100000:2250 = 44.444444444
+         // call match price = 100000:1800 * 1000:1239 = 100000:2230.2 = 44.83902789
+         // (1 / maintenance collateralization) is 100000/1800/1.85 = 30.03003003
+
+         // current feed is capped at (1130029:24885) * (1239:1000) = 56.263047257
+         // call pays price is (1130029:24885) * (1239:1250) = 45.010437806
+         // call match price is 1130029/24885 = 45.410046213
+         // fake (1 / maintenance collateralization) is (1130029/24885)*(1239/1000)/1.85 = 30.412457977
+
+         // borrower4 adds collateral to call4, and setup target CR
+         BOOST_TEST_MESSAGE( "Borrower4 adds collateral" );
+         borrow( borrower4_id(db), asset(0,mpa_id), asset(605), 1000 );
+         // call4 is now 80000:(2058+605) = 80000:2663 = 30.041306797
+         // Its CR is still below required MCR, but above the fake MCR (if calculate with the capped feed)
+
+         // seller4 sells some, this should be matched with call4
+         // due to TCR, both it and call4 won't be fully filled
+         BOOST_TEST_MESSAGE( "Seller4 sells some" );
+         const limit_order_object* sell_mid3 = create_sell_order( seller4, asset(20000,mpa_id), asset(439) );
+         BOOST_REQUIRE( sell_mid3 );
+         limit_order_id_type sell_mid3_id = sell_mid3->id;
+
+         auto check_result_2 = [&]
+         {
+            BOOST_REQUIRE( db.find( sell_mid3_id ) );
+            BOOST_CHECK_LT( sell_mid3_id(db).for_sale.value, 20000 );
+            BOOST_REQUIRE( db.find( call4_id ) );
+            BOOST_CHECK_LT( call4_id(db).debt.value, 80000 );
+         };
+
+         check_result_2();
+
+         BOOST_TEST_MESSAGE( "Generate a block again" );
+         generate_block();
+
+         check_result_2();
+
+         // reset
+         db.pop_block();
+      }
 
       // reset
       db.pop_block();
@@ -734,13 +818,28 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_disable_force_settle_tes
 
 /// Tests individual settlement to fund : settles when price drops, and how taker orders would match after that
 BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
-{
-   try {
+{ try {
 
-      // Advance to core-2467 hard fork
-      auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_2467_TIME - mi);
-      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   // Advance to core-2467 hard fork
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_2467_TIME - mi);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   // multiple passes,
+   // i == 0 : settle more than the amount of debt in fund
+   // i == 1 : settle exactly the amount of debt in fund, before hf core-2582
+   // i == 2 : settle exactly the amount of debt in fund, after hf core-2582
+   for( int i = 0; i < 3; ++ i )
+   {
+      idump( (i) );
+
+      if( 2 == i )
+      {
+         // Advance to core-2582 hard fork
+         generate_blocks(HARDFORK_CORE_2582_TIME);
+         generate_block();
+      }
+
       set_expiration( db, trx );
 
       ACTORS((sam)(feeder)(borrower)(borrower2)(borrower3)(borrower4)(borrower5)(seller)(seller2));
@@ -921,15 +1020,29 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
       BOOST_CHECK_THROW( force_settle( seller2, asset(50,mpa_id) ), fc::exception );
 
       // seller2 settles
-      auto result = force_settle( seller2, asset(150000,mpa_id) );
+      share_type amount_to_settle = ( 0 == i ? 150000 : 100000 );
+      if( 1 == i ) // it will fail
+      {
+         BOOST_REQUIRE_THROW( force_settle( seller2, asset(amount_to_settle, mpa_id) ), fc::exception );
+         generate_block();
+         db.pop_block();
+         continue;
+      }
+      auto result = force_settle( seller2, asset(amount_to_settle, mpa_id) );
       auto op_result = result.get<extendable_operation_result>().value;
 
       auto check_result = [&]
       {
          // seller2 gets 1983
          // seller2 pays 100000
-         BOOST_REQUIRE( op_result.new_objects.valid() ); // force settlement order created
-         force_settlement_id_type settle_id = *op_result.new_objects->begin();
+         force_settlement_id_type settle_id;
+         if( 0 == i )
+         {
+            BOOST_REQUIRE( op_result.new_objects.valid() ); // force settlement order created
+            settle_id = *op_result.new_objects->begin();
+         }
+         else if ( 2 == i )
+            BOOST_CHECK( !op_result.new_objects.valid() ); // force settlement order not created
 
          BOOST_REQUIRE( op_result.paid.valid() && 1U == op_result.paid->size() );
          BOOST_CHECK( *op_result.paid->begin() == asset( 100000, mpa_id ) );
@@ -949,6 +1062,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
          BOOST_CHECK( mpa_id(db).bitasset_data(db).current_feed.settlement_price == f.settlement_price );
          BOOST_CHECK( !mpa_id(db).bitasset_data(db).is_current_feed_price_capped() );
 
+         // the individual settlement fund is now empty, so the price feed is no longer capped
          // call3 is the least collateralized short, matched with the limit order, both filled
          BOOST_CHECK( !db.find(call3_id) );
          BOOST_CHECK( !db.find(limit_id) );
@@ -956,32 +1070,54 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
          // call3 match price 100000:2000
          // call3 gets 100000, pays round_up(2000 * 1250/1239) = 2018, margin call fee 18
 
-         // settle order is matched with call2
-         // call2 is smaller
-         // call2 gets 20020, pays round_up(20020 * (1650/100000) * (1250/1000)) = 413
-         // settle order gets round_up(20020 * (1650/100000) * (1239/1000)) = 410, margin call fee = 3
+         if( 0 == i )
+         {
+            // settle order is matched with call2
+            // call2 is smaller
+            // call2 gets 20020, pays round_up(20020 * (1650/100000) * (1250/1000)) = 413
+            // settle order gets round_up(20020 * (1650/100000) * (1239/1000)) = 410, margin call fee = 3
 
-         // settle order is matched with call4
-         // settle order is smaller
-         BOOST_CHECK( !db.find(settle_id) );
-         // settle order gets round_down((50000-20020) * (1650/100000) * (1239/1000)) = 612
-         // settle order pays round_up(612 * (100000/1650) * (1000/1239)) = 29937
-         // call4 gets 29937
-         // call4 pays round_down(29937 * (1650/100000) * (1250/1000)) = 617, margin call fee = 5
-         // call4 is now (100000-29937):(2500-617) = 70063:1883
-         BOOST_CHECK_EQUAL( call4_id(db).debt.value, 70063 );
-         BOOST_CHECK_EQUAL( call4_id(db).collateral.value, 1883 );
+            // settle order is matched with call4
+            // settle order is smaller
+            BOOST_CHECK( !db.find(settle_id) );
+            // settle order gets round_down((50000-20020) * (1650/100000) * (1239/1000)) = 612
+            // settle order pays round_up(612 * (100000/1650) * (1000/1239)) = 29937
+            // call4 gets 29937
+            // call4 pays round_down(29937 * (1650/100000) * (1250/1000)) = 617, margin call fee = 5
+            // call4 is now (100000-29937):(2500-617) = 70063:1883
+            BOOST_CHECK_EQUAL( call4_id(db).debt.value, 70063 );
+            BOOST_CHECK_EQUAL( call4_id(db).collateral.value, 1883 );
 
-         BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 20020 ); // 200000 - 79980 - 100000
-         BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 3586 ); // 1586 + 2000
-         BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 50043 ); // 200000 - 100000 - 20020 - 29937
-         BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 3005 ); // 1983 + 410 + 612
+            BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 20020 ); // 200000 - 79980 - 100000
+            BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 3586 ); // 1586 + 2000
+            BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 50043 ); // 200000 - 100000 - 20020 - 29937
+            BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 3005 ); // 1983 + 410 + 612
 
-         BOOST_CHECK_EQUAL( get_balance( borrower_id, asset_id_type() ), init_amount - 2000 );
-         BOOST_CHECK_EQUAL( get_balance( borrower2_id, asset_id_type() ), init_amount - 2013 ); // refund some
-         BOOST_CHECK_EQUAL( get_balance( borrower3_id, asset_id_type() ), init_amount - 2018 ); // refund some
-         BOOST_CHECK_EQUAL( get_balance( borrower4_id, asset_id_type() ), init_amount - 2500 );
+            BOOST_CHECK_EQUAL( get_balance( borrower_id, asset_id_type() ), init_amount - 2000 );
+            BOOST_CHECK_EQUAL( get_balance( borrower2_id, asset_id_type() ), init_amount - 2013 ); // refund some
+            BOOST_CHECK_EQUAL( get_balance( borrower3_id, asset_id_type() ), init_amount - 2018 ); // refund some
+            BOOST_CHECK_EQUAL( get_balance( borrower4_id, asset_id_type() ), init_amount - 2500 );
+            BOOST_CHECK_EQUAL( get_balance( borrower5_id, asset_id_type() ), init_amount - 3136 );
+         }
+         else if ( 2 == i )
+         {
+            // no change to other call orders
+            BOOST_CHECK_EQUAL( call2_id(db).debt.value, 20020 );
+            BOOST_CHECK_EQUAL( call2_id(db).collateral.value, 500 );
+            BOOST_CHECK_EQUAL( call4_id(db).debt.value, 100000 );
+            BOOST_CHECK_EQUAL( call4_id(db).collateral.value, 2500 );
 
+            BOOST_CHECK_EQUAL( get_balance( seller_id, mpa_id ), 20020 ); // 200000 - 79980 - 100000
+            BOOST_CHECK_EQUAL( get_balance( seller_id, asset_id_type() ), 3586 ); // 1586 + 2000
+            BOOST_CHECK_EQUAL( get_balance( seller2_id, mpa_id ), 100000 ); // 200000 - 100000
+            BOOST_CHECK_EQUAL( get_balance( seller2_id, asset_id_type() ), 1983 );
+
+            BOOST_CHECK_EQUAL( get_balance( borrower_id, asset_id_type() ), init_amount - 2000 );
+            BOOST_CHECK_EQUAL( get_balance( borrower2_id, asset_id_type() ), init_amount - 2100 );
+            BOOST_CHECK_EQUAL( get_balance( borrower3_id, asset_id_type() ), init_amount - 2018 ); // refund some
+            BOOST_CHECK_EQUAL( get_balance( borrower4_id, asset_id_type() ), init_amount - 2500 );
+            BOOST_CHECK_EQUAL( get_balance( borrower5_id, asset_id_type() ), init_amount - 3136 );
+         }
       };
 
       check_result();
@@ -991,11 +1127,12 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
 
       check_result();
 
-   } catch (fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
+      // reset
+      db.pop_block();
+
+   } // for i
+
+} FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
 
 /// Tests individual settlement to order : settles when price drops, and how orders are being matched after settled
 BOOST_AUTO_TEST_CASE( individual_settlement_to_order_and_taking_test )
