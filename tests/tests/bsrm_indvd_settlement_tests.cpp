@@ -51,6 +51,13 @@ BOOST_AUTO_TEST_CASE( individual_settlement_test )
    {
       idump( (i) );
 
+      if( 1 == i )
+      {
+         // Advance to core-2582 hard fork
+         generate_blocks(HARDFORK_CORE_2582_TIME);
+         generate_block();
+      }
+
       set_expiration( db, trx );
 
       ACTORS((sam)(feeder)(borrower)(borrower2)(borrower3)(borrower4)(borrower5)(seller)(seller2)(seller3)(seller4));
@@ -818,12 +825,21 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
    generate_blocks(HARDFORK_CORE_2467_TIME - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
-   // two passes,
+   // multiple passes,
    // i == 0 : settle more than the amount of debt in fund
-   // i == 1 : settle exactly the amount of debt in fund
-   for( int i = 0; i < 2; ++ i )
+   // i == 1 : settle exactly the amount of debt in fund, before hf core-2582
+   // i == 2 : settle exactly the amount of debt in fund, after hf core-2582
+   for( int i = 0; i < 3; ++ i )
    {
       idump( (i) );
+
+      if( 2 == i )
+      {
+         // Advance to core-2582 hard fork
+         generate_blocks(HARDFORK_CORE_2582_TIME);
+         generate_block();
+      }
+
       set_expiration( db, trx );
 
       ACTORS((sam)(feeder)(borrower)(borrower2)(borrower3)(borrower4)(borrower5)(seller)(seller2));
@@ -1005,6 +1021,13 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
 
       // seller2 settles
       share_type amount_to_settle = ( 0 == i ? 150000 : 100000 );
+      if( 1 == i ) // it will fail
+      {
+         BOOST_REQUIRE_THROW( force_settle( seller2, asset(amount_to_settle, mpa_id) ), fc::exception );
+         generate_block();
+         db.pop_block();
+         continue;
+      }
       auto result = force_settle( seller2, asset(amount_to_settle, mpa_id) );
       auto op_result = result.get<extendable_operation_result>().value;
 
@@ -1018,7 +1041,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
             BOOST_REQUIRE( op_result.new_objects.valid() ); // force settlement order created
             settle_id = *op_result.new_objects->begin();
          }
-         else if ( 1 == i )
+         else if ( 2 == i )
             BOOST_CHECK( !op_result.new_objects.valid() ); // force settlement order not created
 
          BOOST_REQUIRE( op_result.paid.valid() && 1U == op_result.paid->size() );
@@ -1076,7 +1099,7 @@ BOOST_AUTO_TEST_CASE( individual_settlement_to_fund_and_taking_test )
             BOOST_CHECK_EQUAL( get_balance( borrower4_id, asset_id_type() ), init_amount - 2500 );
             BOOST_CHECK_EQUAL( get_balance( borrower5_id, asset_id_type() ), init_amount - 3136 );
          }
-         else if ( 1 == i )
+         else if ( 2 == i )
          {
             // no change to other call orders
             BOOST_CHECK_EQUAL( call2_id(db).debt.value, 20020 );
