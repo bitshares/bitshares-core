@@ -258,15 +258,16 @@ void elasticsearch_plugin_impl::doOperationHistory( const optional <operation_hi
    os.virtual_op = oho->virtual_op;
 
    if(_options.operation_object) {
+      constexpr uint16_t current_depth = 2;
       // op
       oho->op.visit(fc::from_static_variant(os.op_object, FC_PACK_MAX_DEPTH));
       os.op_object = graphene::utilities::es_data_adaptor::adapt( os.op_object.get_object(),
-                                                                  _options.max_mapping_depth - 2 );
+                                                                  _options.max_mapping_depth - current_depth );
       // operation_result
       variant v;
       fc::to_variant( oho->result, v, FC_PACK_MAX_DEPTH );
       os.operation_result_object = graphene::utilities::es_data_adaptor::adapt_static_variant( v.get_array(),
-                                         _options.max_mapping_depth - 2 );
+                                         _options.max_mapping_depth - current_depth );
    }
    if(_options.operation_string)
       os.op = fc::json::to_string(oho->op);
