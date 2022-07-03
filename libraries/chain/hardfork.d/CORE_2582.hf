@@ -1,0 +1,5 @@
+// bitshares-core issue #2582 price feed issues
+#ifndef HARDFORK_CORE_2582_TIME
+#define HARDFORK_CORE_2582_TIME (fc::time_point_sec( 1657636498 )) // testnet, Tuesday, July 12, 2022 14:34:58 UTC
+#define HARDFORK_CORE_2582_PASSED(head_block_time) (head_block_time >= HARDFORK_CORE_2582_TIME)
+#endif
