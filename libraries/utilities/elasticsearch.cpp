@@ -305,30 +305,32 @@ fc::variant es_data_adaptor::adapt( const fc::variant_object& op, uint16_t max_d
          if( vo.contains(name.c_str()) ) // transfer_operation.amount.amount
             keys_to_rename.emplace_back(name);
          element = adapt( vo, max_depth - 1 );
+         continue;
       }
-      else if( element.is_array() )
+
+      if( !element.is_array() )
+         continue;
+
+      auto& array = element.get_array();
+      if( to_string_fields.find(name) != to_string_fields.end() )
       {
-         auto& array = element.get_array();
-         if( to_string_fields.find(name) != to_string_fields.end() )
-         {
-            // make a backup (only if depth is sufficient) and convert to string
-            if( max_depth > 1 )
-               original_arrays.emplace_back( name, array );
-            element = fc::json::to_string(element);
-         }
-         else if( flattened_fields.find(name) != flattened_fields.end() )
-         {
-            // make a backup (only if depth is sufficient) and adapt the original
-            if( max_depth > 1 )
-            {
-               auto backup = array;
-               original_arrays.emplace_back( name, std::move( backup ) );
-            }
-            in_situ_adapt( array, max_depth - 1 );
-         }
-         else
-            in_situ_adapt( array, max_depth - 1 );
+         // make a backup (only if depth is sufficient) and convert to string
+         if( max_depth > 1 )
+            original_arrays.emplace_back( name, array );
+         element = fc::json::to_string(element);
       }
+      else if( flattened_fields.find(name) != flattened_fields.end() )
+      {
+         // make a backup (only if depth is sufficient) and adapt the original
+         if( max_depth > 1 )
+         {
+            auto backup = array;
+            original_arrays.emplace_back( name, std::move( backup ) );
+         }
+         in_situ_adapt( array, max_depth - 1 );
+      }
+      else
+         in_situ_adapt( array, max_depth - 1 );
    }
 
    for( const auto& i : keys_to_rename ) // transfer_operation.amount
