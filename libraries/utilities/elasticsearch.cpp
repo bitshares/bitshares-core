@@ -260,8 +260,15 @@ std::string es_client::query( const std::string& path, const std::string& query 
    return response.content;
 }
 
-fc::variant es_data_adaptor::adapt(const fc::variant_object& op)
+fc::variant es_data_adaptor::adapt( const fc::variant_object& op, uint16_t max_depth )
 {
+   if( 0 == max_depth )
+   {
+      fc::variant v;
+      fc::to_variant(fc::json::to_string(op), v, FC_PACK_MAX_DEPTH);
+      return v;
+   }
+
    fc::mutable_variant_object o(op);
 
    // Note: these fields are maps, but were stored in ES as flattened arrays
@@ -297,27 +304,33 @@ fc::variant es_data_adaptor::adapt(const fc::variant_object& op)
          const auto& vo = element.get_object();
          if( vo.contains(name.c_str()) ) // transfer_operation.amount.amount
             keys_to_rename.emplace_back(name);
-         element = adapt(vo);
+         element = adapt( vo, max_depth - 1 );
+         continue;
       }
-      else if( element.is_array() )
+
+      if( !element.is_array() )
+         continue;
+
+      auto& array = element.get_array();
+      if( to_string_fields.find(name) != to_string_fields.end() )
       {
-         auto& array = element.get_array();
-         if( to_string_fields.find(name) != to_string_fields.end() )
-         {
-            // make a backup and convert to string
+         // make a backup (only if depth is sufficient) and convert to string
+         if( max_depth > 1 )
             original_arrays.emplace_back( name, array );
-            element = fc::json::to_string(element);
-         }
-         else if( flattened_fields.find(name) != flattened_fields.end() )
-         {
-            // make a backup and adapt the original
-            auto backup = array;
-            original_arrays.emplace_back( name, backup );
-            adapt(array);
-         }
-         else
-            adapt(array);
+         element = fc::json::to_string(element);
       }
+      else if( flattened_fields.find(name) != flattened_fields.end() )
+      {
+         // make a backup (only if depth is sufficient) and adapt the original
+         if( max_depth > 1 )
+         {
+            auto backup = array;
+            original_arrays.emplace_back( name, std::move( backup ) );
+         }
+         in_situ_adapt( array, max_depth - 1 );
+      }
+      else
+         in_situ_adapt( array, max_depth - 1 );
    }
 
    for( const auto& i : keys_to_rename ) // transfer_operation.amount
@@ -344,8 +357,8 @@ fc::variant es_data_adaptor::adapt(const fc::variant_object& op)
       auto& value = pair.second;
       auto type = data_type::map_type;
       if( to_string_fields.find(name) != to_string_fields.end() )
-         type =  to_string_fields.at(name);
-      o[name + "_object"] = adapt( value, type );
+         type = to_string_fields.at(name);
+      o[name + "_object"] = adapt( value, type, max_depth - 1 );
    }
 
    fc::variant v;
@@ -353,10 +366,10 @@ fc::variant es_data_adaptor::adapt(const fc::variant_object& op)
    return v;
 }
 
-fc::variant es_data_adaptor::adapt( const fc::variants& v, data_type type )
+fc::variant es_data_adaptor::adapt( const fc::variants& v, data_type type, uint16_t max_depth )
 {
    if( data_type::static_variant_type == type )
-      return adapt_static_variant(v);
+      return adapt_static_variant( v, max_depth );
 
    // map_type or array_type
    fc::variants vs;
@@ -366,12 +379,12 @@ fc::variant es_data_adaptor::adapt( const fc::variants& v, data_type type )
       if( item.is_array() )
       {
          if( data_type::map_type == type )
-            vs.push_back( adapt_map_item( item.get_array() ) );
+            vs.push_back( adapt_map_item( item.get_array(), max_depth ) );
          else // assume it is a static_variant array
-            vs.push_back( adapt_static_variant( item.get_array() ) );
+            vs.push_back( adapt_static_variant( item.get_array(), max_depth ) );
       }
       else if( item.is_object() ) // object array
-         vs.push_back( adapt( item.get_object() ) );
+         vs.push_back( adapt( item.get_object(), max_depth ) );
       else
          wlog( "Type of item is unexpected: ${item}", ("item", item) );
    }
@@ -382,10 +395,11 @@ fc::variant es_data_adaptor::adapt( const fc::variants& v, data_type type )
 }
 
 void es_data_adaptor::extract_data_from_variant(
-      const fc::variant& v, fc::mutable_variant_object& mv, const std::string& prefix )
+      const fc::variant& v, fc::mutable_variant_object& mv, const std::string& prefix, uint16_t max_depth )
 {
+   FC_ASSERT( max_depth > 0, "Internal error" );
    if( v.is_object() )
-      mv[prefix + "_object"] = adapt( v.get_object() );
+      mv[prefix + "_object"] = adapt( v.get_object(), max_depth - 1 );
    else if( v.is_int64() || v.is_uint64() )
       mv[prefix + "_int"] = v;
    else if( v.is_bool() )
@@ -398,40 +412,54 @@ void es_data_adaptor::extract_data_from_variant(
    //       and static_variants (i.e. in custom authorities) and maps (if any) are converted to strings too.
 }
 
-fc::variant es_data_adaptor::adapt_map_item( const fc::variants& v )
+fc::variant es_data_adaptor::adapt_map_item( const fc::variants& v, uint16_t max_depth )
 {
+   if( 0 == max_depth )
+   {
+      fc::variant nv;
+      fc::to_variant(fc::json::to_string(v), nv, FC_PACK_MAX_DEPTH);
+      return nv;
+   }
+
    FC_ASSERT( v.size() == 2, "Internal error" );
    fc::mutable_variant_object mv;
 
-   extract_data_from_variant( v[0], mv, "key" );
-   extract_data_from_variant( v[1], mv, "data" );
+   extract_data_from_variant( v[0], mv, "key", max_depth );
+   extract_data_from_variant( v[1], mv, "data", max_depth );
 
    fc::variant nv;
    fc::to_variant( mv, nv, FC_PACK_MAX_DEPTH );
    return nv;
 }
 
-fc::variant es_data_adaptor::adapt_static_variant( const fc::variants& v )
+fc::variant es_data_adaptor::adapt_static_variant( const fc::variants& v, uint16_t max_depth )
 {
+   if( 0 == max_depth )
+   {
+      fc::variant nv;
+      fc::to_variant(fc::json::to_string(v), nv, FC_PACK_MAX_DEPTH);
+      return nv;
+   }
+
    FC_ASSERT( v.size() == 2, "Internal error" );
    fc::mutable_variant_object mv;
 
    mv["which"] = v[0];
-   extract_data_from_variant( v[1], mv, "data" );
+   extract_data_from_variant( v[1], mv, "data", max_depth );
 
    fc::variant nv;
    fc::to_variant( mv, nv, FC_PACK_MAX_DEPTH );
    return nv;
 }
 
-void es_data_adaptor::adapt(fc::variants& v)
+void es_data_adaptor::in_situ_adapt( fc::variants& v, uint16_t max_depth )
 {
-   for (auto& array_element : v)
+   for( auto& array_element : v )
    {
-      if (array_element.is_object())
-         array_element = adapt(array_element.get_object());
-      else if (array_element.is_array())
-         adapt(array_element.get_array());
+      if( array_element.is_object() )
+         array_element = adapt( array_element.get_object(), max_depth );
+      else if( array_element.is_array() )
+         in_situ_adapt( array_element.get_array(), max_depth );
       else
          array_element = array_element.as_string();
    }

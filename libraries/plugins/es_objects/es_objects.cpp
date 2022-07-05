@@ -82,6 +82,10 @@ class es_objects_plugin_impl
          object_options budget         { true, false, true,  "budget"     };
 
          std::string index_prefix = "objects-";
+
+         /// For the "index.mapping.depth.limit" setting in ES. The default value is 20.
+         uint16_t max_mapping_depth = 20;
+
          uint32_t start_es_after_block = 0;
          bool sync_db_on_startup = false;
 
@@ -276,7 +280,8 @@ void es_objects_plugin_impl::prepareTemplate(
 
    fc::variant blockchain_object_variant;
    fc::to_variant( blockchain_object, blockchain_object_variant, GRAPHENE_NET_MAX_NESTED_OBJECTS );
-   fc::mutable_variant_object o( utilities::es_data_adaptor::adapt( blockchain_object_variant.get_object() ) );
+   fc::mutable_variant_object o( utilities::es_data_adaptor::adapt( blockchain_object_variant.get_object(),
+                                                                    _options.max_mapping_depth ) );
 
    o["object_id"] = string(blockchain_object.id);
    o["block_time"] = block_time;
@@ -384,6 +389,8 @@ void es_objects_plugin::plugin_set_program_options(
 
          ("es-objects-index-prefix", boost::program_options::value<std::string>(),
                "Add a prefix to the index(objects-)")
+         ("es-objects-max-mapping-depth", boost::program_options::value<uint16_t>(),
+               "The maximum index mapping depth (index.mapping.depth.limit) setting in ES (20)")
          ("es-objects-keep-only-current", boost::program_options::value<bool>(),
                "Deprecated. Please use the store-updates or no-delete options. "
                "Keep only current state of the objects(true)")
@@ -428,6 +435,7 @@ void detail::es_objects_plugin_impl::plugin_options::init(const boost::program_o
    utilities::get_program_option( options, "es-objects-asset-bitasset-store-updates", asset_bitasset.store_updates );
    utilities::get_program_option( options, "es-objects-budget-records",               budget.enabled );
    utilities::get_program_option( options, "es-objects-index-prefix",         index_prefix );
+   utilities::get_program_option( options, "es-objects-max-mapping-depth",    max_mapping_depth );
    utilities::get_program_option( options, "es-objects-start-es-after-block", start_es_after_block );
    utilities::get_program_option( options, "es-objects-sync-db-on-startup",   sync_db_on_startup );
 }

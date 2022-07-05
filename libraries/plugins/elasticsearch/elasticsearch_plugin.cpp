@@ -55,6 +55,9 @@ class elasticsearch_plugin_impl
 
          std::string index_prefix = "bitshares-";
 
+         /// For the "index.mapping.depth.limit" setting in ES. The default value is 20.
+         uint16_t max_mapping_depth = 20;
+
          uint32_t start_es_after_block = 0;
 
          bool visitor = false;
@@ -255,13 +258,16 @@ void elasticsearch_plugin_impl::doOperationHistory( const optional <operation_hi
    os.virtual_op = oho->virtual_op;
 
    if(_options.operation_object) {
+      constexpr uint16_t current_depth = 2;
       // op
       oho->op.visit(fc::from_static_variant(os.op_object, FC_PACK_MAX_DEPTH));
-      os.op_object = graphene::utilities::es_data_adaptor::adapt( os.op_object.get_object() );
+      os.op_object = graphene::utilities::es_data_adaptor::adapt( os.op_object.get_object(),
+                                                                  _options.max_mapping_depth - current_depth );
       // operation_result
       variant v;
       fc::to_variant( oho->result, v, FC_PACK_MAX_DEPTH );
-      os.operation_result_object = graphene::utilities::es_data_adaptor::adapt_static_variant( v.get_array() );
+      os.operation_result_object = graphene::utilities::es_data_adaptor::adapt_static_variant( v.get_array(),
+                                         _options.max_mapping_depth - current_depth );
    }
    if(_options.operation_string)
       os.op = fc::json::to_string(oho->op);
@@ -477,20 +483,23 @@ void elasticsearch_plugin::plugin_set_program_options(
    cli.add_options()
          ("elasticsearch-node-url", boost::program_options::value<std::string>(),
                "Elastic Search database node url(http://localhost:9200/)")
+         ("elasticsearch-basic-auth", boost::program_options::value<std::string>(),
+               "Pass basic auth to elasticsearch database('')")
          ("elasticsearch-bulk-replay", boost::program_options::value<uint32_t>(),
                "Number of bulk documents to index on replay(10000)")
          ("elasticsearch-bulk-sync", boost::program_options::value<uint32_t>(),
                "Number of bulk documents to index on a syncronied chain(100)")
-         ("elasticsearch-visitor", boost::program_options::value<bool>(),
-               "Use visitor to index additional data(slows down the replay(false))")
-         ("elasticsearch-basic-auth", boost::program_options::value<std::string>(),
-               "Pass basic auth to elasticsearch database('')")
          ("elasticsearch-index-prefix", boost::program_options::value<std::string>(),
                "Add a prefix to the index(bitshares-)")
-         ("elasticsearch-operation-object", boost::program_options::value<bool>(),
-               "Save operation as object(true)")
+         ("elasticsearch-max-mapping-depth", boost::program_options::value<uint16_t>(),
+               "The maximum index mapping depth (index.mapping.depth.limit) setting in ES, "
+               "should be >=2. (20)")
          ("elasticsearch-start-es-after-block", boost::program_options::value<uint32_t>(),
                "Start doing ES job after block(0)")
+         ("elasticsearch-visitor", boost::program_options::value<bool>(),
+               "Use visitor to index additional data(slows down the replay(false))")
+         ("elasticsearch-operation-object", boost::program_options::value<bool>(),
+               "Save operation as object(true)")
          ("elasticsearch-operation-string", boost::program_options::value<bool>(),
                "Save operation as string. Needed to serve history api calls(false)")
          ("elasticsearch-mode", boost::program_options::value<uint16_t>(),
@@ -520,10 +529,13 @@ void detail::elasticsearch_plugin_impl::plugin_options::init(const boost::progra
    utilities::get_program_option( options, "elasticsearch-bulk-replay",  bulk_replay );
    utilities::get_program_option( options, "elasticsearch-bulk-sync",    bulk_sync );
    utilities::get_program_option( options, "elasticsearch-index-prefix",         index_prefix );
+   utilities::get_program_option( options, "elasticsearch-max-mapping-depth",    max_mapping_depth );
    utilities::get_program_option( options, "elasticsearch-start-es-after-block", start_es_after_block );
    utilities::get_program_option( options, "elasticsearch-visitor",          visitor );
    utilities::get_program_option( options, "elasticsearch-operation-object", operation_object );
    utilities::get_program_option( options, "elasticsearch-operation-string", operation_string );
+
+   FC_ASSERT( max_mapping_depth >= 2, "The minimum value of elasticsearch-max-mapping-depth is 2" );
 
    auto es_mode = static_cast<uint16_t>( elasticsearch_mode );
    utilities::get_program_option( options, "elasticsearch-mode", es_mode );
