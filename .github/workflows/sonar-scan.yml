@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     services:
       elasticsearch:
-        image: docker://elasticsearch:7.10.1
+        image: docker://elasticsearch:7.17.5
         options: --env discovery.type=single-node --publish 9200:9200 --publish 9300:9300
     steps:
     - name: Download and install latest SonarScanner CLI tool
