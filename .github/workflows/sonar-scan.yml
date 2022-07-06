@@ -111,7 +111,7 @@ jobs:
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
         df -h
-        programs/build_helpers/make_with_sonar bw-output -j 2 -C _build \
+        programs/build_helpers/make_with_sonar bw-output -j 1 -C _build \
           witness_node cli_wallet js_operation_serializer get_dev_key network_mapper \
           app_test chain_test cli_test es_test
         df -h
