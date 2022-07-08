@@ -43,6 +43,8 @@
 
 namespace bpo = boost::program_options;
 
+namespace graphene { namespace app { namespace detail {
+
 class deduplicator
 {
 public:
@@ -64,6 +66,8 @@ private:
    boost::container::flat_set<std::string> seen;
    const boost::shared_ptr<bpo::option_description> (*modifier)(const boost::shared_ptr<bpo::option_description>&);
 };
+
+} } } // graphene::app::detail
 
 // Currently, you can only specify the filenames and logging levels, which
 // are all most users would want to change.  At a later time, options can
@@ -208,9 +212,9 @@ static const boost::shared_ptr<bpo::option_description> new_option_description( 
 static void load_config_file(const fc::path& config_ini_path, const bpo::options_description& cfg_options,
                              bpo::variables_map& options )
 {
-   deduplicator dedup;
-   bpo::options_description unique_options("Graphene Witness Node");
-   for( const boost::shared_ptr<bpo::option_description> opt : cfg_options.options() )
+   graphene::app::detail::deduplicator dedup;
+   bpo::options_description unique_options("BitShares Witness Node");
+   for( const boost::shared_ptr<bpo::option_description>& opt : cfg_options.options() )
    {
       const boost::shared_ptr<bpo::option_description> od = dedup.next(opt);
       if( !od ) continue;
@@ -256,10 +260,10 @@ static void create_new_config_file(const fc::path& config_ini_path, const fc::pa
           return new_option_description(name, bpo::value<int>()->default_value(100), o->description() );
        return o;
    };
-   deduplicator dedup(modify_option_defaults);
+   graphene::app::detail::deduplicator dedup(modify_option_defaults);
    std::ofstream out_cfg(config_ini_path.preferred_string());
    std::string plugin_header_surrounding( 78, '=' );
-   for( const boost::shared_ptr<bpo::option_description> opt : cfg_options.options() )
+   for( const boost::shared_ptr<bpo::option_description>& opt : cfg_options.options() )
    {
       const boost::shared_ptr<bpo::option_description> od = dedup.next(opt);
       if( !od ) continue;

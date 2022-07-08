@@ -33,7 +33,7 @@ public:
     _connection(graphene::net::peer_connection::make_shared(this)),
     _connection_was_rejected(false),
     _done(false),
-    _probe_complete_promise(fc::promise<void>::ptr(new fc::promise<void>("probe_complete")))
+    _probe_complete_promise(fc::promise<void>::create("probe_complete"))
   {}
 
   void start(const fc::ip::endpoint& endpoint_to_probe,
@@ -173,7 +173,7 @@ int main(int argc, char** argv)
 
   if ( argc < 3 ) {
      std::cerr << "Usage: " << argv[0] << " <chain-id> <seed-addr> [<seed-addr> ...]\n";
-     exit(1);
+     return 1;
   }
 
   const graphene::chain::chain_id_type chain_id( argv[1] );
@@ -211,7 +211,7 @@ int main(int argc, char** argv)
 
        try
        {
-          std::shared_ptr<peer_probe> probe(new peer_probe());
+          auto probe = std::make_shared<peer_probe>();
           probe->start(remote, my_node_id, chain_id);
           probes.emplace_back( std::move( probe ) );
        }

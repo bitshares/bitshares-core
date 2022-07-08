@@ -34,8 +34,6 @@
 
 #include <fc/crypto/digest.hpp>
 
-#include <locale>
-
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;
@@ -95,6 +93,7 @@ BOOST_AUTO_TEST_CASE( override_transfer_test )
    otrans.from = dan.id;
    otrans.to   = eric.id;
    otrans.amount = advanced.amount(100);
+   trx.operations.clear();
    trx.operations.push_back(otrans);
 
    BOOST_TEST_MESSAGE( "Require throwing without signature" );
@@ -140,6 +139,87 @@ BOOST_AUTO_TEST_CASE( override_transfer_test2 )
    BOOST_REQUIRE_EQUAL( get_balance( eric, advanced ), 0 );
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE( override_transfer_whitelist_test )
+{ try {
+   ACTORS( (dan)(eric)(sam) );
+   const asset_object& advanced = create_user_issued_asset( "ADVANCED", sam, white_list | override_authority );
+   asset_id_type advanced_id = advanced.id;
+   BOOST_TEST_MESSAGE( "Issuing 1000 ADVANCED to dan" );
+   issue_uia( dan, advanced.amount( 1000 ) );
+   BOOST_TEST_MESSAGE( "Checking dan's balance" );
+   BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 1000 );
+
+   override_transfer_operation otrans;
+   otrans.issuer = advanced.issuer;
+   otrans.from = dan.id;
+   otrans.to   = eric.id;
+   otrans.amount = advanced.amount(100);
+   trx.operations.clear();
+   trx.operations.push_back(otrans);
+
+   PUSH_TX( db, trx, ~0 );
+
+   BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 900 );
+   BOOST_REQUIRE_EQUAL( get_balance( eric, advanced ), 100 );
+
+   // Make a whitelist, now it should fail
+   {
+      BOOST_TEST_MESSAGE( "Changing the whitelist authority" );
+      asset_update_operation uop;
+      uop.issuer = advanced_id(db).issuer;
+      uop.asset_to_update = advanced_id;
+      uop.new_options = advanced_id(db).options;
+      // The whitelist is managed by dan
+      uop.new_options.whitelist_authorities.insert(dan_id);
+      trx.operations.clear();
+      trx.operations.push_back(uop);
+      PUSH_TX( db, trx, ~0 );
+      auto whitelist_auths = advanced_id(db).options.whitelist_authorities;
+      BOOST_CHECK( whitelist_auths.find(dan_id) != whitelist_auths.end() );
+
+      // Upgrade dan so that he can manage the whitelist
+      upgrade_to_lifetime_member( dan_id );
+
+      // Add eric to the whitelist, but do not add dan
+      account_whitelist_operation wop;
+      wop.authorizing_account = dan_id;
+      wop.account_to_list = eric_id;
+      wop.new_listing = account_whitelist_operation::white_listed;
+      trx.operations.clear();
+      trx.operations.push_back(wop);
+      PUSH_TX( db, trx, ~0 );
+   }
+
+   // Fail because there is a whitelist authority and dan is not whitelisted
+   trx.operations.clear();
+   trx.operations.push_back(otrans);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   // Balances did not change
+   BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 900 );
+   BOOST_REQUIRE_EQUAL( get_balance( eric, advanced ), 100 );
+
+   // Apply core-2295 hardfork
+   generate_blocks( HARDFORK_CORE_2295_TIME );
+   set_expiration( db, trx );
+
+   // Now it's able to override-transfer from dan to eric
+   PUSH_TX( db, trx, ~0 );
+
+   // Check new balances
+   BOOST_REQUIRE_EQUAL( get_balance( dan_id, advanced_id ), 800 );
+   BOOST_REQUIRE_EQUAL( get_balance( eric_id, advanced_id ), 200 );
+
+   // Still can not override-transfer to sam because he is not whitelisted
+   otrans.to = sam_id;
+   trx.operations.clear();
+   trx.operations.push_back(otrans);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
 {
    try {
@@ -161,6 +241,9 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       BOOST_CHECK(is_authorized_asset( db, nathan_id(db), uia_id(db) ));
       BOOST_CHECK_EQUAL(get_balance(nathan_id, uia_id), 1000);
 
+      // committee-account is free as well
+      BOOST_CHECK( is_authorized_asset( db, account_id_type()(db), uia_id(db) ) );
+
       // Make a whitelist, now it should fail
       {
          BOOST_TEST_MESSAGE( "Changing the whitelist authority" );
@@ -177,6 +260,9 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       // Fail because there is a whitelist authority and I'm not whitelisted
       trx.operations.back() = op;
       GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+      // committee-account is blocked as well
+      BOOST_CHECK( !is_authorized_asset( db, account_id_type()(db), uia_id(db) ) );
 
       account_whitelist_operation wop;
       wop.authorizing_account = izzy_id;
@@ -204,6 +290,11 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       PUSH_TX( db, trx, ~0 );
       BOOST_CHECK_EQUAL(get_balance(nathan_id, uia_id), 2000);
 
+      // committee-account is still blocked
+      BOOST_CHECK( !is_authorized_asset( db, account_id_type()(db), uia_id(db) ) );
+      // izzy is still blocked
+      BOOST_CHECK( !is_authorized_asset( db, izzy_id(db), uia_id(db) ) );
+
    } catch(fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -215,6 +306,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
    try {
       INVOKE(issue_whitelist_uia);
       const asset_object& advanced = get_asset("ADVANCED");
+      const asset_id_type uia_id = advanced.id;
       const account_object& nathan = get_account("nathan");
       const account_object& dan = create_account("dan");
       account_id_type izzy_id = get_account("izzy").id;
@@ -336,6 +428,20 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       trx.operations.back() = burn;
       PUSH_TX(db, trx, ~0);
       BOOST_CHECK_EQUAL(get_balance(dan, advanced), 40);
+
+      // committee-account is still blocked
+      BOOST_CHECK( !is_authorized_asset( db, account_id_type()(db), uia_id(db) ) );
+      // izzy is still blocked
+      BOOST_CHECK( !is_authorized_asset( db, izzy_id(db), uia_id(db) ) );
+
+      // Pass BSIP 86 hardfork
+      generate_blocks( HARDFORK_BSIP_86_TIME );
+
+      // committee-account is now unblocked
+      BOOST_CHECK( is_authorized_asset( db, account_id_type()(db), uia_id(db) ) );
+      // izzy is still blocked
+      BOOST_CHECK( !is_authorized_asset( db, izzy_id(db), uia_id(db) ) );
+
    } catch(fc::exception& e) {
       edump((e.to_detail_string()));
       throw;

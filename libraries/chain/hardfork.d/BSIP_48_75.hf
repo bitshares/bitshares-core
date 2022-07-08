@@ -1,0 +1,7 @@
+// hardfork check for
+// - BSIP 48 : new issuer permissions "lock_max_supply" and "disable_new_supply", precision update, skip cer
+// - BSIP 75 : asset owner set MCR, ICR and MSSR
+#ifndef HARDFORK_BSIP_48_75_TIME
+#define HARDFORK_BSIP_48_75_TIME (fc::time_point_sec( 1596117300 )) // Thursday, July 30, 2020 13:55:00 UTC
+#define HARDFORK_BSIP_48_75_PASSED(now) (now >= HARDFORK_BSIP_48_75_TIME)
+#endif

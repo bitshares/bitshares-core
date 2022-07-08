@@ -26,6 +26,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -46,6 +47,7 @@ void database::debug_dump()
    const auto& statistics_index = db.get_index_type<account_stats_index>().indices();
    const auto& bids = db.get_index_type<collateral_bid_index>().indices();
    const auto& settle_index = db.get_index_type<force_settlement_index>().indices();
+   const auto& htlcs = db.get_index_type<htlc_index>().indices();
    map<asset_id_type,share_type> total_balances;
    map<asset_id_type,share_type> total_debts;
    share_type core_in_orders;
@@ -92,6 +94,8 @@ void database::debug_dump()
       total_balances[asset_id_type()] += asset_obj.dynamic_asset_data_id(db).fee_pool;
 //      edump((total_balances[asset_obj.id])(asset_obj.dynamic_asset_data_id(db).current_supply ) );
    }
+   for( const auto& htlc : htlcs )
+      total_balances[htlc.transfer.asset_id] += htlc.transfer.amount;
 
    if( total_balances[asset_id_type()].value != core_asset_data.current_supply.value )
    {

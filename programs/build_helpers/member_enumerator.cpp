@@ -103,14 +103,14 @@ void class_processor::process_class( const static_variant< T... >* dummy )
    static_variant<T...> dummy2;
    static_variant_visitor vtor( this );
 
-   for( int w=0; w<dummy2.count(); w++ )
+   for( size_t w=0; w<dummy2.count(); w++ )
    {
       dummy2.set_which(w);
       dummy2.visit( vtor );
    }
 }
 
-template<typename IsReflected=fc::false_type>
+template<typename IsReflected=std::false_type>
 struct if_reflected
 {
    template< typename T >
@@ -122,7 +122,7 @@ struct if_reflected
 };
 
 template<>
-struct if_reflected<fc::true_type>
+struct if_reflected<std::true_type>
 {
    template< typename T >
    static void process_class( class_processor* proc, const T* dummy )

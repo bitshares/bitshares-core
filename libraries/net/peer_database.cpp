@@ -50,7 +50,8 @@ namespace graphene { namespace net {
                                            indexed_by<ordered_non_unique<tag<last_seen_time_index>, 
                                                                          member<potential_peer_record, 
                                                                                 fc::time_point_sec, 
-                                                                                &potential_peer_record::last_seen_time> >,
+                                                                                &potential_peer_record::last_seen_time>,
+                                                                         std::greater<fc::time_point_sec> >,
                                                       hashed_unique<tag<endpoint_index>, 
                                                                     member<potential_peer_record, 
                                                                            fc::ip::endpoint, 
@@ -172,12 +173,14 @@ namespace graphene { namespace net {
 
     peer_database::iterator peer_database_impl::begin() const
     {
-      return peer_database::iterator(new peer_database_iterator_impl(_potential_peer_set.get<last_seen_time_index>().begin()));
+      return peer_database::iterator( std::make_unique<peer_database_iterator_impl>(
+                   _potential_peer_set.get<last_seen_time_index>().begin() ) );
     }
 
     peer_database::iterator peer_database_impl::end() const
     {
-      return peer_database::iterator(new peer_database_iterator_impl(_potential_peer_set.get<last_seen_time_index>().end()));
+      return peer_database::iterator( std::make_unique<peer_database_iterator_impl>(
+                   _potential_peer_set.get<last_seen_time_index>().end() ) );
     }
 
     size_t peer_database_impl::size() const
@@ -193,8 +196,8 @@ namespace graphene { namespace net {
     {
     }
 
-    peer_database_iterator::peer_database_iterator(peer_database_iterator_impl* impl) :
-      my(impl)
+    peer_database_iterator::peer_database_iterator( std::unique_ptr<peer_database_iterator_impl>&& impl) :
+      my( std::move(impl) )
     {
     }
 
@@ -216,7 +219,7 @@ namespace graphene { namespace net {
   } // end namespace detail
 
   peer_database::peer_database() :
-    my(new detail::peer_database_impl)
+    my( std::make_unique<detail::peer_database_impl>() )
   {
   }
 

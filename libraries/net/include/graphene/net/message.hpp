@@ -26,7 +26,6 @@
 
 #include <graphene/protocol/types.hpp>
 
-#include <fc/array.hpp>
 #include <fc/io/varint.hpp>
 #include <fc/network/ip.hpp>
 #include <fc/io/raw_fwd.hpp>
@@ -45,9 +44,14 @@ namespace graphene { namespace net {
   {
      boost::endian::little_uint32_buf_t size;   // number of bytes in message, capped at MAX_MESSAGE_SIZE
      boost::endian::little_uint32_buf_t msg_type;  // every channel gets a 16 bit message type specifier
+     message_header()
+     {
+        size = 0;
+        msg_type = 0;
+     }
   };
 
-  typedef fc::uint160_t message_hash_type;
+  using message_hash_type = fc::ripemd160;
 
   /**
    *  Abstracts the process of packing/unpacking a message for a 
@@ -76,7 +80,7 @@ namespace graphene { namespace net {
         size     = (uint32_t)data.size();
      }
 
-     fc::uint160_t id()const
+     message_hash_type id()const
      {
         return fc::ripemd160::hash( data.data(), (uint32_t)data.size() );
      }

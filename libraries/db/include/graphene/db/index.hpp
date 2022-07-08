@@ -130,7 +130,6 @@ namespace graphene { namespace db {
          }
 
          virtual void               inspect_all_objects(std::function<void(const object&)> inspector)const = 0;
-         virtual fc::uint128        hash()const = 0;
          virtual void               add_observer( const shared_ptr<index_observer>& ) = 0;
 
          virtual void               object_from_variant( const fc::variant& var, object& obj, uint32_t max_depth )const = 0;
@@ -170,7 +169,7 @@ namespace graphene { namespace db {
          template<typename T, typename... Args>
          T* add_secondary_index(Args... args)
          {
-            _sindex.emplace_back( new T(args...) );
+            _sindex.emplace_back( std::make_unique<T>(args...) );
             return static_cast<T*>(_sindex.back().get());
          }
 
@@ -209,7 +208,7 @@ namespace graphene { namespace db {
 
       // private
          static const size_t MAX_HOLE = 100;
-         static const size_t _mask = ((1 << chunkbits) - 1);
+         static const size_t _mask = ((1ULL << chunkbits) - 1);
          uint64_t next = 0;
          vector< vector< const Object* > > content;
          std::stack< object_id_type > ids_being_modified;
@@ -226,10 +225,10 @@ namespace graphene { namespace db {
             uint64_t instance = obj.id.instance();
             if( instance == next )
             {
-               if( !(next & _mask) )
+               if( 0 == (next & _mask) )
                {
                   content.resize((next >> chunkbits) + 1);
-                  content[next >> chunkbits].resize( 1 << chunkbits, nullptr );
+                  content[next >> chunkbits].resize( 1ULL << chunkbits, nullptr );
                }
                next++;
             }
@@ -238,10 +237,10 @@ namespace graphene { namespace db {
             else // instance > next, allow small "holes"
             {
                FC_ASSERT( instance <= next + MAX_HOLE, "Out-of-order insert: {id} > {next}!", ("id",obj.id)("next",next) );
-               if( !(next & _mask) || (next & (~_mask)) != (instance & (~_mask)) )
+               if( 0 == (next & _mask) || (next & (~_mask)) != (instance & (~_mask)) )
                {
                   content.resize((instance >> chunkbits) + 1);
-                  content[instance >> chunkbits].resize( 1 << chunkbits, nullptr );
+                  content[instance >> chunkbits].resize( 1ULL << chunkbits, nullptr );
                }
                while( next <= instance )
                {
@@ -295,7 +294,7 @@ namespace graphene { namespace db {
             FC_ASSERT( id.space() == Object::space_id, "Space ID mismatch!" );
             FC_ASSERT( id.type() == Object::type_id, "Type_ID mismatch!" );
             if( id.instance() >= next ) return nullptr;
-            return content[id.instance() >> chunkbits][id.instance() & ((1 << chunkbits) - 1)];
+            return content[id.instance() >> chunkbits][id.instance() & ((1ULL << chunkbits) - 1)];
          };
    };
 

@@ -88,11 +88,11 @@ namespace graphene { namespace chain {
     */
    struct cdd_vesting_policy
    {
-      uint32_t                       vesting_seconds = 0;
-      fc::uint128_t                  coin_seconds_earned;
+      uint32_t                         vesting_seconds = 0;
+      fc::uint128_t                    coin_seconds_earned;
       /** while coindays may accrue over time, none may be claimed before first_claim date */
-      fc::time_point_sec             start_claim;
-      fc::time_point_sec             coin_seconds_earned_last_update;
+      fc::time_point_sec               start_claim;
+      fc::time_point_sec               coin_seconds_earned_last_update;
 
       /**
        * Compute coin_seconds_earned.  Used to
@@ -151,8 +151,8 @@ namespace graphene { namespace chain {
    class vesting_balance_object : public abstract_object<vesting_balance_object>
    {
       public:
-         static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id = vesting_balance_object_type;
+         static constexpr uint8_t space_id = protocol_ids;
+         static constexpr uint8_t type_id = vesting_balance_object_type;
 
          /// Account which owns and may withdraw from this vesting balance
          account_id_type owner;

@@ -95,9 +95,9 @@ namespace graphene { namespace net {
       static const core_message_type_enum type;
 
       graphene::protocol::precomputable_transaction trx;
-      trx_message() {}
-      trx_message(graphene::protocol::signed_transaction transaction) :
-        trx(std::move(transaction))
+      trx_message() = default;
+      explicit trx_message(const graphene::protocol::signed_transaction& signed_trx) :
+        trx(signed_trx)
       {}
    };
 
@@ -245,8 +245,8 @@ namespace graphene { namespace net {
     std::string                                   user_agent;
     uint32_t                                      core_protocol_version;
     fc::ip::endpoint                              remote_endpoint;
-    std::string                                   reason_string;
     fc::enum_type<uint8_t, rejection_reason_code> reason_code;
+    std::string                                   reason_string;
 
     connection_rejected_message() {}
     connection_rejected_message(const std::string& user_agent, uint32_t core_protocol_version,
@@ -255,8 +255,8 @@ namespace graphene { namespace net {
       user_agent(user_agent),
       core_protocol_version(core_protocol_version),
       remote_endpoint(remote_endpoint),
-      reason_string(reason_string),
-      reason_code(reason_code)
+      reason_code(reason_code),
+      reason_string(reason_string)
     {}
   };
 

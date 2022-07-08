@@ -4,13 +4,17 @@ The bitshares plugins are a collection of tools that brings new functionality wi
 
 The main source of I/O of the bitshares blockchain is the API. Plugins are a more powerful alternative to build more complex developments for when the current API is not enough.
 
-Plugins are optional to run by node operator according to their needs. However, all plugins here will be compiled. There are plans for optional build of plugins at: [Issue 533](https://github.com/bitshares/bitshares-core/issues/533)
+Plugins are optional to run by node operator according to their needs. However, all plugins here will be compiled. There are plans for optional build of plugins at: [Issue 533](https://github.com/bitshares/bitshares-core/issues/533).
+
+The [make_new_plugin.sh](make_new_plugin.sh) script can be used to create a skeleton of a new plugin quickly from a [template](template_plugin).
 
 # Available Plugins
 
 Folder                             | Name                     | Description                                                                 | Category       | Status        | SpaceID     
 -----------------------------------|--------------------------|-----------------------------------------------------------------------------|----------------|---------------|--------------|
 [account_history](account_history) | Account History          | Save account history data                                                   | History        | Stable        | 4
+[api_helper_indexes](api_helper_indexes) | API Helper Indexes | Provides some helper indexes used by various API calls                                                 | Database API   | Stable        | 
+[custom_operations](custom_operations) | Custom Operations    | Store and retrieve account catalogs of key=>value data using custom operations | Additional data   | Experimental        | 7
 [debug_witness](debug_witness)     | Debug Witness            | Run "what-if" tests                                                         | Debug          | Stable        |
 [delayed_node](delayed_node)       | Delayed Node             | Avoid forks by running a several times confirmed and delayed blockchain     | Business       | Stable        |
 [elasticsearch](elasticsearch)     | ElasticSearch Operations | Save account history data into elasticsearch database                       | History        | Experimental  | 6

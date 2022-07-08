@@ -31,16 +31,20 @@
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/confidential_object.hpp>
+#include <graphene/chain/credit_offer_object.hpp>
 #include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
+#include <graphene/chain/liquidity_pool_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
+#include <graphene/chain/samet_fund_object.hpp>
 #include <graphene/chain/special_authority_object.hpp>
 #include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/witness_schedule_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/custom_authority_object.hpp>
 
 #include <fc/io/raw.hpp>
 
@@ -61,6 +65,8 @@ FC_REFLECT_DERIVED_NO_TYPENAME(
    (worker_budget)
    (leftover_worker_funds)
    (supply_delta)
+   (max_supply)
+   (current_supply)
 )
 
 FC_REFLECT_DERIVED_NO_TYPENAME(
@@ -100,8 +106,11 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::dynamic_global_property_object,
                     (time)
                     (current_witness)
                     (next_maintenance_time)
+                    (last_vote_tally_time)
                     (last_budget_time)
                     (witness_budget)
+                    (total_pob)
+                    (total_inactive)
                     (accounts_registered_this_interval)
                     (recently_missed_count)
                     (current_aslot)
@@ -127,7 +136,7 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::condition_info::ti
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object::condition_info, BOOST_PP_SEQ_NIL,
    (hash_lock)(time_lock) )
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::htlc_object, (graphene::db::object),
-               (transfer) (conditions) )
+               (transfer) (conditions) (memo) )
 
 FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::operation_history_object, (graphene::chain::object),
                     (op)(result)(block_num)(trx_in_block)(op_in_trx)(virtual_op) )
@@ -189,6 +198,52 @@ FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::worker_object, (graphene::db::o
                     (url)
                   )
 
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::custom_authority_object, (graphene::db::object),
+                               (account)(enabled)(valid_from)(valid_to)(operation_type)
+                               (auth)(restrictions)(restriction_counter) )
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::samet_fund_object, (graphene::db::object),
+                    (owner_account)
+                    (asset_type)
+                    (balance)
+                    (fee_rate)
+                    (unpaid_amount)
+                  )
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::credit_offer_object, (graphene::db::object),
+                    (owner_account)
+                    (asset_type)
+                    (total_balance)
+                    (current_balance)
+                    (fee_rate)
+                    (max_duration_seconds)
+                    (min_deal_amount)
+                    (enabled)
+                    (auto_disable_time)
+                    (acceptable_collateral)
+                    (acceptable_borrowers)
+                  )
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::credit_deal_object, (graphene::db::object),
+                    (borrower)
+                    (offer_id)
+                    (offer_owner)
+                    (debt_asset)
+                    (debt_amount)
+                    (collateral_asset)
+                    (collateral_amount)
+                    (fee_rate)
+                    (latest_repay_time)
+                  )
+
+FC_REFLECT_DERIVED_NO_TYPENAME( graphene::chain::credit_deal_summary_object, (graphene::db::object),
+                    (borrower)
+                    (offer_id)
+                    (offer_owner)
+                    (debt_asset)
+                    (total_debt_amount)
+                  )
+
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::balance_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::block_summary_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::budget_record )
@@ -210,3 +265,9 @@ GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::withdraw_permission_
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::witness_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::witness_schedule_object )
 GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::worker_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::custom_authority_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::liquidity_pool_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::samet_fund_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::credit_offer_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::credit_deal_object )
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::chain::credit_deal_summary_object )

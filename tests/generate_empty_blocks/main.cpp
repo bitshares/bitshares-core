@@ -57,7 +57,7 @@ int main( int argc, char** argv )
 {
    try
    {
-      bpo::options_description cli_options("Graphene empty blocks");
+      bpo::options_description cli_options("BitShares empty blocks");
       cli_options.add_options()
             ("help,h", "Print this help message and exit.")
             ("data-dir", bpo::value<boost::filesystem::path>()->default_value("empty_blocks_data_dir"), "Directory containing generator database")

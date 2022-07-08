@@ -34,18 +34,18 @@ namespace graphene { namespace chain {
 using namespace graphene::db;
 
 /**
- *  @brief an offer to sell a amount of a asset at a specified exchange rate by a certain time
+ *  @brief an offer to sell an amount of an asset at a specified exchange rate by a certain time
  *  @ingroup object
  *  @ingroup protocol
  *  @ingroup market
  *
- *  This limit_order_objects are indexed by @ref expiration and is automatically deleted on the first block after expiration.
+ *  The objects are indexed by @ref expiration and are automatically deleted on the first block after expiration.
  */
 class limit_order_object : public abstract_object<limit_order_object>
 {
    public:
-      static const uint8_t space_id = protocol_ids;
-      static const uint8_t type_id  = limit_order_object_type;
+      static constexpr uint8_t space_id = protocol_ids;
+      static constexpr uint8_t type_id  = limit_order_object_type;
 
       time_point_sec   expiration;
       account_id_type  seller;
@@ -53,6 +53,7 @@ class limit_order_object : public abstract_object<limit_order_object>
       price            sell_price;
       share_type       deferred_fee; ///< fee converted to CORE
       asset            deferred_paid_fee; ///< originally paid fee
+      bool             is_settled_debt = false; ///< Whether this order is an individual settlement fund
 
       pair<asset_id_type,asset_id_type> get_market()const
       {
@@ -70,6 +71,8 @@ class limit_order_object : public abstract_object<limit_order_object>
 struct by_price;
 struct by_expiration;
 struct by_account;
+struct by_account_price;
+struct by_is_settled_debt;
 typedef multi_index_container<
    limit_order_object,
    indexed_by<
@@ -87,7 +90,22 @@ typedef multi_index_container<
          >,
          composite_key_compare< std::greater<price>, std::less<object_id_type> >
       >,
+      ordered_unique< tag<by_is_settled_debt>,
+         composite_key< limit_order_object,
+            member< limit_order_object, bool, &limit_order_object::is_settled_debt >,
+            const_mem_fun< limit_order_object, asset_id_type, &limit_order_object::receive_asset_id >,
+            member< object, object_id_type, &object::id>
+         >
+      >,
+      // index used by APIs
       ordered_unique< tag<by_account>,
+         composite_key< limit_order_object,
+            member<limit_order_object, account_id_type, &limit_order_object::seller>,
+            member<object, object_id_type, &object::id>
+         >
+      >,
+      // index used by APIs
+      ordered_unique< tag<by_account_price>,
          composite_key< limit_order_object,
             member<limit_order_object, account_id_type, &limit_order_object::seller>,
             member<limit_order_object, price, &limit_order_object::sell_price>,
@@ -110,8 +128,8 @@ typedef generic_index<limit_order_object, limit_order_multi_index_type> limit_or
 class call_order_object : public abstract_object<call_order_object>
 {
    public:
-      static const uint8_t space_id = protocol_ids;
-      static const uint8_t type_id  = call_order_object_type;
+      static constexpr uint8_t space_id = protocol_ids;
+      static constexpr uint8_t type_id  = call_order_object_type;
 
       asset get_collateral()const { return asset( collateral, call_price.base.asset_id ); }
       asset get_debt()const { return asset( debt, debt_type() ); }
@@ -147,7 +165,8 @@ class call_order_object : public abstract_object<call_order_object>
       share_type get_max_debt_to_cover( price match_price,
                                         price feed_price,
                                         const uint16_t maintenance_collateral_ratio,
-                                        const optional<price>& maintenance_collateralization = optional<price>() )const;
+                                        const optional<price>& maintenance_collateralization = optional<price>()
+                                      )const;
 };
 
 /**
@@ -159,8 +178,8 @@ class call_order_object : public abstract_object<call_order_object>
 class force_settlement_object : public abstract_object<force_settlement_object>
 {
    public:
-      static const uint8_t space_id = protocol_ids;
-      static const uint8_t type_id  = force_settlement_object_type;
+      static constexpr uint8_t space_id = protocol_ids;
+      static constexpr uint8_t type_id  = force_settlement_object_type;
 
       account_id_type   owner;
       asset             balance;
@@ -180,8 +199,8 @@ class force_settlement_object : public abstract_object<force_settlement_object>
 class collateral_bid_object : public abstract_object<collateral_bid_object>
 {
    public:
-      static const uint8_t space_id = implementation_ids;
-      static const uint8_t type_id  = impl_collateral_bid_object_type;
+      static constexpr uint8_t space_id = implementation_ids;
+      static constexpr uint8_t type_id  = impl_collateral_bid_object_type;
 
       asset get_additional_collateral()const { return inv_swan_price.base; }
       asset get_debt_covered()const { return inv_swan_price.quote; }

@@ -742,7 +742,7 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
    {
       const asset_bitasset_data_object& obj = bit_usd_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(obj.feeds.size(), 3u);
-      BOOST_CHECK(obj.current_feed == price_feed());
+      BOOST_CHECK( obj.current_feed.margin_call_params_equal( price_feed() ) );
    }
    {
       const asset_object& bit_usd = bit_usd_id(db);
@@ -829,7 +829,6 @@ BOOST_AUTO_TEST_CASE( witness_create )
    generate_block(skip);
 
    auto wtplugin = app.register_plugin<graphene::witness_plugin::witness_plugin>();
-   wtplugin->plugin_set_app(&app);
    boost::program_options::variables_map options;
 
    // init witness key cahce
@@ -844,7 +843,7 @@ BOOST_AUTO_TEST_CASE( witness_create )
       if( !db.find(wid) )
          break;
    }
-   options.insert( std::make_pair( "witness-id", boost::program_options::variable_value( witness_ids, false ) ) );
+   fc::set_option( options, "witness-id", witness_ids );
    wtplugin->plugin_initialize(options);
    wtplugin->plugin_startup();
 
@@ -995,6 +994,8 @@ BOOST_AUTO_TEST_CASE( witness_create )
          produced++;
    }
    BOOST_CHECK_GE( produced, 1 );
+
+   wtplugin->plugin_shutdown();
 } FC_LOG_AND_RETHROW() }
 
 /**
@@ -1511,7 +1512,8 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
 
       BOOST_TEST_MESSAGE( "Verify partial settlement of call" );
       // Partially settle a call
-      force_settlement_id_type settle_id = force_settle( nathan_id, asset( 50, bitusd_id ) ).get< object_id_type >();
+      force_settlement_id_type settle_id = *force_settle( nathan_id, asset( 50, bitusd_id ) )
+                                               .get< extendable_operation_result >().value.new_objects->begin();
 
       // Call does not take effect immediately
       BOOST_CHECK_EQUAL( get_balance(nathan_id, bitusd_id), 14950);
@@ -1535,7 +1537,8 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
 
       BOOST_TEST_MESSAGE( "Verify pending settlement is cancelled when asset's force_settle is disabled" );
       // Ensure pending settlement is cancelled when force settle is disabled
-      settle_id = force_settle( nathan_id, asset( 50, bitusd_id ) ).get< object_id_type >();
+      settle_id = *force_settle( nathan_id, asset( 50, bitusd_id ) )
+                                               .get< extendable_operation_result >().value.new_objects->begin();
 
       BOOST_CHECK( !db.get_index_type<force_settlement_index>().indices().empty() );
       update_asset_options( bitusd_id, [&]( asset_options& new_options )
@@ -1545,7 +1548,8 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
       { new_options.flags &= ~disable_force_settle; } );
 
       BOOST_TEST_MESSAGE( "Perform iterative settlement" );
-      settle_id = force_settle( nathan_id, asset( 12500, bitusd_id ) ).get< object_id_type >();
+      settle_id = *force_settle( nathan_id, asset( 12500, bitusd_id ) )
+                                               .get< extendable_operation_result >().value.new_objects->begin();
 
       // c3 2950 : 5731   1.9427   fully settled
       // c5 5000 : 9800   1.9600   fully settled
@@ -2008,8 +2012,6 @@ BOOST_AUTO_TEST_CASE( vbo_withdraw_different )
 BOOST_AUTO_TEST_CASE( top_n_special )
 {
    ACTORS( (alice)(bob)(chloe)(dan)(izzy)(stan) );
-
-   generate_blocks( HARDFORK_516_TIME );
 
    try
    {

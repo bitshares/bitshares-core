@@ -48,8 +48,8 @@ class database;
   * To create a new worker type, define a my_new_worker_type struct with a pay_worker method which updates the
   * my_new_worker_type object and/or the database. Create a my_new_worker_type::initializer struct with an init
   * method and any data members necessary to create a new worker of this type. Reflect my_new_worker_type and
-  * my_new_worker_type::initializer into FC's type system, and add them to @ref worker_type and @ref
-  * worker_initializer respectively. Make sure the order of types in @ref worker_type and @ref worker_initializer
+  * my_new_worker_type::initializer into FC's type system, and add them to @ref worker_type and @c
+  * worker_initializer respectively. Make sure the order of types in @ref worker_type and @c worker_initializer
   * remains the same.
   * @{
   */
@@ -107,8 +107,8 @@ typedef static_variant<
 class worker_object : public abstract_object<worker_object>
 {
    public:
-      static const uint8_t space_id = protocol_ids;
-      static const uint8_t type_id =  worker_object_type;
+      static constexpr uint8_t space_id = protocol_ids;
+      static constexpr uint8_t type_id =  worker_object_type;
 
       /// ID of the account which owns this worker
       account_id_type worker_account;
@@ -145,13 +145,15 @@ class worker_object : public abstract_object<worker_object>
 struct by_account;
 struct by_vote_for;
 struct by_vote_against;
+struct by_end_date;
 typedef multi_index_container<
    worker_object,
    indexed_by<
       ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
       ordered_non_unique< tag<by_account>, member< worker_object, account_id_type, &worker_object::worker_account > >,
       ordered_unique< tag<by_vote_for>, member< worker_object, vote_id_type, &worker_object::vote_for > >,
-   ordered_unique< tag<by_vote_against>, member< worker_object, vote_id_type, &worker_object::vote_against > >
+      ordered_unique< tag<by_vote_against>, member< worker_object, vote_id_type, &worker_object::vote_against > >,
+      ordered_non_unique< tag<by_end_date>, member< worker_object, time_point_sec, &worker_object::work_end_date> >
    >
 > worker_object_multi_index_type;
 

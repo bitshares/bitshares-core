@@ -138,7 +138,7 @@ namespace graphene { namespace db {
             if( _index[ObjectType::space_id].size() <= ObjectType::type_id  )
                 _index[ObjectType::space_id].resize( 255 );
             assert(!_index[ObjectType::space_id][ObjectType::type_id]);
-            unique_ptr<index> indexptr( new IndexType(*this) );
+            unique_ptr<index> indexptr( std::make_unique<IndexType>(*this) );
             _index[ObjectType::space_id][ObjectType::type_id] = std::move(indexptr);
             return static_cast<IndexType*>(_index[ObjectType::space_id][ObjectType::type_id].get());
          }

@@ -69,23 +69,22 @@ namespace detail
 class grouped_orders_plugin : public graphene::app::plugin
 {
    public:
-      grouped_orders_plugin();
-      virtual ~grouped_orders_plugin();
+      explicit grouped_orders_plugin(graphene::app::application& app);
+      ~grouped_orders_plugin() override;
 
       std::string plugin_name()const override;
-      virtual void plugin_set_program_options(
+      void plugin_set_program_options(
          boost::program_options::options_description& cli,
          boost::program_options::options_description& cfg) override;
-      virtual void plugin_initialize(
+      void plugin_initialize(
          const boost::program_options::variables_map& options) override;
-      virtual void plugin_startup() override;
+      void plugin_startup() override;
 
       const flat_set<uint16_t>&   tracked_groups()const;
 
       const map< limit_order_group_key, limit_order_group_data >& limit_order_groups();
 
    private:
-      friend class detail::grouped_orders_plugin_impl;
       std::unique_ptr<detail::grouped_orders_plugin_impl> my;
 };
 
