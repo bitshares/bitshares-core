@@ -100,7 +100,7 @@ namespace graphene { namespace chain {
 
    struct by_block;
 
-   typedef multi_index_container<
+   using operation_history_multi_index_type = multi_index_container<
       operation_history_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
@@ -113,15 +113,15 @@ namespace graphene { namespace chain {
             >
          >
       >
-   > operation_history_multi_index_type;
+   >;
 
-   typedef generic_index<operation_history_object, operation_history_multi_index_type> operation_history_index;
+   using operation_history_index = generic_index< operation_history_object, operation_history_multi_index_type >;
 
    struct by_seq;
    struct by_op;
    struct by_opid;
 
-   typedef multi_index_container<
+   using account_transaction_history_multi_index_type = multi_index_container<
       account_transaction_history_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
@@ -145,10 +145,10 @@ namespace graphene { namespace chain {
                     &account_transaction_history_object::operation_id>
          >
       >
-   > account_transaction_history_multi_index_type;
+   >;
 
-   typedef generic_index<account_transaction_history_object,
-                         account_transaction_history_multi_index_type> account_transaction_history_index;
+   using account_transaction_history_index = generic_index< account_transaction_history_object,
+                                                            account_transaction_history_multi_index_type >;
 
 
 } } // graphene::chain

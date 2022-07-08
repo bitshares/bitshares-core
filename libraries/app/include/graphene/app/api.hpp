@@ -194,9 +194,9 @@ namespace graphene { namespace app {
          /**
           * @brief Get all operations inside a block or a transaction, including virtual operations
           * @param block_num the number (height) of the block to fetch
-          * @param trx_in_block the sequence of a transaction in the block, starts from @a 0, optional,
-          *                     if specified, will return only operations of that transaction;
-          *                     if omitted, will return all operations in the specified block
+          * @param trx_in_block the sequence of a transaction in the block, starts from @a 0, optional.
+          *                     If specified, will return only operations of that transaction.
+          *                     If omitted, will return all operations in the specified block.
           * @return a list of @a operation_history objects ordered by ID
           *
           * @note the data is fetched from @a account_history plugin, thus the result is possible to
