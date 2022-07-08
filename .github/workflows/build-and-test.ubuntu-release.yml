@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     services:
       elasticsearch:
-        image: docker://elasticsearch:7.16.2
+        image: docker://elasticsearch:7.17.5
         options: --env discovery.type=single-node --publish 9200:9200 --publish 9300:9300
     steps:
     - name: Install dependencies

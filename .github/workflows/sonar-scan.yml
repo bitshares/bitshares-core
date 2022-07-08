@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     services:
       elasticsearch:
-        image: docker://elasticsearch:7.10.1
+        image: docker://elasticsearch:7.17.5
         options: --env discovery.type=single-node --publish 9200:9200 --publish 9300:9300
     steps:
     - name: Download and install latest SonarScanner CLI tool
@@ -69,6 +69,12 @@ jobs:
       run: |
         pwd
         df -h .
+        free
+        sudo dd if=/dev/zero of=/swapfile bs=1024 count=4M
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        free
         mkdir -p _build
         sudo mkdir -p /_build/libraries /_build/programs /mnt/_build/tests
         sudo chmod a+rwx /_build/libraries /_build/programs /mnt/_build/tests
@@ -111,7 +117,7 @@ jobs:
         export CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
         mkdir -p "$CCACHE_DIR"
         df -h
-        programs/build_helpers/make_with_sonar bw-output -j 2 -C _build \
+        programs/build_helpers/make_with_sonar bw-output -j 1 -C _build \
           witness_node cli_wallet js_operation_serializer get_dev_key network_mapper \
           app_test chain_test cli_test es_test
         df -h
