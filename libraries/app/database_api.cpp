@@ -123,7 +123,7 @@ fc::variants database_api_impl::get_objects( const vector<object_id_type>& ids, 
                   [this,to_subscribe](object_id_type id) -> fc::variant {
       if(auto obj = _db.find_object(id))
       {
-         if( to_subscribe && !id.is<operation_history_id_type>() && !id.is<account_transaction_history_id_type>() )
+         if( to_subscribe && !id.is<operation_history_id_type>() && !id.is<account_history_id_type>() )
             this->subscribe_to_item( id );
          return obj->to_variant();
       }

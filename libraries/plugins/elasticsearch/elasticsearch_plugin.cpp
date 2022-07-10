@@ -101,7 +101,7 @@ class elasticsearch_plugin_impl
       void doBlock(uint32_t trx_in_block, const signed_block& b, block_struct& bs) const;
       void doVisitor(const optional <operation_history_object>& oho, visitor_struct& vs) const;
       void checkState(const fc::time_point_sec& block_time);
-      void cleanObjects(const account_transaction_history_id_type& ath, const account_id_type& account_id);
+      void cleanObjects(const account_history_id_type& ath, const account_id_type& account_id);
 
       void init_program_options(const boost::program_options::variables_map& options);
 };
@@ -392,8 +392,8 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type& accoun
 
    const auto &stats_obj = db.get_account_stats_by_owner( account_id );
 
-   const auto &ath = db.create<account_transaction_history_object>(
-         [&oho,&account_id,&stats_obj]( account_transaction_history_object &obj ) {
+   const auto &ath = db.create<account_history_object>(
+         [&oho,&account_id,&stats_obj]( account_history_object &obj ) {
       obj.operation_id = oho->id;
       obj.account = account_id;
       obj.sequence = stats_obj.total_ops + 1;
@@ -425,12 +425,12 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type& accoun
    cleanObjects(ath.id, account_id);
 }
 
-void elasticsearch_plugin_impl::cleanObjects( const account_transaction_history_id_type& ath_id,
+void elasticsearch_plugin_impl::cleanObjects( const account_history_id_type& ath_id,
                                               const account_id_type& account_id )
 {
    graphene::chain::database& db = database();
    // remove everything except current object from ath
-   const auto &his_idx = db.get_index_type<account_transaction_history_index>();
+   const auto &his_idx = db.get_index_type<account_history_index>();
    const auto &by_seq_idx = his_idx.indices().get<by_seq>();
    auto itr = by_seq_idx.lower_bound(boost::make_tuple(account_id, 0));
    if (itr != by_seq_idx.end() && itr->account == account_id && itr->id != ath_id) {
@@ -443,8 +443,8 @@ void elasticsearch_plugin_impl::cleanObjects( const account_transaction_history_
       // this should be always true, but just have a check here
       if( itr != by_seq_idx.end() && itr->account == account_id )
       {
-         db.modify( *itr, [&]( account_transaction_history_object& obj ){
-            obj.next = account_transaction_history_id_type();
+         db.modify( *itr, [&]( account_history_object& obj ){
+            obj.next = account_history_id_type();
          });
       }
       // do the same on oho
@@ -555,7 +555,7 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
    my->init_program_options( options );
 
    my->_oho_index = database().add_index< primary_index< operation_history_index > >();
-   database().add_index< primary_index< account_transaction_history_index > >();
+   database().add_index< primary_index< account_history_index > >();
 
    if( my->_options.elasticsearch_mode != mode::only_query )
    {

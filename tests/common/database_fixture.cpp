@@ -2047,14 +2047,14 @@ vector< operation_history_object > database_fixture_base::get_operation_history(
 {
    vector< operation_history_object > result;
    const auto& stats = account_id(db).statistics(db);
-   if(stats.most_recent_op == account_transaction_history_id_type())
+   if(stats.most_recent_op == account_history_id_type())
       return result;
 
-   const account_transaction_history_object* node = &stats.most_recent_op(db);
+   const account_history_object* node = &stats.most_recent_op(db);
    while( true )
    {
       result.push_back( node->operation_id(db) );
-      if(node->next == account_transaction_history_id_type())
+      if(node->next == account_history_id_type())
          break;
       node = db.find(node->next);
    }

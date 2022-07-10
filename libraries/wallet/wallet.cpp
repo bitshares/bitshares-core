@@ -385,7 +385,7 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(
     const auto& account = my->get_account(name);
     const auto& stats = my->get_object(account.statistics);
 
-    // sequence of account_transaction_history_object start with 1
+    // sequence of account_history_object start with 1
     start = start == 0 ? 1 : start;
 
     if (start <= stats.removed_ops) {
