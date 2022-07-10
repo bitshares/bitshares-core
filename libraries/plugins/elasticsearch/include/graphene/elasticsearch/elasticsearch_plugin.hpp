@@ -134,7 +134,7 @@ struct visitor_struct {
 };
 
 struct bulk_struct {
-   account_transaction_history_object account_history;
+   account_history_object account_history;
    operation_history_struct operation_history;
    int64_t  operation_type;
    uint64_t operation_id_num;

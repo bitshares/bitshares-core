@@ -87,62 +87,72 @@ namespace graphene { namespace chain {
     *  linked list can be traversed with relatively effecient disk access because
     *  of the use of a memory mapped stack.
     */
-   class account_transaction_history_object :  public abstract_object<account_transaction_history_object>
+   class account_history_object :  public abstract_object<account_history_object>
    {
       public:
          static constexpr uint8_t space_id = implementation_ids;
-         static constexpr uint8_t type_id  = impl_account_transaction_history_object_type;
+         static constexpr uint8_t type_id  = impl_account_history_object_type;
          account_id_type                      account; /// the account this operation applies to
          operation_history_id_type            operation_id;
          uint64_t                             sequence = 0; /// the operation position within the given account
-         account_transaction_history_id_type  next;
+         account_history_id_type              next;
    };
 
-   typedef multi_index_container<
+   struct by_block;
+
+   using operation_history_mlti_idx_type = multi_index_container<
       operation_history_object,
       indexed_by<
-         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_unique< tag<by_block>,
+            composite_key< operation_history_object,
+               member< operation_history_object, uint32_t, &operation_history_object::block_num>,
+               member< operation_history_object, uint16_t, &operation_history_object::trx_in_block>,
+               member< operation_history_object, uint16_t, &operation_history_object::op_in_trx>,
+               member< operation_history_object, uint32_t, &operation_history_object::virtual_op>
+            >
+         >
       >
-   > operation_history_multi_index_type;
+   >;
 
-   typedef generic_index<operation_history_object, operation_history_multi_index_type> operation_history_index;
+   using operation_history_index = generic_index< operation_history_object, operation_history_mlti_idx_type >;
 
    struct by_seq;
    struct by_op;
    struct by_opid;
 
-   typedef multi_index_container<
-      account_transaction_history_object,
+   using account_history_multi_idx_type = multi_index_container<
+      account_history_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_unique< tag<by_seq>,
-            composite_key< account_transaction_history_object,
-               member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
-               member< account_transaction_history_object, uint64_t, &account_transaction_history_object::sequence>
+            composite_key< account_history_object,
+               member< account_history_object, account_id_type, &account_history_object::account>,
+               member< account_history_object, uint64_t, &account_history_object::sequence>
             >
          >,
          ordered_unique< tag<by_op>,
-            composite_key< account_transaction_history_object,
-               member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
-               member< account_transaction_history_object, operation_history_id_type, &account_transaction_history_object::operation_id>
+            composite_key< account_history_object,
+               member< account_history_object, account_id_type, &account_history_object::account>,
+               member< account_history_object, operation_history_id_type, &account_history_object::operation_id>
             >
          >,
          ordered_non_unique< tag<by_opid>,
-            member< account_transaction_history_object, operation_history_id_type, &account_transaction_history_object::operation_id>
+            member< account_history_object, operation_history_id_type, &account_history_object::operation_id>
          >
       >
-   > account_transaction_history_multi_index_type;
+   >;
 
-   typedef generic_index<account_transaction_history_object, account_transaction_history_multi_index_type> account_transaction_history_index;
+   using account_history_index = generic_index< account_history_object, account_history_multi_idx_type >;
 
 
 } } // graphene::chain
 
 MAP_OBJECT_ID_TO_TYPE(graphene::chain::operation_history_object)
-MAP_OBJECT_ID_TO_TYPE(graphene::chain::account_transaction_history_object)
+MAP_OBJECT_ID_TO_TYPE(graphene::chain::account_history_object)
 
 FC_REFLECT_TYPENAME( graphene::chain::operation_history_object )
-FC_REFLECT_TYPENAME( graphene::chain::account_transaction_history_object )
+FC_REFLECT_TYPENAME( graphene::chain::account_history_object )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::operation_history_object )
-GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::account_transaction_history_object )
+GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::chain::account_history_object )

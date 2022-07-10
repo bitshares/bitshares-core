@@ -84,7 +84,7 @@ class database_api
        *                  @a null to subscribe or not subscribe according to current auto-subscription setting
        *                  (see @ref set_auto_subscription)
        * @return The objects retrieved, in the order they are mentioned in ids
-       * @note operation_history_object (1.11.x) and account_transaction_history_object (2.9.x)
+       * @note operation_history_object (1.11.x) and account_history_object (2.9.x)
        *       can not be subscribed.
        *
        * If any of the provided IDs does not map to an object, a null variant is returned in its position.

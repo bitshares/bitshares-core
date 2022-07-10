@@ -363,7 +363,7 @@ namespace graphene { namespace app {
        account_id_type account;
        try {
           account = database_api.get_account_id_from_string(account_id_or_name);
-          const account_transaction_history_object& node = account(db).statistics(db).most_recent_op(db);
+          const account_history_object& node = account(db).statistics(db).most_recent_op(db);
           if(start == operation_history_id_type() || start.instance.value > node.operation_id.instance.value)
              start = node.operation_id;
        } catch(...) { return result; }
@@ -380,7 +380,7 @@ namespace graphene { namespace app {
           }
        }
 
-       const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
+       const auto& hist_idx = db.get_index_type<account_history_index>();
        const auto& by_op_idx = hist_idx.indices().get<by_op>();
        auto index_start = by_op_idx.begin();
        auto itr = by_op_idx.lower_bound(boost::make_tuple(account, start));
@@ -418,8 +418,8 @@ namespace graphene { namespace app {
           account = database_api.get_account_id_from_string(account_id_or_name);
        } catch(...) { return result; }
        const auto& stats = account(db).statistics(db);
-       if( stats.most_recent_op == account_transaction_history_id_type() ) return result;
-       const account_transaction_history_object* node = &stats.most_recent_op(db);
+       if( stats.most_recent_op == account_history_id_type() ) return result;
+       const account_history_object* node = &stats.most_recent_op(db);
        if( start == operation_history_id_type() )
           start = node->operation_id;
 
@@ -430,12 +430,12 @@ namespace graphene { namespace app {
              if(node->operation_id(db).op.which() == operation_type)
                result.push_back( node->operation_id(db) );
           }
-          if( node->next == account_transaction_history_id_type() )
+          if( node->next == account_history_id_type() )
              node = nullptr;
           else node = &node->next(db);
        }
        if( stop.instance.value == 0 && result.size() < limit ) {
-          auto head = db.find(account_transaction_history_id_type());
+          auto head = db.find(account_history_id_type());
           if (head != nullptr && head->account == account && head->operation_id(db).op.which() == operation_type)
             result.push_back(head->operation_id(db));
        }
@@ -469,7 +469,7 @@ namespace graphene { namespace app {
 
        if( start >= stop && start > stats.removed_ops && limit > 0 )
        {
-          const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
+          const auto& hist_idx = db.get_index_type<account_history_index>();
           const auto& by_seq_idx = hist_idx.indices().get<by_seq>();
 
           auto itr = by_seq_idx.upper_bound( boost::make_tuple( account, start ) );
@@ -482,6 +482,20 @@ namespace graphene { namespace app {
           }
           while ( itr != itr_stop && result.size() < limit );
        }
+       return result;
+    }
+
+    vector<operation_history_object> history_api::get_block_operation_history(
+          uint32_t block_num,
+          optional<uint16_t> trx_in_block ) const
+    {
+       FC_ASSERT(_app.chain_database());
+       const auto& db = *_app.chain_database();
+       const auto& idx = db.get_index_type<operation_history_index>().indices().get<by_block>();
+       auto range = trx_in_block.valid() ? idx.equal_range( boost::make_tuple( block_num, *trx_in_block  ) )
+                                         : idx.equal_range( block_num );
+       vector<operation_history_object> result;
+       std::copy( range.first, range.second, std::back_inserter( result ) );
        return result;
     }
 

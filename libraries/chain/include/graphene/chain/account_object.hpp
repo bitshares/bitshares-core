@@ -56,7 +56,7 @@ namespace graphene { namespace chain {
          /**
           * Keep the most recent operation as a root pointer to a linked list of the transaction history.
           */
-         account_transaction_history_id_type most_recent_op;
+         account_history_id_type most_recent_op;
          /** Total operations related to this account. */
          uint64_t                            total_ops = 0;
          /** Total operations related to this account that has been removed from the database. */

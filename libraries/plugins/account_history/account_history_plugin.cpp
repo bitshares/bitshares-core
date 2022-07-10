@@ -216,7 +216,7 @@ void account_history_plugin_impl::add_account_history( const account_id_type acc
    graphene::chain::database& db = database();
    const auto& stats_obj = account_id(db).statistics(db);
    // add new entry
-   const auto& ath = db.create<account_transaction_history_object>( [&]( account_transaction_history_object& obj ){
+   const auto& ath = db.create<account_history_object>( [&]( account_history_object& obj ){
        obj.operation_id = op_id;
        obj.account = account_id;
        obj.sequence = stats_obj.total_ops + 1;
@@ -242,7 +242,7 @@ void account_history_plugin_impl::add_account_history( const account_id_type acc
    if( stats_obj.total_ops - stats_obj.removed_ops > max_ops_to_keep )
    {
       // look for the earliest entry
-      const auto& his_idx = db.get_index_type<account_transaction_history_index>();
+      const auto& his_idx = db.get_index_type<account_history_index>();
       const auto& by_seq_idx = his_idx.indices().get<by_seq>();
       auto itr = by_seq_idx.lower_bound( boost::make_tuple( account_id, 0 ) );
       // make sure don't remove the one just added
@@ -260,8 +260,8 @@ void account_history_plugin_impl::add_account_history( const account_id_type acc
          // this should be always true, but just have a check here
          if( itr != by_seq_idx.end() && itr->account == account_id )
          {
-            db.modify( *itr, [&]( account_transaction_history_object& obj ){
-               obj.next = account_transaction_history_id_type();
+            db.modify( *itr, [&]( account_history_object& obj ){
+               obj.next = account_history_id_type();
             });
          }
          // else need to modify the head pointer, but it shouldn't be true
@@ -330,7 +330,7 @@ void account_history_plugin::plugin_initialize(const boost::program_options::var
 {
    database().applied_block.connect( [&]( const signed_block& b){ my->update_account_histories(b); } );
    my->_oho_index = database().add_index< primary_index< operation_history_index > >();
-   database().add_index< primary_index< account_transaction_history_index > >();
+   database().add_index< primary_index< account_history_index > >();
 
    LOAD_VALUE_SET(options, "track-account", my->_tracked_accounts, graphene::chain::account_id_type);
    if (options.count("partial-operations") > 0) {

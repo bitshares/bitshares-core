@@ -87,6 +87,13 @@ BOOST_AUTO_TEST_CASE(get_account_history) {
                                                       100, operation_history_id_type());
       BOOST_CHECK_EQUAL(histories.size(), 0u);
 
+      // get_block_operation_history
+      auto head_block_num = db.head_block_num();
+      histories = hist_api.get_block_operation_history(head_block_num);
+      BOOST_CHECK_EQUAL(histories.size(), 3u);
+      histories = hist_api.get_block_operation_history(head_block_num, 1u);
+      BOOST_CHECK_EQUAL(histories.size(), 1u);
+
    } catch (fc::exception &e) {
       edump((e.to_detail_string()));
       throw;
