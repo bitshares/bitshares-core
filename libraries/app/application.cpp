@@ -1367,7 +1367,7 @@ void application::add_available_plugin(std::shared_ptr<graphene::app::abstract_p
    my->add_available_plugin(p);
 }
 
-const application_options& application::get_options()
+const application_options& application::get_options() const
 {
    return my->_app_options;
 }

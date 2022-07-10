@@ -21,22 +21,22 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-
-#include <graphene/app/database_api.hpp>
+#pragma once
 
 #include <fc/bloom_filter.hpp>
+#include "database_api_helper.hxx"
 
 #define GET_REQUIRED_FEES_MAX_RECURSION 4
 
 namespace graphene { namespace app {
 
-typedef std::map< std::pair<graphene::chain::asset_id_type, graphene::chain::asset_id_type>,
-                  std::vector<fc::variant> > market_queue_type;
+using market_queue_type = std::map< std::pair<graphene::chain::asset_id_type, graphene::chain::asset_id_type>,
+                                    std::vector<fc::variant> >;
 
-class database_api_impl : public std::enable_shared_from_this<database_api_impl>
+class database_api_impl : public std::enable_shared_from_this<database_api_impl>, public database_api_helper
 {
    public:
-      explicit database_api_impl( graphene::chain::database& db, const application_options* app_options );
+      database_api_impl( graphene::chain::database& db, const application_options* app_options );
       virtual ~database_api_impl();
 
       // Objects
@@ -67,7 +67,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       bool is_public_key_registered(string public_key) const;
 
       // Accounts
-      account_id_type get_account_id_from_string(const std::string& name_or_id)const;
       vector<optional<account_object>> get_accounts( const vector<std::string>& account_names_or_ids,
                                                      optional<bool> subscribe )const;
       std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids,
@@ -91,7 +90,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Assets
       uint64_t get_asset_count()const;
-      asset_id_type get_asset_id_from_string(const std::string& symbol_or_id)const;
       vector<optional<extended_asset_object>> get_assets( const vector<std::string>& asset_symbols_or_ids,
                                                           optional<bool> subscribe )const;
       vector<extended_asset_object>           list_assets(const string& lower_bound_symbol, uint32_t limit)const;
@@ -253,9 +251,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       // Accounts
       ////////////////////////////////////////////////
 
-      const account_object* get_account_from_string( const std::string& name_or_id,
-                                                     bool throw_if_not_found = true ) const;
-
       ////////////////////////////////////////////////
       // Assets
       ////////////////////////////////////////////////
@@ -274,8 +269,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          return result;
       }
 
-      const asset_object* get_asset_from_string( const std::string& symbol_or_id,
-                                                 bool throw_if_not_found = true ) const;
       // helper function
       vector<optional<extended_asset_object>> get_assets( const vector<asset_id_type>& asset_ids,
                                                           optional<bool> subscribe = optional<bool>() )const;
@@ -343,57 +336,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
          return results;
       }
-
-      /// Template functions for simple list_X and get_X_by_T APIs, to reduce duplicate code
-      /// @{
-      template <typename X>
-      auto make_tuple_if_multiple(X x) const
-      { return x; }
-
-      template <typename... X>
-      auto make_tuple_if_multiple(X... x) const
-      { return std::make_tuple( x... ); }
-
-      template <typename T>
-      auto call_end_or_upper_bound( const T& t ) const
-      { return std::end( t ); }
-
-      template <typename T, typename... X>
-      auto call_end_or_upper_bound( const T& t, X... x ) const
-      { return t.upper_bound( make_tuple_if_multiple( x... ) ); }
-
-      template <typename OBJ_TYPE, typename OBJ_ID_TYPE, typename INDEX_TYPE, typename T, typename... X >
-      vector<OBJ_TYPE> get_objects_by_x(
-                  T application_options::* app_opt_member_ptr,
-                  const INDEX_TYPE& idx,
-                  const optional<uint32_t>& olimit,
-                  const optional<OBJ_ID_TYPE>& ostart_id,
-                  X... x ) const
-      {
-         uint64_t limit = olimit.valid() ? *olimit : ( application_options::get_default().*app_opt_member_ptr );
-
-         FC_ASSERT( _app_options, "Internal error" );
-         const auto configured_limit = _app_options->*app_opt_member_ptr;
-         FC_ASSERT( limit <= configured_limit,
-                    "limit can not be greater than ${configured_limit}",
-                    ("configured_limit", configured_limit) );
-
-         vector<OBJ_TYPE> results;
-
-         OBJ_ID_TYPE start_id = ostart_id.valid() ? *ostart_id : OBJ_ID_TYPE();
-
-         auto lower_itr = idx.lower_bound( make_tuple_if_multiple( x..., start_id ) );
-         auto upper_itr = call_end_or_upper_bound( idx, x... );
-
-         results.reserve( limit );
-         for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
-         {
-            results.emplace_back( *lower_itr );
-         }
-
-         return results;
-      }
-      /// @}
 
       ////////////////////////////////////////////////
       // Subscription
@@ -516,9 +458,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       boost::signals2::scoped_connection _pending_trx_connection;
 
       map< pair<asset_id_type,asset_id_type>, std::function<void(const variant&)> > _market_subscriptions;
-
-      graphene::chain::database& _db;
-      const application_options* _app_options = nullptr;
 
       const graphene::api_helper_indexes::amount_in_collateral_index* amount_in_collateral_index;
       const graphene::api_helper_indexes::asset_in_liquidity_pools_index* asset_in_liquidity_pools_index;

@@ -22,6 +22,8 @@
  * THE SOFTWARE.
  */
 
+#include <graphene/app/database_api.hpp>
+
 #include "database_api_impl.hxx"
 
 #include <graphene/app/util.hpp>
@@ -48,12 +50,24 @@ namespace graphene { namespace app {
 //////////////////////////////////////////////////////////////////////
 
 database_api::database_api( graphene::chain::database& db, const application_options* app_options )
-   : my( std::make_unique<database_api_impl>( db, app_options ) ) {}
+: my( std::make_shared<database_api_impl>( db, app_options ) )
+{ // Nothing else to do
+}
 
-database_api::~database_api() {}
+database_api::~database_api() = default;
+
+database_api_helper::database_api_helper( graphene::chain::database& db, const application_options* app_options )
+:_db(db), _app_options(app_options)
+{ // Nothing else to do
+}
+
+database_api_helper::database_api_helper( graphene::app::application& app )
+:_db( *app.chain_database() ), _app_options( &app.get_options() )
+{ // Nothing else to do
+}
 
 database_api_impl::database_api_impl( graphene::chain::database& db, const application_options* app_options )
-:_db(db), _app_options(app_options)
+:database_api_helper( db, app_options )
 {
    dlog("creating database api ${x}", ("x",int64_t(this)) );
    _new_connection = _db.new_objects.connect([this](const vector<object_id_type>& ids,
@@ -3160,7 +3174,7 @@ vector<ticket_object> database_api_impl::get_tickets_by_account(
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-const account_object* database_api_impl::get_account_from_string( const std::string& name_or_id,
+const account_object* database_api_helper::get_account_from_string( const std::string& name_or_id,
                                                                   bool throw_if_not_found ) const
 {
    // TODO cache the result to avoid repeatly fetching from db
@@ -3186,7 +3200,7 @@ const account_object* database_api_impl::get_account_from_string( const std::str
    return account_ptr;
 }
 
-const asset_object* database_api_impl::get_asset_from_string( const std::string& symbol_or_id,
+const asset_object* database_api_helper::get_asset_from_string( const std::string& symbol_or_id,
                                                               bool throw_if_not_found ) const
 {
    // TODO cache the result to avoid repeatly fetching from db

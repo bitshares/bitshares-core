@@ -89,7 +89,7 @@ namespace graphene { namespace app {
    struct asset_holders
    {
       asset_id_type   asset_id;
-      int             count;
+      int64_t         count;
    };
 
    struct history_operation_detail {
@@ -102,12 +102,12 @@ namespace graphene { namespace app {
     */
    struct limit_order_group
    {
-      limit_order_group( const std::pair<limit_order_group_key,limit_order_group_data>& p )
+      explicit limit_order_group( const std::pair<limit_order_group_key,limit_order_group_data>& p )
          :  min_price( p.first.min_price ),
             max_price( p.second.max_price ),
             total_for_sale( p.second.total_for_sale )
             {}
-      limit_order_group() {}
+      limit_order_group() = default;
 
       price         min_price; ///< possible lowest price in the group
       price         max_price; ///< possible highest price in the group
@@ -122,8 +122,7 @@ namespace graphene { namespace app {
    class history_api
    {
       public:
-         history_api(application& app)
-               :_app(app), database_api( std::ref(*app.chain_database()), &(app.get_options())) {}
+         explicit history_api(application& app);
 
          /**
           * @brief Get operations relevant to the specificed account
@@ -298,7 +297,6 @@ namespace graphene { namespace app {
 
       private:
            application& _app;
-           graphene::app::database_api database_api;
    };
 
    /**
@@ -307,8 +305,7 @@ namespace graphene { namespace app {
    class block_api
    {
    public:
-      block_api(graphene::chain::database& db);
-      ~block_api();
+      explicit block_api(const graphene::chain::database& db);
 
       /**
           * @brief Get signed blocks
@@ -319,7 +316,7 @@ namespace graphene { namespace app {
       vector<optional<signed_block>> get_blocks(uint32_t block_num_from, uint32_t block_num_to)const;
 
    private:
-      graphene::chain::database& _db;
+      const graphene::chain::database& _db;
    };
 
 
@@ -329,7 +326,7 @@ namespace graphene { namespace app {
    class network_broadcast_api : public std::enable_shared_from_this<network_broadcast_api>
    {
       public:
-         network_broadcast_api(application& a);
+         explicit network_broadcast_api(application& a);
 
          struct transaction_confirmation
          {
@@ -339,7 +336,7 @@ namespace graphene { namespace app {
             processed_transaction trx;
          };
 
-         typedef std::function<void(variant/*transaction_confirmation*/)> confirmation_callback;
+         using confirmation_callback = std::function<void(variant/*transaction_confirmation*/)>;
 
          /**
           * @brief Broadcast a transaction to the network
@@ -392,7 +389,7 @@ namespace graphene { namespace app {
    class network_node_api
    {
       public:
-         network_node_api(application& a);
+         explicit network_node_api(application& a);
 
          /**
           * @brief Return general network information, such as p2p port
@@ -438,8 +435,6 @@ namespace graphene { namespace app {
    class crypto_api
    {
       public:
-         crypto_api();
-
          /**
           * @brief Generates a pedersen commitment: *commit = blind * G + value * G2.
           * The commitment is 33 bytes, the blinding factor is 32 bytes.
@@ -529,8 +524,7 @@ namespace graphene { namespace app {
    class asset_api
    {
       public:
-         asset_api(graphene::app::application& app);
-         ~asset_api();
+         explicit asset_api(graphene::app::application& app);
 
          /**
           * @brief Get asset holders for a specific asset
@@ -546,7 +540,7 @@ namespace graphene { namespace app {
           * @param asset The specific asset id or symbol
           * @return Holders count for the specified asset
           */
-         int get_asset_holders_count( std::string asset )const;
+         int64_t get_asset_holders_count( std::string asset )const;
 
          /**
           * @brief Get all asset holders
@@ -557,7 +551,6 @@ namespace graphene { namespace app {
       private:
          graphene::app::application& _app;
          graphene::chain::database& _db;
-         graphene::app::database_api database_api;
    };
 
    /**
@@ -566,9 +559,7 @@ namespace graphene { namespace app {
    class orders_api
    {
       public:
-         orders_api(application& app)
-         :_app(app), database_api( std::ref(*app.chain_database()), &(app.get_options()) ){}
-         //virtual ~orders_api() {}
+         explicit orders_api(application& app);
 
          /**
           * @brief Get tracked groups configured by the server.
@@ -594,7 +585,6 @@ namespace graphene { namespace app {
 
       private:
          application& _app;
-         graphene::app::database_api database_api;
    };
 
    /**
@@ -603,23 +593,23 @@ namespace graphene { namespace app {
     */
    class custom_operations_api
    {
-      public:
-         custom_operations_api(application& app):_app(app), database_api( *app.chain_database(),
-               &(app.get_options()) ){}
+   public:
+      explicit custom_operations_api(application& app);
 
-         /**
-          * @brief Get all stored objects of an account in a particular catalog
-          *
-          * @param account_name_or_id The account name or ID to get info from
-          * @param catalog Category classification. Each account can store multiple catalogs.
-          *
-          * @return The vector of objects of the account or empty
-          */
-         vector<account_storage_object> get_storage_info(std::string account_name_or_id, std::string catalog)const;
+      /**
+       * @brief Get all stored objects of an account in a particular catalog
+       *
+       * @param account_name_or_id The account name or ID to get info from
+       * @param catalog Category classification. Each account can store multiple catalogs.
+       *
+       * @return The vector of objects of the account or empty
+       */
+      vector<account_storage_object> get_storage_info(
+            const std::string& account_name_or_id,
+            const std::string& catalog )const;
 
    private:
-         application& _app;
-         graphene::app::database_api database_api;
+      application& _app;
    };
 } } // graphene::app
 
@@ -642,8 +632,7 @@ namespace graphene { namespace app {
    class login_api
    {
       public:
-         login_api(application& a);
-         ~login_api();
+         explicit login_api(application& a);
 
          /**
           * @brief Authenticate to the RPC server
