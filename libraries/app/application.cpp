@@ -310,6 +310,10 @@ void application_impl::set_api_limit() {
       _app_options.api_limit_get_grouped_limit_orders =
             _options->at("api-limit-get-grouped-limit-orders").as<uint64_t>();
    }
+   if(_options->count("api-limit-get-market-history") > 0){
+      _app_options.api_limit_get_market_history =
+            _options->at("api-limit-get-market-history").as<uint32_t>();
+   }
    if(_options->count("api-limit-get-relative-account-history") > 0){
       _app_options.api_limit_get_relative_account_history =
             _options->at("api-limit-get-relative-account-history").as<uint64_t>();
@@ -1175,6 +1179,9 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("api-limit-get-grouped-limit-orders",
           bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_grouped_limit_orders),
           "For orders_api::get_grouped_limit_orders to set max limit value")
+         ("api-limit-get-market-history",
+          bpo::value<uint32_t>()->default_value(default_opts.api_limit_get_market_history),
+          "Maximum number of records to return for the history_api::get_market_history API")
          ("api-limit-get-relative-account-history",
           bpo::value<uint64_t>()->default_value(default_opts.api_limit_get_relative_account_history),
           "For history_api::get_relative_account_history to set max limit value")

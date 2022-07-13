@@ -340,15 +340,13 @@ namespace graphene { namespace app {
        hkey.quote = b;
        hkey.sequence = std::numeric_limits<int64_t>::min();
 
-       uint32_t count = 0;
        auto itr = history_idx.lower_bound( hkey );
        vector<order_history_object> result;
-       while( itr != history_idx.end() && count < limit)
+       while( itr != history_idx.end() && result.size() < limit )
        {
           if( itr->key.base != a || itr->key.quote != b ) break;
           result.push_back( *itr );
           ++itr;
-          ++count;
        }
 
        return result;
@@ -455,7 +453,7 @@ namespace graphene { namespace app {
     }
 
 
-    vector<operation_history_object> history_api::get_relative_account_history( const std::string account_id_or_name,
+    vector<operation_history_object> history_api::get_relative_account_history( const std::string& account_id_or_name,
                                                                                 uint64_t stop,
                                                                                 uint32_t limit,
                                                                                 uint64_t start ) const
@@ -562,7 +560,8 @@ namespace graphene { namespace app {
        asset_id_type a = db_api_helper.get_asset_from_string( asset_a )->id;
        asset_id_type b = db_api_helper.get_asset_from_string( asset_b )->id;
        vector<bucket_object> result;
-       result.reserve(200);
+       const auto configured_limit = _app.get_options().api_limit_get_market_history;
+       result.reserve( configured_limit );
 
        if( a > b ) std::swap(a,b);
 
@@ -570,7 +569,7 @@ namespace graphene { namespace app {
        const auto& by_key_idx = bidx.indices().get<by_key>();
 
        auto itr = by_key_idx.lower_bound( bucket_key( a, b, bucket_seconds, start ) );
-       while( itr != by_key_idx.end() && itr->key.open <= end && result.size() < 200 )
+       while( itr != by_key_idx.end() && itr->key.open <= end && result.size() < configured_limit )
        {
           if( !(itr->key.base == a && itr->key.quote == b && itr->key.seconds == bucket_seconds) )
           {
@@ -591,7 +590,8 @@ namespace graphene { namespace app {
     { try {
        FC_ASSERT( _app.get_options().has_market_history_plugin, "Market history plugin is not enabled." );
 
-       uint32_t limit = olimit.valid() ? *olimit : 101;
+       uint32_t limit = olimit.valid() ? *olimit
+                                       : application_options::get_default().api_limit_get_liquidity_pool_history;
 
        const auto configured_limit = _app.get_options().api_limit_get_liquidity_pool_history;
        FC_ASSERT( limit <= configured_limit,
@@ -649,7 +649,8 @@ namespace graphene { namespace app {
     { try {
        FC_ASSERT( _app.get_options().has_market_history_plugin, "Market history plugin is not enabled." );
 
-       uint32_t limit = olimit.valid() ? *olimit : 101;
+       uint32_t limit = olimit.valid() ? *olimit
+                                       : application_options::get_default().api_limit_get_liquidity_pool_history;
 
        const auto configured_limit = _app.get_options().api_limit_get_liquidity_pool_history;
        FC_ASSERT( limit <= configured_limit,

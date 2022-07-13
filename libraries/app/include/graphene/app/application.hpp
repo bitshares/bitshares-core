@@ -46,6 +46,7 @@ namespace graphene { namespace app {
          uint64_t api_limit_get_account_history_operations = 100;
          uint64_t api_limit_get_account_history = 100;
          uint64_t api_limit_get_grouped_limit_orders = 101;
+         uint32_t api_limit_get_market_history = 200;
          uint64_t api_limit_get_relative_account_history = 100;
          uint64_t api_limit_get_account_history_by_operations = 100;
          uint64_t api_limit_get_asset_holders = 100;
@@ -78,9 +79,9 @@ namespace graphene { namespace app {
          uint64_t api_limit_get_samet_funds = 101;
          uint64_t api_limit_get_credit_offers = 101;
 
-         static const application_options& get_default()
+         static constexpr application_options get_default()
          {
-            static const application_options default_options;
+            constexpr application_options default_options;
             return default_options;
          }
    };
