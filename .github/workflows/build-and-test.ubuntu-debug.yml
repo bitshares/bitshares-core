@@ -50,6 +50,12 @@ jobs:
       run: |
         pwd
         df -h .
+        free
+        sudo dd if=/dev/zero of=/swapfile bs=1024 count=4M
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        free
         mkdir -p _build
         sudo mkdir -p /_build/libraries /_build/programs /_build/tests /mnt/_build
         sudo chmod a+rwx /_build/libraries /_build/programs /_build/tests
