@@ -323,7 +323,8 @@ namespace graphene { namespace app {
     { // Nothing else to do
     }
 
-    vector<order_history_object> history_api::get_fill_order_history( std::string asset_a, std::string asset_b,
+    vector<order_history_object> history_api::get_fill_order_history( const std::string& asset_a,
+                                                                      const std::string& asset_b,
                                                                       uint32_t limit )const
     {
        auto market_hist_plugin = _app.get_plugin<market_history_plugin>( "market_history" );
@@ -352,7 +353,7 @@ namespace graphene { namespace app {
        return result;
     }
 
-    vector<operation_history_object> history_api::get_account_history( const std::string account_id_or_name,
+    vector<operation_history_object> history_api::get_account_history( const std::string& account_id_or_name,
                                                                        operation_history_id_type stop,
                                                                        uint32_t limit,
                                                                        operation_history_id_type start ) const
@@ -407,7 +408,7 @@ namespace graphene { namespace app {
     }
 
     vector<operation_history_object> history_api::get_account_history_operations(
-          const std::string account_id_or_name,
+          const std::string& account_id_or_name,
           int64_t operation_type,
           operation_history_id_type start,
           operation_history_id_type stop,
@@ -498,7 +499,7 @@ namespace graphene { namespace app {
 
     vector<operation_history_object> history_api::get_block_operation_history(
           uint32_t block_num,
-          optional<uint16_t> trx_in_block ) const
+          const optional<uint16_t>& trx_in_block ) const
     {
        FC_ASSERT(_app.chain_database());
        const auto& db = *_app.chain_database();
@@ -517,9 +518,10 @@ namespace graphene { namespace app {
        return market_hist_plugin->tracked_buckets();
     }
 
-    history_operation_detail history_api::get_account_history_by_operations( const std::string account_id_or_name,
-                                                                             flat_set<uint16_t> operation_types,
-                                                                             uint32_t start, uint32_t limit )const
+    history_operation_detail history_api::get_account_history_by_operations(
+          const std::string& account_id_or_name,
+          const flat_set<uint16_t>& operation_types,
+          uint32_t start, uint32_t limit )const
     {
        const auto configured_limit = _app.get_options().api_limit_get_account_history_by_operations;
        FC_ASSERT( limit <= configured_limit,
@@ -546,9 +548,10 @@ namespace graphene { namespace app {
        return result;
     }
 
-    vector<bucket_object> history_api::get_market_history( std::string asset_a, std::string asset_b,
+    vector<bucket_object> history_api::get_market_history( const std::string& asset_a, const std::string& asset_b,
                                                            uint32_t bucket_seconds,
-                                                           fc::time_point_sec start, fc::time_point_sec end )const
+                                                           const fc::time_point_sec& start,
+                                                           const fc::time_point_sec& end )const
     { try {
 
        auto market_hist_plugin = _app.get_plugin<market_history_plugin>( "market_history" );
@@ -583,10 +586,10 @@ namespace graphene { namespace app {
 
     vector<liquidity_pool_history_object> history_api::get_liquidity_pool_history(
                liquidity_pool_id_type pool_id,
-               optional<fc::time_point_sec> start,
-               optional<fc::time_point_sec> stop,
-               optional<uint32_t> olimit,
-               optional<int64_t> operation_type )const
+               const optional<fc::time_point_sec>& start,
+               const optional<fc::time_point_sec>& stop,
+               const optional<uint32_t>& olimit,
+               const optional<int64_t>& operation_type )const
     { try {
        FC_ASSERT( _app.get_options().has_market_history_plugin, "Market history plugin is not enabled." );
 
@@ -642,10 +645,10 @@ namespace graphene { namespace app {
 
     vector<liquidity_pool_history_object> history_api::get_liquidity_pool_history_by_sequence(
                liquidity_pool_id_type pool_id,
-               optional<uint64_t> start,
-               optional<fc::time_point_sec> stop,
-               optional<uint32_t> olimit,
-               optional<int64_t> operation_type )const
+               const optional<uint64_t>& start,
+               const optional<fc::time_point_sec>& stop,
+               const optional<uint32_t>& olimit,
+               const optional<int64_t>& operation_type )const
     { try {
        FC_ASSERT( _app.get_options().has_market_history_plugin, "Market history plugin is not enabled." );
 
@@ -773,7 +776,7 @@ namespace graphene { namespace app {
     { // Nothing else to do
     }
 
-    vector<account_asset_balance> asset_api::get_asset_holders( std::string asset, uint32_t start,
+    vector<account_asset_balance> asset_api::get_asset_holders( const std::string& asset_symbol_or_id, uint32_t start,
                                                                 uint32_t limit ) const
     {
        const auto configured_limit = _app.get_options().api_limit_get_asset_holders;
@@ -782,7 +785,7 @@ namespace graphene { namespace app {
                   ("configured_limit", configured_limit) );
 
        database_api_helper db_api_helper( _app );
-       asset_id_type asset_id = db_api_helper.get_asset_from_string( asset )->id;
+       asset_id_type asset_id = db_api_helper.get_asset_from_string( asset_symbol_or_id )->id;
        const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
        auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
@@ -813,10 +816,10 @@ namespace graphene { namespace app {
        return result;
     }
     // get number of asset holders.
-    int64_t asset_api::get_asset_holders_count( std::string asset ) const {
+    int64_t asset_api::get_asset_holders_count( const std::string& asset_symbol_or_id ) const {
        const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
        database_api_helper db_api_helper( _app );
-       asset_id_type asset_id = db_api_helper.get_asset_from_string( asset )->id;
+       asset_id_type asset_id = db_api_helper.get_asset_from_string( asset_symbol_or_id )->id;
        auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
        int64_t count = boost::distance(range) - 1;

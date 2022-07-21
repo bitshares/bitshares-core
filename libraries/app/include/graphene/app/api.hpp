@@ -134,7 +134,7 @@ namespace graphene { namespace app {
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
          vector<operation_history_object> get_account_history(
-            const std::string account_name_or_id,
+            const std::string& account_name_or_id,
             operation_history_id_type stop = operation_history_id_type(),
             uint32_t limit = application_options::get_default().api_limit_get_account_history,
             operation_history_id_type start = operation_history_id_type()
@@ -151,8 +151,8 @@ namespace graphene { namespace app {
           * @return history_operation_detail
           */
          history_operation_detail get_account_history_by_operations(
-            const std::string account_name_or_id,
-            flat_set<uint16_t> operation_types,
+            const std::string& account_name_or_id,
+            const flat_set<uint16_t>& operation_types,
             uint32_t start,
             uint32_t limit
          )const;
@@ -169,7 +169,7 @@ namespace graphene { namespace app {
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
          vector<operation_history_object> get_account_history_operations(
-            const std::string account_name_or_id,
+            const std::string& account_name_or_id,
             int64_t operation_type,
             operation_history_id_type start = operation_history_id_type(),
             operation_history_id_type stop = operation_history_id_type(),
@@ -210,7 +210,7 @@ namespace graphene { namespace app {
           */
          vector<operation_history_object> get_block_operation_history(
                uint32_t block_num,
-               optional<uint16_t> trx_in_block = {} ) const;
+               const optional<uint16_t>& trx_in_block = {} ) const;
 
          /**
           * @brief Get details of order executions occurred most recently in a trading pair
@@ -219,7 +219,10 @@ namespace graphene { namespace app {
           * @param limit Maximum records to return
           * @return a list of order_history objects, in "most recent first" order
           */
-         vector<order_history_object> get_fill_order_history( std::string a, std::string b, uint32_t limit )const;
+         vector<order_history_object> get_fill_order_history(
+               const std::string& a,
+               const std::string& b,
+               uint32_t limit )const;
 
          /**
           * @brief Get OHLCV data of a trading pair in a time range
@@ -233,8 +236,10 @@ namespace graphene { namespace app {
           * If there are more records in the specified time range than the configured value of
           *    @a api_limit_get_market_history, only the first records will be returned.
           */
-         vector<bucket_object> get_market_history( std::string a, std::string b, uint32_t bucket_seconds,
-                                                   fc::time_point_sec start, fc::time_point_sec end )const;
+         vector<bucket_object> get_market_history( const std::string& a, const std::string& b,
+                                                   uint32_t bucket_seconds,
+                                                   const fc::time_point_sec& start,
+                                                   const fc::time_point_sec& end )const;
 
          /**
           * @brief Get OHLCV time bucket lengths supported (configured) by this API server
@@ -269,10 +274,11 @@ namespace graphene { namespace app {
           */
          vector<liquidity_pool_history_object> get_liquidity_pool_history(
                liquidity_pool_id_type pool_id,
-               optional<fc::time_point_sec> start = optional<fc::time_point_sec>(),
-               optional<fc::time_point_sec> stop = optional<fc::time_point_sec>(),
-               optional<uint32_t> limit = application_options::get_default().api_limit_get_liquidity_pool_history,
-               optional<int64_t> operation_type = optional<int64_t>() )const;
+               const optional<fc::time_point_sec>& start = optional<fc::time_point_sec>(),
+               const optional<fc::time_point_sec>& stop = optional<fc::time_point_sec>(),
+               const optional<uint32_t>& limit = application_options::get_default()
+                                                    .api_limit_get_liquidity_pool_history,
+               const optional<int64_t>& operation_type = optional<int64_t>() )const;
 
          /**
           * @brief Get history of a liquidity pool
@@ -297,10 +303,11 @@ namespace graphene { namespace app {
           */
          vector<liquidity_pool_history_object> get_liquidity_pool_history_by_sequence(
                liquidity_pool_id_type pool_id,
-               optional<uint64_t> start = optional<uint64_t>(),
-               optional<fc::time_point_sec> stop = optional<fc::time_point_sec>(),
-               optional<uint32_t> limit = application_options::get_default().api_limit_get_liquidity_pool_history,
-               optional<int64_t> operation_type = optional<int64_t>() )const;
+               const optional<uint64_t>& start = optional<uint64_t>(),
+               const optional<fc::time_point_sec>& stop = optional<fc::time_point_sec>(),
+               const optional<uint32_t>& limit = application_options::get_default()
+                                                    .api_limit_get_liquidity_pool_history,
+               const optional<int64_t>& operation_type = optional<int64_t>() )const;
 
       private:
            application& _app;
@@ -535,20 +542,21 @@ namespace graphene { namespace app {
 
          /**
           * @brief Get asset holders for a specific asset
-          * @param asset The specific asset id or symbol
+          * @param asset_symbol_or_id The specific asset symbol or ID
           * @param start The start index
           * @param limit Maximum number of accounts to retrieve, must not exceed the configured value of
           *              @a api_limit_get_asset_holders
           * @return A list of asset holders for the specified asset
           */
-         vector<account_asset_balance> get_asset_holders( std::string asset, uint32_t start, uint32_t limit  )const;
+         vector<account_asset_balance> get_asset_holders( const std::string& asset_symbol_or_id,
+                                                          uint32_t start, uint32_t limit  )const;
 
          /**
           * @brief Get asset holders count for a specific asset
-          * @param asset The specific asset id or symbol
+          * @param asset_symbol_or_id The specific asset symbol or id
           * @return Holders count for the specified asset
           */
-         int64_t get_asset_holders_count( std::string asset )const;
+         int64_t get_asset_holders_count( const std::string& asset_symbol_or_id )const;
 
          /**
           * @brief Get all asset holders

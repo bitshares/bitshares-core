@@ -506,15 +506,13 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
    for (const std::string& account_name_or_id : names_or_ids)
    {
       const account_object* account = get_account_from_string(account_name_or_id, false);
-      if (account == nullptr)
+      if( !account )
          continue;
 
-      if( to_subscribe )
+      if( to_subscribe && _subscribed_accounts.size() < _app_options->api_limit_get_full_accounts_subscribe )
       {
-         if(_subscribed_accounts.size() < _app_options->api_limit_get_full_accounts_subscribe) {
-            _subscribed_accounts.insert( account->get_id() );
-            subscribe_to_item( account->id );
-         }
+         _subscribed_accounts.insert( account->get_id() );
+         subscribe_to_item( account->id );
       }
 
       full_account acnt;
