@@ -429,7 +429,7 @@ namespace graphene { namespace app {
           * @param value Positive 64-bit integer value
           * @return A 33-byte pedersen commitment: *commit = blind * G + value * G2
           */
-         fc::ecc::commitment_type blind( const fc::ecc::blind_factor_type& blind, uint64_t value );
+         fc::ecc::commitment_type blind( const fc::ecc::blind_factor_type& blind, uint64_t value ) const;
 
          /**
           * @brief Get sha-256 blind factor type
@@ -437,7 +437,8 @@ namespace graphene { namespace app {
           * @param non_neg 32-bit integer value
           * @return A blind factor type
           */
-         fc::ecc::blind_factor_type blind_sum( const std::vector<blind_factor_type>& blinds_in, uint32_t non_neg );
+         fc::ecc::blind_factor_type blind_sum( const std::vector<blind_factor_type>& blinds_in,
+                                               uint32_t non_neg ) const;
 
          /**
           * @brief Verifies that commits + neg_commits + excess == 0
@@ -451,7 +452,7 @@ namespace graphene { namespace app {
             const std::vector<commitment_type>& commits_in,
             const std::vector<commitment_type>& neg_commits_in,
             int64_t excess
-         );
+         ) const;
 
          /**
           * @brief Verifies range proof for 33-byte pedersen commitment
@@ -459,7 +460,8 @@ namespace graphene { namespace app {
           * @param proof List of characters
           * @return A structure with success, min and max values
           */
-         verify_range_result verify_range( const fc::ecc::commitment_type& commit, const std::vector<char>& proof );
+         verify_range_result verify_range( const fc::ecc::commitment_type& commit,
+                                           const std::vector<char>& proof ) const;
 
          /**
           * @brief Proves with respect to min_value the range for pedersen
@@ -479,7 +481,7 @@ namespace graphene { namespace app {
                                              const blind_factor_type& nonce,
                                              int8_t base10_exp,
                                              uint8_t min_bits,
-                                             uint64_t actual_value );
+                                             uint64_t actual_value ) const;
 
          /**
           * @brief Verifies range proof rewind for 33-byte pedersen commitment
@@ -490,7 +492,7 @@ namespace graphene { namespace app {
           */
          verify_range_proof_rewind_result verify_range_proof_rewind( const blind_factor_type& nonce,
                                                                      const fc::ecc::commitment_type& commit,
-                                                                     const std::vector<char>& proof );
+                                                                     const std::vector<char>& proof ) const;
 
          /**
           * @brief Gets "range proof" info. The cli_wallet includes functionality for sending blind transfers
@@ -501,7 +503,7 @@ namespace graphene { namespace app {
           * @param proof List of proof's characters
           * @return A range proof info structure with exponent, mantissa, min and max values
           */
-         fc::ecc::range_proof_info range_get_info( const std::vector<char>& proof );
+         fc::ecc::range_proof_info range_get_info( const std::vector<char>& proof ) const;
    };
 
    /**

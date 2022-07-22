@@ -715,26 +715,26 @@ namespace graphene { namespace app {
     } FC_CAPTURE_AND_RETHROW( (pool_id)(start)(stop)(olimit)(operation_type) ) }
 
 
-    fc::ecc::commitment_type crypto_api::blind( const blind_factor_type& blind, uint64_t value )
+    fc::ecc::commitment_type crypto_api::blind( const blind_factor_type& blind, uint64_t value ) const
     {
        return fc::ecc::blind( blind, value );
     }
 
     fc::ecc::blind_factor_type crypto_api::blind_sum( const std::vector<blind_factor_type>& blinds_in,
-                                                      uint32_t non_neg )
+                                                      uint32_t non_neg ) const
     {
        return fc::ecc::blind_sum( blinds_in, non_neg );
     }
 
     bool crypto_api::verify_sum( const std::vector<commitment_type>& commits_in,
                                  const std::vector<commitment_type>& neg_commits_in,
-                                 int64_t excess )
+                                 int64_t excess ) const
     {
        return fc::ecc::verify_sum( commits_in, neg_commits_in, excess );
     }
 
     crypto_api::verify_range_result crypto_api::verify_range( const commitment_type& commit,
-                                                              const std::vector<char>& proof )
+                                                              const std::vector<char>& proof ) const
     {
        verify_range_result result;
        result.success = fc::ecc::verify_range( result.min_val, result.max_val, commit, proof );
@@ -747,7 +747,7 @@ namespace graphene { namespace app {
                                                     const blind_factor_type& nonce,
                                                     int8_t base10_exp,
                                                     uint8_t min_bits,
-                                                    uint64_t actual_value )
+                                                    uint64_t actual_value ) const
     {
        return fc::ecc::range_proof_sign( min_value, commit, commit_blind, nonce, base10_exp, min_bits, actual_value );
     }
@@ -755,7 +755,7 @@ namespace graphene { namespace app {
     crypto_api::verify_range_proof_rewind_result crypto_api::verify_range_proof_rewind(
           const blind_factor_type& nonce,
           const commitment_type& commit,
-          const std::vector<char>& proof )
+          const std::vector<char>& proof ) const
     {
        verify_range_proof_rewind_result result;
        result.success = fc::ecc::verify_range_proof_rewind( result.blind_out,
@@ -769,7 +769,7 @@ namespace graphene { namespace app {
        return result;
     }
 
-    fc::ecc::range_proof_info crypto_api::range_get_info( const std::vector<char>& proof )
+    fc::ecc::range_proof_info crypto_api::range_get_info( const std::vector<char>& proof ) const
     {
        return fc::ecc::range_get_info( proof );
     }
