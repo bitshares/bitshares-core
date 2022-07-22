@@ -584,7 +584,7 @@ namespace graphene { namespace app {
        return result;
     } FC_CAPTURE_AND_RETHROW( (asset_a)(asset_b)(bucket_seconds)(start)(end) ) }
 
-    static uint32_t validate_get_lp_history_params( application& _app, const optional<uint32_t>& olimit )
+    static uint32_t validate_get_lp_history_params( const application& _app, const optional<uint32_t>& olimit )
     {
        FC_ASSERT( _app.get_options().has_market_history_plugin, "Market history plugin is not enabled." );
 
