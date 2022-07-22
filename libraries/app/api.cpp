@@ -584,13 +584,8 @@ namespace graphene { namespace app {
        return result;
     } FC_CAPTURE_AND_RETHROW( (asset_a)(asset_b)(bucket_seconds)(start)(end) ) }
 
-    vector<liquidity_pool_history_object> history_api::get_liquidity_pool_history(
-               liquidity_pool_id_type pool_id,
-               const optional<fc::time_point_sec>& start,
-               const optional<fc::time_point_sec>& stop,
-               const optional<uint32_t>& olimit,
-               const optional<int64_t>& operation_type )const
-    { try {
+    static uint32_t validate_get_lp_history_params( application& _app, const optional<uint32_t>& olimit )
+    {
        FC_ASSERT( _app.get_options().has_market_history_plugin, "Market history plugin is not enabled." );
 
        uint32_t limit = olimit.valid() ? *olimit
@@ -603,12 +598,24 @@ namespace graphene { namespace app {
 
        FC_ASSERT( _app.chain_database(), "Internal error: the chain database is not availalbe" );
 
-       const auto& db = *_app.chain_database();
+       return limit;
+    }
+
+    vector<liquidity_pool_history_object> history_api::get_liquidity_pool_history(
+               liquidity_pool_id_type pool_id,
+               const optional<fc::time_point_sec>& start,
+               const optional<fc::time_point_sec>& stop,
+               const optional<uint32_t>& olimit,
+               const optional<int64_t>& operation_type )const
+    { try {
+       uint32_t limit = validate_get_lp_history_params( _app, olimit );
 
        vector<liquidity_pool_history_object> result;
 
-       if( limit == 0 || ( start.valid() && stop.valid() && *start <= *stop ) ) // empty result
+       if( 0 == limit || ( start.valid() && stop.valid() && *start <= *stop ) ) // empty result
           return result;
+
+       const auto& db = *_app.chain_database();
 
        const auto& hist_idx = db.get_index_type<liquidity_pool_history_index>();
 
@@ -650,24 +657,14 @@ namespace graphene { namespace app {
                const optional<uint32_t>& olimit,
                const optional<int64_t>& operation_type )const
     { try {
-       FC_ASSERT( _app.get_options().has_market_history_plugin, "Market history plugin is not enabled." );
-
-       uint32_t limit = olimit.valid() ? *olimit
-                                       : application_options::get_default().api_limit_get_liquidity_pool_history;
-
-       const auto configured_limit = _app.get_options().api_limit_get_liquidity_pool_history;
-       FC_ASSERT( limit <= configured_limit,
-                  "limit can not be greater than ${configured_limit}",
-                  ("configured_limit", configured_limit) );
-
-       FC_ASSERT( _app.chain_database(), "Internal error: the chain database is not availalbe" );
-
-       const auto& db = *_app.chain_database();
+       uint32_t limit = validate_get_lp_history_params( _app, olimit );
 
        vector<liquidity_pool_history_object> result;
 
-       if( limit == 0 ) // empty result
+       if( 0 == limit ) // empty result
           return result;
+
+       const auto& db = *_app.chain_database();
 
        const auto& hist_idx = db.get_index_type<liquidity_pool_history_index>();
 
