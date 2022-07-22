@@ -1351,10 +1351,10 @@ signed_message wallet_api::sign_message(string signer, string message)
    return my->sign_message(signer, message);
 }
 
-bool wallet_api::verify_message( const string& message, const string& account, int32_t block, const string& time,
+bool wallet_api::verify_message( const string& message, const string& account, int32_t block, const string& msg_time,
                                  const fc::ecc::compact_signature& sig )
 {
-   return my->verify_message( message, account, block, time, sig );
+   return my->verify_message( message, account, block, msg_time, sig );
 }
 
 /** Verify a message signed with sign_message

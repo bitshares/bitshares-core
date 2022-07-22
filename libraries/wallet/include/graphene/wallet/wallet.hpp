@@ -831,11 +831,11 @@ class wallet_api
        * @param message the message text
        * @param account the account name of the message
        * @param block the block number of the message
-       * @param time the timestamp of the message
+       * @param msg_time the timestamp of the message
        * @param sig the message signature
        * @return true if signature matches
        */
-      bool verify_message( const string& message, const string& account, int32_t block, const string& time,
+      bool verify_message( const string& message, const string& account, int32_t block, const string& msg_time,
                            const fc::ecc::compact_signature& sig );
 
       /** Verify a message signed with sign_message

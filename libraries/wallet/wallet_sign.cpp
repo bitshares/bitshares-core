@@ -215,7 +215,7 @@ namespace graphene { namespace wallet { namespace detail {
    }
 
    bool wallet_api_impl::verify_message( const string& message, const string& account, int32_t block,
-                                         const string& time, const fc::ecc::compact_signature& sig )
+                                         const string& msg_time, const fc::ecc::compact_signature& sig )
    {
       const account_object from_account = get_account( account );
 
@@ -224,7 +224,7 @@ namespace graphene { namespace wallet { namespace detail {
       msg.meta.account = from_account.name;
       msg.meta.memo_key = from_account.options.memo_key;
       msg.meta.block = block;
-      msg.meta.time = time;
+      msg.meta.time = msg_time;
       msg.signature = sig;
 
       return verify_signed_message( msg );

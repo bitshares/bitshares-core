@@ -342,7 +342,7 @@ public:
 
    signed_message sign_message(string signer, string message);
 
-   bool verify_message( const string& message, const string& account, int32_t block, const string& time,
+   bool verify_message( const string& message, const string& account, int32_t block, const string& msg_time,
          const fc::ecc::compact_signature& sig );
 
    bool verify_signed_message( const signed_message& message );
