@@ -518,7 +518,7 @@ namespace graphene { namespace app {
        return market_hist_plugin->tracked_buckets();
     }
 
-    history_operation_detail history_api::get_account_history_by_operations(
+    history_api::history_operation_detail history_api::get_account_history_by_operations(
           const std::string& account_id_or_name,
           const flat_set<uint16_t>& operation_types,
           uint32_t start, uint32_t limit )const
@@ -715,22 +715,26 @@ namespace graphene { namespace app {
     } FC_CAPTURE_AND_RETHROW( (pool_id)(start)(stop)(olimit)(operation_type) ) }
 
 
-    commitment_type crypto_api::blind( const blind_factor_type& blind, uint64_t value )
+    fc::ecc::commitment_type crypto_api::blind( const blind_factor_type& blind, uint64_t value )
     {
        return fc::ecc::blind( blind, value );
     }
 
-    blind_factor_type crypto_api::blind_sum( const std::vector<blind_factor_type>& blinds_in, uint32_t non_neg )
+    fc::ecc::blind_factor_type crypto_api::blind_sum( const std::vector<blind_factor_type>& blinds_in,
+                                                      uint32_t non_neg )
     {
        return fc::ecc::blind_sum( blinds_in, non_neg );
     }
 
-    bool crypto_api::verify_sum( const std::vector<commitment_type>& commits_in, const std::vector<commitment_type>& neg_commits_in, int64_t excess )
+    bool crypto_api::verify_sum( const std::vector<commitment_type>& commits_in,
+                                 const std::vector<commitment_type>& neg_commits_in,
+                                 int64_t excess )
     {
        return fc::ecc::verify_sum( commits_in, neg_commits_in, excess );
     }
 
-    verify_range_result crypto_api::verify_range( const commitment_type& commit, const std::vector<char>& proof )
+    crypto_api::verify_range_result crypto_api::verify_range( const commitment_type& commit,
+                                                              const std::vector<char>& proof )
     {
        verify_range_result result;
        result.success = fc::ecc::verify_range( result.min_val, result.max_val, commit, proof );
@@ -748,9 +752,10 @@ namespace graphene { namespace app {
        return fc::ecc::range_proof_sign( min_value, commit, commit_blind, nonce, base10_exp, min_bits, actual_value );
     }
 
-    verify_range_proof_rewind_result crypto_api::verify_range_proof_rewind( const blind_factor_type& nonce,
-                                                                            const commitment_type& commit,
-                                                                            const std::vector<char>& proof )
+    crypto_api::verify_range_proof_rewind_result crypto_api::verify_range_proof_rewind(
+          const blind_factor_type& nonce,
+          const commitment_type& commit,
+          const std::vector<char>& proof )
     {
        verify_range_proof_rewind_result result;
        result.success = fc::ecc::verify_range_proof_rewind( result.blind_out,
@@ -764,7 +769,7 @@ namespace graphene { namespace app {
        return result;
     }
 
-    range_proof_info crypto_api::range_get_info( const std::vector<char>& proof )
+    fc::ecc::range_proof_info crypto_api::range_get_info( const std::vector<char>& proof )
     {
        return fc::ecc::range_get_info( proof );
     }
@@ -776,8 +781,8 @@ namespace graphene { namespace app {
     { // Nothing else to do
     }
 
-    vector<account_asset_balance> asset_api::get_asset_holders( const std::string& asset_symbol_or_id, uint32_t start,
-                                                                uint32_t limit ) const
+    vector<asset_api::account_asset_balance> asset_api::get_asset_holders( const std::string& asset_symbol_or_id,
+                                                                           uint32_t start, uint32_t limit ) const
     {
        const auto configured_limit = _app.get_options().api_limit_get_asset_holders;
        FC_ASSERT( limit <= configured_limit,
@@ -827,7 +832,7 @@ namespace graphene { namespace app {
        return count;
     }
     // function to get vector of system assets with holders count.
-    vector<asset_holders> asset_api::get_all_asset_holders() const {
+    vector<asset_api::asset_holders> asset_api::get_all_asset_holders() const {
        vector<asset_holders> result;
        vector<asset_id_type> total_assets;
        for( const asset_object& asset_obj : _db.get_index_type<asset_index>().indices() )
@@ -865,11 +870,11 @@ namespace graphene { namespace app {
       return plugin->tracked_groups();
    }
 
-   vector< limit_order_group > orders_api::get_grouped_limit_orders( std::string base_asset,
-                                                               std::string quote_asset,
-                                                               uint16_t group,
-                                                               optional<price> start,
-                                                               uint32_t limit )const
+   vector< orders_api::limit_order_group > orders_api::get_grouped_limit_orders( const std::string& base_asset,
+                                                                                 const std::string& quote_asset,
+                                                                                 uint16_t group,
+                                                                                 const optional<price>& start,
+                                                                                 uint32_t limit )const
    {
       const auto configured_limit = _app.get_options().api_limit_get_grouped_limit_orders;
       FC_ASSERT( limit <= configured_limit,

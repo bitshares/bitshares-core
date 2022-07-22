@@ -56,63 +56,11 @@ namespace graphene { namespace app {
    using namespace graphene::grouped_orders;
    using namespace graphene::custom_operations;
 
-   using namespace fc::ecc;
    using std::string;
    using std::vector;
    using std::map;
 
    class application;
-
-   struct verify_range_result
-   {
-      bool        success;
-      uint64_t    min_val;
-      uint64_t    max_val;
-   };
-
-   struct verify_range_proof_rewind_result
-   {
-      bool                          success;
-      uint64_t                      min_val;
-      uint64_t                      max_val;
-      uint64_t                      value_out;
-      fc::ecc::blind_factor_type    blind_out;
-      string                        message_out;
-   };
-
-   struct account_asset_balance
-   {
-      string          name;
-      account_id_type account_id;
-      share_type      amount;
-   };
-   struct asset_holders
-   {
-      asset_id_type   asset_id;
-      int64_t         count;
-   };
-
-   struct history_operation_detail {
-      uint32_t total_count = 0;
-      vector<operation_history_object> operation_history_objs;
-   };
-
-   /**
-    * @brief summary data of a group of limit orders
-    */
-   struct limit_order_group
-   {
-      explicit limit_order_group( const std::pair<limit_order_group_key,limit_order_group_data>& p )
-         :  min_price( p.first.min_price ),
-            max_price( p.second.max_price ),
-            total_for_sale( p.second.total_for_sale )
-            {}
-      limit_order_group() = default;
-
-      price         min_price; ///< possible lowest price in the group
-      price         max_price; ///< possible highest price in the group
-      share_type    total_for_sale; ///< total amount of asset for sale, asset id is min_price.base.asset_id
-   };
 
    /**
     * @brief The history_api class implements the RPC API for account history
@@ -123,6 +71,12 @@ namespace graphene { namespace app {
    {
       public:
          explicit history_api(application& app);
+
+         struct history_operation_detail
+         {
+            uint32_t total_count = 0;
+            vector<operation_history_object> operation_history_objs;
+         };
 
          /**
           * @brief Get operations relevant to the specificed account
@@ -449,6 +403,24 @@ namespace graphene { namespace app {
    class crypto_api
    {
       public:
+
+         struct verify_range_result
+         {
+            bool        success;
+            uint64_t    min_val;
+            uint64_t    max_val;
+         };
+
+         struct verify_range_proof_rewind_result
+         {
+            bool                          success;
+            uint64_t                      min_val;
+            uint64_t                      max_val;
+            uint64_t                      value_out;
+            fc::ecc::blind_factor_type    blind_out;
+            string                        message_out;
+         };
+
          /**
           * @brief Generates a pedersen commitment: *commit = blind * G + value * G2.
           * The commitment is 33 bytes, the blinding factor is 32 bytes.
@@ -529,7 +501,7 @@ namespace graphene { namespace app {
           * @param proof List of proof's characters
           * @return A range proof info structure with exponent, mantissa, min and max values
           */
-         range_proof_info range_get_info( const std::vector<char>& proof );
+         fc::ecc::range_proof_info range_get_info( const std::vector<char>& proof );
    };
 
    /**
@@ -539,6 +511,18 @@ namespace graphene { namespace app {
    {
       public:
          explicit asset_api(graphene::app::application& app);
+
+         struct account_asset_balance
+         {
+            string          name;
+            account_id_type account_id;
+            share_type      amount;
+         };
+         struct asset_holders
+         {
+            asset_id_type   asset_id;
+            int64_t         count;
+         };
 
          /**
           * @brief Get asset holders for a specific asset
@@ -578,6 +562,23 @@ namespace graphene { namespace app {
          explicit orders_api(application& app);
 
          /**
+          * @brief summary data of a group of limit orders
+          */
+         struct limit_order_group
+         {
+            explicit limit_order_group( const std::pair<limit_order_group_key,limit_order_group_data>& p )
+               :  min_price( p.first.min_price ),
+                  max_price( p.second.max_price ),
+                  total_for_sale( p.second.total_for_sale )
+                  {}
+            limit_order_group() = default;
+
+            price         min_price; ///< possible lowest price in the group
+            price         max_price; ///< possible highest price in the group
+            share_type    total_for_sale; ///< total amount of asset for sale, asset id is min_price.base.asset_id
+         };
+
+         /**
           * @brief Get tracked groups configured by the server.
           * @return A list of numbers which indicate configured groups, of those, 1 means 0.01% diff on price.
           */
@@ -594,10 +595,10 @@ namespace graphene { namespace app {
           *              @a api_limit_get_grouped_limit_orders
           * @return The grouped limit orders, ordered from best offered price to worst
           */
-         vector< limit_order_group > get_grouped_limit_orders( std::string base_asset,
-                                                               std::string quote_asset,
+         vector< limit_order_group > get_grouped_limit_orders( const std::string& base_asset,
+                                                               const std::string& quote_asset,
                                                                uint16_t group,
-                                                               optional<price> start,
+                                                               const optional<price>& start,
                                                                uint32_t limit )const;
 
       private:
@@ -705,19 +706,20 @@ extern template class fc::api<graphene::app::login_api>;
 
 FC_REFLECT( graphene::app::network_broadcast_api::transaction_confirmation,
         (id)(block_num)(trx_num)(trx) )
-FC_REFLECT( graphene::app::verify_range_result,
-        (success)(min_val)(max_val) )
-FC_REFLECT( graphene::app::verify_range_proof_rewind_result,
-        (success)(min_val)(max_val)(value_out)(blind_out)(message_out) )
-FC_REFLECT( graphene::app::history_operation_detail,
-            (total_count)(operation_history_objs) )
-FC_REFLECT( graphene::app::limit_order_group,
-            (min_price)(max_price)(total_for_sale) )
-//FC_REFLECT_TYPENAME( fc::ecc::compact_signature )
-//FC_REFLECT_TYPENAME( fc::ecc::commitment_type )
 
-FC_REFLECT( graphene::app::account_asset_balance, (name)(account_id)(amount) )
-FC_REFLECT( graphene::app::asset_holders, (asset_id)(count) )
+FC_REFLECT( graphene::app::crypto_api::verify_range_result,
+        (success)(min_val)(max_val) )
+FC_REFLECT( graphene::app::crypto_api::verify_range_proof_rewind_result,
+        (success)(min_val)(max_val)(value_out)(blind_out)(message_out) )
+
+FC_REFLECT( graphene::app::history_api::history_operation_detail,
+            (total_count)(operation_history_objs) )
+
+FC_REFLECT( graphene::app::orders_api::limit_order_group,
+            (min_price)(max_price)(total_for_sale) )
+
+FC_REFLECT( graphene::app::asset_api::account_asset_balance, (name)(account_id)(amount) )
+FC_REFLECT( graphene::app::asset_api::asset_holders, (asset_id)(count) )
 
 FC_API(graphene::app::history_api,
        (get_account_history)

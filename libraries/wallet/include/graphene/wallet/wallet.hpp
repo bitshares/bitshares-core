@@ -835,7 +835,8 @@ class wallet_api
        * @param sig the message signature
        * @return true if signature matches
        */
-      bool verify_message( string message, string account, int block, const string& time, compact_signature sig );
+      bool verify_message( const string& message, const string& account, int32_t block, const string& time,
+                           const fc::ecc::compact_signature& sig );
 
       /** Verify a message signed with sign_message
        *

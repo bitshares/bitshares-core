@@ -214,8 +214,8 @@ namespace graphene { namespace wallet { namespace detail {
       return msg;
    }
 
-   bool wallet_api_impl::verify_message( const string& message, const string& account, int block, const string& time,
-                        const compact_signature& sig )
+   bool wallet_api_impl::verify_message( const string& message, const string& account, int32_t block,
+                                         const string& time, const fc::ecc::compact_signature& sig )
    {
       const account_object from_account = get_account( account );
 
@@ -236,7 +236,7 @@ namespace graphene { namespace wallet { namespace detail {
 
       const account_object from_account = get_account( message.meta.account );
 
-      const public_key signer( *message.signature, message.digest() );
+      const fc::ecc::public_key signer( *message.signature, message.digest() );
       if( !( message.meta.memo_key == signer ) ) return false;
       FC_ASSERT( from_account.options.memo_key == signer,
                  "Message was signed by contained key, but it doesn't belong to the contained account!" );
