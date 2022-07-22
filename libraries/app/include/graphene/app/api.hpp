@@ -212,7 +212,8 @@ namespace graphene { namespace app {
           * @param limit Maximum quantity of operations in the history to retrieve.  Optional.
           *              If not specified, the default value of
           *                @ref application_options::api_limit_get_liquidity_pool_history will be used.
-          *              If specified, it must not exceed the configured limit.
+          *              If specified, it must not exceed the configured value of
+          *                @a api_limit_get_liquidity_pool_history.
           * @param operation_type Optional. If specified, only the operations whose type is the specified type
           *                       will be returned. Otherwise all operations will be returned.
           * @return operation history of the liquidity pool, ordered by time, most recent first.
@@ -244,7 +245,8 @@ namespace graphene { namespace app {
           * @param limit Maximum quantity of operations in the history to retrieve.  Optional.
           *              If not specified, the default value of
           *                @ref application_options::api_limit_get_liquidity_pool_history will be used.
-          *              If specified, it must not exceed the configured limit.
+          *              If specified, it must not exceed the configured value of
+          *                @a api_limit_get_liquidity_pool_history.
           * @param operation_type Optional. If specified, only the operations whose type is the specified type
           *                       will be returned. Otherwise all operations will be returned.
           * @return operation history of the liquidity pool, ordered by time, most recent first.
