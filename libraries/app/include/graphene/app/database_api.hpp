@@ -281,9 +281,9 @@ class database_api
        * This function fetches relevant objects for the given accounts, and subscribes to updates to the given
        * accounts. If any of the strings in @p names_or_ids cannot be tied to an account, that input will be
        * ignored. Other accounts will be retrieved and subscribed.
-       * @note the maximum number of accounts allowed to subscribe per connection is configured by the
+       * @note The maximum number of accounts allowed to subscribe per connection is configured by the
        *       @a api_limit_get_full_accounts_subscribe option. Exceeded subscriptions will be ignored.
-       * @note for each object type, the maximum number of objects to return is configured by the
+       * @note For each object type, the maximum number of objects to return is configured by the
        *       @a api_limit_get_full_accounts_lists option. Exceeded objects need to be queried with other APIs.
        *
        */
