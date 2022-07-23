@@ -1720,42 +1720,10 @@ vector<extended_liquidity_pool_object> database_api::list_liquidity_pools(
             const optional<liquidity_pool_id_type>& start_id,
             const optional<bool>& with_statistics )const
 {
-   return my->list_liquidity_pools(
+   return my->get_liquidity_pools_by_asset_x<by_id>(
             limit,
             start_id,
             with_statistics );
-}
-
-vector<extended_liquidity_pool_object> database_api_impl::list_liquidity_pools(
-            const optional<uint32_t>& olimit,
-            const optional<liquidity_pool_id_type>& ostart_id,
-            const optional<bool>& with_statistics )const
-{
-   uint32_t limit = olimit.valid() ? *olimit : application_options::get_default().api_limit_get_liquidity_pools;
-
-   FC_ASSERT( _app_options, "Internal error" );
-   const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
-   FC_ASSERT( limit <= configured_limit,
-              "limit can not be greater than ${configured_limit}",
-              ("configured_limit", configured_limit) );
-
-   bool with_stats = ( with_statistics.valid() && *with_statistics );
-
-   vector<extended_liquidity_pool_object> results;
-
-   liquidity_pool_id_type start_id = ostart_id.valid() ? *ostart_id : liquidity_pool_id_type();
-
-   const auto& idx = _db.get_index_type<liquidity_pool_index>().indices().get<by_id>();
-   auto lower_itr = idx.lower_bound( start_id );
-   auto upper_itr = idx.end();
-
-   results.reserve( limit );
-   for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
-   {
-      results.emplace_back( extend_liquidity_pool( *lower_itr, with_stats ) );
-   }
-
-   return results;
 }
 
 vector<extended_liquidity_pool_object> database_api::get_liquidity_pools_by_asset_a(
@@ -1764,24 +1732,12 @@ vector<extended_liquidity_pool_object> database_api::get_liquidity_pools_by_asse
             const optional<liquidity_pool_id_type>& start_id,
             const optional<bool>& with_statistics )const
 {
-   return my->get_liquidity_pools_by_asset_a(
-            asset_symbol_or_id,
+   asset_id_type asset_id = my->get_asset_from_string(asset_symbol_or_id)->id;
+   return my->get_liquidity_pools_by_asset_x<by_asset_a>(
             limit,
             start_id,
-            with_statistics );
-}
-
-vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by_asset_a(
-            const std::string& asset_symbol_or_id,
-            const optional<uint32_t>& limit,
-            const optional<liquidity_pool_id_type>& start_id,
-            const optional<bool>& with_statistics )const
-{
-   return get_liquidity_pools_by_asset_x<by_asset_a>(
-            asset_symbol_or_id,
-            limit,
-            start_id,
-            with_statistics );
+            with_statistics,
+            asset_id );
 }
 
 vector<extended_liquidity_pool_object> database_api::get_liquidity_pools_by_asset_b(
@@ -1790,24 +1746,12 @@ vector<extended_liquidity_pool_object> database_api::get_liquidity_pools_by_asse
             const optional<liquidity_pool_id_type>& start_id,
             const optional<bool>& with_statistics )const
 {
-   return my->get_liquidity_pools_by_asset_b(
-            asset_symbol_or_id,
+   asset_id_type asset_id = my->get_asset_from_string(asset_symbol_or_id)->id;
+   return my->get_liquidity_pools_by_asset_x<by_asset_b>(
             limit,
             start_id,
-            with_statistics );
-}
-
-vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by_asset_b(
-            const std::string& asset_symbol_or_id,
-            const optional<uint32_t>& limit,
-            const optional<liquidity_pool_id_type>& start_id,
-            const optional<bool>& with_statistics )const
-{
-   return get_liquidity_pools_by_asset_x<by_asset_b>(
-            asset_symbol_or_id,
-            limit,
-            start_id,
-            with_statistics );
+            with_statistics,
+            asset_id );
 }
 
 vector<extended_liquidity_pool_object> database_api::get_liquidity_pools_by_one_asset(
@@ -1869,51 +1813,16 @@ vector<extended_liquidity_pool_object> database_api::get_liquidity_pools_by_both
             const optional<liquidity_pool_id_type>& start_id,
             const optional<bool>& with_statistics )const
 {
-   return my->get_liquidity_pools_by_both_assets(
-            asset_symbol_or_id_a,
-            asset_symbol_or_id_b,
-            limit,
-            start_id,
-            with_statistics );
-}
-
-vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by_both_assets(
-            const std::string& asset_symbol_or_id_a,
-            const std::string& asset_symbol_or_id_b,
-            const optional<uint32_t>& olimit,
-            const optional<liquidity_pool_id_type>& ostart_id,
-            const optional<bool>& with_statistics )const
-{
-   uint32_t limit = olimit.valid() ? *olimit : application_options::get_default().api_limit_get_liquidity_pools;
-
-   FC_ASSERT( _app_options, "Internal error" );
-   const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
-   FC_ASSERT( limit <= configured_limit,
-              "limit can not be greater than ${configured_limit}",
-              ("configured_limit", configured_limit) );
-
-   bool with_stats = ( with_statistics.valid() && *with_statistics );
-
-   vector<extended_liquidity_pool_object> results;
-
-   asset_id_type asset_id_a = get_asset_from_string(asset_symbol_or_id_a)->id;
-   asset_id_type asset_id_b = get_asset_from_string(asset_symbol_or_id_b)->id;
+   asset_id_type asset_id_a = my->get_asset_from_string(asset_symbol_or_id_a)->id;
+   asset_id_type asset_id_b = my->get_asset_from_string(asset_symbol_or_id_b)->id;
    if( asset_id_a > asset_id_b )
       std::swap( asset_id_a, asset_id_b );
-
-   liquidity_pool_id_type start_id = ostart_id.valid() ? *ostart_id : liquidity_pool_id_type();
-
-   const auto& idx = _db.get_index_type<liquidity_pool_index>().indices().get<by_asset_ab>();
-   auto lower_itr = idx.lower_bound( std::make_tuple( asset_id_a, asset_id_b, start_id ) );
-   auto upper_itr = idx.upper_bound( std::make_tuple( asset_id_a, asset_id_b ) );
-
-   results.reserve( limit );
-   for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
-   {
-      results.emplace_back( extend_liquidity_pool( *lower_itr, with_stats ) );
-   }
-
-   return results;
+   return my->get_liquidity_pools_by_asset_x<by_asset_ab>(
+            limit,
+            start_id,
+            with_statistics,
+            asset_id_a,
+            asset_id_b );
 }
 
 vector<optional<extended_liquidity_pool_object>> database_api::get_liquidity_pools(

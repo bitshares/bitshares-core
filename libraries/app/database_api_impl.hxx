@@ -136,28 +136,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
                                                                         uint32_t limit )const;
 
       // Liquidity pools
-      vector<extended_liquidity_pool_object> list_liquidity_pools(
-            const optional<uint32_t>& limit,
-            const optional<liquidity_pool_id_type>& start_id,
-            const optional<bool>& with_statistics )const;
-      vector<extended_liquidity_pool_object> get_liquidity_pools_by_asset_a(
-            const std::string& asset_symbol_or_id,
-            const optional<uint32_t>& limit,
-            const optional<liquidity_pool_id_type>& start_id,
-            const optional<bool>& with_statistics )const;
-      vector<extended_liquidity_pool_object> get_liquidity_pools_by_asset_b(
-            const std::string& asset_symbol_or_id,
-            const optional<uint32_t>& limit,
-            const optional<liquidity_pool_id_type>& start_id,
-            const optional<bool>& with_statistics )const;
       vector<extended_liquidity_pool_object> get_liquidity_pools_by_one_asset(
             const std::string& asset_symbol_or_id,
-            const optional<uint32_t>& limit,
-            const optional<liquidity_pool_id_type>& start_id,
-            const optional<bool>& with_statistics )const;
-      vector<extended_liquidity_pool_object> get_liquidity_pools_by_both_assets(
-            const std::string& asset_symbol_or_id_a,
-            const std::string& asset_symbol_or_id_b,
             const optional<uint32_t>& limit,
             const optional<liquidity_pool_id_type>& start_id,
             const optional<bool>& with_statistics )const;
@@ -291,12 +271,12 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       }
 
       // template function to reduce duplicate code
-      template <typename X>
+      template <typename INDEX_TAG, typename... X>
       vector<extended_liquidity_pool_object> get_liquidity_pools_by_asset_x(
-                  std::string asset_symbol_or_id,
-                  optional<uint32_t> olimit,
-                  optional<liquidity_pool_id_type> ostart_id,
-                  optional<bool> with_statistics )const
+                  const optional<uint32_t>& olimit,
+                  const optional<liquidity_pool_id_type>& ostart_id,
+                  const optional<bool>& with_statistics,
+                  X... x )const
       {
          uint32_t limit = olimit.valid() ? *olimit : application_options::get_default().api_limit_get_liquidity_pools;
 
@@ -310,13 +290,12 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
          vector<extended_liquidity_pool_object> results;
 
-         const asset_id_type asset_id = get_asset_from_string(asset_symbol_or_id)->id;
-
          liquidity_pool_id_type start_id = ostart_id.valid() ? *ostart_id : liquidity_pool_id_type();
 
-         const auto& idx = _db.get_index_type<liquidity_pool_index>().indices().get<X>();
-         auto lower_itr = idx.lower_bound( std::make_tuple( asset_id, start_id ) );
-         auto upper_itr = idx.upper_bound( asset_id );
+         const auto& idx = _db.get_index_type<liquidity_pool_index>().indices().get<INDEX_TAG>();
+
+         auto lower_itr = idx.lower_bound( make_tuple_if_multiple( x..., start_id ) );
+         auto upper_itr = call_end_or_upper_bound( idx, x... );
 
          results.reserve( limit );
          for ( ; lower_itr != upper_itr && results.size() < limit; ++lower_itr )
