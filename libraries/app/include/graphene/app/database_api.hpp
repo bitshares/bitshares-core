@@ -450,7 +450,6 @@ class database_api
        * @param b symbol or ID of asset being purchased
        * @param limit Maximum number of orders to retrieve, must not exceed the configured value of
        *              @a api_limit_get_limit_orders
-       * @return The assets issued (owned) by the account
        * @return The limit orders, ordered from least price to greatest
        */
       vector<limit_order_object> get_limit_orders(std::string a, std::string b, uint32_t limit)const;
