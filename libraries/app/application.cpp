@@ -1388,3 +1388,5 @@ const application_options& application::get_options() const
 
 // namespace detail
 } }
+
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::app::application_options )

@@ -25,21 +25,10 @@
 
 #include <graphene/app/api.hpp>
 #include <graphene/app/api_access.hpp>
-#include <graphene/app/application.hpp>
-#include <graphene/chain/database.hpp>
-#include <graphene/chain/get_config.hpp>
-#include <graphene/utilities/key_conversion.hpp>
-#include <graphene/protocol/fee_schedule.hpp>
-#include <graphene/chain/confidential_object.hpp>
-#include <graphene/chain/market_object.hpp>
-#include <graphene/chain/transaction_history_object.hpp>
-#include <graphene/chain/withdraw_permission_object.hpp>
-#include <graphene/chain/worker_object.hpp>
 
 #include "database_api_helper.hxx"
 
 #include <fc/crypto/base64.hpp>
-#include <fc/crypto/hex.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/thread/future.hpp>
 
@@ -83,6 +72,11 @@ namespace graphene { namespace app {
        for( const std::string& api_name : acc->allowed_apis )
           enable_api( api_name );
        return true;
+    }
+
+    application_options login_api::get_config() const
+    {
+       return _app.get_options();
     }
 
     void login_api::enable_api( const std::string& api_name )

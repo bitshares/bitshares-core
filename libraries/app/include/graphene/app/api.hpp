@@ -26,7 +26,6 @@
 #include <graphene/app/database_api.hpp>
 
 #include <graphene/protocol/types.hpp>
-#include <graphene/protocol/confidential.hpp>
 
 #include <graphene/market_history/market_history_plugin.hpp>
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
@@ -666,6 +665,10 @@ namespace graphene { namespace app {
           *       Other APIs may not be accessible until the client has sucessfully authenticated.
           */
          bool login(const string& user, const string& password);
+
+         /// @brief Retrieve configured application options
+         application_options get_config() const;
+
          /// @brief Retrieve the network block API
          fc::api<block_api> block()const;
          /// @brief Retrieve the network broadcast API
@@ -777,6 +780,7 @@ FC_API(graphene::app::custom_operations_api,
      )
 FC_API(graphene::app::login_api,
        (login)
+       (get_config)
        (block)
        (network_broadcast)
        (database)

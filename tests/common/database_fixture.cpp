@@ -306,6 +306,11 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
       fc::set_option( options, "api-limit-get-full-accounts", (uint32_t)200 );
       fc::set_option( options, "api-limit-get-full-accounts-lists", (uint32_t)120 );
    }
+   if( fixture.current_suite_name == "login_api_tests"
+         && fixture.current_test_name =="get_config_test" )
+   {
+      fc::set_option( options, "api-limit-get-full-accounts-subscribe", (uint32_t)120 );
+   }
 
    // add account tracking for ahplugin for special test case with track-account enabled
    if( !options.count("track-account") && fixture.current_test_name == "track_account") {
