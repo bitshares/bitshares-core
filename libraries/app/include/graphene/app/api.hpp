@@ -56,63 +56,11 @@ namespace graphene { namespace app {
    using namespace graphene::grouped_orders;
    using namespace graphene::custom_operations;
 
-   using namespace fc::ecc;
    using std::string;
    using std::vector;
    using std::map;
 
    class application;
-
-   struct verify_range_result
-   {
-      bool        success;
-      uint64_t    min_val;
-      uint64_t    max_val;
-   };
-
-   struct verify_range_proof_rewind_result
-   {
-      bool                          success;
-      uint64_t                      min_val;
-      uint64_t                      max_val;
-      uint64_t                      value_out;
-      fc::ecc::blind_factor_type    blind_out;
-      string                        message_out;
-   };
-
-   struct account_asset_balance
-   {
-      string          name;
-      account_id_type account_id;
-      share_type      amount;
-   };
-   struct asset_holders
-   {
-      asset_id_type   asset_id;
-      int             count;
-   };
-
-   struct history_operation_detail {
-      uint32_t total_count = 0;
-      vector<operation_history_object> operation_history_objs;
-   };
-
-   /**
-    * @brief summary data of a group of limit orders
-    */
-   struct limit_order_group
-   {
-      limit_order_group( const std::pair<limit_order_group_key,limit_order_group_data>& p )
-         :  min_price( p.first.min_price ),
-            max_price( p.second.max_price ),
-            total_for_sale( p.second.total_for_sale )
-            {}
-      limit_order_group() {}
-
-      price         min_price; ///< possible lowest price in the group
-      price         max_price; ///< possible highest price in the group
-      share_type    total_for_sale; ///< total amount of asset for sale, asset id is min_price.base.asset_id
-   };
 
    /**
     * @brief The history_api class implements the RPC API for account history
@@ -122,21 +70,27 @@ namespace graphene { namespace app {
    class history_api
    {
       public:
-         history_api(application& app)
-               :_app(app), database_api( std::ref(*app.chain_database()), &(app.get_options())) {}
+         explicit history_api(application& app);
+
+         struct history_operation_detail
+         {
+            uint32_t total_count = 0;
+            vector<operation_history_object> operation_history_objs;
+         };
 
          /**
           * @brief Get operations relevant to the specificed account
           * @param account_name_or_id The account name or ID whose history should be queried
           * @param stop ID of the earliest operation to retrieve
-          * @param limit Maximum number of operations to retrieve (must not exceed 100)
+          * @param limit Maximum number of operations to retrieve, must not exceed the configured value of
+          *              @a api_limit_get_account_history
           * @param start ID of the most recent operation to retrieve
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
          vector<operation_history_object> get_account_history(
-            const std::string account_name_or_id,
+            const std::string& account_name_or_id,
             operation_history_id_type stop = operation_history_id_type(),
-            uint32_t limit = 100,
+            uint32_t limit = application_options::get_default().api_limit_get_account_history,
             operation_history_id_type start = operation_history_id_type()
          )const;
 
@@ -146,12 +100,13 @@ namespace graphene { namespace app {
           * @param operation_types The IDs of the operation we want to get operations in the account
           * ( 0 = transfer , 1 = limit order create, ...)
           * @param start the sequence number where to start looping back throw the history
-          * @param limit the max number of entries to return (from start number)
+          * @param limit the max number of entries to return (from start number), must not exceed the configured
+          *              value of @a api_limit_get_account_history_by_operations
           * @return history_operation_detail
           */
          history_operation_detail get_account_history_by_operations(
-            const std::string account_name_or_id,
-            flat_set<uint16_t> operation_types,
+            const std::string& account_name_or_id,
+            const flat_set<uint16_t>& operation_types,
             uint32_t start,
             uint32_t limit
          )const;
@@ -162,16 +117,17 @@ namespace graphene { namespace app {
           * @param operation_type The type of the operation we want to get operations in the account
           * ( 0 = transfer , 1 = limit order create, ...)
           * @param stop ID of the earliest operation to retrieve
-          * @param limit Maximum number of operations to retrieve (must not exceed 100)
+          * @param limit Maximum number of operations to retrieve, must not exceed the configured value of
+          *              @a api_limit_get_account_history_operations
           * @param start ID of the most recent operation to retrieve
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
          vector<operation_history_object> get_account_history_operations(
-            const std::string account_name_or_id,
+            const std::string& account_name_or_id,
             int64_t operation_type,
             operation_history_id_type start = operation_history_id_type(),
             operation_history_id_type stop = operation_history_id_type(),
-            uint32_t limit = 100
+            uint32_t limit = application_options::get_default().api_limit_get_account_history_operations
          )const;
 
          /**
@@ -180,16 +136,18 @@ namespace graphene { namespace app {
           * for the account can be found in the account statistics (or use 0 for start).
           * @param account_name_or_id The account name or ID whose history should be queried
           * @param stop Sequence number of earliest operation. 0 is default and will
-          * query 'limit' number of operations.
-          * @param limit Maximum number of operations to retrieve (must not exceed 100)
+          *             query 'limit' number of operations.
+          * @param limit Maximum number of operations to retrieve, must not exceed the configured value of
+          *              @a api_limit_get_relative_account_history
           * @param start Sequence number of the most recent operation to retrieve.
-          * 0 is default, which will start querying from the most recent operation.
+          *              0 is default, which will start querying from the most recent operation.
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
-         vector<operation_history_object> get_relative_account_history( const std::string account_name_or_id,
-                                                                        uint64_t stop = 0,
-                                                                        uint32_t limit = 100,
-                                                                        uint64_t start = 0) const;
+         vector<operation_history_object> get_relative_account_history(
+               const std::string& account_name_or_id,
+               uint64_t stop = 0,
+               uint32_t limit = application_options::get_default().api_limit_get_relative_account_history,
+               uint64_t start = 0) const;
 
          /**
           * @brief Get all operations inside a block or a transaction, including virtual operations
@@ -206,7 +164,7 @@ namespace graphene { namespace app {
           */
          vector<operation_history_object> get_block_operation_history(
                uint32_t block_num,
-               optional<uint16_t> trx_in_block = {} ) const;
+               const optional<uint16_t>& trx_in_block = {} ) const;
 
          /**
           * @brief Get details of order executions occurred most recently in a trading pair
@@ -215,7 +173,10 @@ namespace graphene { namespace app {
           * @param limit Maximum records to return
           * @return a list of order_history objects, in "most recent first" order
           */
-         vector<order_history_object> get_fill_order_history( std::string a, std::string b, uint32_t limit )const;
+         vector<order_history_object> get_fill_order_history(
+               const std::string& a,
+               const std::string& b,
+               uint32_t limit )const;
 
          /**
           * @brief Get OHLCV data of a trading pair in a time range
@@ -226,10 +187,13 @@ namespace graphene { namespace app {
           * @param start The start of a time range, E.G. "2018-01-01T00:00:00"
           * @param end The end of the time range
           * @return A list of OHLCV data, in "least recent first" order.
-          * If there are more than 200 records in the specified time range, the first 200 records will be returned.
+          * If there are more records in the specified time range than the configured value of
+          *    @a api_limit_get_market_history, only the first records will be returned.
           */
-         vector<bucket_object> get_market_history( std::string a, std::string b, uint32_t bucket_seconds,
-                                                   fc::time_point_sec start, fc::time_point_sec end )const;
+         vector<bucket_object> get_market_history( const std::string& a, const std::string& b,
+                                                   uint32_t bucket_seconds,
+                                                   const fc::time_point_sec& start,
+                                                   const fc::time_point_sec& end )const;
 
          /**
           * @brief Get OHLCV time bucket lengths supported (configured) by this API server
@@ -245,15 +209,18 @@ namespace graphene { namespace app {
           *              If specified, only the operations occurred not later than this time will be returned.
           * @param stop  A UNIX timestamp. Optional.
           *              If specified, only the operations occurred later than this time will be returned.
-          * @param limit Maximum quantity of operations in the history to retrieve.
-          *              Optional. If not specified, at most 101 records will be returned.
+          * @param limit Maximum quantity of operations in the history to retrieve.  Optional.
+          *              If not specified, the default value of
+          *                @ref application_options::api_limit_get_liquidity_pool_history will be used.
+          *              If specified, it must not exceed the configured value of
+          *                @a api_limit_get_liquidity_pool_history.
           * @param operation_type Optional. If specified, only the operations whose type is the specified type
           *                       will be returned. Otherwise all operations will be returned.
           * @return operation history of the liquidity pool, ordered by time, most recent first.
           *
           * @note
           * 1. The time must be UTC. The range is (stop, start].
-          * 2. In case when there are more than 100 operations occurred in the same second, this API only returns
+          * 2. In case when there are more operations than @p limit occurred in the same second, this API only returns
           *    the most recent records, the rest records can be retrieved with the
           *    @ref get_liquidity_pool_history_by_sequence API.
           * 3. List of operation type code: 59-creation, 60-deletion, 61-deposit, 62-withdrawal, 63-exchange.
@@ -262,10 +229,11 @@ namespace graphene { namespace app {
           */
          vector<liquidity_pool_history_object> get_liquidity_pool_history(
                liquidity_pool_id_type pool_id,
-               optional<fc::time_point_sec> start = optional<fc::time_point_sec>(),
-               optional<fc::time_point_sec> stop = optional<fc::time_point_sec>(),
-               optional<uint32_t> limit = 101,
-               optional<int64_t> operation_type = optional<int64_t>() )const;
+               const optional<fc::time_point_sec>& start = optional<fc::time_point_sec>(),
+               const optional<fc::time_point_sec>& stop = optional<fc::time_point_sec>(),
+               const optional<uint32_t>& limit = application_options::get_default()
+                                                    .api_limit_get_liquidity_pool_history,
+               const optional<int64_t>& operation_type = optional<int64_t>() )const;
 
          /**
           * @brief Get history of a liquidity pool
@@ -274,31 +242,31 @@ namespace graphene { namespace app {
           *              If specified, only the operations whose sequences are not greater than this will be returned.
           * @param stop  A UNIX timestamp. Optional.
           *              If specified, only operations occurred later than this time will be returned.
-          * @param limit Maximum quantity of operations in the history to retrieve.
-          *              Optional. If not specified, at most 101 records will be returned.
+          * @param limit Maximum quantity of operations in the history to retrieve.  Optional.
+          *              If not specified, the default value of
+          *                @ref application_options::api_limit_get_liquidity_pool_history will be used.
+          *              If specified, it must not exceed the configured value of
+          *                @a api_limit_get_liquidity_pool_history.
           * @param operation_type Optional. If specified, only the operations whose type is the specified type
           *                       will be returned. Otherwise all operations will be returned.
           * @return operation history of the liquidity pool, ordered by time, most recent first.
           *
           * @note
           * 1. The time must be UTC. The range is (stop, start].
-          * 2. In case when there are more than 100 operations occurred in the same second, this API only returns
-          *    the most recent records, the rest records can be retrieved with the
-          *    @ref get_liquidity_pool_history_by_sequence API.
-          * 3. List of operation type code: 59-creation, 60-deletion, 61-deposit, 62-withdrawal, 63-exchange.
-          * 4. Can only omit one or more arguments in the end of the list, but not one or more in the middle.
+          * 2. List of operation type code: 59-creation, 60-deletion, 61-deposit, 62-withdrawal, 63-exchange.
+          * 3. Can only omit one or more arguments in the end of the list, but not one or more in the middle.
           *    If need to not specify an individual argument, can specify \c null in the place.
           */
          vector<liquidity_pool_history_object> get_liquidity_pool_history_by_sequence(
                liquidity_pool_id_type pool_id,
-               optional<uint64_t> start = optional<uint64_t>(),
-               optional<fc::time_point_sec> stop = optional<fc::time_point_sec>(),
-               optional<uint32_t> limit = 101,
-               optional<int64_t> operation_type = optional<int64_t>() )const;
+               const optional<uint64_t>& start = optional<uint64_t>(),
+               const optional<fc::time_point_sec>& stop = optional<fc::time_point_sec>(),
+               const optional<uint32_t>& limit = application_options::get_default()
+                                                    .api_limit_get_liquidity_pool_history,
+               const optional<int64_t>& operation_type = optional<int64_t>() )const;
 
       private:
            application& _app;
-           graphene::app::database_api database_api;
    };
 
    /**
@@ -307,8 +275,7 @@ namespace graphene { namespace app {
    class block_api
    {
    public:
-      block_api(graphene::chain::database& db);
-      ~block_api();
+      explicit block_api(const graphene::chain::database& db);
 
       /**
           * @brief Get signed blocks
@@ -319,7 +286,7 @@ namespace graphene { namespace app {
       vector<optional<signed_block>> get_blocks(uint32_t block_num_from, uint32_t block_num_to)const;
 
    private:
-      graphene::chain::database& _db;
+      const graphene::chain::database& _db;
    };
 
 
@@ -329,7 +296,7 @@ namespace graphene { namespace app {
    class network_broadcast_api : public std::enable_shared_from_this<network_broadcast_api>
    {
       public:
-         network_broadcast_api(application& a);
+         explicit network_broadcast_api(application& a);
 
          struct transaction_confirmation
          {
@@ -339,7 +306,7 @@ namespace graphene { namespace app {
             processed_transaction trx;
          };
 
-         typedef std::function<void(variant/*transaction_confirmation*/)> confirmation_callback;
+         using confirmation_callback = std::function<void(variant/*transaction_confirmation*/)>;
 
          /**
           * @brief Broadcast a transaction to the network
@@ -392,7 +359,7 @@ namespace graphene { namespace app {
    class network_node_api
    {
       public:
-         network_node_api(application& a);
+         explicit network_node_api(application& a);
 
          /**
           * @brief Return general network information, such as p2p port
@@ -438,7 +405,23 @@ namespace graphene { namespace app {
    class crypto_api
    {
       public:
-         crypto_api();
+
+         struct verify_range_result
+         {
+            bool        success;
+            uint64_t    min_val;
+            uint64_t    max_val;
+         };
+
+         struct verify_range_proof_rewind_result
+         {
+            bool                          success;
+            uint64_t                      min_val;
+            uint64_t                      max_val;
+            uint64_t                      value_out;
+            fc::ecc::blind_factor_type    blind_out;
+            string                        message_out;
+         };
 
          /**
           * @brief Generates a pedersen commitment: *commit = blind * G + value * G2.
@@ -448,7 +431,7 @@ namespace graphene { namespace app {
           * @param value Positive 64-bit integer value
           * @return A 33-byte pedersen commitment: *commit = blind * G + value * G2
           */
-         fc::ecc::commitment_type blind( const fc::ecc::blind_factor_type& blind, uint64_t value );
+         fc::ecc::commitment_type blind( const fc::ecc::blind_factor_type& blind, uint64_t value ) const;
 
          /**
           * @brief Get sha-256 blind factor type
@@ -456,7 +439,8 @@ namespace graphene { namespace app {
           * @param non_neg 32-bit integer value
           * @return A blind factor type
           */
-         fc::ecc::blind_factor_type blind_sum( const std::vector<blind_factor_type>& blinds_in, uint32_t non_neg );
+         fc::ecc::blind_factor_type blind_sum( const std::vector<blind_factor_type>& blinds_in,
+                                               uint32_t non_neg ) const;
 
          /**
           * @brief Verifies that commits + neg_commits + excess == 0
@@ -470,7 +454,7 @@ namespace graphene { namespace app {
             const std::vector<commitment_type>& commits_in,
             const std::vector<commitment_type>& neg_commits_in,
             int64_t excess
-         );
+         ) const;
 
          /**
           * @brief Verifies range proof for 33-byte pedersen commitment
@@ -478,7 +462,8 @@ namespace graphene { namespace app {
           * @param proof List of characters
           * @return A structure with success, min and max values
           */
-         verify_range_result verify_range( const fc::ecc::commitment_type& commit, const std::vector<char>& proof );
+         verify_range_result verify_range( const fc::ecc::commitment_type& commit,
+                                           const std::vector<char>& proof ) const;
 
          /**
           * @brief Proves with respect to min_value the range for pedersen
@@ -498,7 +483,7 @@ namespace graphene { namespace app {
                                              const blind_factor_type& nonce,
                                              int8_t base10_exp,
                                              uint8_t min_bits,
-                                             uint64_t actual_value );
+                                             uint64_t actual_value ) const;
 
          /**
           * @brief Verifies range proof rewind for 33-byte pedersen commitment
@@ -509,7 +494,7 @@ namespace graphene { namespace app {
           */
          verify_range_proof_rewind_result verify_range_proof_rewind( const blind_factor_type& nonce,
                                                                      const fc::ecc::commitment_type& commit,
-                                                                     const std::vector<char>& proof );
+                                                                     const std::vector<char>& proof ) const;
 
          /**
           * @brief Gets "range proof" info. The cli_wallet includes functionality for sending blind transfers
@@ -520,7 +505,7 @@ namespace graphene { namespace app {
           * @param proof List of proof's characters
           * @return A range proof info structure with exponent, mantissa, min and max values
           */
-         range_proof_info range_get_info( const std::vector<char>& proof );
+         fc::ecc::range_proof_info range_get_info( const std::vector<char>& proof ) const;
    };
 
    /**
@@ -529,24 +514,37 @@ namespace graphene { namespace app {
    class asset_api
    {
       public:
-         asset_api(graphene::app::application& app);
-         ~asset_api();
+         explicit asset_api(graphene::app::application& app);
+
+         struct account_asset_balance
+         {
+            string          name;
+            account_id_type account_id;
+            share_type      amount;
+         };
+         struct asset_holders
+         {
+            asset_id_type   asset_id;
+            int64_t         count;
+         };
 
          /**
           * @brief Get asset holders for a specific asset
-          * @param asset The specific asset id or symbol
+          * @param asset_symbol_or_id The specific asset symbol or ID
           * @param start The start index
-          * @param limit Maximum limit must not exceed 100
+          * @param limit Maximum number of accounts to retrieve, must not exceed the configured value of
+          *              @a api_limit_get_asset_holders
           * @return A list of asset holders for the specified asset
           */
-         vector<account_asset_balance> get_asset_holders( std::string asset, uint32_t start, uint32_t limit  )const;
+         vector<account_asset_balance> get_asset_holders( const std::string& asset_symbol_or_id,
+                                                          uint32_t start, uint32_t limit  )const;
 
          /**
           * @brief Get asset holders count for a specific asset
-          * @param asset The specific asset id or symbol
+          * @param asset_symbol_or_id The specific asset symbol or id
           * @return Holders count for the specified asset
           */
-         int get_asset_holders_count( std::string asset )const;
+         int64_t get_asset_holders_count( const std::string& asset_symbol_or_id )const;
 
          /**
           * @brief Get all asset holders
@@ -557,7 +555,6 @@ namespace graphene { namespace app {
       private:
          graphene::app::application& _app;
          graphene::chain::database& _db;
-         graphene::app::database_api database_api;
    };
 
    /**
@@ -566,9 +563,24 @@ namespace graphene { namespace app {
    class orders_api
    {
       public:
-         orders_api(application& app)
-         :_app(app), database_api( std::ref(*app.chain_database()), &(app.get_options()) ){}
-         //virtual ~orders_api() {}
+         explicit orders_api(application& app);
+
+         /**
+          * @brief summary data of a group of limit orders
+          */
+         struct limit_order_group
+         {
+            explicit limit_order_group( const std::pair<limit_order_group_key,limit_order_group_data>& p )
+               :  min_price( p.first.min_price ),
+                  max_price( p.second.max_price ),
+                  total_for_sale( p.second.total_for_sale )
+                  {}
+            limit_order_group() = default;
+
+            price         min_price; ///< possible lowest price in the group
+            price         max_price; ///< possible highest price in the group
+            share_type    total_for_sale; ///< total amount of asset for sale, asset id is min_price.base.asset_id
+         };
 
          /**
           * @brief Get tracked groups configured by the server.
@@ -583,18 +595,18 @@ namespace graphene { namespace app {
           * @param quote_asset symbol or ID of asset being purchased
           * @param group Maximum price diff within each order group, have to be one of configured values
           * @param start Optional price to indicate the first order group to retrieve
-          * @param limit Maximum number of order groups to retrieve (must not exceed 101)
+          * @param limit Maximum number of order groups to retrieve, must not exceed the configured value of
+          *              @a api_limit_get_grouped_limit_orders
           * @return The grouped limit orders, ordered from best offered price to worst
           */
-         vector< limit_order_group > get_grouped_limit_orders( std::string base_asset,
-                                                               std::string quote_asset,
+         vector< limit_order_group > get_grouped_limit_orders( const std::string& base_asset,
+                                                               const std::string& quote_asset,
                                                                uint16_t group,
-                                                               optional<price> start,
+                                                               const optional<price>& start,
                                                                uint32_t limit )const;
 
       private:
          application& _app;
-         graphene::app::database_api database_api;
    };
 
    /**
@@ -603,23 +615,23 @@ namespace graphene { namespace app {
     */
    class custom_operations_api
    {
-      public:
-         custom_operations_api(application& app):_app(app), database_api( *app.chain_database(),
-               &(app.get_options()) ){}
+   public:
+      explicit custom_operations_api(application& app);
 
-         /**
-          * @brief Get all stored objects of an account in a particular catalog
-          *
-          * @param account_name_or_id The account name or ID to get info from
-          * @param catalog Category classification. Each account can store multiple catalogs.
-          *
-          * @return The vector of objects of the account or empty
-          */
-         vector<account_storage_object> get_storage_info(std::string account_name_or_id, std::string catalog)const;
+      /**
+       * @brief Get all stored objects of an account in a particular catalog
+       *
+       * @param account_name_or_id The account name or ID to get info from
+       * @param catalog Category classification. Each account can store multiple catalogs.
+       *
+       * @return The vector of objects of the account or empty
+       */
+      vector<account_storage_object> get_storage_info(
+            const std::string& account_name_or_id,
+            const std::string& catalog )const;
 
    private:
-         application& _app;
-         graphene::app::database_api database_api;
+      application& _app;
    };
 } } // graphene::app
 
@@ -642,8 +654,7 @@ namespace graphene { namespace app {
    class login_api
    {
       public:
-         login_api(application& a);
-         ~login_api();
+         explicit login_api(application& a);
 
          /**
           * @brief Authenticate to the RPC server
@@ -699,19 +710,20 @@ extern template class fc::api<graphene::app::login_api>;
 
 FC_REFLECT( graphene::app::network_broadcast_api::transaction_confirmation,
         (id)(block_num)(trx_num)(trx) )
-FC_REFLECT( graphene::app::verify_range_result,
-        (success)(min_val)(max_val) )
-FC_REFLECT( graphene::app::verify_range_proof_rewind_result,
-        (success)(min_val)(max_val)(value_out)(blind_out)(message_out) )
-FC_REFLECT( graphene::app::history_operation_detail,
-            (total_count)(operation_history_objs) )
-FC_REFLECT( graphene::app::limit_order_group,
-            (min_price)(max_price)(total_for_sale) )
-//FC_REFLECT_TYPENAME( fc::ecc::compact_signature )
-//FC_REFLECT_TYPENAME( fc::ecc::commitment_type )
 
-FC_REFLECT( graphene::app::account_asset_balance, (name)(account_id)(amount) )
-FC_REFLECT( graphene::app::asset_holders, (asset_id)(count) )
+FC_REFLECT( graphene::app::crypto_api::verify_range_result,
+        (success)(min_val)(max_val) )
+FC_REFLECT( graphene::app::crypto_api::verify_range_proof_rewind_result,
+        (success)(min_val)(max_val)(value_out)(blind_out)(message_out) )
+
+FC_REFLECT( graphene::app::history_api::history_operation_detail,
+            (total_count)(operation_history_objs) )
+
+FC_REFLECT( graphene::app::orders_api::limit_order_group,
+            (min_price)(max_price)(total_for_sale) )
+
+FC_REFLECT( graphene::app::asset_api::account_asset_balance, (name)(account_id)(amount) )
+FC_REFLECT( graphene::app::asset_api::asset_holders, (asset_id)(count) )
 
 FC_API(graphene::app::history_api,
        (get_account_history)

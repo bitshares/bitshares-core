@@ -42,7 +42,7 @@ using namespace graphene::custom_operations;
 BOOST_FIXTURE_TEST_SUITE( custom_operation_tests, database_fixture )
 
 void map_operation(flat_map<string, optional<string>>& pairs, bool remove, string& catalog, account_id_type& account,
-      private_key& pk, database& db)
+      fc::ecc::private_key& pk, database& db)
 {
    signed_transaction trx;
    set_expiration(db, trx);

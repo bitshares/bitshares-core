@@ -831,7 +831,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_account_history_by_operations) {
    generate_block();
    fc::usleep(fc::milliseconds(100));
    GRAPHENE_CHECK_THROW(hist_api.get_account_history_by_operations("1.2.0", operation_types, 0, 260), fc::exception);
-   history_operation_detail histories = hist_api.get_account_history_by_operations("1.2.0", operation_types, 0, 210);
+   auto histories = hist_api.get_account_history_by_operations("1.2.0", operation_types, 0, 210);
    BOOST_REQUIRE_EQUAL( histories.total_count, 3u );
    }
    catch (fc::exception &e) {

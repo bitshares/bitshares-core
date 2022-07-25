@@ -204,107 +204,107 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
    if (fixture.current_test_name == "api_limit_get_account_history_operations")
    {
       fc::set_option( options, "max-ops-per-account", (uint64_t)125 );
-      fc::set_option( options, "api-limit-get-account-history-operations", (uint64_t)300 );
+      fc::set_option( options, "api-limit-get-account-history-operations", (uint32_t)300 );
    }
    if(fixture.current_test_name =="api_limit_get_account_history")
    {
       fc::set_option( options, "max-ops-per-account", (uint64_t)125 );
-      fc::set_option( options, "api-limit-get-account-history", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-account-history", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_grouped_limit_orders")
    {
-      fc::set_option( options, "api-limit-get-grouped-limit-orders", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-grouped-limit-orders", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_relative_account_history")
    {
       fc::set_option( options, "max-ops-per-account", (uint64_t)125 );
-      fc::set_option( options, "api-limit-get-relative-account-history", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-relative-account-history", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_account_history_by_operations")
    {
-      fc::set_option( options, "api-limit-get-account-history-by-operations", (uint64_t)250 );
-      fc::set_option( options, "api-limit-get-relative-account-history", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-account-history-by-operations", (uint32_t)250 );
+      fc::set_option( options, "api-limit-get-relative-account-history", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_asset_holders")
    {
-      fc::set_option( options, "api-limit-get-asset-holders", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-asset-holders", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_key_references")
    {
-      fc::set_option( options, "api-limit-get-key-references", (uint64_t)200 );
+      fc::set_option( options, "api-limit-get-key-references", (uint32_t)200 );
    }
    if(fixture.current_test_name =="api_limit_get_limit_orders")
    {
-      fc::set_option( options, "api-limit-get-limit-orders", (uint64_t)350 );
+      fc::set_option( options, "api-limit-get-limit-orders", (uint32_t)350 );
    }
    if(fixture.current_test_name =="api_limit_get_limit_orders_by_account")
    {
-      fc::set_option( options, "api-limit-get-limit-orders-by-account", (uint64_t)150 );
+      fc::set_option( options, "api-limit-get-limit-orders-by-account", (uint32_t)150 );
    }
    if(fixture.current_test_name =="api_limit_get_call_orders")
    {
-      fc::set_option( options, "api-limit-get-call-orders", (uint64_t)350 );
+      fc::set_option( options, "api-limit-get-call-orders", (uint32_t)350 );
    }
    if(fixture.current_test_name =="api_limit_get_settle_orders")
    {
-      fc::set_option( options, "api-limit-get-settle-orders", (uint64_t)350 );
+      fc::set_option( options, "api-limit-get-settle-orders", (uint32_t)350 );
    }
    if(fixture.current_test_name =="api_limit_get_order_book")
    {
-      fc::set_option( options, "api-limit-get-order-book", (uint64_t)80 );
+      fc::set_option( options, "api-limit-get-order-book", (uint32_t)80 );
    }
    if(fixture.current_test_name =="api_limit_lookup_accounts")
    {
-      fc::set_option( options, "api-limit-lookup-accounts", (uint64_t)200 );
+      fc::set_option( options, "api-limit-lookup-accounts", (uint32_t)200 );
    }
    if(fixture.current_test_name =="api_limit_lookup_witness_accounts")
    {
-      fc::set_option( options, "api-limit-lookup-witness-accounts", (uint64_t)200 );
+      fc::set_option( options, "api-limit-lookup-witness-accounts", (uint32_t)200 );
    }
    if(fixture.current_test_name =="api_limit_lookup_committee_member_accounts")
    {
-      fc::set_option( options, "api-limit-lookup-committee-member-accounts", (uint64_t)200 );
+      fc::set_option( options, "api-limit-lookup-committee-member-accounts", (uint32_t)200 );
    }
    if(fixture.current_test_name =="api_limit_lookup_committee_member_accounts")
    {
-      fc::set_option( options, "api-limit-lookup-committee-member-accounts", (uint64_t)200 );
+      fc::set_option( options, "api-limit-lookup-committee-member-accounts", (uint32_t)200 );
    }
    if(fixture.current_test_name =="api_limit_lookup_vote_ids")
    {
-      fc::set_option( options, "api-limit-lookup-vote-ids", (uint64_t)2 );
+      fc::set_option( options, "api-limit-lookup-vote-ids", (uint32_t)2 );
    }
    if(fixture.current_test_name =="api_limit_get_account_limit_orders")
    {
-      fc::set_option( options, "api-limit-get-account-limit-orders", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-account-limit-orders", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_collateral_bids")
    {
-      fc::set_option( options, "api-limit-get-collateral-bids", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-collateral-bids", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_top_markets")
    {
-      fc::set_option( options, "api-limit-get-top-markets", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-top-markets", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_trade_history")
    {
-      fc::set_option( options, "api-limit-get-trade-history", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-trade-history", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_trade_history_by_sequence")
    {
-      fc::set_option( options, "api-limit-get-trade-history-by-sequence", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-trade-history-by-sequence", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_withdraw_permissions_by_giver")
    {
-      fc::set_option( options, "api-limit-get-withdraw-permissions-by-giver", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-withdraw-permissions-by-giver", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_withdraw_permissions_by_recipient")
    {
-      fc::set_option( options, "api-limit-get-withdraw-permissions-by-recipient", (uint64_t)250 );
+      fc::set_option( options, "api-limit-get-withdraw-permissions-by-recipient", (uint32_t)250 );
    }
    if(fixture.current_test_name =="api_limit_get_full_accounts2")
    {
-      fc::set_option( options, "api-limit-get-full-accounts", (uint64_t)200 );
-      fc::set_option( options, "api-limit-get-full-accounts-lists", (uint64_t)120 );
+      fc::set_option( options, "api-limit-get-full-accounts", (uint32_t)200 );
+      fc::set_option( options, "api-limit-get-full-accounts-lists", (uint32_t)120 );
    }
 
    // add account tracking for ahplugin for special test case with track-account enabled
