@@ -1,4 +1,4 @@
-name: Build and push to DockerHub
+name: Docker
 on: [ push, pull_request ]
 jobs:
   docker:
