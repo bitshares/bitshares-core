@@ -13,16 +13,16 @@ Visit [Awesome BitShares](https://github.com/bitshares/awesome-bitshares) to fin
 * [Getting Started](#getting-started)
 * [Support](#support)
 * [Using the API](#using-the-api)
-* [Accessing restrictable node API's](#accessing-restrictable-node-apis)
+* [Accessing restrictable node API sets](#accessing-restrictable-node-api-sets)
 * [FAQ](#faq)
 * [License](#license)
 
 |Branch|Build Status|
 |---|---|
-|`master`|[![](https://github.com/bitshares/bitshares-core/workflows/macOS/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"macOS"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Debug/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Release/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Release"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-core/workflows/Windows%20MinGW64/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Windows+MinGW64"+branch%3Amaster)|
-|`develop`|[![](https://github.com/bitshares/bitshares-core/workflows/macOS/badge.svg?branch=develop)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"macOS"+branch%3Adevelop) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Debug/badge.svg?branch=develop)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Adevelop) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Release/badge.svg?branch=develop)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Release"+branch%3Adevelop) [![](https://github.com/bitshares/bitshares-core/workflows/Windows%20MinGW64/badge.svg?branch=develop)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Windows+MinGW64"+branch%3Adevelop)|
-|`hardfork`|[![](https://github.com/bitshares/bitshares-core/workflows/macOS/badge.svg?branch=hardfork)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"macOS"+branch%3Ahardfork) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Debug/badge.svg?branch=hardfork)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Ahardfork) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Release/badge.svg?branch=hardfork)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Release"+branch%3Ahardfork) [![](https://github.com/bitshares/bitshares-core/workflows/Windows%20MinGW64/badge.svg?branch=hardfork)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Windows+MinGW64"+branch%3Ahardfork)|
-|`testnet`|[![](https://github.com/bitshares/bitshares-core/workflows/macOS/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"macOS"+branch%3Atestnet) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Debug/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Atestnet) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Release/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Release"+branch%3Atestnet) [![](https://github.com/bitshares/bitshares-core/workflows/Windows%20MinGW64/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Windows+MinGW64"+branch%3Atestnet)|
+|`master`|[![](https://github.com/bitshares/bitshares-core/workflows/macOS/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"macOS"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Debug/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Release/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Release"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-core/workflows/Windows%20MinGW64/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Windows+MinGW64"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-core/workflows/Docker/badge.svg?branch=master)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A%22Docker%22+branch%3Amaster)|
+|`develop`|[![](https://github.com/bitshares/bitshares-core/workflows/macOS/badge.svg?branch=develop)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"macOS"+branch%3Adevelop) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Debug/badge.svg?branch=develop)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Adevelop) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Release/badge.svg?branch=develop)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Release"+branch%3Adevelop) [![](https://github.com/bitshares/bitshares-core/workflows/Windows%20MinGW64/badge.svg?branch=develop)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Windows+MinGW64"+branch%3Adevelop) [![](https://github.com/bitshares/bitshares-core/workflows/Docker/badge.svg?branch=develop)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A%22Docker%22+branch%3Adevelop)|
+|`hardfork`|[![](https://github.com/bitshares/bitshares-core/workflows/macOS/badge.svg?branch=hardfork)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"macOS"+branch%3Ahardfork) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Debug/badge.svg?branch=hardfork)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Ahardfork) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Release/badge.svg?branch=hardfork)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Release"+branch%3Ahardfork) [![](https://github.com/bitshares/bitshares-core/workflows/Windows%20MinGW64/badge.svg?branch=hardfork)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Windows+MinGW64"+branch%3Ahardfork) [![](https://github.com/bitshares/bitshares-core/workflows/Docker/badge.svg?branch=hardfork)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A%22Docker%22+branch%3Ahardfork)|
+|`testnet`|[![](https://github.com/bitshares/bitshares-core/workflows/macOS/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"macOS"+branch%3Atestnet) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Debug/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Atestnet) [![](https://github.com/bitshares/bitshares-core/workflows/Ubuntu%20Release/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Ubuntu+Release"+branch%3Atestnet) [![](https://github.com/bitshares/bitshares-core/workflows/Windows%20MinGW64/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A"Windows+MinGW64"+branch%3Atestnet) [![](https://github.com/bitshares/bitshares-core/workflows/Docker/badge.svg?branch=testnet)](https://github.com/bitshares/bitshares-core/actions?query=workflow%3A%22Docker%22+branch%3Atestnet)|
 |`master` of `bitshares-fc`|[![](https://github.com/bitshares/bitshares-fc/workflows/macOS/badge.svg?branch=master)](https://github.com/bitshares/bitshares-fc/actions?query=workflow%3A"macOS"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-fc/workflows/Ubuntu%20Debug/badge.svg?branch=master)](https://github.com/bitshares/bitshares-fc/actions?query=workflow%3A"Ubuntu+Debug"+branch%3Amaster) [![](https://github.com/bitshares/bitshares-fc/workflows/Ubuntu%20Release/badge.svg?branch=master)](https://github.com/bitshares/bitshares-fc/actions?query=workflow%3A"Ubuntu+Release"+branch%3Amaster)|
 
 Getting Started
@@ -205,12 +205,12 @@ Using the API
 
 ### Node API
 
-The `witness_node` software provides several different API's, known as *node API*.
+The `witness_node` software provides several different API sets, known as *node API*.
 
-Each API has its own ID and a name.
-When running `witness_node` with RPC connection enabled, initially two API's are available:
-* API 0 has name *"database"*, it provides read-only access to the database,
-* API 1 has name *"login"*, it is used to login and gain access to additional, restrictable API's.
+Each API set has its own ID and a name.
+When running `witness_node` with RPC connection enabled, initially two API sets are available:
+* API set with ID `0` has name *"database"*, it provides read-only access to the database,
+* API set with ID `1` has name *"login"*, it is used to login and gain access to additional, restrictable API sets.
 
 Here is an example using `wscat` package from `npm` for websockets:
 
@@ -219,26 +219,26 @@ Here is an example using `wscat` package from `npm` for websockets:
     > {"id":1, "method":"call", "params":[0,"get_accounts",[["1.2.0"]]]}
     < {"id":1,"result":[{"id":"1.2.0","annotations":[],"membership_expiration_date":"1969-12-31T23:59:59","registrar":"1.2.0","referrer":"1.2.0","lifetime_referrer":"1.2.0","network_fee_percentage":2000,"lifetime_referrer_fee_percentage":8000,"referrer_rewards_percentage":0,"name":"committee-account","owner":{"weight_threshold":1,"account_auths":[],"key_auths":[],"address_auths":[]},"active":{"weight_threshold":6,"account_auths":[["1.2.5",1],["1.2.6",1],["1.2.7",1],["1.2.8",1],["1.2.9",1],["1.2.10",1],["1.2.11",1],["1.2.12",1],["1.2.13",1],["1.2.14",1]],"key_auths":[],"address_auths":[]},"options":{"memo_key":"GPH1111111111111111111111111111111114T1Anm","voting_account":"1.2.0","num_witness":0,"num_committee":0,"votes":[],"extensions":[]},"statistics":"2.7.0","whitelisting_accounts":[],"blacklisting_accounts":[]}]}
 
-We can do the same thing using an HTTP client such as `curl` for API's which do not require login or other session state:
+We can do the same thing using an HTTP client such as `curl` for APIs which do not require login or other session state:
 
     $ curl --data '{"jsonrpc": "2.0", "method": "call", "params": [0, "get_accounts", [["1.2.0"]]], "id": 1}' http://127.0.0.1:8090/
     {"id":1,"result":[{"id":"1.2.0","annotations":[],"membership_expiration_date":"1969-12-31T23:59:59","registrar":"1.2.0","referrer":"1.2.0","lifetime_referrer":"1.2.0","network_fee_percentage":2000,"lifetime_referrer_fee_percentage":8000,"referrer_rewards_percentage":0,"name":"committee-account","owner":{"weight_threshold":1,"account_auths":[],"key_auths":[],"address_auths":[]},"active":{"weight_threshold":6,"account_auths":[["1.2.5",1],["1.2.6",1],["1.2.7",1],["1.2.8",1],["1.2.9",1],["1.2.10",1],["1.2.11",1],["1.2.12",1],["1.2.13",1],["1.2.14",1]],"key_auths":[],"address_auths":[]},"options":{"memo_key":"GPH1111111111111111111111111111111114T1Anm","voting_account":"1.2.0","num_witness":0,"num_committee":0,"votes":[],"extensions":[]},"statistics":"2.7.0","whitelisting_accounts":[],"blacklisting_accounts":[]}]}
 
-When using an HTTP client, the API ID can be replaced by the API name, E.G.
+When using an HTTP client, the API set ID can be replaced by the API set name, E.G.
 
     $ curl --data '{"jsonrpc": "2.0", "method": "call", "params": ["database", "get_accounts", [["1.2.0"]]], "id": 1}' http://127.0.0.1:8090/
 
-The definition of all node API's is available in the source code files including
+The definition of all node APIs is available in the source code files including
 [database_api.hpp](https://github.com/bitshares/bitshares-core/blob/master/libraries/app/include/graphene/app/database_api.hpp)
 and [api.hpp](https://github.com/bitshares/bitshares-core/blob/master/libraries/app/include/graphene/app/api.hpp).
 Corresponding documentation can be found in Doxygen:
 * [database API](https://doxygen.bitshares.org/classgraphene_1_1app_1_1database__api.html)
-* [other API's](https://doxygen.bitshares.org/namespacegraphene_1_1app.html)
+* [other APIs](https://doxygen.bitshares.org/namespacegraphene_1_1app.html)
 
 
 ### Wallet API
 
-The `cli_wallet` program can also be configured to serve **all of its commands** as API's, known as *wallet API*.
+The `cli_wallet` program can also be configured to serve **all of its commands** as APIs, known as *wallet API*.
 
 Start `cli_wallet` with RPC connection enabled:
 
@@ -246,8 +246,8 @@ Start `cli_wallet` with RPC connection enabled:
 
 Access the wallet API using an HTTP client:
 
-    $ curl --data '{"jsonrpc": "2.0", "method": "info", "params": [], "id": 1}' http://127.0.0.1:8091/rpc
-    $ curl --data '{"jsonrpc": "2.0", "method": "get_account", "params": ["1.2.0"], "id": 1}' http://127.0.0.1:8091/rpc
+    $ curl --data '{"jsonrpc": "2.0", "method": "info", "params": [], "id": 1}' http://127.0.0.1:8091/
+    $ curl --data '{"jsonrpc": "2.0", "method": "get_account", "params": ["1.2.0"], "id": 1}' http://127.0.0.1:8091/
 
 Note: The syntax to access wallet API is a bit different than accessing node API.
 
@@ -256,12 +256,12 @@ Note: The syntax to access wallet API is a bit different than accessing node API
 * When using wallet API, sensitive data E.G. the wallet password and private keys is transmitted as plain text, thus may be vulnerable to network sniffing. It is recommended that only use wallet API with localhost, or in a clean network, and / or use `--rpc-tls-endpoint` parameter to only serve wallet API via secure connections.
 
 
-Accessing restrictable node API's
----------------------------------
+Accessing restrictable node API sets
+------------------------------------
 
-You can restrict node API's to particular users by specifying an `api-access` file in `config.ini`
-or by using the `--api-access /full/path/to/api-access.json` startup node command.  Here is an example `api-access` file which allows
-user `bytemaster` with password `supersecret` to access four different API's, while allowing any other user to access the three public API's
+You can restrict node API sets to particular users by specifying an `api-access` file in `config.ini`
+or by using the `--api-access /full/path/to/api-access.json` command line option on node startup. Here is an example `api-access` file which allows
+user `bytemaster` with password `supersecret` to access four different API sets, while allowing any other user to access the three public API sets
 necessary to use the node:
 
     {
@@ -286,25 +286,27 @@ necessary to use the node:
        ]
     }
 
+Note: the `login` API set is always accessible.
+
 Passwords are stored in `base64` as salted `sha256` hashes.  A simple Python script,
 [`saltpass.py`](https://github.com/bitshares/bitshares-core/blob/master/programs/witness_node/saltpass.py)
 is avaliable to obtain hash and salt values from a password.
 A single asterisk `"*"` may be specified as username or password hash to accept any value.
 
-With the above configuration, here is an example of how to call `add_node` from the `network_node` API:
+With the above configuration, here is an example of how to call the `add_node` API from the `network_node` API set:
 
     {"id":1, "method":"call", "params":[1,"login",["bytemaster", "supersecret"]]}
     {"id":2, "method":"call", "params":[1,"network_node",[]]}
     {"id":3, "method":"call", "params":[2,"add_node",["127.0.0.1:9090"]]}
 
-Note, the call to `network_node` is necessary to obtain the correct API identifier for the network API.  It is not guaranteed that the network API identifier will always be `2`.
+Note, the call to `network_node` is necessary to obtain the correct API set ID for the `network_node` API set.  It is not guaranteed that the API set ID for the `network_node` API set will always be `2`.
 
-The restricted API's are accessible via HTTP too using *basic access authentication*. E.G.
+The restricted API sets are accessible via HTTP too using *basic access authentication*. E.G.
 
     $ curl --data '{"jsonrpc": "2.0", "method": "call", "params": ["network_node", "add_node", ["127.0.0.1:9090"]], "id": 1}' http://bytemaster:supersecret@127.0.0.1:8090/
 
 Our `doxygen` documentation contains the most up-to-date information
-about API's for the [node](https://doxygen.bitshares.org/namespacegraphene_1_1app.html) and the
+about APIs for the [node](https://doxygen.bitshares.org/namespacegraphene_1_1app.html) and the
 [wallet](https://doxygen.bitshares.org/classgraphene_1_1wallet_1_1wallet__api.html).
 
 
@@ -332,7 +334,7 @@ FAQ
 
 - Is there a way to access methods which require login over HTTP?
 
-    Yes. Most of the methods can be accessed by specifying the API name instead of an API ID. If an API is protected by a username and a password, it can be accessed by using *basic access authentication*. Please check the ["Accessing restrictable node API's"](#accessing-restrictable-node-apis) section for more info.
+    Yes. Most of the methods can be accessed by specifying the API name instead of an API ID. If an API is protected by a username and a password, it can be accessed by using *basic access authentication*. Please check the ["Accessing restrictable node API sets"](#accessing-restrictable-node-api-sets) section for more info.
 
     However, HTTP is not really designed for "server push" notifications, and we would have to figure out a way to queue notifications for a polling client. Websockets solves this problem. If you need to access the stateful methods, use Websockets.
 
@@ -366,8 +368,8 @@ FAQ
 
 - How do I get the `network_add_nodes` command to work?  Why is it so complicated?
 
-    You need to follow the instructions in the ["Accessing restrictable node API's"](#accessing-restrictable-node-apis) section to
-    allow a username/password access to the `network_node` API.  Then you need
+    You need to follow the instructions in the ["Accessing restrictable node API sets"](#accessing-restrictable-node-api-sets) section to
+    allow a username/password access to the `network_node` API set.  Then you need
     to pass the username/password to the `cli_wallet` on the command line.
 
     It's set up this way so that the default configuration is secure even if the RPC port is
