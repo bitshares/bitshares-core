@@ -83,8 +83,9 @@ class es_objects_plugin_impl
 
          std::string index_prefix = "objects-";
 
-         /// For the "index.mapping.depth.limit" setting in ES. The default value is 20.
-         uint16_t max_mapping_depth = 20;
+         /// For the "index.mapping.depth.limit" setting in ES whose default value is 20,
+         /// and need to be even smaller to not trigger the index.mapping.total_fields.limit error
+         uint16_t max_mapping_depth = 10;
 
          uint32_t start_es_after_block = 0;
          bool sync_db_on_startup = false;
@@ -390,7 +391,8 @@ void es_objects_plugin::plugin_set_program_options(
          ("es-objects-index-prefix", boost::program_options::value<std::string>(),
                "Add a prefix to the index(objects-)")
          ("es-objects-max-mapping-depth", boost::program_options::value<uint16_t>(),
-               "The maximum index mapping depth (index.mapping.depth.limit) setting in ES (20)")
+               "Can not exceed the maximum index mapping depth (index.mapping.depth.limit) setting in ES, "
+               "and need to be even smaller to not trigger the index.mapping.total_fields.limit error (10)")
          ("es-objects-keep-only-current", boost::program_options::value<bool>(),
                "Deprecated. Please use the store-updates or no-delete options. "
                "Keep only current state of the objects(true)")
