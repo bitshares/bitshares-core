@@ -688,6 +688,7 @@ namespace graphene { namespace app {
          bool logout();
 
          /// @brief Retrieve configured application options
+         /// @note It requires the user to be logged in and have access to at least one API set other than login_api.
          application_options get_config() const;
 
          /// @brief Retrieve a list of API sets that the user has access to
