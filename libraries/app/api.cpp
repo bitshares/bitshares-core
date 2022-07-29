@@ -97,6 +97,8 @@ namespace graphene { namespace app {
 
     application_options login_api::get_config() const
     {
+       bool allowed = !_allowed_apis.empty();
+       FC_ASSERT( allowed, "Access denied, please login" );
        return _app.get_options();
     }
 

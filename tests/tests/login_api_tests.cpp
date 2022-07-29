@@ -39,6 +39,9 @@ BOOST_AUTO_TEST_CASE( get_config_test )
    auto opt = app.get_options();
 
    graphene::app::login_api login_api1( app );
+   BOOST_CHECK_THROW( login_api1.get_config(), fc::exception );
+
+   login_api1.login("",""); // */*
    auto config = login_api1.get_config();
 
    BOOST_CHECK_EQUAL( default_opt.api_limit_get_call_orders, config.api_limit_get_call_orders );
