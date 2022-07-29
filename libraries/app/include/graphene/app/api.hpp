@@ -632,6 +632,14 @@ namespace graphene { namespace app {
    private:
       application& _app;
    };
+
+   /**
+    * @brief A dummy API class that does nothing, used when access to database_api is not allowed
+    */
+   struct dummy_api
+   {
+      bool dummy() const { return false; }
+   };
 } } // graphene::app
 
 extern template class fc::api<graphene::app::block_api>;
@@ -643,6 +651,7 @@ extern template class fc::api<graphene::app::asset_api>;
 extern template class fc::api<graphene::app::orders_api>;
 extern template class fc::api<graphene::debug_witness::debug_api>;
 extern template class fc::api<graphene::app::custom_operations_api>;
+extern template class fc::api<graphene::app::dummy_api>;
 
 namespace graphene { namespace app {
    /**
@@ -656,55 +665,75 @@ namespace graphene { namespace app {
          explicit login_api(application& a);
 
          /**
-          * @brief Authenticate to the RPC server
-          * @param user Username to login with
-          * @param password Password to login with
-          * @return True if logged in successfully; false otherwise
+          * @brief Authenticate to the RPC server, or retrieve the API set ID of the @a login API set
+          * @param user Username to login with, optional
+          * @param password Password to login with, optional
+          * @return @a true if to authenticate and logged in successfully,
+          *         @a false if to authenticate and failed to log in,
+          *         or the API set ID if to retrieve it
           *
-          * @note This must be called prior to requesting other APIs.
-          *       Other APIs may not be accessible until the client has sucessfully authenticated.
+          * @note Provide both @p user and @p password to authenticate,
+          *       or provide none of them (or @a null without quotes) to retrieve the API set ID
+          *          of the @a login API set.
+          * @note This is called automatically for authentication when a HTTP or WebSocket connection is established,
+          *       assuming credentials are provided with HTTP Basic authentication headers.
+          * @note When trying to authenticate again, even if failed to log in, already allocated API set IDs are
+          *       still accessible.
           */
-         bool login(const string& user, const string& password);
+         variant login(const optional<string>& user, const optional<string>& password);
+
+         /// @brief Log out
+         /// @return @a false
+         /// @note Already allocated API set IDs are still accessible after calling this.
+         bool logout();
 
          /// @brief Retrieve configured application options
          application_options get_config() const;
 
-         /// @brief Retrieve the network block API
-         fc::api<block_api> block()const;
-         /// @brief Retrieve the network broadcast API
-         fc::api<network_broadcast_api> network_broadcast()const;
-         /// @brief Retrieve the database API
-         fc::api<database_api> database()const;
-         /// @brief Retrieve the history API
-         fc::api<history_api> history()const;
-         /// @brief Retrieve the network node API
-         fc::api<network_node_api> network_node()const;
-         /// @brief Retrieve the cryptography API
-         fc::api<crypto_api> crypto()const;
-         /// @brief Retrieve the asset API
-         fc::api<asset_api> asset()const;
-         /// @brief Retrieve the orders API
-         fc::api<orders_api> orders()const;
-         /// @brief Retrieve the debug API (if available)
-         fc::api<graphene::debug_witness::debug_api> debug()const;
-         /// @brief Retrieve the custom operations API
-         fc::api<custom_operations_api> custom_operations()const;
+         /// @brief Retrieve the network block API set
+         fc::api<block_api> block();
+         /// @brief Retrieve the network broadcast API set
+         fc::api<network_broadcast_api> network_broadcast();
+         /// @brief Retrieve the database API set
+         fc::api<database_api> database();
+         /// @brief Retrieve the history API set
+         fc::api<history_api> history();
+         /// @brief Retrieve the network node API set
+         fc::api<network_node_api> network_node();
+         /// @brief Retrieve the cryptography API set
+         fc::api<crypto_api> crypto();
+         /// @brief Retrieve the asset API set
+         fc::api<asset_api> asset();
+         /// @brief Retrieve the orders API set
+         fc::api<orders_api> orders();
+         /// @brief Retrieve the debug API set
+         fc::api<graphene::debug_witness::debug_api> debug();
+         /// @brief Retrieve the custom operations API set
+         fc::api<custom_operations_api> custom_operations();
 
-         /// @brief Called to enable an API, not reflected.
-         void enable_api( const string& api_name );
+         /// @brief Retrieve a dummy API set, not reflected
+         fc::api<dummy_api> dummy();
+
+         /// @brief Check whether database_api is allowed, not reflected
+         /// @return @a true if database_api is allowed, @a false otherwise
+         bool is_database_api_allowed() const;
+
       private:
-
          application& _app;
-         optional< fc::api<block_api> > _block_api;
-         optional< fc::api<database_api> > _database_api;
-         optional< fc::api<network_broadcast_api> > _network_broadcast_api;
-         optional< fc::api<network_node_api> > _network_node_api;
-         optional< fc::api<history_api> >  _history_api;
-         optional< fc::api<crypto_api> > _crypto_api;
-         optional< fc::api<asset_api> > _asset_api;
-         optional< fc::api<orders_api> > _orders_api;
+
+         flat_set< string > _allowed_apis;
+
+         optional< fc::api<block_api> >                          _block_api;
+         optional< fc::api<database_api> >                       _database_api;
+         optional< fc::api<network_broadcast_api> >              _network_broadcast_api;
+         optional< fc::api<network_node_api> >                   _network_node_api;
+         optional< fc::api<history_api> >                        _history_api;
+         optional< fc::api<crypto_api> >                         _crypto_api;
+         optional< fc::api<asset_api> >                          _asset_api;
+         optional< fc::api<orders_api> >                         _orders_api;
          optional< fc::api<graphene::debug_witness::debug_api> > _debug_api;
-         optional< fc::api<custom_operations_api> > _custom_operations_api;
+         optional< fc::api<custom_operations_api> >              _custom_operations_api;
+         optional< fc::api<dummy_api> >                          _dummy_api;
    };
 
 }}  // graphene::app
@@ -778,8 +807,12 @@ FC_API(graphene::app::orders_api,
 FC_API(graphene::app::custom_operations_api,
        (get_storage_info)
      )
+FC_API(graphene::app::dummy_api,
+       (dummy)
+     )
 FC_API(graphene::app::login_api,
        (login)
+       (logout)
        (get_config)
        (block)
        (network_broadcast)
