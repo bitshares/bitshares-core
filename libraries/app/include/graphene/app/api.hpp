@@ -690,6 +690,9 @@ namespace graphene { namespace app {
          /// @brief Retrieve configured application options
          application_options get_config() const;
 
+         /// @brief Retrieve a list of API sets that the user has access to
+         flat_set<string> get_available_api_sets() const;
+
          /// @brief Retrieve the network block API set
          fc::api<block_api> block();
          /// @brief Retrieve the network broadcast API set
@@ -814,6 +817,7 @@ FC_API(graphene::app::login_api,
        (login)
        (logout)
        (get_config)
+       (get_available_api_sets)
        (block)
        (network_broadcast)
        (database)

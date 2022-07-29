@@ -100,6 +100,11 @@ namespace graphene { namespace app {
        return _app.get_options();
     }
 
+    flat_set<string> login_api::get_available_api_sets() const
+    {
+       return _allowed_apis;
+    }
+
     bool login_api::is_database_api_allowed() const
     {
        bool allowed = ( _allowed_apis.find("database_api") != _allowed_apis.end() );
