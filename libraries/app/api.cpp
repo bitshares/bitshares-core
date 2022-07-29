@@ -95,6 +95,11 @@ namespace graphene { namespace app {
        return false;
     }
 
+    string login_api::get_info() const
+    {
+       return _app.get_node_info();
+    }
+
     application_options login_api::get_config() const
     {
        bool allowed = !_allowed_apis.empty();

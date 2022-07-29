@@ -687,6 +687,9 @@ namespace graphene { namespace app {
          /// @note Already allocated API set IDs are still accessible after calling this.
          bool logout();
 
+         /// @brief Retrive the node info string configured by the node operator
+         string get_info() const;
+
          /// @brief Retrieve configured application options
          /// @note It requires the user to be logged in and have access to at least one API set other than login_api.
          application_options get_config() const;
@@ -817,6 +820,7 @@ FC_API(graphene::app::dummy_api,
 FC_API(graphene::app::login_api,
        (login)
        (logout)
+       (get_info)
        (get_config)
        (get_available_api_sets)
        (block)

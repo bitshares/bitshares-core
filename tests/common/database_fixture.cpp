@@ -311,7 +311,10 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
    if( fixture.current_suite_name == "login_api_tests" )
    {
       if( fixture.current_test_name =="get_config_test" )
+      {
+         fc::set_option( options, "api-node-info", string("Test API node") );
          fc::set_option( options, "api-limit-get-full-accounts-subscribe", (uint32_t)120 );
+      }
       if( fixture.current_test_name =="login_test" )
       {
          // bytemaster/supersecret, user2/superpassword2

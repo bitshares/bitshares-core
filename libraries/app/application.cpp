@@ -268,6 +268,9 @@ void application_impl::initialize(const fc::path& data_dir, shared_ptr<boost::pr
    else
       ilog("API helper indexes plugin is not enabled");
 
+   if (_options->count("api-node-info") > 0)
+      _node_info = _options->at("api-node-info").as<string>();
+
    if( _options->count("api-access") > 0 )
    {
 
@@ -1166,6 +1169,8 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
          ("dbg-init-key", bpo::value<string>(),
           "Block signing key to use for init witnesses, overrides genesis file, for debug")
+         ("api-node-info", bpo::value<string>(),
+          "A string defined by the node operator, which can be retrieved via the login_api::get_info API")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("io-threads", bpo::value<uint16_t>()->implicit_value(0),
           "Number of IO threads, default to 0 for auto-configuration")
@@ -1384,6 +1389,11 @@ void application::add_available_plugin(std::shared_ptr<graphene::app::abstract_p
 const application_options& application::get_options() const
 {
    return my->_app_options;
+}
+
+const string& application::get_node_info() const
+{
+   return my->_node_info;
 }
 
 // namespace detail

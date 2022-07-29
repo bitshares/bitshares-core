@@ -224,6 +224,9 @@ class application_impl : public net::node_delegate, public std::enable_shared_fr
 
       bool _is_finished_syncing = false;
 
+      /// A string defined by the node operator, which can be retrieved via the login_api::get_info API
+      string _node_info;
+
       fc::serial_valve valve;
    };
 

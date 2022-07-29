@@ -39,6 +39,9 @@ BOOST_AUTO_TEST_CASE( get_config_test )
    auto opt = app.get_options();
 
    graphene::app::login_api login_api1( app );
+
+   BOOST_CHECK( login_api1.get_info() == "Test API node" );
+
    BOOST_CHECK_THROW( login_api1.get_config(), fc::exception );
 
    login_api1.login("",""); // */*
