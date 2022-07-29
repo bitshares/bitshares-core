@@ -50,4 +50,66 @@ BOOST_AUTO_TEST_CASE( get_config_test )
 
 } FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
 
+BOOST_AUTO_TEST_CASE( login_test )
+{ try {
+   graphene::app::login_api login_api1( app );
+   BOOST_CHECK_EQUAL( login_api1.get_available_api_sets().size(), 0u );
+   BOOST_CHECK_THROW( login_api1.network_node(), fc::exception );
+
+   login_api1.login("",""); // */*
+   BOOST_CHECK_EQUAL( login_api1.get_available_api_sets().size(), 3u );
+   BOOST_CHECK_THROW( login_api1.network_node(), fc::exception );
+   auto db_api1 = login_api1.database();
+   auto his_api1 = login_api1.history();
+   auto nb_api1 = login_api1.network_broadcast();
+
+   login_api1.login("user2","superpassword2");
+   BOOST_CHECK_EQUAL( login_api1.get_available_api_sets().size(), 1u );
+   BOOST_CHECK_THROW( login_api1.network_node(), fc::exception );
+   BOOST_CHECK_THROW( login_api1.database(), fc::exception );
+   auto his_api2 = login_api1.history();
+   BOOST_CHECK( his_api1 == his_api2 );
+
+   login_api1.login("user2","superpassword3"); // wrong password
+   BOOST_CHECK_EQUAL( login_api1.get_available_api_sets().size(), 0u );
+   BOOST_CHECK_THROW( login_api1.network_node(), fc::exception );
+   BOOST_CHECK_THROW( login_api1.database(), fc::exception );
+   BOOST_CHECK_THROW( login_api1.history(), fc::exception );
+
+   login_api1.login("bytemaster","supersecret4"); // wrong password
+   BOOST_CHECK_EQUAL( login_api1.get_available_api_sets().size(), 0u );
+   BOOST_CHECK_THROW( login_api1.network_node(), fc::exception );
+   BOOST_CHECK_THROW( login_api1.database(), fc::exception );
+   BOOST_CHECK_THROW( login_api1.history(), fc::exception );
+
+   login_api1.login("bytemaster","supersecret");
+   BOOST_CHECK_EQUAL( login_api1.get_available_api_sets().size(), 10u );
+   auto nn_api3 = login_api1.network_node();
+   auto db_api3 = login_api1.database();
+   auto his_api3 = login_api1.history();
+   auto ord_api3 = login_api1.orders();
+   auto nb_api3 = login_api1.network_broadcast();
+   auto as_api3 = login_api1.asset();
+   auto cr_api3 = login_api1.crypto();
+   auto blk_api3 = login_api1.block();
+   auto co_api3 = login_api1.custom_operations();
+   auto dbg_api3 = login_api1.debug();
+   BOOST_CHECK( his_api1 == his_api3 );
+
+   login_api1.logout();
+   BOOST_CHECK_EQUAL( login_api1.get_available_api_sets().size(), 0u );
+   BOOST_CHECK_THROW( login_api1.network_node(), fc::exception );
+   BOOST_CHECK_THROW( login_api1.database(), fc::exception );
+   BOOST_CHECK_THROW( login_api1.history(), fc::exception );
+
+   login_api1.login("bytemaster2","randompassword"); // */*
+   BOOST_CHECK_EQUAL( login_api1.get_available_api_sets().size(), 3u );
+   BOOST_CHECK_THROW( login_api1.network_node(), fc::exception );
+   auto db_api4 = login_api1.database();
+   auto his_api4 = login_api1.history();
+   auto nb_api4 = login_api1.network_broadcast();
+   BOOST_CHECK( his_api1 == his_api4 );
+
+} FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -31,6 +31,7 @@
 #include <graphene/api_helper_indexes/api_helper_indexes.hpp>
 #include <graphene/es_objects/es_objects.hpp>
 #include <graphene/custom_operations/custom_operations_plugin.hpp>
+#include <graphene/debug_witness/debug_witness.hpp>
 
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
@@ -306,10 +307,57 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
       fc::set_option( options, "api-limit-get-full-accounts", (uint32_t)200 );
       fc::set_option( options, "api-limit-get-full-accounts-lists", (uint32_t)120 );
    }
-   if( fixture.current_suite_name == "login_api_tests"
-         && fixture.current_test_name =="get_config_test" )
+
+   if( fixture.current_suite_name == "login_api_tests" )
    {
-      fc::set_option( options, "api-limit-get-full-accounts-subscribe", (uint32_t)120 );
+      if( fixture.current_test_name =="get_config_test" )
+         fc::set_option( options, "api-limit-get-full-accounts-subscribe", (uint32_t)120 );
+      if( fixture.current_test_name =="login_test" )
+      {
+         // bytemaster/supersecret, user2/superpassword2
+         string api_access_config = R"(
+         {
+            "permission_map" :
+            [
+               [
+                  "bytemaster",
+                  {
+                     "password_hash_b64" : "9e9GF7ooXVb9k4BoSfNIPTelXeGOZ5DrgOYMj94elaY=",
+                     "password_salt_b64" : "INDdM6iCi/8=",
+                     "allowed_apis" : ["database_api", "network_broadcast_api", "history_api", "network_node_api",
+                                       "asset_api", "crypto_api", "block_api", "orders_api", "custom_operations_api"
+                                       "debug_api"]
+                  }
+               ],
+               [
+                  "user2",
+                  {
+                     "password_hash_b64" : "myadjRISnFOWn2TTd91zqbY50q0w2j/oJGlcdQkUB0Y=",
+                     "password_salt_b64" : "Zb8JrQDKNIQ=",
+                     "allowed_apis" : ["history_api"]
+                  }
+               ],
+               [
+                  "*",
+                  {
+                     "password_hash_b64" : "*",
+                     "password_salt_b64" : "*",
+                     "allowed_apis" : ["database_api", "network_broadcast_api", "history_api"]
+                  }
+               ]
+            ]
+         }
+         )";
+
+         fc::json::save_to_file( fc::json::from_string( api_access_config ),
+                                 fixture.data_dir.path() / "api-access.json" );
+         fc::set_option( options, "api-access",
+                         boost::filesystem::path(fixture.data_dir.path() / "api-access.json") );
+
+         fixture.app.register_plugin<graphene::debug_witness_plugin::debug_witness_plugin>(true);
+         fixture.app.register_plugin<graphene::custom_operations::custom_operations_plugin>(true);
+         fc::set_option( options, "custom-operations-start-block", uint32_t(1) );
+      }
    }
 
    // add account tracking for ahplugin for special test case with track-account enabled
