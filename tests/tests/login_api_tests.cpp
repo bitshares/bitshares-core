@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE( login_test )
    BOOST_CHECK_THROW( login_api1.database(), fc::exception );
    BOOST_CHECK_THROW( login_api1.history(), fc::exception );
 
-   login_api1.login("bytemaster","supersecret4"); // wrong password
+   login_api1.login("bytemaster","looooooooooooooooongpassword"); // wrong password
    BOOST_CHECK_EQUAL( login_api1.get_available_api_sets().size(), 0u );
    BOOST_CHECK_THROW( login_api1.network_node(), fc::exception );
    BOOST_CHECK_THROW( login_api1.database(), fc::exception );
