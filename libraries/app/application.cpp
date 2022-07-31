@@ -164,14 +164,6 @@ void application_impl::new_connection( const fc::http::websocket_connection_ptr&
 {
    auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(c, GRAPHENE_NET_MAX_NESTED_OBJECTS);
    auto login = std::make_shared<graphene::app::login_api>( _self );
-   login->enable_api("database_api");
-
-   wsc->register_api(login->database());
-   wsc->register_api(fc::api<graphene::app::login_api>(login));
-   c->set_session_data( wsc );
-
-   std::string username = "*";
-   std::string password = "*";
 
     // Try to extract login information from "Authorization" header if present
    std::string auth = c->get_request_header("Authorization");
@@ -185,11 +177,21 @@ void application_impl::new_connection( const fc::http::websocket_connection_ptr&
 
       FC_ASSERT(parts.size() == 2);
 
-      username = parts[0];
-      password = parts[1];
+      const string& username = parts[0];
+      const string& password = parts[1];
+      login->login(username, password);
    }
+   else
+      login->login("", "");
 
-   login->login(username, password);
+   // API set ID 0. Note: changing it may break client applications
+   if( login->is_database_api_allowed() )
+      wsc->register_api(login->database());
+   else
+      wsc->register_api(login->dummy());
+   // API set ID 1. Note: changing it may break client applications
+   wsc->register_api(fc::api<graphene::app::login_api>(login));
+   c->set_session_data( wsc );
 }
 
 void application_impl::reset_websocket_server()
@@ -266,6 +268,9 @@ void application_impl::initialize(const fc::path& data_dir, shared_ptr<boost::pr
    else
       ilog("API helper indexes plugin is not enabled");
 
+   if (_options->count("api-node-info") > 0)
+      _node_info = _options->at("api-node-info").as<string>();
+
    if( _options->count("api-access") > 0 )
    {
 
@@ -283,14 +288,12 @@ void application_impl::initialize(const fc::path& data_dir, shared_ptr<boost::pr
       // TODO:  Remove this generous default access policy
       // when the UI logs in properly
       _apiaccess = api_access();
-      api_access_info wild_access;
-      wild_access.password_hash_b64 = "*";
-      wild_access.password_salt_b64 = "*";
-      wild_access.allowed_apis.push_back( "database_api" );
-      wild_access.allowed_apis.push_back( "network_broadcast_api" );
-      wild_access.allowed_apis.push_back( "history_api" );
-      wild_access.allowed_apis.push_back( "orders_api" );
-      wild_access.allowed_apis.push_back( "custom_operations_api" );
+      api_access_info wild_access("*", "*");
+      wild_access.allowed_apis.insert( "database_api" );
+      wild_access.allowed_apis.insert( "network_broadcast_api" );
+      wild_access.allowed_apis.insert( "history_api" );
+      wild_access.allowed_apis.insert( "orders_api" );
+      wild_access.allowed_apis.insert( "custom_operations_api" );
       _apiaccess.permission_map["*"] = wild_access;
    }
 
@@ -1166,6 +1169,8 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
          ("dbg-init-key", bpo::value<string>(),
           "Block signing key to use for init witnesses, overrides genesis file, for debug")
+         ("api-node-info", bpo::value<string>(),
+          "A string defined by the node operator, which can be retrieved via the login_api::get_info API")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("io-threads", bpo::value<uint16_t>()->implicit_value(0),
           "Number of IO threads, default to 0 for auto-configuration")
@@ -1386,5 +1391,12 @@ const application_options& application::get_options() const
    return my->_app_options;
 }
 
+const string& application::get_node_info() const
+{
+   return my->_node_info;
+}
+
 // namespace detail
 } }
+
+GRAPHENE_IMPLEMENT_EXTERNAL_SERIALIZATION( graphene::app::application_options )

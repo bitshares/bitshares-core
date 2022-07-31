@@ -25,21 +25,10 @@
 
 #include <graphene/app/api.hpp>
 #include <graphene/app/api_access.hpp>
-#include <graphene/app/application.hpp>
-#include <graphene/chain/database.hpp>
-#include <graphene/chain/get_config.hpp>
-#include <graphene/utilities/key_conversion.hpp>
-#include <graphene/protocol/fee_schedule.hpp>
-#include <graphene/chain/confidential_object.hpp>
-#include <graphene/chain/market_object.hpp>
-#include <graphene/chain/transaction_history_object.hpp>
-#include <graphene/chain/withdraw_permission_object.hpp>
-#include <graphene/chain/worker_object.hpp>
 
 #include "database_api_helper.hxx"
 
 #include <fc/crypto/base64.hpp>
-#include <fc/crypto/hex.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/thread/future.hpp>
 
@@ -52,6 +41,7 @@ template class fc::api<graphene::app::asset_api>;
 template class fc::api<graphene::app::orders_api>;
 template class fc::api<graphene::app::custom_operations_api>;
 template class fc::api<graphene::debug_witness::debug_api>;
+template class fc::api<graphene::app::dummy_api>;
 template class fc::api<graphene::app::login_api>;
 
 
@@ -63,75 +53,69 @@ namespace graphene { namespace app {
        // Nothing to do
     }
 
-    bool login_api::login(const string& user, const string& password)
+    variant login_api::login(const optional<string>& o_user, const optional<string>& o_password)
     {
+       if( !o_user && !o_password )
+          return uint32_t(1); // Note: hard code it here for backward compatibility
+
+       FC_ASSERT( o_user.valid() && o_password.valid(), "Must provide both user and password" );
+       string user = *o_user;
+
        optional< api_access_info > acc = _app.get_api_access_info( user );
        if( !acc.valid() )
-          return false;
+          return logout();
        if( acc->password_hash_b64 != "*" )
        {
           std::string password_salt = fc::base64_decode( acc->password_salt_b64 );
           std::string acc_password_hash = fc::base64_decode( acc->password_hash_b64 );
 
+          string password = *o_password;
           fc::sha256 hash_obj = fc::sha256::hash( password + password_salt );
           if( hash_obj.data_size() != acc_password_hash.length() )
-             return false;
+             return logout();
           if( memcmp( hash_obj.data(), acc_password_hash.c_str(), hash_obj.data_size() ) != 0 )
-             return false;
+             return logout();
        }
 
-       for( const std::string& api_name : acc->allowed_apis )
-          enable_api( api_name );
+       // Ideally, we should clean up the API sets that the previous user registered but the new user
+       //   no longer has access to.
+       // However, the shared pointers to these objects are already saved elsewhere (in FC),
+       //   so we are unable to clean up, so it does not make sense to reset the optional fields here.
+
+       _allowed_apis = acc->allowed_apis;
        return true;
     }
 
-    void login_api::enable_api( const std::string& api_name )
+    bool login_api::logout()
     {
-       if( api_name == "database_api" )
-       {
-          _database_api = std::make_shared< database_api >( std::ref( *_app.chain_database() ),
-                                                            &( _app.get_options() ) );
-       }
-       else if( api_name == "block_api" )
-       {
-          _block_api = std::make_shared< block_api >( std::ref( *_app.chain_database() ) );
-       }
-       else if( api_name == "network_broadcast_api" )
-       {
-          _network_broadcast_api = std::make_shared< network_broadcast_api >( std::ref( _app ) );
-       }
-       else if( api_name == "history_api" )
-       {
-          _history_api = std::make_shared< history_api >( _app );
-       }
-       else if( api_name == "network_node_api" )
-       {
-          _network_node_api = std::make_shared< network_node_api >( std::ref(_app) );
-       }
-       else if( api_name == "crypto_api" )
-       {
-          _crypto_api = std::make_shared< crypto_api >();
-       }
-       else if( api_name == "asset_api" )
-       {
-          _asset_api = std::make_shared< asset_api >( _app );
-       }
-       else if( api_name == "orders_api" )
-       {
-          _orders_api = std::make_shared< orders_api >( std::ref( _app ) );
-       }
-       else if( api_name == "custom_operations_api" )
-       {
-          if( _app.get_plugin( "custom_operations" ) )
-             _custom_operations_api = std::make_shared< custom_operations_api >( std::ref( _app ) );
-       }
-       else if( api_name == "debug_api" )
-       {
-          // can only enable this API if the plugin was loaded
-          if( _app.get_plugin( "debug_witness" ) )
-             _debug_api = std::make_shared< graphene::debug_witness::debug_api >( std::ref(_app) );
-       }
-       return;
+       // Ideally, we should clean up the API sets that the previous user registered.
+       // However, the shared pointers to these objects are already saved elsewhere (in FC),
+       //   so we are unable to clean up, so it does not make sense to reset the optional fields here.
+       _allowed_apis.clear();
+       return false;
+    }
+
+    string login_api::get_info() const
+    {
+       return _app.get_node_info();
+    }
+
+    application_options login_api::get_config() const
+    {
+       bool allowed = !_allowed_apis.empty();
+       FC_ASSERT( allowed, "Access denied, please login" );
+       return _app.get_options();
+    }
+
+    flat_set<string> login_api::get_available_api_sets() const
+    {
+       return _allowed_apis;
+    }
+
+    bool login_api::is_database_api_allowed() const
+    {
+       bool allowed = ( _allowed_apis.find("database_api") != _allowed_apis.end() );
+       return allowed;
     }
 
     // block_api
@@ -258,64 +242,130 @@ namespace graphene { namespace app {
        return _app.p2p_node()->set_advanced_node_parameters(params);
     }
 
-    fc::api<network_broadcast_api> login_api::network_broadcast()const
+    fc::api<network_broadcast_api> login_api::network_broadcast()
     {
-       FC_ASSERT(_network_broadcast_api);
+       bool allowed = ( _allowed_apis.find("network_broadcast_api") != _allowed_apis.end() );
+       FC_ASSERT( allowed, "Access denied" );
+       if( !_network_broadcast_api )
+       {
+          _network_broadcast_api = std::make_shared< network_broadcast_api >( std::ref( _app ) );
+       }
        return *_network_broadcast_api;
     }
 
-    fc::api<block_api> login_api::block()const
+    fc::api<block_api> login_api::block()
     {
-       FC_ASSERT(_block_api);
+       bool allowed = ( _allowed_apis.find("block_api") != _allowed_apis.end() );
+       FC_ASSERT( allowed, "Access denied" );
+       if( !_block_api )
+       {
+          _block_api = std::make_shared< block_api >( std::ref( *_app.chain_database() ) );
+       }
        return *_block_api;
     }
 
-    fc::api<network_node_api> login_api::network_node()const
+    fc::api<network_node_api> login_api::network_node()
     {
-       FC_ASSERT(_network_node_api);
+       bool allowed = ( _allowed_apis.find("network_node_api") != _allowed_apis.end() );
+       FC_ASSERT( allowed, "Access denied" );
+       if( !_network_node_api )
+       {
+          _network_node_api = std::make_shared< network_node_api >( std::ref(_app) );
+       }
        return *_network_node_api;
     }
 
-    fc::api<database_api> login_api::database()const
+    fc::api<database_api> login_api::database()
     {
-       FC_ASSERT(_database_api);
+       bool allowed = ( _allowed_apis.find("database_api") != _allowed_apis.end() );
+       FC_ASSERT( allowed, "Access denied" );
+       if( !_database_api )
+       {
+          _database_api = std::make_shared< database_api >( std::ref( *_app.chain_database() ),
+                                                            &( _app.get_options() ) );
+       }
        return *_database_api;
     }
 
-    fc::api<history_api> login_api::history() const
+    fc::api<history_api> login_api::history()
     {
-       FC_ASSERT(_history_api);
+       bool allowed = ( _allowed_apis.find("history_api") != _allowed_apis.end() );
+       FC_ASSERT( allowed, "Access denied" );
+       if( !_history_api )
+       {
+          _history_api = std::make_shared< history_api >( _app );
+       }
        return *_history_api;
     }
 
-    fc::api<crypto_api> login_api::crypto() const
+    fc::api<crypto_api> login_api::crypto()
     {
-       FC_ASSERT(_crypto_api);
+       bool allowed = ( _allowed_apis.find("crypto_api") != _allowed_apis.end() );
+       FC_ASSERT( allowed, "Access denied" );
+       if( !_crypto_api )
+       {
+          _crypto_api = std::make_shared< crypto_api >();
+       }
        return *_crypto_api;
     }
 
-    fc::api<asset_api> login_api::asset() const
+    fc::api<asset_api> login_api::asset()
     {
-       FC_ASSERT(_asset_api);
+       bool allowed = ( _allowed_apis.find("asset_api") != _allowed_apis.end() );
+       FC_ASSERT( allowed, "Access denied" );
+       if( !_asset_api )
+       {
+          _asset_api = std::make_shared< asset_api >( _app );
+       }
        return *_asset_api;
     }
 
-    fc::api<orders_api> login_api::orders() const
+    fc::api<orders_api> login_api::orders()
     {
-       FC_ASSERT(_orders_api);
+       bool allowed = ( _allowed_apis.find("orders_api") != _allowed_apis.end() );
+       FC_ASSERT( allowed, "Access denied" );
+       if( !_orders_api )
+       {
+          _orders_api = std::make_shared< orders_api >( std::ref( _app ) );
+       }
        return *_orders_api;
     }
 
-    fc::api<graphene::debug_witness::debug_api> login_api::debug() const
+    fc::api<graphene::debug_witness::debug_api> login_api::debug()
     {
-       FC_ASSERT(_debug_api);
+       bool allowed = ( _allowed_apis.find("debug_api") != _allowed_apis.end() );
+       FC_ASSERT( allowed, "Access denied" );
+       // can only use this API set if the plugin was loaded
+       bool plugin_enabled = !!_app.get_plugin( "debug_witness" );
+       FC_ASSERT( plugin_enabled, "The debug_witness plugin is not enabled" );
+       if( ! _debug_api )
+       {
+          _debug_api = std::make_shared< graphene::debug_witness::debug_api >( std::ref(_app) );
+       }
        return *_debug_api;
     }
 
-    fc::api<custom_operations_api> login_api::custom_operations() const
+    fc::api<custom_operations_api> login_api::custom_operations()
     {
-       FC_ASSERT(_custom_operations_api);
+       bool allowed = ( _allowed_apis.find("custom_operations_api") != _allowed_apis.end() );
+       FC_ASSERT( allowed, "Access denied" );
+       // can only use this API set if the plugin was loaded
+       bool plugin_enabled = !!_app.get_plugin( "custom_operations" );
+       FC_ASSERT( plugin_enabled, "The custom_operations plugin is not enabled" );
+       if( !_custom_operations_api )
+       {
+          _custom_operations_api = std::make_shared< custom_operations_api >( std::ref( _app ) );
+       }
        return *_custom_operations_api;
+    }
+
+    fc::api<dummy_api> login_api::dummy()
+    {
+       if( !_dummy_api )
+       {
+          _dummy_api = std::make_shared< dummy_api >();
+       }
+       return *_dummy_api;
     }
 
     history_api::history_api(application& app)
