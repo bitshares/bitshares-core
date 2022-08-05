@@ -50,6 +50,10 @@ struct account_storage_object : public abstract_object<account_storage_object>
 };
 
 struct by_account_catalog_key;
+struct by_account_catalog;
+struct by_account;
+struct by_catalog_key;
+struct by_catalog;
 
 using account_storage_multi_idx_type = multi_index_container<
       account_storage_object,
@@ -60,6 +64,32 @@ using account_storage_multi_idx_type = multi_index_container<
                         member< account_storage_object, account_id_type, &account_storage_object::account >,
                         member< account_storage_object, string, &account_storage_object::catalog >,
                         member< account_storage_object, string, &account_storage_object::key >
+                  >
+            >,
+            ordered_unique< tag<by_account_catalog>,
+                  composite_key< account_storage_object,
+                        member< account_storage_object, account_id_type, &account_storage_object::account >,
+                        member< account_storage_object, string, &account_storage_object::catalog >,
+                        member< object, object_id_type, &object::id >
+                  >
+            >,
+            ordered_unique< tag<by_account>,
+                  composite_key< account_storage_object,
+                        member< account_storage_object, account_id_type, &account_storage_object::account >,
+                        member< object, object_id_type, &object::id >
+                  >
+            >,
+            ordered_unique< tag<by_catalog_key>,
+                  composite_key< account_storage_object,
+                        member< account_storage_object, string, &account_storage_object::catalog >,
+                        member< account_storage_object, string, &account_storage_object::key >,
+                        member< object, object_id_type, &object::id >
+                  >
+            >,
+            ordered_unique< tag<by_catalog>,
+                  composite_key< account_storage_object,
+                        member< account_storage_object, string, &account_storage_object::catalog >,
+                        member< object, object_id_type, &object::id >
                   >
             >
       >
