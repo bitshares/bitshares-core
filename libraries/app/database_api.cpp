@@ -1035,18 +1035,17 @@ vector<limit_order_object> database_api_impl::get_limit_orders( const std::strin
 }
 
 vector<limit_order_object> database_api::get_limit_orders_by_account( const string& account_name_or_id,
-                              optional<uint32_t> limit, optional<limit_order_id_type> start_id )
+                              const optional<uint32_t>& limit, const optional<limit_order_id_type>& start_id )
 {
    return my->get_limit_orders_by_account( account_name_or_id, limit, start_id );
 }
 
 vector<limit_order_object> database_api_impl::get_limit_orders_by_account( const string& account_name_or_id,
-                              optional<uint32_t> olimit, optional<limit_order_id_type> ostart_id )
+                              const optional<uint32_t>& olimit, const optional<limit_order_id_type>& ostart_id )
 {
-   uint32_t limit = olimit.valid() ? *olimit : 101;
-
    FC_ASSERT( _app_options, "Internal error" );
    const auto configured_limit = _app_options->api_limit_get_limit_orders_by_account;
+   uint32_t limit = olimit.valid() ? *olimit : configured_limit;
    FC_ASSERT( limit <= configured_limit,
               "limit can not be greater than ${configured_limit}",
               ("configured_limit", configured_limit) );

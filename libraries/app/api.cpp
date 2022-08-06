@@ -638,10 +638,8 @@ namespace graphene { namespace app {
     {
        FC_ASSERT( _app.get_options().has_market_history_plugin, "Market history plugin is not enabled." );
 
-       uint32_t limit = olimit.valid() ? *olimit
-                                       : application_options::get_default().api_limit_get_liquidity_pool_history;
-
        const auto configured_limit = _app.get_options().api_limit_get_liquidity_pool_history;
+       uint32_t limit = olimit.valid() ? *olimit : configured_limit;
        FC_ASSERT( limit <= configured_limit,
                   "limit can not be greater than ${configured_limit}",
                   ("configured_limit", configured_limit) );
