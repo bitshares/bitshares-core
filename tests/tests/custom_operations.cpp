@@ -236,10 +236,10 @@ try {
    generate_block();
 
    // test API limit config
-   BOOST_CHECK_THROW( custom_operations_api.get_storage_info("alice", "account_object", {}, 121), fc::exception );
+   BOOST_CHECK_THROW( custom_operations_api.get_storage_info("alice", "account_object", {}, 7), fc::exception );
 
    // This does not throw
-   storage_results_alice = custom_operations_api.get_storage_info("alice", "account_object", {}, 120);
+   storage_results_alice = custom_operations_api.get_storage_info("alice", "account_object", {}, 6);
    BOOST_REQUIRE_EQUAL(storage_results_alice.size(), 3U);
    BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17);
    BOOST_CHECK_EQUAL(storage_results_alice[0].key, "nathan");
@@ -345,7 +345,7 @@ try {
 
    // query all
    storage_results = custom_operations_api.get_storage_info();
-   BOOST_REQUIRE_EQUAL(storage_results.size(), 7U );
+   BOOST_REQUIRE_EQUAL(storage_results.size(), 6U ); // the configured limit, the first page
    BOOST_CHECK_EQUAL(storage_results[0].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(storage_results[0].catalog, "settings");
    BOOST_CHECK_EQUAL(storage_results[0].key, "image_url");
@@ -370,10 +370,19 @@ try {
    BOOST_CHECK_EQUAL(storage_results[5].catalog, "account_object");
    BOOST_CHECK_EQUAL(storage_results[5].key, "robert");
    BOOST_CHECK_EQUAL(storage_results[5].value->as<account_object>(20).name, "robert");
-   BOOST_CHECK_EQUAL(storage_results[6].account.instance.value, 17 );
-   BOOST_CHECK_EQUAL(storage_results[6].catalog, "settings");
-   BOOST_CHECK_EQUAL(storage_results[6].key, "image_url");
-   BOOST_CHECK_EQUAL(storage_results[6].value->as_string(), "http://some.other.image.url/img.jpg");
+
+   storage_id = storage_results[5].id;
+
+   storage_results = custom_operations_api.get_storage_info({},{},{},{},storage_id);
+   BOOST_REQUIRE_EQUAL(storage_results.size(), 2U ); // the 2nd page
+   BOOST_CHECK_EQUAL(storage_results[0].account.instance.value, 17 );
+   BOOST_CHECK_EQUAL(storage_results[0].catalog, "account_object");
+   BOOST_CHECK_EQUAL(storage_results[0].key, "robert");
+   BOOST_CHECK_EQUAL(storage_results[0].value->as<account_object>(20).name, "robert");
+   BOOST_CHECK_EQUAL(storage_results[1].account.instance.value, 17 );
+   BOOST_CHECK_EQUAL(storage_results[1].catalog, "settings");
+   BOOST_CHECK_EQUAL(storage_results[1].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results[1].value->as_string(), "http://some.other.image.url/img.jpg");
 
 }
 catch (fc::exception &e) {
