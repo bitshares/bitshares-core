@@ -1776,8 +1776,8 @@ vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by
    FC_ASSERT( _app_options && _app_options->has_api_helper_indexes_plugin,
               "api_helper_indexes plugin is not enabled on this server." );
 
-   uint32_t limit = olimit.valid() ? *olimit : application_options::get_default().api_limit_get_liquidity_pools;
    const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
+   uint32_t limit = olimit.valid() ? *olimit : configured_limit;
    FC_ASSERT( limit <= configured_limit,
               "limit can not be greater than ${configured_limit}",
               ("configured_limit", configured_limit) );
@@ -1934,10 +1934,9 @@ vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by
             const optional<asset_id_type>& ostart_id,
             const optional<bool>& with_statistics )const
 {
-   uint32_t limit = olimit.valid() ? *olimit : application_options::get_default().api_limit_get_liquidity_pools;
-
    FC_ASSERT( _app_options, "Internal error" );
    const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
+   uint32_t limit = olimit.valid() ? *olimit : configured_limit;
    FC_ASSERT( limit <= configured_limit,
               "limit can not be greater than ${configured_limit}",
               ("configured_limit", configured_limit) );
