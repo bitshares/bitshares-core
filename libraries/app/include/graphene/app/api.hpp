@@ -621,26 +621,29 @@ namespace graphene { namespace app {
        * @brief Get stored objects
        *
        * @param account_name_or_id The account name or ID to get info from. Optional.
-       * @param catalog Category classification. Each account can store multiple catalogs. Optional.
-       * @param key Key classification. Each catalog can contain multiple keys. Optional.
+       * @param catalog The catalog to get info from. Each account can store data in multiple catalogs. Optional.
+       * @param key The key to get info from. Each catalog can contain multiple keys. Optional.
        * @param limit The limitation of items each query can fetch, not greater than the configured value of
        *              @a api_limit_get_storage_info
        * @param start_id Start ID of stored object, fetch objects whose IDs are greater than or equal to this ID
-       * @return The stored objects found, ordered by their IDs
+       * @return The stored objects found, sorted by their ID
        *
        * @note
-       * 1. By passing @a null to various optional arguments, this API can be used to query stored objects by
+       * 1. By passing @a null to various optional parameters, or omitting where applicable, this API can be used to
+       *    query stored objects by
        *    a) account, catalog and key, or
        *    b) account and catalog, or
        *    c) account, or
        *    d) catalog and key, or
        *    e) catalog, or
-       *    f) no condition.
+       *    f) unconditionally.
+       *    Queries with keys without a catalog are not allowed.
        * 2. If @p account_name_or_id is specified but cannot be tied to an account, an error will be returned.
        * 3. @p limit can be omitted or be @a null, if so the default value of
        *       @ref application_options::api_limit_get_tickets will be used.
-       * 4. @p start_id can be omitted or be null, if so the api will return the "first page" of objects.
-       * 5. Can only omit one or more arguments in the end of the list, but not one or more in the middle.
+       * 4. @p start_id can be omitted or be @a null, if so the API will return the "first page" of objects.
+       * 5. One or more parameters can be omitted from the end of the parameter list, and the parameters in the
+       *    middle cannot be omitted (but can be @a null).
        */
       vector<account_storage_object> get_storage_info(
             const optional<std::string>& account_name_or_id = optional<std::string>(),
