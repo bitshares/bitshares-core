@@ -440,6 +440,8 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
       fixture.current_test_name == "custom_operations_account_storage_list_test") {
       fixture.app.register_plugin<graphene::custom_operations::custom_operations_plugin>(true);
       fc::set_option( options, "custom-operations-start-block", uint32_t(1) );
+      if( fixture.current_test_name == "custom_operations_account_storage_map_test" )
+         fc::set_option( options, "api-limit-get-storage-info", uint32_t(120) );
    }
 
    fc::set_option( options, "bucket-size", string("[15]") );

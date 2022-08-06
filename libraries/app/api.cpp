@@ -960,21 +960,72 @@ namespace graphene { namespace app {
    }
 
    vector<account_storage_object> custom_operations_api::get_storage_info(
-         const std::string& account_id_or_name,
-         const std::string& catalog)const
+         const optional<std::string>& o_account_name_or_id,
+         const optional<std::string>& catalog,
+         const optional<std::string>& key,
+         const optional<uint32_t>& limit,
+         const optional<account_storage_id_type>& start_id )const
    {
       auto plugin = _app.get_plugin<graphene::custom_operations::custom_operations_plugin>("custom_operations");
-      FC_ASSERT( plugin );
+      FC_ASSERT( plugin, "The custom_operations plugin is not enabled" );
 
       database_api_helper db_api_helper( _app );
-      const account_id_type account_id = db_api_helper.get_account_from_string(account_id_or_name)->id;
-      vector<account_storage_object> results;
-      const auto& storage_index = _app.chain_database()->get_index_type<account_storage_index>();
-      const auto& by_account_catalog_idx = storage_index.indices().get<by_account_catalog_key>();
-      auto range = by_account_catalog_idx.equal_range(make_tuple(account_id, catalog));
-      for( const account_storage_object& aso : boost::make_iterator_range( range.first, range.second ) )
-         results.push_back(aso);
-      return results;
+      const auto& storage_index = _app.chain_database()->get_index_type<account_storage_index>().indices();
+
+      if( o_account_name_or_id.valid() )
+      {
+         const string& account_name_or_id = *o_account_name_or_id;
+         const account_id_type account_id = db_api_helper.get_account_from_string(account_name_or_id)->id;
+         if( catalog.valid() )
+         {
+            if( key.valid() )
+               return db_api_helper.get_objects_by_x< account_storage_object,
+                                                      account_storage_id_type
+                                                     >( &application_options::api_limit_get_storage_info,
+                                                        storage_index.get<by_account_catalog_key>(),
+                                                        limit, start_id, account_id, *catalog, *key );
+            else
+               return db_api_helper.get_objects_by_x< account_storage_object,
+                                                      account_storage_id_type
+                                                     >( &application_options::api_limit_get_storage_info,
+                                                        storage_index.get<by_account_catalog>(),
+                                                        limit, start_id, account_id, *catalog );
+         }
+         else
+         {
+            FC_ASSERT( !key.valid(), "Can not specify key if catalog is not specified" );
+            return db_api_helper.get_objects_by_x< account_storage_object,
+                                                   account_storage_id_type
+                                                  >( &application_options::api_limit_get_storage_info,
+                                                     storage_index.get<custom_operations::by_account>(),
+                                                     limit, start_id, account_id );
+         }
+      }
+      else if( catalog.valid() )
+      {
+         if( key.valid() )
+            return db_api_helper.get_objects_by_x< account_storage_object,
+                                                   account_storage_id_type
+                                                  >( &application_options::api_limit_get_storage_info,
+                                                     storage_index.get<by_catalog_key>(),
+                                                     limit, start_id, *catalog, *key );
+         else
+            return db_api_helper.get_objects_by_x< account_storage_object,
+                                                   account_storage_id_type
+                                                  >( &application_options::api_limit_get_storage_info,
+                                                     storage_index.get<by_catalog>(),
+                                                     limit, start_id, *catalog );
+      }
+      else
+      {
+         FC_ASSERT( !key.valid(), "Can not specify key if catalog is not specified" );
+         return db_api_helper.get_objects_by_x< account_storage_object,
+                                                account_storage_id_type
+                                               >( &application_options::api_limit_get_storage_info,
+                                                  storage_index.get<by_id>(),
+                                                  limit, start_id );
+      }
+
    }
 
 } } // graphene::app
