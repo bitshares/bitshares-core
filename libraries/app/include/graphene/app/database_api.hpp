@@ -465,15 +465,17 @@ class database_api
        * @return List of limit orders of the specified account
        *
        * @note
-       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *      @ref application_options::api_limit_get_limit_orders_by_account will be used
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *      @a api_limit_get_limit_orders_by_account will be used
        * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of orders
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
-      vector<limit_order_object> get_limit_orders_by_account( const string& account_name_or_id,
-            optional<uint32_t> limit = application_options::get_default().api_limit_get_limit_orders_by_account,
-            optional<limit_order_id_type> start_id = optional<limit_order_id_type>() );
+      vector<limit_order_object> get_limit_orders_by_account(
+            const string& account_name_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<limit_order_id_type>& start_id = optional<limit_order_id_type>() );
 
       /**
        * @brief Fetch all orders relevant to the specified account and specified market, result orders
@@ -491,7 +493,7 @@ class database_api
        * @return List of orders from @p account_name_or_id to the corresponding account
        *
        * @note
-       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
        * 2. @p ostart_id and @p ostart_price can be empty, if so the api will return the "first page" of orders;
        *    if @p ostart_id is specified, its price will be used to do page query preferentially,
        *    otherwise the @p ostart_price will be used;
@@ -670,13 +672,14 @@ class database_api
        * @return The liquidity pools
        *
        * @note
-       * 1. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_liquidity_pools will be used
-       * 2. @p start_id can be omitted or be null, if so the api will return the "first page" of pools
-       * 3. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_liquidity_pools will be used
+       * 2. @p start_id can be omitted or be @a null, if so the api will return the "first page" of pools
+       * 3. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<extended_liquidity_pool_object> list_liquidity_pools(
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_liquidity_pools,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<liquidity_pool_id_type>& start_id = optional<liquidity_pool_id_type>(),
             const optional<bool>& with_statistics = false )const;
 
@@ -690,15 +693,16 @@ class database_api
        * @return The liquidity pools
        *
        * @note
-       * 1. if @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_liquidity_pools will be used
-       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of pools
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. If @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_liquidity_pools will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of pools
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<extended_liquidity_pool_object> get_liquidity_pools_by_asset_a(
             const std::string& asset_symbol_or_id,
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_liquidity_pools,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<liquidity_pool_id_type>& start_id = optional<liquidity_pool_id_type>(),
             const optional<bool>& with_statistics = false )const;
 
@@ -712,15 +716,16 @@ class database_api
        * @return The liquidity pools
        *
        * @note
-       * 1. if @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_liquidity_pools will be used
-       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of pools
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. If @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_liquidity_pools will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of pools
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<extended_liquidity_pool_object> get_liquidity_pools_by_asset_b(
             const std::string& asset_symbol_or_id,
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_liquidity_pools,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<liquidity_pool_id_type>& start_id = optional<liquidity_pool_id_type>(),
             const optional<bool>& with_statistics = false )const;
 
@@ -734,15 +739,16 @@ class database_api
        * @return The liquidity pools
        *
        * @note
-       * 1. if @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_liquidity_pools will be used
-       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of pools
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. If @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_liquidity_pools will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of pools
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<extended_liquidity_pool_object> get_liquidity_pools_by_one_asset(
             const std::string& asset_symbol_or_id,
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_liquidity_pools,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<liquidity_pool_id_type>& start_id = optional<liquidity_pool_id_type>(),
             const optional<bool>& with_statistics = false )const;
 
@@ -757,17 +763,18 @@ class database_api
        * @return The liquidity pools
        *
        * @note
-       * 1. if @p asset_symbol_or_id_a or @p asset_symbol_or_id_b cannot be tied to an asset,
+       * 1. If @p asset_symbol_or_id_a or @p asset_symbol_or_id_b cannot be tied to an asset,
        *    an error will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_liquidity_pools will be used
-       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of pools
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_liquidity_pools will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of pools
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<extended_liquidity_pool_object> get_liquidity_pools_by_both_assets(
             const std::string& asset_symbol_or_id_a,
             const std::string& asset_symbol_or_id_b,
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_liquidity_pools,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<liquidity_pool_id_type>& start_id = optional<liquidity_pool_id_type>(),
             const optional<bool>& with_statistics = false )const;
 
@@ -819,15 +826,16 @@ class database_api
        * @return The liquidity pools
        *
        * @note
-       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_liquidity_pools will be used
-       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of pools
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_liquidity_pools will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of pools
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<extended_liquidity_pool_object> get_liquidity_pools_by_owner(
             const std::string& account_name_or_id,
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_liquidity_pools,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<asset_id_type>& start_id = optional<asset_id_type>(),
             const optional<bool>& with_statistics = false )const;
 
@@ -844,13 +852,14 @@ class database_api
        * @return The SameT Funds
        *
        * @note
-       * 1. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_samet_funds will be used
-       * 2. @p start_id can be omitted or be null, if so the api will return the "first page" of data
-       * 3. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_samet_funds will be used
+       * 2. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 3. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<samet_fund_object> list_samet_funds(
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_samet_funds,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
 
       /**
@@ -862,15 +871,16 @@ class database_api
        * @return The SameT Funds
        *
        * @note
-       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_samet_funds will be used
-       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_samet_funds will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<samet_fund_object> get_samet_funds_by_owner(
             const std::string& account_name_or_id,
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_samet_funds,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
 
       /**
@@ -882,15 +892,16 @@ class database_api
        * @return The SameT Funds
        *
        * @note
-       * 1. if @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_samet_funds will be used
-       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. If @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_samet_funds will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<samet_fund_object> get_samet_funds_by_asset(
             const std::string& asset_symbol_or_id,
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_samet_funds,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
       /// @}
 
@@ -907,13 +918,14 @@ class database_api
        * @return The credit offers
        *
        * @note
-       * 1. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_credit_offers will be used
-       * 2. @p start_id can be omitted or be null, if so the api will return the "first page" of data
-       * 3. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 2. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 3. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<credit_offer_object> list_credit_offers(
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_credit_offers,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<credit_offer_id_type>& start_id = optional<credit_offer_id_type>() )const;
 
       /**
@@ -925,15 +937,16 @@ class database_api
        * @return The credit offers
        *
        * @note
-       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_credit_offers will be used
-       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<credit_offer_object> get_credit_offers_by_owner(
             const std::string& account_name_or_id,
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_credit_offers,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<credit_offer_id_type>& start_id = optional<credit_offer_id_type>() )const;
 
       /**
@@ -945,15 +958,16 @@ class database_api
        * @return The credit offers
        *
        * @note
-       * 1. if @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_credit_offers will be used
-       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. If @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<credit_offer_object> get_credit_offers_by_asset(
             const std::string& asset_symbol_or_id,
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_credit_offers,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<credit_offer_id_type>& start_id = optional<credit_offer_id_type>() )const;
 
       /**
@@ -964,13 +978,14 @@ class database_api
        * @return The credit deals
        *
        * @note
-       * 1. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_credit_offers will be used
-       * 2. @p start_id can be omitted or be null, if so the api will return the "first page" of data
-       * 3. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 2. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 3. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<credit_deal_object> list_credit_deals(
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_credit_offers,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
 
       /**
@@ -982,15 +997,16 @@ class database_api
        * @return The credit deals
        *
        * @note
-       * 1. if @p offer_id cannot be tied to a credit offer, an empty list will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_credit_offers will be used
-       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. If @p offer_id cannot be tied to a credit offer, an empty list will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<credit_deal_object> get_credit_deals_by_offer_id(
             const credit_offer_id_type& offer_id,
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_credit_offers,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
 
       /**
@@ -1002,15 +1018,16 @@ class database_api
        * @return The credit deals
        *
        * @note
-       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_credit_offers will be used
-       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<credit_deal_object> get_credit_deals_by_offer_owner(
             const std::string& account_name_or_id,
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_credit_offers,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
 
       /**
@@ -1022,15 +1039,16 @@ class database_api
        * @return The credit deals
        *
        * @note
-       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_credit_offers will be used
-       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<credit_deal_object> get_credit_deals_by_borrower(
             const std::string& account_name_or_id,
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_credit_offers,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
 
       /**
@@ -1042,15 +1060,16 @@ class database_api
        * @return The credit deals
        *
        * @note
-       * 1. if @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_credit_offers will be used
-       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. If @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<credit_deal_object> get_credit_deals_by_debt_asset(
             const std::string& asset_symbol_or_id,
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_credit_offers,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
 
       /**
@@ -1062,15 +1081,16 @@ class database_api
        * @return The credit deals
        *
        * @note
-       * 1. if @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_credit_offers will be used
-       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of data
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. If @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<credit_deal_object> get_credit_deals_by_collateral_asset(
             const std::string& asset_symbol_or_id,
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_credit_offers,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
       /// @}
 
@@ -1384,13 +1404,14 @@ class database_api
        * @return The tickets
        *
        * @note
-       * 1. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_tickets will be used
-       * 2. @p start_id can be omitted or be null, if so the api will return the "first page" of tickets
-       * 3. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_tickets will be used
+       * 2. @p start_id can be omitted or be @a null, if so the api will return the "first page" of tickets
+       * 3. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<ticket_object> list_tickets(
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_tickets,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<ticket_id_type>& start_id = optional<ticket_id_type>() )const;
 
       /**
@@ -1402,15 +1423,16 @@ class database_api
        * @return The tickets
        *
        * @note
-       * 1. if @p account_name_or_id cannot be tied to an account, an error will be returned
-       * 2. @p limit can be omitted or be null, if so the default value of
-       *       @ref application_options::api_limit_get_tickets will be used
-       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of tickets
-       * 4. can only omit one or more arguments in the end of the list, but not one or more in the middle
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_tickets will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of tickets
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<ticket_object> get_tickets_by_account(
             const std::string& account_name_or_id,
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_tickets,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<ticket_id_type>& start_id = optional<ticket_id_type>() )const;
 
 private:

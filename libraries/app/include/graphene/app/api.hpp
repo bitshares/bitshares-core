@@ -208,9 +208,9 @@ namespace graphene { namespace app {
           *              If specified, only the operations occurred not later than this time will be returned.
           * @param stop  A UNIX timestamp. Optional.
           *              If specified, only the operations occurred later than this time will be returned.
-          * @param limit Maximum quantity of operations in the history to retrieve.  Optional.
-          *              If not specified, the default value of
-          *                @ref application_options::api_limit_get_liquidity_pool_history will be used.
+          * @param limit Maximum quantity of operations in the history to retrieve. Optional.
+          *              If not specified, the configured value of
+          *                @a api_limit_get_liquidity_pool_history will be used.
           *              If specified, it must not exceed the configured value of
           *                @a api_limit_get_liquidity_pool_history.
           * @param operation_type Optional. If specified, only the operations whose type is the specified type
@@ -223,15 +223,14 @@ namespace graphene { namespace app {
           *    the most recent records, the rest records can be retrieved with the
           *    @ref get_liquidity_pool_history_by_sequence API.
           * 3. List of operation type code: 59-creation, 60-deletion, 61-deposit, 62-withdrawal, 63-exchange.
-          * 4. Can only omit one or more arguments in the end of the list, but not one or more in the middle.
-          *    If need to not specify an individual argument, can specify \c null in the place.
+          * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+          *    parameters in the middle cannot be omitted (but can be @a null).
           */
          vector<liquidity_pool_history_object> get_liquidity_pool_history(
                liquidity_pool_id_type pool_id,
                const optional<fc::time_point_sec>& start = optional<fc::time_point_sec>(),
                const optional<fc::time_point_sec>& stop = optional<fc::time_point_sec>(),
-               const optional<uint32_t>& limit = application_options::get_default()
-                                                    .api_limit_get_liquidity_pool_history,
+               const optional<uint32_t>& limit = optional<uint32_t>(),
                const optional<int64_t>& operation_type = optional<int64_t>() )const;
 
          /**
@@ -241,9 +240,9 @@ namespace graphene { namespace app {
           *              If specified, only the operations whose sequences are not greater than this will be returned.
           * @param stop  A UNIX timestamp. Optional.
           *              If specified, only operations occurred later than this time will be returned.
-          * @param limit Maximum quantity of operations in the history to retrieve.  Optional.
-          *              If not specified, the default value of
-          *                @ref application_options::api_limit_get_liquidity_pool_history will be used.
+          * @param limit Maximum quantity of operations in the history to retrieve. Optional.
+          *              If not specified, the configured value of
+          *                @a api_limit_get_liquidity_pool_history will be used.
           *              If specified, it must not exceed the configured value of
           *                @a api_limit_get_liquidity_pool_history.
           * @param operation_type Optional. If specified, only the operations whose type is the specified type
@@ -253,15 +252,14 @@ namespace graphene { namespace app {
           * @note
           * 1. The time must be UTC. The range is (stop, start].
           * 2. List of operation type code: 59-creation, 60-deletion, 61-deposit, 62-withdrawal, 63-exchange.
-          * 3. Can only omit one or more arguments in the end of the list, but not one or more in the middle.
-          *    If need to not specify an individual argument, can specify \c null in the place.
+          * 3. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+          *    parameters in the middle cannot be omitted (but can be @a null).
           */
          vector<liquidity_pool_history_object> get_liquidity_pool_history_by_sequence(
                liquidity_pool_id_type pool_id,
                const optional<uint64_t>& start = optional<uint64_t>(),
                const optional<fc::time_point_sec>& stop = optional<fc::time_point_sec>(),
-               const optional<uint32_t>& limit = application_options::get_default()
-                                                    .api_limit_get_liquidity_pool_history,
+               const optional<uint32_t>& limit = optional<uint32_t>(),
                const optional<int64_t>& operation_type = optional<int64_t>() )const;
 
       private:
@@ -624,7 +622,7 @@ namespace graphene { namespace app {
        * @param catalog The catalog to get info from. Each account can store data in multiple catalogs. Optional.
        * @param key The key to get info from. Each catalog can contain multiple keys. Optional.
        * @param limit The limitation of items each query can fetch, not greater than the configured value of
-       *              @a api_limit_get_storage_info
+       *              @a api_limit_get_storage_info. Optional.
        * @param start_id Start ID of stored object, fetch objects whose IDs are greater than or equal to this ID
        * @return The stored objects found, sorted by their ID
        *
@@ -639,17 +637,17 @@ namespace graphene { namespace app {
        *    f) unconditionally.
        *    Queries with keys without a catalog are not allowed.
        * 2. If @p account_name_or_id is specified but cannot be tied to an account, an error will be returned.
-       * 3. @p limit can be omitted or be @a null, if so the default value of
-       *       @ref application_options::api_limit_get_tickets will be used.
+       * 3. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_storage_info will be used.
        * 4. @p start_id can be omitted or be @a null, if so the API will return the "first page" of objects.
-       * 5. One or more parameters can be omitted from the end of the parameter list, and the parameters in the
-       *    middle cannot be omitted (but can be @a null).
+       * 5. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
        */
       vector<account_storage_object> get_storage_info(
             const optional<std::string>& account_name_or_id = optional<std::string>(),
             const optional<std::string>& catalog = optional<std::string>(),
             const optional<std::string>& key = optional<std::string>(),
-            const optional<uint32_t>& limit = application_options::get_default().api_limit_get_storage_info,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
             const optional<account_storage_id_type>& start_id = optional<account_storage_id_type>() )const;
 
    private:

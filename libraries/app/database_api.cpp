@@ -1035,18 +1035,17 @@ vector<limit_order_object> database_api_impl::get_limit_orders( const std::strin
 }
 
 vector<limit_order_object> database_api::get_limit_orders_by_account( const string& account_name_or_id,
-                              optional<uint32_t> limit, optional<limit_order_id_type> start_id )
+                              const optional<uint32_t>& limit, const optional<limit_order_id_type>& start_id )
 {
    return my->get_limit_orders_by_account( account_name_or_id, limit, start_id );
 }
 
 vector<limit_order_object> database_api_impl::get_limit_orders_by_account( const string& account_name_or_id,
-                              optional<uint32_t> olimit, optional<limit_order_id_type> ostart_id )
+                              const optional<uint32_t>& olimit, const optional<limit_order_id_type>& ostart_id )
 {
-   uint32_t limit = olimit.valid() ? *olimit : 101;
-
    FC_ASSERT( _app_options, "Internal error" );
    const auto configured_limit = _app_options->api_limit_get_limit_orders_by_account;
+   uint32_t limit = olimit.valid() ? *olimit : configured_limit;
    FC_ASSERT( limit <= configured_limit,
               "limit can not be greater than ${configured_limit}",
               ("configured_limit", configured_limit) );
@@ -1777,8 +1776,8 @@ vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by
    FC_ASSERT( _app_options && _app_options->has_api_helper_indexes_plugin,
               "api_helper_indexes plugin is not enabled on this server." );
 
-   uint32_t limit = olimit.valid() ? *olimit : application_options::get_default().api_limit_get_liquidity_pools;
    const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
+   uint32_t limit = olimit.valid() ? *olimit : configured_limit;
    FC_ASSERT( limit <= configured_limit,
               "limit can not be greater than ${configured_limit}",
               ("configured_limit", configured_limit) );
@@ -1935,10 +1934,9 @@ vector<extended_liquidity_pool_object> database_api_impl::get_liquidity_pools_by
             const optional<asset_id_type>& ostart_id,
             const optional<bool>& with_statistics )const
 {
-   uint32_t limit = olimit.valid() ? *olimit : application_options::get_default().api_limit_get_liquidity_pools;
-
    FC_ASSERT( _app_options, "Internal error" );
    const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
+   uint32_t limit = olimit.valid() ? *olimit : configured_limit;
    FC_ASSERT( limit <= configured_limit,
               "limit can not be greater than ${configured_limit}",
               ("configured_limit", configured_limit) );

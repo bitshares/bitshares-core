@@ -101,8 +101,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<limit_order_object>         get_limit_orders( const std::string& a, const std::string& b,
                                                            uint32_t limit)const;
       vector<limit_order_object>         get_limit_orders_by_account( const string& account_name_or_id,
-                                                                      optional<uint32_t> limit,
-                                                                      optional<limit_order_id_type> start_id );
+                                                                      const optional<uint32_t>& limit,
+                                                                      const optional<limit_order_id_type>& start_id );
       vector<limit_order_object>         get_account_limit_orders( const string& account_name_or_id,
                                                                    const string &base,
                                                                    const string &quote, uint32_t limit,
@@ -278,10 +278,9 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
                   const optional<bool>& with_statistics,
                   X... x )const
       {
-         uint32_t limit = olimit.valid() ? *olimit : application_options::get_default().api_limit_get_liquidity_pools;
-
          FC_ASSERT( _app_options, "Internal error" );
          const auto configured_limit = _app_options->api_limit_get_liquidity_pools;
+         uint32_t limit = olimit.valid() ? *olimit : configured_limit;
          FC_ASSERT( limit <= configured_limit,
                     "limit can not be greater than ${configured_limit}",
                     ("configured_limit", configured_limit) );

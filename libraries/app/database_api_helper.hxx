@@ -69,10 +69,9 @@ public:
                const optional<OBJ_ID_TYPE>& ostart_id,
                X... x ) const
    {
-      uint64_t limit = olimit.valid() ? *olimit : ( application_options::get_default().*app_opt_member_ptr );
-
       FC_ASSERT( _app_options, "Internal error" );
       const auto configured_limit = _app_options->*app_opt_member_ptr;
+      uint64_t limit = olimit.valid() ? *olimit : configured_limit;
       FC_ASSERT( limit <= configured_limit,
                  "limit can not be greater than ${configured_limit}",
                  ("configured_limit", configured_limit) );
