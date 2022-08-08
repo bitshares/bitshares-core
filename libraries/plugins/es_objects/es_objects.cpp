@@ -276,8 +276,6 @@ void es_objects_plugin_impl::delete_from_database(
 
 void es_objects_plugin_impl::delete_all_from_database( const plugin_options::object_options& opt )
 {
-   if( opt.no_delete )
-      return;
    // Note:
    // 1. The _delete_by_query API deletes the data but keeps the index mapping, so the function is OK.
    //    Simply deleting the index is probably faster, but it requires the "delete_index" permission, and
