@@ -115,7 +115,7 @@ class es_objects_plugin_impl
       /// Delete one object from ES
       void delete_from_database( const object_id_type& id, const plugin_options::object_options& opt );
       /// Delete all objects of the specified type from ES
-      void delete_all_from_database( const plugin_options::object_options& opt );
+      void delete_all_from_database( const plugin_options::object_options& opt ) const;
 
       es_objects_plugin& _self;
       plugin_options _options;
@@ -281,7 +281,7 @@ void es_objects_plugin_impl::delete_from_database(
    send_bulk_if_ready();
 }
 
-void es_objects_plugin_impl::delete_all_from_database( const plugin_options::object_options& opt )
+void es_objects_plugin_impl::delete_all_from_database( const plugin_options::object_options& opt ) const
 {
    // Note:
    // 1. The _delete_by_query API deletes the data but keeps the index mapping, so the function is OK.
@@ -289,7 +289,7 @@ void es_objects_plugin_impl::delete_all_from_database( const plugin_options::obj
    //    may probably mess up the index mapping and other existing settings.
    //    Don't know if there is a good way to only delete objects that do not exist in the object database.
    // 2. We don't check the return value here, it's probably OK
-   es->query( _options.index_prefix + opt.index_name + "/_delete_by_query", "{\"query\":{\"match_all\":{}}}" );
+   es->query( _options.index_prefix + opt.index_name + "/_delete_by_query", R"({"query":{"match_all":{}}})" );
 }
 
 template<typename T>
