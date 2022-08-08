@@ -111,7 +111,7 @@ class es_objects_plugin_impl
 
       void index_database(const vector<object_id_type>& ids, action_type action);
       /// Load all data from the object database into ES
-      void sync_db();
+      void sync_db( bool delete_before_load = false );
       /// Delete one object from ES
       void delete_from_database( const object_id_type& id, const plugin_options::object_options& opt );
       /// Delete all objects of the specified type from ES
@@ -149,13 +149,14 @@ struct data_loader
    }
 
    template<typename ObjType>
-   void load( const es_objects_plugin_impl::plugin_options::object_options& opt )
+   void load( const es_objects_plugin_impl::plugin_options::object_options& opt,
+              bool force_delete = false )
    {
       if( !opt.enabled )
          return;
 
       // If no_delete or store_updates is true, do not delete
-      if( !( opt.no_delete || opt.store_updates ) )
+      if( force_delete || !( opt.no_delete || opt.store_updates ) )
          my->delete_all_from_database( opt );
 
       db.get_index( ObjType::space_id, ObjType::type_id ).inspect_all_objects(
@@ -165,7 +166,7 @@ struct data_loader
    }
 };
 
-void es_objects_plugin_impl::sync_db()
+void es_objects_plugin_impl::sync_db( bool delete_before_load )
 {
    ilog("elasticsearch OBJECTS: loading data from the object database (chain state)");
 
@@ -176,13 +177,13 @@ void es_objects_plugin_impl::sync_db()
 
    data_loader loader( this );
 
-   loader.load<account_object             >( _options.accounts );
-   loader.load<asset_object               >( _options.assets );
-   loader.load<asset_bitasset_data_object >( _options.asset_bitasset );
-   loader.load<account_balance_object     >( _options.balances );
-   loader.load<proposal_object            >( _options.proposals );
-   loader.load<limit_order_object         >( _options.limit_orders );
-   loader.load<budget_record_object       >( _options.budget );
+   loader.load<account_object             >( _options.accounts,       delete_before_load );
+   loader.load<asset_object               >( _options.assets,         delete_before_load );
+   loader.load<asset_bitasset_data_object >( _options.asset_bitasset, delete_before_load );
+   loader.load<account_balance_object     >( _options.balances,       delete_before_load );
+   loader.load<proposal_object            >( _options.proposals,      delete_before_load );
+   loader.load<limit_order_object         >( _options.limit_orders,   delete_before_load );
+   loader.load<budget_record_object       >( _options.budget,         delete_before_load );
 }
 
 void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, action_type action)
@@ -482,7 +483,9 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
 
 void es_objects_plugin::plugin_startup()
 {
-   if( my->_options.sync_db_on_startup || 0 == database().head_block_num() )
+   if( 0 == database().head_block_num() )
+      my->sync_db( true );
+   else if( my->_options.sync_db_on_startup )
       my->sync_db();
 }
 
