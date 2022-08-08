@@ -110,8 +110,12 @@ class es_objects_plugin_impl
       { index_database( ids, action_type::deletion ); }
 
       void index_database(const vector<object_id_type>& ids, action_type action);
-      void sync_db();
-      void remove_from_database( const object_id_type& id, const plugin_options::object_options& opt );
+      /// Load all data from the object database into ES
+      void sync_db( bool delete_before_load = false );
+      /// Delete one object from ES
+      void delete_from_database( const object_id_type& id, const plugin_options::object_options& opt );
+      /// Delete all objects of the specified type from ES
+      void delete_all_from_database( const plugin_options::object_options& opt ) const;
 
       es_objects_plugin& _self;
       plugin_options _options;
@@ -145,11 +149,20 @@ struct data_loader
    }
 
    template<typename ObjType>
-   void load( const es_objects_plugin_impl::plugin_options::object_options& opt )
+   void load( const es_objects_plugin_impl::plugin_options::object_options& opt,
+              bool force_delete = false )
    {
       if( !opt.enabled )
          return;
 
+      // If no_delete or store_updates is true, do not delete
+      if( force_delete || !( opt.no_delete || opt.store_updates ) )
+      {
+         ilog( "Deleting all data in index " + my->_options.index_prefix + opt.index_name );
+         my->delete_all_from_database( opt );
+      }
+
+      ilog( "Loading data into index " + my->_options.index_prefix + opt.index_name );
       db.get_index( ObjType::space_id, ObjType::type_id ).inspect_all_objects(
             [this, &opt](const graphene::db::object &o) {
          my->prepareTemplate( static_cast<const ObjType&>(o), opt );
@@ -157,7 +170,7 @@ struct data_loader
    }
 };
 
-void es_objects_plugin_impl::sync_db()
+void es_objects_plugin_impl::sync_db( bool delete_before_load )
 {
    ilog("elasticsearch OBJECTS: loading data from the object database (chain state)");
 
@@ -168,13 +181,15 @@ void es_objects_plugin_impl::sync_db()
 
    data_loader loader( this );
 
-   loader.load<account_object             >( _options.accounts );
-   loader.load<asset_object               >( _options.assets );
-   loader.load<asset_bitasset_data_object >( _options.asset_bitasset );
-   loader.load<account_balance_object     >( _options.balances );
-   loader.load<proposal_object            >( _options.proposals );
-   loader.load<limit_order_object         >( _options.limit_orders );
-   loader.load<budget_record_object       >( _options.budget );
+   loader.load<account_object             >( _options.accounts,       delete_before_load );
+   loader.load<asset_object               >( _options.assets,         delete_before_load );
+   loader.load<asset_bitasset_data_object >( _options.asset_bitasset, delete_before_load );
+   loader.load<account_balance_object     >( _options.balances,       delete_before_load );
+   loader.load<proposal_object            >( _options.proposals,      delete_before_load );
+   loader.load<limit_order_object         >( _options.limit_orders,   delete_before_load );
+   loader.load<budget_record_object       >( _options.budget,         delete_before_load );
+
+   ilog("elasticsearch OBJECTS: done loading data from the object database (chain state)");
 }
 
 void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, action_type action)
@@ -213,7 +228,7 @@ void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, a
          continue;
       const auto& opt = itr->second;
       if( action_type::deletion == action )
-         remove_from_database( value, opt );
+         delete_from_database( value, opt );
       else
       {
          switch( itr->first )
@@ -247,7 +262,7 @@ void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, a
 
 }
 
-void es_objects_plugin_impl::remove_from_database(
+void es_objects_plugin_impl::delete_from_database(
       const object_id_type& id, const es_objects_plugin_impl::plugin_options::object_options& opt )
 {
    if( opt.no_delete )
@@ -264,6 +279,17 @@ void es_objects_plugin_impl::remove_from_database(
    bulk_lines.push_back( fc::json::to_string(final_delete_line) );
 
    send_bulk_if_ready();
+}
+
+void es_objects_plugin_impl::delete_all_from_database( const plugin_options::object_options& opt ) const
+{
+   // Note:
+   // 1. The _delete_by_query API deletes the data but keeps the index mapping, so the function is OK.
+   //    Simply deleting the index is probably faster, but it requires the "delete_index" permission, and
+   //    may probably mess up the index mapping and other existing settings.
+   //    Don't know if there is a good way to only delete objects that do not exist in the object database.
+   // 2. We don't check the return value here, it's probably OK
+   es->query( _options.index_prefix + opt.index_name + "/_delete_by_query", R"({"query":{"match_all":{}}})" );
 }
 
 template<typename T>
@@ -463,7 +489,9 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
 
 void es_objects_plugin::plugin_startup()
 {
-   if( my->_options.sync_db_on_startup || 0 == database().head_block_num() )
+   if( 0 == database().head_block_num() )
+      my->sync_db( true );
+   else if( my->_options.sync_db_on_startup )
       my->sync_db();
 }
 

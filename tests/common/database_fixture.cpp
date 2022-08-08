@@ -413,8 +413,8 @@ std::shared_ptr<boost::program_options::variables_map> database_fixture_base::in
       fixture.app.register_plugin<graphene::es_objects::es_objects_plugin>(true);
 
       fc::set_option( options, "es-objects-elasticsearch-url", GRAPHENE_TESTING_ES_URL );
-      fc::set_option( options, "es-objects-bulk-replay", uint32_t(2) );
-      fc::set_option( options, "es-objects-bulk-sync", uint32_t(2) );
+      fc::set_option( options, "es-objects-bulk-replay", uint32_t(1) );
+      fc::set_option( options, "es-objects-bulk-sync", uint32_t(1) );
       fc::set_option( options, "es-objects-proposals", true );
       fc::set_option( options, "es-objects-accounts", true );
       fc::set_option( options, "es-objects-assets", true );

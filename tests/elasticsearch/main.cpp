@@ -235,7 +235,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
       if(delete_objects) { // all records deleted
 
          // asset and bitasset
-         create_bitasset("USD", account_id_type());
+         asset_id_type usd_id = create_bitasset("USD", account_id_type()).id;
          generate_block();
 
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
@@ -268,8 +268,28 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
          auto bitasset_object_id = j["hits"]["hits"][size_t(0)]["_source"]["object_id"].as_string();
          BOOST_CHECK_EQUAL(bitasset_object_id, bitasset_data_id);
 
+         // create a limit order that expires at the next maintenance time
+         create_sell_order( account_id_type(), asset(1), asset(1, usd_id),
+                            db.get_dynamic_global_properties().next_maintenance_time );
+         generate_block();
+
+         es.endpoint = es.index_prefix + "limitorder/_doc/_count";
+         es.query = "";
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            res = graphene::utilities::getEndPoint(es);
+            j = fc::json::from_string(res);
+            if( !j.is_object() )
+               return false;
+            const auto& obj = j.get_object();
+            if( obj.find("count") == obj.end() )
+               return false;
+            total = obj["count"].as_string();
+            return (total == "1");
+         });
+
          // maintenance, for budget records
          generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+         generate_block();
 
          es.endpoint = es.index_prefix + "budget/_doc/_count";
          es.query = "";
@@ -283,6 +303,20 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
                return false;
             total = obj["count"].as_string();
             return (total == "1"); // new record inserted at the first maintenance block
+         });
+
+         es.endpoint = es.index_prefix + "limitorder/_doc/_count";
+         es.query = "";
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            res = graphene::utilities::getEndPoint(es);
+            j = fc::json::from_string(res);
+            if( !j.is_object() )
+               return false;
+            const auto& obj = j.get_object();
+            if( obj.find("count") == obj.end() )
+               return false;
+            total = obj["count"].as_string();
+            return (total == "0"); // the limit order expired, so the object is removed
          });
 
       }
