@@ -307,13 +307,17 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
 
          es.endpoint = es.index_prefix + "limitorder/_doc/_count";
          es.query = "";
-         res = graphene::utilities::getEndPoint(es);
-         j = fc::json::from_string(res);
-         BOOST_REQUIRE( j.is_object() );
-         const auto& obj = j.get_object();
-         BOOST_REQUIRE( obj.find("count") != obj.end() );
-         total = obj["count"].as_string();
-         BOOST_CHECK( total == "0" ); // the limit order expired, so the object is removed
+         fc::wait_for( ES_WAIT_TIME,  [&]() {
+            res = graphene::utilities::getEndPoint(es);
+            j = fc::json::from_string(res);
+            if( !j.is_object() )
+               return false;
+            const auto& obj = j.get_object();
+            if( obj.find("count") == obj.end() )
+               return false;
+            total = obj["count"].as_string();
+            return (total == "0"); // the limit order expired, so the object is removed
+         });
 
       }
    }
