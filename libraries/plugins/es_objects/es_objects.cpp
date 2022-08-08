@@ -157,8 +157,12 @@ struct data_loader
 
       // If no_delete or store_updates is true, do not delete
       if( force_delete || !( opt.no_delete || opt.store_updates ) )
+      {
+         ilog( "Deleting all data in index " + my->_options.index_prefix + opt.index_name );
          my->delete_all_from_database( opt );
+      }
 
+      ilog( "Loading data into index " + my->_options.index_prefix + opt.index_name );
       db.get_index( ObjType::space_id, ObjType::type_id ).inspect_all_objects(
             [this, &opt](const graphene::db::object &o) {
          my->prepareTemplate( static_cast<const ObjType&>(o), opt );
@@ -184,6 +188,8 @@ void es_objects_plugin_impl::sync_db( bool delete_before_load )
    loader.load<proposal_object            >( _options.proposals,      delete_before_load );
    loader.load<limit_order_object         >( _options.limit_orders,   delete_before_load );
    loader.load<budget_record_object       >( _options.budget,         delete_before_load );
+
+   ilog("elasticsearch OBJECTS: done loading data from the object database (chain state)");
 }
 
 void es_objects_plugin_impl::index_database(const vector<object_id_type>& ids, action_type action)
