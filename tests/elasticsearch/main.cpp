@@ -127,6 +127,8 @@ BOOST_AUTO_TEST_CASE(elasticsearch_account_history) {
          j = fc::json::from_string(res);
          auto last_transfer_amount = j["_source"]["operation_history"]["op_object"]["amount_"]["amount"].as_string();
          BOOST_CHECK_EQUAL(last_transfer_amount, "300");
+         auto last_transfer_payer = j["_source"]["operation_history"]["fee_payer"].as_string();
+         BOOST_CHECK_EQUAL(last_transfer_payer, "1.2.0");
 
          // To test credit offers
          generate_blocks( HARDFORK_CORE_2362_TIME );
