@@ -82,9 +82,10 @@ class elasticsearch_plugin : public graphene::app::plugin
 struct operation_history_struct {
    uint16_t trx_in_block;
    uint16_t op_in_trx;
-   std::string operation_result;
    uint32_t virtual_op;
+   account_id_type fee_payer;
    std::string op;
+   std::string operation_result;
    variant op_object;
    variant operation_result_object;
 };
@@ -146,7 +147,8 @@ struct bulk_struct {
 
 FC_REFLECT_ENUM( graphene::elasticsearch::mode, (only_save)(only_query)(all) )
 FC_REFLECT( graphene::elasticsearch::operation_history_struct,
-            (trx_in_block)(op_in_trx)(operation_result)(virtual_op)(op)(op_object)(operation_result_object) )
+            (trx_in_block)(op_in_trx)(virtual_op)(fee_payer)
+            (op)(operation_result)(op_object)(operation_result_object) )
 FC_REFLECT( graphene::elasticsearch::block_struct, (block_num)(block_time)(trx_id) )
 FC_REFLECT( graphene::elasticsearch::fee_struct, (asset)(asset_name)(amount)(amount_units) )
 FC_REFLECT( graphene::elasticsearch::transfer_struct, (asset)(asset_name)(amount)(amount_units)(from)(to) )
