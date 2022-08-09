@@ -249,13 +249,29 @@ void elasticsearch_plugin_impl::checkState(const fc::time_point_sec& block_time)
    bulk_lines.reserve(limit_documents);
 }
 
+struct get_fee_payer_visitor
+{
+   using result_type = account_id_type;
+
+   template<typename OpType>
+   account_id_type operator()(const OpType& op) const
+   {
+      return op.fee_payer();
+   }
+};
+
 void elasticsearch_plugin_impl::doOperationHistory( const optional <operation_history_object>& oho,
                                                     operation_history_struct& os ) const
 { try {
    os.trx_in_block = oho->trx_in_block;
    os.op_in_trx = oho->op_in_trx;
-   os.operation_result = fc::json::to_string(oho->result);
    os.virtual_op = oho->virtual_op;
+   os.fee_payer = oho->op.visit( get_fee_payer_visitor() );
+
+   if(_options.operation_string)
+      os.op = fc::json::to_string(oho->op);
+
+   os.operation_result = fc::json::to_string(oho->result);
 
    if(_options.operation_object) {
       constexpr uint16_t current_depth = 2;
@@ -269,8 +285,6 @@ void elasticsearch_plugin_impl::doOperationHistory( const optional <operation_hi
       os.operation_result_object = graphene::utilities::es_data_adaptor::adapt_static_variant( v.get_array(),
                                          _options.max_mapping_depth - current_depth );
    }
-   if(_options.operation_string)
-      os.op = fc::json::to_string(oho->op);
 } FC_CAPTURE_LOG_AND_RETHROW( (oho) ) }
 
 void elasticsearch_plugin_impl::doBlock(uint32_t trx_in_block, const signed_block& b, block_struct& bs) const
