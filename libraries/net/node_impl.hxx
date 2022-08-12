@@ -174,7 +174,7 @@ public:
       fc::scoped_lock<fc::mutex> lock(mux);
       return std::unordered_set<Key, Hash, Pred>::find(key); 
    }
-};   
+};
 
 class blockchain_tied_message_cache
 {
@@ -782,7 +782,7 @@ public:
       void listen_to_p2p_network();
       void connect_to_p2p_network(node_impl_ptr self);
       void add_node( const fc::ip::endpoint& ep );
-      void set_advertise_algorithm( const std::string& algo, 
+      void set_advertise_algorithm( const std::string& algo,
             const std::vector<std::string>& advertise_or_exclude_list );
       void add_seed_node( const std::string& seed_string );
       void resolve_seed_node_and_add( const std::string& seed_string );
@@ -830,7 +830,7 @@ public:
 
 }}} // end of namespace graphene::net::detail
 
-FC_REFLECT( graphene::net::detail::node_configuration, 
+FC_REFLECT( graphene::net::detail::node_configuration,
             (listen_endpoint)
             (accept_incoming_connections)
             (connect_to_new_peers)

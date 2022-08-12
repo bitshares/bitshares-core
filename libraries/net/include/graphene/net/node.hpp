@@ -76,7 +76,7 @@ namespace graphene { namespace net {
           */
          virtual bool handle_block( const graphene::net::block_message& blk_msg, bool sync_mode, 
                                     std::vector<message_hash_type>& contained_transaction_msg_ids ) = 0;
-         
+
          /**
           *  @brief Called when a new transaction comes in from the network
           *
@@ -87,7 +87,7 @@ namespace graphene { namespace net {
 
          /**
           *  @brief Called when a new message comes in from the network other than a
-          *         block or a transaction.  Currently there are no other possible 
+          *         block or a transaction.  Currently there are no other possible
           *         messages, so this should never be called.
           *
           *  @throws exception if error validating the item, otherwise the item is
@@ -197,7 +197,7 @@ namespace graphene { namespace net {
         void      set_node_delegate( std::shared_ptr<node_delegate> del ) const;
 
         void      load_configuration( const fc::path& configuration_directory );
-        
+
         virtual void      listen_to_p2p_network();
         virtual void      connect_to_p2p_network();
 

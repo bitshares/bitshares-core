@@ -195,10 +195,10 @@ namespace graphene { namespace net { namespace detail {
                      list.insert(tmp);
                   }
                }
-               catch(const fc::exception& ) 
+               catch(const fc::exception& )
                {
                   wlog( "Address ${addr} invalid.", ("addr", str) );
-               } 
+               }
             } );
       }
 
@@ -208,7 +208,7 @@ namespace graphene { namespace net { namespace detail {
          // only pass those that are in the list AND we are connected to
          for(auto& it : advertise_list)
          {
-            graphene::net::peer_connection_ptr peer_conn 
+            graphene::net::peer_connection_ptr peer_conn
                = impl->get_active_connection_for_endpoint( it.remote_endpoint );
             if ( peer_conn != peer_connection_ptr() )
                ret_val.push_back( it );
@@ -247,7 +247,7 @@ namespace graphene { namespace net { namespace detail {
          // filter out those in the exclude list
          for(const peer_connection_ptr& active_peer : impl->_active_connections)
          {
-            if (exclude_list.find( *active_peer->get_remote_endpoint() ) == exclude_list.end())  
+            if (exclude_list.find( *active_peer->get_remote_endpoint() ) == exclude_list.end())
                reply.addresses.emplace_back(update_address_record(impl, active_peer));
          }
          reply.addresses.shrink_to_fit();
@@ -700,7 +700,7 @@ namespace graphene { namespace net { namespace detail {
                   });
                   break;
                 }
-              }  
+              }
             }
             if (!item_fetched)
               ++item_iter;
@@ -711,7 +711,7 @@ namespace graphene { namespace net { namespace detail {
         for (const peer_and_items_to_fetch& peer_and_items : items_by_peer)
         {
           // the item lists are heterogenous and
-          // the fetch_items_message can only deal with one item type at a time.  
+          // the fetch_items_message can only deal with one item type at a time.
           std::map<uint32_t, std::vector<item_hash_t> > items_to_fetch_by_type;
           for (const item_id& item : peer_and_items.item_ids)
             items_to_fetch_by_type[item.item_type].push_back(item.item_hash);
@@ -866,7 +866,7 @@ namespace graphene { namespace net { namespace detail {
       // This might not be so bad because it could make us initiate more connections and
       // reconnect with the rest of the network, or it might just futher isolate us.
       // As usual, the first step is to walk through all our peers and figure out which
-      // peers need action (disconneting, sending keepalives, etc), then we walk through 
+      // peers need action (disconneting, sending keepalives, etc), then we walk through
       // those lists yielding at our leisure later.
 
       uint32_t handshaking_timeout = _peer_inactivity_timeout;
@@ -967,7 +967,7 @@ namespace graphene { namespace net { namespace detail {
                   wlog( "Sending a keepalive message to peer ${peer} who hasn't sent us any messages in the last ${timeout} seconds",
                         ( "peer", active_peer->get_remote_endpoint() )("timeout", active_send_keepalive_timeout ) );
                   peers_to_send_keep_alive.push_back(active_peer);
-               }              
+               }
                else if (active_peer->we_need_sync_items_from_peer && 
                      !active_peer->is_currently_handling_message() &&
                      !active_peer->item_ids_requested_from_peer &&
@@ -1084,7 +1084,6 @@ namespace graphene { namespace net { namespace detail {
     void node_impl::fetch_updated_peer_lists_loop()
     {
       VERIFY_CORRECT_THREAD();
-      
       {
          fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          // JMJ 2018-10-22 Unsure why we're making a copy here, but this is probably unnecessary
@@ -1107,7 +1106,7 @@ namespace graphene { namespace net { namespace detail {
          }
       }
 
-      // this has nothing to do with updating the peer list, but we need to prune this list 
+      // this has nothing to do with updating the peer list, but we need to prune this list
       // at regular intervals, this is a fine place to do it.
       fc::time_point_sec oldest_failed_ids_to_keep(fc::time_point::now() - fc::minutes(15));
       auto oldest_failed_ids_to_keep_iter = _recently_failed_items.get<peer_connection::timestamp_index>()
@@ -1867,7 +1866,7 @@ namespace graphene { namespace net { namespace detail {
       catch (const peer_is_on_an_unreachable_fork&)
       {
         dlog("Peer is on a fork and there's no set of blocks we can provide to switch them to our fork");
-        // we reply with an empty list as if we had an empty blockchain; 
+        // we reply with an empty list as if we had an empty blockchain;
         // we don't want to disconnect because they may be able to provide
         // us with blocks on their chain
       }
@@ -1991,7 +1990,7 @@ namespace graphene { namespace net { namespace detail {
         synopsis = _delegate->get_blockchain_synopsis(reference_point, number_of_blocks_after_reference_point);
 
       // TODO: it's possible that the returned synopsis is empty if the blockchain is empty (that's fine)
-      // or if the reference point is now past our undo history (that's not). 
+      // or if the reference point is now past our undo history (that's not).
       // in the second case, we should mark this peer as one we're unable to sync with and
       // disconnect them.
       if (reference_point != item_hash_t() && synopsis.empty())
@@ -2004,10 +2003,10 @@ namespace graphene { namespace net { namespace detail {
         uint32_t first_block_num_in_ids_to_get = _delegate->get_block_number(original_ids_of_items_to_get.front());
         uint32_t true_high_block_num = first_block_num_in_ids_to_get + original_ids_of_items_to_get.size() - 1;
 
-        // in order to generate a seamless synopsis, we need to be using the same low_block_num as the 
+        // in order to generate a seamless synopsis, we need to be using the same low_block_num as the
         // backend code; the first block in the synopsis will be the low block number it used
         uint32_t low_block_num = synopsis.empty() ? 1 : _delegate->get_block_number(synopsis.front());
-        
+
         do
         {
           if( low_block_num >= first_block_num_in_ids_to_get )
@@ -2033,7 +2032,7 @@ namespace graphene { namespace net { namespace detail {
       try
       {
         std::vector<item_hash_t> blockchain_synopsis = create_blockchain_synopsis_for_peer( peer );
-      
+
         item_hash_t last_item_seen = blockchain_synopsis.empty() ? item_hash_t() : blockchain_synopsis.back();
         dlog( "sync: sending a request for the next items after ${last_item_seen} to peer ${peer}, "
               "(full request is ${blockchain_synopsis})",
@@ -2059,7 +2058,7 @@ namespace graphene { namespace net { namespace detail {
       if( originating_peer->item_ids_requested_from_peer )
       {
         // verify that the peer's the block ids the peer sent is a valid response to our request;
-        // It should either be an empty list of blocks, or a list of blocks that builds off of one of 
+        // It should either be an empty list of blocks, or a list of blocks that builds off of one of
         // the blocks in the synopsis we sent
         if (!blockchain_item_ids_inventory_message_received.item_hashes_available.empty())
         {
@@ -2283,7 +2282,7 @@ namespace graphene { namespace net { namespace detail {
 
           // append the remaining items to the peer's list
           boost::push_back(originating_peer->ids_of_items_to_get, item_hashes_received);
-          
+
           uint32_t new_number_of_unfetched_items = calculate_unsynced_block_count_from_all_peers();
           if (new_number_of_unfetched_items != _total_num_of_unfetched_items)
             _delegate->sync_status(blockchain_item_ids_inventory_message_received.item_type,
@@ -2539,7 +2538,7 @@ namespace graphene { namespace net { namespace detail {
                 // too, we can expect it to be around in this peer's cache for longer, so update its timestamp
                 _items_to_fetch.get<item_id_index>().modify(items_to_fetch_iter,
                                                             [](prioritized_item_id& item) { item.timestamp = fc::time_point::now(); });
-              } 
+              }
             }
           }
         }
@@ -3122,7 +3121,7 @@ namespace graphene { namespace net { namespace detail {
       {
         throw;
       }
-      catch (const unlinkable_block_exception& e) 
+      catch (const unlinkable_block_exception& e)
       {
         restart_sync_exception = e;
       }
