@@ -3950,8 +3950,6 @@ namespace graphene { namespace net { namespace detail {
         uint32_t port = GRAPHENE_NET_DEFAULT_P2P_PORT;
 #endif
         _node_configuration.listen_endpoint.set_port( port );
-        _node_configuration.accept_incoming_connections = true;
-        _node_configuration.wait_if_endpoint_is_busy = false;
 
         ilog( "generating new private key for this node" );
         _node_configuration.private_key = fc::ecc::private_key::generate();
