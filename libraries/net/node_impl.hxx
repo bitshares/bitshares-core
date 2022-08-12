@@ -415,6 +415,7 @@ public:
       static std::shared_ptr<address_builder> create_default_address_builder();
       virtual void build( node_impl* impl, address_message& ) const = 0;
       virtual bool should_advertise(const  fc::ip::endpoint& in ) const = 0;
+      virtual ~address_builder() = default;
    };
 
 #ifdef P2P_IN_DEDICATED_THREAD
