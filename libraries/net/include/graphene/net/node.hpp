@@ -277,7 +277,7 @@ namespace graphene { namespace net {
          * Allows the caller to determine how to respond to requests for peers
          * @param algo the algorithm to use ("exclude_list", "list", "nothing", "all")
          * @param advertise_or_exclude_list a list of nodes to
-         *     advertise (if algo = "list") or exclude (if algo is "exclude")
+         *     advertise (if algo is "list") or exclude (if algo is "exclude_list")
          */
         void set_advertise_algorithm( const std::string& algo,
             const std::vector<std::string>& advertise_or_exclude_list = std::vector<std::string>() );
