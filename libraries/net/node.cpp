@@ -1031,8 +1031,8 @@ namespace graphene { namespace net { namespace detail {
       } // scoped_lock
       peers_to_terminate.clear();
 
-      // if we're going to abruptly disconnect anyone, do it here 
-      // (it doesn't yield).  I don't think there would be any harm if this were 
+      // if we're going to abruptly disconnect anyone, do it here
+      // (it doesn't yield).  I don't think there would be any harm if this were
       // moved to the yielding section
       for( const peer_connection_ptr& peer : peers_to_disconnect_forcibly )
       {
