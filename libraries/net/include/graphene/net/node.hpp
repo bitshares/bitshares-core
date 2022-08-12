@@ -23,14 +23,11 @@
  */
 #pragma once
 
-#include <fc/thread/thread.hpp>
 #include <graphene/net/core_messages.hpp>
 #include <graphene/net/message.hpp>
 #include <graphene/net/peer_database.hpp>
 
 #include <graphene/protocol/types.hpp>
-
-#include <list>
 
 namespace graphene { namespace net {
 
@@ -40,11 +37,8 @@ namespace graphene { namespace net {
   namespace detail
   {
     class node_impl;
-    struct node_impl_deleter
-    {
-      void operator()(node_impl*);
-    };
   }
+  using node_impl_ptr = std::shared_ptr<detail::node_impl>;
 
   // during network development, we need to track message propagation across the network
   // using a structure like this:
@@ -62,7 +56,7 @@ namespace graphene { namespace net {
    class node_delegate
    {
       public:
-         virtual ~node_delegate(){}
+         virtual ~node_delegate() = default;
 
          /**
           *  If delegate has the item, the network has no need to fetch it.
@@ -72,14 +66,16 @@ namespace graphene { namespace net {
          /**
           *  @brief Called when a new block comes in from the network
           *
+          *  @param blk_msg the message which contains the block
           *  @param sync_mode true if the message was fetched through the sync process, false during normal operation
+          *  @param contained_transaction_msg_ids container for the transactions to write back into
           *  @returns true if this message caused the blockchain to switch forks, false if it did not
           *
           *  @throws exception if error validating the item, otherwise the item is
           *          safe to broadcast on.
           */
          virtual bool handle_block( const graphene::net::block_message& blk_msg, bool sync_mode, 
-                                    std::vector<fc::uint160_t>& contained_transaction_message_ids ) = 0;
+                                    std::vector<message_hash_type>& contained_transaction_msg_ids ) = 0;
          
          /**
           *  @brief Called when a new transaction comes in from the network
@@ -193,32 +189,15 @@ namespace graphene { namespace net {
    class node : public std::enable_shared_from_this<node>
    {
       public:
-        node(const std::string& user_agent);
+        explicit node(const std::string& user_agent);
         virtual ~node();
 
         void close();
 
-        void      set_node_delegate( node_delegate* del );
-        /***
-         * Allows the caller to determine how to respond to requests for peers
-         * @param algo the algorithm to use ("exclude_list", "list", "nothing", "all")
-         * @param advertise_or_exclude_list a list of nodes to 
-         *     advertise (if algo = "list") or exclude (if algo is "exclude")
-         */
-        void set_advertise_algorithm( std::string algo,
-            const fc::optional<std::vector<std::string>>& advertise_or_exclude_list 
-            = fc::optional<std::vector<std::string>>() );
+        void      set_node_delegate( std::shared_ptr<node_delegate> del ) const;
 
         void      load_configuration( const fc::path& configuration_directory );
         
-        /**
-         * Specifies the network interface and port upon which incoming
-         *  connections should be accepted.
-         * @param ep the endpoint (network interface and port)
-         * @param wait_if_not_available keep retrying if port is not available
-         */
-        void set_listen_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available );
-
         virtual void      listen_to_p2p_network();
         virtual void      connect_to_p2p_network();
 
@@ -249,7 +228,7 @@ namespace graphene { namespace net {
         /**
          * @brief Helper to convert a string to a collection of endpoints
          *
-         * This converts a string (i.e. "bitshares.eu:665535" to a collection of endpoints.
+         * This converts a string (i.e. "bitshares.eu:665535") to a collection of endpoints.
          * NOTE: Throws an exception if not in correct format or was unable to resolve URL.
          *
          * @param in the incoming string
@@ -257,17 +236,13 @@ namespace graphene { namespace net {
          */
         static std::vector<fc::ip::endpoint> resolve_string_to_ip_endpoints( const std::string& in );
 
-         /**
-          * enable/disable listening for incoming connections
-          * @param accept set to true to listen for incoming connections, false otherwise
+        /**
+         * Specifies the network interface and port upon which incoming
+         *  connections should be accepted.
+         * @param ep the endpoint (network interface and port)
+         * @param wait_if_not_available keep retrying if port is not available
          */
-         void set_accept_incoming_connections( bool accept );
-
-         /***
-          * enable/disable connection attempts when new connections are advertised
-          * @param connect true to attempt new connections, false otherwise
-          */
-         void set_connect_to_new_peers( bool connect );
+        void set_listen_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available );
 
         /**
          *  Specifies the port upon which incoming connections should be accepted.
@@ -279,12 +254,33 @@ namespace graphene { namespace net {
          */
         void set_listen_port( uint16_t port, bool wait_if_not_available );
 
+         /**
+          * Enable or disable listening for incoming connections
+          * @param accept set to true to listen for incoming connections, false otherwise
+          */
+         void set_accept_incoming_connections( bool accept );
+
+         /***
+          * Enable or disable connection attempts when new connections are advertised
+          * @param connect true to attempt new connections, false otherwise
+          */
+         void set_connect_to_new_peers( bool connect );
+
         /**
          * Returns the endpoint the node is listening on.  This is usually the same
          * as the value previously passed in to set_listen_endpoint, unless we
          * were unable to bind to that port.
          */
         virtual fc::ip::endpoint get_actual_listening_endpoint() const;
+
+        /***
+         * Allows the caller to determine how to respond to requests for peers
+         * @param algo the algorithm to use ("exclude_list", "list", "nothing", "all")
+         * @param advertise_or_exclude_list a list of nodes to
+         *     advertise (if algo = "list") or exclude (if algo is "exclude")
+         */
+        void set_advertise_algorithm( const std::string& algo,
+            const std::vector<std::string>& advertise_or_exclude_list = std::vector<std::string>() );
 
         /**
          *  @return a list of peers that are currently connected.
@@ -335,34 +331,10 @@ namespace graphene { namespace net {
         void disable_peer_advertising();
         fc::variant_object get_call_statistics() const;
       protected:
-        std::unique_ptr<detail::node_impl, detail::node_impl_deleter> my;
+        node_impl_ptr my;
    };
 
-    class simulated_network : public node
-    {
-    public:
-      ~simulated_network();
-      simulated_network(const std::string& user_agent) : node(user_agent) {}
-      void      listen_to_p2p_network() override {}
-      void      connect_to_p2p_network() override {}
-      void      connect_to_endpoint(const fc::ip::endpoint& ep) override {}
-
-      fc::ip::endpoint get_actual_listening_endpoint() const override { return fc::ip::endpoint(); }
-
-      void      sync_from(const item_id& current_head_block, const std::vector<uint32_t>& hard_fork_block_numbers) override {}
-      void      broadcast(const message& item_to_broadcast) override;
-      void      add_node_delegate(node_delegate* node_delegate_to_add);
-
-      virtual uint32_t get_connection_count() const override { return 8; }
-    private:
-      struct node_info;
-      void message_sender(node_info* destination_node);
-      std::list<node_info*> network_nodes;
-    };
-
-
-   typedef std::shared_ptr<node> node_ptr;
-   typedef std::shared_ptr<simulated_network> simulated_network_ptr;
+   using node_ptr = std::shared_ptr<node>;
 
 } } // graphene::net
 

@@ -45,7 +45,7 @@ namespace graphene { namespace db {
              auto id = get_next_id();
              auto instance = id.instance();
              if( instance >= _objects.size() ) _objects.resize( instance + 1 );
-             _objects[instance].reset(new T);
+             _objects[instance] = std::make_unique<T>();
              _objects[instance]->id = id;
              constructor( *_objects[instance] );
              _objects[instance]->id = id; // just in case it changed
@@ -65,7 +65,7 @@ namespace graphene { namespace db {
             assert( nullptr != dynamic_cast<T*>(&obj) );
             if( _objects.size() <= instance ) _objects.resize( instance+1 );
             assert( !_objects[instance] );
-            _objects[instance].reset( new T( std::move( static_cast<T&>(obj) ) ) );
+            _objects[instance] = std::make_unique<T>( std::move( static_cast<T&>(obj) ) );
             return *_objects[instance];
          }
 

@@ -138,18 +138,35 @@ namespace graphene { namespace wallet { namespace detail {
       try {
          account_object from_account = get_account(from);
          md.from = from_account.options.memo_key;
-      } catch (const fc::exception& e) {
-         md.from =  self.get_public_key( from );
+      } catch (const fc::exception&) {
+         // check if the string itself is a pubkey, if not, consider it as a label
+         try {
+            md.from = public_key_type( from );
+         } catch (const fc::exception&) {
+            md.from = self.get_public_key( from );
+         }
       }
       // same as above, for destination key
       try {
          account_object to_account = get_account(to);
          md.to = to_account.options.memo_key;
-      } catch (const fc::exception& e) {
-         md.to = self.get_public_key( to );
+      } catch (const fc::exception&) {
+         // check if the string itself is a pubkey, if not, consider it as a label
+         try {
+            md.to = public_key_type( to );
+         } catch (const fc::exception&) {
+            md.to = self.get_public_key( to );
+         }
       }
 
-      md.set_message(get_private_key(md.from), md.to, memo);
+      // try to get private key of from and sign, if that fails, try to sign with to
+      try {
+         md.set_message(get_private_key(md.from), md.to, memo);
+      } catch (const fc::exception&) {
+         std::swap( md.from, md.to );
+         md.set_message(get_private_key(md.from), md.to, memo);
+         std::swap( md.from, md.to );
+      }
       return md;
    }
 
@@ -161,10 +178,10 @@ namespace graphene { namespace wallet { namespace detail {
       const memo_data *memo = &md;
 
       try {
-         FC_ASSERT( _keys.count(memo->to) || _keys.count(memo->from),
+         FC_ASSERT( _keys.count(memo->to) > 0 || _keys.count(memo->from) > 0,
                     "Memo is encrypted to a key ${to} or ${from} not in this wallet.",
                     ("to", memo->to)("from",memo->from) );
-         if( _keys.count(memo->to) ) {
+         if( _keys.count(memo->to) > 0 ) {
             auto my_key = wif_to_key(_keys.at(memo->to));
             FC_ASSERT(my_key, "Unable to recover private key to decrypt memo. Wallet may be corrupted.");
             clear_text = memo->get_message(*my_key, memo->from);
@@ -197,8 +214,8 @@ namespace graphene { namespace wallet { namespace detail {
       return msg;
    }
 
-   bool wallet_api_impl::verify_message( const string& message, const string& account, int block, const string& time,
-                        const compact_signature& sig )
+   bool wallet_api_impl::verify_message( const string& message, const string& account, int32_t block,
+                                         const string& msg_time, const fc::ecc::compact_signature& sig )
    {
       const account_object from_account = get_account( account );
 
@@ -207,7 +224,7 @@ namespace graphene { namespace wallet { namespace detail {
       msg.meta.account = from_account.name;
       msg.meta.memo_key = from_account.options.memo_key;
       msg.meta.block = block;
-      msg.meta.time = time;
+      msg.meta.time = msg_time;
       msg.signature = sig;
 
       return verify_signed_message( msg );
@@ -219,7 +236,7 @@ namespace graphene { namespace wallet { namespace detail {
 
       const account_object from_account = get_account( message.meta.account );
 
-      const public_key signer( *message.signature, message.digest() );
+      const fc::ecc::public_key signer( *message.signature, message.digest() );
       if( !( message.meta.memo_key == signer ) ) return false;
       FC_ASSERT( from_account.options.memo_key == signer,
                  "Message was signed by contained key, but it doesn't belong to the contained account!" );
@@ -312,7 +329,18 @@ namespace graphene { namespace wallet { namespace detail {
 
    signed_transaction wallet_api_impl::sign_transaction( signed_transaction tx, bool broadcast )
    {
+      return sign_transaction2(tx, {}, broadcast);
+   }
+
+   signed_transaction wallet_api_impl::sign_transaction2( signed_transaction tx,
+                                                         const vector<public_key_type>& signing_keys, bool broadcast)
+   {
       set<public_key_type> approving_key_set = get_owned_required_keys(tx);
+
+      // Add any explicit keys to the approving_key_set
+      for (const public_key_type& explicit_key : signing_keys) {
+         approving_key_set.insert(explicit_key);
+      }
 
       auto dyn_props = get_dynamic_global_properties();
       tx.set_reference_block( dyn_props.head_block_id );

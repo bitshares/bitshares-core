@@ -103,7 +103,6 @@ namespace graphene { namespace wallet {
 
       // Create as many derived owner keys as requested
       vector<brain_key_info> results;
-      brain_key = graphene::wallet::detail::normalize_brain_key(brain_key);
       for (int i = 0; i < number_of_desired_keys; ++i) {
         fc::ecc::private_key priv_key = graphene::wallet::detail::derive_private_key( brain_key, i );
 
@@ -152,7 +151,7 @@ namespace graphene { namespace wallet {
 namespace graphene { namespace wallet {
 
 wallet_api::wallet_api(const wallet_data& initial_data, fc::api<login_api> rapi)
-   : my(new detail::wallet_api_impl(*this, initial_data, rapi))
+   : my( std::make_unique<detail::wallet_api_impl>(*this, initial_data, rapi) )
 {
 }
 
@@ -202,10 +201,10 @@ uint64_t wallet_api::get_asset_count()const
 
 signed_transaction wallet_api::htlc_create( string source, string destination, string amount, string asset_symbol,
          string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
-         const uint32_t claim_period_seconds, bool broadcast)
+         const uint32_t claim_period_seconds, const std::string& memo, bool broadcast)
 {
    return my->htlc_create(source, destination, amount, asset_symbol, hash_algorithm, preimage_hash, preimage_size,
-         claim_period_seconds, broadcast);
+         claim_period_seconds, memo, broadcast);
 }
 
 fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
@@ -223,6 +222,8 @@ fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
       const auto& asset = my->get_asset( obj.transfer.asset_id );
       transfer["asset"] = asset.symbol;
       transfer["amount"] = graphene::app::uint128_amount_to_string( obj.transfer.amount.value, asset.precision );
+      if (obj.memo.valid())
+         transfer["memo"] = my->read_memo( *obj.memo );
       class htlc_hash_to_variant_visitor
       {
          public:
@@ -234,6 +235,8 @@ fc::optional<fc::variant> wallet_api::get_htlc(std::string htlc_id) const
          { return convert("SHA1", obj.str()); }
          result_type operator()(const fc::sha256& obj)const
          { return convert("SHA256", obj.str()); }
+         result_type operator()(const fc::hash160& obj)const
+         { return convert("HASH160", obj.str()); }
          private:
          result_type convert(const std::string& type, const std::string& hash)const
          {
@@ -273,7 +276,7 @@ signed_transaction wallet_api::htlc_extend ( std::string htlc_id, std::string is
    return my->htlc_extend(htlc_id, issuer, seconds_to_add, broadcast);
 }
 
-vector<operation_detail> wallet_api::get_account_history(string name, int limit)const
+vector<operation_detail> wallet_api::get_account_history(const string& name, uint32_t limit)const
 {
    vector<operation_detail> result;
 
@@ -295,7 +298,9 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
          }
       }
 
-      int page_limit = skip_first_row ? std::min( 100, limit + 1 ) : std::min( 100, limit );
+      uint32_t default_page_size = 100;
+      uint32_t page_limit = skip_first_row ? std::min<uint32_t>( default_page_size, limit + 1 )
+                                           : std::min<uint32_t>( default_page_size, limit );
 
       vector<operation_history_object> current = my->_remote_hist->get_account_history(
             name,
@@ -318,7 +323,7 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
          result.push_back( operation_detail{ memo, ss.str(), o } );
       }
 
-      if( int(current.size()) < page_limit )
+      if( current.size() < page_limit )
          break;
 
       limit -= current.size();
@@ -330,9 +335,9 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
 }
 
 vector<operation_detail> wallet_api::get_relative_account_history(
-      string name,
+      const string& name,
       uint32_t stop,
-      int limit,
+      uint32_t limit,
       uint32_t start)const
 {
    vector<operation_detail> result;
@@ -346,40 +351,41 @@ vector<operation_detail> wallet_api::get_relative_account_history(
    else
       start = std::min<uint32_t>(start, stats.total_ops);
 
+   uint32_t default_page_size = 100;
    while( limit > 0 )
    {
+      uint32_t page_size = std::min<uint32_t>(default_page_size, limit);
       vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(
             name,
             stop,
-            std::min<uint32_t>(100, limit),
+            page_size,
             start);
       for (auto &o : current) {
          std::stringstream ss;
          auto memo = o.op.visit(detail::operation_printer(ss, *my, o));
          result.push_back(operation_detail{memo, ss.str(), o});
       }
-      if (current.size() < std::min<uint32_t>(100, limit))
+      if (current.size() < page_size)
          break;
-      limit -= current.size();
-      start -= 100;
+      limit -= page_size;
+      start -= page_size;
       if( start == 0 ) break;
    }
    return result;
 }
 
 account_history_operation_detail wallet_api::get_account_history_by_operations(
-      string name,
-      vector<uint16_t> operation_types,
+      const string& name,
+      const flat_set<uint16_t>& operation_types,
       uint32_t start,
-      int limit)
+      uint32_t limit)
 {
     account_history_operation_detail result;
-    auto account_id = get_account(name).get_id();
 
-    const auto& account = my->get_account(account_id);
+    const auto& account = my->get_account(name);
     const auto& stats = my->get_object(account.statistics);
 
-    // sequence of account_transaction_history_object start with 1
+    // sequence of account_history_object start with 1
     start = start == 0 ? 1 : start;
 
     if (start <= stats.removed_ops) {
@@ -387,10 +393,14 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(
         result.total_count =stats.removed_ops;
     }
 
+    uint32_t default_page_size = 100;
     while (limit > 0 && start <= stats.total_ops) {
-        uint32_t min_limit = std::min<uint32_t> (100, limit);
+        uint32_t min_limit = std::min(default_page_size, limit);
         auto current = my->_remote_hist->get_account_history_by_operations(name, operation_types, start, min_limit);
-        for (auto& obj : current.operation_history_objs) {
+        auto his_rend = current.operation_history_objs.rend();
+        for( auto it = current.operation_history_objs.rbegin(); it != his_rend; ++it )
+        {
+            auto& obj = *it;
             std::stringstream ss;
             auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj));
 
@@ -526,6 +536,13 @@ signed_transaction wallet_api::sign_builder_transaction(transaction_handle_type 
    return my->sign_builder_transaction(transaction_handle, broadcast);
 }
 
+signed_transaction wallet_api::sign_builder_transaction2(transaction_handle_type transaction_handle,
+                                                        const vector<public_key_type>& explicit_keys,
+                                                        bool broadcast)
+{
+   return my->sign_builder_transaction2(transaction_handle, explicit_keys, broadcast);
+}
+
 pair<transaction_id_type,signed_transaction> wallet_api::broadcast_transaction(signed_transaction tx)
 {
     return my->broadcast_transaction(tx);
@@ -562,9 +579,9 @@ account_object wallet_api::get_account(string account_name_or_id) const
 
 extended_asset_object wallet_api::get_asset(string asset_name_or_id) const
 {
-   auto a = my->find_asset(asset_name_or_id);
-   FC_ASSERT(a);
-   return *a;
+   auto found_asset = my->find_asset(asset_name_or_id);
+   FC_ASSERT( found_asset, "Unable to find asset '${a}'", ("a",asset_name_or_id) );
+   return *found_asset;
 }
 
 asset_bitasset_data_object wallet_api::get_bitasset_data(string asset_name_or_id) const
@@ -579,7 +596,7 @@ account_id_type wallet_api::get_account_id(string account_name_or_id) const
    return my->get_account_id(account_name_or_id);
 }
 
-asset_id_type wallet_api::get_asset_id(string asset_symbol_or_id) const
+asset_id_type wallet_api::get_asset_id(const string& asset_symbol_or_id) const
 {
    return my->get_asset_id(asset_symbol_or_id);
 }
@@ -999,6 +1016,12 @@ signed_transaction wallet_api::sign_transaction(signed_transaction tx, bool broa
    return my->sign_transaction( tx, broadcast);
 } FC_CAPTURE_AND_RETHROW( (tx) ) }
 
+signed_transaction wallet_api::sign_transaction2(signed_transaction tx, const vector<public_key_type>& signing_keys,
+                                                 bool broadcast /* = false */)
+{ try {
+   return my->sign_transaction2( tx, signing_keys, broadcast);
+} FC_CAPTURE_AND_RETHROW( (tx) ) }
+
 flat_set<public_key_type> wallet_api::get_transaction_signers(const signed_transaction &tx) const
 { try {
    return my->get_transaction_signers(tx);
@@ -1112,7 +1135,7 @@ string wallet_api::help()const
 {
    std::vector<std::string> method_names = my->method_documentation.get_method_names();
    std::stringstream ss;
-   for (const std::string method_name : method_names)
+   for (const std::string& method_name : method_names)
    {
       try
       {
@@ -1328,9 +1351,10 @@ signed_message wallet_api::sign_message(string signer, string message)
    return my->sign_message(signer, message);
 }
 
-bool wallet_api::verify_message( string message, string account, int block, const string& time, compact_signature sig )
+bool wallet_api::verify_message( const string& message, const string& account, int32_t block, const string& msg_time,
+                                 const fc::ecc::compact_signature& sig )
 {
-   return my->verify_message( message, account, block, time, sig );
+   return my->verify_message( message, account, block, msg_time, sig );
 }
 
 /** Verify a message signed with sign_message
@@ -1905,9 +1929,9 @@ signed_transaction wallet_api::account_store_map(string account, string catalog,
 }
 
 vector<account_storage_object> wallet_api::get_account_storage(string account, string catalog)
-{
+{ try {
    return my->_custom_operations->get_storage_info(account, catalog);
-}
+} FC_CAPTURE_AND_RETHROW( (account)(catalog) ) }
 
 signed_block_with_info::signed_block_with_info( const signed_block& block )
    : signed_block( block )

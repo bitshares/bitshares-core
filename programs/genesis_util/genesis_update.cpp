@@ -81,26 +81,26 @@ int main( int argc, char** argv )
          return 1;
       }
 
-      if( options.count("help") )
+      if( options.count("help") > 0 )
       {
          std::cout << cli_options << "\n";
          return 1;
       }
 
-      if( !options.count( "genesis-json" ) )
+      if( options.count( "genesis-json" ) == 0 )
       {
          std::cerr << "--genesis-json option is required\n";
          return 1;
       }
 
-      if( !options.count( "out" ) )
+      if( options.count( "out" ) == 0 )
       {
          std::cerr << "--out option is required\n";
          return 1;
       }
 
       genesis_state_type genesis;
-      if( options.count("genesis-json") )
+      if( options.count("genesis-json") > 0 )
       {
          fc::path genesis_json_filename = options["genesis-json"].as<boost::filesystem::path>();
          std::cerr << "update_genesis:  Reading genesis from file " << genesis_json_filename.preferred_string() << "\n";

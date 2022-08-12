@@ -151,8 +151,8 @@ namespace graphene { namespace chain {
    class vesting_balance_object : public abstract_object<vesting_balance_object>
    {
       public:
-         static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id = vesting_balance_object_type;
+         static constexpr uint8_t space_id = protocol_ids;
+         static constexpr uint8_t type_id = vesting_balance_object_type;
 
          /// Account which owns and may withdraw from this vesting balance
          account_id_type owner;

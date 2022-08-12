@@ -45,8 +45,11 @@ public:
    typedef std::string result_type;
 
    std::string operator()(const graphene::protocol::void_result& x) const;
-   std::string operator()(const graphene::protocol::object_id_type& oid);
-   std::string operator()(const graphene::protocol::asset& a);
+   std::string operator()(const graphene::protocol::object_id_type& oid) const;
+   std::string operator()(const graphene::protocol::asset& a) const;
+   std::string operator()(const graphene::protocol::generic_operation_result& r) const;
+   std::string operator()(const graphene::protocol::generic_exchange_operation_result& r) const;
+   std::string operator()(const graphene::protocol::extendable_operation_result& r) const;
 };
 
 // BLOCK  TRX  OP  VOP
@@ -58,46 +61,68 @@ private:
    graphene::protocol::operation_result result;
    graphene::chain::operation_history_object hist;
 
-   std::string fee(const graphene::protocol::asset& a) const;
+   std::string format_asset(const graphene::protocol::asset& a) const;
+   void print_fee(const graphene::protocol::asset& a) const;
 
 public:
-   operation_printer( std::ostream& out, const wallet_api_impl& wallet, 
+   operation_printer( std::ostream& out, const wallet_api_impl& wallet,
          const graphene::chain::operation_history_object& obj )
       : out(out),
         wallet(wallet),
         result(obj.result),
         hist(obj)
    {}
+
+   /// Return the decrypted memo if a memo exists, otherwise return an empty string
    typedef std::string result_type;
 
    template<typename T>
    std::string operator()(const T& op)const
    {
-      auto a = wallet.get_asset( op.fee.asset_id );
       auto payer = wallet.get_account( op.fee_payer() );
 
       std::string op_name = fc::get_typename<T>::name();
       if( op_name.find_last_of(':') != std::string::npos )
          op_name.erase(0, op_name.find_last_of(':')+1);
-      out << op_name <<" ";
-      out << payer.name << " fee: " << a.amount_to_pretty_string( op.fee );
-      operation_result_printer rprinter(wallet);
-      std::string str_result = result.visit(rprinter);
-      if( str_result != "" )
-      {
-         out << "   result: " << str_result;
-      }
+      out << op_name << " ";
+      out << payer.name;
+      print_fee( op.fee );
+      print_result();
       return "";
    }
 
    std::string operator()(const graphene::protocol::transfer_operation& op)const;
+   std::string operator()(const graphene::protocol::override_transfer_operation& op)const;
    std::string operator()(const graphene::protocol::transfer_from_blind_operation& op)const;
    std::string operator()(const graphene::protocol::transfer_to_blind_operation& op)const;
    std::string operator()(const graphene::protocol::account_create_operation& op)const;
    std::string operator()(const graphene::protocol::account_update_operation& op)const;
    std::string operator()(const graphene::protocol::asset_create_operation& op)const;
+   std::string operator()(const graphene::protocol::asset_update_operation& op)const;
+   std::string operator()(const graphene::protocol::asset_update_bitasset_operation& op)const;
+   std::string operator()(const graphene::protocol::asset_update_feed_producers_operation& op)const;
+   std::string operator()(const graphene::protocol::asset_publish_feed_operation& op)const;
+   std::string operator()(const graphene::protocol::asset_fund_fee_pool_operation& op)const;
+   std::string operator()(const graphene::protocol::asset_claim_pool_operation& op)const;
+   std::string operator()(const graphene::protocol::asset_issue_operation& op)const;
+   std::string operator()(const graphene::protocol::asset_reserve_operation& op)const;
+   std::string operator()(const graphene::protocol::asset_settle_operation& op)const;
+   std::string operator()(const graphene::protocol::call_order_update_operation& op)const;
+   std::string operator()(const graphene::protocol::limit_order_create_operation& op)const;
+   std::string operator()(const graphene::protocol::limit_order_cancel_operation& op)const;
+   std::string operator()(const graphene::protocol::fill_order_operation& op)const;
+   std::string operator()(const graphene::protocol::proposal_update_operation& op)const;
    std::string operator()(const graphene::protocol::htlc_create_operation& op)const;
    std::string operator()(const graphene::protocol::htlc_redeem_operation& op)const;
+   std::string operator()(const graphene::protocol::htlc_redeemed_operation& op)const;
+
+protected:
+   std::string print_memo( const fc::optional<graphene::protocol::memo_data>& memo)const;
+   void print_preimage( const std::vector<char>& preimage)const;
+   void print_redeem(const graphene::protocol::htlc_id_type& id,
+         const std::string& redeemer, const std::vector<char>& preimage,
+         const graphene::protocol::asset& op_fee)const;
+   void print_result()const;
 };
 
 }}} // namespace graphene::wallet::detail

@@ -52,18 +52,20 @@ namespace detail
 class template_plugin : public graphene::app::plugin
 {
    public:
-      template_plugin();
-      virtual ~template_plugin();
+      explicit template_plugin(graphene::app::application& app);
+      ~template_plugin() override;
 
       std::string plugin_name()const override;
       std::string plugin_description()const override;
-      virtual void plugin_set_program_options(
+      void plugin_set_program_options(
          boost::program_options::options_description& cli,
          boost::program_options::options_description& cfg) override;
-      virtual void plugin_initialize(const boost::program_options::variables_map& options) override;
-      virtual void plugin_startup() override;
+      void plugin_initialize(const boost::program_options::variables_map& options) override;
+      void plugin_startup() override;
+      void plugin_shutdown() override;
 
-      friend class detail::template_plugin_impl;
+   private:
+      void cleanup();
       std::unique_ptr<detail::template_plugin_impl> my;
 };
 

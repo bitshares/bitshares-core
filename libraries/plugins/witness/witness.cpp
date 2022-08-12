@@ -122,7 +122,7 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
    _options = &options;
    LOAD_VALUE_SET(options, "witness-id", _witnesses, chain::witness_id_type)
 
-   if( options.count("private-key") )
+   if( options.count("private-key") > 0 )
    {
       const std::vector<std::string> key_id_to_wif_pair_strings = options["private-key"].as<std::vector<std::string>>();
       for (const std::string& key_id_to_wif_pair_string : key_id_to_wif_pair_strings)
@@ -130,7 +130,7 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
          add_private_key(key_id_to_wif_pair_string);
       }
    }
-   if (options.count("private-key-file"))
+   if (options.count("private-key-file") > 0)
    {
       const std::vector<boost::filesystem::path> key_id_to_wif_pair_files =
             options["private-key-file"].as<std::vector<boost::filesystem::path>>();
@@ -154,7 +154,7 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
          }
       }
    }
-   if(options.count("required-participation"))
+   if(options.count("required-participation") > 0)
    {
        auto required_participation = options["required-participation"].as<uint32_t>();
        FC_ASSERT(required_participation <= 100);
@@ -195,11 +195,6 @@ void witness_plugin::plugin_startup()
    ilog("witness plugin:  plugin_startup() end");
 } FC_CAPTURE_AND_RETHROW() }
 
-void witness_plugin::plugin_shutdown()
-{
-   stop_block_production();
-}
-
 void witness_plugin::stop_block_production()
 {
    _shutting_down = true;
@@ -217,7 +212,7 @@ void witness_plugin::stop_block_production()
 void witness_plugin::refresh_witness_key_cache()
 {
    const auto& db = database();
-   for( const chain::witness_id_type wit_id : _witnesses )
+   for( const chain::witness_id_type& wit_id : _witnesses )
    {
       const chain::witness_object* wit_obj = db.find( wit_id );
       if( wit_obj )
@@ -300,6 +295,9 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
       case block_production_condition::shutdown:
          ilog( "shutdown producing block" );
          return result;
+      case block_production_condition::no_network:
+         ilog( "not connected to P2P network" );
+         return result;
       default:
          elog( "unknown condition ${result} while producing block", ("result", (unsigned char)result) );
          break;
@@ -374,6 +372,9 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
       return block_production_condition::lag;
    }
 
+   if( p2p_node() == nullptr )
+      return block_production_condition::no_network;
+
    auto block = db.generate_block(
       scheduled_time,
       scheduled_witness,
@@ -381,7 +382,7 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
       _production_skip_flags
       );
    capture("n", block.block_num())("t", block.timestamp)("c", now)("x", block.transactions.size());
-   fc::async( [this,block](){ p2p_node().broadcast(net::block_message(block)); } );
+   fc::async( [this,block](){ p2p_node()->broadcast(net::block_message(block)); } );
 
    return block_production_condition::produced;
 }

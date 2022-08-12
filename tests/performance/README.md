@@ -6,7 +6,8 @@ of our current implementation. The subject was talked about in detail at
 BitFest Amsterdam, Sep 22, 2018.
 
 The original description of the 100,000 transactions per second test can be
-found at https://bitshares.org/blog/2015/06/08/measuring-performance/ .
+found at
+https://web.archive.org/web/20181111215859/https://bitshares.org/blog/2015/06/08/measuring-performance/ .
 
 Prepare
 -------

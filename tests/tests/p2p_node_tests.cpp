@@ -32,14 +32,16 @@
 #include <fc/filesystem.hpp>
 
 #include <graphene/net/node.hpp>
+#include <graphene/net/peer_connection.hpp>
+
+#include <fc/io/raw.hpp>
+
 #include <graphene/protocol/fee_schedule.hpp>
 
-#include <graphene/net/peer_connection.hpp>
-#define P2P_IN_DEDICATED_THREAD 1
 #include "../../libraries/net/node_impl.hxx"
 
 #include "../common/genesis_file_util.hpp"
-#include "../common/node_util.hpp"
+#include "../common/utils.hpp"
 
 /***
  * A peer connection delegate
@@ -83,7 +85,8 @@ class test_node : public graphene::net::node, public graphene::net::node_delegat
       close();
    }
 
-   void on_message( graphene::net::peer_connection_ptr originating_peer, const graphene::net::message& received_message )
+   void on_message( graphene::net::peer_connection_ptr originating_peer,
+                    const graphene::net::message& received_message )
    {
       my->get_thread()->async( [&]() {
          my->on_message( originating_peer.get(), received_message );
@@ -205,7 +208,7 @@ class test_peer : public graphene::net::peer_connection
             }
             case graphene::net::core_message_type_enum::check_firewall_reply_message_type :
             {
-               graphene::net::check_firewall_reply_message m = message_to_send.as<graphene::net::check_firewall_reply_message>();
+               auto m = message_to_send.as<graphene::net::check_firewall_reply_message>();
                message_received = std::make_shared<graphene::net::message>(m);
                break;
             }
@@ -257,7 +260,7 @@ BOOST_AUTO_TEST_SUITE( p2p_node_tests )
 BOOST_AUTO_TEST_CASE( disable_peer_advertising )
 {
    // create a node
-   int node1_port = graphene::app::get_available_port();
+   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir;
    test_node node1( "Node1", node1_dir.path(), node1_port );
    node1.disable_peer_advertising();
@@ -280,7 +283,7 @@ BOOST_AUTO_TEST_CASE( disable_peer_advertising )
 BOOST_AUTO_TEST_CASE( set_nothing_advertise_algorithm )
 {
    // create a node
-   int node1_port = graphene::app::get_available_port();
+   int node1_port = fc::network::get_available_port();
    fc::temp_directory node1_dir;
    test_node node1( "Node1", node1_dir.path(), node1_port );
    node1.set_advertise_algorithm( "nothing" );
@@ -305,7 +308,7 @@ BOOST_AUTO_TEST_CASE( advertise_list_test )
 {
    std::vector<std::string> advert_list = { "127.0.0.1:8090" };
    // set up my node
-   int my_node_port = graphene::app::get_available_port();
+   int my_node_port = fc::network::get_available_port();
    fc::temp_directory my_node_dir;
    test_node my_node( "Hello", my_node_dir.path(), my_node_port );
    my_node.set_advertise_algorithm( "list", advert_list );
@@ -332,7 +335,7 @@ BOOST_AUTO_TEST_CASE( exclude_list )
 {
    std::vector<std::string> ex_list = { "127.0.0.1:8090" };
    // set up my node
-   int my_node_port = graphene::app::get_available_port();
+   int my_node_port = fc::network::get_available_port();
    fc::temp_directory my_node_dir;
    test_node my_node( "Hello", my_node_dir.path(), my_node_port );
    my_node.set_advertise_algorithm( "exclude_list", ex_list );

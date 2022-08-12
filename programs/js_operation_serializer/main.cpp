@@ -220,7 +220,7 @@ class serialize_member_visitor
 template<typename T>
 struct serializer<T,false>
 {
-   static_assert( fc::reflector<T>::is_defined::value == false, "invalid template arguments" );
+   static_assert( !fc::reflector<T>::is_defined::value, "invalid template arguments" );
    static void init()
    {}
 
@@ -293,7 +293,7 @@ struct serializer< fc::static_variant<T...>, false >
       {
          init = true;
          fc::static_variant<T...> var;
-         for( int i = 0; i < var.count(); ++i )
+         for( size_t i = 0; i < var.count(); ++i )
          {
             var.set_which(i);
             var.visit( register_type_visitor() );
@@ -341,7 +341,7 @@ class register_member_visitor
 template<typename T, bool reflected>
 struct serializer
 {
-   static_assert( fc::reflector<T>::is_defined::value == reflected, "invalid template arguments" );
+   static_assert( fc::reflector<T>::is_defined::value, "invalid template arguments" );
    static void init()
    {
       auto name = js_name<T>::name();
@@ -372,7 +372,7 @@ int main( int argc, char** argv )
     operation op;
 
     std::cout << "ChainTypes.operations=\n";
-    for( int i = 0; i < op.count(); ++i )
+    for( size_t i = 0; i < op.count(); ++i )
     {
        op.set_which(i);
        op.visit( detail_ns::serialize_type_visitor(i) );

@@ -26,7 +26,7 @@
 #include <graphene/protocol/asset.hpp>
 #include <graphene/protocol/memo.hpp>
 
-namespace graphene { namespace protocol { 
+namespace graphene { namespace protocol {
 
    /**
     * @brief Create a new withdrawal permission
@@ -119,8 +119,8 @@ namespace graphene { namespace protocol {
     */
    struct withdraw_permission_claim_operation : public base_operation
    {
-      struct fee_parameters_type { 
-         uint64_t fee = 20*GRAPHENE_BLOCKCHAIN_PRECISION; 
+      struct fee_parameters_type {
+         uint64_t fee = 20*GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t price_per_kbyte = 10;
       };
 
@@ -173,12 +173,17 @@ FC_REFLECT( graphene::protocol::withdraw_permission_update_operation::fee_parame
 FC_REFLECT( graphene::protocol::withdraw_permission_claim_operation::fee_parameters_type, (fee)(price_per_kbyte) )
 FC_REFLECT( graphene::protocol::withdraw_permission_delete_operation::fee_parameters_type, (fee) )
 
-FC_REFLECT( graphene::protocol::withdraw_permission_create_operation, (fee)(withdraw_from_account)(authorized_account)
+FC_REFLECT( graphene::protocol::withdraw_permission_create_operation,
+            (fee)(withdraw_from_account)(authorized_account)
             (withdrawal_limit)(withdrawal_period_sec)(periods_until_expiration)(period_start_time) )
-FC_REFLECT( graphene::protocol::withdraw_permission_update_operation, (fee)(withdraw_from_account)(authorized_account)
-            (permission_to_update)(withdrawal_limit)(withdrawal_period_sec)(period_start_time)(periods_until_expiration) )
-FC_REFLECT( graphene::protocol::withdraw_permission_claim_operation, (fee)(withdraw_permission)(withdraw_from_account)(withdraw_to_account)(amount_to_withdraw)(memo) );
-FC_REFLECT( graphene::protocol::withdraw_permission_delete_operation, (fee)(withdraw_from_account)(authorized_account)
+FC_REFLECT( graphene::protocol::withdraw_permission_update_operation,
+            (fee)(withdraw_from_account)(authorized_account)
+            (permission_to_update)(withdrawal_limit)(withdrawal_period_sec)
+            (period_start_time)(periods_until_expiration) )
+FC_REFLECT( graphene::protocol::withdraw_permission_claim_operation,
+            (fee)(withdraw_permission)(withdraw_from_account)(withdraw_to_account)(amount_to_withdraw)(memo) )
+FC_REFLECT( graphene::protocol::withdraw_permission_delete_operation,
+            (fee)(withdraw_from_account)(authorized_account)
             (withdrawal_permission) )
 
 GRAPHENE_DECLARE_EXTERNAL_SERIALIZATION( graphene::protocol::withdraw_permission_create_operation::fee_parameters_type )

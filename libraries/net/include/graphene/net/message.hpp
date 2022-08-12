@@ -28,9 +28,7 @@
 
 #include <fc/io/varint.hpp>
 #include <fc/network/ip.hpp>
-#include <fc/io/raw_fwd.hpp>
 #include <fc/crypto/ripemd160.hpp>
-#include <fc/reflect/typename.hpp>
 
 namespace graphene { namespace net {
 
@@ -51,7 +49,7 @@ namespace graphene { namespace net {
      }
   };
 
-  typedef fc::uint160_t message_hash_type;
+  using message_hash_type = fc::ripemd160;
 
   /**
    *  Abstracts the process of packing/unpacking a message for a 
@@ -80,7 +78,7 @@ namespace graphene { namespace net {
         size     = (uint32_t)data.size();
      }
 
-     fc::uint160_t id()const
+     message_hash_type id()const
      {
         return fc::ripemd160::hash( data.data(), (uint32_t)data.size() );
      }

@@ -33,8 +33,8 @@ namespace graphene { namespace chain {
 class chain_property_object : public abstract_object<chain_property_object>
 {
    public:
-      static const uint8_t space_id = implementation_ids;
-      static const uint8_t type_id  = impl_chain_property_object_type;
+      static constexpr uint8_t space_id = implementation_ids;
+      static constexpr uint8_t type_id  = impl_chain_property_object_type;
 
       chain_id_type chain_id;
       immutable_chain_parameters immutable_parameters;

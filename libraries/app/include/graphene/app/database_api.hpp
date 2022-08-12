@@ -33,14 +33,15 @@
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/confidential_object.hpp>
+#include <graphene/chain/credit_offer_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
+#include <graphene/chain/samet_fund_object.hpp>
+#include <graphene/chain/ticket_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 
 #include <fc/api.hpp>
 #include <fc/variant_object.hpp>
-
-#include <fc/network/ip.hpp>
 
 #include <boost/container/flat_set.hpp>
 
@@ -83,7 +84,7 @@ class database_api
        *                  @a null to subscribe or not subscribe according to current auto-subscription setting
        *                  (see @ref set_auto_subscription)
        * @return The objects retrieved, in the order they are mentioned in ids
-       * @note operation_history_object (1.11.x) and account_transaction_history_object (2.9.x)
+       * @note operation_history_object (1.11.x) and account_history_object (2.9.x)
        *       can not be subscribed.
        *
        * If any of the provided IDs does not map to an object, a null variant is returned in its position.
@@ -118,6 +119,8 @@ class database_api
        * - lookup_accounts
        * - get_full_accounts
        * - get_htlc
+       * - get_liquidity_pools
+       * - get_liquidity_pools_by_share_asset
        *
        * Note: auto-subscription is enabled by default
        *
@@ -224,7 +227,9 @@ class database_api
       /**
        * @brief Get all accounts that refer to the specified public keys in their owner authority, active authorities
        *        or memo key
-       * @param keys a list of public keys to query
+       * @param keys a list of public keys to query,
+       *              the quantity should not be greater than the configured value of
+       *              @a api_limit_get_key_references
        * @return ID of all accounts that refer to the specified keys
        */
       vector<flat_set<account_id_type>> get_key_references( vector<public_key_type> keys )const;
@@ -264,20 +269,34 @@ class database_api
                                                      optional<bool> subscribe = optional<bool>() )const;
 
       /**
-       * @brief Fetch all objects relevant to the specified accounts and optionally subscribe to updates
-       * @param names_or_ids Each item must be the name or ID of an account to retrieve
+       * @brief Fetch objects relevant to the specified accounts and optionally subscribe to updates
+       * @param names_or_ids Each item must be the name or ID of an account to retrieve,
+       *              the quantity should not be greater than the configured value of
+       *              @a api_limit_get_full_accounts
        * @param subscribe @a true to subscribe to the queried full account objects; @a false to not subscribe;
        *                  @a null to subscribe or not subscribe according to current auto-subscription setting
        *                  (see @ref set_auto_subscription)
        * @return Map of string from @p names_or_ids to the corresponding account
        *
-       * This function fetches all relevant objects for the given accounts, and subscribes to updates to the given
+       * This function fetches relevant objects for the given accounts, and subscribes to updates to the given
        * accounts. If any of the strings in @p names_or_ids cannot be tied to an account, that input will be
-       * ignored. All other accounts will be retrieved and subscribed.
+       * ignored. Other accounts will be retrieved and subscribed.
+       * @note The maximum number of accounts allowed to subscribe per connection is configured by the
+       *       @a api_limit_get_full_accounts_subscribe option. Exceeded subscriptions will be ignored.
+       * @note For each object type, the maximum number of objects to return is configured by the
+       *       @a api_limit_get_full_accounts_lists option. Exceeded objects need to be queried with other APIs.
        *
        */
       std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids,
                                                        optional<bool> subscribe = optional<bool>() );
+
+      /**
+       * @brief Returns vector of voting power sorted by reverse vp_active
+       * @param limit Maximum number of accounts to retrieve, must not exceed the configured value of
+       *              @a api_limit_get_top_voters
+       * @return Desc Sorted voting power vector
+       */
+      vector<account_statistics_object> get_top_voters(uint32_t limit)const;
 
       /**
        * @brief Get info of an account by name
@@ -305,7 +324,8 @@ class database_api
       /**
        * @brief Get names and IDs for registered accounts
        * @param lower_bound_name Lower bound of the first name to return
-       * @param limit Maximum number of results to return -- must not exceed 1000
+       * @param limit Maximum number of results to return, must not exceed the configured value of
+       *              @a api_limit_lookup_accounts
        * @param subscribe @a true to subscribe to the queried account objects; @a false to not subscribe;
        *                  @a null to subscribe or not subscribe according to current auto-subscription setting
        *                  (see @ref set_auto_subscription)
@@ -388,7 +408,8 @@ class database_api
       /**
        * @brief Get assets alphabetically by symbol name
        * @param lower_bound_symbol Lower bound of symbol names to retrieve
-       * @param limit Maximum number of assets to fetch (must not exceed 101)
+       * @param limit Maximum number of assets to fetch, must not exceed the configured value of
+       *              @a api_limit_get_assets
        * @return The assets found
        */
       vector<extended_asset_object> list_assets(const string& lower_bound_symbol, uint32_t limit)const;
@@ -412,7 +433,8 @@ class database_api
        * @brief Get assets issued (owned) by a given account
        * @param issuer_name_or_id Account name or ID to get objects from
        * @param start Asset objects(1.3.X) before this ID will be skipped in results. Pagination purposes.
-       * @param limit Maximum number of orders to retrieve
+       * @param limit Maximum number of assets to retrieve, must not exceed the configured value of
+       *              @a api_limit_get_assets
        * @return The assets issued (owned) by the account
        */
       vector<extended_asset_object> get_assets_by_issuer(const std::string& issuer_name_or_id,
@@ -426,10 +448,34 @@ class database_api
        * @brief Get limit orders in a given market
        * @param a symbol or ID of asset being sold
        * @param b symbol or ID of asset being purchased
-       * @param limit Maximum number of orders to retrieve
+       * @param limit Maximum number of orders to retrieve, must not exceed the configured value of
+       *              @a api_limit_get_limit_orders
        * @return The limit orders, ordered from least price to greatest
        */
       vector<limit_order_object> get_limit_orders(std::string a, std::string b, uint32_t limit)const;
+
+      /**
+       * @brief Fetch open limit orders in all markets relevant to the specified account, ordered by ID
+       *
+       * @param account_name_or_id  The name or ID of an account to retrieve
+       * @param limit  The limitation of items each query can fetch, not greater than the configured value of
+       *               @a api_limit_get_limit_orders_by_account
+       * @param start_id  Start order id, fetch orders whose IDs are greater than or equal to this order
+       *
+       * @return List of limit orders of the specified account
+       *
+       * @note
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *      @a api_limit_get_limit_orders_by_account will be used
+       * 3. @p start_id can be omitted or be null, if so the api will return the "first page" of orders
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<limit_order_object> get_limit_orders_by_account(
+            const string& account_name_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<limit_order_id_type>& start_id = optional<limit_order_id_type>() );
 
       /**
        * @brief Fetch all orders relevant to the specified account and specified market, result orders
@@ -438,7 +484,8 @@ class database_api
        * @param account_name_or_id  The name or ID of an account to retrieve
        * @param base  Base asset
        * @param quote  Quote asset
-       * @param limit  The limitation of items each query can fetch, not greater than 101
+       * @param limit  The limitation of items each query can fetch, not greater than the configured value of
+       *               @a api_limit_get_account_limit_orders
        * @param ostart_id  Start order id, fetch orders which price lower than this order,
        *                   or price equal to this order but order ID greater than this order
        * @param ostart_price  Fetch orders with price lower than or equal to this price
@@ -446,7 +493,7 @@ class database_api
        * @return List of orders from @p account_name_or_id to the corresponding account
        *
        * @note
-       * 1. if @p account_name_or_id cannot be tied to an account, empty result will be returned
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
        * 2. @p ostart_id and @p ostart_price can be empty, if so the api will return the "first page" of orders;
        *    if @p ostart_id is specified, its price will be used to do page query preferentially,
        *    otherwise the @p ostart_price will be used;
@@ -455,16 +502,17 @@ class database_api
        *    @p ostart_price, but orders' id greater than @p ostart_id
        */
       vector<limit_order_object> get_account_limit_orders( const string& account_name_or_id,
-                                    const string &base,
-                                    const string &quote,
-                                    uint32_t limit = 101,
-                                    optional<limit_order_id_type> ostart_id = optional<limit_order_id_type>(),
-                                    optional<price> ostart_price = optional<price>());
+            const string &base,
+            const string &quote,
+            uint32_t limit = application_options::get_default().api_limit_get_account_limit_orders,
+            optional<limit_order_id_type> ostart_id = optional<limit_order_id_type>(),
+            optional<price> ostart_price = optional<price>());
 
       /**
        * @brief Get call orders (aka margin positions) for a given asset
        * @param a symbol name or ID of the debt asset
-       * @param limit Maximum number of orders to retrieve
+       * @param limit Maximum number of orders to retrieve, must not exceed the configured value of
+       *              @a api_limit_get_call_orders
        * @return The call orders, ordered from earliest to be called to latest
        */
       vector<call_order_object> get_call_orders(const std::string& a, uint32_t limit)const;
@@ -473,7 +521,8 @@ class database_api
        * @brief Get call orders (aka margin positions) of a given account
        * @param account_name_or_id Account name or ID to get objects from
        * @param start Asset objects(1.3.X) before this ID will be skipped in results. Pagination purposes.
-       * @param limit Maximum number of objects to retrieve
+       * @param limit Maximum number of orders to retrieve, must not exceed the configured value of
+       *              @a api_limit_get_call_orders
        * @return The call orders of the account
        */
       vector<call_order_object> get_call_orders_by_account(const std::string& account_name_or_id,
@@ -482,7 +531,8 @@ class database_api
       /**
        * @brief Get forced settlement orders in a given asset
        * @param a Symbol or ID of asset being settled
-       * @param limit Maximum number of orders to retrieve
+       * @param limit Maximum number of orders to retrieve, must not exceed the configured value of
+       *              @a api_limit_get_settle_orders
        * @return The settle orders, ordered from earliest settlement date to latest
        */
       vector<force_settlement_object> get_settle_orders(const std::string& a, uint32_t limit)const;
@@ -491,7 +541,9 @@ class database_api
        * @brief Get forced settlement orders of a given account
        * @param account_name_or_id Account name or ID to get objects from
        * @param start Force settlement objects(1.4.X) before this ID will be skipped in results. Pagination purposes.
-       * @param limit Maximum number of orders to retrieve
+       * @param limit Maximum number of orders to retrieve, must not exceed the configured value of
+       *              @a api_limit_get_settle_orders
+       * @return The settle orders, ordered from earliest settlement date to latest
        * @return The settle orders of the account
        */
       vector<force_settlement_object> get_settle_orders_by_account( const std::string& account_name_or_id,
@@ -501,20 +553,22 @@ class database_api
       /**
        * @brief Get collateral_bid_objects for a given asset
        * @param a Symbol or ID of asset
-       * @param limit Maximum number of objects to retrieve
+       * @param limit Maximum number of objects to retrieve, must not exceed the configured value of
+       *              @a api_limit_get_collateral_bids
        * @param start skip that many results
        * @return The settle orders, ordered from earliest settlement date to latest
        */
       vector<collateral_bid_object> get_collateral_bids(const std::string& a, uint32_t limit, uint32_t start)const;
 
       /**
-       * @brief Get all open margin positions of a given account
+       * @brief Get open margin positions of a given account
        * @param account_name_or_id name or ID of an account
-       * @return all open margin positions of the account
+       * @return open margin positions of the account
        *
-       * Similar to @ref get_call_orders_by_account, but without pagination.
+       * Similar to @ref get_call_orders_by_account, but only the first page will be returned, the page size is
+       * the configured value of @a api_limit_get_call_orders.
        */
-      vector<call_order_object> get_margin_positions( const std::string account_name_or_id )const;
+      vector<call_order_object> get_margin_positions( const std::string& account_name_or_id )const;
 
       /**
        * @brief Request notification when the active orders in the market between two assets changes
@@ -555,49 +609,490 @@ class database_api
        * @brief Returns the order book for the market base:quote
        * @param base symbol name or ID of the base asset
        * @param quote symbol name or ID of the quote asset
-       * @param limit depth of the order book to retrieve, for bids and asks each, capped at 50
+       * @param limit depth of the order book to retrieve, for bids and asks each, capped at the configured value of
+       *              @a api_limit_get_order_book and @a api_limit_get_limit_orders
        * @return Order book of the market
        */
-      order_book get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
+      order_book get_order_book( const string& base, const string& quote,
+            uint32_t limit = application_options::get_default().api_limit_get_order_book )const;
 
       /**
        * @brief Returns vector of tickers sorted by reverse base_volume
-       * Note: this API is experimental and subject to change in next releases
-       * @param limit Max number of results
+       * @note this API is experimental and subject to change in next releases
+       * @param limit Max number of results, must not exceed the configured value of
+       *              @a api_limit_get_top_markets
        * @return Desc Sorted ticker vector
        */
       vector<market_ticker> get_top_markets(uint32_t limit)const;
 
       /**
-       * @brief Returns recent trades for the market base:quote, ordered by time, most recent first.
-       * Note: Currently, timezone offsets are not supported. The time must be UTC. The range is [stop, start).
-       *       In case when there are more than 100 trades occurred in the same second, this API only returns
-       *       the first 100 records, can use another API @ref get_trade_history_by_sequence to query for the rest.
+       * @brief Get market transactions occurred in the market base:quote, ordered by time, most recent first.
        * @param base symbol or ID of the base asset
        * @param quote symbol or ID of the quote asset
-       * @param start Start time as a UNIX timestamp, the latest trade to retrieve
-       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
-       * @param limit Number of trasactions to retrieve, capped at 100.
-       * @return Recent transactions in the market
+       * @param start Start time as a UNIX timestamp, the latest transactions to retrieve
+       * @param stop Stop time as a UNIX timestamp, the earliest transactions to retrieve
+       * @param limit Maximum quantity of transactions to retrieve, capped at the configured value of
+       *              @a api_limit_get_trade_history
+       * @return Transactions in the market
+       * @note The time must be UTC, timezone offsets are not supported. The range is [stop, start].
+       *       In case when there are more transactions than @p limit occurred in the same second,
+       *       this API only returns the most recent records, the rest records can be retrieved
+       *       with the @ref get_trade_history_by_sequence API.
        */
       vector<market_trade> get_trade_history( const string& base, const string& quote,
-                                              fc::time_point_sec start, fc::time_point_sec stop,
-                                              unsigned limit = 100 )const;
+            fc::time_point_sec start, fc::time_point_sec stop,
+            uint32_t limit = application_options::get_default().api_limit_get_trade_history )const;
 
       /**
-       * @brief Returns trades for the market base:quote, ordered by time, most recent first.
-       * Note: Currently, timezone offsets are not supported. The time must be UTC. The range is [stop, start).
+       * @brief Get market transactions occurred in the market base:quote, ordered by time, most recent first.
        * @param base symbol or ID of the base asset
        * @param quote symbol or ID of the quote asset
-       * @param start Start sequence as an Integer, the latest trade to retrieve
-       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
-       * @param limit Number of trasactions to retrieve, capped at 100
+       * @param start Start sequence as an Integer, the latest transaction to retrieve
+       * @param stop Stop time as a UNIX timestamp, the earliest transactions to retrieve
+       * @param limit Maximum quantity of transactions to retrieve, capped at the configured value of
+       *              @a api_limit_get_trade_history_by_sequence
        * @return Transactions in the market
+       * @note The time must be UTC, timezone offsets are not supported. The range is [stop, start].
        */
       vector<market_trade> get_trade_history_by_sequence( const string& base, const string& quote,
-                                                          int64_t start, fc::time_point_sec stop,
-                                                          unsigned limit = 100 )const;
+            int64_t start, fc::time_point_sec stop,
+            uint32_t limit = application_options::get_default().api_limit_get_trade_history_by_sequence )const;
 
+
+      /////////////////////
+      // Liquidity pools //
+      /////////////////////
+
+      /**
+       * @brief Get a list of liquidity pools
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_liquidity_pools
+       * @param start_id Start liquidity pool id, fetch pools whose IDs are greater than or equal to this ID
+       * @param with_statistics Whether to return statistics
+       * @return The liquidity pools
+       *
+       * @note
+       * 1. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_liquidity_pools will be used
+       * 2. @p start_id can be omitted or be @a null, if so the api will return the "first page" of pools
+       * 3. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<extended_liquidity_pool_object> list_liquidity_pools(
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<liquidity_pool_id_type>& start_id = optional<liquidity_pool_id_type>(),
+            const optional<bool>& with_statistics = false )const;
+
+      /**
+       * @brief Get a list of liquidity pools by the symbol or ID of the first asset in the pool
+       * @param asset_symbol_or_id symbol name or ID of the asset
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_liquidity_pools
+       * @param start_id Start liquidity pool id, fetch pools whose IDs are greater than or equal to this ID
+       * @param with_statistics Whether to return statistics
+       * @return The liquidity pools
+       *
+       * @note
+       * 1. If @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_liquidity_pools will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of pools
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<extended_liquidity_pool_object> get_liquidity_pools_by_asset_a(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<liquidity_pool_id_type>& start_id = optional<liquidity_pool_id_type>(),
+            const optional<bool>& with_statistics = false )const;
+
+      /**
+       * @brief Get a list of liquidity pools by the symbol or ID of the second asset in the pool
+       * @param asset_symbol_or_id symbol name or ID of the asset
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_liquidity_pools
+       * @param start_id Start liquidity pool id, fetch pools whose IDs are greater than or equal to this ID
+       * @param with_statistics Whether to return statistics
+       * @return The liquidity pools
+       *
+       * @note
+       * 1. If @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_liquidity_pools will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of pools
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<extended_liquidity_pool_object> get_liquidity_pools_by_asset_b(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<liquidity_pool_id_type>& start_id = optional<liquidity_pool_id_type>(),
+            const optional<bool>& with_statistics = false )const;
+
+      /**
+       * @brief Get a list of liquidity pools by the symbol or ID of one asset in the pool
+       * @param asset_symbol_or_id symbol name or ID of the asset
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_liquidity_pools
+       * @param start_id Start liquidity pool id, fetch pools whose IDs are greater than or equal to this ID
+       * @param with_statistics Whether to return statistics
+       * @return The liquidity pools
+       *
+       * @note
+       * 1. If @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_liquidity_pools will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of pools
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<extended_liquidity_pool_object> get_liquidity_pools_by_one_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<liquidity_pool_id_type>& start_id = optional<liquidity_pool_id_type>(),
+            const optional<bool>& with_statistics = false )const;
+
+      /**
+       * @brief Get a list of liquidity pools by the symbols or IDs of the two assets in the pool
+       * @param asset_symbol_or_id_a symbol name or ID of one asset
+       * @param asset_symbol_or_id_b symbol name or ID of the other asset
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_liquidity_pools
+       * @param start_id Start liquidity pool id, fetch pools whose IDs are greater than or equal to this ID
+       * @param with_statistics Whether to return statistics
+       * @return The liquidity pools
+       *
+       * @note
+       * 1. If @p asset_symbol_or_id_a or @p asset_symbol_or_id_b cannot be tied to an asset,
+       *    an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_liquidity_pools will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of pools
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<extended_liquidity_pool_object> get_liquidity_pools_by_both_assets(
+            const std::string& asset_symbol_or_id_a,
+            const std::string& asset_symbol_or_id_b,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<liquidity_pool_id_type>& start_id = optional<liquidity_pool_id_type>(),
+            const optional<bool>& with_statistics = false )const;
+
+      /**
+       * @brief Get a list of liquidity pools by their IDs
+       * @param ids IDs of the liquidity pools,
+       *              the quantity should not be greater than the configured value of
+       *              @a api_limit_get_liquidity_pools
+       * @param subscribe @a true to subscribe to the queried objects; @a false to not subscribe;
+       *                  @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                  (see @ref set_auto_subscription)
+       * @param with_statistics Whether to return statistics
+       * @return The liquidity pools
+       *
+       * @note if an ID in the list can not be found,
+       *       the corresponding data in the returned list is null.
+       */
+      vector<optional<extended_liquidity_pool_object>> get_liquidity_pools(
+            const vector<liquidity_pool_id_type>& ids,
+            const optional<bool>& subscribe = optional<bool>(),
+            const optional<bool>& with_statistics = false )const;
+
+      /**
+       * @brief Get a list of liquidity pools by their share asset symbols or IDs
+       * @param asset_symbols_or_ids symbol names or IDs of the share assets,
+       *              the quantity should not be greater than the configured value of
+       *              @a api_limit_get_liquidity_pools
+       * @param subscribe @a true to subscribe to the queried objects; @a false to not subscribe;
+       *                  @a null to subscribe or not subscribe according to current auto-subscription setting
+       *                  (see @ref set_auto_subscription)
+       * @param with_statistics Whether to return statistics
+       * @return The liquidity pools that the assets are for
+       *
+       * @note if an asset in the list can not be found or is not a share asset of any liquidity pool,
+       *       the corresponding data in the returned list is null.
+       */
+      vector<optional<extended_liquidity_pool_object>> get_liquidity_pools_by_share_asset(
+            const vector<std::string>& asset_symbols_or_ids,
+            const optional<bool>& subscribe = optional<bool>(),
+            const optional<bool>& with_statistics = false )const;
+
+      /**
+       * @brief Get a list of liquidity pools by the name or ID of the owner account
+       * @param account_name_or_id name or ID of the owner account
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_liquidity_pools
+       * @param start_id Start share asset id, fetch pools whose share asset IDs are greater than or equal to this ID
+       * @param with_statistics Whether to return statistics
+       * @return The liquidity pools
+       *
+       * @note
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_liquidity_pools will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of pools
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<extended_liquidity_pool_object> get_liquidity_pools_by_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<asset_id_type>& start_id = optional<asset_id_type>(),
+            const optional<bool>& with_statistics = false )const;
+
+
+      /////////////////////
+      /// SameT Funds
+      /// @{
+
+      /**
+       * @brief Get a list of SameT Funds
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_samet_funds
+       * @param start_id Start SameT Fund id, fetch items whose IDs are greater than or equal to this ID
+       * @return The SameT Funds
+       *
+       * @note
+       * 1. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_samet_funds will be used
+       * 2. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 3. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<samet_fund_object> list_samet_funds(
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
+
+      /**
+       * @brief Get a list of SameT Funds by the name or ID of the owner account
+       * @param account_name_or_id name or ID of the owner account
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_samet_funds
+       * @param start_id Start SameT Fund id, fetch items whose IDs are greater than or equal to this ID
+       * @return The SameT Funds
+       *
+       * @note
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_samet_funds will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<samet_fund_object> get_samet_funds_by_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
+
+      /**
+       * @brief Get a list of SameT Funds by the symbol or ID of the asset type
+       * @param asset_symbol_or_id symbol or ID of the asset type
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_samet_funds
+       * @param start_id Start SameT Fund id, fetch items whose IDs are greater than or equal to this ID
+       * @return The SameT Funds
+       *
+       * @note
+       * 1. If @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_samet_funds will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<samet_fund_object> get_samet_funds_by_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<samet_fund_id_type>& start_id = optional<samet_fund_id_type>() )const;
+      /// @}
+
+
+      ////////////////////////////////////
+      /// Credit offers and credit deals
+      /// @{
+
+      /**
+       * @brief Get a list of credit offers
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_credit_offers
+       * @param start_id Start credit offer id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit offers
+       *
+       * @note
+       * 1. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 2. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 3. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<credit_offer_object> list_credit_offers(
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<credit_offer_id_type>& start_id = optional<credit_offer_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit offers by the name or ID of the owner account
+       * @param account_name_or_id name or ID of the owner account
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_credit_offers
+       * @param start_id Start credit offer id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit offers
+       *
+       * @note
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<credit_offer_object> get_credit_offers_by_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<credit_offer_id_type>& start_id = optional<credit_offer_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit offers by the symbol or ID of the asset type
+       * @param asset_symbol_or_id symbol or ID of the asset type
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_credit_offers
+       * @param start_id Start credit offer id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit offers
+       *
+       * @note
+       * 1. If @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<credit_offer_object> get_credit_offers_by_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<credit_offer_id_type>& start_id = optional<credit_offer_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit deals
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_credit_offers
+       * @param start_id Start credit deal id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit deals
+       *
+       * @note
+       * 1. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 2. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 3. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<credit_deal_object> list_credit_deals(
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit deals by the ID of a credit offer
+       * @param offer_id ID of the credit offer
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_credit_offers
+       * @param start_id Start credit deal id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit deals
+       *
+       * @note
+       * 1. If @p offer_id cannot be tied to a credit offer, an empty list will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<credit_deal_object> get_credit_deals_by_offer_id(
+            const credit_offer_id_type& offer_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit deals by the name or ID of a credit offer owner account
+       * @param account_name_or_id name or ID of the credit offer owner account
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_credit_offers
+       * @param start_id Start credit deal id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit deals
+       *
+       * @note
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<credit_deal_object> get_credit_deals_by_offer_owner(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit deals by the name or ID of a borrower account
+       * @param account_name_or_id name or ID of the borrower account
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_credit_offers
+       * @param start_id Start credit deal id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit deals
+       *
+       * @note
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<credit_deal_object> get_credit_deals_by_borrower(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit deals by the symbol or ID of the debt asset type
+       * @param asset_symbol_or_id symbol or ID of the debt asset type
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_credit_offers
+       * @param start_id Start credit deal id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit deals
+       *
+       * @note
+       * 1. If @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<credit_deal_object> get_credit_deals_by_debt_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
+
+      /**
+       * @brief Get a list of credit deals by the symbol or ID of the collateral asset type
+       * @param asset_symbol_or_id symbol or ID of the collateral asset type
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_credit_offers
+       * @param start_id Start credit deal id, fetch items whose IDs are greater than or equal to this ID
+       * @return The credit deals
+       *
+       * @note
+       * 1. If @p asset_symbol_or_id cannot be tied to an asset, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_credit_offers will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of data
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<credit_deal_object> get_credit_deals_by_collateral_asset(
+            const std::string& asset_symbol_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<credit_deal_id_type>& start_id = optional<credit_deal_id_type>() )const;
+      /// @}
 
 
       ///////////////
@@ -618,12 +1113,13 @@ class database_api
        * @param account_name_or_id The name or ID of the account whose witness should be retrieved
        * @return The witness object, or null if the account does not have a witness
        */
-      fc::optional<witness_object> get_witness_by_account(const std::string account_name_or_id)const;
+      fc::optional<witness_object> get_witness_by_account(const std::string& account_name_or_id)const;
 
       /**
        * @brief Get names and IDs for registered witnesses
        * @param lower_bound_name Lower bound of the first name to return
-       * @param limit Maximum number of results to return -- must not exceed 1000
+       * @param limit Maximum number of results to return, must not exceed the configured value of
+       *              @a api_limit_lookup_witness_accounts
        * @return Map of witness names to corresponding IDs
        */
       map<string, witness_id_type> lookup_witness_accounts(const string& lower_bound_name, uint32_t limit)const;
@@ -652,12 +1148,13 @@ class database_api
        * @param account_name_or_id The name or ID of the account whose committee_member should be retrieved
        * @return The committee_member object, or null if the account does not have a committee_member
        */
-      fc::optional<committee_member_object> get_committee_member_by_account( const string account_name_or_id )const;
+      fc::optional<committee_member_object> get_committee_member_by_account( const string& account_name_or_id )const;
 
       /**
        * @brief Get names and IDs for registered committee_members
        * @param lower_bound_name Lower bound of the first name to return
-       * @param limit Maximum number of results to return -- must not exceed 1000
+       * @param limit Maximum number of results to return, must not exceed the configured value of
+       *              @a api_limit_lookup_committee_member_accounts
        * @return Map of committee_member names to corresponding IDs
        */
       map<string, committee_member_id_type> lookup_committee_member_accounts( const string& lower_bound_name,
@@ -674,18 +1171,19 @@ class database_api
       ///////////////////////
 
       /**
-       * @brief Get all workers
-       * @return All the workers
+       * @brief Get workers
+       * @param is_expired null for all workers, true for expired workers only, false for non-expired workers only
+       * @return A list of worker objects
        *
       */
-      vector<worker_object> get_all_workers()const;
+      vector<worker_object> get_all_workers( const optional<bool>& is_expired = optional<bool>() )const;
 
       /**
        * @brief Get the workers owned by a given account
        * @param account_name_or_id The name or ID of the account whose worker should be retrieved
        * @return A list of worker objects owned by the account
        */
-      vector<optional<worker_object>> get_workers_by_account(const std::string account_name_or_id)const;
+      vector<worker_object> get_workers_by_account(const std::string& account_name_or_id)const;
 
       /**
        * @brief Get the total number of workers registered with the blockchain
@@ -700,7 +1198,9 @@ class database_api
 
       /**
        * @brief Given a set of votes, return the objects they are voting for
-       * @param votes a list of vote IDs
+       * @param votes a list of vote IDs,
+       *              the quantity should not be greater than the configured value of
+       *              @a api_limit_lookup_vote_ids
        * @return the referenced objects
        *
        * This will be a mixture of committee_member_objects, witness_objects, and worker_objects
@@ -726,7 +1226,7 @@ class database_api
        * @param trx a transaction to get hexdump from
        * @return the hexdump of the transaction without the signatures
        */
-      std::string get_transaction_hex_without_sig( const signed_transaction &trx ) const;
+      std::string get_transaction_hex_without_sig( const transaction &trx ) const;
 
       /**
        *  This API will take a partially signed transaction and a set of public keys that the owner
@@ -823,7 +1323,8 @@ class database_api
        *  @param account_name_or_id Account name or ID to get objects from
        *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results.
        *               Pagination purposes.
-       *  @param limit Maximum number of objects to retrieve
+       *  @param limit Maximum number of objects to retrieve, must not exceed the configured value of
+       *               @a api_limit_get_withdraw_permissions_by_giver
        *  @return Withdraw permission objects for the account
        */
       vector<withdraw_permission_object> get_withdraw_permissions_by_giver( const std::string account_name_or_id,
@@ -835,7 +1336,8 @@ class database_api
        *  @param account_name_or_id Account name or ID to get objects from
        *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results.
        *               Pagination purposes.
-       *  @param limit Maximum number of objects to retrieve
+       *  @param limit Maximum number of objects to retrieve, must not exceed the configured value of
+       *               @a api_limit_get_withdraw_permissions_by_recipient
        *  @return Withdraw permission objects for the account
        */
       vector<withdraw_permission_object> get_withdraw_permissions_by_recipient( const std::string account_name_or_id,
@@ -860,7 +1362,8 @@ class database_api
        *  @brief Get non expired HTLC objects using the sender account
        *  @param account_name_or_id Account name or ID to get objects from
        *  @param start htlc objects before this ID will be skipped in results. Pagination purposes.
-       *  @param limit Maximum number of objects to retrieve
+       *  @param limit Maximum number of objects to retrieve, must not exceed the configured value of
+       *               @a api_limit_get_htlc_by
        *  @return HTLC objects for the account
        */
       vector<htlc_object> get_htlc_by_from( const std::string account_name_or_id,
@@ -871,7 +1374,8 @@ class database_api
        *  @brief Get non expired HTLC objects using the receiver account
        *  @param account_name_or_id Account name or ID to get objects from
        *  @param start htlc objects before this ID will be skipped in results. Pagination purposes.
-       *  @param limit Maximum number of objects to retrieve
+       *  @param limit Maximum number of objects to retrieve, must not exceed the configured value of
+       *               @a api_limit_get_htlc_by
        *  @return HTLC objects for the account
       */
       vector<htlc_object> get_htlc_by_to( const std::string account_name_or_id,
@@ -881,11 +1385,55 @@ class database_api
       /**
        * @brief Get all HTLCs
        * @param start Lower bound of htlc id to start getting results
-       * @param limit Maximum number of htlc objects to fetch
+       * @param limit Maximum number of htlc objects to fetch, must not exceed the configured value of
+       *              @a api_limit_list_htlcs
        * @return The htlc object list
       */
       vector<htlc_object> list_htlcs(const htlc_id_type start, uint32_t limit) const;
 
+
+      /////////////
+      // Tickets //
+      /////////////
+
+      /**
+       * @brief Get a list of tickets
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_tickets
+       * @param start_id Start ticket id, fetch tickets whose IDs are greater than or equal to this ID
+       * @return The tickets
+       *
+       * @note
+       * 1. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_tickets will be used
+       * 2. @p start_id can be omitted or be @a null, if so the api will return the "first page" of tickets
+       * 3. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<ticket_object> list_tickets(
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<ticket_id_type>& start_id = optional<ticket_id_type>() )const;
+
+      /**
+       * @brief Get a list of tickets by the name or ID of the owner account
+       * @param account_name_or_id name or ID of the owner account
+       * @param limit The limitation of items each query can fetch, not greater than the configured value of
+       *              @a api_limit_get_tickets
+       * @param start_id Start ticket id, fetch tickets whose IDs are greater than or equal to this ID
+       * @return The tickets
+       *
+       * @note
+       * 1. If @p account_name_or_id cannot be tied to an account, an error will be returned
+       * 2. @p limit can be omitted or be @a null, if so the configured value of
+       *       @a api_limit_get_tickets will be used
+       * 3. @p start_id can be omitted or be @a null, if so the api will return the "first page" of tickets
+       * 4. One or more optional parameters can be omitted from the end of the parameter list, and the optional
+       *    parameters in the middle cannot be omitted (but can be @a null).
+       */
+      vector<ticket_object> get_tickets_by_account(
+            const std::string& account_name_or_id,
+            const optional<uint32_t>& limit = optional<uint32_t>(),
+            const optional<ticket_id_type>& start_id = optional<ticket_id_type>() )const;
 
 private:
       std::shared_ptr< database_api_impl > my;
@@ -928,6 +1476,7 @@ FC_API(graphene::app::database_api,
    (get_account_id_from_string)
    (get_accounts)
    (get_full_accounts)
+   (get_top_voters)
    (get_account_by_name)
    (get_account_references)
    (lookup_account_names)
@@ -952,6 +1501,7 @@ FC_API(graphene::app::database_api,
    // Markets / feeds
    (get_order_book)
    (get_limit_orders)
+   (get_limit_orders_by_account)
    (get_account_limit_orders)
    (get_call_orders)
    (get_call_orders_by_account)
@@ -966,6 +1516,32 @@ FC_API(graphene::app::database_api,
    (get_top_markets)
    (get_trade_history)
    (get_trade_history_by_sequence)
+
+   // Liquidity pools
+   (list_liquidity_pools)
+   (get_liquidity_pools_by_asset_a)
+   (get_liquidity_pools_by_asset_b)
+   (get_liquidity_pools_by_one_asset)
+   (get_liquidity_pools_by_both_assets)
+   (get_liquidity_pools)
+   (get_liquidity_pools_by_share_asset)
+   (get_liquidity_pools_by_owner)
+
+   // SameT Funds
+   (list_samet_funds)
+   (get_samet_funds_by_owner)
+   (get_samet_funds_by_asset)
+
+   // Credit offers and credit deals
+   (list_credit_offers)
+   (get_credit_offers_by_owner)
+   (get_credit_offers_by_asset)
+   (list_credit_deals)
+   (get_credit_deals_by_offer_id)
+   (get_credit_deals_by_offer_owner)
+   (get_credit_deals_by_borrower)
+   (get_credit_deals_by_debt_asset)
+   (get_credit_deals_by_collateral_asset)
 
    // Witnesses
    (get_witnesses)
@@ -1013,4 +1589,8 @@ FC_API(graphene::app::database_api,
    (get_htlc_by_from)
    (get_htlc_by_to)
    (list_htlcs)
+
+   // Tickets
+   (list_tickets)
+   (get_tickets_by_account)
 )

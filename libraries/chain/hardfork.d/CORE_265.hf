@@ -1,0 +1,5 @@
+// bitshares-core issue #265 Account_history plugin: notify all related accounts after a new account is created
+#ifndef HARDFORK_CORE_265_TIME
+#define HARDFORK_CORE_265_TIME (fc::time_point_sec( 1641909720 )) // Tuesday, January 11, 2022 14:02:00 UTC
+#define HARDFORK_CORE_265_PASSED(now) (now >= HARDFORK_CORE_265_TIME)
+#endif

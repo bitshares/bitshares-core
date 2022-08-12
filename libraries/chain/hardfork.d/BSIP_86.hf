@@ -1,0 +1,5 @@
+// BSIP 86 (Share market fees to the network) hardfork check
+#ifndef HARDFORK_BSIP_86_TIME
+#define HARDFORK_BSIP_86_TIME (fc::time_point_sec( 1596117300 )) // Thursday, July 30, 2020 13:55:00 UTC
+#define HARDFORK_BSIP_86_PASSED(now) (now >= HARDFORK_BSIP_86_TIME)
+#endif

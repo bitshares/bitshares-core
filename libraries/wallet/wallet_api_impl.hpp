@@ -169,7 +169,7 @@ public:
 
    fc::optional<htlc_object> get_htlc(string htlc_id) const;
 
-   asset_id_type get_asset_id(string asset_symbol_or_id) const;
+   asset_id_type get_asset_id(const string& asset_symbol_or_id) const;
 
    string get_wallet_filename() const;
 
@@ -219,6 +219,8 @@ public:
    asset set_fees_on_builder_transaction(transaction_handle_type handle, string fee_asset = GRAPHENE_SYMBOL);
    transaction preview_builder_transaction(transaction_handle_type handle);
    signed_transaction sign_builder_transaction(transaction_handle_type transaction_handle, bool broadcast = true);
+   signed_transaction sign_builder_transaction2(transaction_handle_type transaction_handle,
+         const vector<public_key_type>& signing_keys = vector<public_key_type>(), bool broadcast = true);
 
    pair<transaction_id_type,signed_transaction> broadcast_transaction(signed_transaction tx);
 
@@ -297,9 +299,10 @@ public:
 
    signed_transaction htlc_create( string source, string destination, string amount, string asset_symbol,
          string hash_algorithm, const std::string& preimage_hash, uint32_t preimage_size,
-         const uint32_t claim_period_seconds, bool broadcast = false );
+         const uint32_t claim_period_seconds, const std::string& memo, bool broadcast = false );
 
-   signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<char>& preimage, bool broadcast );
+   signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<char>& preimage, 
+         bool broadcast );
 
    signed_transaction htlc_extend ( string htlc_id, string issuer, const uint32_t seconds_to_add, bool broadcast);
 
@@ -325,6 +328,9 @@ public:
          bool broadcast );
 
    signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false);
+   signed_transaction sign_transaction2(signed_transaction tx,
+                                        const vector<public_key_type>& signing_keys = vector<public_key_type>(),
+                                        bool broadcast = false);
 
    flat_set<public_key_type> get_transaction_signers(const signed_transaction &tx) const;
 
@@ -336,8 +342,8 @@ public:
 
    signed_message sign_message(string signer, string message);
 
-   bool verify_message( const string& message, const string& account, int block, const string& time,
-         const compact_signature& sig );
+   bool verify_message( const string& message, const string& account, int32_t block, const string& msg_time,
+         const fc::ecc::compact_signature& sig );
 
    bool verify_signed_message( const signed_message& message );
 

@@ -42,7 +42,7 @@ using namespace graphene::custom_operations;
 BOOST_FIXTURE_TEST_SUITE( custom_operation_tests, database_fixture )
 
 void map_operation(flat_map<string, optional<string>>& pairs, bool remove, string& catalog, account_id_type& account,
-      private_key& pk, database& db)
+      fc::ecc::private_key& pk, database& db)
 {
    signed_transaction trx;
    set_expiration(db, trx);
@@ -55,7 +55,7 @@ void map_operation(flat_map<string, optional<string>>& pairs, bool remove, strin
    store.catalog = catalog;
 
    auto packed = fc::raw::pack(store);
-   packed.insert(packed.begin(), types::account_map);
+   packed.insert(packed.begin(), account_storage_object::type_id);
 
    op.payer = account;
    op.data = packed;
@@ -123,7 +123,7 @@ try {
 
    // check nathan stored data with the api
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
-   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
+   BOOST_REQUIRE_EQUAL(storage_results_nathan.size(), 2U );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].key, "image_url");
    BOOST_CHECK_EQUAL(storage_results_nathan[0].value->as_string(), "http://some.image.url/img.jpg");
@@ -140,7 +140,7 @@ try {
 
    // check old and new stuff
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
-   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 3 );
+   BOOST_REQUIRE_EQUAL(storage_results_nathan.size(), 3U );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].key, "image_url");
    BOOST_CHECK_EQUAL(storage_results_nathan[0].value->as_string(), "http://new.image.url/newimg.jpg");
@@ -158,7 +158,7 @@ try {
 
    // theme is removed from the storage
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
-   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
+   BOOST_REQUIRE_EQUAL(storage_results_nathan.size(), 2U );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].key, "image_url");
    BOOST_CHECK_EQUAL(storage_results_nathan[0].value->as_string(), "http://new.image.url/newimg.jpg");
@@ -174,7 +174,7 @@ try {
 
    // nothing changes
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "settings");
-   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
+   BOOST_REQUIRE_EQUAL(storage_results_nathan.size(), 2U );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].key, "image_url");
    BOOST_CHECK_EQUAL(storage_results_nathan[0].value->as_string(), "http://new.image.url/newimg.jpg");
@@ -191,7 +191,7 @@ try {
    generate_block();
 
    vector<account_storage_object> storage_results_alice = custom_operations_api.get_storage_info("alice", "random");
-   BOOST_CHECK_EQUAL(storage_results_alice.size(), 1 );
+   BOOST_REQUIRE_EQUAL(storage_results_alice.size(), 1U );
    BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17 );
    BOOST_CHECK_EQUAL(storage_results_alice[0].key, "key1");
    BOOST_CHECK_EQUAL(storage_results_alice[0].value->as_string(), "value2");
@@ -204,7 +204,7 @@ try {
    generate_block();
 
    storage_results_alice = custom_operations_api.get_storage_info("alice", "account_object");
-   BOOST_CHECK_EQUAL(storage_results_alice.size(), 1);
+   BOOST_REQUIRE_EQUAL(storage_results_alice.size(), 1U);
    BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17);
    BOOST_CHECK_EQUAL(storage_results_alice[0].key, "nathan");
    BOOST_CHECK_EQUAL(storage_results_alice[0].value->as<account_object>(20).name, "nathan");
@@ -218,7 +218,7 @@ try {
    generate_block();
 
    storage_results_alice = custom_operations_api.get_storage_info("alice", "account_object");
-   BOOST_CHECK_EQUAL(storage_results_alice.size(), 3);
+   BOOST_REQUIRE_EQUAL(storage_results_alice.size(), 3U);
    BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17);
    BOOST_CHECK_EQUAL(storage_results_alice[0].key, "nathan");
    BOOST_CHECK_EQUAL(storage_results_alice[0].value->as<account_object>(20).name, "nathan");
@@ -227,6 +227,163 @@ try {
    BOOST_CHECK_EQUAL(storage_results_alice[1].value->as<account_object>(20).name, "patty");
    BOOST_CHECK_EQUAL(storage_results_alice[2].key, "robert");
    BOOST_CHECK_EQUAL(storage_results_alice[2].value->as<account_object>(20).name, "robert");
+
+   // alice adds key-value data via custom operation to a settings catalog
+   catalog = "settings";
+   pairs.clear();
+   pairs["image_url"] = fc::json::to_string("http://some.other.image.url/img.jpg");
+   map_operation(pairs, false, catalog, alice_id, alice_private_key, db);
+   generate_block();
+
+   // test API limit config
+   BOOST_CHECK_THROW( custom_operations_api.get_storage_info("alice", "account_object", {}, 7), fc::exception );
+
+   // This does not throw
+   storage_results_alice = custom_operations_api.get_storage_info("alice", "account_object", {}, 6);
+   BOOST_REQUIRE_EQUAL(storage_results_alice.size(), 3U);
+   BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17);
+   BOOST_CHECK_EQUAL(storage_results_alice[0].key, "nathan");
+   BOOST_CHECK_EQUAL(storage_results_alice[0].value->as<account_object>(20).name, "nathan");
+   BOOST_CHECK_EQUAL(storage_results_alice[1].account.instance.value, 17);
+   BOOST_CHECK_EQUAL(storage_results_alice[1].key, "patty");
+   BOOST_CHECK_EQUAL(storage_results_alice[1].value->as<account_object>(20).name, "patty");
+   BOOST_CHECK_EQUAL(storage_results_alice[2].key, "robert");
+   BOOST_CHECK_EQUAL(storage_results_alice[2].value->as<account_object>(20).name, "robert");
+
+   // query by a wrong account
+   BOOST_CHECK_THROW( custom_operations_api.get_storage_info("alice1", "account_object" ), fc::exception );
+
+   // query by account and key
+   BOOST_CHECK_THROW( custom_operations_api.get_storage_info("alice", {}, "patty" ), fc::exception );
+
+   // query by key only
+   BOOST_CHECK_THROW( custom_operations_api.get_storage_info({}, {}, "patty" ), fc::exception );
+
+   // query by account, catalog and key
+   storage_results_alice = custom_operations_api.get_storage_info("alice", "account_object", "alice1");
+   BOOST_CHECK_EQUAL(storage_results_alice.size(), 0 );
+
+   storage_results_alice = custom_operations_api.get_storage_info("alice", "account_object1", "patty");
+   BOOST_CHECK_EQUAL(storage_results_alice.size(), 0 );
+
+   storage_results_alice = custom_operations_api.get_storage_info("alice", "account_object", "patty");
+   BOOST_REQUIRE_EQUAL(storage_results_alice.size(), 1U );
+   BOOST_CHECK_EQUAL(storage_results_alice[0].key, "patty");
+   BOOST_CHECK_EQUAL(storage_results_alice[0].value->as<account_object>(20).name, "patty");
+
+   // query by account only
+   storage_results_alice = custom_operations_api.get_storage_info("alice");
+   BOOST_REQUIRE_EQUAL(storage_results_alice.size(), 5U );
+   BOOST_CHECK_EQUAL(storage_results_alice[0].catalog, "random");
+   BOOST_CHECK_EQUAL(storage_results_alice[0].key, "key1");
+   BOOST_CHECK_EQUAL(storage_results_alice[0].value->as_string(), "value2");
+   BOOST_CHECK_EQUAL(storage_results_alice[1].catalog, "account_object");
+   BOOST_CHECK_EQUAL(storage_results_alice[1].key, "nathan");
+   BOOST_CHECK_EQUAL(storage_results_alice[1].value->as<account_object>(20).name, "nathan");
+   BOOST_CHECK_EQUAL(storage_results_alice[2].catalog, "account_object");
+   BOOST_CHECK_EQUAL(storage_results_alice[2].key, "patty");
+   BOOST_CHECK_EQUAL(storage_results_alice[2].value->as<account_object>(20).name, "patty");
+   BOOST_CHECK_EQUAL(storage_results_alice[3].catalog, "account_object");
+   BOOST_CHECK_EQUAL(storage_results_alice[3].key, "robert");
+   BOOST_CHECK_EQUAL(storage_results_alice[3].value->as<account_object>(20).name, "robert");
+   BOOST_CHECK_EQUAL(storage_results_alice[4].catalog, "settings");
+   BOOST_CHECK_EQUAL(storage_results_alice[4].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results_alice[4].value->as_string(), "http://some.other.image.url/img.jpg");
+
+   // query by catalog only
+   auto storage_results = custom_operations_api.get_storage_info({}, "settings1");
+   BOOST_REQUIRE_EQUAL(storage_results.size(), 0 );
+
+   storage_results = custom_operations_api.get_storage_info({}, "settings");
+   BOOST_REQUIRE_EQUAL(storage_results.size(), 3U );
+   BOOST_CHECK_EQUAL(storage_results[0].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(storage_results[0].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results[0].value->as_string(), "http://new.image.url/newimg.jpg");
+   BOOST_CHECK_EQUAL(storage_results[1].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(storage_results[1].key, "language");
+   BOOST_CHECK_EQUAL(storage_results[1].value->as_string(), "en");
+   BOOST_CHECK_EQUAL(storage_results[2].account.instance.value, 17 );
+   BOOST_CHECK_EQUAL(storage_results[2].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results[2].value->as_string(), "http://some.other.image.url/img.jpg");
+
+   // Pagination
+   storage_results = custom_operations_api.get_storage_info({}, "settings", {}, 2);
+   BOOST_REQUIRE_EQUAL(storage_results.size(), 2U );
+   BOOST_CHECK_EQUAL(storage_results[0].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(storage_results[0].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results[0].value->as_string(), "http://new.image.url/newimg.jpg");
+   BOOST_CHECK_EQUAL(storage_results[1].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(storage_results[1].key, "language");
+   BOOST_CHECK_EQUAL(storage_results[1].value->as_string(), "en");
+
+   account_storage_id_type storage_id = storage_results[1].id;
+
+   storage_results = custom_operations_api.get_storage_info({}, "settings", {}, 2, storage_id);
+   BOOST_REQUIRE_EQUAL(storage_results.size(), 2U );
+   BOOST_CHECK_EQUAL(storage_results[0].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(storage_results[0].key, "language");
+   BOOST_CHECK_EQUAL(storage_results[0].value->as_string(), "en");
+   BOOST_CHECK_EQUAL(storage_results[1].account.instance.value, 17 );
+   BOOST_CHECK_EQUAL(storage_results[1].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results[1].value->as_string(), "http://some.other.image.url/img.jpg");
+
+   // query by catalog and key
+   storage_results = custom_operations_api.get_storage_info({}, "settings", "test");
+   BOOST_REQUIRE_EQUAL(storage_results.size(), 0 );
+
+   storage_results = custom_operations_api.get_storage_info({}, "settings1", "image_url");
+   BOOST_REQUIRE_EQUAL(storage_results.size(), 0 );
+
+   storage_results = custom_operations_api.get_storage_info({}, "settings", "image_url");
+   BOOST_REQUIRE_EQUAL(storage_results.size(), 2U );
+   BOOST_CHECK_EQUAL(storage_results[0].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(storage_results[0].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results[0].value->as_string(), "http://new.image.url/newimg.jpg");
+   BOOST_CHECK_EQUAL(storage_results[1].account.instance.value, 17 );
+   BOOST_CHECK_EQUAL(storage_results[1].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results[1].value->as_string(), "http://some.other.image.url/img.jpg");
+
+   // query all
+   storage_results = custom_operations_api.get_storage_info();
+   BOOST_REQUIRE_EQUAL(storage_results.size(), 6U ); // the configured limit, the first page
+   BOOST_CHECK_EQUAL(storage_results[0].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(storage_results[0].catalog, "settings");
+   BOOST_CHECK_EQUAL(storage_results[0].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results[0].value->as_string(), "http://new.image.url/newimg.jpg");
+   BOOST_CHECK_EQUAL(storage_results[1].account.instance.value, 16 );
+   BOOST_CHECK_EQUAL(storage_results[1].catalog, "settings");
+   BOOST_CHECK_EQUAL(storage_results[1].key, "language");
+   BOOST_CHECK_EQUAL(storage_results[1].value->as_string(), "en");
+   BOOST_CHECK_EQUAL(storage_results[2].account.instance.value, 17 );
+   BOOST_CHECK_EQUAL(storage_results[2].catalog, "random");
+   BOOST_CHECK_EQUAL(storage_results[2].key, "key1");
+   BOOST_CHECK_EQUAL(storage_results[2].value->as_string(), "value2");
+   BOOST_CHECK_EQUAL(storage_results[3].account.instance.value, 17 );
+   BOOST_CHECK_EQUAL(storage_results[3].catalog, "account_object");
+   BOOST_CHECK_EQUAL(storage_results[3].key, "nathan");
+   BOOST_CHECK_EQUAL(storage_results[3].value->as<account_object>(20).name, "nathan");
+   BOOST_CHECK_EQUAL(storage_results[4].account.instance.value, 17 );
+   BOOST_CHECK_EQUAL(storage_results[4].catalog, "account_object");
+   BOOST_CHECK_EQUAL(storage_results[4].key, "patty");
+   BOOST_CHECK_EQUAL(storage_results[4].value->as<account_object>(20).name, "patty");
+   BOOST_CHECK_EQUAL(storage_results[5].account.instance.value, 17 );
+   BOOST_CHECK_EQUAL(storage_results[5].catalog, "account_object");
+   BOOST_CHECK_EQUAL(storage_results[5].key, "robert");
+   BOOST_CHECK_EQUAL(storage_results[5].value->as<account_object>(20).name, "robert");
+
+   storage_id = storage_results[5].id;
+
+   storage_results = custom_operations_api.get_storage_info({},{},{},{},storage_id);
+   BOOST_REQUIRE_EQUAL(storage_results.size(), 2U ); // the 2nd page
+   BOOST_CHECK_EQUAL(storage_results[0].account.instance.value, 17 );
+   BOOST_CHECK_EQUAL(storage_results[0].catalog, "account_object");
+   BOOST_CHECK_EQUAL(storage_results[0].key, "robert");
+   BOOST_CHECK_EQUAL(storage_results[0].value->as<account_object>(20).name, "robert");
+   BOOST_CHECK_EQUAL(storage_results[1].account.instance.value, 17 );
+   BOOST_CHECK_EQUAL(storage_results[1].catalog, "settings");
+   BOOST_CHECK_EQUAL(storage_results[1].key, "image_url");
+   BOOST_CHECK_EQUAL(storage_results[1].value->as_string(), "http://some.other.image.url/img.jpg");
+
 }
 catch (fc::exception &e) {
    edump((e.to_detail_string()));
@@ -259,6 +416,9 @@ try {
    auto storage_results_nathan = custom_operations_api.get_storage_info("nathan", catalog);
    BOOST_CHECK_EQUAL(storage_results_nathan.size(), 0 );
 
+   // This throws due to API limit
+   BOOST_CHECK_THROW( custom_operations_api.get_storage_info("nathan", catalog, {}, 120), fc::exception );
+
    // keys are indexed so they cant be too big(greater than CUSTOM_OPERATIONS_MAX_KEY_SIZE(200) is not allowed)
    catalog = "whatever";
    std::string value(201, 'a');
@@ -280,7 +440,7 @@ try {
 
    // get the account list for nathan, check alice and robert are there
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
-   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
+   BOOST_REQUIRE_EQUAL(storage_results_nathan.size(), 2U );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].key, alice.name);
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
@@ -294,7 +454,7 @@ try {
 
    // nothing changes
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
-   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 2 );
+   BOOST_REQUIRE_EQUAL(storage_results_nathan.size(), 2U );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].key, alice.name);
    BOOST_CHECK_EQUAL(storage_results_nathan[1].account.instance.value, 16 );
@@ -308,7 +468,7 @@ try {
 
    // alice gone
    storage_results_nathan = custom_operations_api.get_storage_info("nathan", "contact_list");
-   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 1 );
+   BOOST_CHECK_EQUAL(storage_results_nathan.size(), 1U );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].account.instance.value, 16 );
    BOOST_CHECK_EQUAL(storage_results_nathan[0].key, robert.name);
 
@@ -320,7 +480,7 @@ try {
    generate_block();
 
    auto storage_results_alice = custom_operations_api.get_storage_info("alice", "contact_list");
-   BOOST_CHECK_EQUAL(storage_results_alice.size(), 1 );
+   BOOST_CHECK_EQUAL(storage_results_alice.size(), 1U );
    BOOST_CHECK_EQUAL(storage_results_alice[0].account.instance.value, 17 );
    BOOST_CHECK_EQUAL(storage_results_alice[0].key, robert.name);
 }

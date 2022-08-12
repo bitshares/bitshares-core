@@ -172,7 +172,7 @@ namespace graphene { namespace protocol {
    /**
     *  @ingroup operations
     *
-    *  This operation can be used after a black swan to bid collateral for
+    *  This operation can be used after a global settlement to bid collateral for
     *  taking over part of the debt and the settlement_fund (see BSIP-0018).
     */
    struct bid_collateral_operation : public base_operation

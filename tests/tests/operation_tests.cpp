@@ -184,7 +184,10 @@ BOOST_AUTO_TEST_CASE( old_call_order_update_test_after_hardfork_583 )
 {
    try {
 
-      generate_blocks( HARDFORK_CORE_583_TIME );
+      auto hf_time = HARDFORK_CORE_583_TIME;
+      if( bsip77 )
+         hf_time = HARDFORK_BSIP_77_TIME;
+      generate_blocks( hf_time );
       generate_block();
       set_expiration( db, trx );
 
@@ -284,12 +287,492 @@ BOOST_AUTO_TEST_CASE( old_call_order_update_test_after_hardfork_583 )
    }
 }
 
+BOOST_AUTO_TEST_CASE( call_order_update_asset_auth_test )
+{
+   try {
+      generate_blocks( HARDFORK_CORE_973_TIME - fc::days(1) );
+      set_expiration( db, trx );
+
+      ACTORS((dan)(sam));
+
+      const auto& backasset = create_user_issued_asset("BACK", sam, white_list | charge_market_fee);
+      asset_id_type back_id = backasset.id;
+
+      const auto& bitusd = create_bitasset("USDBIT", sam.id, 10, white_list | charge_market_fee, 3, back_id);
+      asset_id_type usd_id = bitusd.id;
+
+      issue_uia( dan_id, backasset.amount(10000000) );
+      issue_uia( sam_id, backasset.amount(10000000) );
+
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed;
+      current_feed.core_exchange_rate = bitusd.amount( 100 ) / asset( 100 );
+      current_feed.settlement_price = bitusd.amount( 100 ) / backasset.amount( 100 );
+      current_feed.maintenance_collateral_ratio = 1750; // need to set explicitly, testnet has a different default
+      publish_feed( bitusd, sam, current_feed );
+
+      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      BOOST_TEST_MESSAGE( "attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      borrow( dan, bitusd.amount(5000), backasset.amount(10000) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, backasset ), 10000000 - 10000 );
+
+      // Make a whitelist
+      {
+         BOOST_TEST_MESSAGE( "Setting up whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         // The whitelist is managed by Sam
+         uop.new_options.whitelist_authorities.insert(sam_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // For BACK
+         uop.asset_to_update = back_id;
+         uop.new_options = back_id(db).options;
+         // The whitelist is managed by Sam
+         uop.new_options.whitelist_authorities.insert(sam_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Upgrade Sam so that he can manage the whitelist
+         upgrade_to_lifetime_member( sam_id );
+
+         // Add Sam to the whitelist, but do not add Dan
+         account_whitelist_operation wop;
+         wop.authorizing_account = sam_id;
+         wop.account_to_list = sam_id;
+         wop.new_listing = account_whitelist_operation::white_listed;
+         trx.operations.clear();
+         trx.operations.push_back(wop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Reproduces bitshares-core issue #973: no asset authorization check thus Dan is able to borrow
+      BOOST_TEST_MESSAGE( "Dan attempting to borrow using 2x collateral at 1:1 price again" );
+      borrow( dan_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, usd_id ), 5000 + 5000);
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, back_id ), 10000000 - 10000 - 10000 );
+
+      // Apply core-973 hardfork
+      generate_blocks( HARDFORK_CORE_973_TIME );
+      set_expiration( db, trx );
+
+      // Update price feed
+      publish_feed( usd_id(db), sam_id(db), current_feed );
+
+      // Sam should be able to borrow, but Dan should be unable to borrow
+      borrow( sam_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, usd_id ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, back_id ), 10000000 - 10000 );
+
+      GRAPHENE_REQUIRE_THROW( borrow( dan_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) ),
+                              fc::exception );
+
+      // Update USDBIT, disable remove whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Disable USDBIT whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         uop.new_options.whitelist_authorities.clear();
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Sam should be able to borrow, but Dan should be unable to borrow
+      borrow( sam_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) );
+      GRAPHENE_REQUIRE_THROW( borrow( dan_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) ),
+                              fc::exception );
+
+      // Update BACK, disable whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Disable BACK whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = back_id;
+         uop.new_options = back_id(db).options;
+         uop.new_options.whitelist_authorities.clear();
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Both Sam and Dan should be able to borrow
+      borrow( sam_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) );
+      borrow( dan_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) );
+
+      // Update USDBIT, enable whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Enable USDBIT whitelisting again" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         uop.new_options.whitelist_authorities.insert( sam_id );
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Sam should be able to borrow, but Dan should be unable to borrow
+      borrow( sam_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) );
+      GRAPHENE_REQUIRE_THROW( borrow( dan_id(db), usd_id(db).amount(5000), back_id(db).amount(10000) ),
+                              fc::exception );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( asset_settle_operation_asset_auth_test )
+{
+   try {
+      generate_blocks( HARDFORK_CORE_973_TIME - fc::days(1) );
+      set_expiration( db, trx );
+
+      ACTORS((dan)(sam));
+
+      const auto& backasset = create_user_issued_asset("BACK", sam, white_list | charge_market_fee);
+      asset_id_type back_id = backasset.id;
+
+      const auto& bitusd = create_bitasset("USDBIT", sam.id, 10, white_list | charge_market_fee, 3, back_id);
+      asset_id_type usd_id = bitusd.id;
+
+      issue_uia( dan_id, backasset.amount(10000000) );
+      issue_uia( sam_id, backasset.amount(10000000) );
+
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed;
+      current_feed.core_exchange_rate = bitusd.amount( 100 ) / asset( 100 );
+      current_feed.settlement_price = bitusd.amount( 100 ) / backasset.amount( 100 );
+      current_feed.maintenance_collateral_ratio = 1750; // need to set explicitly, testnet has a different default
+      publish_feed( bitusd, sam, current_feed );
+
+      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      BOOST_TEST_MESSAGE( "attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      borrow( dan, bitusd.amount(5000), backasset.amount(10000) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, backasset ), 10000000 - 10000 );
+
+      transfer( dan, sam, bitusd.amount(2000) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, usd_id ), 3000 );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, usd_id ), 2000 );
+
+      // Make a whitelist
+      {
+         BOOST_TEST_MESSAGE( "Setting up whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         // The whitelist is managed by Sam
+         uop.new_options.whitelist_authorities.insert(sam_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // For BACK
+         uop.asset_to_update = back_id;
+         uop.new_options = back_id(db).options;
+         // The whitelist is managed by Sam
+         uop.new_options.whitelist_authorities.insert(sam_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Upgrade Sam so that he can manage the whitelist
+         upgrade_to_lifetime_member( sam_id );
+
+         // Add Sam to the whitelist, but do not add Dan
+         account_whitelist_operation wop;
+         wop.authorizing_account = sam_id;
+         wop.account_to_list = sam_id;
+         wop.new_listing = account_whitelist_operation::white_listed;
+         trx.operations.clear();
+         trx.operations.push_back(wop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Reproduces bitshares-core issue #973: no asset authorization check thus Dan is able to force-settle
+      BOOST_TEST_MESSAGE( "Dan and Sam attempting to force-settle" );
+      force_settle( dan_id(db), usd_id(db).amount(100) );
+      force_settle( sam_id(db), usd_id(db).amount(100) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, usd_id ), 2900 );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, usd_id ), 1900 );
+
+      // Apply core-973 hardfork
+      BOOST_TEST_MESSAGE( "Apply core-973 hardfork" );
+      generate_blocks( HARDFORK_CORE_973_TIME );
+      set_expiration( db, trx );
+
+      // Update price feed
+      publish_feed( usd_id(db), sam_id(db), current_feed );
+
+      // Sam should be able to force-settle, but Dan should be unable to force-settle
+      BOOST_TEST_MESSAGE( "Dan and Sam attempting to force-settle again" );
+      GRAPHENE_REQUIRE_THROW( force_settle( dan_id(db), usd_id(db).amount(100) ), fc::exception );
+      force_settle( sam_id(db), usd_id(db).amount(100) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, usd_id ), 2900 );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, usd_id ), 1800 );
+
+      // Update USDBIT, disable remove whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Disable USDBIT whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         uop.new_options.whitelist_authorities.clear();
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Sam should be able to force-settle, but Dan should be unable to force-settle
+      GRAPHENE_REQUIRE_THROW( force_settle( dan_id(db), usd_id(db).amount(100) ), fc::exception );
+      force_settle( sam_id(db), usd_id(db).amount(100) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, usd_id ), 2900 );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, usd_id ), 1700 );
+
+      // Update BACK, disable whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Disable BACK whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = back_id;
+         uop.new_options = back_id(db).options;
+         uop.new_options.whitelist_authorities.clear();
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Both Sam and Dan should be able to force-settle
+      force_settle( dan_id(db), usd_id(db).amount(100) );
+      force_settle( sam_id(db), usd_id(db).amount(100) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, usd_id ), 2800 );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, usd_id ), 1600 );
+
+      // Update USDBIT, enable whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Enable USDBIT whitelisting again" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         uop.new_options.whitelist_authorities.insert( sam_id );
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Sam should be able to force-settle, but Dan should be unable to force-settle
+      GRAPHENE_REQUIRE_THROW( force_settle( dan_id(db), usd_id(db).amount(100) ), fc::exception );
+      force_settle( sam_id(db), usd_id(db).amount(100) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan_id, usd_id ), 2800 );
+      BOOST_REQUIRE_EQUAL( get_balance( sam_id, usd_id ), 1500 );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( bid_collateral_operation_asset_auth_test )
+{
+   try {
+      generate_blocks( HARDFORK_CORE_973_TIME - fc::days(1) );
+      set_expiration( db, trx );
+
+      ACTORS((dan)(sam));
+
+      const auto& backasset = create_user_issued_asset("BACK", sam, white_list | charge_market_fee);
+      asset_id_type back_id = backasset.id;
+
+      const auto& bitusd = create_bitasset("USDBIT", sam.id, 10, white_list | charge_market_fee, 3, back_id);
+      asset_id_type usd_id = bitusd.id;
+
+      issue_uia( dan_id, backasset.amount(10000000) );
+      issue_uia( sam_id, backasset.amount(10000000) );
+
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed;
+      current_feed.core_exchange_rate = bitusd.amount( 100 ) / asset( 100 );
+      current_feed.settlement_price = bitusd.amount( 100 ) / backasset.amount( 100 );
+      current_feed.maintenance_collateral_ratio = 1750; // need to set explicitly, testnet has a different default
+      publish_feed( bitusd, sam, current_feed );
+
+      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      BOOST_TEST_MESSAGE( "attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      borrow( dan, bitusd.amount(5000), backasset.amount(10000) );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, backasset ), 10000000 - 10000 );
+
+      // Make a whitelist
+      {
+         BOOST_TEST_MESSAGE( "Setting up whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         // The whitelist is managed by Sam
+         uop.new_options.whitelist_authorities.insert(sam_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // For BACK
+         uop.asset_to_update = back_id;
+         uop.new_options = back_id(db).options;
+         // The whitelist is managed by Sam
+         uop.new_options.whitelist_authorities.insert(sam_id);
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+
+         // Upgrade Sam so that he can manage the whitelist
+         upgrade_to_lifetime_member( sam_id );
+
+         // Add Sam to the whitelist, but do not add Dan
+         account_whitelist_operation wop;
+         wop.authorizing_account = sam_id;
+         wop.account_to_list = sam_id;
+         wop.new_listing = account_whitelist_operation::white_listed;
+         trx.operations.clear();
+         trx.operations.push_back(wop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Trigger a black swan event, globally settle USDBIT
+      BOOST_TEST_MESSAGE( "Trigger a black swan event" );
+      current_feed.settlement_price = bitusd.amount( 10 ) / backasset.amount( 100 );
+      publish_feed( bitusd, sam, current_feed );
+      BOOST_REQUIRE( bitusd.bitasset_data(db).has_settlement() );
+
+      // Reproduces bitshares-core issue #973: no asset authorization check thus Dan is able to bid collateral
+      BOOST_TEST_MESSAGE( "Dan and Sam attempting to bid collateral" );
+      bid_collateral( dan_id(db), back_id(db).amount(1), usd_id(db).amount(100) );
+      bid_collateral( sam_id(db), back_id(db).amount(1), usd_id(db).amount(100) );
+
+      // Apply core-973 hardfork
+      BOOST_TEST_MESSAGE( "Apply core-973 hardfork" );
+      generate_blocks( HARDFORK_CORE_973_TIME );
+      set_expiration( db, trx );
+
+      // Update price feed
+      publish_feed( usd_id(db), sam_id(db), current_feed );
+
+      // Sam should be able to bid collateral, but Dan should be unable to bid
+      BOOST_TEST_MESSAGE( "Dan and Sam attempting to bid collateral again" );
+      GRAPHENE_REQUIRE_THROW( bid_collateral( dan_id(db), back_id(db).amount(2), usd_id(db).amount(200) ),
+                              fc::exception );
+      bid_collateral( sam_id(db), back_id(db).amount(2), usd_id(db).amount(200) );
+
+      // Update USDBIT, disable remove whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Disable USDBIT whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         uop.new_options.whitelist_authorities.clear();
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Sam should be able to bid collateral, but Dan should be unable to bid
+      GRAPHENE_REQUIRE_THROW( bid_collateral( dan_id(db), back_id(db).amount(3), usd_id(db).amount(300) ),
+                              fc::exception );
+      bid_collateral( sam_id(db), back_id(db).amount(3), usd_id(db).amount(300) );
+
+      // Update BACK, disable whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Disable BACK whitelisting" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = back_id;
+         uop.new_options = back_id(db).options;
+         uop.new_options.whitelist_authorities.clear();
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Both Sam and Dan should be able to bid collateral
+      bid_collateral( dan_id(db), back_id(db).amount(4), usd_id(db).amount(400) );
+      bid_collateral( sam_id(db), back_id(db).amount(4), usd_id(db).amount(400) );
+
+      // Update USDBIT, enable whitelisting
+      {
+         BOOST_TEST_MESSAGE( "Enable USDBIT whitelisting again" );
+         asset_update_operation uop;
+         uop.issuer = sam_id;
+
+         // For USDBIT
+         uop.asset_to_update = usd_id;
+         uop.new_options = usd_id(db).options;
+         uop.new_options.whitelist_authorities.insert( sam_id );
+         trx.operations.clear();
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      // Sam should be able to bid collateral, but Dan should be unable to bid
+      GRAPHENE_REQUIRE_THROW( bid_collateral( dan_id(db), back_id(db).amount(5), usd_id(db).amount(500) ),
+                              fc::exception );
+      bid_collateral( sam_id(db), back_id(db).amount(5), usd_id(db).amount(500) );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( asset_settle_cancel_operation_test_after_hf588 )
 {
-   // fast jump to hardfork time
-   generate_blocks( HARDFORK_CORE_588_TIME );
-   // one more block to pass hardfork time
-   generate_block();
    set_expiration( db, trx );
 
    BOOST_TEST_MESSAGE( "Creating a proposal containing a asset_settle_cancel_operation" );
@@ -342,6 +825,204 @@ BOOST_AUTO_TEST_CASE( asset_settle_cancel_operation_test_after_hf588 )
                return false;
             });
    }
+}
+
+/// Test case for bsip77:
+/// * the "initial_collateral_ratio" parameter can only be set after the BSIP77 hard fork
+/// * the parameter should be within a range
+// TODO removed the hard fork part after the hard fork, keep the valid range part
+BOOST_AUTO_TEST_CASE( bsip77_hardfork_time_and_param_valid_range_test )
+{
+   try {
+
+      // Proceeds to a recent hard fork
+      generate_blocks( HARDFORK_CORE_583_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((sam));
+
+      // Before bsip77 hard fork, unable to create a bitasset with ICR
+      BOOST_CHECK_THROW( create_bitasset( "USDBIT", sam_id, 100, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBIT", sam_id, 100, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 1 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBIT", sam_id, 100, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 1000 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBIT", sam_id, 100, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 1001 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBIT", sam_id, 100, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 1750 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBIT", sam_id, 100, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 32000 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBIT", sam_id, 100, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 32001 ), fc::exception );
+
+      // Can create a bitasset without ICR
+      const auto& bitusd = create_bitasset( "USDBIT", sam.id, 100, charge_market_fee, 2, {},
+                                            GRAPHENE_MAX_SHARE_SUPPLY );
+      asset_id_type usd_id = bitusd.id;
+
+      // helper function for setting ICR for an asset
+      auto set_icr_for_asset = [&](asset_id_type aid, optional<uint16_t> icr) {
+         const asset_object& ao = aid(db);
+         const asset_bitasset_data_object& abo = ao.bitasset_data(db);
+         asset_update_bitasset_operation uop;
+         uop.issuer = ao.issuer;
+         uop.asset_to_update = aid;
+         uop.new_options = abo.options;
+         uop.new_options.extensions.value.initial_collateral_ratio = icr;
+         trx.operations.clear();
+         trx.operations.push_back( uop );
+         trx.validate();
+         set_expiration( db, trx );
+         PUSH_TX(db, trx, ~0);
+      };
+
+      // Before bsip77 hard fork, unable to update a bitasset with ICR
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 0 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 1 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 1000 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 1001 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 1750 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 32000 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 32001 ), fc::exception );
+
+      // helper function for creating a proposal which contains an asset_create_operation with ICR
+      auto propose_create_bitasset = [&]( string name, optional<uint16_t> icr ) {
+         asset_create_operation acop = make_bitasset( name, sam_id, 100, charge_market_fee, 2, {},
+                                                      GRAPHENE_MAX_SHARE_SUPPLY, icr );
+         proposal_create_operation cop;
+         cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+         cop.expiration_time = db.head_block_time() + 100;
+         cop.proposed_ops.emplace_back( acop );
+         trx.operations.clear();
+         trx.operations.push_back( cop );
+         trx.validate();
+         set_expiration( db, trx );
+         processed_transaction ptx = PUSH_TX(db, trx, ~0);
+         trx.operations.clear();
+      };
+
+      // Before bsip77 hard fork, unable to create a proposal with an asset_create_operation with ICR
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITA", 0 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITA", 1 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITA", 1000 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITA", 1001 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITA", 1750 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITA", 32000 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITA", 32001 ), fc::exception );
+
+      // helper function for creating a proposal which contains an asset_update_bitasset_operation with ICR
+      auto propose_set_icr_for_asset = [&](asset_id_type aid, optional<uint16_t> icr) {
+         const asset_object& ao = aid(db);
+         const asset_bitasset_data_object& abo = ao.bitasset_data(db);
+         asset_update_bitasset_operation uop;
+         uop.issuer = ao.issuer;
+         uop.asset_to_update = aid;
+         uop.new_options = abo.options;
+         uop.new_options.extensions.value.initial_collateral_ratio = icr;
+
+         proposal_create_operation cop;
+         cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+         cop.expiration_time = db.head_block_time() + 100;
+         cop.proposed_ops.emplace_back( uop );
+         trx.operations.clear();
+         trx.operations.push_back( cop );
+         trx.validate();
+         set_expiration( db, trx );
+         PUSH_TX(db, trx, ~0);
+         trx.operations.clear();
+      };
+
+      // Before bsip77 hard fork, unable to create a proposal with an asset_update_bitasset_op with ICR
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 0 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 1 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 1000 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 1001 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 1750 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 32000 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 32001 ), fc::exception );
+
+      // Pass the hard fork time
+      generate_blocks( HARDFORK_BSIP_77_TIME );
+      set_expiration( db, trx );
+
+      // Unable to create a bitasset with an invalid ICR
+      BOOST_CHECK_THROW( create_bitasset( "USDBITB", sam_id, 0, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBITB", sam_id, 1, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBITB", sam_id, 1000, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 0 ), fc::exception );
+      BOOST_CHECK_THROW( create_bitasset( "USDBITB", sam_id, 32001, charge_market_fee, 2, {},
+                                          GRAPHENE_MAX_SHARE_SUPPLY, 0 ), fc::exception );
+      // Able to create a bitasset with a valid ICR
+      asset_id_type usdc_id = create_bitasset( "USDBITC", sam.id, 100, charge_market_fee, 2, {},
+                                               GRAPHENE_MAX_SHARE_SUPPLY, 1001 ).id;
+      asset_id_type usdd_id = create_bitasset( "USDBITD", sam.id, 100, charge_market_fee, 2, {},
+                                               GRAPHENE_MAX_SHARE_SUPPLY, 1750 ).id;
+      asset_id_type usde_id = create_bitasset( "USDBITE", sam.id, 100, charge_market_fee, 2, {},
+                                               GRAPHENE_MAX_SHARE_SUPPLY, 32000 ).id;
+      // Able to create a bitasset without ICR
+      asset_id_type usdf_id = create_bitasset( "USDBITF", sam.id, 100, charge_market_fee, 2, {},
+                                               GRAPHENE_MAX_SHARE_SUPPLY, {} ).id;
+
+      BOOST_CHECK( usdc_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio == 1001 );
+      BOOST_CHECK( usdd_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio == 1750 );
+      BOOST_CHECK( usde_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio == 32000 );
+      BOOST_CHECK( !usdf_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio.valid() );
+
+      // Unable to update a bitasset with an invalid ICR
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 0 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 1 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 1000 ), fc::exception );
+      BOOST_CHECK_THROW( set_icr_for_asset( usd_id, 32001 ), fc::exception );
+      // Able to update a bitasset with a valid ICR
+      set_icr_for_asset( usd_id, 1001 );
+      BOOST_CHECK( usd_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio == 1001 );
+      set_icr_for_asset( usd_id, 1750 );
+      BOOST_CHECK( usd_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio == 1750 );
+      set_icr_for_asset( usd_id, 32000 );
+      BOOST_CHECK( usd_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio == 32000 );
+      // Able to update a bitasset, unset its ICR
+      set_icr_for_asset( usd_id, {} );
+      BOOST_CHECK( !usd_id(db).bitasset_data(db).options.extensions.value.initial_collateral_ratio.valid() );
+
+      // Unable to create a proposal with an asset_create_operation with an invalid ICR
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITG", 0 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITG", 1 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITG", 1000 ), fc::exception );
+      BOOST_CHECK_THROW( propose_create_bitasset( "USDBITG", 32001 ), fc::exception );
+      // able to create a proposal with a valid ICR or no ICR
+      propose_create_bitasset( "USDBITG", 1001 );
+      propose_create_bitasset( "USDBITG", 1750 );
+      propose_create_bitasset( "USDBITG", 32000 );
+      propose_create_bitasset( "USDBITG", {} );
+
+      // Unable to create a proposal with an asset_update_bitasset_op with an invalid ICR
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 0 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 1 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 1000 ), fc::exception );
+      BOOST_CHECK_THROW( propose_set_icr_for_asset( usd_id, 32001 ), fc::exception );
+      // Able to create a proposal with a valid ICR or no ICR
+      propose_set_icr_for_asset( usd_id, 1001 );
+      propose_set_icr_for_asset( usd_id, 1750 );
+      propose_set_icr_for_asset( usd_id, 32000 );
+      propose_set_icr_for_asset( usd_id, {} );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( old_call_order_update_test_after_hardfork_bsip77_when_icr_not_set )
+{
+   bsip77 = true;
+   INVOKE( old_call_order_update_test_after_hardfork_583 );
 }
 
 BOOST_AUTO_TEST_CASE( more_call_order_update_test )
@@ -451,7 +1132,10 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
 {
    try {
 
-      generate_blocks( HARDFORK_CORE_583_TIME );
+      auto hf_time = HARDFORK_CORE_583_TIME;
+      if( bsip77 )
+         hf_time = HARDFORK_BSIP_77_TIME;
+      generate_blocks( hf_time );
       generate_block();
       set_expiration( db, trx );
 
@@ -560,6 +1244,396 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
    }
 }
 
+BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr_not_set )
+{
+   bsip77 = true;
+   INVOKE( more_call_order_update_test_after_hardfork_583 );
+}
+
+BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr_is_set )
+{
+   try {
+
+      auto hf_time = HARDFORK_BSIP_77_TIME;
+      generate_blocks( hf_time );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((dan)(sam)(alice)(bob));
+      const auto& bitusd = create_bitasset( "USDBIT", sam.id, 100, charge_market_fee, 2, {},
+                                            GRAPHENE_MAX_SHARE_SUPPLY, 1050 ); // ICR = 1.05
+      const auto& core   = asset_id_type()(db);
+
+      asset_id_type usd_id = bitusd.id;
+
+      // helper function for setting ICR for an asset
+      auto set_icr_for_asset = [&](asset_id_type aid, optional<uint16_t> icr) {
+         const asset_object& ao = aid(db);
+         const asset_bitasset_data_object& abo = ao.bitasset_data(db);
+         asset_update_bitasset_operation uop;
+         uop.issuer = ao.issuer;
+         uop.asset_to_update = aid;
+         uop.new_options = abo.options;
+         uop.new_options.extensions.value.initial_collateral_ratio = icr;
+         trx.operations.clear();
+         trx.operations.push_back( uop );
+         trx.validate();
+         set_expiration( db, trx );
+         PUSH_TX(db, trx, ~0);
+      };
+
+      transfer(committee_account, dan_id, asset(10000000));
+      transfer(committee_account, sam_id, asset(10000000));
+      transfer(committee_account, alice_id, asset(10000000));
+      transfer(committee_account, bob_id, asset(10000000));
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
+      current_feed.maximum_short_squeeze_ratio = 1100; // need to set this explicitly, testnet has a different default
+      publish_feed( bitusd, sam, current_feed );
+
+      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      BOOST_TEST_MESSAGE( "ICR 1.05, MCR 1.75" );
+      BOOST_TEST_MESSAGE( "attempting to borrow using <=1.75x collateral at 1:1 price should not be allowed" );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17499) ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "alice borrow using 1.7501x collateral at 1:1 price should be allowed" );
+      BOOST_CHECK( borrow( alice, bitusd.amount(10000), core.amount(17501) ) != nullptr );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 10000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 17501 );
+      BOOST_TEST_MESSAGE( "ICR 1.05, MCR 1.75, Alice CR 1.7501" );
+
+      // Update ICR
+      BOOST_TEST_MESSAGE( "Updating ICR to 1.85" );
+      set_icr_for_asset( usd_id, 1850 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 1.7501" );
+
+      BOOST_TEST_MESSAGE( "alice adding more collateral should be allowed" );
+      BOOST_CHECK( borrow( alice, bitusd.amount(0), core.amount(18000-17501) ) != nullptr );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 10000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 18000 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 1.8000" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral should not be allowed if CR<=1.85 and not margin called" );
+      GRAPHENE_REQUIRE_THROW( cover( alice, bitusd.amount(0), core.amount(1)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "alice borrow using 1.8502x collateral at 1:1 price should be allowed" );
+      BOOST_CHECK( borrow( alice, bitusd.amount(0), core.amount(18502-18000) ) != nullptr );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 10000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 18502 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 1.8502" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral to >1.85x should be allowed" );
+      cover( alice, bitusd.amount(0), core.amount(1) );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 10000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 18501 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 1.8501" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral to <=1.85x should not be allowed if not margin called" );
+      GRAPHENE_REQUIRE_THROW( cover( alice, bitusd.amount(0), core.amount(1)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "alice borrow using 4x collateral at 1:1 price" );
+      BOOST_CHECK( borrow( alice, bitusd.amount(100000-10000), core.amount(400000-18501) ) != nullptr );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 4.0000" );
+
+      BOOST_TEST_MESSAGE( "alice place an order to sell usd at 1.05" );
+      const limit_order_id_type alice_sell_id = create_sell_order( alice, bitusd.amount(1000), core.amount(1050) )->id;
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow too much using 1.75x collateral at 1:1 price should not be allowed" );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow less using 1.75x collateral at 1:1 price should be allowed and margin called" );
+      BOOST_CHECK( !borrow( bob, bitusd.amount(100), core.amount(175) ) );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      const call_order_id_type bob_call_id = borrow( bob, bitusd.amount(100), asset(200))->id;
+      BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 + 100 );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 200 );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow too much more using 1.75x collateral at 1:1 price should not be allowed" );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000-100), core.amount(17500-200) ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "bob attempting to reduce collateral to 1.75x at 1:1 price should be allowed and margin called" );
+      BOOST_CHECK( !borrow( bob, bitusd.amount(0), core.amount(175-200) ) );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 + 100 );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 105 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 + 105 );
+      BOOST_CHECK( !db.find<call_order_object>( bob_call_id ) );
+
+      BOOST_TEST_MESSAGE( "alice cancel sell order" );
+      cancel_limit_order( alice_sell_id(db) );
+
+      BOOST_TEST_MESSAGE( "dan attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      borrow( dan, bitusd.amount(5000), asset(10000));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 );
+
+      BOOST_TEST_MESSAGE( "sam update price feed so dan's position will enter margin call territory." );
+      current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(180);
+      publish_feed( bitusd, sam, current_feed );
+
+      BOOST_TEST_MESSAGE( "dan covering 2500 usd and freeing 5000 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(5000)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan covering 2500 usd and freeing 5001 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(5001)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5000 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(5000)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 4999 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(4999)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan covering 2500 usd and freeing 4999 core should be allowed..." );
+      cover( dan, bitusd.amount(2500), asset(4999));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 2500 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 + 4999  );
+
+      BOOST_TEST_MESSAGE( "dan covering 0 usd and freeing 1 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), core.amount(1)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan adding 1 core as collateral should be allowed..." );
+      borrow( dan, bitusd.amount(0), asset(1));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 2500 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 + 4999 - 1  );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5002 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(5002)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5003 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), asset(5003) ), fc::exception );
+
+      // CR of Alice's postion is now 4.0 / 1.8 ~= 2.2222
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 2.222222" );
+
+      BOOST_TEST_MESSAGE( "alice adding more collateral should be allowed" );
+      const call_order_id_type alice_call_id = borrow( alice, bitusd.amount(0), asset(1))->id;
+      BOOST_CHECK_EQUAL( alice_call_id(db).collateral.value, 400000 + 1 );
+      BOOST_CHECK_EQUAL( alice_call_id(db).debt.value, 100000 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 2.222228" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral to >1.85x should be allowed" );
+      cover( alice, bitusd.amount(0), core.amount(67000) );
+      BOOST_CHECK_EQUAL( alice_call_id(db).collateral.value, 333001 );
+      BOOST_CHECK_EQUAL( alice_call_id(db).debt.value, 100000 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 1.850006" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral to <=1.85x should not be allowed if not margin called" );
+      GRAPHENE_REQUIRE_THROW( cover( alice, bitusd.amount(0), core.amount(1) ), fc::exception );
+
+      // Update ICR
+      BOOST_TEST_MESSAGE( "Updating ICR to 1.84" );
+      set_icr_for_asset( usd_id, 1840 );
+      BOOST_TEST_MESSAGE( "ICR 1.84, MCR 1.75, Alice CR 1.850006" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral to >1.84x should be allowed" );
+      cover( alice, bitusd.amount(0), core.amount(1) );
+      BOOST_CHECK_EQUAL( alice_call_id(db).collateral.value, 333000 );
+      BOOST_CHECK_EQUAL( alice_call_id(db).debt.value, 100000 );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_bsip77_when_icr_is_fed )
+{
+   try {
+
+      auto hf_time = HARDFORK_BSIP_77_TIME;
+      generate_blocks( hf_time );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((dan)(sam)(alice)(bob));
+      const auto& bitusd = create_bitasset( "USDBIT", sam.id, 100, charge_market_fee, 2, {},
+                                            GRAPHENE_MAX_SHARE_SUPPLY, {} ); // ICR is not set
+      const auto& core   = asset_id_type()(db);
+
+      transfer(committee_account, dan_id, asset(10000000));
+      transfer(committee_account, sam_id, asset(10000000));
+      transfer(committee_account, alice_id, asset(10000000));
+      transfer(committee_account, bob_id, asset(10000000));
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
+      current_feed.maximum_short_squeeze_ratio = 1100; // need to set this explicitly, testnet has a different default
+      publish_feed( bitusd, sam, current_feed, 1050 ); // ICR = 1.05
+
+      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      BOOST_TEST_MESSAGE( "ICR 1.05, MCR 1.75" );
+      BOOST_TEST_MESSAGE( "attempting to borrow using <=1.75x collateral at 1:1 price should not be allowed" );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17499) ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "alice borrow using 1.7501x collateral at 1:1 price should be allowed" );
+      BOOST_CHECK( borrow( alice, bitusd.amount(10000), core.amount(17501) ) != nullptr );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 10000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 17501 );
+      BOOST_TEST_MESSAGE( "ICR 1.05, MCR 1.75, Alice CR 1.7501" );
+
+      // Update ICR
+      BOOST_TEST_MESSAGE( "Updating ICR to 1.85" );
+      publish_feed( bitusd, sam, current_feed, 1850 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 1.7501" );
+
+      BOOST_TEST_MESSAGE( "alice adding more collateral should be allowed" );
+      BOOST_CHECK( borrow( alice, bitusd.amount(0), core.amount(18000-17501) ) != nullptr );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 10000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 18000 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 1.8000" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral should not be allowed if CR<=1.85 and not margin called" );
+      GRAPHENE_REQUIRE_THROW( cover( alice, bitusd.amount(0), core.amount(1)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "alice borrow using 1.8502x collateral at 1:1 price should be allowed" );
+      BOOST_CHECK( borrow( alice, bitusd.amount(0), core.amount(18502-18000) ) != nullptr );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 10000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 18502 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 1.8502" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral to >1.85x should be allowed" );
+      cover( alice, bitusd.amount(0), core.amount(1) );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 10000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 18501 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 1.8501" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral to <=1.85x should not be allowed if not margin called" );
+      GRAPHENE_REQUIRE_THROW( cover( alice, bitusd.amount(0), core.amount(1)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "alice borrow using 4x collateral at 1:1 price" );
+      BOOST_CHECK( borrow( alice, bitusd.amount(100000-10000), core.amount(400000-18501) ) != nullptr );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 4.0000" );
+
+      BOOST_TEST_MESSAGE( "alice place an order to sell usd at 1.05" );
+      const limit_order_id_type alice_sell_id = create_sell_order( alice, bitusd.amount(1000), core.amount(1050) )->id;
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow too much using 1.75x collateral at 1:1 price should not be allowed" );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow less using 1.75x collateral at 1:1 price should be allowed and margin called" );
+      BOOST_CHECK( !borrow( bob, bitusd.amount(100), core.amount(175) ) );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      const call_order_id_type bob_call_id = borrow( bob, bitusd.amount(100), asset(200))->id;
+      BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 + 100 );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 200 );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow too much more using 1.75x collateral at 1:1 price should not be allowed" );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000-100), core.amount(17500-200) ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "bob attempting to reduce collateral to 1.75x at 1:1 price should be allowed and margin called" );
+      BOOST_CHECK( !borrow( bob, bitusd.amount(0), core.amount(175-200) ) );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 + 100 );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 105 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 + 105 );
+      BOOST_CHECK( !db.find<call_order_object>( bob_call_id ) );
+
+      BOOST_TEST_MESSAGE( "alice cancel sell order" );
+      cancel_limit_order( alice_sell_id(db) );
+
+      BOOST_TEST_MESSAGE( "dan attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      borrow( dan, bitusd.amount(5000), asset(10000));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 );
+
+      BOOST_TEST_MESSAGE( "sam update price feed so dan's position will enter margin call territory." );
+      current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(180);
+      publish_feed( bitusd, sam, current_feed, 1850 );
+
+      BOOST_TEST_MESSAGE( "dan covering 2500 usd and freeing 5000 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(5000)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan covering 2500 usd and freeing 5001 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(5001)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5000 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(5000)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 4999 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(4999)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan covering 2500 usd and freeing 4999 core should be allowed..." );
+      cover( dan, bitusd.amount(2500), asset(4999));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 2500 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 + 4999  );
+
+      BOOST_TEST_MESSAGE( "dan covering 0 usd and freeing 1 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), core.amount(1)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan adding 1 core as collateral should be allowed..." );
+      borrow( dan, bitusd.amount(0), asset(1));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 2500 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 + 4999 - 1  );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5002 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(5002)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5003 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), asset(5003) ), fc::exception );
+
+      // CR of Alice's postion is now 4.0 / 1.8 ~= 2.2222
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 2.222222" );
+
+      BOOST_TEST_MESSAGE( "alice adding more collateral should be allowed" );
+      const call_order_id_type alice_call_id = borrow( alice, bitusd.amount(0), asset(1))->id;
+      BOOST_CHECK_EQUAL( alice_call_id(db).collateral.value, 400000 + 1 );
+      BOOST_CHECK_EQUAL( alice_call_id(db).debt.value, 100000 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 2.222228" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral to >1.85x should be allowed" );
+      cover( alice, bitusd.amount(0), core.amount(67000) );
+      BOOST_CHECK_EQUAL( alice_call_id(db).collateral.value, 333001 );
+      BOOST_CHECK_EQUAL( alice_call_id(db).debt.value, 100000 );
+      BOOST_TEST_MESSAGE( "ICR 1.85, MCR 1.75, Alice CR 1.850006" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral to <=1.85x should not be allowed if not margin called" );
+      GRAPHENE_REQUIRE_THROW( cover( alice, bitusd.amount(0), core.amount(1) ), fc::exception );
+
+      // Update ICR
+      BOOST_TEST_MESSAGE( "Updating ICR to 1.84" );
+      publish_feed( bitusd, sam, current_feed, 1840 );
+      BOOST_TEST_MESSAGE( "ICR 1.84, MCR 1.75, Alice CR 1.850006" );
+
+      BOOST_TEST_MESSAGE( "alice reducing collateral to >1.84x should be allowed" );
+      cover( alice, bitusd.amount(0), core.amount(1) );
+      BOOST_CHECK_EQUAL( alice_call_id(db).collateral.value, 333000 );
+      BOOST_CHECK_EQUAL( alice_call_id(db).debt.value, 100000 );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( call_order_update_validation_test )
 {
    call_order_update_operation op;
@@ -592,74 +1666,6 @@ BOOST_AUTO_TEST_CASE( call_order_update_validation_test )
 
    op.extensions.value.target_collateral_ratio = 65535;
    op.validate(); // still valid
-}
-
-// Tests that target_cr option can't be set before hard fork core-834
-// TODO: remove this test case after hard fork
-BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
-{
-   try {
-      set_expiration( db, trx );
-
-      ACTORS((sam)(alice)(bob));
-      const auto& bitusd = create_bitasset("USDBIT", sam.id);
-      const auto& core   = asset_id_type()(db);
-      asset_id_type bitusd_id = bitusd.id;
-      asset_id_type core_id = core.id;
-
-      transfer(committee_account, sam_id, asset(10000000));
-      transfer(committee_account, alice_id, asset(10000000));
-      transfer(committee_account, bob_id, asset(10000000));
-      update_feed_producers( bitusd, {sam.id} );
-
-      price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
-      current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
-      current_feed.maximum_short_squeeze_ratio = 1100; // need to set this explicitly, testnet has a different default
-      publish_feed( bitusd, sam, current_feed );
-
-      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
-
-      auto call_update_proposal = [this]( const account_object& proposer,
-                                       const account_object& updater,
-                                       const asset& delta_collateral,
-                                       const asset& delta_debt,
-                                       const optional<uint16_t> target_cr )
-      {
-         call_order_update_operation op;
-         op.funding_account = updater.id;
-         op.delta_collateral = delta_collateral;
-         op.delta_debt = delta_debt;
-         op.extensions.value.target_collateral_ratio = target_cr;
-
-         const auto& curfees = db.get_global_properties().parameters.get_current_fees();
-         const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
-         proposal_create_operation prop;
-         prop.fee_paying_account = proposer.id;
-         prop.proposed_ops.emplace_back( op );
-         prop.expiration_time =  db.head_block_time() + fc::days(1);
-         prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
-
-         signed_transaction tx;
-         tx.operations.push_back( prop );
-         db.current_fee_schedule().set_fee( tx.operations.back() );
-         set_expiration( db, tx );
-         PUSH_TX( db, tx, ~0 );
-      };
-
-      generate_blocks(HARDFORK_CORE_834_TIME);
-      set_expiration( db, trx );
-
-      BOOST_TEST_MESSAGE( "bob tries to propose a proposal with target_cr set, "
-                          "will success after hard fork time" );
-      // now able to propose
-      call_update_proposal( bob_id(db), alice_id(db), bitusd_id(db).amount(10), core_id(db).amount(40), 65535 );
-
-      generate_block();
-
-   } catch (fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
 }
 
 /**
@@ -835,6 +1841,68 @@ BOOST_AUTO_TEST_CASE( prediction_market_resolves_to_0 )
       generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
       generate_block();
 } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/***
+ * Prediction markets should not suffer a black swan (Issue #460)
+ */
+BOOST_AUTO_TEST_CASE( prediction_market_black_swan )
+{ 
+   try {
+      ACTORS((judge)(dan)(nathan));
+
+      // progress to recent hardfork
+      generate_blocks( HARDFORK_CORE_1270_TIME );
+      set_expiration( db, trx );
+
+      const auto& pmark = create_prediction_market("PMARK", judge_id);
+
+      int64_t init_balance(1000000);
+      transfer(committee_account, judge_id, asset(init_balance));
+      transfer(committee_account, dan_id, asset(init_balance));
+
+      update_feed_producers( pmark, { judge_id });
+      price_feed feed;
+      feed.settlement_price = asset( 1, pmark.id ) / asset( 1 );
+      publish_feed( pmark, judge, feed );
+
+      borrow( dan, pmark.amount(1000), asset(1000) );
+
+      // feed a price that will cause a black swan
+      feed.settlement_price = asset( 1, pmark.id ) / asset( 1000 );
+      publish_feed( pmark, judge, feed );
+
+      // verify a black swan happened
+      GRAPHENE_REQUIRE_THROW(borrow( dan, pmark.amount(1000), asset(1000) ), fc::exception);
+      trx.clear();
+
+      // progress past hardfork
+      generate_blocks( HARDFORK_CORE_460_TIME + db.get_global_properties().parameters.maintenance_interval );
+      set_expiration( db, trx );
+
+      // create another prediction market to test the hardfork
+      const auto& pmark2 = create_prediction_market("PMARKII", judge_id);
+      update_feed_producers( pmark2, { judge_id });
+      price_feed feed2;
+      feed2.settlement_price = asset( 1, pmark2.id ) / asset( 1 );
+      publish_feed( pmark2, judge, feed2 );
+
+      borrow( dan, pmark2.amount(1000), asset(1000) );
+
+      // feed a price that would have caused a black swan
+      feed2.settlement_price = asset( 1, pmark2.id ) / asset( 1000 );
+      publish_feed( pmark2, judge, feed2 );
+
+      // verify a black swan did not happen
+      borrow( dan, pmark2.amount(1000), asset(1000) );
+
+      generate_block(~database::skip_transaction_dupe_check);
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      generate_block();
+   } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
    }
@@ -1114,7 +2182,7 @@ BOOST_AUTO_TEST_CASE( create_uia )
       creator.common_options.max_supply = 100000000;
       creator.precision = 2;
       creator.common_options.market_fee_percent = GRAPHENE_MAX_MARKET_FEE_PERCENT/100; /*1%*/
-      creator.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK;
+      creator.common_options.issuer_permissions = DEFAULT_UIA_ASSET_ISSUER_PERMISSION;
       creator.common_options.flags = charge_market_fee;
       creator.common_options.core_exchange_rate = price(asset(2),asset(1,asset_id_type(1)));
       trx.operations.push_back(std::move(creator));
@@ -1175,7 +2243,7 @@ BOOST_AUTO_TEST_CASE( update_uia )
 
       //Cannot convert to an MIA
       BOOST_TEST_MESSAGE( "Make sure we can't convert UIA to MIA" );
-      REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, ASSET_ISSUER_PERMISSION_MASK);
+      REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, ASSET_ISSUER_PERMISSION_ENABLE_BITS_MASK);
       REQUIRE_THROW_WITH_VALUE(op, new_options.core_exchange_rate, price(asset(5), asset(5)));
 
       BOOST_TEST_MESSAGE( "Test updating core_exchange_rate" );
@@ -1211,11 +2279,18 @@ BOOST_AUTO_TEST_CASE( update_uia )
          PUSH_TX( db, trx, ~0 );
       }
 
-      BOOST_TEST_MESSAGE( "Make sure white_list can't be re-enabled" );
+      asset_issue_operation issue_op;
+      issue_op.issuer = op.issuer;
+      issue_op.asset_to_issue =  asset(5000000,op.asset_to_update);
+      issue_op.issue_to_account = nathan.get_id();
+      trx.operations.push_back(issue_op);
+      PUSH_TX(db, trx, ~0);
+      
+      BOOST_TEST_MESSAGE( "Make sure white_list can't be re-enabled (after tokens issued)" );
       op.new_options.issuer_permissions = test.options.issuer_permissions;
       op.new_options.flags = test.options.flags;
       BOOST_CHECK(!(test.options.issuer_permissions & white_list));
-      REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, UIA_ASSET_ISSUER_PERMISSION_MASK);
+      REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, DEFAULT_UIA_ASSET_ISSUER_PERMISSION);
 
       BOOST_TEST_MESSAGE( "We can change issuer to account_id_type(), but can't do it again" );
       op.new_issuer = account_id_type();
@@ -2215,6 +3290,148 @@ BOOST_AUTO_TEST_CASE( vesting_balance_create_test )
    op.amount = core.amount( 1000 );
    REQUIRE_OP_EVALUATION_SUCCESS( op, owner, alice_account.get_id() );
    REQUIRE_OP_EVALUATION_SUCCESS( op, owner,   bob_account.get_id() );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( vesting_balance_create_asset_auth_test )
+{ try {
+   INVOKE( create_uia );
+
+   generate_block();
+
+   ACTORS( (alice)(bob)(cindy) );
+
+   const asset_object& test_asset = get_asset(UIA_TEST_SYMBOL);
+
+   issue_uia( alice, test_asset.amount( 10000 ) );
+   issue_uia( bob, test_asset.amount( 10000 ) );
+
+   // Success when no whitelist configured
+   vesting_balance_create_operation op;
+   op.creator = alice_id;
+   op.owner = alice_id;
+   op.amount = test_asset.amount( 100 );
+   op.policy = cdd_vesting_policy_initializer{ 60*60*24 };
+
+   trx.operations.clear();
+   trx.operations.push_back(op);
+   PUSH_TX( db, trx, ~0 );
+
+   vesting_balance_create_operation op2 = op;
+   op2.owner = bob_id;
+   trx.operations.clear();
+   trx.operations.push_back(op2);
+   PUSH_TX( db, trx, ~0 );
+
+   vesting_balance_create_operation op3 = op;
+   op3.creator = bob_id;
+   trx.operations.clear();
+   trx.operations.push_back(op3);
+   PUSH_TX( db, trx, ~0 );
+
+   vesting_balance_create_operation op4 = op;
+   op4.creator = bob_id;
+   op4.owner = bob_id;
+   trx.operations.clear();
+   trx.operations.push_back(op4);
+   PUSH_TX( db, trx, ~0 );
+
+   generate_block();
+
+   // Make a whitelist
+   {
+      BOOST_TEST_MESSAGE( "Setting up whitelisting" );
+      asset_update_operation uop;
+      uop.issuer = test_asset.issuer;
+      uop.asset_to_update = test_asset.id;
+      uop.new_options = test_asset.options;
+
+      // Enable whitelisting
+      uop.new_options.flags = white_list | charge_market_fee;
+      trx.operations.clear();
+      trx.operations.push_back(uop);
+      PUSH_TX( db, trx, ~0 );
+
+      // The whitelist is managed by bob
+      uop.new_options.whitelist_authorities.insert(bob_id);
+      trx.operations.clear();
+      trx.operations.push_back(uop);
+      PUSH_TX( db, trx, ~0 );
+
+      // Upgrade bob so that he can manage the whitelist
+      upgrade_to_lifetime_member( bob_id );
+
+      // Add bob to the whitelist, but do not add alice
+      account_whitelist_operation wop;
+      wop.authorizing_account = bob_id;
+      wop.account_to_list = bob_id;
+      wop.new_listing = account_whitelist_operation::white_listed;
+      trx.operations.clear();
+      trx.operations.push_back(wop);
+      PUSH_TX( db, trx, ~0 );
+   }
+
+   generate_block();
+
+   // Reproduces bitshares-core issue #972: the whitelist is ignored
+   trx.operations.clear();
+   trx.operations.push_back(op);
+   trx.operations.push_back(op2);
+   trx.operations.push_back(op3);
+   trx.operations.push_back(op4);
+   PUSH_TX( db, trx, ~0 );
+
+   // Apply core-973 hardfork
+   generate_blocks( HARDFORK_CORE_973_TIME );
+   set_expiration( db, trx );
+
+   // Now asset authorization is in effect, Alice is unable to create vesting balances for herself
+   trx.operations.clear();
+   trx.operations.push_back(op);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   // Alice can not create vesting balances for Bob
+   trx.operations.clear();
+   trx.operations.push_back(op2);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   // Bob can not create vesting balances for Alice
+   trx.operations.clear();
+   trx.operations.push_back(op3);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   // Bob can still create vesting balances for himself
+   trx.operations.clear();
+   trx.operations.push_back(op4);
+   PUSH_TX( db, trx, ~0 );
+
+   {
+      // Add Alice to the whitelist
+      account_whitelist_operation wop;
+      wop.authorizing_account = bob_id;
+      wop.account_to_list = alice_id;
+      wop.new_listing = account_whitelist_operation::white_listed;
+      trx.operations.clear();
+      trx.operations.push_back(wop);
+      PUSH_TX( db, trx, ~0 );
+   }
+
+   // Success again
+   trx.operations.clear();
+   trx.operations.push_back(op);
+   trx.operations.push_back(op2);
+   trx.operations.push_back(op3);
+   trx.operations.push_back(op4);
+   PUSH_TX( db, trx, ~0 );
+
+   // And Alice still can not create vesting balances for Cindy
+   vesting_balance_create_operation op5 = op;
+   op5.owner = cindy_id;
+   trx.operations.clear();
+   trx.operations.push_back(op5);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   generate_block();
+
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
