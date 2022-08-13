@@ -219,10 +219,12 @@ int main(int argc, char** argv)
        });
     }
 
-    if (!probes.empty())
+    if( probes.empty() )
+       continue;
+
+    std::vector<std::shared_ptr<peer_probe>> running;
+    for ( auto& probe : probes )
     {
-       std::vector<std::shared_ptr<peer_probe>> running;
-       for ( auto& probe : probes ) {
           if (probe->_probe_complete_promise->error())
           {
              continue;
@@ -235,26 +237,24 @@ int main(int argc, char** argv)
 
           idump( (probe->_node_id)(probe->_remote)(probe->_peers.size()) );
 
+          graphene::net::address_info this_node_info;
+          this_node_info.direction = graphene::net::peer_connection_direction::outbound;
+          this_node_info.firewalled = graphene::net::firewalled_state::not_firewalled;
+          this_node_info.remote_endpoint = probe->_remote;
+          this_node_info.node_id = probe->_node_id;
+
+          // Note: Update if already exists.
+          //       Some nodes may have the same node_id, E.G. created by copying the whole data directory of
+          //            another node. In this case data here could be overwritten.
+          connections_by_node_id[this_node_info.node_id] = probe->_peers;
+          address_info_by_node_id[this_node_info.node_id] = this_node_info;
+
+          node_id_by_endpoint[probe->_remote] = probe->_node_id;
+
+          for( const auto& info: address_info_by_node_id )
           {
-             graphene::net::address_info this_node_info;
-             this_node_info.direction = graphene::net::peer_connection_direction::outbound;
-             this_node_info.firewalled = graphene::net::firewalled_state::not_firewalled;
-             this_node_info.remote_endpoint = probe->_remote;
-             this_node_info.node_id = probe->_node_id;
-
-             // Note: Update if already exists.
-             //       Some nodes may have the same node_id, E.G. created by copying the whole data directory of
-             //            another node. In this case data here could be overwritten.
-             connections_by_node_id[this_node_info.node_id] = probe->_peers;
-             address_info_by_node_id[this_node_info.node_id] = this_node_info;
-
-             node_id_by_endpoint[probe->_remote] = probe->_node_id;
-
-             for( const auto& info: address_info_by_node_id )
-             {
-                if( info.second.remote_endpoint == probe->_remote && info.first != probe->_node_id )
-                   outdated_nodes[info.first] = probe->_node_id;
-             }
+             if( info.second.remote_endpoint == probe->_remote && info.first != probe->_node_id )
+                outdated_nodes[info.first] = probe->_node_id;
           }
 
           for (const graphene::net::address_info& info : probe->_peers)
@@ -274,13 +274,14 @@ int main(int argc, char** argv)
                 address_info_by_node_id[info.node_id].firewalled = graphene::net::firewalled_state::unknown;
              }
           }
-       }
-       constexpr uint32_t five = 5;
-       if( running.size() == probes.size() )
-          fc::usleep( fc::seconds( five ) );
-       else
-          probes = std::move( running );
     }
+
+    constexpr uint32_t five = 5;
+    if( running.size() == probes.size() )
+       fc::usleep( fc::seconds( five ) );
+    else
+       probes = std::move( running );
+
     ilog( "${total} nodes detected, ${outdated} outdated, ${tried} endpoints tried, "
           "${reachable} reachable, ${trying} trying, ${todo} to do",
           ( "total",     address_info_by_node_id.size() )
@@ -289,6 +290,7 @@ int main(int argc, char** argv)
           ( "reachable", node_id_by_endpoint.size() )
           ( "trying",    probes.size() )
           ( "todo",      nodes_to_visit.size() ) );
+
   }
 
   // Remove outdated nodes
@@ -359,9 +361,10 @@ int main(int argc, char** argv)
       dot_stream << ",shape=rectangle";
     dot_stream << "];\n";
   }
+  constexpr uint16_t pair_depth = 2;
   for (auto& node_and_connections : connections_by_node_id)
     for (const graphene::net::address_info& this_connection : node_and_connections.second)
-      dot_stream << "  \"" << fc::variant( node_and_connections.first, 2 ).as_string()
+      dot_stream << "  \"" << fc::variant( node_and_connections.first, pair_depth ).as_string()
                  << "\" -- \"" << fc::variant( this_connection.node_id, 1 ).as_string() << "\";\n";
 
   dot_stream << "}\n";
