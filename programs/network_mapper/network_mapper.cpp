@@ -199,7 +199,7 @@ int main(int argc, char** argv)
   std::map<graphene::net::node_id_t, graphene::net::address_info> address_info_by_node_id;
   std::map<graphene::net::node_id_t, std::vector<graphene::net::address_info> > connections_by_node_id;
   std::map<fc::ip::endpoint, graphene::net::node_id_t> node_id_by_endpoint;
-  std::set<graphene::net::node_id_t> outdated_nodes;
+  std::map<graphene::net::node_id_t, graphene::net::node_id_t> outdated_nodes;
   std::vector<std::shared_ptr<peer_probe>> probes;
 
   constexpr size_t max_concurrent_probes = 200;
@@ -242,15 +242,18 @@ int main(int argc, char** argv)
              this_node_info.remote_endpoint = probe->_remote;
              this_node_info.node_id = probe->_node_id;
 
+             // Note: Update if already exists.
+             //       Some nodes may have the same node_id, E.G. created by copying the whole data directory of
+             //            another node. In this case data here could be overwritten.
              connections_by_node_id[this_node_info.node_id] = probe->_peers;
-             // Note: Update if already exists
              address_info_by_node_id[this_node_info.node_id] = this_node_info;
+
              node_id_by_endpoint[probe->_remote] = probe->_node_id;
 
              for( const auto& info: address_info_by_node_id )
              {
                 if( info.second.remote_endpoint == probe->_remote && info.first != probe->_node_id )
-                   outdated_nodes.insert( info.first );
+                   outdated_nodes[info.first] = probe->_node_id;
              }
           }
 
@@ -289,21 +292,16 @@ int main(int argc, char** argv)
   }
 
   // Remove outdated nodes
-  for( const auto& node : outdated_nodes )
-  {
-    address_info_by_node_id.erase(node);
-    connections_by_node_id.erase(node);
-  }
+  for( const auto& node_pair : outdated_nodes )
+    address_info_by_node_id.erase(node_pair.first);
+  // Update connection info, replace outdated node_id with new node_id
   for( auto& connection_by_id : connections_by_node_id )
   {
-    std::vector<graphene::net::address_info> updated_connections;
-    for( const auto& connection : connection_by_id.second )
+    for( auto& connection : connection_by_id.second )
     {
-       if( outdated_nodes.find( connection.node_id ) == outdated_nodes.end() )
-          updated_connections.push_back( connection );
+       if( outdated_nodes.find( connection.node_id ) != outdated_nodes.end() )
+          connection.node_id = outdated_nodes[connection.node_id];
     }
-    if( updated_connections.size() != connection_by_id.second.size() )
-       std::swap( updated_connections, connection_by_id.second );
   }
 
   ilog( "${total} nodes, ${reachable} reachable",
