@@ -165,8 +165,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    if( _options->count("p2p-endpoint") > 0 )
       _p2p_network->set_listen_endpoint( fc::ip::endpoint::from_string(_options->at("p2p-endpoint").as<string>()),
                                          true );
-   else
-      _p2p_network->set_listen_port(0, false);
+   // else try to listen on the default port first, if failed, use a random port
 
    if ( _options->count("accept-incoming-connections") > 0 )
       _p2p_network->set_accept_incoming_connections( _options->at("accept-incoming-connections").as<bool>() );

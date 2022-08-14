@@ -182,18 +182,7 @@ namespace graphene { namespace net { namespace detail {
                // ignore fc exceptions (like poorly formatted endpoints)
                try
                {
-                  fc::ip::endpoint ep = fc::ip::endpoint::from_string(str);
-                  if (list.find(ep) == list.end() )
-                  {
-                     graphene::net::address_info tmp(
-                           ep,
-                           fc::time_point_sec(),
-                           fc::microseconds(0),
-                           node_id_t(),
-                           peer_connection_direction::unknown,
-                           firewalled_state::unknown );
-                     list.insert(tmp);
-                  }
+                  list.insert( fc::ip::endpoint::from_string(str) );
                }
                catch(const fc::exception& )
                {
@@ -205,11 +194,12 @@ namespace graphene { namespace net { namespace detail {
       void build(node_impl* impl, address_message& reply) const override
       {
          std::vector<graphene::net::address_info> ret_val;
+         ret_val.reserve( advertise_list.size() );
          // only pass those that are in the list AND we are connected to
-         for(auto& it : advertise_list)
+         for( const auto& it : advertise_list )
          {
-            graphene::net::peer_connection_ptr peer_conn
-               = impl->get_active_connection_for_endpoint( it.remote_endpoint );
+            fc::scoped_lock<fc::mutex> lock(impl->_active_connections.get_mutex());
+            graphene::net::peer_connection_ptr peer_conn = impl->get_active_connection_for_endpoint( it );
             if( peer_conn != peer_connection_ptr() )
                ret_val.emplace_back( update_address_record( impl, peer_conn ) );
          }
@@ -222,7 +212,7 @@ namespace graphene { namespace net { namespace detail {
       }
 
    private:
-      std::set<graphene::net::address_info, address_endpoint_comparator> advertise_list;
+      fc::flat_set<fc::ip::endpoint> advertise_list;
    };
 
    /****
@@ -235,29 +225,37 @@ namespace graphene { namespace net { namespace detail {
       {
          FC_ASSERT( !address_list.empty(), "The exclude peer node list must not be empty" );
          std::for_each( address_list.begin(), address_list.end(),
-                        [&exclude_list = exclude_list](const std::string& input)
+                        [&exclude_list = exclude_list](const std::string& str)
             {
-               exclude_list.insert(input);
+               // ignore fc exceptions (like poorly formatted endpoints)
+               try
+               {
+                  exclude_list.insert( fc::ip::endpoint::from_string(str) );
+               }
+               catch(const fc::exception& )
+               {
+                  wlog( "Address ${addr} invalid", ("addr", str) );
+               }
             });
       }
       void build(node_impl* impl, address_message& reply) const override
       {
          reply.addresses.clear();
          reply.addresses.reserve(impl->_active_connections.size());
+         fc::scoped_lock<fc::mutex> lock(impl->_active_connections.get_mutex());
          // filter out those in the exclude list
-         for(const peer_connection_ptr& active_peer : impl->_active_connections)
+         for( const peer_connection_ptr& active_peer : impl->_active_connections )
          {
-            if (exclude_list.find( *active_peer->get_remote_endpoint() ) == exclude_list.end())
-               reply.addresses.emplace_back(update_address_record(impl, active_peer));
+            if( exclude_list.find( *active_peer->get_remote_endpoint() ) == exclude_list.end() )
+               reply.addresses.emplace_back( update_address_record( impl, active_peer ) );
          }
-         reply.addresses.shrink_to_fit();
       }
       bool should_advertise( const fc::ip::endpoint& in ) const override
       {
          return ( exclude_list.find( in ) == exclude_list.end() );
       }
    private:
-      fc::flat_set<std::string> exclude_list;
+      fc::flat_set<fc::ip::endpoint> exclude_list;
    };
 
    /***
@@ -269,9 +267,10 @@ namespace graphene { namespace net { namespace detail {
       {
          reply.addresses.clear();
          reply.addresses.reserve(impl->_active_connections.size());
-         for (const peer_connection_ptr& active_peer : impl->_active_connections)
+         fc::scoped_lock<fc::mutex> lock(impl->_active_connections.get_mutex());
+         for( const peer_connection_ptr& active_peer : impl->_active_connections )
          {
-            reply.addresses.emplace_back(update_address_record(impl, active_peer));
+            reply.addresses.emplace_back( update_address_record( impl, active_peer ) );
          }
       }
       bool should_advertise( const fc::ip::endpoint& in ) const override
@@ -3952,6 +3951,7 @@ namespace graphene { namespace net { namespace detail {
 
         ilog( "generating new private key for this node" );
         _node_configuration.private_key = fc::ecc::private_key::generate();
+        save_node_configuration();
       }
 
       _node_public_key = _node_configuration.private_key.get_public_key().serialize();
@@ -4131,6 +4131,44 @@ namespace graphene { namespace net { namespace detail {
       resolve_seed_node_and_add( endpoint_string );
    }
 
+   /**
+    * @brief Helper to convert a string to a collection of endpoints
+    *
+    * This converts a string (i.e. "bitshares.eu:665535") to a collection of endpoints.
+    * NOTE: Throws an exception if not in correct format or was unable to resolve URL.
+    *
+    * @param in the incoming string
+    * @returns a vector of endpoints
+    */
+   static std::vector<fc::ip::endpoint> resolve_string_to_ip_endpoints(const std::string& in)
+   {
+      try
+      {
+         std::string::size_type colon_pos = in.find(':');
+         if (colon_pos == std::string::npos)
+            FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
+                  ("endpoint_string", in));
+         std::string port_string = in.substr(colon_pos + 1);
+         try
+         {
+            uint16_t port = boost::lexical_cast<uint16_t>(port_string);
+
+            std::string hostname = in.substr(0, colon_pos);
+            std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
+            if (endpoints.empty())
+               FC_THROW_EXCEPTION( fc::unknown_host_exception,
+                     "The host name can not be resolved: ${hostname}",
+                     ("hostname", hostname) );
+            return endpoints;
+         }
+         catch (const boost::bad_lexical_cast&)
+         {
+            FC_THROW("Bad port: ${port}", ("port", port_string));
+         }
+      }
+      FC_CAPTURE_AND_RETHROW((in))
+   }
+
    void node_impl::resolve_seed_node_and_add(const std::string& endpoint_string)
    {
       VERIFY_CORRECT_THREAD();
@@ -4138,7 +4176,7 @@ namespace graphene { namespace net { namespace detail {
       ilog("Resolving seed node ${endpoint}", ("endpoint", endpoint_string));
       try
       {
-         endpoints = graphene::net::node::resolve_string_to_ip_endpoints(endpoint_string);
+         endpoints = resolve_string_to_ip_endpoints(endpoint_string);
       }
       catch(...)
       {
@@ -5036,36 +5074,6 @@ namespace graphene { namespace net { namespace detail {
 #undef INVOKE_AND_COLLECT_STATISTICS
 
   } // end namespace detail
-
-   // TODO move this function to impl class
-   std::vector<fc::ip::endpoint> node::resolve_string_to_ip_endpoints(const std::string& in)
-   {
-      try
-      {
-         std::string::size_type colon_pos = in.find(':');
-         if (colon_pos == std::string::npos)
-            FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
-                  ("endpoint_string", in));
-         std::string port_string = in.substr(colon_pos + 1);
-         try
-         {
-            uint16_t port = boost::lexical_cast<uint16_t>(port_string);
-
-            std::string hostname = in.substr(0, colon_pos);
-            std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
-            if (endpoints.empty())
-               FC_THROW_EXCEPTION( fc::unknown_host_exception,
-                     "The host name can not be resolved: ${hostname}",
-                     ("hostname", hostname) );
-            return endpoints;
-         }
-         catch (const boost::bad_lexical_cast&)
-         {
-            FC_THROW("Bad port: ${port}", ("port", port_string));
-         }
-      }
-      FC_CAPTURE_AND_RETHROW((in))
-   }
 
    void node::add_seed_nodes(std::vector<std::string> seeds)
    {

@@ -295,23 +295,6 @@ namespace graphene { namespace net {
     {}
   };
 
-  struct address_endpoint_comparator
-  {
-      using is_transparent = void;
-      bool operator()(const address_info& lhs, const address_info& rhs) const
-      {
-         return lhs.remote_endpoint < rhs.remote_endpoint;
-      }
-      bool operator()(const fc::ip::endpoint in, const address_info& addr) const
-      {
-         return in < addr.remote_endpoint;
-      }
-      bool operator()(const address_info& addr, const fc::ip::endpoint& in) const
-      {
-         return addr.remote_endpoint < in;
-      }
-   };
-
   struct address_message
   {
     static const core_message_type_enum type;

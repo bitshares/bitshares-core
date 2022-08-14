@@ -396,7 +396,7 @@ struct node_configuration
    fc::ip::endpoint listen_endpoint;
    bool accept_incoming_connections = true;
    bool connect_to_new_peers = true;
-   bool wait_if_endpoint_is_busy = true;
+   bool wait_if_endpoint_is_busy = false;
    /**
     * Originally, our p2p code just had a 'node-id' that was a random number identifying this node
     * on the network.  This is now a private key/public key pair, where the public key is used
