@@ -278,7 +278,7 @@ int main(int argc, char** argv)
        continue;
 
     std::vector<std::shared_ptr<peer_probe>> running;
-    for ( auto& probe : probes )
+    for ( const auto& probe : probes )
     {
        if (probe->_probe_complete_promise->error())
        {
