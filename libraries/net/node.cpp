@@ -167,17 +167,17 @@ namespace graphene { namespace net { namespace detail {
          active_peer->node_id, active_peer->direction, firewalled_state::unknown);
    }
 
-   /******
-    * Use information passed from command line or config file to advertise nodes
-    */
-   class list_address_builder : public node_impl::address_builder
+   /// Base class for list address builder and exclude_list address builder
+   class generic_list_address_builder : public node_impl::address_builder
    {
    public:
-      explicit list_address_builder(const std::vector<std::string>& address_list)
-      {
-         FC_ASSERT( !address_list.empty(), "The advertise peer node list must not be empty" );
+      fc::flat_set<fc::ip::endpoint> list;
 
-         std::for_each( address_list.begin(), address_list.end(), [&list = advertise_list]( const std::string& str )
+      explicit generic_list_address_builder(const std::vector<std::string>& address_list)
+      {
+         FC_ASSERT( !address_list.empty(), "The peer node list must not be empty" );
+
+         std::for_each( address_list.begin(), address_list.end(), [&list = list]( const std::string& str )
             {
                // ignore fc exceptions (like poorly formatted endpoints)
                try
@@ -190,72 +190,36 @@ namespace graphene { namespace net { namespace detail {
                }
             } );
       }
+   };
 
-      void build(node_impl* impl, address_message& reply) const override
-      {
-         std::vector<graphene::net::address_info> ret_val;
-         ret_val.reserve( advertise_list.size() );
-         // only pass those that are in the list AND we are connected to
-         for( const auto& it : advertise_list )
-         {
-            fc::scoped_lock<fc::mutex> lock(impl->_active_connections.get_mutex());
-            graphene::net::peer_connection_ptr peer_conn = impl->get_active_connection_for_endpoint( it );
-            if( peer_conn != peer_connection_ptr() )
-               ret_val.emplace_back( update_address_record( impl, peer_conn ) );
-         }
-         reply.addresses = std::move(ret_val);
-      }
+   /******
+    * Use information passed from command line or config file to advertise nodes
+    */
+   class list_address_builder : public generic_list_address_builder
+   {
+   public:
+      explicit list_address_builder(const std::vector<std::string>& address_list)
+      : generic_list_address_builder( address_list ) { /* Nothing to do */ }
 
       bool should_advertise( const fc::ip::endpoint& in ) const override
       {
-         return !( advertise_list.find(in) == advertise_list.end() );
+         return !( list.find(in) == list.end() );
       }
-
-   private:
-      fc::flat_set<fc::ip::endpoint> advertise_list;
    };
 
    /****
     * Advertise all nodes except a predefined list
     */
-   class exclude_address_builder : public node_impl::address_builder
+   class exclude_address_builder : public generic_list_address_builder
    {
    public:
       explicit exclude_address_builder(const std::vector<std::string>& address_list)
-      {
-         FC_ASSERT( !address_list.empty(), "The exclude peer node list must not be empty" );
-         std::for_each( address_list.begin(), address_list.end(),
-                        [&exclude_list = exclude_list](const std::string& str)
-            {
-               // ignore fc exceptions (like poorly formatted endpoints)
-               try
-               {
-                  exclude_list.insert( fc::ip::endpoint::from_string(str) );
-               }
-               catch(const fc::exception& )
-               {
-                  wlog( "Address ${addr} invalid", ("addr", str) );
-               }
-            });
-      }
-      void build(node_impl* impl, address_message& reply) const override
-      {
-         reply.addresses.clear();
-         reply.addresses.reserve(impl->_active_connections.size());
-         fc::scoped_lock<fc::mutex> lock(impl->_active_connections.get_mutex());
-         // filter out those in the exclude list
-         for( const peer_connection_ptr& active_peer : impl->_active_connections )
-         {
-            if( exclude_list.find( *active_peer->get_remote_endpoint() ) == exclude_list.end() )
-               reply.addresses.emplace_back( update_address_record( impl, active_peer ) );
-         }
-      }
+      : generic_list_address_builder( address_list ) { /* Nothing to do */ }
+
       bool should_advertise( const fc::ip::endpoint& in ) const override
       {
-         return ( exclude_list.find( in ) == exclude_list.end() );
+         return ( list.find( in ) == list.end() );
       }
-   private:
-      fc::flat_set<fc::ip::endpoint> exclude_list;
    };
 
    /***
@@ -263,16 +227,6 @@ namespace graphene { namespace net { namespace detail {
     */
    class all_address_builder : public node_impl::address_builder
    {
-      void build( node_impl* impl, address_message& reply ) const override
-      {
-         reply.addresses.clear();
-         reply.addresses.reserve(impl->_active_connections.size());
-         fc::scoped_lock<fc::mutex> lock(impl->_active_connections.get_mutex());
-         for( const peer_connection_ptr& active_peer : impl->_active_connections )
-         {
-            reply.addresses.emplace_back( update_address_record( impl, active_peer ) );
-         }
-      }
       bool should_advertise( const fc::ip::endpoint& in ) const override
       {
          return true;
@@ -282,6 +236,19 @@ namespace graphene { namespace net { namespace detail {
    std::shared_ptr<node_impl::address_builder> node_impl::address_builder::create_default_address_builder()
    {
       return std::make_shared<all_address_builder>();
+   }
+
+   void node_impl::address_builder::build(node_impl* impl, address_message& reply) const
+   {
+      reply.addresses.clear();
+      reply.addresses.reserve( impl->_active_connections.size() );
+      fc::scoped_lock<fc::mutex> lock(impl->_active_connections.get_mutex());
+      // only pass those that are allowed to advertise AND we are connected to
+      for( const peer_connection_ptr& active_peer : impl->_active_connections )
+      {
+         if( should_advertise( *active_peer->get_remote_endpoint() ) )
+            reply.addresses.emplace_back( update_address_record( impl, active_peer ) );
+      }
    }
 
     node_impl::node_impl(const std::string& user_agent) :

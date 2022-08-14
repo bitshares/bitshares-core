@@ -413,7 +413,7 @@ public:
    {
    public:
       static std::shared_ptr<address_builder> create_default_address_builder();
-      virtual void build( node_impl* impl, address_message& ) const = 0;
+      void build( node_impl* impl, address_message& ) const;
       virtual bool should_advertise(const  fc::ip::endpoint& in ) const = 0;
       virtual ~address_builder() = default;
    };
