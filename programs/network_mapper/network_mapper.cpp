@@ -202,39 +202,11 @@ int main(int argc, char** argv)
   std::map<graphene::net::node_id_t, graphene::net::node_id_t> outdated_nodes;
   std::vector<std::shared_ptr<peer_probe>> probes;
 
-  constexpr size_t max_concurrent_probes = 200;
-  while (!nodes_to_visit.empty() || !probes.empty())
+  const auto& update_info_by_probe = [ &connections_by_node_id, &address_info_by_node_id,
+                                       &node_id_by_endpoint, &outdated_nodes, &my_node_id,
+                                       &nodes_already_visited, &nodes_to_visit_set, &nodes_to_visit ]
+                                     ( const std::shared_ptr<peer_probe>& probe )
   {
-    while (!nodes_to_visit.empty() && probes.size() < max_concurrent_probes )
-    {
-       fc::ip::endpoint remote = nodes_to_visit.front();
-       nodes_to_visit.pop();
-       nodes_to_visit_set.erase( remote );
-       nodes_already_visited.insert( remote );
-
-       probes.emplace_back( std::make_shared<peer_probe>(remote) );
-       auto& probe = *probes.back();
-       fc::async( [&probe, &my_node_id, &my_node_key, &chain_id](){
-          probe.start(my_node_id, my_node_key, chain_id);
-       });
-    }
-
-    if( probes.empty() )
-       continue;
-
-    std::vector<std::shared_ptr<peer_probe>> running;
-    for ( auto& probe : probes )
-    {
-          if (probe->_probe_complete_promise->error())
-          {
-             continue;
-          }
-          if (!probe->_probe_complete_promise->ready())
-          {
-             running.push_back( probe );
-             continue;
-          }
-
           idump( (probe->_node_id)(probe->_remote)(probe->_peers.size()) );
 
           graphene::net::address_info this_node_info;
@@ -274,6 +246,41 @@ int main(int argc, char** argv)
                 address_info_by_node_id[info.node_id].firewalled = graphene::net::firewalled_state::unknown;
              }
           }
+  };
+
+  constexpr size_t max_concurrent_probes = 200;
+  while (!nodes_to_visit.empty() || !probes.empty())
+  {
+    while (!nodes_to_visit.empty() && probes.size() < max_concurrent_probes )
+    {
+       fc::ip::endpoint remote = nodes_to_visit.front();
+       nodes_to_visit.pop();
+       nodes_to_visit_set.erase( remote );
+       nodes_already_visited.insert( remote );
+
+       probes.emplace_back( std::make_shared<peer_probe>(remote) );
+       auto& probe = *probes.back();
+       fc::async( [&probe, &my_node_id, &my_node_key, &chain_id](){
+          probe.start(my_node_id, my_node_key, chain_id);
+       });
+    }
+
+    if( probes.empty() )
+       continue;
+
+    std::vector<std::shared_ptr<peer_probe>> running;
+    for ( auto& probe : probes )
+    {
+       if (probe->_probe_complete_promise->error())
+       {
+          continue;
+       }
+       if (!probe->_probe_complete_promise->ready())
+       {
+          running.push_back( probe );
+          continue;
+       }
+       update_info_by_probe(probe);
     }
 
     constexpr uint32_t five = 5;
