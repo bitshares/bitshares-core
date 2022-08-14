@@ -149,6 +149,9 @@ public:
 
   void on_connection_closed(graphene::net::peer_connection* originating_peer) override
   {
+    // Note: In rare cases, the peer may neither send us an address_message nor close the connection,
+    //       causing us to wait forever.
+    //       We tolerate it, because this program (network_mapper) is not critical.
     _done = true;
     _probe_complete_promise->set_value();
   }
