@@ -1295,11 +1295,17 @@ namespace graphene { namespace net { namespace detail {
       bool new_information_received = false;
       for (const address_info& address : addresses)
       {
-         potential_peer_record updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(address.remote_endpoint);
+         // Note: if found, a copy is returned
+         auto updated_peer_record = _potential_peer_db.lookup_or_create_entry_for_endpoint(address.remote_endpoint);
+         // Note:
+         // 1. node_id of that peer may have changed, but we don't check or update
+         // 2. we don't check by node_id either, in case when a peer's IP address has changed, we don't handle it
          if (address.last_seen_time > updated_peer_record.last_seen_time)
-         new_information_received = true;
-         updated_peer_record.last_seen_time = std::max(address.last_seen_time, updated_peer_record.last_seen_time);
-         _potential_peer_db.update_entry(updated_peer_record);
+         {
+            new_information_received = true;
+            updated_peer_record.last_seen_time = std::max(address.last_seen_time, updated_peer_record.last_seen_time);
+            _potential_peer_db.update_entry(updated_peer_record);
+         }
       }
       return new_information_received;
     }
