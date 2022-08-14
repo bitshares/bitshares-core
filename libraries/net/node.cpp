@@ -210,8 +210,8 @@ namespace graphene { namespace net { namespace detail {
          {
             graphene::net::peer_connection_ptr peer_conn
                = impl->get_active_connection_for_endpoint( it.remote_endpoint );
-            if ( peer_conn != peer_connection_ptr() )
-               ret_val.push_back( it );
+            if( peer_conn != peer_connection_ptr() )
+               ret_val.emplace_back( update_address_record( impl, peer_conn ) );
          }
          reply.addresses = std::move(ret_val);
       }
